@@ -796,6 +796,43 @@ def sidtime(jd: float, longitude: float, obliquity: float, nutation: float) -> f
     return last
 
 
+def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
+    """
+    Calculate Greenwich Sidereal Time for a given Julian Day.
+
+    This is the sidereal time at Greenwich (longitude 0°) and is the base
+    for calculating local sidereal time at any other longitude. Compatible
+    with Swiss Ephemeris swe_sidtime0().
+
+    The calculation uses the IAU formula for Greenwich Mean Sidereal Time (GMST)
+    and applies the equation of equinoxes to get Greenwich Apparent Sidereal
+    Time (GAST).
+
+    Args:
+        jd: Julian Day number in UT (Universal Time)
+        obliquity: Obliquity of the ecliptic in degrees (typically ~23.44°)
+        nutation: Nutation in longitude in degrees (typically small, ~±0.005°)
+
+    Returns:
+        float: Greenwich sidereal time in hours (0.0 to 24.0)
+
+    Note:
+        - This function is equivalent to calling sidtime(jd, 0.0, obliquity, nutation)
+        - GMST is computed using the IAU 1982 formula from Meeus
+          "Astronomical Algorithms" Chapter 12
+        - The equation of equinoxes = nutation_in_longitude * cos(obliquity)
+        - Result is normalized to the range 0-24 hours
+
+    Example:
+        >>> from libephemeris import sidtime0
+        >>> # Calculate GST for J2000.0 (Jan 1, 2000 at noon)
+        >>> gst = sidtime0(2451545.0, 23.4393, 0.0)
+        >>> print(f"GST: {gst:.4f} hours")
+        GST: 18.6974 hours
+    """
+    return sidtime(jd, 0.0, obliquity, nutation)
+
+
 def utc_time_zone(
     year: int,
     month: int,

@@ -301,3 +301,137 @@ class TestSidtimeOutputFormat:
         assert 0 <= hours < 24
         assert 0 <= minutes < 60
         assert 0 <= seconds < 60
+
+
+class TestSidtime0BasicValues:
+    """Test sidtime0 returns correct Greenwich Sidereal Time values."""
+
+    @pytest.mark.unit
+    def test_sidtime0_j2000_greenwich(self):
+        """Sidereal time at J2000.0 should be ~18.7h."""
+        jd = 2451545.0  # J2000
+        obliquity = 23.4393
+        gst = ephem.sidtime0(jd, obliquity, 0.0)
+        # GMST at J2000.0 is about 18.6974 hours
+        assert 18.5 < gst < 19.0, f"GST at J2000 = {gst:.4f} hours, expected ~18.7h"
+
+    @pytest.mark.unit
+    def test_sidtime0_returns_float(self):
+        """sidtime0 should return a float."""
+        jd = 2451545.0
+        gst = ephem.sidtime0(jd, 23.44, 0.0)
+        assert isinstance(gst, float)
+
+    @pytest.mark.unit
+    def test_sidtime0_range_0_to_24(self):
+        """sidtime0 should always return a value between 0 and 24."""
+        for offset in range(0, 365, 10):
+            jd = 2451545.0 + offset
+            gst = ephem.sidtime0(jd, 23.44, 0.0)
+            assert 0 <= gst < 24, f"GST = {gst} hours at JD {jd}, out of range"
+
+    @pytest.mark.unit
+    def test_sidtime0_equals_sidtime_at_greenwich(self):
+        """sidtime0(jd, obl, nut) should equal sidtime(jd, 0.0, obl, nut)."""
+        jd = 2451545.0
+        obliquity = 23.44
+        nutation = 0.005
+
+        gst = ephem.sidtime0(jd, obliquity, nutation)
+        lst_greenwich = ephem.sidtime(jd, 0.0, obliquity, nutation)
+
+        assert gst == lst_greenwich, f"sidtime0={gst}, sidtime(lon=0)={lst_greenwich}"
+
+
+class TestSidtime0VsPyswisseph:
+    """Compare sidtime0 with pyswisseph sidtime0 function."""
+
+    @pytest.mark.comparison
+    def test_sidtime0_j2000_matches_swe(self):
+        """GST at J2000 should match pyswisseph sidtime0."""
+        jd = 2451545.0
+        obliquity = 23.4393
+        nutation = 0.0
+
+        gst_lib = ephem.sidtime0(jd, obliquity, nutation)
+        gst_swe = swe.sidtime0(jd, obliquity, nutation)
+
+        diff_seconds = abs(gst_lib - gst_swe) * 3600
+        assert diff_seconds < 1.0, (
+            f"lib={gst_lib:.6f}h, swe={gst_swe:.6f}h, diff={diff_seconds:.2f}s"
+        )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("offset", [0, 0.25, 0.5, 0.75, 1.0, 10, 100, 365])
+    def test_sidtime0_various_times_match_swe(self, offset):
+        """GST at various times should match pyswisseph."""
+        jd = 2451545.0 + offset
+        obliquity = 23.44
+        nutation = 0.0
+
+        gst_lib = ephem.sidtime0(jd, obliquity, nutation)
+        gst_swe = swe.sidtime0(jd, obliquity, nutation)
+
+        diff_seconds = abs(gst_lib - gst_swe) * 3600
+        assert diff_seconds < 1.0, (
+            f"JD {jd}: lib={gst_lib:.6f}h, swe={gst_swe:.6f}h, diff={diff_seconds:.2f}s"
+        )
+
+    @pytest.mark.comparison
+    def test_sidtime0_with_nutation_matches_swe(self):
+        """GST with nutation should match pyswisseph."""
+        jd = 2451545.0
+        obliquity = 23.4393
+        nutation = 0.00478  # Typical nutation value
+
+        gst_lib = ephem.sidtime0(jd, obliquity, nutation)
+        gst_swe = swe.sidtime0(jd, obliquity, nutation)
+
+        diff_seconds = abs(gst_lib - gst_swe) * 3600
+        assert diff_seconds < 1.0, (
+            f"lib={gst_lib:.6f}h, swe={gst_swe:.6f}h, diff={diff_seconds:.2f}s"
+        )
+
+    @pytest.mark.comparison
+    def test_sidtime0_100_dates_match_swe(self, random_dates_in_de421_range):
+        """100 random dates should match pyswisseph sidtime0."""
+        dates = random_dates_in_de421_range(100)
+        max_diff = 0
+        obliquity = 23.44
+        nutation = 0.0
+
+        for _, _, _, _, jd in dates:
+            gst_lib = ephem.sidtime0(jd, obliquity, nutation)
+            gst_swe = swe.sidtime0(jd, obliquity, nutation)
+            diff = abs(gst_lib - gst_swe) * 3600  # in seconds
+            max_diff = max(max_diff, diff)
+            assert diff < 1.0, f"Diff = {diff:.2f}s at JD {jd}"
+
+        print(f"Max sidtime0 difference: {max_diff:.3f} seconds")
+
+
+class TestSidtime0EdgeCases:
+    """Test edge cases for sidtime0 calculation."""
+
+    @pytest.mark.edge_case
+    def test_sidtime0_de421_range_start(self):
+        """GST at DE421 range start (1900)."""
+        jd = ephem.swe_julday(1900, 1, 1, 12.0)
+        gst = ephem.sidtime0(jd, 23.44, 0.0)
+        assert 0 <= gst < 24
+
+    @pytest.mark.edge_case
+    def test_sidtime0_de421_range_end(self):
+        """GST at DE421 range end (2050)."""
+        jd = ephem.swe_julday(2050, 1, 1, 12.0)
+        gst = ephem.sidtime0(jd, 23.44, 0.0)
+        assert 0 <= gst < 24
+
+    @pytest.mark.edge_case
+    def test_sidtime0_midnight_ut(self):
+        """Test at midnight UT (JD ending in .5)."""
+        jd = 2451544.5  # Jan 1, 2000, 0h UT
+        gst_lib = ephem.sidtime0(jd, 23.44, 0.0)
+        gst_swe = swe.sidtime0(jd, 23.44, 0.0)
+        diff_seconds = abs(gst_lib - gst_swe) * 3600
+        assert diff_seconds < 1.0
