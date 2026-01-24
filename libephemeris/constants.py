@@ -364,3 +364,23 @@ BIT_CIVIL_TWILIGHT: int = SE_BIT_CIVIL_TWILIGHT
 BIT_NAUTIC_TWILIGHT: int = SE_BIT_NAUTIC_TWILIGHT
 BIT_ASTRO_TWILIGHT: int = SE_BIT_ASTRO_TWILIGHT
 BIT_FIXED_DISC_SIZE: int = SE_BIT_FIXED_DISC_SIZE
+
+# =============================================================================
+# HELIACAL EVENT TYPES
+# =============================================================================
+# Event types for heliacal_ut() function
+
+SE_HELIACAL_RISING: int = 1  # Heliacal rising (morning first)
+SE_HELIACAL_SETTING: int = 2  # Heliacal setting (evening last)
+SE_MORNING_FIRST: int = SE_HELIACAL_RISING  # Alias: first visibility at morning
+SE_EVENING_LAST: int = SE_HELIACAL_SETTING  # Alias: last visibility at evening
+SE_EVENING_FIRST: int = 3  # First visibility at evening (after superior conjunction)
+SE_MORNING_LAST: int = 4  # Last visibility at morning (before superior conjunction)
+
+# pyswisseph-compatible aliases (without SE_ prefix)
+HELIACAL_RISING: int = SE_HELIACAL_RISING
+HELIACAL_SETTING: int = SE_HELIACAL_SETTING
+MORNING_FIRST: int = SE_MORNING_FIRST
+EVENING_LAST: int = SE_EVENING_LAST
+EVENING_FIRST: int = SE_EVENING_FIRST
+MORNING_LAST: int = SE_MORNING_LAST

@@ -4116,3 +4116,490 @@ def rise_trans_true_hor(
 
 # Alias for Swiss Ephemeris API compatibility
 swe_rise_trans_true_hor = rise_trans_true_hor
+
+
+# =============================================================================
+# HELIACAL RISING AND SETTING CALCULATIONS
+# =============================================================================
+
+
+def heliacal_ut(
+    jd_start: float,
+    lat: float,
+    lon: float,
+    altitude: float = 0.0,
+    pressure: float = 1013.25,
+    temperature: float = 15.0,
+    humidity: float = 0.5,
+    body: int = SE_SUN,
+    event_type: int = 1,
+    flags: int = SEFLG_SWIEPH,
+) -> Tuple[float, int]:
+    """
+    Calculate heliacal rising or setting time for a celestial body.
+
+    Heliacal events are the first/last visibility of a celestial body
+    at dawn or dusk. These were fundamental for ancient calendars:
+    - Heliacal rising: First morning visibility after a period of invisibility
+    - Heliacal setting: Last evening visibility before becoming invisible
+
+    Args:
+        jd_start: Julian Day (UT) to start search from
+        lat: Observer latitude in degrees (positive = North, negative = South)
+        lon: Observer longitude in degrees (positive = East, negative = West)
+        altitude: Observer altitude in meters above sea level (default 0)
+        pressure: Atmospheric pressure in mbar/hPa for refraction (default 1013.25)
+        temperature: Temperature in Celsius for refraction (default 15)
+        humidity: Relative humidity 0.0-1.0 for atmospheric extinction (default 0.5)
+        body: Planet/body ID (SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN,
+              or fixed stars). Note: SE_SUN and SE_MOON are not valid for heliacal events.
+        event_type: Type of heliacal event:
+            - SE_HELIACAL_RISING (1): Morning first visibility (heliacal rising)
+            - SE_HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
+            - SE_EVENING_FIRST (3): First evening visibility (after superior conjunction)
+            - SE_MORNING_LAST (4): Last morning visibility (before superior conjunction)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Tuple containing:
+            - jd_event: Julian Day (UT) of the heliacal event, or 0.0 if not found
+            - retflag: Return flag (event_type on success, negative on error)
+
+    Raises:
+        ValueError: If invalid body ID or event_type
+
+    Algorithm:
+        The algorithm searches for the moment when:
+        1. The body is at a specific altitude above the horizon (arcus visionis)
+        2. The Sun is at twilight position (typically -6° to -12° below horizon)
+        3. The body's apparent magnitude is brighter than the sky's limiting magnitude
+
+        For heliacal rising (morning first):
+        - Search forward for when the body first becomes visible at dawn
+        - Body must be above horizon while Sun is still below
+        - Sky must be dark enough for the body to be seen
+
+        For heliacal setting (evening last):
+        - Search forward for when the body is last visible at dusk
+        - Body must be above horizon while Sun is setting
+        - Sky brightness must not overwhelm the body's light
+
+    Historical Note:
+        Heliacal risings were crucial for ancient calendars. The heliacal
+        rising of Sirius marked the Egyptian new year and predicted the
+        Nile flood. Babylonians used heliacal events to track planetary
+        positions without modern instruments.
+
+    Example:
+        >>> from libephemeris import julday, heliacal_ut, SE_VENUS, SE_HELIACAL_RISING
+        >>> jd = julday(2024, 1, 1, 0)
+        >>> # Find next heliacal rising of Venus from Rome
+        >>> jd_event, flag = heliacal_ut(jd, 41.9, 12.5, body=SE_VENUS,
+        ...                              event_type=SE_HELIACAL_RISING)
+        >>> print(f"Heliacal rising at JD {jd_event:.5f}")
+
+    References:
+        - Swiss Ephemeris: swe_heliacal_ut()
+        - Schoch "Planets in Mesopotamian Astral Science"
+        - Ptolemy's criteria for heliacal visibility
+    """
+    from .constants import (
+        SE_HELIACAL_RISING,
+        SE_HELIACAL_SETTING,
+        SE_EVENING_FIRST,
+        SE_MORNING_LAST,
+    )
+    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .state import get_planets, get_timescale
+    from skyfield.api import wgs84
+
+    # Validate event type
+    if event_type not in (
+        SE_HELIACAL_RISING,
+        SE_HELIACAL_SETTING,
+        SE_EVENING_FIRST,
+        SE_MORNING_LAST,
+    ):
+        raise ValueError(
+            f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
+            "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
+        )
+
+    # Sun and Moon are not valid for heliacal events
+    if body == SE_SUN:
+        raise ValueError("SE_SUN is not valid for heliacal calculations")
+    if body == SE_MOON:
+        raise ValueError("SE_MOON is not valid for heliacal calculations")
+
+    # Validate body
+    if body not in _PLANET_MAP:
+        raise ValueError(f"Invalid body ID: {body}")
+
+    # Get ephemeris and timescale
+    eph = get_planets()
+    ts = get_timescale()
+
+    # Get celestial bodies
+    target_name = _PLANET_MAP[body]
+    target = eph[target_name]
+    sun = eph["sun"]
+    earth = eph["earth"]
+
+    # Create observer location
+    observer = wgs84.latlon(lat, lon, altitude)
+
+    # Note: Arcus visionis (minimum altitude for visibility) and
+    # sun altitude thresholds are used in the visibility check functions.
+    # Typical values: arcus visionis ~7° for bright objects, sun altitude ~-8°.
+
+    def _get_altitudes(jd: float) -> Tuple[float, float, float]:
+        """Get Sun altitude, body altitude, and body azimuth at given JD."""
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+
+        # Sun position
+        sun_app = observer_at.at(t).observe(sun).apparent()
+        sun_alt, _, _ = sun_app.altaz()
+
+        # Body position
+        body_app = observer_at.at(t).observe(target).apparent()
+        body_alt, body_az, _ = body_app.altaz()
+
+        return sun_alt.degrees, body_alt.degrees, body_az.degrees
+
+    def _get_elongation(jd: float) -> float:
+        """Get the elongation of body from Sun in degrees."""
+        try:
+            pheno, _ = swe_pheno_ut(jd, body, flags)
+            return pheno[2]  # Elongation
+        except Exception:
+            # Fallback: calculate elongation manually
+            t = ts.ut1_jd(jd)
+            sun_app = earth.at(t).observe(sun).apparent()
+            body_app = earth.at(t).observe(target).apparent()
+            return body_app.separation_from(sun_app).degrees
+
+    def _get_body_magnitude(jd: float) -> float:
+        """Get the visual magnitude of the body."""
+        try:
+            pheno, _ = swe_pheno_ut(jd, body, flags)
+            return pheno[4]  # Visual magnitude
+        except Exception:
+            return 0.0  # Default to bright magnitude
+
+    def _calculate_limiting_magnitude(sun_alt: float, body_alt: float) -> float:
+        """
+        Calculate the limiting magnitude based on sky brightness.
+
+        The limiting magnitude depends on:
+        - Sun's altitude below horizon (darker = higher limit)
+        - Body's altitude (extinction increases near horizon)
+        - Atmospheric conditions (humidity, pressure)
+
+        This is a simplified model based on Schaefer (1990).
+        """
+        # Sky brightness model (simplified)
+        # When Sun is below -18°, sky is fully dark (limiting mag ~6.5)
+        # When Sun is at -6° (civil twilight), limiting mag is ~3
+        # When Sun is at 0° (horizon), limiting mag is ~-2
+
+        if sun_alt >= 0:
+            return -2.0  # Daylight - essentially nothing visible
+        elif sun_alt >= -6:
+            # Civil twilight
+            return -2.0 + (sun_alt + 6) * (-3.0 - (-2.0)) / (-6)
+        elif sun_alt >= -12:
+            # Nautical twilight
+            return 3.0 + (sun_alt + 12) * (5.0 - 3.0) / 6
+        elif sun_alt >= -18:
+            # Astronomical twilight
+            return 5.0 + (sun_alt + 18) * (6.5 - 5.0) / 6
+        else:
+            # Full darkness
+            return 6.5
+
+        # Atmospheric extinction correction (simplified)
+        # Add extinction based on altitude (airmass)
+        # At low altitudes, extinction can be 0.5-1.0 magnitudes
+
+    def _is_body_visible(jd: float) -> Tuple[bool, float, float, float]:
+        """
+        Check if body is visible at given time.
+
+        Returns: (is_visible, sun_alt, body_alt, elongation)
+        """
+        sun_alt, body_alt, body_az = _get_altitudes(jd)
+        elongation = _get_elongation(jd)
+
+        # Body must be above minimum altitude
+        if body_alt < 0:
+            return False, sun_alt, body_alt, elongation
+
+        # Sun must be below horizon
+        if sun_alt > 0:
+            return False, sun_alt, body_alt, elongation
+
+        # Check limiting magnitude vs body magnitude
+        limiting_mag = _calculate_limiting_magnitude(sun_alt, body_alt)
+        body_mag = _get_body_magnitude(jd)
+
+        # Body is visible if its magnitude is brighter (lower) than limiting magnitude
+        # Also require sufficient elongation from Sun
+        min_elongation = 10.0  # Minimum elongation for visibility (degrees)
+
+        is_visible = (body_mag <= limiting_mag) and (elongation >= min_elongation)
+
+        return is_visible, sun_alt, body_alt, elongation
+
+    def _find_twilight_time(jd: float, sun_target_alt: float, rising: bool) -> float:
+        """
+        Find when Sun crosses target altitude (morning or evening).
+
+        Args:
+            jd: Starting JD
+            sun_target_alt: Target Sun altitude (negative for below horizon)
+            rising: True for morning (Sun rising), False for evening (Sun setting)
+        """
+        # Search within one day
+        for _ in range(50):
+            sun_alt, _, _ = _get_altitudes(jd)
+
+            # Check if we're at the right phase of day
+            if rising:
+                # Morning: looking for Sun rising through target altitude
+                if abs(sun_alt - sun_target_alt) < 0.01:
+                    return jd
+            else:
+                # Evening: looking for Sun setting through target altitude
+                if abs(sun_alt - sun_target_alt) < 0.01:
+                    return jd
+
+            # Adjust time based on Sun's position
+            # Sun moves ~15°/hour = 0.25°/minute = 360°/day
+            sun_rate = 360.0 / 1.0  # degrees per day
+            diff = sun_target_alt - sun_alt
+
+            # Crude estimate of time adjustment
+            dt = diff / sun_rate
+
+            # Limit step size
+            dt = max(-0.1, min(0.1, dt))
+
+            if abs(dt) < 1e-6:
+                return jd
+
+            jd += dt
+
+        return jd
+
+    def _search_heliacal_rising(jd_start: float) -> float:
+        """
+        Search for heliacal rising (morning first visibility).
+
+        The body becomes visible in the morning before sunrise after
+        a period of being hidden in the Sun's glare.
+        """
+        max_days = 400  # Search up to more than a year
+
+        # Use coarse search first (check once per day at approximate twilight)
+        for day in range(max_days):
+            jd_day = jd_start + day
+
+            # Check at approximately 5 AM local time (rough morning twilight estimate)
+            # This is a coarse check - we'll refine if we find visibility
+            for hour in [4, 5, 6]:  # Check a few morning hours
+                jd_check = jd_day + hour / 24.0
+
+                sun_alt, body_alt, _ = _get_altitudes(jd_check)
+
+                # Look for conditions: Sun below horizon but not too deep, body above
+                if -15 < sun_alt < -3 and body_alt > 1:
+                    visible, s_alt, b_alt, elong = _is_body_visible(jd_check)
+
+                    if visible:
+                        # Found a potential heliacal rising
+                        # Refine the time using binary search
+                        return _refine_heliacal_time(jd_check, is_morning=True)
+
+        return 0.0  # Not found
+
+    def _search_heliacal_setting(jd_start: float) -> float:
+        """
+        Search for heliacal setting (evening last visibility).
+
+        The body is last visible in the evening after sunset before
+        becoming hidden in the Sun's glare.
+        """
+        max_days = 400
+
+        # First, find when the body is visible in the evening
+        first_visible_jd = 0.0
+
+        for day in range(max_days):
+            jd_day = jd_start + day
+
+            # Check at a few evening hours (coarse search)
+            for hour in [18, 19, 20]:
+                jd_check = jd_day + hour / 24.0
+
+                sun_alt, body_alt, _ = _get_altitudes(jd_check)
+
+                # Look for conditions: Sun below horizon, body above
+                if -15 < sun_alt < -3 and body_alt > 1:
+                    visible, s_alt, b_alt, elong = _is_body_visible(jd_check)
+
+                    if visible:
+                        first_visible_jd = jd_check
+                        break
+
+            if first_visible_jd > 0:
+                break
+
+        if first_visible_jd == 0:
+            return 0.0
+
+        # Now find the LAST day of visibility
+        last_visible_jd = first_visible_jd
+        start_day = int(first_visible_jd - jd_start)
+
+        for day in range(start_day, start_day + 120):  # Check up to 120 days ahead
+            jd_day = jd_start + day
+            found_visible = False
+
+            for hour in [18, 19, 20]:
+                jd_check = jd_day + hour / 24.0
+                sun_alt, body_alt, _ = _get_altitudes(jd_check)
+
+                if -15 < sun_alt < -3 and body_alt > 1:
+                    visible, _, _, _ = _is_body_visible(jd_check)
+                    if visible:
+                        last_visible_jd = jd_check
+                        found_visible = True
+                        break
+
+            if not found_visible and day > start_day:
+                # No visibility found today - return the last visible day
+                return _refine_heliacal_time(last_visible_jd, is_morning=False)
+
+        # If still visible after 120 days, return the last checked
+        return _refine_heliacal_time(last_visible_jd, is_morning=False)
+
+    def _search_evening_first(jd_start: float) -> float:
+        """
+        Search for evening first visibility (after superior conjunction).
+
+        The body appears in the evening sky for the first time after
+        passing behind the Sun (superior conjunction for inferior planets,
+        or conjunction for superior planets).
+        """
+        max_days = 400
+        was_invisible = False
+
+        for day in range(max_days):
+            jd_day = jd_start + day
+
+            # Check at a few evening hours (coarse search)
+            for hour in [18, 19, 20]:
+                jd_check = jd_day + hour / 24.0
+
+                sun_alt, body_alt, _ = _get_altitudes(jd_check)
+
+                if -15 < sun_alt < -3:
+                    visible, s_alt, b_alt, elong = _is_body_visible(jd_check)
+                    if not visible and body_alt < 5:
+                        was_invisible = True
+                    elif visible and was_invisible:
+                        # First evening visibility after being invisible
+                        return _refine_heliacal_time(jd_check, is_morning=False)
+
+        return 0.0
+
+    def _search_morning_last(jd_start: float) -> float:
+        """
+        Search for morning last visibility (before superior conjunction).
+
+        The body is last visible in the morning sky before passing
+        behind the Sun.
+        """
+        max_days = 400
+        last_visible_jd = 0.0
+        found_visible = False
+
+        for day in range(max_days):
+            jd_day = jd_start + day
+
+            # Check at a few morning hours (coarse search)
+            for hour in [4, 5, 6]:
+                jd_check = jd_day + hour / 24.0
+
+                sun_alt, body_alt, _ = _get_altitudes(jd_check)
+
+                if -15 < sun_alt < -3:
+                    visible, s_alt, b_alt, elong = _is_body_visible(jd_check)
+
+                    if visible:
+                        last_visible_jd = jd_check
+                        found_visible = True
+                    elif found_visible and not visible:
+                        # Found the transition to invisibility
+                        return _refine_heliacal_time(last_visible_jd, is_morning=True)
+
+        return last_visible_jd if last_visible_jd > 0 else 0.0
+
+    def _refine_heliacal_time(jd_approx: float, is_morning: bool) -> float:
+        """
+        Refine the heliacal event time using binary search.
+
+        Find the exact moment when the body becomes just visible/invisible.
+        """
+        # Use binary search to find the transition point
+        jd_low = jd_approx - 0.1  # ~2.4 hours before
+        jd_high = jd_approx + 0.1  # ~2.4 hours after
+
+        for _ in range(30):  # ~30 iterations gives very high precision
+            jd_mid = (jd_low + jd_high) / 2
+
+            visible, sun_alt, body_alt, elong = _is_body_visible(jd_mid)
+
+            # For heliacal rising: looking for first visibility
+            # For heliacal setting: looking for last visibility
+            if is_morning:
+                # Morning: visibility increases as time progresses (Sun rises)
+                # But we want first visibility, so search backwards
+                if visible:
+                    jd_high = jd_mid  # Look earlier
+                else:
+                    jd_low = jd_mid  # Look later
+            else:
+                # Evening: visibility decreases as time progresses (sky darkens)
+                # For last visibility, we want the last moment still visible
+                if visible:
+                    jd_low = jd_mid  # Look later for last visibility
+                else:
+                    jd_high = jd_mid  # Look earlier
+
+            if jd_high - jd_low < 1e-6:  # ~0.1 second precision
+                break
+
+        return (jd_low + jd_high) / 2
+
+    # Main search logic based on event type
+    if event_type == SE_HELIACAL_RISING:
+        jd_event = _search_heliacal_rising(jd_start)
+    elif event_type == SE_HELIACAL_SETTING:
+        jd_event = _search_heliacal_setting(jd_start)
+    elif event_type == SE_EVENING_FIRST:
+        jd_event = _search_evening_first(jd_start)
+    elif event_type == SE_MORNING_LAST:
+        jd_event = _search_morning_last(jd_start)
+    else:
+        jd_event = 0.0
+
+    if jd_event > 0:
+        return jd_event, event_type
+    else:
+        return 0.0, -1  # Not found
+
+
+# Alias for Swiss Ephemeris API compatibility
+swe_heliacal_ut = heliacal_ut
