@@ -908,6 +908,37 @@ def difdegn(p1: float, p2: float) -> float:
     return (p1 - p2) % 360.0
 
 
+def difrad2n(p1: float, p2: float) -> float:
+    """
+    Calculate distance in radians p1 - p2 normalized to [-π, π].
+
+    This is the radians equivalent of difdeg2n().
+    Computes the signed angular difference, handling 2π wrapping.
+
+    Args:
+        p1: First angle in radians
+        p2: Second angle in radians
+
+    Returns:
+        Normalized difference in range [-π, π]
+
+    Examples:
+        >>> import math
+        >>> difrad2n(0.1, 0.2)
+        -0.1
+        >>> difrad2n(6.0, 0.2)  # Near 2π wraparound
+        -0.48318530717958...
+        >>> difrad2n(0.2, 6.0)  # Opposite direction
+        0.48318530717958...
+        >>> difrad2n(math.pi, 0)
+        -3.141592653589793
+    """
+    diff = (p1 - p2) % TWO_PI
+    if diff >= math.pi:
+        diff -= TWO_PI
+    return diff
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
