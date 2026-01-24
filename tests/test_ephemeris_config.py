@@ -5,6 +5,7 @@ Tests the set_ephemeris_file() and set_ephe_path() functions to ensure
 users can configure which ephemeris file to use.
 """
 
+import os
 import pytest
 from libephemeris import (
     swe_calc_ut,
@@ -15,6 +16,8 @@ from libephemeris import (
     set_ephe_path,
     set_jpl_file,
     swe_set_jpl_file,
+    get_library_path,
+    swe_get_library_path,
 )
 from libephemeris.state import get_planets
 
@@ -154,3 +157,87 @@ def test_set_jpl_file_with_local_path():
         # Reset to defaults
         set_ephe_path(None)
         set_jpl_file("de421.bsp")
+
+
+def test_get_library_path_returns_default():
+    """Test that get_library_path() returns default path when no custom path set"""
+    # Reset to default
+    set_ephe_path(None)
+
+    path = get_library_path()
+
+    # Should return an absolute path
+    assert os.path.isabs(path)
+
+    # Should be the parent directory of the libephemeris package
+    import libephemeris
+
+    expected_base = os.path.dirname(os.path.dirname(libephemeris.__file__))
+    assert os.path.normpath(path) == os.path.normpath(expected_base)
+
+
+def test_get_library_path_returns_custom_path():
+    """Test that get_library_path() returns custom path when set"""
+    import tempfile
+
+    # Reset first
+    set_ephe_path(None)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Set custom ephemeris path
+        set_ephe_path(tmpdir)
+
+        path = get_library_path()
+
+        # Should return the custom path
+        assert os.path.normpath(path) == os.path.normpath(tmpdir)
+
+        # Reset to default
+        set_ephe_path(None)
+
+
+def test_get_library_path_returns_absolute_path():
+    """Test that get_library_path() always returns absolute path"""
+    # Test with relative custom path
+    set_ephe_path("./relative/path")
+
+    path = get_library_path()
+
+    # Should be absolute
+    assert os.path.isabs(path)
+
+    # Reset to default
+    set_ephe_path(None)
+
+
+def test_swe_get_library_path_alias():
+    """Test that swe_get_library_path() is an alias for get_library_path()"""
+    # Reset to default
+    set_ephe_path(None)
+
+    path1 = get_library_path()
+    path2 = swe_get_library_path()
+
+    # Both should return the same path
+    assert path1 == path2
+
+
+def test_get_library_path_after_close():
+    """Test that get_library_path() returns default after close()"""
+    import tempfile
+    from libephemeris import close
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Set custom path
+        set_ephe_path(tmpdir)
+
+        # close() should reset the path
+        close()
+
+        path = get_library_path()
+
+        # Should return default path, not the custom one
+        import libephemeris
+
+        expected_base = os.path.dirname(os.path.dirname(libephemeris.__file__))
+        assert os.path.normpath(path) == os.path.normpath(expected_base)

@@ -57,6 +57,7 @@ from .state import (
     get_delta_t_userdef as swe_get_delta_t_userdef,
     set_lapse_rate as swe_set_lapse_rate,
     get_lapse_rate as swe_get_lapse_rate,
+    get_library_path as swe_get_library_path,
     close as swe_close,
 )
 from .crossing import (
@@ -211,6 +212,9 @@ get_delta_t_userdef = swe_get_delta_t_userdef
 set_lapse_rate = swe_set_lapse_rate
 get_lapse_rate = swe_get_lapse_rate
 
+# Library path
+get_library_path = swe_get_library_path
+
 # Close and cleanup
 close = swe_close
 
@@ -342,6 +346,9 @@ __all__ = [
     "set_lapse_rate",
     "swe_get_lapse_rate",
     "get_lapse_rate",
+    # Library path
+    "swe_get_library_path",
+    "get_library_path",
     # Close and cleanup
     "swe_close",
     "close",

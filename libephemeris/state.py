@@ -485,6 +485,40 @@ def get_lapse_rate() -> float:
     return _LAPSE_RATE
 
 
+def get_library_path() -> str:
+    """
+    Get the path where ephemeris files are stored.
+
+    For libephemeris, this returns the directory containing the JPL ephemeris
+    files (.bsp files used by Skyfield). This is analogous to pyswisseph's
+    get_library_path(), which returns the path of the Swiss Ephemeris library.
+
+    Returns:
+        str: The absolute path to the directory containing ephemeris files.
+             If set_ephe_path() was called, returns that custom path.
+             Otherwise returns the default data directory (parent of the
+             libephemeris package).
+
+    Note:
+        - If a custom ephemeris path was set via set_ephe_path(), that path
+          is returned regardless of whether files actually exist there.
+        - Otherwise, returns the workspace root directory where de421.bsp
+          and other data files are located by default.
+
+    Example:
+        >>> from libephemeris import get_library_path, set_ephe_path
+        >>> get_library_path()  # Returns default path
+        '/path/to/workspace'
+        >>> set_ephe_path('/custom/ephemeris/path')
+        >>> get_library_path()  # Returns custom path
+        '/custom/ephemeris/path'
+    """
+    if _EPHEMERIS_PATH is not None:
+        return os.path.abspath(_EPHEMERIS_PATH)
+    # Default: parent directory of this module (workspace root)
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
 def close() -> None:
     """
     Close all opened ephemeris files and release resources.
