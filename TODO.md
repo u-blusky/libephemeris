@@ -78,7 +78,7 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 - [x] Implementare la funzione `rise_trans(jd, planet, lat, lon, altitude, pressure, temperature, flags, rsmi)` che calcola i tempi di levata, tramonto e transito (culminazione) di un corpo celeste per una specifica località. Il parametro rsmi specifica quale evento cercare (rise=1, set=2, transit=4, lower transit=8). Gestisce correttamente i corpi circumpolari che non tramontano mai. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Implementare la funzione `rise_trans_true_hor(jd, planet, lat, lon, altitude, pressure, temperature, horizon_altitude, flags, rsmi)` che è come rise_trans() ma permette di specificare un'altezza dell'orizzonte diversa da 0°, utile per località con montagne o edifici che occludono l'orizzonte reale. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Implementare la funzione `rise_trans_true_hor(jd, planet, lat, lon, altitude, pressure, temperature, horizon_altitude, flags, rsmi)` che è come rise_trans() ma permette di specificare un'altezza dell'orizzonte diversa da 0°, utile per località con montagne o edifici che occludono l'orizzonte reale. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
 - [ ] Implementare la funzione `solcross(target_lon, jd_start, flags)` che è la versione TT di solcross_ut(). Cerca quando il Sole attraversa una specifica longitudine eclittica, ma usa Terrestrial Time invece di Universal Time per l'input e l'output. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 

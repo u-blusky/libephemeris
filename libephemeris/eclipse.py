@@ -3902,3 +3902,217 @@ def _calculate_rise_set(
 
 # Alias for Swiss Ephemeris API compatibility
 swe_rise_trans = rise_trans
+
+
+def rise_trans_true_hor(
+    jd_start: float,
+    planet: int,
+    lat: float,
+    lon: float,
+    altitude: float = 0.0,
+    pressure: float = 1013.25,
+    temperature: float = 15.0,
+    horizon_altitude: float = 0.0,
+    flags: int = SEFLG_SWIEPH,
+    rsmi: int = 1,
+) -> Tuple[float, int]:
+    """
+    Calculate rise, set, or transit time with a custom horizon altitude.
+
+    This function is similar to rise_trans() but allows specifying a custom
+    horizon altitude. This is useful for locations with mountains or buildings
+    that occlude the real horizon.
+
+    Args:
+        jd_start: Julian Day (UT) to start search from
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        lat: Observer latitude in degrees (positive = North, negative = South)
+        lon: Observer longitude in degrees (positive = East, negative = West)
+        altitude: Observer altitude in meters above sea level (default 0)
+        pressure: Atmospheric pressure in mbar/hPa for refraction (default 1013.25)
+        temperature: Temperature in Celsius for refraction (default 15)
+        horizon_altitude: Custom horizon altitude in degrees (default 0.0).
+            Positive values mean the horizon is elevated (e.g., mountains),
+            so rise times will be later and set times earlier.
+            Negative values mean the horizon is depressed (e.g., observer on a mountain).
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        rsmi: Event type and calculation flags (bitmask):
+            - SE_CALC_RISE (1): Rise time (body crossing horizon going up)
+            - SE_CALC_SET (2): Set time (body crossing horizon going down)
+            - SE_CALC_MTRANSIT (4): Upper meridian transit (culmination)
+            - SE_CALC_ITRANSIT (8): Lower meridian transit (anti-culmination)
+            Additional flags (OR with event type):
+            - SE_BIT_DISC_CENTER (256): Use disc center instead of upper limb
+            - SE_BIT_DISC_BOTTOM (8192): Use lower limb of disc
+            - SE_BIT_NO_REFRACTION (512): Ignore atmospheric refraction
+
+    Returns:
+        Tuple containing:
+            - jd_event: Julian Day (UT) of the event, or 0.0 if not found
+            - retflag: Return flag (same as rsmi on success, or error indicator)
+                       Returns -2 if body is circumpolar (never rises/sets)
+
+    Raises:
+        ValueError: If invalid planet ID or parameters
+
+    Note:
+        For circumpolar objects (always above or below horizon at the given
+        latitude), the function returns (0.0, -2). For transits, circumpolar
+        objects still have valid transit times.
+
+        Twilight flags (SE_BIT_CIVIL_TWILIGHT, SE_BIT_NAUTIC_TWILIGHT,
+        SE_BIT_ASTRO_TWILIGHT) are NOT supported in this function since
+        the horizon_altitude parameter already specifies the target altitude.
+
+    Algorithm:
+        1. For transits: Find when body crosses the local meridian
+           (Local Sidereal Time = body's Right Ascension)
+        2. For rise/set: Find when body's altitude crosses the custom horizon
+           accounting for refraction and disc size
+        3. Uses Newton-Raphson iteration for precise timing
+
+    Precision:
+        Rise/set times accurate to ~1 minute for Sun/Moon (due to refraction
+        uncertainty), better than 1 second for transit times.
+
+    Example:
+        >>> from libephemeris import julday, rise_trans_true_hor, SE_SUN, SE_CALC_RISE
+        >>> jd = julday(2024, 6, 21, 0)
+        >>> # Find sunrise with mountains at 5° above horizon at Rome
+        >>> jd_rise, _ = rise_trans_true_hor(jd, SE_SUN, 41.9, 12.5,
+        ...                                   horizon_altitude=5.0, rsmi=SE_CALC_RISE)
+        >>> print(f"Sunrise at JD {jd_rise:.5f}")
+
+    References:
+        - Swiss Ephemeris: swe_rise_trans_true_hor()
+        - Meeus "Astronomical Algorithms" Ch. 15 (Rise, Set, Transit)
+    """
+    from skyfield.api import wgs84
+
+    from .constants import (
+        SE_CALC_RISE,
+        SE_CALC_SET,
+        SE_CALC_MTRANSIT,
+        SE_CALC_ITRANSIT,
+        SE_BIT_DISC_CENTER,
+        SE_BIT_DISC_BOTTOM,
+        SE_BIT_NO_REFRACTION,
+    )
+    from .planets import _PLANET_MAP
+    from .state import get_planets, get_timescale
+
+    # Extract event type from rsmi (lower bits)
+    event_type = rsmi & 0x0F  # First 4 bits for event type
+
+    # Validate event type
+    if event_type not in (
+        SE_CALC_RISE,
+        SE_CALC_SET,
+        SE_CALC_MTRANSIT,
+        SE_CALC_ITRANSIT,
+    ):
+        raise ValueError(
+            f"Invalid event type in rsmi: {rsmi}. Use SE_CALC_RISE, SE_CALC_SET, SE_CALC_MTRANSIT, or SE_CALC_ITRANSIT"
+        )
+
+    # Get ephemeris and timescale
+    eph = get_planets()
+    ts = get_timescale()
+
+    # Validate planet and get target body
+    if planet not in _PLANET_MAP:
+        raise ValueError(f"Invalid planet ID: {planet}")
+
+    target_name = _PLANET_MAP[planet]
+    target = eph[target_name]
+    earth = eph["earth"]
+
+    # Create observer location
+    observer = wgs84.latlon(lat, lon, altitude)
+
+    # Determine refraction
+    # Standard refraction at horizon is about 34 arcminutes
+    if rsmi & SE_BIT_NO_REFRACTION:
+        refraction = 0.0
+    else:
+        # Simple refraction model (more accurate would use pressure/temperature)
+        # Standard refraction at horizon: ~34 arcminutes = 0.5667 degrees
+        refraction = 0.5667
+
+    # Use the custom horizon altitude provided by the user
+    horizon_alt = horizon_altitude
+
+    # Account for disc semi-diameter
+    # Sun: ~16 arcmin, Moon: ~16 arcmin (varies)
+    if rsmi & SE_BIT_DISC_CENTER:
+        disc_correction = 0.0
+    elif rsmi & SE_BIT_DISC_BOTTOM:
+        # Lower limb: add semi-diameter (rises later, sets earlier)
+        if planet == SE_SUN:
+            disc_correction = 16.0 / 60.0  # degrees
+        elif planet == SE_MOON:
+            disc_correction = 16.0 / 60.0
+        else:
+            disc_correction = 0.0
+    else:
+        # Default: upper limb (subtract semi-diameter)
+        if planet == SE_SUN:
+            disc_correction = -16.0 / 60.0  # degrees
+        elif planet == SE_MOON:
+            disc_correction = -16.0 / 60.0
+        else:
+            disc_correction = 0.0
+
+    # Effective horizon altitude (negative means below geometric horizon)
+    target_altitude = horizon_alt - refraction + disc_correction
+
+    def _get_body_altaz(jd: float) -> Tuple[float, float]:
+        """Get body's altitude and azimuth at given JD from observer location."""
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+        body_app = observer_at.at(t).observe(target).apparent()
+        alt, az, _ = body_app.altaz()
+        return alt.degrees, az.degrees
+
+    def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+        """Get body's RA and Dec at given JD (epoch of date)."""
+        t = ts.ut1_jd(jd)
+        body_app = earth.at(t).observe(target).apparent()
+        ra, dec, _ = body_app.radec(epoch="date")
+        return ra.hours, dec.degrees  # RA in hours, Dec in degrees
+
+    # Handle transit calculations
+    if event_type in (SE_CALC_MTRANSIT, SE_CALC_ITRANSIT):
+        return _calculate_transit(
+            jd_start,
+            lat,
+            lon,
+            event_type,
+            ts,
+            earth,
+            target,
+            observer,
+            SE_CALC_ITRANSIT,
+        )
+
+    # Handle rise/set calculations
+    return _calculate_rise_set(
+        jd_start,
+        lat,
+        lon,
+        event_type,
+        target_altitude,
+        ts,
+        earth,
+        target,
+        observer,
+        _get_body_altaz,
+        _get_body_ra_dec,
+        SE_CALC_RISE,
+        SE_CALC_SET,
+        rsmi,
+    )
+
+
+# Alias for Swiss Ephemeris API compatibility
+swe_rise_trans_true_hor = rise_trans_true_hor
