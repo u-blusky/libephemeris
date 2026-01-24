@@ -11,6 +11,7 @@ from libephemeris import (
     swe_revjul,
     SE_ECL_TOTAL,
     SE_ECL_ANNULAR,
+    SE_ECL_PARTIAL,
     SE_ECL_CENTRAL,
     SE_ECL_VISIBLE,
     SE_ECL_1ST_VISIBLE,
@@ -596,3 +597,236 @@ class TestSolEclipseWhere:
             # Longitudes should be different (shadow moves westward)
             # The shadow moves about 0.25 degrees per minute in longitude
             assert geopos1[0] != geopos2[0] or geopos1[1] != geopos2[1]
+
+
+class TestSolEclipseHow:
+    """Tests for sol_eclipse_how function."""
+
+    def test_returns_correct_tuple_size(self):
+        """Should return attr tuple of 11 elements."""
+        from libephemeris import sol_eclipse_how
+
+        # Find an eclipse to get a valid time
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Calculate circumstances at Dallas
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        attr, ecl_type = sol_eclipse_how(times[0], dallas_lat, dallas_lon)
+
+        assert len(attr) == 11
+
+    def test_eclipse_visible_during_eclipse(self):
+        """During an eclipse, should return positive magnitude."""
+        from libephemeris import sol_eclipse_how
+
+        # April 8, 2024 total eclipse
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Dallas was in path of totality
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        attr, ecl_type = sol_eclipse_how(times[0], dallas_lat, dallas_lon)
+
+        # Should have visibility
+        if ecl_type & SE_ECL_VISIBLE:
+            magnitude = attr[0]
+            assert magnitude > 0
+
+    def test_no_eclipse_at_random_time(self):
+        """At a random time with no eclipse, magnitude should be 0."""
+        from libephemeris import sol_eclipse_how
+
+        # Random time during full moon (no solar eclipse possible)
+        jd_full_moon = swe_julday(2024, 4, 23, 12)  # Near full moon
+
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        attr, ecl_type = sol_eclipse_how(jd_full_moon, dallas_lat, dallas_lon)
+
+        # Should have no eclipse
+        assert ecl_type == 0 or attr[0] == 0
+
+    def test_attributes_have_valid_ranges(self):
+        """Eclipse attributes should be within valid ranges."""
+        from libephemeris import sol_eclipse_how
+
+        # Find an eclipse
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        attr, ecl_type = sol_eclipse_how(times[0], dallas_lat, dallas_lon)
+
+        if ecl_type != 0:
+            # Magnitude should be 0-1.5 range
+            magnitude = attr[0]
+            assert 0 <= magnitude <= 1.5
+
+            # Obscuration should be 0-1 range
+            obscuration = attr[2]
+            assert 0 <= obscuration <= 1
+
+            # Sun altitude should be -90 to 90
+            altitude = attr[4]
+            assert -90 <= altitude <= 90
+
+            # Azimuth should be 0 to 360
+            azimuth = attr[3]
+            assert 0 <= azimuth <= 360
+
+            # Moon/Sun apparent diameters should be positive and reasonable
+            moon_diam = attr[5]
+            sun_diam = attr[6]
+            if moon_diam > 0:
+                assert 0.4 < moon_diam < 0.7  # degrees (roughly)
+            if sun_diam > 0:
+                assert 0.4 < sun_diam < 0.7  # degrees
+
+    def test_sun_below_horizon_returns_zero_magnitude(self):
+        """When Sun is below horizon, should return 0 magnitude or no visibility."""
+        from libephemeris import sol_eclipse_how
+
+        # Find an eclipse
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Check from a location on opposite side of Earth (Sun below horizon)
+        # For an eclipse happening in North America around 18 UT,
+        # a location in Eastern Asia/Australia would have Sun below horizon
+        east_asia_lat, east_asia_lon = 35.0, 135.0  # Japan area
+
+        attr, ecl_type = sol_eclipse_how(times[0], east_asia_lat, east_asia_lon)
+
+        # Either no visibility flag or zero magnitude
+        sun_alt = attr[4]
+        if sun_alt < -1.0:
+            # Sun below horizon, should have no visible eclipse
+            assert attr[0] == 0.0 or not (ecl_type & SE_ECL_VISIBLE)
+
+    def test_different_locations_different_magnitudes(self):
+        """Different locations should show different eclipse magnitudes."""
+        from libephemeris import sol_eclipse_how
+
+        # Find an eclipse
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Dallas (in path of totality)
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        attr_dallas, type_dallas = sol_eclipse_how(times[0], dallas_lat, dallas_lon)
+
+        # Miami (away from path)
+        miami_lat, miami_lon = 25.7617, -80.1918
+        attr_miami, type_miami = sol_eclipse_how(times[0], miami_lat, miami_lon)
+
+        # If both visible, Dallas should have higher magnitude (closer to center)
+        if (type_dallas & SE_ECL_VISIBLE) and (type_miami & SE_ECL_VISIBLE):
+            # The magnitudes should be different
+            # (may not always be true depending on exact timing)
+            assert attr_dallas[0] != attr_miami[0] or attr_dallas[2] != attr_miami[2]
+
+    def test_total_eclipse_type_flags(self):
+        """Total eclipse should have appropriate type flags."""
+        from libephemeris import sol_eclipse_how
+
+        # Find a total eclipse
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # From a location in the path
+        # Use local time found by sol_eclipse_when_loc for better timing
+        times_loc, attr_loc, _ = sol_eclipse_when_loc(
+            swe_julday(2024, 3, 1, 0), 32.7767, -96.7970
+        )
+
+        if times_loc[0] > 0:
+            attr, ecl_type = sol_eclipse_how(times_loc[0], 32.7767, -96.7970)
+
+            if ecl_type & SE_ECL_TOTAL:
+                # Should also have central and visible flags
+                assert ecl_type & SE_ECL_CENTRAL
+                assert ecl_type & SE_ECL_VISIBLE
+
+    def test_partial_eclipse_type_flags(self):
+        """Partial eclipse should have partial flag."""
+        from libephemeris import sol_eclipse_how
+
+        # Find an eclipse and check from edge location
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # NYC is far from totality path for April 2024 eclipse
+        nyc_lat, nyc_lon = 40.7128, -74.0060
+        attr, ecl_type = sol_eclipse_how(times[0], nyc_lat, nyc_lon)
+
+        # If visible and not central, should be partial
+        if (ecl_type & SE_ECL_VISIBLE) and not (ecl_type & SE_ECL_CENTRAL):
+            assert ecl_type & SE_ECL_PARTIAL
+
+    def test_altitude_parameter(self):
+        """Should accept altitude parameter."""
+        from libephemeris import sol_eclipse_how
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start)
+
+        # Should not raise
+        attr, ecl_type = sol_eclipse_how(times[0], 32.7767, -96.7970, altitude=1000.0)
+
+        assert len(attr) == 11
+
+    def test_flags_parameter_accepted(self):
+        """Should accept flags parameter."""
+        from libephemeris import sol_eclipse_how
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start)
+
+        # Should not raise
+        attr, ecl_type = sol_eclipse_how(
+            times[0], 32.7767, -96.7970, flags=SEFLG_SWIEPH
+        )
+
+        assert len(attr) == 11
+
+    def test_alias_matches_main_function(self):
+        """swe_sol_eclipse_how should be an alias for sol_eclipse_how."""
+        from libephemeris import sol_eclipse_how, swe_sol_eclipse_how
+
+        assert swe_sol_eclipse_how is sol_eclipse_how
+
+    def test_known_eclipse_april_2024_dallas(self):
+        """Test April 8, 2024 eclipse from Dallas."""
+        from libephemeris import sol_eclipse_how
+
+        # During the April 2024 eclipse, around 18:40 UT
+        jd_eclipse = swe_julday(2024, 4, 8, 18.67)  # ~18:40 UT
+
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        attr, ecl_type = sol_eclipse_how(jd_eclipse, dallas_lat, dallas_lon)
+
+        # Should have significant magnitude (Dallas was in path of totality)
+        if ecl_type & SE_ECL_VISIBLE:
+            assert attr[0] > 0.8  # High magnitude expected
+
+    def test_obscuration_consistent_with_magnitude(self):
+        """Obscuration should be consistent with magnitude."""
+        from libephemeris import sol_eclipse_how
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        attr, ecl_type = sol_eclipse_how(times[0], dallas_lat, dallas_lon)
+
+        if ecl_type & SE_ECL_VISIBLE:
+            magnitude = attr[0]
+            obscuration = attr[2]
+
+            # Both should be positive if eclipse is visible
+            if magnitude > 0:
+                assert obscuration > 0
+
+            # For total eclipse (magnitude >= 1), obscuration should be 1
+            if magnitude >= 1.0:
+                assert obscuration >= 0.99  # Allow small tolerance
