@@ -110,6 +110,8 @@ class TestContextConcurrency:
             except Exception as e:
                 errors.append((thread_id, e))
 
+        print("  Starting 10 concurrent threads...")
+
         threads = []
         for i in range(10):
             jd = 2451545.0 + i
@@ -119,6 +121,8 @@ class TestContextConcurrency:
 
         for t in threads:
             t.join()
+
+        print(f"  Threads complete: {len(results)} results, {len(errors)} errors")
 
         # No errors should have occurred
         assert len(errors) == 0, f"Errors: {errors}"
@@ -140,6 +144,8 @@ class TestContextConcurrency:
             pos, _ = ctx.calc_ut(2451545.0, SE_SUN, SEFLG_SIDEREAL)
             results[mode_name] = pos[0]
 
+        print("  Starting sid mode threads...")
+
         threads = [
             threading.Thread(
                 target=calculate_with_mode, args=(SE_SIDM_LAHIRI, "Lahiri")
@@ -153,6 +159,10 @@ class TestContextConcurrency:
             t.start()
         for t in threads:
             t.join()
+
+        print(
+            f"  Lahiri={results.get('Lahiri', 'N/A'):.2f}, Fagan={results.get('Fagan', 'N/A'):.2f}"
+        )
 
         # Results should be different (different ayanamshas)
         assert "Lahiri" in results
@@ -180,15 +190,20 @@ class TestContextResourceSharing:
         assert pos1[1] == pytest.approx(pos2[1], abs=1e-10)
 
     @pytest.mark.unit
-    def test_context_reuse(self):
+    def test_context_reuse(self, progress_reporter):
         """Same context should be reusable for multiple calculations."""
         ctx = EphemerisContext()
 
         results = []
+        progress = progress_reporter("Context reuse", 100, report_every=25)
+
         for i in range(100):
             jd = 2451545.0 + i
             pos, _ = ctx.calc_ut(jd, SE_SUN, 0)
             results.append(pos[0])
+            progress.update(i)
+
+        progress.done()
 
         # All results should be valid
         assert len(results) == 100

@@ -198,11 +198,16 @@ class TestCalcUtVsPyswisseph:
         assert abs(pos_lib[2] - pos_swe[2]) < 0.001, f"{planet_name} distance diff"
 
     @pytest.mark.comparison
-    def test_100_dates_all_planets(self, random_dates_in_de421_range, all_planets):
+    def test_100_dates_all_planets(
+        self, random_dates_in_de421_range, all_planets, progress_reporter
+    ):
         """Test all planets at multiple dates."""
         dates = random_dates_in_de421_range(10)  # 10 dates x 10 planets = 100 tests
         tolerance = 0.001
+        total = len(dates) * len(all_planets)
+        progress = progress_reporter("Testing planets/dates", total, report_every=10)
 
+        iteration = 0
         for year, month, day, hour, jd in dates:
             for planet_id, planet_name in all_planets:
                 pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
@@ -215,6 +220,12 @@ class TestCalcUtVsPyswisseph:
                 assert lon_diff < tolerance, (
                     f"{planet_name} at JD {jd}: lon diff {lon_diff}"
                 )
+                progress.update(
+                    iteration, f"{planet_name} @ {year}-{month:02d}-{day:02d}"
+                )
+                iteration += 1
+
+        progress.done()
 
 
 class TestCalcUtTopocentric:

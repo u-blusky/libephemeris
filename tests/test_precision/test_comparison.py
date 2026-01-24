@@ -70,7 +70,9 @@ class TestMassiveComparisonPlanets:
 
     @pytest.mark.comparison
     @pytest.mark.slow
-    def test_all_planets_100_dates(self, random_dates_in_de421_range):
+    def test_all_planets_100_dates(
+        self, random_dates_in_de421_range, progress_reporter
+    ):
         """Test all planets at 100 dates."""
         dates = random_dates_in_de421_range(100)
         planets = [
@@ -88,7 +90,10 @@ class TestMassiveComparisonPlanets:
 
         max_diff = 0
         worst_case = None
+        total = len(dates) * len(planets)
+        progress = progress_reporter("Planets x dates", total, report_every=10)
 
+        iteration = 0
         for _, _, _, _, jd in dates:
             for planet in planets:
                 pos_lib, _ = ephem.swe_calc_ut(jd, planet, 0)
@@ -103,10 +108,10 @@ class TestMassiveComparisonPlanets:
                     worst_case = (jd, planet, diff)
 
                 assert diff < 0.001, f"Planet {planet} at JD {jd}: diff {diff}"
+                progress.update(iteration)
+                iteration += 1
 
-        print(f"Max planet position diff: {max_diff * 3600:.3f} arcsec")
-        if worst_case:
-            print(f"Worst case: JD {worst_case[0]}, planet {worst_case[1]}")
+        progress.done(f"max diff: {max_diff * 3600:.3f} arcsec")
 
 
 class TestMassiveComparisonHouses:
@@ -114,15 +119,19 @@ class TestMassiveComparisonHouses:
 
     @pytest.mark.comparison
     @pytest.mark.slow
-    def test_houses_100_locations(self, random_dates_in_de421_range, random_locations):
+    def test_houses_100_locations(
+        self, random_dates_in_de421_range, random_locations, progress_reporter
+    ):
         """Test houses at 100 random locations."""
         jd = 2451545.0
         locations = random_locations(100)
 
         max_asc_diff = 0
+        progress = progress_reporter("House locations", len(locations), report_every=10)
 
-        for name, lat, lon, alt in locations:
+        for i, (name, lat, lon, alt) in enumerate(locations):
             if abs(lat) > 66:  # Skip polar for Placidus
+                progress.update(i, f"skip polar {lat:.0f}°")
                 continue
 
             try:
@@ -141,7 +150,9 @@ class TestMassiveComparisonHouses:
             except Exception as e:
                 pass  # Some locations may fail for Placidus
 
-        print(f"Max ASC diff: {max_asc_diff:.4f} degrees")
+            progress.update(i, f"{name}")
+
+        progress.done(f"max ASC diff: {max_asc_diff:.4f}°")
 
 
 class TestMassiveComparisonAyanamsha:
@@ -149,13 +160,17 @@ class TestMassiveComparisonAyanamsha:
 
     @pytest.mark.comparison
     @pytest.mark.slow
-    def test_all_ayanamshas_at_multiple_dates(self):
+    def test_all_ayanamshas_at_multiple_dates(self, progress_reporter):
         """Test all 43 ayanamshas at multiple dates."""
         dates = [2415020.0, 2451545.0, 2460000.0]  # 1900, 2000, 2023
+        modes = list(range(30))  # First 30 modes
 
         max_diff = 0
+        total = len(modes) * len(dates)
+        progress = progress_reporter("Ayanamsha modes", total, report_every=10)
 
-        for sid_mode in range(30):  # First 30 modes
+        iteration = 0
+        for sid_mode in modes:
             for jd in dates:
                 try:
                     ephem.swe_set_sid_mode(sid_mode)
@@ -173,7 +188,10 @@ class TestMassiveComparisonAyanamsha:
                 except Exception:
                     pass  # Some modes may not be implemented
 
-        print(f"Max ayanamsha diff: {max_diff:.4f} degrees")
+                progress.update(iteration, f"mode {sid_mode}")
+                iteration += 1
+
+        progress.done(f"max diff: {max_diff:.4f}°")
 
 
 class TestJulianDayPrecision:

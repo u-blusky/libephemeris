@@ -651,6 +651,92 @@ def normalize_angle():
 
 
 # ============================================================================
+# PROGRESS REPORTING
+# ============================================================================
+
+
+class ProgressReporter:
+    """
+    Progress reporter for long-running test loops.
+
+    Usage:
+        def test_long_loop(progress_reporter):
+            items = range(100)
+            progress = progress_reporter("Testing items", len(items))
+            for i, item in enumerate(items):
+                # ... do work ...
+                progress.update(i, f"item={item}")
+            progress.done()
+
+    The reporter will print progress at regular intervals (default 10%),
+    showing current iteration, percentage, and optional context.
+    """
+
+    def __init__(self, description="Progress", total=100, report_every=10):
+        """
+        Initialize progress reporter.
+
+        Args:
+            description: Description of the operation being tracked
+            total: Total number of iterations
+            report_every: Report progress every N percent (default 10%)
+        """
+        self.description = description
+        self.total = total
+        self.report_every = report_every
+        self._last_reported_pct = -1
+
+    def update(self, current, context=""):
+        """
+        Update progress and print if at a reporting interval.
+
+        Args:
+            current: Current iteration (0-based)
+            context: Optional context string to display
+        """
+        if self.total <= 0:
+            return
+
+        pct = int((current + 1) * 100 / self.total)
+
+        # Report at every report_every percent
+        report_pct = (pct // self.report_every) * self.report_every
+
+        if report_pct > self._last_reported_pct:
+            self._last_reported_pct = report_pct
+            ctx_str = f" [{context}]" if context else ""
+            print(f"  {self.description}: {current + 1}/{self.total} ({pct}%){ctx_str}")
+
+    def done(self, summary=""):
+        """Print completion message."""
+        if summary:
+            print(f"  {self.description}: DONE - {summary}")
+        else:
+            print(f"  {self.description}: DONE ({self.total} iterations)")
+
+
+@pytest.fixture
+def progress_reporter():
+    """
+    Fixture to report progress in long-running test loops.
+
+    Usage:
+        def test_many_iterations(progress_reporter):
+            data = list(range(100))
+            pr = progress_reporter("Testing values", len(data))
+            for i, val in enumerate(data):
+                # ... do test work ...
+                pr.update(i, f"val={val}")
+            pr.done()
+    """
+
+    def _create_reporter(description="Progress", total=100, report_every=10):
+        return ProgressReporter(description, total, report_every)
+
+    return _create_reporter
+
+
+# ============================================================================
 # MARKERS
 # ============================================================================
 

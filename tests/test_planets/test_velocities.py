@@ -69,43 +69,58 @@ class TestPlanetVelocityRanges:
     """Test expected velocity ranges for each planet."""
 
     @pytest.mark.unit
-    def test_mercury_velocity_range(self):
+    def test_mercury_velocity_range(self, progress_reporter):
         """Mercury velocity range (includes retrograde)."""
         velocities = []
-        for jd in range(2451545, 2451545 + 365):
+        days = list(range(2451545, 2451545 + 365))
+        progress = progress_reporter("Mercury velocity", len(days), report_every=25)
+
+        for i, jd in enumerate(days):
             pos, _ = ephem.swe_calc_ut(float(jd), SE_MERCURY, SEFLG_SPEED)
             velocities.append(pos[3])
+            progress.update(i)
 
         min_vel, max_vel = min(velocities), max(velocities)
         # Mercury can go from about -1.5 to +2.2 degrees/day
         assert -2.0 < min_vel < 0, f"Mercury min velocity {min_vel}"
         assert 1.0 < max_vel < 2.5, f"Mercury max velocity {max_vel}"
+        progress.done(f"vel range: {min_vel:.2f} to {max_vel:.2f}")
 
     @pytest.mark.unit
-    def test_venus_velocity_range(self):
+    def test_venus_velocity_range(self, progress_reporter):
         """Venus velocity range (includes retrograde)."""
         velocities = []
-        for jd in range(2451545, 2451545 + 500):
+        days = list(range(2451545, 2451545 + 500))
+        progress = progress_reporter("Venus velocity", len(days), report_every=25)
+
+        for i, jd in enumerate(days):
             pos, _ = ephem.swe_calc_ut(float(jd), SE_VENUS, SEFLG_SPEED)
             velocities.append(pos[3])
+            progress.update(i)
 
         min_vel, max_vel = min(velocities), max(velocities)
         # Venus can go from about -0.8 to +1.3 degrees/day
         assert -1.5 < min_vel < 0, f"Venus min velocity {min_vel}"
         assert 0.5 < max_vel < 1.5, f"Venus max velocity {max_vel}"
+        progress.done(f"vel range: {min_vel:.2f} to {max_vel:.2f}")
 
     @pytest.mark.unit
-    def test_mars_velocity_range(self):
+    def test_mars_velocity_range(self, progress_reporter):
         """Mars velocity range."""
         velocities = []
-        for jd in range(2451545, 2451545 + 700):
+        days = list(range(2451545, 2451545 + 700))
+        progress = progress_reporter("Mars velocity", len(days), report_every=25)
+
+        for i, jd in enumerate(days):
             pos, _ = ephem.swe_calc_ut(float(jd), SE_MARS, SEFLG_SPEED)
             velocities.append(pos[3])
+            progress.update(i)
 
         min_vel, max_vel = min(velocities), max(velocities)
         # Mars can go from about -0.6 to +0.8 degrees/day
         assert -1.0 < min_vel, f"Mars min velocity {min_vel}"
         assert max_vel < 1.0, f"Mars max velocity {max_vel}"
+        progress.done(f"vel range: {min_vel:.2f} to {max_vel:.2f}")
 
     @pytest.mark.unit
     def test_outer_planets_slow(self):

@@ -32,6 +32,7 @@ dev = [
     "poethepoet>=0.38.0",
     "pyswisseph>=2.10.3.2",
     "pytest>=9.0.1",
+    "pytest-xdist>=3.5.0",
     "ruff>=0.14.6",
     "pytest-cov>=6.0.0",
 ]
@@ -47,4 +48,5 @@ packages = ["libephemeris"]
 format = "ruff format ."
 lint = "ruff check . --fix"
 test = "pytest"
+test-fast = "pytest -n auto"
 coverage = "pytest --cov=libephemeris --cov-report=term-missing"
