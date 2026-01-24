@@ -254,3 +254,250 @@ class TestCotransRandomValues:
             assert abs(result_lib[1] - result_swe[1]) < 0.0001, (
                 f"Latitude mismatch for input {coord}"
             )
+
+
+class TestCotransSpBasic:
+    """Basic functionality tests for cotrans_sp."""
+
+    def test_cotrans_sp_exported(self):
+        """Test that cotrans_sp is exported from the package."""
+        assert hasattr(ephem, "cotrans_sp")
+        assert callable(ephem.cotrans_sp)
+
+    def test_cotrans_sp_origin_point(self):
+        """Test transformation at the origin (0, 0)."""
+        obliquity = 23.4392911
+        coord = (0.0, 0.0, 1.0)
+        speed = (1.0, 0.0, 0.0)
+
+        coord_result, speed_result = ephem.cotrans_sp(coord, speed, obliquity)
+
+        assert abs(coord_result[0]) < 1e-10 or abs(coord_result[0] - 360.0) < 1e-10
+        assert abs(coord_result[1]) < 1e-10
+        assert coord_result[2] == 1.0  # Distance unchanged
+
+    def test_cotrans_sp_preserves_distance(self):
+        """Test that distance and distance speed are preserved."""
+        obliquity = 23.4
+        coord = (45.0, 30.0, 2.5)
+        speed = (1.0, 0.5, 0.1)
+
+        coord_result, speed_result = ephem.cotrans_sp(coord, speed, obliquity)
+
+        assert coord_result[2] == coord[2]
+        assert speed_result[2] == speed[2]
+
+    def test_cotrans_sp_returns_tuples(self):
+        """Test that cotrans_sp returns two tuples of three elements each."""
+        coord = (90.0, 0.0, 1.0)
+        speed = (1.0, 0.0, 0.0)
+        obliquity = 23.4
+
+        result = ephem.cotrans_sp(coord, speed, obliquity)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert isinstance(result[0], tuple)
+        assert isinstance(result[1], tuple)
+        assert len(result[0]) == 3
+        assert len(result[1]) == 3
+
+    def test_cotrans_sp_zero_speed(self):
+        """Test with zero speed returns consistent position."""
+        obliquity = 23.4392911
+        coord = (90.0, 23.4, 1.0)
+        speed = (0.0, 0.0, 0.0)
+
+        coord_result, speed_result = ephem.cotrans_sp(coord, speed, obliquity)
+
+        # Position should match cotrans
+        cotrans_result = ephem.cotrans(coord, obliquity)
+        lon_diff = abs(coord_result[0] - cotrans_result[0])
+        if lon_diff > 180:
+            lon_diff = 360 - lon_diff
+        assert lon_diff < 1e-10
+        assert abs(coord_result[1] - cotrans_result[1]) < 1e-10
+
+        # Speed should be zero when input speed is zero
+        assert abs(speed_result[0]) < 1e-10
+        assert abs(speed_result[1]) < 1e-10
+        assert abs(speed_result[2]) < 1e-10
+
+
+class TestCotransSpVsSwisseph:
+    """Comparison tests with pyswisseph's swe.cotrans_sp()."""
+
+    @pytest.mark.parametrize(
+        "coord,speed,obliquity",
+        [
+            ((0.0, 0.0, 1.0), (1.0, 0.0, 0.0), 23.4392911),
+            ((90.0, 0.0, 1.0), (0.5, 0.1, 0.0), 23.4392911),
+            ((180.0, 0.0, 1.0), (1.0, 0.5, 0.0), 23.4392911),
+            ((270.0, 0.0, 1.0), (0.0, 1.0, 0.0), 23.4392911),
+            ((45.0, 30.0, 1.0), (0.8, 0.2, 0.1), 23.4392911),
+            ((120.0, -15.0, 1.0), (1.2, -0.3, 0.0), 23.4392911),
+            ((200.0, 5.0, 2.5), (0.5, 0.1, 0.05), 23.4392911),
+            ((359.0, 0.0, 1.0), (1.0, 0.0, 0.0), 23.4392911),
+        ],
+    )
+    def test_cotrans_sp_ecl_to_eq_matches_swisseph(self, coord, speed, obliquity):
+        """Test ecliptic to equatorial transformation matches pyswisseph."""
+        coord_result, speed_result = ephem.cotrans_sp(coord, speed, obliquity)
+
+        # pyswisseph takes a 6-tuple and returns 6 values
+        input_6 = coord + speed
+        swe_result = swe.cotrans_sp(input_6, obliquity)
+
+        # Compare position
+        lon_diff = abs(coord_result[0] - swe_result[0])
+        if lon_diff > 180:
+            lon_diff = 360 - lon_diff
+        assert lon_diff < 0.0001, (
+            f"Longitude mismatch: lib={coord_result[0]}, swe={swe_result[0]}"
+        )
+        assert abs(coord_result[1] - swe_result[1]) < 0.0001, (
+            f"Latitude mismatch: lib={coord_result[1]}, swe={swe_result[1]}"
+        )
+        assert abs(coord_result[2] - swe_result[2]) < 1e-10, (
+            f"Distance mismatch: lib={coord_result[2]}, swe={swe_result[2]}"
+        )
+
+        # Compare speed
+        assert abs(speed_result[0] - swe_result[3]) < 0.0001, (
+            f"Lon speed mismatch: lib={speed_result[0]}, swe={swe_result[3]}"
+        )
+        assert abs(speed_result[1] - swe_result[4]) < 0.0001, (
+            f"Lat speed mismatch: lib={speed_result[1]}, swe={swe_result[4]}"
+        )
+        assert abs(speed_result[2] - swe_result[5]) < 1e-10, (
+            f"Dist speed mismatch: lib={speed_result[2]}, swe={swe_result[5]}"
+        )
+
+    @pytest.mark.parametrize(
+        "coord,speed,obliquity",
+        [
+            ((0.0, 0.0, 1.0), (1.0, 0.0, 0.0), -23.4392911),
+            ((90.0, 0.0, 1.0), (0.5, 0.1, 0.0), -23.4392911),
+            ((180.0, 0.0, 1.0), (1.0, 0.5, 0.0), -23.4392911),
+            ((270.0, 0.0, 1.0), (0.0, 1.0, 0.0), -23.4392911),
+            ((45.0, 30.0, 1.0), (0.8, 0.2, 0.1), -23.4392911),
+            ((120.0, -15.0, 1.0), (1.2, -0.3, 0.0), -23.4392911),
+            ((200.0, 5.0, 2.5), (0.5, 0.1, 0.05), -23.4392911),
+            ((359.0, 0.0, 1.0), (1.0, 0.0, 0.0), -23.4392911),
+        ],
+    )
+    def test_cotrans_sp_eq_to_ecl_matches_swisseph(self, coord, speed, obliquity):
+        """Test equatorial to ecliptic transformation matches pyswisseph."""
+        coord_result, speed_result = ephem.cotrans_sp(coord, speed, obliquity)
+
+        # pyswisseph takes a 6-tuple and returns 6 values
+        input_6 = coord + speed
+        swe_result = swe.cotrans_sp(input_6, obliquity)
+
+        # Compare position
+        lon_diff = abs(coord_result[0] - swe_result[0])
+        if lon_diff > 180:
+            lon_diff = 360 - lon_diff
+        assert lon_diff < 0.0001, (
+            f"Longitude mismatch: lib={coord_result[0]}, swe={swe_result[0]}"
+        )
+        assert abs(coord_result[1] - swe_result[1]) < 0.0001, (
+            f"Latitude mismatch: lib={coord_result[1]}, swe={swe_result[1]}"
+        )
+        assert abs(coord_result[2] - swe_result[2]) < 1e-10, (
+            f"Distance mismatch: lib={coord_result[2]}, swe={swe_result[2]}"
+        )
+
+        # Compare speed
+        assert abs(speed_result[0] - swe_result[3]) < 0.0001, (
+            f"Lon speed mismatch: lib={speed_result[0]}, swe={swe_result[3]}"
+        )
+        assert abs(speed_result[1] - swe_result[4]) < 0.0001, (
+            f"Lat speed mismatch: lib={speed_result[1]}, swe={swe_result[4]}"
+        )
+        assert abs(speed_result[2] - swe_result[5]) < 1e-10, (
+            f"Dist speed mismatch: lib={speed_result[2]}, swe={swe_result[5]}"
+        )
+
+
+class TestCotransSpRoundTrip:
+    """Test that round-trip transformations return to the original values."""
+
+    @pytest.mark.parametrize(
+        "coord,speed",
+        [
+            ((0.0, 0.0, 1.0), (1.0, 0.0, 0.0)),
+            ((45.0, 23.0, 1.0), (0.5, 0.2, 0.0)),
+            ((90.0, 0.0, 1.0), (0.8, 0.1, 0.0)),
+            ((120.0, -10.0, 1.5), (1.0, -0.5, 0.1)),
+            ((180.0, 45.0, 1.0), (0.3, 0.3, 0.0)),
+            ((270.0, -30.0, 2.0), (0.7, 0.0, 0.0)),
+        ],
+    )
+    def test_round_trip_ecl_eq_ecl(self, coord, speed):
+        """Test ecliptic -> equatorial -> ecliptic round trip."""
+        obliquity = 23.4392911
+
+        # Ecliptic to equatorial
+        eq_coord, eq_speed = ephem.cotrans_sp(coord, speed, obliquity)
+
+        # Equatorial back to ecliptic
+        result_coord, result_speed = ephem.cotrans_sp(eq_coord, eq_speed, -obliquity)
+
+        # Compare with original position
+        lon_diff = abs(result_coord[0] - coord[0])
+        if lon_diff > 180:
+            lon_diff = 360 - lon_diff
+        assert lon_diff < 0.0001, (
+            f"Longitude not preserved in round trip: {coord[0]} -> {result_coord[0]}"
+        )
+        assert abs(result_coord[1] - coord[1]) < 0.0001, (
+            f"Latitude not preserved in round trip: {coord[1]} -> {result_coord[1]}"
+        )
+        assert abs(result_coord[2] - coord[2]) < 1e-10, (
+            f"Distance not preserved: {coord[2]} -> {result_coord[2]}"
+        )
+
+        # Compare with original speed
+        assert abs(result_speed[0] - speed[0]) < 0.0001, (
+            f"Lon speed not preserved: {speed[0]} -> {result_speed[0]}"
+        )
+        assert abs(result_speed[1] - speed[1]) < 0.0001, (
+            f"Lat speed not preserved: {speed[1]} -> {result_speed[1]}"
+        )
+        assert abs(result_speed[2] - speed[2]) < 1e-10, (
+            f"Dist speed not preserved: {speed[2]} -> {result_speed[2]}"
+        )
+
+
+class TestCotransSpPositionConsistency:
+    """Test that cotrans_sp position matches cotrans."""
+
+    @pytest.mark.parametrize(
+        "coord,obliquity",
+        [
+            ((0.0, 0.0, 1.0), 23.4392911),
+            ((90.0, 23.4, 1.0), 23.4392911),
+            ((180.0, -15.0, 1.0), 23.4392911),
+            ((270.0, 45.0, 1.0), 23.4392911),
+            ((45.0, 30.0, 1.0), -23.4392911),
+            ((120.0, -5.0, 1.0), -23.4392911),
+        ],
+    )
+    def test_position_matches_cotrans(self, coord, obliquity):
+        """Test that position from cotrans_sp matches cotrans."""
+        speed = (1.0, 0.5, 0.1)
+
+        coord_sp, _ = ephem.cotrans_sp(coord, speed, obliquity)
+        coord_plain = ephem.cotrans(coord, obliquity)
+
+        lon_diff = abs(coord_sp[0] - coord_plain[0])
+        if lon_diff > 180:
+            lon_diff = 360 - lon_diff
+        assert lon_diff < 1e-10, (
+            f"cotrans_sp lon {coord_sp[0]} != cotrans lon {coord_plain[0]}"
+        )
+        assert abs(coord_sp[1] - coord_plain[1]) < 1e-10, (
+            f"cotrans_sp lat {coord_sp[1]} != cotrans lat {coord_plain[1]}"
+        )
+        assert abs(coord_sp[2] - coord_plain[2]) < 1e-10
