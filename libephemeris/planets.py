@@ -1936,6 +1936,347 @@ def _calc_nod_aps(
     return (xnasc, xndsc, xperi, xaphe)
 
 
+def swe_get_orbital_elements(
+    tjd_et: float, ipl: int, iflag: int
+) -> Tuple[Tuple[float, ...], int]:
+    """
+    Calculate Keplerian orbital elements for a celestial body.
+
+    Swiss Ephemeris compatible function.
+
+    This function computes the osculating (instantaneous) orbital elements
+    for a planet at a given time. The elements describe the elliptical orbit
+    that the planet would follow if all perturbations ceased at that moment.
+
+    Args:
+        tjd_et: Julian Day in Ephemeris Time (TT/ET)
+        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        iflag: Calculation flags (SEFLG_HELCTR for heliocentric, etc.)
+
+    Returns:
+        Tuple containing:
+            - Tuple of 17 orbital elements:
+                [0] a: Semi-major axis (AU)
+                [1] e: Eccentricity (0=circle, <1=ellipse, 1=parabola, >1=hyperbola)
+                [2] i: Inclination (degrees, relative to ecliptic)
+                [3] Omega: Longitude of ascending node (degrees)
+                [4] omega: Argument of perihelion (degrees)
+                [5] M: Mean anomaly (degrees)
+                [6] nu: True anomaly (degrees)
+                [7] E: Eccentric anomaly (degrees)
+                [8] L: Mean longitude (degrees)
+                [9] varpi: Longitude of perihelion (degrees)
+                [10] n: Mean daily motion (degrees/day)
+                [11] q: Perihelion distance (AU)
+                [12] Q: Aphelion distance (AU)
+                [13] P: Orbital period (tropical years)
+                [14] T: Time of perihelion passage (JD)
+                [15] Ps: Synodic period (days)
+                [16] r: Current heliocentric distance (AU)
+            - Return flag: iflag value on success
+
+    Example:
+        >>> from libephemeris import get_orbital_elements, SE_MARS, SEFLG_HELCTR
+        >>> elements, flag = get_orbital_elements(2451545.0, SE_MARS, SEFLG_HELCTR)
+        >>> a, e, i = elements[0], elements[1], elements[2]
+        >>> print(f"Mars: a={a:.4f} AU, e={e:.4f}, i={i:.4f}°")
+
+    Note:
+        - For heliocentric calculations (default), elements are relative to the Sun
+        - Moon's elements are geocentric (relative to Earth)
+        - Elements change constantly due to perturbations from other planets
+    """
+    ts = get_timescale()
+    t = ts.tt_jd(tjd_et)
+    return _calc_orbital_elements(t, ipl, iflag)
+
+
+def swe_get_orbital_elements_ut(
+    tjd_ut: float, ipl: int, iflag: int
+) -> Tuple[Tuple[float, ...], int]:
+    """
+    Calculate Keplerian orbital elements for Universal Time.
+
+    Swiss Ephemeris compatible function. Similar to swe_get_orbital_elements()
+    but takes Universal Time instead of Ephemeris Time.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        iflag: Calculation flags
+
+    Returns:
+        Same as swe_get_orbital_elements: (elements_tuple, retflag)
+
+    Example:
+        >>> elements, flag = get_orbital_elements_ut(2451545.0, SE_JUPITER, 0)
+        >>> print(f"Jupiter semi-major axis: {elements[0]:.4f} AU")
+    """
+    ts = get_timescale()
+    t = ts.ut1_jd(tjd_ut)
+    return _calc_orbital_elements(t, ipl, iflag)
+
+
+def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
+    """
+    Internal function to calculate orbital elements.
+
+    Computes osculating Keplerian elements from the body's current position
+    and velocity vectors. Uses state vectors from JPL ephemeris.
+
+    Args:
+        t: Skyfield Time object
+        ipl: Planet ID
+        iflag: Calculation flags
+
+    Returns:
+        Tuple of (17-element tuple, flags)
+    """
+    planets = get_planets()
+    zero_elements = tuple([0.0] * 17)
+
+    # Sun and Earth don't have heliocentric orbital elements
+    if ipl == SE_SUN:
+        return (zero_elements, iflag)
+
+    # Get target and center bodies
+    if ipl not in _PLANET_MAP:
+        return (zero_elements, iflag)
+
+    target_name = _PLANET_MAP[ipl]
+    target = planets[target_name]
+
+    # For Moon, use geocentric orbit (around Earth)
+    if ipl == SE_MOON:
+        center = planets["earth"]
+        # GM_Earth in AU^3/day^2 (from solar mass ratio)
+        GM = 0.01720209895**2 / 332946.0
+    else:
+        center = planets["sun"]
+        # GM_sun in AU^3/day^2
+        GM = 0.01720209895**2
+
+    # Get heliocentric (or geocentric for Moon) position and velocity
+    center_pos = center.at(t)
+    target_pos = target.at(t)
+
+    # Position and velocity vectors in ICRS (equatorial) frame
+    r_icrs = target_pos.position.au - center_pos.position.au
+    v_icrs = target_pos.velocity.au_per_d - center_pos.velocity.au_per_d
+
+    # Convert from ICRS (equatorial) to ecliptic coordinates
+    eps = 23.4392911  # Mean obliquity at J2000.0
+    eps_rad = math.radians(eps)
+    cos_eps = math.cos(eps_rad)
+    sin_eps = math.sin(eps_rad)
+
+    # Rotate position to ecliptic
+    x = r_icrs[0]
+    y = r_icrs[1] * cos_eps + r_icrs[2] * sin_eps
+    z = -r_icrs[1] * sin_eps + r_icrs[2] * cos_eps
+
+    # Rotate velocity to ecliptic
+    vx = v_icrs[0]
+    vy = v_icrs[1] * cos_eps + v_icrs[2] * sin_eps
+    vz = -v_icrs[1] * sin_eps + v_icrs[2] * cos_eps
+
+    # Calculate orbital elements from state vectors
+    r_mag = math.sqrt(x**2 + y**2 + z**2)
+    v_mag = math.sqrt(vx**2 + vy**2 + vz**2)
+
+    # Radial velocity
+    r_dot_v = x * vx + y * vy + z * vz
+    v_r = r_dot_v / r_mag
+
+    # Specific angular momentum vector h = r x v
+    hx = y * vz - z * vy
+    hy = z * vx - x * vz
+    hz = x * vy - y * vx
+    h_mag = math.sqrt(hx**2 + hy**2 + hz**2)
+
+    # Node vector n = k x h (k is unit vector in z-direction)
+    nx = -hy
+    ny = hx
+    n_mag = math.sqrt(nx**2 + ny**2)
+
+    # Eccentricity vector e = (v x h)/GM - r/|r|
+    e_coef = v_mag**2 / GM - 1.0 / r_mag
+    rv_coef = r_dot_v / GM
+    ex = e_coef * x - rv_coef * vx
+    ey = e_coef * y - rv_coef * vy
+    ez = e_coef * z - rv_coef * vz
+    e_mag = math.sqrt(ex**2 + ey**2 + ez**2)
+
+    # Specific orbital energy
+    epsilon = v_mag**2 / 2 - GM / r_mag
+
+    # Semi-major axis
+    if abs(epsilon) > 1e-10:
+        a = -GM / (2 * epsilon)
+    else:
+        a = float("inf")  # Parabolic orbit
+
+    # Handle near-circular and near-equatorial orbits
+    e = e_mag
+    if e < 1e-10:
+        e = 0.0
+
+    # Inclination
+    if h_mag > 1e-10:
+        i = math.acos(max(-1.0, min(1.0, hz / h_mag)))
+    else:
+        i = 0.0
+
+    # Longitude of ascending node (Omega)
+    if n_mag > 1e-10:
+        Omega = math.atan2(ny, nx)
+        if Omega < 0:
+            Omega += 2 * math.pi
+    else:
+        Omega = 0.0
+
+    # Argument of perihelion (omega)
+    if n_mag > 1e-10 and e_mag > 1e-10:
+        n_dot_e = nx * ex + ny * ey
+        cos_omega = n_dot_e / (n_mag * e_mag)
+        cos_omega = max(-1.0, min(1.0, cos_omega))
+        omega = math.acos(cos_omega)
+        if ez < 0:
+            omega = 2 * math.pi - omega
+    elif e_mag > 1e-10:
+        # Near-equatorial orbit: measure from x-axis
+        omega = math.atan2(ey, ex)
+        if omega < 0:
+            omega += 2 * math.pi
+    else:
+        omega = 0.0
+
+    # True anomaly (nu)
+    if e_mag > 1e-10:
+        e_dot_r = ex * x + ey * y + ez * z
+        cos_nu = e_dot_r / (e_mag * r_mag)
+        cos_nu = max(-1.0, min(1.0, cos_nu))
+        nu = math.acos(cos_nu)
+        if r_dot_v < 0:
+            nu = 2 * math.pi - nu
+    else:
+        # Circular orbit: measure from ascending node or x-axis
+        if n_mag > 1e-10:
+            n_dot_r = nx * x + ny * y
+            cos_nu = n_dot_r / (n_mag * r_mag)
+            cos_nu = max(-1.0, min(1.0, cos_nu))
+            nu = math.acos(cos_nu)
+            if z < 0:
+                nu = 2 * math.pi - nu
+        else:
+            nu = math.atan2(y, x)
+            if nu < 0:
+                nu += 2 * math.pi
+
+    # Eccentric anomaly (E) from true anomaly
+    if e < 1.0 and e > 1e-10:
+        tan_half_nu = math.tan(nu / 2)
+        sqrt_term = math.sqrt((1 - e) / (1 + e))
+        E = 2 * math.atan(sqrt_term * tan_half_nu)
+        if E < 0:
+            E += 2 * math.pi
+    else:
+        E = nu  # For circular orbits, E = nu
+
+    # Mean anomaly (M) from eccentric anomaly (Kepler's equation)
+    if e < 1.0:
+        M = E - e * math.sin(E)
+        if M < 0:
+            M += 2 * math.pi
+    else:
+        M = E  # For circular or hyperbolic orbits
+
+    # Mean longitude (L)
+    L = (Omega + omega + M) % (2 * math.pi)
+
+    # Longitude of perihelion (varpi)
+    varpi = (Omega + omega) % (2 * math.pi)
+
+    # Mean daily motion (n) in radians/day
+    if a > 0 and a < float("inf"):
+        n = math.sqrt(GM / (a**3))  # radians/day
+    else:
+        n = 0.0
+
+    # Perihelion and aphelion distances
+    if a > 0 and a < float("inf"):
+        q = a * (1 - e)  # Perihelion
+        Q = a * (1 + e)  # Aphelion
+    else:
+        q = r_mag  # For parabolic/hyperbolic
+        Q = float("inf")
+
+    # Orbital period in tropical years
+    # 1 tropical year = 365.24219 days
+    if n > 0:
+        P_days = 2 * math.pi / n
+        P_years = P_days / 365.24219
+    else:
+        P_years = float("inf")
+
+    # Time of perihelion passage (T)
+    # T = t - M/n where M is in radians and n is radians/day
+    if n > 0:
+        T_jd = t.tt - M / n
+    else:
+        T_jd = 0.0
+
+    # Synodic period (for planets relative to Earth)
+    # P_syn = |1 / (1/P_planet - 1/P_earth)|
+    P_earth_days = 365.24219  # Earth's orbital period in days
+    if P_years > 0 and P_years < float("inf") and ipl not in [SE_EARTH, SE_MOON]:
+        P_planet_days = P_years * 365.24219
+        denom = abs(1.0 / P_planet_days - 1.0 / P_earth_days)
+        if denom > 1e-10:
+            P_syn = 1.0 / denom
+        else:
+            P_syn = float("inf")
+    else:
+        P_syn = 0.0  # Not applicable for Earth or Moon
+
+    # Current heliocentric distance
+    r_current = r_mag
+
+    # Convert angles to degrees
+    i_deg = math.degrees(i)
+    Omega_deg = math.degrees(Omega)
+    omega_deg = math.degrees(omega)
+    nu_deg = math.degrees(nu)
+    E_deg = math.degrees(E)
+    M_deg = math.degrees(M)
+    L_deg = math.degrees(L)
+    varpi_deg = math.degrees(varpi)
+    n_deg = math.degrees(n)  # degrees/day
+
+    # Build the 17-element tuple
+    elements = (
+        a,  # [0] Semi-major axis (AU)
+        e,  # [1] Eccentricity
+        i_deg,  # [2] Inclination (degrees)
+        Omega_deg,  # [3] Longitude of ascending node (degrees)
+        omega_deg,  # [4] Argument of perihelion (degrees)
+        M_deg,  # [5] Mean anomaly (degrees)
+        nu_deg,  # [6] True anomaly (degrees)
+        E_deg,  # [7] Eccentric anomaly (degrees)
+        L_deg,  # [8] Mean longitude (degrees)
+        varpi_deg,  # [9] Longitude of perihelion (degrees)
+        n_deg,  # [10] Mean daily motion (degrees/day)
+        q,  # [11] Perihelion distance (AU)
+        Q,  # [12] Aphelion distance (AU)
+        P_years,  # [13] Orbital period (tropical years)
+        T_jd,  # [14] Time of perihelion passage (JD)
+        P_syn,  # [15] Synodic period (days)
+        r_current,  # [16] Current heliocentric distance (AU)
+    )
+
+    return (elements, iflag)
+
+
 def _calc_nod_aps_osculating(
     t, ipl: int, iflag: int
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:

@@ -10,6 +10,8 @@ from .planets import (
     swe_set_sid_mode,
     swe_nod_aps,
     swe_nod_aps_ut,
+    swe_get_orbital_elements,
+    swe_get_orbital_elements_ut,
 )
 from .houses import swe_houses, swe_houses_ex, swe_house_name
 from .state import (
@@ -40,6 +42,8 @@ calc = swe_calc
 calc_pctr = swe_calc_pctr
 nod_aps = swe_nod_aps
 nod_aps_ut = swe_nod_aps_ut
+get_orbital_elements = swe_get_orbital_elements
+get_orbital_elements_ut = swe_get_orbital_elements_ut
 
 # Houses
 houses = swe_houses
@@ -96,6 +100,10 @@ __all__ = [
     "nod_aps",
     "swe_nod_aps_ut",
     "nod_aps_ut",
+    "swe_get_orbital_elements",
+    "get_orbital_elements",
+    "swe_get_orbital_elements_ut",
+    "get_orbital_elements_ut",
     # Houses
     "swe_houses",
     "houses",
