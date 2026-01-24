@@ -21,7 +21,7 @@ Algorithm: Initial linear estimate + Newton-Raphson refinement
 References: Meeus "Astronomical Algorithms" Ch. 5 (interpolation)
 """
 
-from .constants import SEFLG_SWIEPH, SEFLG_SPEED, SE_SUN, SE_MOON
+from .constants import SEFLG_SWIEPH, SEFLG_SPEED, SEFLG_HELCTR, SE_SUN, SE_MOON
 from .planets import swe_calc_ut, swe_calc
 
 
@@ -760,3 +760,242 @@ def swe_cross_ut(
             raise RuntimeError("Planet crossing search diverged")
 
     raise RuntimeError("Maximum iterations reached in planet crossing calculation")
+
+
+def swe_helio_cross_ut(
+    planet_id: int, x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH
+) -> float:
+    """
+    Find when a planet crosses a specific heliocentric ecliptic longitude.
+
+    Calculates the time when a planet, as seen from the Sun (heliocentric
+    coordinates), crosses a specific ecliptic longitude. Useful for heliocentric
+    astrology calculations.
+
+    Searches FORWARD in time for the next crossing after jd_ut.
+
+    Args:
+        planet_id: Planet ID (SE_MERCURY, SE_VENUS, SE_EARTH, SE_MARS, etc.)
+                   Note: SE_EARTH can be used to find when Earth crosses a longitude
+                   as seen from the Sun.
+        x2cross: Target heliocentric ecliptic longitude in degrees (0-360)
+        jd_ut: Julian Day (UT) to start search from
+        flag: Calculation flags (SEFLG_SWIEPH, etc.). SEFLG_HELCTR is automatically added.
+
+    Returns:
+        float: Julian Day of crossing (UT)
+
+    Raises:
+        RuntimeError: If convergence fails or calculation error occurs
+
+    Note:
+        Heliocentric positions show where planets are relative to the Sun,
+        not Earth. This is useful for:
+        - Heliocentric astrology systems
+        - Planetary synodic cycles
+        - Finding planetary positions in solar-centered coordinates
+
+    Algorithm:
+        1. Get current heliocentric position and velocity
+        2. Linear estimate: dt = (target - current) / velocity
+        3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
+        4. Converge to < 1 arcsecond
+
+    Example:
+        >>> # Find when Mars crosses 0° heliocentric longitude
+        >>> jd_cross = swe_helio_cross_ut(SE_MARS, 0.0, jd_now)
+        >>> # Find when Earth crosses 90° as seen from the Sun
+        >>> jd_earth_cross = swe_helio_cross_ut(SE_EARTH, 90.0, jd_now)
+    """
+    x2cross = x2cross % 360.0
+
+    # Always add SEFLG_HELCTR for heliocentric calculations
+    helio_flag = flag | SEFLG_HELCTR | SEFLG_SPEED
+
+    try:
+        pos, _ = swe_calc_ut(jd_ut, planet_id, helio_flag)
+        lon_start = pos[0]
+        speed = pos[3]
+    except Exception as e:
+        raise RuntimeError(f"Failed to calculate heliocentric planet position: {e}")
+
+    # Estimate typical heliocentric speed if near zero
+    # Heliocentric speeds are different from geocentric due to no retrograde
+    typical_speeds = {
+        2: 4.09,  # Mercury (heliocentric, no retro)
+        3: 1.60,  # Venus
+        14: 0.986,  # Earth
+        4: 0.524,  # Mars
+        5: 0.083,  # Jupiter
+        6: 0.034,  # Saturn
+        7: 0.012,  # Uranus
+        8: 0.006,  # Neptune
+        9: 0.004,  # Pluto
+    }
+    speed_default = typical_speeds.get(planet_id, 0.5)
+
+    # Calculate initial guess
+    diff = (x2cross - lon_start) % 360.0
+
+    # Heliocentric planets don't go retrograde (except for very minor perturbations)
+    # so we always search forward
+    if diff < 1e-5:
+        diff += 360.0
+
+    if abs(speed) < 0.0001:
+        speed = speed_default
+
+    dt_guess = diff / speed
+    jd_guess = jd_ut + dt_guess
+
+    # Adaptive iteration count
+    max_iter = 40 if abs(speed) < 0.05 else 25
+
+    jd = jd_guess
+    for iteration in range(max_iter):
+        try:
+            pos, _ = swe_calc_ut(jd, planet_id, helio_flag)
+            lon = pos[0]
+            speed = pos[3]
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to calculate heliocentric position during iteration: {e}"
+            )
+
+        diff = (x2cross - lon) % 360.0
+        if diff > 180:
+            diff -= 360
+
+        # Check convergence (< 1 arcsecond = 1/3600 degree)
+        if abs(diff) < 1.0 / 3600.0:
+            return jd
+
+        if abs(speed) < 0.0001:
+            speed = speed_default
+
+        jd += diff / speed
+
+        # Safety: longer range for slower planets
+        max_range = 500 if abs(speed_default) < 0.05 else 400
+        if abs(jd - jd_guess) > max_range:
+            raise RuntimeError("Heliocentric crossing search diverged")
+
+    raise RuntimeError(
+        "Maximum iterations reached in heliocentric crossing calculation"
+    )
+
+
+def swe_helio_cross(
+    planet_id: int, x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH
+) -> float:
+    """
+    Find when a planet crosses a specific heliocentric ecliptic longitude (TT version).
+
+    This is the Terrestrial Time version of swe_helio_cross_ut(). Takes Julian Day
+    in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
+
+    Calculates the time when a planet, as seen from the Sun (heliocentric
+    coordinates), crosses a specific ecliptic longitude.
+
+    Searches FORWARD in time for the next crossing after jd_tt.
+
+    Args:
+        planet_id: Planet ID (SE_MERCURY, SE_VENUS, SE_EARTH, SE_MARS, etc.)
+        x2cross: Target heliocentric ecliptic longitude in degrees (0-360)
+        jd_tt: Julian Day in Terrestrial Time (TT/ET) to start search from
+        flag: Calculation flags (SEFLG_SWIEPH, etc.). SEFLG_HELCTR is automatically added.
+
+    Returns:
+        float: Julian Day of crossing (TT)
+
+    Raises:
+        RuntimeError: If convergence fails or calculation error occurs
+
+    Note:
+        TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
+        which varies from ~32 seconds (year 2000) to minutes (historical times).
+        For most astrological applications, use swe_helio_cross_ut() instead.
+
+    Algorithm:
+        1. Get current heliocentric position and velocity
+        2. Linear estimate: dt = (target - current) / velocity
+        3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
+        4. Converge to < 1 arcsecond
+
+    Example:
+        >>> # Find when Mars crosses 0° heliocentric longitude using TT
+        >>> jd_cross_tt = swe_helio_cross(SE_MARS, 0.0, jd_tt_now)
+    """
+    x2cross = x2cross % 360.0
+
+    # Always add SEFLG_HELCTR for heliocentric calculations
+    helio_flag = flag | SEFLG_HELCTR | SEFLG_SPEED
+
+    try:
+        pos, _ = swe_calc(jd_tt, planet_id, helio_flag)
+        lon_start = pos[0]
+        speed = pos[3]
+    except Exception as e:
+        raise RuntimeError(f"Failed to calculate heliocentric planet position: {e}")
+
+    # Estimate typical heliocentric speed if near zero
+    typical_speeds = {
+        2: 4.09,  # Mercury
+        3: 1.60,  # Venus
+        14: 0.986,  # Earth
+        4: 0.524,  # Mars
+        5: 0.083,  # Jupiter
+        6: 0.034,  # Saturn
+        7: 0.012,  # Uranus
+        8: 0.006,  # Neptune
+        9: 0.004,  # Pluto
+    }
+    speed_default = typical_speeds.get(planet_id, 0.5)
+
+    # Calculate initial guess
+    diff = (x2cross - lon_start) % 360.0
+
+    if diff < 1e-5:
+        diff += 360.0
+
+    if abs(speed) < 0.0001:
+        speed = speed_default
+
+    dt_guess = diff / speed
+    jd_guess = jd_tt + dt_guess
+
+    # Adaptive iteration count
+    max_iter = 40 if abs(speed) < 0.05 else 25
+
+    jd = jd_guess
+    for iteration in range(max_iter):
+        try:
+            pos, _ = swe_calc(jd, planet_id, helio_flag)
+            lon = pos[0]
+            speed = pos[3]
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to calculate heliocentric position during iteration: {e}"
+            )
+
+        diff = (x2cross - lon) % 360.0
+        if diff > 180:
+            diff -= 360
+
+        # Check convergence (< 1 arcsecond = 1/3600 degree)
+        if abs(diff) < 1.0 / 3600.0:
+            return jd
+
+        if abs(speed) < 0.0001:
+            speed = speed_default
+
+        jd += diff / speed
+
+        # Safety: longer range for slower planets
+        max_range = 500 if abs(speed_default) < 0.05 else 400
+        if abs(jd - jd_guess) > max_range:
+            raise RuntimeError("Heliocentric crossing search diverged")
+
+    raise RuntimeError(
+        "Maximum iterations reached in heliocentric crossing calculation"
+    )

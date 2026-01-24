@@ -597,6 +597,248 @@ class TestMooncrossNodeVsPyswisseph:
             jd = jd_lib + 0.5
 
 
+class TestHelioCrossBasic:
+    """Basic tests for heliocentric crossing function."""
+
+    @pytest.mark.unit
+    def test_helio_cross_ut_mars_basic(self):
+        """Heliocentric Mars crossing should return valid JD."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 0.0
+
+        jd_cross = ephem.swe_helio_cross_ut(SE_MARS, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+        # Mars completes one heliocentric orbit in ~687 days
+        assert jd_cross < jd_start + 700
+
+    @pytest.mark.unit
+    def test_helio_cross_ut_precision(self):
+        """Planet should be very close to target at heliocentric crossing."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 45.0
+
+        jd_cross = ephem.swe_helio_cross_ut(SE_MARS, target, jd_start, 0)
+
+        # Check Mars heliocentric position at crossing
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MARS, SEFLG_HELCTR)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 0.01, f"Mars helio at {pos[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_helio_cross_ut_earth(self):
+        """Should work for Earth (heliocentric view of Earth from Sun)."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 90.0
+
+        jd_cross = ephem.swe_helio_cross_ut(SE_EARTH, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+        # Earth completes one heliocentric orbit in ~365 days
+        assert jd_cross < jd_start + 366
+
+        # Verify position
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_EARTH, SEFLG_HELCTR)
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.01
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "planet,max_days",
+        [
+            (SE_MERCURY, 90),  # Mercury helio period ~88 days
+            (SE_VENUS, 230),  # Venus helio period ~225 days
+            (SE_EARTH, 370),  # Earth helio period ~365 days
+            (SE_MARS, 700),  # Mars helio period ~687 days
+        ],
+    )
+    def test_helio_cross_ut_multiple_planets(self, planet, max_days):
+        """Should work for various planets."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 180.0
+
+        jd_cross = ephem.swe_helio_cross_ut(planet, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+        assert jd_cross < jd_start + max_days
+
+        # Verify position
+        pos, _ = ephem.swe_calc_ut(jd_cross, planet, SEFLG_HELCTR)
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1, f"Planet {planet} at {pos[0]}, target {target}"
+
+
+class TestHelioCrossTT:
+    """Tests for swe_helio_cross (TT version)."""
+
+    @pytest.mark.unit
+    def test_helio_cross_tt_basic(self):
+        """Heliocentric crossing should return valid JD using TT."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        target = 90.0
+        jd_cross_tt = ephem.swe_helio_cross(SE_MARS, target, jd_start_tt, 0)
+
+        assert jd_cross_tt > jd_start_tt
+        assert jd_cross_tt < jd_start_tt + 700
+
+    @pytest.mark.unit
+    def test_helio_cross_tt_precision(self):
+        """Planet should be very close to target at crossing time (TT)."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        target = 123.456
+        jd_cross_tt = ephem.swe_helio_cross(SE_MARS, target, jd_start_tt, 0)
+
+        # Check position (using TT version of calc)
+        pos, _ = ephem.swe_calc(jd_cross_tt, SE_MARS, SEFLG_HELCTR)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 0.01, f"Mars helio at {pos[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_helio_cross_tt_vs_ut_consistency(self):
+        """TT and UT versions should give consistent results."""
+        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_ut)
+        jd_tt = jd_ut + delta_t
+
+        target = 180.0
+
+        # Get crossing time in UT
+        jd_cross_ut = ephem.swe_helio_cross_ut(SE_MARS, target, jd_ut, 0)
+
+        # Get crossing time in TT
+        jd_cross_tt = ephem.swe_helio_cross(SE_MARS, target, jd_tt, 0)
+
+        # Convert UT result to TT for comparison
+        delta_t_cross = ephem.swe_deltat(jd_cross_ut)
+        jd_cross_ut_as_tt = jd_cross_ut + delta_t_cross
+
+        # They should be very close (within seconds)
+        diff_seconds = abs(jd_cross_tt - jd_cross_ut_as_tt) * 86400
+        assert diff_seconds < 10, f"TT vs UT consistency diff {diff_seconds} seconds"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "target", [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+    )
+    def test_helio_cross_tt_all_signs(self, target):
+        """All zodiac sign ingresses should work with TT version."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        jd_cross_tt = ephem.swe_helio_cross(SE_EARTH, float(target), jd_start_tt, 0)
+
+        # Verify position
+        pos, _ = ephem.swe_calc(jd_cross_tt, SE_EARTH, SEFLG_HELCTR)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 0.01, f"Target {target}° diff {diff}°"
+
+
+class TestHelioCrossEdgeCases:
+    """Test edge cases for heliocentric crossing functions."""
+
+    @pytest.mark.edge_case
+    def test_helio_cross_target_360_equals_0(self):
+        """360° should be same as 0°."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        jd_360 = ephem.swe_helio_cross_ut(SE_MARS, 360.0, jd_start, 0)
+        jd_0 = ephem.swe_helio_cross_ut(SE_MARS, 0.0, jd_start, 0)
+
+        # Should be the same crossing
+        assert abs(jd_360 - jd_0) < 0.001
+
+    @pytest.mark.edge_case
+    def test_helio_cross_target_negative_normalized(self):
+        """Negative target should be normalized."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        jd_neg = ephem.swe_helio_cross_ut(SE_MARS, -30.0, jd_start, 0)  # = 330°
+        jd_pos = ephem.swe_helio_cross_ut(SE_MARS, 330.0, jd_start, 0)
+
+        assert abs(jd_neg - jd_pos) < 0.001
+
+    @pytest.mark.edge_case
+    def test_helio_cross_consecutive_crossings(self):
+        """Should find consecutive crossings for a full orbit."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        crossings = []
+
+        # Find Earth crossing each 30° for a full year
+        for target in range(0, 360, 30):
+            jd_cross = ephem.swe_helio_cross_ut(SE_EARTH, float(target), jd_start, 0)
+            crossings.append(jd_cross)
+
+        # All crossings should be within one year
+        assert max(crossings) - jd_start < 366
+
+
+class TestHelioCrossVsGeocentricConcept:
+    """Verify heliocentric differs from geocentric (conceptual tests)."""
+
+    @pytest.mark.unit
+    def test_helio_no_retrograde(self):
+        """Heliocentric planets should not show retrograde behavior."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find several consecutive crossings for Mars
+        crossings = []
+        jd = jd_start
+        for _ in range(4):
+            jd_cross = ephem.swe_helio_cross_ut(SE_MARS, 90.0, jd, 0)
+            crossings.append(jd_cross)
+            jd = jd_cross + 1  # Move past this crossing
+
+        # Each crossing should be about one Mars orbital period apart (~687 days)
+        for i in range(1, len(crossings)):
+            diff = crossings[i] - crossings[i - 1]
+            # Should be around 687 days (±50 days for minor perturbations)
+            assert 600 < diff < 750, f"Period between crossings: {diff} days"
+
+    @pytest.mark.unit
+    def test_helio_vs_geocentric_different_positions(self):
+        """Heliocentric and geocentric positions should generally differ."""
+        jd = ephem.swe_julday(2024, 6, 15, 12.0)
+
+        # Get geocentric Mars position
+        geo_pos, _ = ephem.swe_calc_ut(jd, SE_MARS, 0)
+
+        # Get heliocentric Mars position
+        helio_pos, _ = ephem.swe_calc_ut(jd, SE_MARS, SEFLG_HELCTR)
+
+        # Positions should be different (unless Mars is in opposition)
+        diff = abs(geo_pos[0] - helio_pos[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        # They're generally different but we just verify the function works
+        # and returns valid positions
+        assert 0 <= geo_pos[0] < 360
+        assert 0 <= helio_pos[0] < 360
+
+
 class TestMooncrossNodeEclipseRelevance:
     """Test mooncross_node in context of eclipse calculations."""
 
