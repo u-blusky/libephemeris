@@ -30,7 +30,7 @@ from .planets import (
     swe_get_orbital_elements_ut,
     swe_orbit_max_min_true_distance,
 )
-from .houses import swe_houses, swe_houses_ex, swe_house_name
+from .houses import swe_houses, swe_houses_ex, swe_houses_ex2, swe_house_name
 from .state import (
     set_topo as swe_set_topo,
     set_ephe_path as swe_set_ephe_path,
@@ -68,6 +68,7 @@ orbit_max_min_true_distance = swe_orbit_max_min_true_distance
 # Houses
 houses = swe_houses
 houses_ex = swe_houses_ex
+houses_ex2 = swe_houses_ex2
 house_name = swe_house_name
 
 # Ayanamsa (sidereal)
@@ -144,6 +145,8 @@ __all__ = [
     "houses",
     "swe_houses_ex",
     "houses_ex",
+    "swe_houses_ex2",
+    "houses_ex2",
     "swe_house_name",
     "house_name",
     # Ayanamsa (sidereal)
