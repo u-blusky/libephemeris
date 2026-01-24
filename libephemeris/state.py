@@ -26,7 +26,7 @@ from skyfield.jpllib import SpiceKernel
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de421.bsp"  # Ephemeris file to use (default: DE421)
 _LOADER: Optional[Loader] = None  # Skyfield data loader
-_PLANETS: Optional[SpiceKernel]  = None  # Loaded planetary ephemeris
+_PLANETS: Optional[SpiceKernel] = None  # Loaded planetary ephemeris
 _TS: Optional[Timescale] = None  # Timescale object
 _TOPO: Optional[Topos] = None  # Observer location
 _SIDEREAL_MODE: Optional[int] = None  # Active sidereal mode ID
@@ -38,10 +38,10 @@ _ANGLES_CACHE: dict[str, float] = {}  # Pre-calculated angles {name: longitude}
 def get_loader() -> Loader:
     """
     Get or create the Skyfield data loader.
-    
+
     Returns:
         Loader: Skyfield Loader instance for downloading/caching ephemeris files
-        
+
     Note:
         Data files are cached in the parent directory of this module by default.
     """
@@ -55,10 +55,10 @@ def get_loader() -> Loader:
 def get_timescale() -> Timescale:
     """
     Get or create the Skyfield timescale object.
-    
+
     Returns:
         Timescale: Skyfield timescale for time conversions (UTC, TT, etc.)
-        
+
     Note:
         Automatically downloads IERS data for Delta T calculations if needed.
     """
@@ -72,13 +72,13 @@ def get_timescale() -> Timescale:
 def get_planets() -> SpiceKernel:
     """
     Get or load the planetary ephemeris (DE421 by default).
-    
+
     Returns:
         SpiceKernel: Loaded JPL ephemeris kernel containing planetary positions
-        
+
     Raises:
         FileNotFoundError: If ephemeris file cannot be found or downloaded
-        
+
     Note:
         Uses the ephemeris file set via set_ephemeris_file() (default: de421.bsp).
         Searches in _EPHEMERIS_PATH if set, then workspace root, then downloads.
@@ -86,14 +86,14 @@ def get_planets() -> SpiceKernel:
     global _PLANETS
     if _PLANETS is None:
         load = get_loader()
-        
+
         # Try custom ephemeris path first if set
         if _EPHEMERIS_PATH:
             bsp_path = os.path.join(_EPHEMERIS_PATH, _EPHEMERIS_FILE)
             if os.path.exists(bsp_path):
                 _PLANETS = load(bsp_path)
                 return _PLANETS
-        
+
         # Try workspace root
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         bsp_path = os.path.join(base_dir, _EPHEMERIS_FILE)
@@ -108,12 +108,12 @@ def get_planets() -> SpiceKernel:
 def set_topo(lon: float, lat: float, alt: float) -> None:
     """
     Set observer's topocentric location for planet calculations.
-    
+
     Args:
         lon: Geographic longitude in degrees (East positive)
         lat: Geographic latitude in degrees (North positive)
         alt: Elevation above sea level in meters
-        
+
     Note:
         Required for topocentric calculations (SEFLG_TOPOCTR),
         angles (Ascendant, MC), and Arabic parts.
@@ -125,7 +125,7 @@ def set_topo(lon: float, lat: float, alt: float) -> None:
 def get_topo() -> Optional[Topos]:
     """
     Get the observer's topocentric location.
-    
+
     Returns:
         Optional[Topos]: Current observer location or None if not set
     """
@@ -135,12 +135,12 @@ def get_topo() -> Optional[Topos]:
 def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
     """
     Set the sidereal mode (ayanamsha system) for calculations.
-    
+
     Args:
         mode: Sidereal mode ID (SE_SIDM_*) or 255 for custom
         t0: Reference epoch (Julian Day) for custom ayanamsha (default: J2000.0)
         ayan_t0: Ayanamsha value at t0 in degrees (for custom mode)
-        
+
     Note:
         Affects all position calculations when SEFLG_SIDEREAL is set.
         Default is Lahiri (SE_SIDM_LAHIRI) if never set.
@@ -154,13 +154,13 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
 def get_sid_mode(full: bool = False) -> Union[int, tuple[int, float, float]]:
     """
     Get the current sidereal mode configuration.
-    
+
     Args:
         full: If True, return (mode, t0, ayan_t0); if False, return only mode ID
-        
+
     Returns:
         int or tuple: Sidereal mode ID, or full configuration tuple
-        
+
     Note:
         Returns SE_SIDM_LAHIRI (1) by default if never set.
     """
@@ -172,10 +172,10 @@ def get_sid_mode(full: bool = False) -> Union[int, tuple[int, float, float]]:
 def get_angles_cache() -> dict[str, float]:
     """
     Get cached astrological angles for the current calculation context.
-    
+
     Returns:
         dict: Cached angles {name: longitude_degrees}
-        
+
     Note:
         Used by Arabic parts calculations which require pre-calculated
         planetary positions and angles.
@@ -186,11 +186,11 @@ def get_angles_cache() -> dict[str, float]:
 def set_angles_cache(angles: dict[str, float]) -> None:
     """
     Cache pre-calculated angles for use in Arabic parts and other virtual points.
-    
+
     Args:
         angles: Dictionary of angles {name: longitude_degrees}
                 e.g., {"Sun": 120.5, "Moon": 240.3, "Asc": 15.7}
-                
+
     Note:
         Creates a copy to prevent external mutation of cache.
     """
@@ -201,7 +201,7 @@ def set_angles_cache(angles: dict[str, float]) -> None:
 def clear_angles_cache() -> None:
     """
     Clear the angles cache.
-    
+
     Use this between unrelated calculation contexts to prevent stale data.
     """
     global _ANGLES_CACHE
@@ -213,10 +213,10 @@ def clear_angles_cache() -> None:
 def set_ephe_path(path: Optional[str]) -> None:
     """
     Set the path for ephemeris files.
-    
+
     Args:
         path: Path to directory containing ephemeris files.
-        
+
     Note:
         This sets the directory where get_planets() will look for the ephemeris
         file specified by set_ephemeris_file(). If the file is not found there,
@@ -231,25 +231,55 @@ def set_ephe_path(path: Optional[str]) -> None:
 def set_ephemeris_file(filename: str) -> None:
     """
     Set the ephemeris file to use for planetary calculations.
-    
+
     Args:
         filename: Name of the JPL ephemeris file (e.g., "de421.bsp", "de422.bsp", "de431.bsp")
-        
+
     Note:
         This allows using different ephemeris files with varying date ranges:
         - de421.bsp: 1900-2050 (default, 16 MB)
         - de422.bsp: -3000-3000 (623 MB)
         - de430.bsp: 1550-2650 (128 MB)
         - de431.bsp: -13200-17191 (3.4 GB)
-        
+
         The file will be searched in:
         1. The path set by set_ephe_path() if configured
         2. The workspace root directory
         3. Downloaded from JPL if not found locally
-        
+
         Changing the ephemeris file clears the cached planets and forces a reload.
     """
     global _EPHEMERIS_FILE, _PLANETS
     _EPHEMERIS_FILE = filename
     # Clear cached planets to force reload with new file
     _PLANETS = None
+
+
+def set_jpl_file(filename: str) -> None:
+    """
+    Set the JPL ephemeris file to use for planetary calculations.
+
+    This is an alias for set_ephemeris_file() with a more descriptive name
+    emphasizing JPL (Jet Propulsion Laboratory) ephemeris files.
+
+    Args:
+        filename: Name of the JPL ephemeris file (e.g., "de421.bsp", "de441.bsp")
+
+    Note:
+        Skyfield/libephemeris uses JPL Development Ephemeris (DE) files:
+        - de421.bsp: 1900-2050 (default, 16 MB)
+        - de422.bsp: -3000-3000 (623 MB)
+        - de430.bsp: 1550-2650 (128 MB)
+        - de431.bsp: -13200-17191 (3.4 GB)
+        - de440.bsp: 1550-2650 (128 MB)
+        - de441.bsp: -13200-17191 (3.4 GB)
+
+        If the file is not found locally, Skyfield will attempt to download it.
+        Use set_ephe_path() to specify a local directory containing the file.
+
+    Example:
+        >>> from libephemeris import set_jpl_file, set_ephe_path
+        >>> set_ephe_path("/path/to/ephemeris/files")
+        >>> set_jpl_file("de441.bsp")  # Use local de441.bsp file
+    """
+    set_ephemeris_file(filename)

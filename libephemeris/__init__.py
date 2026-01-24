@@ -50,6 +50,7 @@ from .state import (
     set_topo as swe_set_topo,
     set_ephe_path as swe_set_ephe_path,
     set_ephemeris_file as swe_set_ephemeris_file,
+    set_jpl_file as swe_set_jpl_file,
 )
 from .crossing import (
     swe_solcross_ut,
@@ -189,6 +190,7 @@ set_sid_mode = swe_set_sid_mode
 set_topo = swe_set_topo
 set_ephe_path = swe_set_ephe_path
 set_ephemeris_file = swe_set_ephemeris_file
+set_jpl_file = swe_set_jpl_file
 
 # Fixed Stars
 fixstar_ut = swe_fixstar_ut
@@ -301,6 +303,8 @@ __all__ = [
     "set_ephe_path",
     "swe_set_ephemeris_file",
     "set_ephemeris_file",
+    "swe_set_jpl_file",
+    "set_jpl_file",
     # Crossings
     "swe_solcross_ut",
     "solcross_ut",
