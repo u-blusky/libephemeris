@@ -65,6 +65,7 @@ class StarCatalogEntry:
         nomenclature: Bayer/Flamsteed designation (e.g. "alLeo", "alVir")
         hip_number: Hipparcos catalog number (e.g. 49669)
         data: Astrometric data for position calculation
+        magnitude: Visual magnitude (apparent brightness)
     """
 
     id: int
@@ -72,6 +73,7 @@ class StarCatalogEntry:
     nomenclature: str
     hip_number: int
     data: StarData
+    magnitude: float
 
 
 # Extended star catalog with names and catalog numbers
@@ -87,6 +89,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00249,  # -249 mas/yr (westward)
             pm_dec=0.00152,  # +152 mas/yr (northward)
         ),
+        magnitude=1.40,  # Visual magnitude
     ),
     StarCatalogEntry(
         id=SE_SPICA_STAR,
@@ -99,6 +102,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.04235,  # -42.35 mas/yr
             pm_dec=-0.03067,  # -30.67 mas/yr
         ),
+        magnitude=1.04,  # Visual magnitude
     ),
 ]
 
@@ -536,3 +540,75 @@ def swe_fixstar2(
         return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
     except Exception as e:
         return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
+
+
+# Magnitude values for legacy _resolve_star_id lookup
+_STAR_MAGNITUDES = {
+    SE_REGULUS: 1.40,
+    SE_SPICA_STAR: 1.04,
+}
+
+
+def swe_fixstar_mag(star_name: str) -> Tuple[float, str]:
+    """
+    Get the visual magnitude of a fixed star without calculating position.
+
+    Lightweight function that returns only the magnitude, useful for
+    visibility calculations where position is not needed.
+
+    Args:
+        star_name: Name of star (e.g. "Regulus", "Spica")
+
+    Returns:
+        Tuple containing:
+            - magnitude: Visual magnitude (float), or 0.0 on error
+            - error_msg: Error message if any, empty string on success
+
+    Example:
+        >>> mag, err = swe_fixstar_mag("Regulus")
+        >>> print(f"Regulus magnitude: {mag}")  # 1.40
+    """
+    star_id, error = _resolve_star_id(star_name)
+    if error:
+        return (0.0, error)
+
+    if star_id in _STAR_MAGNITUDES:
+        return (_STAR_MAGNITUDES[star_id], "")
+    else:
+        return (0.0, f"Magnitude not available for star ID {star_id}")
+
+
+def swe_fixstar2_mag(star_name: str) -> Tuple[str, float, str]:
+    """
+    Get the visual magnitude of a fixed star with flexible lookup.
+
+    Enhanced version that supports flexible star lookup like swe_fixstar2:
+    - Star name (full or partial): "Regulus", "Reg"
+    - Hipparcos catalog number: "49669", ",49669"
+    - Bayer/Flamsteed designation: "alLeo", "alVir"
+
+    Returns the full star name along with the magnitude, useful for
+    visibility calculations where position is not needed.
+
+    Args:
+        star_name: Star identifier (name, catalog number, or partial search)
+
+    Returns:
+        Tuple containing:
+            - star_name_out: Full star name "Name,Nomenclature" (e.g. "Regulus,alLeo")
+            - magnitude: Visual magnitude (float), or 0.0 on error
+            - error_msg: Error message if any, empty string on success
+
+    Example:
+        >>> name, mag, err = swe_fixstar2_mag("Reg")
+        >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
+
+        >>> name, mag, err = swe_fixstar2_mag("49669")
+        >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
+    """
+    entry, error = _resolve_star2(star_name)
+    if error or entry is None:
+        return ("", 0.0, error or "Star not found")
+
+    star_name_out = _format_star_name(entry)
+    return (star_name_out, entry.magnitude, "")

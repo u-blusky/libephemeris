@@ -51,7 +51,14 @@ from .state import (
 )
 from .crossing import swe_solcross_ut, swe_mooncross_ut, swe_cross_ut
 from .utils import difdeg2n, swe_calc_angles
-from .fixed_stars import swe_fixstar_ut, swe_fixstar, swe_fixstar2, swe_fixstar2_ut
+from .fixed_stars import (
+    swe_fixstar_ut,
+    swe_fixstar,
+    swe_fixstar2,
+    swe_fixstar2_ut,
+    swe_fixstar_mag,
+    swe_fixstar2_mag,
+)
 from .context import EphemerisContext  # NEW: Thread-safe context API
 
 
@@ -105,6 +112,8 @@ fixstar_ut = swe_fixstar_ut
 fixstar = swe_fixstar
 fixstar2 = swe_fixstar2
 fixstar2_ut = swe_fixstar2_ut
+fixstar_mag = swe_fixstar_mag
+fixstar2_mag = swe_fixstar2_mag
 
 # Crossings
 solcross_ut = swe_solcross_ut
@@ -218,4 +227,8 @@ __all__ = [
     "fixstar2",
     "swe_fixstar2_ut",
     "fixstar2_ut",
+    "swe_fixstar_mag",
+    "fixstar_mag",
+    "swe_fixstar2_mag",
+    "fixstar2_mag",
 ]
