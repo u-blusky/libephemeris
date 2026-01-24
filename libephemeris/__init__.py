@@ -33,6 +33,7 @@ from .planets import (
 from .houses import (
     swe_houses,
     swe_houses_armc,
+    swe_houses_armc_ex2,
     swe_houses_ex,
     swe_houses_ex2,
     swe_house_name,
@@ -74,6 +75,7 @@ orbit_max_min_true_distance = swe_orbit_max_min_true_distance
 # Houses
 houses = swe_houses
 houses_armc = swe_houses_armc
+houses_armc_ex2 = swe_houses_armc_ex2
 houses_ex = swe_houses_ex
 houses_ex2 = swe_houses_ex2
 house_name = swe_house_name
@@ -152,6 +154,8 @@ __all__ = [
     "houses",
     "swe_houses_armc",
     "houses_armc",
+    "swe_houses_armc_ex2",
+    "houses_armc_ex2",
     "swe_houses_ex",
     "houses_ex",
     "swe_houses_ex2",

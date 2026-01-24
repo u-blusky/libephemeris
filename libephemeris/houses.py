@@ -787,6 +787,87 @@ def swe_houses_armc(
     return tuple(cusps[1:13]), tuple(ascmc)
 
 
+def swe_houses_armc_ex2(
+    armc: float, lat: float, eps: float, hsys: int, flags: int = 0
+) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
+    """
+    Extended house calculation from ARMC returning cusps, angles, and their velocities.
+
+    This function combines swe_houses_armc() with velocity calculations similar to
+    swe_houses_ex2(). It calculates house cusps directly from the ARMC value and
+    also returns the velocities (derivatives) of house cusps and angles.
+
+    Velocities are calculated using centered finite differences at ±1 minute
+    intervals, with ARMC shifted by ±0.25° (corresponding to 1 minute of sidereal time).
+
+    Note: The flags parameter is accepted for API compatibility but currently
+    has no effect since sidereal mode requires a Julian Day for ayanamsa calculation,
+    which is not available when using ARMC directly.
+
+    Args:
+        armc: Right Ascension of Medium Coeli in degrees (0-360)
+        lat: Geographic latitude in degrees (positive North, negative South)
+        eps: True obliquity of the ecliptic in degrees
+        hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
+        flags: Calculation flags bitmask (reserved for future use)
+
+    Returns:
+        Tuple containing:
+            - cusps: Tuple of 12 house cusp longitudes in degrees
+            - ascmc: Tuple of 8 angles (Asc, MC, ARMC, Vertex, EquAsc, CoAsc, CoAscKoch, PolarAsc)
+            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day
+            - ascmc_speed: Tuple of 8 angle velocities in degrees/day
+
+    Example:
+        >>> eps = 23.4393  # true obliquity
+        >>> armc = 292.957  # ARMC in degrees
+        >>> cusps, ascmc, cusps_speed, ascmc_speed = swe_houses_armc_ex2(
+        ...     armc, 41.9, eps, ord('P'), 0
+        ... )
+        >>> # cusps_speed[0] is the velocity of the 1st house cusp (same as ASC)
+    """
+    # ARMC shift for 1 minute of time: 360° / (24 * 60 min) = 0.25° per minute
+    # This corresponds to dt = 1/1440 days used in swe_houses_ex2
+    d_armc = 360.0 / (24.0 * 60.0)  # 0.25° = 1 minute in ARMC
+    dt = 1.0 / 1440.0  # 1 minute in days (for velocity calculation)
+
+    # Calculate positions at current ARMC
+    cusps, ascmc = swe_houses_armc(armc, lat, eps, hsys)
+
+    # Calculate positions at ARMC - d_armc (1 minute earlier)
+    cusps_before, ascmc_before = swe_houses_armc(armc - d_armc, lat, eps, hsys)
+
+    # Calculate positions at ARMC + d_armc (1 minute later)
+    cusps_after, ascmc_after = swe_houses_armc(armc + d_armc, lat, eps, hsys)
+
+    # Calculate velocities using centered finite differences
+    # velocity = (pos_after - pos_before) / (2 * dt)
+    # Result is in degrees/day
+
+    def angular_diff_local(pos2: float, pos1: float) -> float:
+        """Calculate angular difference handling 360° wraparound."""
+        diff = pos2 - pos1
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        return diff
+
+    # Calculate cusp velocities
+    cusps_speed = tuple(
+        angular_diff_local(cusps_after[i], cusps_before[i]) / (2 * dt)
+        for i in range(len(cusps))
+    )
+
+    # Calculate ascmc velocities
+    ascmc_speed = tuple(
+        angular_diff_local(ascmc_after[i], ascmc_before[i]) / (2 * dt)
+        for i in range(len(ascmc))
+    )
+
+    return cusps, ascmc, cusps_speed, ascmc_speed
+
+
 def swe_houses_ex(
     tjdut: float, lat: float, lon: float, hsys: int, flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:

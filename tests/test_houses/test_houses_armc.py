@@ -264,3 +264,268 @@ class TestHousesArmcAlias:
 
         assert cusps1 == cusps2
         assert ascmc1 == ascmc2
+
+
+class TestHousesArmcEx2Basic:
+    """Basic tests for houses_armc_ex2 function."""
+
+    @pytest.mark.unit
+    def test_houses_armc_ex2_returns_correct_structure(self):
+        """houses_armc_ex2() should return (cusps, ascmc, cusps_speed, ascmc_speed) tuples."""
+        armc = 292.957
+        lat = 41.9
+        eps = 23.4393
+
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P")
+        )
+
+        # Should have 12 cusps
+        assert len(cusps) == 12
+        # Should have 8 ASCMC elements
+        assert len(ascmc) == 8
+        # Should have 12 cusp velocities
+        assert len(cusps_speed) == 12
+        # Should have 8 ASCMC velocities
+        assert len(ascmc_speed) == 8
+
+    @pytest.mark.unit
+    def test_houses_armc_ex2_cusps_match_houses_armc(self):
+        """Cusps and ascmc from houses_armc_ex2 should match houses_armc."""
+        armc = 292.957
+        lat = 41.9
+        eps = 23.4393
+
+        cusps_ex2, ascmc_ex2, _, _ = ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+
+        # Positions should be identical
+        assert cusps_ex2 == cusps
+        assert ascmc_ex2 == ascmc
+
+    @pytest.mark.unit
+    def test_houses_armc_ex2_velocities_are_reasonable(self):
+        """Velocities should be in reasonable range for house cusps."""
+        armc = 292.957
+        lat = 41.9
+        eps = 23.4393
+
+        _, _, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P")
+        )
+
+        # House cusps and angles rotate with Earth: ~360°/day
+        # Velocities should be approximately 360°/day (±50% due to projection effects)
+        for i, speed in enumerate(cusps_speed):
+            assert 100 < abs(speed) < 600, f"Cusp {i + 1} speed {speed} out of range"
+
+        # ASC velocity
+        assert 100 < abs(ascmc_speed[0]) < 600, (
+            f"ASC speed {ascmc_speed[0]} out of range"
+        )
+        # MC velocity
+        assert 100 < abs(ascmc_speed[1]) < 600, (
+            f"MC speed {ascmc_speed[1]} out of range"
+        )
+
+    @pytest.mark.unit
+    def test_houses_armc_ex2_velocities_are_positive(self):
+        """Velocities should generally be positive (prograde motion)."""
+        armc = 150.0
+        lat = 45.0
+        eps = 23.44
+
+        _, _, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P")
+        )
+
+        # Most cusps should have positive velocity (increasing longitude)
+        positive_cusps = sum(1 for s in cusps_speed if s > 0)
+        assert positive_cusps >= 8, (
+            f"Only {positive_cusps} cusps have positive velocity"
+        )
+
+        # ARMC velocity (ascmc_speed[2]) should be exactly 360°/day
+        assert abs(ascmc_speed[2] - 360.0) < 0.01, f"ARMC speed {ascmc_speed[2]} != 360"
+
+
+class TestHousesArmcEx2VariousSystems:
+    """Test houses_armc_ex2 for various house systems."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "hsys,name",
+        [
+            (ord("P"), "Placidus"),
+            (ord("K"), "Koch"),
+            (ord("O"), "Porphyry"),
+            (ord("R"), "Regiomontanus"),
+            (ord("C"), "Campanus"),
+            (ord("E"), "Equal"),
+            (ord("W"), "Whole Sign"),
+            (ord("B"), "Alcabitius"),
+            (ord("M"), "Morinus"),
+        ],
+    )
+    def test_houses_armc_ex2_various_systems(self, hsys, name):
+        """Test houses_armc_ex2 works for various house systems."""
+        armc = 150.0
+        lat = 45.0
+        eps = 23.44
+
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, hsys
+        )
+
+        # All should return valid structure
+        assert len(cusps) == 12, f"{name} cusps count wrong"
+        assert len(ascmc) == 8, f"{name} ascmc count wrong"
+        assert len(cusps_speed) == 12, f"{name} cusps_speed count wrong"
+        assert len(ascmc_speed) == 8, f"{name} ascmc_speed count wrong"
+
+        # All positions should be valid longitudes
+        for i, cusp in enumerate(cusps):
+            assert 0 <= cusp < 360, f"{name} cusp {i + 1} = {cusp} out of range"
+
+
+class TestHousesArmcEx2EdgeCases:
+    """Test edge cases for houses_armc_ex2."""
+
+    @pytest.mark.edge_case
+    def test_houses_armc_ex2_at_equator(self):
+        """houses_armc_ex2 should work at equator (lat=0)."""
+        armc = 180.0
+        lat = 0.0
+        eps = 23.44
+
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P")
+        )
+
+        assert len(cusps) == 12
+        assert len(cusps_speed) == 12
+
+    @pytest.mark.edge_case
+    @pytest.mark.parametrize("lat", [60.0, 65.0])
+    def test_houses_armc_ex2_high_latitude(self, lat):
+        """houses_armc_ex2 should handle high latitudes."""
+        armc = 100.0
+        eps = 23.44
+
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P")
+        )
+
+        assert len(cusps) == 12
+        assert len(cusps_speed) == 12
+
+    @pytest.mark.edge_case
+    def test_houses_armc_ex2_southern_hemisphere(self):
+        """houses_armc_ex2 should work in southern hemisphere."""
+        armc = 200.0
+        lat = -33.9  # Sydney
+        eps = 23.44
+
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P")
+        )
+
+        assert len(cusps) == 12
+        assert len(cusps_speed) == 12
+
+
+class TestHousesArmcEx2Alias:
+    """Test the houses_armc_ex2 alias (without swe_ prefix)."""
+
+    @pytest.mark.unit
+    def test_houses_armc_ex2_alias_exists(self):
+        """houses_armc_ex2 alias should exist."""
+        assert hasattr(ephem, "houses_armc_ex2")
+
+    @pytest.mark.unit
+    def test_houses_armc_ex2_alias_works(self):
+        """houses_armc_ex2 alias should work correctly."""
+        armc = 292.957
+        lat = 41.9
+        eps = 23.4393
+
+        # Both should return the same result
+        result1 = ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"))
+        result2 = ephem.houses_armc_ex2(armc, lat, eps, ord("P"))
+
+        assert result1 == result2
+
+
+class TestHousesArmcEx2VsPyswisseph:
+    """Compare houses_armc_ex2 with pyswisseph houses_armc_ex2."""
+
+    @pytest.mark.comparison
+    def test_houses_armc_ex2_cusps_match_pyswisseph(self):
+        """houses_armc_ex2 cusps should match pyswisseph."""
+        armc = 292.957072438026
+        lat = 41.9
+        eps = 23.43767671605485
+
+        cusps_lib, ascmc_lib, cusps_speed_lib, ascmc_speed_lib = (
+            ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"))
+        )
+        cusps_swe, ascmc_swe, cusps_speed_swe, ascmc_speed_swe = swe.houses_armc_ex2(
+            armc, lat, eps, b"P"
+        )
+
+        # Compare cusps
+        for i in range(12):
+            diff = abs(cusps_lib[i] - cusps_swe[i])
+            if diff > 180:
+                diff = 360 - diff
+            assert diff < 0.1, f"Cusp {i + 1} diff {diff}"
+
+        # Compare ASC
+        asc_diff = abs(ascmc_lib[0] - ascmc_swe[0])
+        if asc_diff > 180:
+            asc_diff = 360 - asc_diff
+        assert asc_diff < 0.01, f"ASC diff {asc_diff}"
+
+        # Compare MC
+        mc_diff = abs(ascmc_lib[1] - ascmc_swe[1])
+        if mc_diff > 180:
+            mc_diff = 360 - mc_diff
+        assert mc_diff < 0.01, f"MC diff {mc_diff}"
+
+    @pytest.mark.comparison
+    def test_houses_armc_ex2_velocities_match_pyswisseph(self):
+        """houses_armc_ex2 velocities should be close to pyswisseph."""
+        armc = 150.0
+        lat = 45.0
+        eps = 23.44
+
+        _, _, cusps_speed_lib, ascmc_speed_lib = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P")
+        )
+        _, _, cusps_speed_swe, ascmc_speed_swe = swe.houses_armc_ex2(
+            armc, lat, eps, b"P"
+        )
+
+        # Compare cusp velocities (allow 6% tolerance due to different finite diff methods)
+        for i in range(12):
+            if abs(cusps_speed_swe[i]) > 1:  # Avoid division by very small values
+                rel_diff = abs(cusps_speed_lib[i] - cusps_speed_swe[i]) / abs(
+                    cusps_speed_swe[i]
+                )
+                assert rel_diff < 0.06, (
+                    f"Cusp {i + 1} speed rel diff {rel_diff * 100:.1f}%"
+                )
+
+        # Compare ASC velocity
+        if abs(ascmc_speed_swe[0]) > 1:
+            rel_diff = abs(ascmc_speed_lib[0] - ascmc_speed_swe[0]) / abs(
+                ascmc_speed_swe[0]
+            )
+            assert rel_diff < 0.06, f"ASC speed rel diff {rel_diff * 100:.1f}%"
+
+        # Compare MC velocity
+        if abs(ascmc_speed_swe[1]) > 1:
+            rel_diff = abs(ascmc_speed_lib[1] - ascmc_speed_swe[1]) / abs(
+                ascmc_speed_swe[1]
+            )
+            assert rel_diff < 0.06, f"MC speed rel diff {rel_diff * 100:.1f}%"
