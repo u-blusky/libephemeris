@@ -12,6 +12,10 @@ from typing import Tuple
 SE_ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
 SE_EQU2HOR: int = 1  # Equatorial coordinates to horizontal
 
+# Azalt_rev calculation method flags (compatible with pyswisseph)
+SE_HOR2ECL: int = 0  # Horizontal to ecliptic coordinates
+SE_HOR2EQU: int = 1  # Horizontal to equatorial coordinates
+
 
 def cotrans_sp(
     coord: Tuple[float, float, float],
@@ -328,6 +332,131 @@ def azalt(
         alt_apparent = alt_true
 
     return (azimuth, alt_true, alt_apparent)
+
+
+def azalt_rev(
+    jd: float,
+    calc_flag: int,
+    lat: float,
+    lon: float,
+    altitude: float,
+    azimuth: float,
+    true_altitude: float,
+) -> Tuple[float, float]:
+    """
+    Convert horizontal coordinates (azimuth/altitude) to equatorial or ecliptic.
+
+    This function is the inverse of azalt(): it transforms horizontal coordinates
+    (azimuth and true altitude) to celestial coordinates (equatorial or ecliptic)
+    for a given observer location and time.
+
+    Compatible with pyswisseph's swe.azalt_rev() function.
+
+    Note: This function is not precisely the reverse of azalt(). If only an
+    apparent altitude is available, the true altitude must first be computed
+    using a refraction correction.
+
+    Args:
+        jd: Julian Day in Universal Time (UT1)
+        calc_flag: Output coordinate type flag:
+            - SE_HOR2EQU (1): Output is equatorial (RA, Dec)
+            - SE_HOR2ECL (0): Output is ecliptic (longitude, latitude)
+        lat: Geographic latitude of observer in degrees (North positive)
+        lon: Geographic longitude of observer in degrees (East positive)
+        altitude: Observer altitude above sea level in meters
+        azimuth: Azimuth in degrees from South, westward
+                 (0=South, 90=West, 180=North, 270=East)
+        true_altitude: True (geometric) altitude above horizon in degrees
+
+    Returns:
+        Tuple of (x1, x2) where:
+            - If calc_flag == SE_HOR2EQU: (Right Ascension, Declination) in degrees
+            - If calc_flag == SE_HOR2ECL: (Ecliptic longitude, Ecliptic latitude) in degrees
+
+    Example:
+        >>> from libephemeris import azalt_rev, SE_HOR2EQU, julday
+        >>> jd = julday(2024, 6, 15, 12.0)
+        >>> # Object at azimuth 90° (West), altitude 45°, observer at Rome
+        >>> ra, dec = azalt_rev(jd, SE_HOR2EQU, 41.9, 12.5, 0, 90.0, 45.0)
+    """
+    from .time_utils import sidtime
+    from skyfield.nutationlib import iau2000b_radians
+    from .state import get_timescale
+
+    # Get true obliquity (mean obliquity + nutation in obliquity)
+    # This is needed for accurate equatorial to ecliptic conversion
+    T = (jd - 2451545.0) / 36525.0
+
+    # Mean obliquity (Laskar 1986 formula)
+    eps0 = (
+        84381.406 - 46.836769 * T - 0.0001831 * T * T + 0.00200340 * T * T * T
+    ) / 3600.0  # Convert arcsec to degrees
+
+    # Add nutation in obliquity for true obliquity
+    ts = get_timescale()
+    t = ts.ut1_jd(jd)
+    dpsi_rad, deps_rad = iau2000b_radians(t)
+    deps_deg = math.degrees(deps_rad)
+    eps = eps0 + deps_deg  # True obliquity
+
+    # Convert to radians for calculation
+    az_rad = math.radians(azimuth)
+    alt_rad = math.radians(true_altitude)
+    lat_rad = math.radians(lat)
+
+    # Calculate declination from horizontal coordinates
+    # For azimuth measured from South (westward), the formula is:
+    # sin(dec) = sin(lat) * sin(alt) - cos(lat) * cos(alt) * cos(az)
+    # Note: The minus sign is because azimuth is from South, not North
+    sin_dec = math.sin(lat_rad) * math.sin(alt_rad) - math.cos(lat_rad) * math.cos(
+        alt_rad
+    ) * math.cos(az_rad)
+    # Clamp to avoid numerical issues with asin
+    sin_dec = max(-1.0, min(1.0, sin_dec))
+    dec_rad = math.asin(sin_dec)
+    dec = math.degrees(dec_rad)
+
+    # Calculate hour angle from horizontal coordinates
+    # From the forward azalt transform, we have:
+    # y = sin(H) * cos(dec)  -> used in atan2 to get azimuth
+    # x = cos(H) * cos(dec) * sin(lat) - sin(dec) * cos(lat)
+    #
+    # Therefore:
+    # sin(H) = sin(az) * cos(alt) / cos(dec)
+    # cos(H) = (cos(az) * cos(alt) + sin(dec) * cos(lat)) / (cos(dec) * sin(lat))
+    cos_dec = math.cos(dec_rad)
+    cos_lat = math.cos(lat_rad)
+    sin_lat = math.sin(lat_rad)
+
+    if abs(cos_dec) < 1e-10 or abs(sin_lat) < 1e-10:
+        # At poles or object at celestial pole, hour angle is undefined
+        # Use 0 as default
+        ha = 0.0
+    else:
+        sin_H = math.sin(az_rad) * math.cos(alt_rad) / cos_dec
+        cos_H = (math.cos(az_rad) * math.cos(alt_rad) + sin_dec * cos_lat) / (
+            cos_dec * sin_lat
+        )
+
+        ha_rad = math.atan2(sin_H, cos_H)
+        ha = math.degrees(ha_rad)
+
+    # Calculate Local Sidereal Time
+    nutation = 0.0  # Mean sidereal time approximation (same as azalt)
+    lst_hours = sidtime(jd, lon, eps, nutation)
+    lst_deg = lst_hours * 15.0  # Convert hours to degrees
+
+    # Calculate Right Ascension: RA = LST - H
+    ra = (lst_deg - ha) % 360.0
+
+    if calc_flag == SE_HOR2EQU:
+        # Return equatorial coordinates (RA, Dec)
+        return (ra, dec)
+    else:
+        # SE_HOR2ECL: Convert equatorial to ecliptic
+        # cotrans with negative obliquity converts equatorial to ecliptic
+        ecl_coord = cotrans((ra, dec, 1.0), eps)
+        return (ecl_coord[0], ecl_coord[1])
 
 
 def cotrans(

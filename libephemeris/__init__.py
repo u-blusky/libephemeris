@@ -92,8 +92,11 @@ from .utils import (
     cotrans,
     cotrans_sp,
     azalt,
+    azalt_rev,
     SE_ECL2HOR,
     SE_EQU2HOR,
+    SE_HOR2ECL,
+    SE_HOR2EQU,
 )
 from .fixed_stars import (
     swe_fixstar_ut,
@@ -307,8 +310,11 @@ __all__ = [
     "cotrans",
     "cotrans_sp",
     "azalt",
+    "azalt_rev",
     "SE_ECL2HOR",
     "SE_EQU2HOR",
+    "SE_HOR2ECL",
+    "SE_HOR2EQU",
     # Helpers
     "calc_all_arabic_parts",
     # Fixed Stars
