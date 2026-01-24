@@ -430,3 +430,195 @@ class TestCrossUtGeneric:
         if diff > 180:
             diff = 360 - diff
         assert diff < 0.1  # Mercury moves fast, allow more tolerance
+
+
+class TestMooncrossNodeBasic:
+    """Basic tests for Moon node crossing function."""
+
+    @pytest.mark.unit
+    def test_mooncross_node_basic(self):
+        """Moon node crossing should return valid JD."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_cross = ephem.swe_mooncross_node_ut(jd_start, 0)
+
+        assert jd_cross > jd_start
+        # Should be within ~14 days (half the nodal month)
+        assert jd_cross < jd_start + 14
+
+    @pytest.mark.unit
+    def test_mooncross_node_latitude_near_zero(self):
+        """Moon latitude should be near zero at node crossing."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_cross = ephem.swe_mooncross_node_ut(jd_start, 0)
+
+        # Check Moon latitude at crossing
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+
+        # Latitude should be very close to 0
+        assert abs(pos[1]) < 0.01, f"Moon latitude at node crossing: {pos[1]}"
+
+    @pytest.mark.unit
+    def test_mooncross_node_consecutive_crossings(self):
+        """Should find consecutive node crossings ~13.6 days apart."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find first node crossing
+        jd_first = ephem.swe_mooncross_node_ut(jd_start, 0)
+
+        # Find second node crossing by starting just after first
+        jd_second = ephem.swe_mooncross_node_ut(jd_first + 0.5, 0)
+
+        # Should be roughly 13.6 days apart (half the nodal month)
+        diff_days = jd_second - jd_first
+        assert 12 < diff_days < 15, f"Time between node crossings: {diff_days} days"
+
+    @pytest.mark.unit
+    def test_mooncross_node_ascending_vs_descending(self):
+        """Can determine ascending vs descending node from latitude velocity."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find first crossing
+        jd_first = ephem.swe_mooncross_node_ut(jd_start, 0)
+        pos_first, _ = ephem.swe_calc_ut(jd_first, SE_MOON, SEFLG_SPEED)
+
+        # Find second crossing
+        jd_second = ephem.swe_mooncross_node_ut(jd_first + 0.5, 0)
+        pos_second, _ = ephem.swe_calc_ut(jd_second, SE_MOON, SEFLG_SPEED)
+
+        # Latitude velocities should have opposite signs
+        # (one ascending, one descending)
+        assert pos_first[4] * pos_second[4] < 0, (
+            f"Consecutive crossings should alternate: "
+            f"v1={pos_first[4]}, v2={pos_second[4]}"
+        )
+
+
+class TestMooncrossNodeTT:
+    """Tests for swe_mooncross_node (TT version)."""
+
+    @pytest.mark.unit
+    def test_mooncross_node_tt_basic(self):
+        """Moon node crossing should return valid JD using TT."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        jd_cross_tt = ephem.swe_mooncross_node(jd_start_tt, 0)
+
+        assert jd_cross_tt > jd_start_tt
+        # Should be within ~14 days
+        assert jd_cross_tt < jd_start_tt + 14
+
+    @pytest.mark.unit
+    def test_mooncross_node_tt_precision(self):
+        """Moon latitude should be near zero at node crossing (TT)."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        jd_cross_tt = ephem.swe_mooncross_node(jd_start_tt, 0)
+
+        # Check Moon latitude at crossing (using TT version of calc)
+        pos, _ = ephem.swe_calc(jd_cross_tt, SE_MOON, 0)
+
+        # Latitude should be very close to 0
+        assert abs(pos[1]) < 0.01, f"Moon latitude at node crossing: {pos[1]}"
+
+    @pytest.mark.unit
+    def test_mooncross_node_tt_vs_ut_consistency(self):
+        """TT and UT versions should give consistent results."""
+        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_ut)
+        jd_tt = jd_ut + delta_t
+
+        # Get crossing time in UT
+        jd_cross_ut = ephem.swe_mooncross_node_ut(jd_ut, 0)
+
+        # Get crossing time in TT
+        jd_cross_tt = ephem.swe_mooncross_node(jd_tt, 0)
+
+        # Convert UT result to TT for comparison
+        delta_t_cross = ephem.swe_deltat(jd_cross_ut)
+        jd_cross_ut_as_tt = jd_cross_ut + delta_t_cross
+
+        # They should be very close (within seconds)
+        diff_seconds = abs(jd_cross_tt - jd_cross_ut_as_tt) * 86400
+        assert diff_seconds < 10, f"TT vs UT consistency diff {diff_seconds} seconds"
+
+
+class TestMooncrossNodeVsPyswisseph:
+    """Compare mooncross_node with pyswisseph."""
+
+    @pytest.mark.comparison
+    def test_mooncross_node_vs_pyswisseph(self):
+        """Moon node crossing should match pyswisseph."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        jd_lib = ephem.swe_mooncross_node_ut(jd_start, 0)
+        # pyswisseph returns (jd_cross, xlon, xlat)
+        result_swe = swe.mooncross_node_ut(jd_start, 0)
+        jd_swe = result_swe[0]
+
+        # Difference should be less than 3 minutes
+        diff_seconds = abs(jd_lib - jd_swe) * 86400
+        assert diff_seconds < 180, f"Moon node crossing diff {diff_seconds} seconds"
+
+    @pytest.mark.comparison
+    def test_mooncross_node_tt_vs_pyswisseph(self):
+        """TT version should match pyswisseph mooncross_node()."""
+        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = swe.deltat(jd_ut)
+        jd_tt = jd_ut + delta_t
+
+        jd_lib = ephem.swe_mooncross_node(jd_tt, 0)
+        # pyswisseph returns (jd_cross, xlon, xlat)
+        result_swe = swe.mooncross_node(jd_tt, 0)
+        jd_swe = result_swe[0]
+
+        # Difference should be less than 3 minutes
+        diff_seconds = abs(jd_lib - jd_swe) * 86400
+        assert diff_seconds < 180, f"Moon node crossing diff {diff_seconds} seconds"
+
+    @pytest.mark.comparison
+    def test_mooncross_node_multiple_crossings(self):
+        """Multiple consecutive crossings should match pyswisseph."""
+        jd = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        for i in range(4):
+            jd_lib = ephem.swe_mooncross_node_ut(jd, 0)
+            # pyswisseph returns (jd_cross, xlon, xlat)
+            result_swe = swe.mooncross_node_ut(jd, 0)
+            jd_swe = result_swe[0]
+
+            diff_seconds = abs(jd_lib - jd_swe) * 86400
+            assert diff_seconds < 180, f"Crossing {i + 1} diff {diff_seconds} seconds"
+
+            # Move to after this crossing for next iteration
+            jd = jd_lib + 0.5
+
+
+class TestMooncrossNodeEclipseRelevance:
+    """Test mooncross_node in context of eclipse calculations."""
+
+    @pytest.mark.unit
+    def test_eclipse_proximity_to_node(self):
+        """Eclipses occur when Sun is near a lunar node."""
+        # Start from a known solar eclipse date: April 8, 2024
+        jd_eclipse = ephem.swe_julday(2024, 4, 8, 18.0)
+
+        # Find the nearest node crossing
+        # Check both before and after
+        jd_before = jd_eclipse - 7  # Week before
+        jd_cross_before = ephem.swe_mooncross_node_ut(jd_before, 0)
+
+        jd_after = jd_eclipse - 0.5
+        jd_cross_after = ephem.swe_mooncross_node_ut(jd_after, 0)
+
+        # The eclipse should be close to a node crossing (within a few days)
+        diff_before = abs(jd_eclipse - jd_cross_before)
+        diff_after = abs(jd_cross_after - jd_eclipse)
+
+        # Eclipse should be within ~1 day of a node crossing for a total eclipse
+        assert min(diff_before, diff_after) < 2, (
+            f"Eclipse not near node: before={diff_before}, after={diff_after}"
+        )

@@ -54,6 +54,8 @@ from .crossing import (
     swe_solcross,
     swe_mooncross_ut,
     swe_mooncross,
+    swe_mooncross_node_ut,
+    swe_mooncross_node,
     swe_cross_ut,
 )
 from .eclipse import (
@@ -152,6 +154,8 @@ solcross_ut = swe_solcross_ut
 solcross = swe_solcross
 mooncross_ut = swe_mooncross_ut
 mooncross = swe_mooncross
+mooncross_node_ut = swe_mooncross_node_ut
+mooncross_node = swe_mooncross_node
 
 
 # Helper for Arabic parts
@@ -250,6 +254,10 @@ __all__ = [
     "mooncross_ut",
     "swe_mooncross",
     "mooncross",
+    "swe_mooncross_node_ut",
+    "mooncross_node_ut",
+    "swe_mooncross_node",
+    "mooncross_node",
     "swe_cross_ut",
     # Eclipses
     "sol_eclipse_when_glob",
