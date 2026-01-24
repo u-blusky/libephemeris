@@ -783,6 +783,36 @@ def cotrans(
     return (new_lon, new_lat, dist)
 
 
+def degnorm(angle: float) -> float:
+    """
+    Normalize an angle to the range [0, 360).
+
+    Compatible with pyswisseph's swe.degnorm() function.
+    Equivalent to `angle % 360` but correctly handles negative numbers.
+
+    Args:
+        angle: Angle in degrees (any value)
+
+    Returns:
+        Normalized angle in range [0, 360)
+
+    Examples:
+        >>> degnorm(45)
+        45.0
+        >>> degnorm(-45)
+        315.0
+        >>> degnorm(370)
+        10.0
+        >>> degnorm(-370)
+        350.0
+        >>> degnorm(360)
+        0.0
+        >>> degnorm(720)
+        0.0
+    """
+    return angle % 360.0
+
+
 def difdeg2n(p1: float, p2: float) -> float:
     """
     Calculate distance in degrees p1 - p2 normalized to [-180;180].

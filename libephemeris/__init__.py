@@ -95,6 +95,7 @@ from .eclipse import (
     swe_vis_limit_mag,
 )
 from .utils import (
+    degnorm,
     difdeg2n,
     swe_calc_angles,
     cotrans,
@@ -329,6 +330,7 @@ __all__ = [
     "heliacal_pheno_ut",
     "swe_heliacal_pheno_ut",
     # Utilities
+    "degnorm",
     "difdeg2n",
     "swe_calc_angles",
     "cotrans",
