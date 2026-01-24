@@ -96,6 +96,7 @@ from .eclipse import (
 )
 from .utils import (
     degnorm,
+    radnorm,
     difdeg2n,
     swe_calc_angles,
     cotrans,
@@ -331,6 +332,7 @@ __all__ = [
     "swe_heliacal_pheno_ut",
     # Utilities
     "degnorm",
+    "radnorm",
     "difdeg2n",
     "swe_calc_angles",
     "cotrans",

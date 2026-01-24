@@ -813,6 +813,40 @@ def degnorm(angle: float) -> float:
     return angle % 360.0
 
 
+TWO_PI = 2.0 * math.pi
+
+
+def radnorm(angle: float) -> float:
+    """
+    Normalize an angle to the range [0, 2*pi).
+
+    Compatible with pyswisseph's swe.radnorm() function.
+    Equivalent to `angle % (2*pi)` but correctly handles negative numbers.
+
+    Args:
+        angle: Angle in radians (any value)
+
+    Returns:
+        Normalized angle in range [0, 2*pi)
+
+    Examples:
+        >>> import math
+        >>> radnorm(math.pi / 4)  # 45 degrees
+        0.7853981633974483
+        >>> radnorm(-math.pi / 4)  # -45 degrees -> 315 degrees
+        5.497787143782138
+        >>> radnorm(3 * math.pi)  # 540 degrees -> 180 degrees
+        3.141592653589793
+        >>> radnorm(-3 * math.pi)  # -540 degrees -> 180 degrees
+        3.141592653589793
+        >>> radnorm(2 * math.pi)  # 360 degrees -> 0
+        0.0
+        >>> radnorm(4 * math.pi)  # 720 degrees -> 0
+        0.0
+    """
+    return angle % TWO_PI
+
+
 def difdeg2n(p1: float, p2: float) -> float:
     """
     Calculate distance in degrees p1 - p2 normalized to [-180;180].
