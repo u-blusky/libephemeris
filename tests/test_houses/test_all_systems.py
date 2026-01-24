@@ -181,6 +181,69 @@ class TestHouseSystemsPolarLatitudes:
         assert "polar circle" in str(exc_info.value).lower()
 
     @pytest.mark.edge_case
+    @pytest.mark.parametrize("lat", [67.0, 70.0, 80.0])
+    def test_gauquelin_polar_raises_error(self, lat):
+        """Gauquelin should raise Error at polar latitudes (>66.5°).
+
+        This matches Swiss Ephemeris behavior which raises an error
+        with message 'within polar circle, switched to Porphyry'.
+        """
+        jd = 2451545.0
+
+        # Should raise an Error for polar latitudes
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, ord("G"))
+
+        # Error message should mention polar circle
+        assert "polar circle" in str(exc_info.value).lower()
+
+    @pytest.mark.edge_case
+    @pytest.mark.parametrize("lat", [-67.0, -70.0, -80.0])
+    def test_gauquelin_polar_southern_raises_error(self, lat):
+        """Gauquelin should raise Error at Southern polar latitudes."""
+        jd = 2451545.0
+
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, ord("G"))
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+    @pytest.mark.edge_case
+    def test_gauquelin_below_polar_circle(self):
+        """Gauquelin should work below the polar circle (~66.5°)."""
+        jd = 2451545.0
+
+        # At 65° latitude, Gauquelin should work normally
+        cusps, ascmc = ephem.swe_houses(jd, 65.0, 0.0, ord("G"))
+        assert 0 <= ascmc[0] < 360
+        assert 0 <= ascmc[1] < 360
+
+    @pytest.mark.edge_case
+    def test_gauquelin_polar_matches_swisseph(self):
+        """Gauquelin error behavior should match Swiss Ephemeris for polar latitudes."""
+        jd = 2451545.0
+        lat = 70.0
+
+        # Both should raise Error
+        with pytest.raises(swe.Error):
+            swe.houses(jd, lat, 0.0, b"G")
+
+        with pytest.raises(ephem.Error):
+            ephem.swe_houses(jd, lat, 0.0, ord("G"))
+
+    @pytest.mark.edge_case
+    def test_houses_armc_gauquelin_polar_raises_error(self):
+        """swe_houses_armc should also raise Error for Gauquelin at polar latitudes."""
+        armc = 280.46
+        eps = 23.44
+        lat = 70.0
+
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses_armc(armc, lat, eps, ord("G"))
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+    @pytest.mark.edge_case
     def test_porphyry_works_at_polar(self):
         """Porphyry should work at polar latitudes (user fallback)."""
         jd = 2451545.0

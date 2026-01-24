@@ -520,10 +520,10 @@ def swe_houses(
         # MC was flipped. Flip latitude for intermediate cusp calculations.
         calc_lat = -lat
 
-    # Check for polar circle condition for Placidus/Koch
+    # Check for polar circle condition for Placidus/Koch/Gauquelin
     # These systems cannot be calculated when abs(lat) + eps > 90°
     # Swiss Ephemeris raises an error in this case
-    if hsys_char in ["P", "K"] and _is_polar_circle(lat, eps):
+    if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
         raise Error("swe_houses: within polar circle, switched to Porphyry")
 
     cusps = [0.0] * 13
@@ -766,10 +766,10 @@ def swe_houses_armc(
         # MC was flipped. Flip latitude for intermediate cusp calculations.
         calc_lat = -lat
 
-    # Check for polar circle condition for Placidus/Koch
+    # Check for polar circle condition for Placidus/Koch/Gauquelin
     # These systems cannot be calculated when abs(lat) + eps > 90°
     # Swiss Ephemeris raises an error in this case
-    if hsys_char in ["P", "K"] and _is_polar_circle(lat, eps):
+    if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
         raise Error("swe_houses_armc: within polar circle, switched to Porphyry")
 
     cusps = [0.0] * 13

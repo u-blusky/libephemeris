@@ -106,61 +106,61 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 - [x] Implementare la funzione `heliacal_pheno_ut(jd, lat, lon, altitude, pressure, temperature, humidity, body, flags)` che calcola le circostanze dettagliate di un evento eliacale: altezza del corpo, altezza del Sole, azimut, magnitudine limite, visibilità. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Implementare la funzione `vis_limit_mag(jd, lat, lon, altitude, pressure, temperature, humidity, body, flags)` che calcola la magnitudine limite per la visibilità di un corpo celeste date le condizioni atmosferiche. Utile per determinare se una stella o pianeta debole sarà visibile.
+- [x] Implementare la funzione `vis_limit_mag(jd, lat, lon, altitude, pressure, temperature, humidity, body, flags)` che calcola la magnitudine limite per la visibilità di un corpo celeste date le condizioni atmosferiche. Utile per determinare se una stella o pianeta debole sarà visibile.
 
-- [ ] Implementare la funzione `degnorm(angle)` che normalizza un angolo in gradi all'intervallo 0-360°. Equivalente a `angle % 360` ma gestisce correttamente i numeri negativi. pyswisseph la espone per comodità e consistenza.
+- [x] Implementare la funzione `degnorm(angle)` che normalizza un angolo in gradi all'intervallo 0-360°. Equivalente a `angle % 360` ma gestisce correttamente i numeri negativi. pyswisseph la espone per comodità e consistenza.
 
-- [ ] Implementare la funzione `radnorm(angle)` che normalizza un angolo in radianti all'intervallo 0-2π. Equivalente a `angle % (2*pi)` ma gestisce correttamente i numeri negativi.
+- [x] Implementare la funzione `radnorm(angle)` che normalizza un angolo in radianti all'intervallo 0-2π. Equivalente a `angle % (2*pi)` ma gestisce correttamente i numeri negativi.
 
-- [ ] Implementare la funzione `deg_midp(a, b)` che calcola il punto medio tra due angoli in gradi, gestendo correttamente il wraparound a 360°. Per esempio, il punto medio tra 350° e 10° è 0° (o 360°), non 180°.
+- [x] Implementare la funzione `deg_midp(a, b)` che calcola il punto medio tra due angoli in gradi, gestendo correttamente il wraparound a 360°. Per esempio, il punto medio tra 350° e 10° è 0° (o 360°), non 180°.
 
-- [ ] Implementare la funzione `rad_midp(a, b)` che calcola il punto medio tra due angoli in radianti, gestendo correttamente il wraparound a 2π.
+- [x] Implementare la funzione `rad_midp(a, b)` che calcola il punto medio tra due angoli in radianti, gestendo correttamente il wraparound a 2π.
 
-- [ ] Implementare la funzione `difdegn(a, b)` che calcola la differenza tra due angoli normalizzata all'intervallo 0-360° (sempre positiva). A differenza di difdeg2n() che ritorna -180..+180, questa ritorna sempre un valore positivo.
+- [x] Implementare la funzione `difdegn(a, b)` che calcola la differenza tra due angoli normalizzata all'intervallo 0-360° (sempre positiva). A differenza di difdeg2n() che ritorna -180..+180, questa ritorna sempre un valore positivo.
 
-- [ ] Implementare la funzione `difrad2n(a, b)` che calcola la differenza tra due angoli in radianti normalizzata all'intervallo -π..+π. È l'equivalente in radianti di difdeg2n().
+- [x] Implementare la funzione `difrad2n(a, b)` che calcola la differenza tra due angoli in radianti normalizzata all'intervallo -π..+π. È l'equivalente in radianti di difdeg2n().
 
-- [ ] Implementare la funzione `difcs2n(a, b)` che calcola la differenza tra due angoli in centesimi di secondo d'arco (centiseconds, 1/100 di arcsec) normalizzata all'intervallo -180°..+180° (in centiseconds).
+- [x] Implementare la funzione `difcs2n(a, b)` che calcola la differenza tra due angoli in centesimi di secondo d'arco (centiseconds, 1/100 di arcsec) normalizzata all'intervallo -180°..+180° (in centiseconds).
 
-- [ ] Implementare la funzione `difcsn(a, b)` che calcola la differenza tra due angoli in centiseconds normalizzata all'intervallo 0-360° (in centiseconds, sempre positiva).
+- [x] Implementare la funzione `difcsn(a, b)` che calcola la differenza tra due angoli in centiseconds normalizzata all'intervallo 0-360° (in centiseconds, sempre positiva).
 
-- [ ] Implementare la funzione `csnorm(cs)` che normalizza un valore in centiseconds all'intervallo 0-360° (0 - 360*3600*100 centiseconds).
+- [x] Implementare la funzione `csnorm(cs)` che normalizza un valore in centiseconds all'intervallo 0-360° (0 - 360*3600*100 centiseconds).
 
-- [ ] Implementare la funzione `csroundsec(cs)` che arrotonda un valore in centiseconds al secondo d'arco più vicino. Divide per 100 e arrotonda.
+- [x] Implementare la funzione `csroundsec(cs)` che arrotonda un valore in centiseconds al secondo d'arco più vicino. Divide per 100 e arrotonda.
 
-- [ ] Implementare la funzione `d2l(value)` che converte un double a long integer con arrotondamento. pyswisseph la usa internamente ma la espone anche pubblicamente.
+- [x] Implementare la funzione `d2l(value)` che converte un double a long integer con arrotondamento. pyswisseph la usa internamente ma la espone anche pubblicamente.
 
-- [ ] Implementare la funzione `split_deg(degrees, roundflag)` che divide un angolo in gradi nelle sue componenti: segno zodiacale (0-11), gradi (0-29), minuti (0-59), secondi (0-59), frazioni di secondo. Il roundflag controlla l'arrotondamento. Ritorna una tupla con tutte le componenti.
+- [x] Implementare la funzione `split_deg(degrees, roundflag)` che divide un angolo in gradi nelle sue componenti: segno zodiacale (0-11), gradi (0-29), minuti (0-59), secondi (0-59), frazioni di secondo. Il roundflag controlla l'arrotondamento. Ritorna una tupla con tutte le componenti.
 
-- [ ] Implementare la funzione `cs2degstr(cs)` che converte un valore in centiseconds a una stringa formattata in gradi, minuti, secondi (es. "123°45'67.89\"").
+- [x] Implementare la funzione `cs2degstr(cs)` che converte un valore in centiseconds a una stringa formattata in gradi, minuti, secondi (es. "123°45'67.89\"").
 
-- [ ] Implementare la funzione `cs2lonlatstr(cs, plus_char, minus_char)` che converte un valore in centiseconds a una stringa di longitudine o latitudine con carattere direzionale (es. "45°30'00\" N" o "122°15'30\" W").
+- [x] Implementare la funzione `cs2lonlatstr(cs, plus_char, minus_char)` che converte un valore in centiseconds a una stringa di longitudine o latitudine con carattere direzionale (es. "45°30'00\" N" o "122°15'30\" W").
 
-- [ ] Implementare la funzione `cs2timestr(cs)` che converte un valore in centiseconds a una stringa di tempo formattata come ore, minuti, secondi (es. "12:34:56").
+- [x] Implementare la funzione `cs2timestr(cs)` che converte un valore in centiseconds a una stringa di tempo formattata come ore, minuti, secondi (es. "12:34:56").
 
-- [ ] Implementare la funzione `set_jpl_file(filename)` che specifica quale file di effemeridi JPL usare (es. "de441.bsp"). libephemeris usa Skyfield che scarica automaticamente i file, ma questa funzione dovrebbe permettere di specificare un file locale.
+- [x] Implementare la funzione `set_jpl_file(filename)` che specifica quale file di effemeridi JPL usare (es. "de441.bsp"). libephemeris usa Skyfield che scarica automaticamente i file, ma questa funzione dovrebbe permettere di specificare un file locale.
 
-- [ ] Implementare le funzioni `set_tid_acc(value)` e `get_tid_acc()` per impostare e leggere l'accelerazione mareale usata nei calcoli di Delta-T. Il valore di default è basato su DE431, ma può essere personalizzato per studi storici.
+- [x] Implementare le funzioni `set_tid_acc(value)` e `get_tid_acc()` per impostare e leggere l'accelerazione mareale usata nei calcoli di Delta-T. Il valore di default è basato su DE431, ma può essere personalizzato per studi storici.
 
-- [ ] Implementare la funzione `set_delta_t_userdef(dt)` che permette di specificare un valore di Delta-T definito dall'utente invece di usare i valori tabulati. Utile per test o per date molto antiche/future dove Delta-T è incerto.
+- [x] Implementare la funzione `set_delta_t_userdef(dt)` che permette di specificare un valore di Delta-T definito dall'utente invece di usare i valori tabulati. Utile per test o per date molto antiche/future dove Delta-T è incerto.
 
-- [ ] Implementare la funzione `set_lapse_rate(lapse_rate)` che imposta il tasso di variazione della temperatura atmosferica con l'altitudine (lapse rate) per i calcoli di rifrazione. Il default è circa 0.0065 K/m.
+- [x] Implementare la funzione `set_lapse_rate(lapse_rate)` che imposta il tasso di variazione della temperatura atmosferica con l'altitudine (lapse rate) per i calcoli di rifrazione. Il default è circa 0.0065 K/m.
 
-- [ ] Implementare la funzione `close()` che chiude tutti i file di effemeridi aperti e libera le risorse. In libephemeris con Skyfield questo potrebbe significare rilasciare la cache dei kernel SPK.
+- [x] Implementare la funzione `close()` che chiude tutti i file di effemeridi aperti e libera le risorse. In libephemeris con Skyfield questo potrebbe significare rilasciare la cache dei kernel SPK.
 
-- [ ] Implementare la funzione `get_library_path()` che ritorna il percorso dove sono memorizzati i file di effemeridi (per pyswisseph i file .se1, per libephemeris i file .bsp di Skyfield).
+- [x] Implementare la funzione `get_library_path()` che ritorna il percorso dove sono memorizzati i file di effemeridi (per pyswisseph i file .se1, per libephemeris i file .bsp di Skyfield).
 
-- [ ] Implementare la funzione `get_current_file_data(ifno)` che ritorna informazioni sul file di effemeridi attualmente in uso: nome del file, intervallo di date coperto, tipo di effemeridi. Il parametro ifno seleziona quale file (0=pianeti, 1=Luna, 2=asteroidi).
+- [x] Implementare la funzione `get_current_file_data(ifno)` che ritorna informazioni sul file di effemeridi attualmente in uso: nome del file, intervallo di date coperto, tipo di effemeridi. Il parametro ifno seleziona quale file (0=pianeti, 1=Luna, 2=asteroidi).
 
-- [ ] Implementare la funzione `get_planet_name(planet_id)` che ritorna il nome di un pianeta dato il suo ID numerico. Per esempio, get_planet_name(0) ritorna "Sun", get_planet_name(1) ritorna "Moon", ecc. Utile per messaggi di errore e debug.
+- [x] Implementare la funzione `get_planet_name(planet_id)` che ritorna il nome di un pianeta dato il suo ID numerico. Per esempio, get_planet_name(0) ritorna "Sun", get_planet_name(1) ritorna "Moon", ecc. Utile per messaggi di errore e debug.
 
-- [ ] Implementare la classe eccezione `Error` che corrisponde a `swe.Error` di pyswisseph. Deve essere sollevata in tutti i casi dove pyswisseph solleva swe.Error (effemeridi non trovate, pianeta non supportato, date fuori range, ecc.) per garantire compatibilità del codice client.
+- [x] Implementare la classe eccezione `Error` che corrisponde a `swe.Error` di pyswisseph. Deve essere sollevata in tutti i casi dove pyswisseph solleva swe.Error (effemeridi non trovate, pianeta non supportato, date fuori range, ecc.) per garantire compatibilità del codice client.
 
 ## Precision Improvements
 
-- [ ] Correggere il fallimento del calcolo delle case per latitudini polari (>66.5°) in houses.py linea 678. Attualmente alcune case non vengono calcolate correttamente quando l'eclittica non interseca l'orizzonte in modo normale. Bisogna implementare la gestione speciale per case circumpolari. Vedere CALCS.md per i dettagli sui calcoli delle case.
+- [x] Correggere il fallimento del calcolo delle case per latitudini polari (>66.5°) in houses.py linea 678. Attualmente alcune case non vengono calcolate correttamente quando l'eclittica non interseca l'orizzonte in modo normale. Bisogna implementare la gestione speciale per case circumpolari. Vedere CALCS.md per i dettagli sui calcoli delle case.
 
-- [ ] Correggere il secondo caso di fallimento per latitudini polari in houses.py linea 1003. Stesso problema del precedente ma in un diverso sistema di case. Vedere CALCS.md per i dettagli sui calcoli delle case.
+- [x] Correggere il secondo caso di fallimento per latitudini polari in houses.py linea 1003. Stesso problema del precedente ma in un diverso sistema di case. Vedere CALCS.md per i dettagli sui calcoli delle case.
 
 - [ ] Correggere l'approssimazione nel sistema di case Alcabitus in houses.py linea 1918 dove viene usata un'approssimazione perché non si ha accesso al vero Ascendente calcolato. Bisogna refactorizzare per passare l'Ascendente già calcolato. Vedere CALCS.md per i dettagli sui calcoli delle case.
 
