@@ -877,6 +877,55 @@ def difdeg2n(p1: float, p2: float) -> float:
     return diff
 
 
+def deg_midp(a: float, b: float) -> float:
+    """
+    Calculate the midpoint between two angles in degrees.
+
+    Handles wraparound at 360° correctly by finding the midpoint along the
+    shorter arc between the two angles. For example, the midpoint between
+    350° and 10° is 0° (or equivalently 360°), not 180°.
+
+    Args:
+        a: First angle in degrees (any value, will be normalized)
+        b: Second angle in degrees (any value, will be normalized)
+
+    Returns:
+        Midpoint angle in range [0, 360)
+
+    Examples:
+        >>> deg_midp(0, 90)
+        45.0
+        >>> deg_midp(350, 10)
+        0.0
+        >>> deg_midp(10, 350)
+        0.0
+        >>> deg_midp(180, 0)
+        90.0
+        >>> deg_midp(170, 190)
+        180.0
+        >>> deg_midp(-10, 10)
+        0.0
+    """
+    # Normalize both angles to [0, 360)
+    a = a % 360.0
+    b = b % 360.0
+
+    # Calculate the difference
+    diff = b - a
+
+    # If the absolute difference is greater than 180, go the shorter way
+    if diff > 180.0:
+        diff -= 360.0
+    elif diff < -180.0:
+        diff += 360.0
+
+    # Calculate midpoint along the shorter arc
+    midp = a + diff / 2.0
+
+    # Normalize result to [0, 360)
+    return midp % 360.0
+
+
 def swe_calc_angles(jd_ut: float, lat: float, lon: float):
     """
     Pre-calculate and cache astrological angles and planet positions
