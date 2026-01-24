@@ -1,5 +1,5 @@
 from .constants import *
-from .time_utils import swe_julday, swe_revjul, swe_deltat
+from .time_utils import swe_julday, swe_revjul, swe_deltat, swe_deltat_ex
 from .planets import (
     swe_calc_ut,
     swe_calc,
@@ -36,6 +36,7 @@ from .context import EphemerisContext  # NEW: Thread-safe context API
 julday = swe_julday
 revjul = swe_revjul
 deltat = swe_deltat
+deltat_ex = swe_deltat_ex
 
 # Planet calculation
 calc_ut = swe_calc_ut
@@ -91,6 +92,8 @@ __all__ = [
     "revjul",
     "swe_deltat",
     "deltat",
+    "swe_deltat_ex",
+    "deltat_ex",
     # Planet calculation
     "swe_calc_ut",
     "calc_ut",
