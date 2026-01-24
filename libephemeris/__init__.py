@@ -93,10 +93,13 @@ from .utils import (
     cotrans_sp,
     azalt,
     azalt_rev,
+    refrac,
     SE_ECL2HOR,
     SE_EQU2HOR,
     SE_HOR2ECL,
     SE_HOR2EQU,
+    SE_TRUE_TO_APP,
+    SE_APP_TO_TRUE,
 )
 from .fixed_stars import (
     swe_fixstar_ut,
@@ -311,10 +314,13 @@ __all__ = [
     "cotrans_sp",
     "azalt",
     "azalt_rev",
+    "refrac",
     "SE_ECL2HOR",
     "SE_EQU2HOR",
     "SE_HOR2ECL",
     "SE_HOR2EQU",
+    "SE_TRUE_TO_APP",
+    "SE_APP_TO_TRUE",
     # Helpers
     "calc_all_arabic_parts",
     # Fixed Stars

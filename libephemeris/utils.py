@@ -16,6 +16,10 @@ SE_EQU2HOR: int = 1  # Equatorial coordinates to horizontal
 SE_HOR2ECL: int = 0  # Horizontal to ecliptic coordinates
 SE_HOR2EQU: int = 1  # Horizontal to equatorial coordinates
 
+# Refraction calculation flags (compatible with pyswisseph)
+SE_TRUE_TO_APP: int = 0  # True altitude to apparent altitude
+SE_APP_TO_TRUE: int = 1  # Apparent altitude to true altitude
+
 
 def cotrans_sp(
     coord: Tuple[float, float, float],
@@ -457,6 +461,132 @@ def azalt_rev(
         # cotrans with negative obliquity converts equatorial to ecliptic
         ecl_coord = cotrans((ra, dec, 1.0), eps)
         return (ecl_coord[0], ecl_coord[1])
+
+
+def refrac(
+    altitude: float,
+    pressure: float = 1013.25,
+    temperature: float = 15.0,
+    calc_flag: int = SE_TRUE_TO_APP,
+) -> float:
+    """
+    Calculate true altitude from apparent altitude, or vice-versa.
+
+    Atmospheric refraction makes celestial objects appear higher than their
+    true (geometric) position. The effect is strongest near the horizon
+    (about 34 arcminutes at 0 degrees) and negligible at high altitudes.
+
+    This function converts between true (geometric) altitude and apparent
+    (observed) altitude by adding or removing the refraction correction.
+
+    Compatible with pyswisseph's swe.refrac() function.
+
+    Args:
+        altitude: Altitude in degrees. For SE_TRUE_TO_APP, this is the true
+                  (geometric) altitude. For SE_APP_TO_TRUE, this is the apparent
+                  (observed) altitude.
+        pressure: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
+                  Use 0 to disable refraction correction (returns input altitude).
+        temperature: Atmospheric temperature in Celsius. Default is 15.0.
+        calc_flag: Direction of conversion:
+            - SE_TRUE_TO_APP (0): Convert true altitude to apparent altitude
+              (add refraction - object appears higher)
+            - SE_APP_TO_TRUE (1): Convert apparent altitude to true altitude
+              (subtract refraction - object's true position)
+
+    Returns:
+        The converted altitude in degrees:
+        - For SE_TRUE_TO_APP: apparent altitude (= true altitude + refraction)
+        - For SE_APP_TO_TRUE: true altitude (= apparent altitude - refraction)
+
+    Notes:
+        - At the horizon (0 degrees), refraction is approximately 34 arcminutes
+          (0.567 degrees) under standard atmospheric conditions.
+        - The formula used is the Saemund-Bennett formula, which is accurate
+          to about 0.07 arcminutes for altitudes above 15 degrees.
+        - For altitudes below -2 degrees, refraction is extrapolated linearly.
+        - Pressure and temperature adjustments follow the standard formula:
+          correction = (pressure / 1010) * (283 / (273 + temperature))
+
+    Examples:
+        >>> # True altitude at horizon -> apparent altitude is higher
+        >>> refrac(0.0, 1013.25, 15.0, SE_TRUE_TO_APP)
+        0.476...  # apparent altitude
+        >>> # Apparent altitude at horizon -> true altitude (0° apparent = ~-0.5° true)
+        >>> refrac(0.5, 1013.25, 15.0, SE_APP_TO_TRUE)
+        0.0...  # approximately 0° true altitude
+        >>> # No refraction when pressure is 0
+        >>> refrac(10.0, 0, 15.0, SE_TRUE_TO_APP)
+        10.0  # returns input altitude unchanged
+    """
+    # No refraction if pressure is zero or negative
+    if pressure <= 0:
+        return altitude
+
+    # Pressure and temperature correction factors
+    # Standard conditions: 1010 mbar, 10°C (283 K)
+    pressure_factor = pressure / 1010.0
+    temperature_factor = 283.0 / (273.0 + temperature)
+    correction = pressure_factor * temperature_factor
+
+    if calc_flag == SE_TRUE_TO_APP:
+        # True altitude to apparent altitude (add refraction)
+        alt = altitude
+
+        if alt > 15.0:
+            # Simple formula for high altitudes
+            # R = 58.1" * tan(z) - 0.07" * tan^3(z) where z = zenith angle
+            z_rad = math.radians(90.0 - alt)
+            tan_z = math.tan(z_rad)
+            refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
+            refraction = refraction_arcsec / 3600.0 * correction
+        elif alt > -2.0:
+            # Bennett formula for lower altitudes (more accurate near horizon)
+            # R = 1.02 / tan(h + 10.3/(h + 5.11)) arcminutes
+            h = max(alt, 0.01)  # Avoid division issues
+            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+            refraction = r_arcmin / 60.0 * correction
+        else:
+            # Below -2 degrees: extrapolate linearly
+            # Calculate refraction at -2 degrees and extrapolate
+            h = -2.0
+            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+            refraction_at_minus2 = r_arcmin / 60.0 * correction
+            # Linear decrease for more negative altitudes
+            refraction = refraction_at_minus2 + (alt + 2.0) * 0.1
+
+        return altitude + refraction
+
+    else:
+        # SE_APP_TO_TRUE: Apparent altitude to true altitude (subtract refraction)
+        # We need to find what true altitude would give this apparent altitude
+
+        # First, calculate the refraction at true altitude 0° (horizon)
+        # This is the threshold below which APP_TO_TRUE returns input unchanged
+        h = 0.01  # Small value near 0
+        r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+        horizon_refraction = r_arcmin / 60.0 * correction
+
+        # If apparent altitude is at or below the horizon refraction threshold,
+        # return input unchanged (matching pyswisseph behavior)
+        if altitude <= horizon_refraction:
+            return altitude
+
+        alt = altitude
+
+        if alt > 15.0:
+            # Simple formula for high altitudes
+            z_rad = math.radians(90.0 - alt)
+            tan_z = math.tan(z_rad)
+            refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
+            refraction = refraction_arcsec / 3600.0 * correction
+        else:
+            # Bennett formula (using apparent altitude directly is a good approximation)
+            h = max(alt, 0.01)  # Avoid division issues
+            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+            refraction = r_arcmin / 60.0 * correction
+
+        return altitude - refraction
 
 
 def cotrans(
