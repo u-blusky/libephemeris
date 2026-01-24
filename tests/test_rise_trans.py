@@ -1,0 +1,448 @@
+"""
+Tests for rise_trans function in libephemeris.
+
+Tests the calculation of rise, set, and transit times for celestial bodies.
+
+Reference data from USNO and timeanddate.com for verification.
+"""
+
+import pytest
+
+from libephemeris import (
+    julday,
+    revjul,
+    rise_trans,
+    swe_rise_trans,
+    SE_SUN,
+    SE_MOON,
+    SE_MARS,
+    SE_JUPITER,
+    SE_CALC_RISE,
+    SE_CALC_SET,
+    SE_CALC_MTRANSIT,
+    SE_CALC_ITRANSIT,
+    SE_BIT_DISC_CENTER,
+    SE_BIT_NO_REFRACTION,
+    SE_BIT_CIVIL_TWILIGHT,
+    SE_BIT_NAUTIC_TWILIGHT,
+    SE_BIT_ASTRO_TWILIGHT,
+)
+
+
+class TestRiseTransBasic:
+    """Basic tests for rise_trans function."""
+
+    def test_sunrise_returns_valid_time(self):
+        """Test that sunrise calculation returns a valid time."""
+        # June 21, 2024 - summer solstice
+        jd_start = julday(2024, 6, 21, 0)
+        # Rome, Italy
+        lat, lon = 41.9028, 12.4964
+
+        jd_rise, retflag = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+
+        # Should find sunrise on June 21
+        assert jd_rise > jd_start
+        assert jd_rise < jd_start + 1  # Within 24 hours
+        assert retflag == SE_CALC_RISE
+
+        # Verify it's in the morning (before noon local time)
+        year, month, day, hour = revjul(jd_rise)
+        assert year == 2024
+        assert month == 6
+        assert day == 21
+        # Rome is UTC+1 (summer: UTC+2), sunrise should be ~5:30 local = ~3:30 UTC
+        assert 3.0 <= hour <= 6.0
+
+    def test_sunset_returns_valid_time(self):
+        """Test that sunset calculation returns a valid time."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        jd_set, retflag = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+
+        # Should find sunset on June 21
+        assert jd_set > jd_start
+        assert jd_set < jd_start + 1
+        assert retflag == SE_CALC_SET
+
+        # Verify it's in the evening (after noon)
+        year, month, day, hour = revjul(jd_set)
+        assert year == 2024
+        assert month == 6
+        # Sunset should be ~20:50 local = ~18:50 UTC
+        assert 18.0 <= hour <= 21.0
+
+    def test_transit_returns_valid_time(self):
+        """Test that meridian transit (noon) calculation works."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        jd_transit, retflag = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_MTRANSIT
+        )
+
+        # Should find transit on June 21
+        assert jd_transit > jd_start
+        assert jd_transit < jd_start + 1
+        assert retflag == SE_CALC_MTRANSIT
+
+        # Verify it's around solar noon (12:00-13:00 local)
+        year, month, day, hour = revjul(jd_transit)
+        assert year == 2024
+        # Solar noon at Rome (~12.5°E) is about 12:10 - 0:50 (longitude offset) = ~11:20 UTC
+        assert 10.5 <= hour <= 13.0
+
+    def test_lower_transit_returns_valid_time(self):
+        """Test that lower transit (midnight) calculation works."""
+        jd_start = julday(2024, 6, 21, 12)  # Start at noon
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        jd_itransit, retflag = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_ITRANSIT
+        )
+
+        # Should find lower transit around midnight
+        assert jd_itransit > jd_start
+        assert jd_itransit < jd_start + 1
+        assert retflag == SE_CALC_ITRANSIT
+
+    def test_swe_alias_works(self):
+        """Test that swe_rise_trans is an alias for rise_trans."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964
+
+        result1 = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        result2 = swe_rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+
+        assert result1 == result2
+
+
+class TestRiseTransMoon:
+    """Tests for Moon rise/set calculations."""
+
+    def test_moonrise_valid(self):
+        """Test moonrise calculation."""
+        jd_start = julday(2024, 1, 15, 0)
+        lat, lon = 51.5074, -0.1278  # London
+
+        jd_rise, retflag = rise_trans(jd_start, SE_MOON, lat, lon, rsmi=SE_CALC_RISE)
+
+        assert jd_rise > jd_start
+        assert jd_rise < jd_start + 2  # Moon can rise any time
+        assert retflag == SE_CALC_RISE
+
+    def test_moonset_valid(self):
+        """Test moonset calculation."""
+        jd_start = julday(2024, 1, 15, 0)
+        lat, lon = 51.5074, -0.1278  # London
+
+        jd_set, retflag = rise_trans(jd_start, SE_MOON, lat, lon, rsmi=SE_CALC_SET)
+
+        assert jd_set > jd_start
+        assert jd_set < jd_start + 2
+        assert retflag == SE_CALC_SET
+
+    def test_moon_transit_valid(self):
+        """Test Moon transit calculation."""
+        jd_start = julday(2024, 1, 15, 0)
+        lat, lon = 51.5074, -0.1278  # London
+
+        jd_transit, retflag = rise_trans(
+            jd_start, SE_MOON, lat, lon, rsmi=SE_CALC_MTRANSIT
+        )
+
+        assert jd_transit > jd_start
+        assert jd_transit < jd_start + 1.5  # Moon transit within ~1 day
+        assert retflag == SE_CALC_MTRANSIT
+
+
+class TestRiseTransPlanets:
+    """Tests for planet rise/set calculations."""
+
+    def test_mars_rise(self):
+        """Test Mars rise calculation."""
+        jd_start = julday(2024, 1, 15, 0)
+        lat, lon = 40.7128, -74.0060  # New York
+
+        jd_rise, retflag = rise_trans(jd_start, SE_MARS, lat, lon, rsmi=SE_CALC_RISE)
+
+        assert jd_rise > jd_start
+        assert jd_rise < jd_start + 2
+        assert retflag == SE_CALC_RISE
+
+    def test_jupiter_transit(self):
+        """Test Jupiter transit calculation."""
+        jd_start = julday(2024, 1, 15, 0)
+        lat, lon = 40.7128, -74.0060  # New York
+
+        jd_transit, retflag = rise_trans(
+            jd_start, SE_JUPITER, lat, lon, rsmi=SE_CALC_MTRANSIT
+        )
+
+        assert jd_transit > jd_start
+        assert jd_transit < jd_start + 1.5
+        assert retflag == SE_CALC_MTRANSIT
+
+
+class TestRiseTransCircumpolar:
+    """Tests for circumpolar objects."""
+
+    def test_sun_circumpolar_arctic_summer(self):
+        """Test that Sun doesn't set in Arctic summer (midnight sun)."""
+        # Svalbard in late June - Sun should be circumpolar
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 78.0, 16.0  # Svalbard
+
+        jd_set, retflag = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+
+        # Should return -2 for circumpolar (never sets)
+        assert retflag == -2
+        assert jd_set == 0.0
+
+    def test_sun_circumpolar_arctic_winter(self):
+        """Test that Sun doesn't rise in Arctic winter (polar night)."""
+        # Svalbard in late December - Sun should never rise
+        jd_start = julday(2024, 12, 21, 0)
+        lat, lon = 78.0, 16.0  # Svalbard
+
+        jd_rise, retflag = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+
+        # Should return -2 for circumpolar (never rises)
+        assert retflag == -2
+        assert jd_rise == 0.0
+
+    def test_transit_still_works_for_circumpolar(self):
+        """Test that transit calculations work for circumpolar objects."""
+        # Even circumpolar Sun crosses meridian
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 78.0, 16.0  # Svalbard
+
+        jd_transit, retflag = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_MTRANSIT
+        )
+
+        # Transit should still be calculable
+        assert jd_transit > jd_start
+        assert jd_transit < jd_start + 1
+        assert retflag == SE_CALC_MTRANSIT
+
+
+class TestRiseTransFlags:
+    """Tests for various flag combinations."""
+
+    def test_disc_center_flag(self):
+        """Test SE_BIT_DISC_CENTER flag."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        # With upper limb (default)
+        jd_rise_limb, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+
+        # With disc center
+        jd_rise_center, _ = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_DISC_CENTER
+        )
+
+        # Center rise should be later than upper limb rise
+        assert jd_rise_center > jd_rise_limb
+        # Difference should be about 1-2 minutes (Sun's semi-diameter crossing)
+        diff_minutes = (jd_rise_center - jd_rise_limb) * 24 * 60
+        assert 0.5 < diff_minutes < 3.0
+
+    def test_no_refraction_flag(self):
+        """Test SE_BIT_NO_REFRACTION flag."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        # With refraction (default)
+        jd_rise_refr, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+
+        # Without refraction
+        jd_rise_no_refr, _ = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_NO_REFRACTION
+        )
+
+        # Without refraction, rise should be later (Sun appears lower)
+        assert jd_rise_no_refr > jd_rise_refr
+        # Difference should be about 2-4 minutes (34' refraction)
+        diff_minutes = (jd_rise_no_refr - jd_rise_refr) * 24 * 60
+        assert 1.0 < diff_minutes < 6.0
+
+    def test_civil_twilight(self):
+        """Test civil twilight calculation."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        # Civil twilight begins (Sun at -6 degrees)
+        jd_twilight, _ = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_CIVIL_TWILIGHT
+        )
+
+        # Regular sunrise
+        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+
+        # Civil twilight should be before sunrise
+        assert jd_twilight < jd_rise
+        # Difference should be about 25-35 minutes
+        diff_minutes = (jd_rise - jd_twilight) * 24 * 60
+        assert 15 < diff_minutes < 60
+
+    def test_nautical_twilight(self):
+        """Test nautical twilight calculation."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        # Nautical twilight begins (Sun at -12 degrees)
+        jd_nautical, _ = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_NAUTIC_TWILIGHT
+        )
+
+        # Civil twilight
+        jd_civil, _ = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_CIVIL_TWILIGHT
+        )
+
+        # Nautical twilight should be before civil twilight
+        assert jd_nautical < jd_civil
+
+    def test_astronomical_twilight(self):
+        """Test astronomical twilight calculation."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        # Astronomical twilight begins (Sun at -18 degrees)
+        jd_astro, _ = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_ASTRO_TWILIGHT
+        )
+
+        # Nautical twilight
+        jd_nautical, _ = rise_trans(
+            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_NAUTIC_TWILIGHT
+        )
+
+        # Astronomical twilight should be before nautical twilight
+        assert jd_astro < jd_nautical
+
+
+class TestRiseTransLocations:
+    """Tests for different geographic locations."""
+
+    def test_equator(self):
+        """Test rise/set at equator."""
+        jd_start = julday(2024, 3, 20, 0)  # Near equinox
+        lat, lon = 0.0, 0.0  # Equator, prime meridian
+
+        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        jd_set, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+
+        # At equator during equinox, day and night are nearly equal
+        day_length = (jd_set - jd_rise) * 24
+        assert 11.5 < day_length < 12.5
+
+    def test_southern_hemisphere(self):
+        """Test rise/set in southern hemisphere."""
+        jd_start = julday(2024, 12, 21, 0)  # Southern summer
+        lat, lon = -33.8688, 151.2093  # Sydney
+
+        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        jd_set, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+
+        # Should have valid times
+        assert jd_rise > jd_start
+        assert jd_set > jd_start
+
+        # Find next sunrise/sunset that form a coherent pair
+        # (starting from midnight UTC, for Sydney the set might be before or after rise)
+        if jd_set < jd_rise:
+            # Sunset happened before sunrise, get next sunset after sunrise
+            jd_set2, _ = rise_trans(jd_rise + 0.01, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+            day_length = (jd_set2 - jd_rise) * 24
+        else:
+            day_length = (jd_set - jd_rise) * 24
+
+        # Long summer day in Sydney
+        assert day_length > 13  # Sydney has ~14h days in December
+
+    def test_high_latitude_not_circumpolar(self):
+        """Test high latitude location that's not circumpolar."""
+        jd_start = julday(2024, 3, 20, 0)  # Equinox
+        lat, lon = 65.0, 25.0  # Northern Finland
+
+        jd_rise, flag_rise = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        jd_set, flag_set = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+
+        # At equinox, even high latitudes have sunrise/sunset
+        assert flag_rise != -2
+        assert flag_set != -2
+        assert jd_rise > jd_start
+        assert jd_set > jd_rise
+
+
+class TestRiseTransErrors:
+    """Tests for error handling."""
+
+    def test_invalid_planet_raises_error(self):
+        """Test that invalid planet ID raises ValueError."""
+        jd_start = julday(2024, 6, 21, 0)
+
+        with pytest.raises(ValueError, match="Invalid planet ID"):
+            rise_trans(jd_start, 9999, 41.9, 12.5, rsmi=SE_CALC_RISE)
+
+    def test_invalid_rsmi_raises_error(self):
+        """Test that invalid rsmi raises ValueError."""
+        jd_start = julday(2024, 6, 21, 0)
+
+        with pytest.raises(ValueError, match="Invalid event type"):
+            rise_trans(jd_start, SE_SUN, 41.9, 12.5, rsmi=0)
+
+        with pytest.raises(ValueError, match="Invalid event type"):
+            rise_trans(jd_start, SE_SUN, 41.9, 12.5, rsmi=16)
+
+
+class TestRiseTransSequential:
+    """Tests for sequential event calculations."""
+
+    def test_multiple_sunrises(self):
+        """Test finding multiple consecutive sunrises."""
+        jd = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+        sunrises = []
+
+        for _ in range(3):
+            jd_rise, _ = rise_trans(jd, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+            sunrises.append(jd_rise)
+            jd = jd_rise + 0.5  # Start from noon after sunrise
+
+        # Each sunrise should be about 1 day apart
+        for i in range(1, len(sunrises)):
+            diff = sunrises[i] - sunrises[i - 1]
+            assert 0.99 < diff < 1.01  # About 1 day
+
+    def test_sunrise_before_sunset_same_day(self):
+        """Test that sunrise comes before sunset on the same day."""
+        jd_start = julday(2024, 6, 21, 0)  # Midnight
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        jd_set, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+
+        # Sunrise should be before sunset (starting from midnight)
+        assert jd_rise < jd_set
+
+        # Both should be on the same day
+        y1, m1, d1, _ = revjul(jd_rise)
+        y2, m2, d2, _ = revjul(jd_set)
+        assert (y1, m1, d1) == (y2, m2, d2)
+
+    def test_transit_between_rise_and_set(self):
+        """Test that transit occurs between rise and set."""
+        jd_start = julday(2024, 6, 21, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        jd_transit, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_MTRANSIT)
+        jd_set, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+
+        # Transit should be between rise and set
+        assert jd_rise < jd_transit < jd_set

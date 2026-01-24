@@ -71,6 +71,8 @@ from .eclipse import (
     swe_lun_occult_when_loc,
     lun_occult_where,
     swe_lun_occult_where,
+    rise_trans,
+    swe_rise_trans,
 )
 from .utils import difdeg2n, swe_calc_angles
 from .fixed_stars import (
@@ -256,6 +258,9 @@ __all__ = [
     "swe_lun_occult_when_loc",
     "lun_occult_where",
     "swe_lun_occult_where",
+    # Rise/Set/Transit
+    "rise_trans",
+    "swe_rise_trans",
     # Utilities
     "difdeg2n",
     "swe_calc_angles",

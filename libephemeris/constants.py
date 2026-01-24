@@ -332,3 +332,35 @@ NODBIT_MEAN: int = SE_NODBIT_MEAN
 NODBIT_OSCU: int = SE_NODBIT_OSCU
 NODBIT_OSCU_BAR: int = SE_NODBIT_OSCU_BAR
 NODBIT_FOPOINT: int = SE_NODBIT_FOPOINT
+
+# =============================================================================
+# RISE/SET/TRANSIT CALCULATION FLAGS
+# =============================================================================
+# Event type flags for rise_trans() rsmi parameter
+
+SE_CALC_RISE: int = 1  # Calculate rise time
+SE_CALC_SET: int = 2  # Calculate set time
+SE_CALC_MTRANSIT: int = 4  # Calculate meridian transit (upper culmination)
+SE_CALC_ITRANSIT: int = 8  # Calculate lower transit (anti-culmination)
+
+# Bitmask flags for additional rise/set options
+SE_BIT_DISC_CENTER: int = 256  # Use center of disc instead of upper limb
+SE_BIT_DISC_BOTTOM: int = 8192  # Use lower limb of disc
+SE_BIT_NO_REFRACTION: int = 512  # No atmospheric refraction
+SE_BIT_CIVIL_TWILIGHT: int = 1024  # Civil twilight (Sun at -6 degrees)
+SE_BIT_NAUTIC_TWILIGHT: int = 2048  # Nautical twilight (Sun at -12 degrees)
+SE_BIT_ASTRO_TWILIGHT: int = 4096  # Astronomical twilight (Sun at -18 degrees)
+SE_BIT_FIXED_DISC_SIZE: int = 16384  # Use fixed disc size (ignore parallax)
+
+# pyswisseph-compatible aliases (without SE_ prefix)
+CALC_RISE: int = SE_CALC_RISE
+CALC_SET: int = SE_CALC_SET
+CALC_MTRANSIT: int = SE_CALC_MTRANSIT
+CALC_ITRANSIT: int = SE_CALC_ITRANSIT
+BIT_DISC_CENTER: int = SE_BIT_DISC_CENTER
+BIT_DISC_BOTTOM: int = SE_BIT_DISC_BOTTOM
+BIT_NO_REFRACTION: int = SE_BIT_NO_REFRACTION
+BIT_CIVIL_TWILIGHT: int = SE_BIT_CIVIL_TWILIGHT
+BIT_NAUTIC_TWILIGHT: int = SE_BIT_NAUTIC_TWILIGHT
+BIT_ASTRO_TWILIGHT: int = SE_BIT_ASTRO_TWILIGHT
+BIT_FIXED_DISC_SIZE: int = SE_BIT_FIXED_DISC_SIZE
