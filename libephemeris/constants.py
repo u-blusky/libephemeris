@@ -384,3 +384,30 @@ MORNING_FIRST: int = SE_MORNING_FIRST
 EVENING_LAST: int = SE_EVENING_LAST
 EVENING_FIRST: int = SE_EVENING_FIRST
 MORNING_LAST: int = SE_MORNING_LAST
+
+# =============================================================================
+# HELIACAL VISIBILITY FLAGS
+# =============================================================================
+# Flags for vis_limit_mag() and heliacal calculations
+
+SE_HELFLAG_OPTICAL_PARAMS: int = 1 << 9  # 512 - Use optical instrument parameters
+SE_HELFLAG_NO_DETAILS: int = 1 << 10  # 1024 - Skip detailed calculations
+SE_HELFLAG_VISLIM_DARK: int = 1 << 11  # 2048 - Assume Sun at nadir (dark sky)
+SE_HELFLAG_VISLIM_NOMOON: int = 1 << 12  # 4096 - Exclude Moon's contribution
+
+# pyswisseph-compatible aliases (without SE_ prefix)
+HELFLAG_OPTICAL_PARAMS: int = SE_HELFLAG_OPTICAL_PARAMS
+HELFLAG_NO_DETAILS: int = SE_HELFLAG_NO_DETAILS
+HELFLAG_VISLIM_DARK: int = SE_HELFLAG_VISLIM_DARK
+HELFLAG_VISLIM_NOMOON: int = SE_HELFLAG_VISLIM_NOMOON
+
+# Visibility result codes for vis_limit_mag()
+SE_HELFLAG_BELOW_HORIZON: int = -2  # Object is below horizon
+SE_HELFLAG_PHOTOPIC: int = 0  # OK, photopic (daylight) vision
+SE_HELFLAG_SCOTOPIC: int = 1  # OK, scotopic (night) vision
+SE_HELFLAG_MIXED: int = 2  # OK, near limit photopic/scotopic vision
+
+HELFLAG_BELOW_HORIZON: int = SE_HELFLAG_BELOW_HORIZON
+HELFLAG_PHOTOPIC: int = SE_HELFLAG_PHOTOPIC
+HELFLAG_SCOTOPIC: int = SE_HELFLAG_SCOTOPIC
+HELFLAG_MIXED: int = SE_HELFLAG_MIXED

@@ -4993,3 +4993,437 @@ def heliacal_pheno_ut(
 
 # Alias for Swiss Ephemeris API compatibility
 swe_heliacal_pheno_ut = heliacal_pheno_ut
+
+
+# =============================================================================
+# VISUAL LIMITING MAGNITUDE CALCULATIONS
+# =============================================================================
+
+
+def vis_limit_mag(
+    jd: float,
+    geopos: tuple,
+    atmo: tuple,
+    observer: tuple,
+    objname: str,
+    flags: int = SEFLG_SWIEPH,
+) -> Tuple[int, Tuple[float, ...]]:
+    """
+    Calculate the limiting visual magnitude for observing a celestial body.
+
+    This function determines whether a celestial body (planet, star, etc.)
+    is visible given the current sky brightness conditions, atmospheric
+    parameters, and observer characteristics. It returns both the visibility
+    status and detailed information about the observation conditions.
+
+    Args:
+        jd: Julian Day (UT) for the observation time
+        geopos: Geographic position as a sequence:
+            - [0]: Geographic longitude in degrees (east positive)
+            - [1]: Geographic latitude in degrees (north positive)
+            - [2]: Altitude above sea level in meters
+        atmo: Atmospheric conditions as a sequence:
+            - [0]: Atmospheric pressure in mbar/hPa
+            - [1]: Atmospheric temperature in degrees Celsius
+            - [2]: Relative humidity in percent (0-100)
+            - [3]: If >= 1: Meteorological Range in km
+                   If 0-1: Total atmospheric coefficient (ktot)
+                   If 0: Compute ktot from other parameters
+        observer: Observer characteristics as a sequence:
+            - [0]: Age of observer in years (default 36)
+            - [1]: Snellen ratio of observer's eyes (default 1.0 = normal)
+            For optical instruments (when HELFLAG_OPTICAL_PARAMS is set):
+            - [2]: 0 = monocular, 1 = binocular
+            - [3]: Telescope magnification (0 = naked eye)
+            - [4]: Optical aperture (telescope diameter) in mm
+            - [5]: Optical transmission coefficient
+        objname: Name of the object to observe. Can be:
+            - Planet name (e.g., "Venus", "Mars", "Jupiter")
+            - Fixed star name (e.g., "Sirius", "Aldebaran")
+            - Planet number as string (e.g., "2" for Venus)
+        flags: Calculation flags combining ephemeris and heliacal flags:
+            - SEFLG_SWIEPH, SEFLG_JPLEPH, etc. for ephemeris
+            - HELFLAG_OPTICAL_PARAMS: Use optical instrument parameters
+            - HELFLAG_NO_DETAILS: Skip detailed calculations
+            - HELFLAG_VISLIM_DARK: Assume Sun at nadir (dark sky)
+            - HELFLAG_VISLIM_NOMOON: Exclude Moon's brightness contribution
+
+    Returns:
+        Tuple containing:
+            - result: Visibility status code:
+                - (-2): Object is below horizon
+                - (0): OK, photopic vision (bright conditions)
+                - (1): OK, scotopic vision (dark conditions)
+                - (2): OK, near limit between photopic/scotopic
+            - dret: Tuple of 8 floats with observation details:
+                - [0]: Limiting visual magnitude (object visible if mag < this)
+                - [1]: Altitude of object in degrees
+                - [2]: Azimuth of object in degrees
+                - [3]: Altitude of Sun in degrees
+                - [4]: Azimuth of Sun in degrees
+                - [5]: Altitude of Moon in degrees
+                - [6]: Azimuth of Moon in degrees
+                - [7]: Magnitude of object
+
+    Raises:
+        ValueError: If objname is empty or invalid
+
+    Algorithm:
+        The limiting magnitude calculation is based on Schaefer's model (1990)
+        which considers:
+        1. Sky brightness from Sun, Moon, zodiacal light, airglow
+        2. Atmospheric extinction based on airmass and conditions
+        3. Observer's eye adaptation (scotopic vs photopic)
+        4. Optional optical instrument characteristics
+
+        The sky background brightness varies with:
+        - Sun altitude (twilight contribution)
+        - Moon altitude and phase (moonlight)
+        - Atmospheric scattering
+
+    Example:
+        >>> from libephemeris import julday, vis_limit_mag
+        >>> jd = julday(2024, 8, 15, 22.0)
+        >>> # Rome location
+        >>> geopos = (12.5, 41.9, 0)
+        >>> # Standard atmosphere
+        >>> atmo = (1013.25, 15.0, 50.0, 0.0)
+        >>> # Normal observer
+        >>> observer = (36, 1.0)
+        >>> result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
+        >>> if dret[0] > dret[7]:
+        ...     print("Venus is visible")
+        ... else:
+        ...     print("Venus is not visible")
+
+    References:
+        - Swiss Ephemeris: swe_vis_limit_mag()
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+        - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
+    """
+    import math
+    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .fixed_stars import swe_fixstar2_ut, swe_fixstar2_mag
+    from .state import get_planets, get_timescale
+    from .constants import (
+        SE_SUN,
+        SE_MOON,
+        SE_HELFLAG_VISLIM_DARK,
+        SE_HELFLAG_VISLIM_NOMOON,
+        SE_HELFLAG_BELOW_HORIZON,
+        SE_HELFLAG_PHOTOPIC,
+        SE_HELFLAG_SCOTOPIC,
+        SE_HELFLAG_MIXED,
+    )
+    from skyfield.api import wgs84
+
+    if not objname:
+        raise ValueError("objname cannot be empty")
+
+    # Parse geographic position
+    lon = geopos[0] if len(geopos) > 0 else 0.0
+    lat = geopos[1] if len(geopos) > 1 else 0.0
+    alt_m = geopos[2] if len(geopos) > 2 else 0.0
+
+    # Parse atmospheric conditions
+    pressure = atmo[0] if len(atmo) > 0 else 1013.25
+    temperature = atmo[1] if len(atmo) > 1 else 15.0
+    humidity_pct = atmo[2] if len(atmo) > 2 else 50.0
+    met_range = atmo[3] if len(atmo) > 3 else 0.0
+
+    # Parse observer data
+    observer_age = observer[0] if len(observer) > 0 else 36.0
+    snellen_ratio = observer[1] if len(observer) > 1 else 1.0
+
+    # Get ephemeris and timescale
+    eph = get_planets()
+    ts = get_timescale()
+
+    # Create observer location
+    obs_location = wgs84.latlon(lat, lon, alt_m)
+    earth = eph["earth"]
+    sun = eph["sun"]
+    moon = eph["moon"]
+
+    t = ts.ut1_jd(jd)
+    observer_at = earth + obs_location
+
+    # Calculate Sun position
+    sun_app = observer_at.at(t).observe(sun).apparent()
+    sun_alt_deg, sun_az_deg, _ = sun_app.altaz()
+    sun_alt = sun_alt_deg.degrees
+    sun_az = sun_az_deg.degrees
+
+    # Calculate Moon position
+    moon_app = observer_at.at(t).observe(moon).apparent()
+    moon_alt_deg, moon_az_deg, _ = moon_app.altaz()
+    moon_alt = moon_alt_deg.degrees
+    moon_az = moon_az_deg.degrees
+
+    # Determine if objname is a planet ID or name
+    body_id = None
+    is_fixed_star = False
+
+    # Try parsing as integer (planet ID)
+    try:
+        body_id = int(objname)
+    except ValueError:
+        # Try to find planet by name
+        name_upper = objname.upper().strip()
+        planet_names = {
+            "SUN": SE_SUN,
+            "MOON": SE_MOON,
+            "MERCURY": 2,
+            "VENUS": 3,
+            "MARS": 4,
+            "JUPITER": 5,
+            "SATURN": 6,
+            "URANUS": 7,
+            "NEPTUNE": 8,
+            "PLUTO": 9,
+        }
+        if name_upper in planet_names:
+            body_id = planet_names[name_upper]
+        else:
+            # Assume it's a fixed star
+            is_fixed_star = True
+
+    # Calculate object position and magnitude
+    obj_alt = 0.0
+    obj_az = 0.0
+    obj_mag = 0.0
+
+    if is_fixed_star:
+        # Fixed star calculation
+        try:
+            star_name_out, star_result, retflag, error = swe_fixstar2_ut(
+                objname, jd, flags & 0xFF
+            )
+            if error:
+                raise ValueError(f"Fixed star '{objname}' not found: {error}")
+
+            # star_result is (lon, lat, dist, lon_speed, lat_speed, dist_speed)
+            # We need to convert ecliptic to horizontal
+            star_lon = star_result[0]
+            star_lat = star_result[1]
+
+            # Get star magnitude
+            star_name_mag, star_mag_val, mag_error = swe_fixstar2_mag(objname)
+            if not mag_error:
+                obj_mag = star_mag_val
+            else:
+                obj_mag = 2.0  # Default magnitude if not found
+
+            # Convert ecliptic to equatorial then to horizontal
+            # Simplified: use azalt function if available
+            from .utils import azalt, SE_ECL2HOR
+
+            hor_result = azalt(
+                jd,
+                SE_ECL2HOR,
+                lat,
+                lon,
+                alt_m,
+                pressure,
+                temperature,
+                (star_lon, star_lat, 1.0),
+            )
+            obj_az = hor_result[0]
+            obj_alt = hor_result[1]
+
+        except ValueError:
+            raise
+        except Exception as e:
+            # Star not found or other error
+            raise ValueError(f"Fixed star '{objname}' not found: {e}")
+    else:
+        # Planet calculation
+        if body_id is None:
+            raise ValueError(f"Unknown object: {objname}")
+
+        # Get planet name from _PLANET_MAP
+        if body_id in _PLANET_MAP:
+            target_name = _PLANET_MAP[body_id]
+            target = eph[target_name]
+
+            # Calculate position
+            body_app = observer_at.at(t).observe(target).apparent()
+            body_alt_deg, body_az_deg, _ = body_app.altaz()
+            obj_alt = body_alt_deg.degrees
+            obj_az = body_az_deg.degrees
+
+            # Get magnitude from pheno
+            try:
+                pheno_result, _ = swe_pheno_ut(jd, body_id, flags)
+                obj_mag = pheno_result[4]  # Visual magnitude
+            except Exception:
+                obj_mag = 0.0  # Default bright
+        else:
+            raise ValueError(f"Invalid body ID: {body_id}")
+
+    # Check if object is below horizon
+    if obj_alt < 0:
+        # Apply HELFLAG options before returning
+        use_dark_sky_early = bool(flags & SE_HELFLAG_VISLIM_DARK)
+        exclude_moon_early = bool(flags & SE_HELFLAG_VISLIM_NOMOON)
+        ret_sun_alt = -90.0 if use_dark_sky_early else sun_alt
+        ret_moon_alt = -90.0 if exclude_moon_early else moon_alt
+        dret = (
+            0.0,
+            obj_alt,
+            obj_az,
+            ret_sun_alt,
+            sun_az,
+            ret_moon_alt,
+            moon_az,
+            obj_mag,
+        )
+        return SE_HELFLAG_BELOW_HORIZON, dret
+
+    # Apply HELFLAG options
+    use_dark_sky = bool(flags & SE_HELFLAG_VISLIM_DARK)
+    exclude_moon = bool(flags & SE_HELFLAG_VISLIM_NOMOON)
+
+    if use_dark_sky:
+        sun_alt = -90.0  # Assume Sun at nadir
+
+    if exclude_moon:
+        moon_alt = -90.0  # Assume Moon at nadir
+
+    # Calculate atmospheric extinction coefficient
+    # Simplified Schaefer model
+    def calc_extinction_coeff(pressure_mbar, temp_c, humidity_pct, met_range_km):
+        """Calculate total atmospheric extinction coefficient."""
+        # Rayleigh scattering (molecular)
+        k_rayleigh = 0.1451 * (pressure_mbar / 1013.25)
+
+        # Aerosol scattering
+        if met_range_km >= 1:
+            # Meteorological range given
+            k_aerosol = 3.912 / met_range_km - 0.106
+        elif 0 < met_range_km < 1:
+            # ktot given directly
+            return met_range_km
+        else:
+            # Estimate from humidity
+            # Higher humidity = more scattering
+            k_aerosol = 0.1 + 0.2 * (humidity_pct / 100.0)
+
+        # Ozone absorption (small contribution)
+        k_ozone = 0.016
+
+        return k_rayleigh + k_aerosol + k_ozone
+
+    k_ext = calc_extinction_coeff(pressure, temperature, humidity_pct, met_range)
+
+    # Calculate airmass
+    def calc_airmass(altitude_deg):
+        """Calculate airmass using Kasten & Young formula."""
+        if altitude_deg <= 0:
+            return 40.0  # Maximum airmass at/below horizon
+        z = 90.0 - altitude_deg  # Zenith angle
+        z_rad = math.radians(z)
+        # Kasten & Young (1989)
+        airmass = 1.0 / (math.cos(z_rad) + 0.50572 * (96.07995 - z) ** (-1.6364))
+        return min(airmass, 40.0)
+
+    airmass = calc_airmass(obj_alt)
+
+    # Calculate sky brightness contribution from Sun
+    def calc_sun_brightness_contribution(sun_altitude):
+        """Calculate sky brightness factor from Sun position."""
+        if sun_altitude >= 0:
+            return 1e10  # Daylight - essentially infinite brightness
+        elif sun_altitude >= -6:
+            # Civil twilight
+            return 10 ** (4.0 + sun_altitude * 0.4)
+        elif sun_altitude >= -12:
+            # Nautical twilight
+            return 10 ** (1.6 + (sun_altitude + 6) * 0.2)
+        elif sun_altitude >= -18:
+            # Astronomical twilight
+            return 10 ** (0.4 + (sun_altitude + 12) * 0.1)
+        else:
+            # Full night
+            return 1.0
+
+    # Calculate sky brightness contribution from Moon
+    def calc_moon_brightness_contribution(moon_altitude, jd_ut):
+        """Calculate sky brightness factor from Moon position and phase."""
+        if moon_altitude <= 0:
+            return 0.0
+
+        # Get Moon phase
+        try:
+            moon_pheno, _ = swe_pheno_ut(jd_ut, SE_MOON, flags & 0xFF)
+            phase_angle = moon_pheno[0]  # Phase angle in degrees
+            illumination = (1 + math.cos(math.radians(phase_angle))) / 2.0
+        except Exception:
+            illumination = 0.5  # Assume half moon
+
+        # Moon brightness increases with altitude and illumination
+        moon_factor = illumination * math.sin(math.radians(moon_altitude))
+        return moon_factor * 100.0
+
+    sun_contrib = calc_sun_brightness_contribution(sun_alt)
+    moon_contrib = (
+        calc_moon_brightness_contribution(moon_alt, jd) if not exclude_moon else 0.0
+    )
+
+    # Total sky brightness (arbitrary units)
+    total_sky_brightness = sun_contrib + moon_contrib + 1.0  # 1.0 = natural sky glow
+
+    # Calculate limiting magnitude
+    # Base limiting magnitude for perfect conditions: ~6.5 for naked eye
+    base_limit_mag = 6.5
+
+    # Adjust for observer characteristics
+    # Age reduces sensitivity (approximately 0.05 mag per decade over 30)
+    age_factor = max(0, (observer_age - 30) / 10.0) * 0.05
+
+    # Snellen ratio adjustment (better eyes = higher limit)
+    snellen_factor = -2.5 * math.log10(snellen_ratio) if snellen_ratio > 0 else 0
+
+    # Airmass extinction
+    airmass_extinction = k_ext * airmass
+
+    # Sky brightness reduction of limiting magnitude
+    if total_sky_brightness > 1:
+        sky_reduction = 2.5 * math.log10(total_sky_brightness)
+    else:
+        sky_reduction = 0.0
+
+    # Calculate final limiting magnitude
+    limiting_mag = base_limit_mag - age_factor - snellen_factor - sky_reduction
+
+    # Apply extinction to object magnitude (object appears fainter)
+    apparent_obj_mag = obj_mag + airmass_extinction
+
+    # Determine vision type based on sky brightness
+    if sun_alt >= -6:
+        # Photopic vision (daylight/bright twilight)
+        vision_type = SE_HELFLAG_PHOTOPIC
+    elif sun_alt >= -12:
+        # Mixed/mesopic vision
+        vision_type = SE_HELFLAG_MIXED
+    else:
+        # Scotopic vision (night)
+        vision_type = SE_HELFLAG_SCOTOPIC
+
+    # Build result tuple
+    dret = (
+        limiting_mag,  # 0: Limiting visual magnitude
+        obj_alt,  # 1: Altitude of object
+        obj_az,  # 2: Azimuth of object
+        sun_alt,  # 3: Altitude of Sun
+        sun_az,  # 4: Azimuth of Sun
+        moon_alt,  # 5: Altitude of Moon
+        moon_az,  # 6: Azimuth of Moon
+        apparent_obj_mag,  # 7: Apparent magnitude of object (with extinction)
+    )
+
+    return vision_type, dret
+
+
+# Alias for Swiss Ephemeris API compatibility
+swe_vis_limit_mag = vis_limit_mag

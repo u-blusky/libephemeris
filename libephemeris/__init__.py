@@ -91,6 +91,8 @@ from .eclipse import (
     swe_heliacal_ut,
     heliacal_pheno_ut,
     swe_heliacal_pheno_ut,
+    vis_limit_mag,
+    swe_vis_limit_mag,
 )
 from .utils import (
     difdeg2n,
