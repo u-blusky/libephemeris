@@ -569,3 +569,92 @@ def close() -> None:
     _TIDAL_ACCELERATION = None
     _DELTA_T_USERDEF = None
     _LAPSE_RATE = None
+
+
+def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
+    """
+    Get information about the currently loaded ephemeris file.
+
+    This function returns details about the JPL ephemeris file currently in use,
+    including the file path and the date range covered by the ephemeris.
+
+    Args:
+        ifno: File number indicator (for compatibility with pyswisseph):
+              - 0: planet file (main ephemeris - DE421, DE431, etc.)
+              - 1: moon file (same as planets in JPL ephemeris)
+              - 2: main asteroid file (not applicable for JPL ephemeris)
+              - 3: other asteroid file (not applicable for JPL ephemeris)
+              - 4: star file (not applicable for JPL ephemeris)
+
+    Returns:
+        A tuple containing:
+            - path (str): Full path to the ephemeris file, or empty string if
+                         no ephemeris is loaded or ifno is not applicable
+            - start (float): Start date of the ephemeris file (Julian Day)
+            - end (float): End date of the ephemeris file (Julian Day)
+            - denum (int): JPL Development Ephemeris number (e.g., 421, 431, 441)
+                          or 0 if not determinable
+
+    Note:
+        - For libephemeris using JPL/Skyfield ephemerides, ifno values 0 and 1
+          return the same data since planets and Moon are in the same file.
+        - ifno values 2, 3, 4 return empty data as those file types are not
+          used by libephemeris.
+        - The ephemeris file must have been loaded (by calling calc_ut or
+          get_planets) before this function returns meaningful data.
+
+    Example:
+        >>> from libephemeris import get_current_file_data, calc_ut, SE_SUN
+        >>> calc_ut(2451545.0, SE_SUN, 0)  # Triggers ephemeris loading
+        >>> path, start, end, denum = get_current_file_data(0)
+        >>> print(f"Using DE{denum}, covering JD {start:.1f} to {end:.1f}")
+        Using DE421, covering JD 2414864.5 to 2471184.5
+    """
+    # Only file types 0 (planets) and 1 (moon) are meaningful for JPL ephemeris
+    # Types 2, 3, 4 (asteroids, stars) are not applicable
+    if ifno not in (0, 1):
+        return ("", 0.0, 0.0, 0)
+
+    # If no ephemeris loaded, return empty data
+    if _PLANETS is None:
+        return ("", 0.0, 0.0, 0)
+
+    try:
+        # Get the file path
+        path = str(_PLANETS.path) if hasattr(_PLANETS, "path") else ""
+        if not path and hasattr(_PLANETS, "filename"):
+            path = str(_PLANETS.filename)
+
+        # Get start/end dates from the SPK segments
+        # All segments in a JPL DE file typically have the same date range
+        start_jd = 0.0
+        end_jd = 0.0
+
+        if hasattr(_PLANETS, "spk") and hasattr(_PLANETS.spk, "segments"):
+            segments = list(_PLANETS.spk.segments)
+            if segments:
+                # Use the first segment's date range as representative
+                first_seg = segments[0]
+                start_jd = (
+                    float(first_seg.start_jd) if hasattr(first_seg, "start_jd") else 0.0
+                )
+                end_jd = (
+                    float(first_seg.end_jd) if hasattr(first_seg, "end_jd") else 0.0
+                )
+
+        # Extract DE number from filename (e.g., "de421.bsp" -> 421)
+        denum = 0
+        filename = _EPHEMERIS_FILE.lower()
+        if filename.startswith("de") and ".bsp" in filename:
+            try:
+                # Extract digits between "de" and ".bsp"
+                num_str = filename[2:].split(".")[0]
+                denum = int(num_str)
+            except (ValueError, IndexError):
+                denum = 0
+
+        return (path, start_jd, end_jd, denum)
+
+    except Exception:
+        # Return empty data on any error
+        return ("", 0.0, 0.0, 0)

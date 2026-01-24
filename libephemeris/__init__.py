@@ -58,6 +58,7 @@ from .state import (
     set_lapse_rate as swe_set_lapse_rate,
     get_lapse_rate as swe_get_lapse_rate,
     get_library_path as swe_get_library_path,
+    get_current_file_data as swe_get_current_file_data,
     close as swe_close,
 )
 from .crossing import (
@@ -215,6 +216,9 @@ get_lapse_rate = swe_get_lapse_rate
 # Library path
 get_library_path = swe_get_library_path
 
+# Current file data
+get_current_file_data = swe_get_current_file_data
+
 # Close and cleanup
 close = swe_close
 
@@ -349,6 +353,9 @@ __all__ = [
     # Library path
     "swe_get_library_path",
     "get_library_path",
+    # Current file data
+    "swe_get_current_file_data",
+    "get_current_file_data",
     # Close and cleanup
     "swe_close",
     "close",
