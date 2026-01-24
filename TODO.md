@@ -14,41 +14,41 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 - [x] Implementare la funzione `deltat_ex(jd, ephe_flag)` che è una versione estesa di deltat() che permette di specificare esplicitamente quale fonte usare per il calcolo di Delta-T (differenza tra TT e UT). Il parametro ephe_flag può essere SEFLG_SWIEPH, SEFLG_JPLEPH, o SEFLG_MOSEPH. Attualmente deltat() usa sempre un valore di default.
 
-- [ ] Implementare la funzione `date_conversion(year, month, day, hour, calendar)` che converte date tra calendario Giuliano e Gregoriano. Il parametro calendar è 'j' per Giuliano o 'g' per Gregoriano. Ritorna (year, month, day, hour) nel calendario richiesto. La transizione standard è il 15 ottobre 1582.
+- [x] Implementare la funzione `date_conversion(year, month, day, hour, calendar)` che converte date tra calendario Giuliano e Gregoriano. Il parametro calendar è 'j' per Giuliano o 'g' per Gregoriano. Ritorna (year, month, day, hour) nel calendario richiesto. La transizione standard è il 15 ottobre 1582.
 
-- [ ] Implementare la funzione `day_of_week(jd)` che ritorna il giorno della settimana (0=Lunedì, 1=Martedì, ..., 6=Domenica) per qualsiasi Julian Day. Questa è una semplice operazione matematica: (floor(jd + 1.5) % 7) ma pyswisseph la espone come funzione per comodità.
+- [x] Implementare la funzione `day_of_week(jd)` che ritorna il giorno della settimana (0=Lunedì, 1=Martedì, ..., 6=Domenica) per qualsiasi Julian Day. Questa è una semplice operazione matematica: (floor(jd + 1.5) % 7) ma pyswisseph la espone come funzione per comodità.
 
-- [ ] Implementare la funzione `utc_to_jd(year, month, day, hour, min, sec, calendar)` che converte una data/ora UTC in Julian Day, gestendo correttamente i leap seconds. A differenza di julday() che assume UT1, questa funzione tiene conto della differenza tra UTC e UT1. Ritorna una tupla (jd_et, jd_ut) con entrambe le versioni.
+- [x] Implementare la funzione `utc_to_jd(year, month, day, hour, min, sec, calendar)` che converte una data/ora UTC in Julian Day, gestendo correttamente i leap seconds. A differenza di julday() che assume UT1, questa funzione tiene conto della differenza tra UTC e UT1. Ritorna una tupla (jd_et, jd_ut) con entrambe le versioni.
 
-- [ ] Implementare la funzione `jdet_to_utc(jd_et, calendar)` che converte un Julian Day in Ephemeris Time (TT/ET) a data/ora UTC, applicando Delta-T e leap seconds. Ritorna (year, month, day, hour, min, sec). Il parametro calendar specifica se usare Giuliano o Gregoriano.
+- [x] Implementare la funzione `jdet_to_utc(jd_et, calendar)` che converte un Julian Day in Ephemeris Time (TT/ET) a data/ora UTC, applicando Delta-T e leap seconds. Ritorna (year, month, day, hour, min, sec). Il parametro calendar specifica se usare Giuliano o Gregoriano.
 
-- [ ] Implementare la funzione `jdut1_to_utc(jd_ut1, calendar)` che converte un Julian Day in UT1 a data/ora UTC. La differenza tra UT1 e UTC è piccola (< 0.9 secondi) ma importante per precisione astronomica. Ritorna (year, month, day, hour, min, sec).
+- [x] Implementare la funzione `jdut1_to_utc(jd_ut1, calendar)` che converte un Julian Day in UT1 a data/ora UTC. La differenza tra UT1 e UTC è piccola (< 0.9 secondi) ma importante per precisione astronomica. Ritorna (year, month, day, hour, min, sec).
 
-- [ ] Implementare la funzione `utc_time_zone(year, month, day, hour, min, sec, timezone_offset)` che applica un offset di fuso orario a una data/ora UTC. L'offset è in ore (es. +1 per CET, -5 per EST). Ritorna la data/ora locale come tupla.
+- [x] Implementare la funzione `utc_time_zone(year, month, day, hour, min, sec, timezone_offset)` che applica un offset di fuso orario a una data/ora UTC. L'offset è in ore (es. +1 per CET, -5 per EST). Ritorna la data/ora locale come tupla.
 
-- [ ] Implementare la funzione `time_equ(jd)` che calcola l'Equazione del Tempo, cioè la differenza tra tempo solare apparente e tempo solare medio. Ritorna il valore in giorni (moltiplicare per 1440 per minuti). L'equazione del tempo varia da circa -14 a +16 minuti durante l'anno.
+- [x] Implementare la funzione `time_equ(jd)` che calcola l'Equazione del Tempo, cioè la differenza tra tempo solare apparente e tempo solare medio. Ritorna il valore in giorni (moltiplicare per 1440 per minuti). L'equazione del tempo varia da circa -14 a +16 minuti durante l'anno.
 
-- [ ] Implementare la funzione `lat_to_lmt(jd_lat, longitude)` che converte Local Apparent Time (tempo solare vero) a Local Mean Time (tempo solare medio) per una data longitudine. La differenza è l'equazione del tempo. Ritorna il Julian Day in LMT.
+- [x] Implementare la funzione `lat_to_lmt(jd_lat, longitude)` che converte Local Apparent Time (tempo solare vero) a Local Mean Time (tempo solare medio) per una data longitudine. La differenza è l'equazione del tempo. Ritorna il Julian Day in LMT.
 
-- [ ] Implementare la funzione `lmt_to_lat(jd_lmt, longitude)` che converte Local Mean Time a Local Apparent Time per una data longitudine. È l'operazione inversa di lat_to_lmt(). Ritorna il Julian Day in LAT.
+- [x] Implementare la funzione `lmt_to_lat(jd_lmt, longitude)` che converte Local Mean Time a Local Apparent Time per una data longitudine. È l'operazione inversa di lat_to_lmt(). Ritorna il Julian Day in LAT.
 
-- [ ] Implementare la funzione `sidtime(jd, longitude, obliquity, nutation)` che calcola il tempo siderale locale per una data posizione geografica. Il tempo siderale è l'angolo orario del punto vernale e serve per calcolare quali stelle sono visibili. Ritorna il valore in ore (0-24).
+- [x] Implementare la funzione `sidtime(jd, longitude, obliquity, nutation)` che calcola il tempo siderale locale per una data posizione geografica. Il tempo siderale è l'angolo orario del punto vernale e serve per calcolare quali stelle sono visibili. Ritorna il valore in ore (0-24).
 
-- [ ] Implementare la funzione `sidtime0(jd, obliquity, nutation)` che calcola il tempo siderale a Greenwich (longitudine 0°) a mezzanotte UT. È la base per calcolare il tempo siderale locale. Ritorna il valore in ore. pyswisseph usa l'algoritmo IAU 2006.
+- [x] Implementare la funzione `sidtime0(jd, obliquity, nutation)` che calcola il tempo siderale a Greenwich (longitudine 0°) a mezzanotte UT. È la base per calcolare il tempo siderale locale. Ritorna il valore in ore. pyswisseph usa l'algoritmo IAU 2006.
 
-- [ ] Implementare la funzione `houses_ex2(jd, lat, lon, hsys, flags)` che è una versione estesa di houses_ex() che ritorna anche le velocità (derivate) delle cuspidi delle case. pyswisseph ritorna (cusps, ascmc, cusps_speed, ascmc_speed). Questo è utile per calcolare quando una cuspide cambia segno. Vedere CALCS.md per i dettagli sui calcoli delle case.
+- [x] Implementare la funzione `houses_ex2(jd, lat, lon, hsys, flags)` che è una versione estesa di houses_ex() che ritorna anche le velocità (derivate) delle cuspidi delle case. pyswisseph ritorna (cusps, ascmc, cusps_speed, ascmc_speed). Questo è utile per calcolare quando una cuspide cambia segno. Vedere CALCS.md per i dettagli sui calcoli delle case.
 
-- [ ] Implementare la funzione `houses_armc(armc, lat, obliquity, hsys)` che calcola le case a partire dall'ARMC (Ascensione Retta del Medium Coeli) invece che dal Julian Day. Questo è utile quando si ha già l'ARMC precalcolato o per sistemi di case che dipendono solo dall'ARMC. Vedere CALCS.md per i dettagli sui calcoli delle case.
+- [x] Implementare la funzione `houses_armc(armc, lat, obliquity, hsys)` che calcola le case a partire dall'ARMC (Ascensione Retta del Medium Coeli) invece che dal Julian Day. Questo è utile quando si ha già l'ARMC precalcolato o per sistemi di case che dipendono solo dall'ARMC. Vedere CALCS.md per i dettagli sui calcoli delle case.
 
-- [ ] Implementare la funzione `houses_armc_ex2(armc, lat, obliquity, hsys, flags)` che combina houses_armc() con il calcolo delle velocità come houses_ex2(). Ritorna (cusps, ascmc, cusps_speed, ascmc_speed). Vedere CALCS.md per i dettagli sui calcoli delle case.
+- [x] Implementare la funzione `houses_armc_ex2(armc, lat, obliquity, hsys, flags)` che combina houses_armc() con il calcolo delle velocità come houses_ex2(). Ritorna (cusps, ascmc, cusps_speed, ascmc_speed). Vedere CALCS.md per i dettagli sui calcoli delle case.
 
-- [ ] Implementare la funzione `house_pos(armc, lat, obliquity, hsys, lon, lat_body)` che determina in quale casa si trova un corpo celeste data la sua longitudine e latitudine eclittica. Ritorna un valore decimale dove la parte intera è il numero della casa (1-12) e la parte decimale indica la posizione all'interno della casa (0.0 = inizio cuspide, 0.999 = fine casa). Vedere CALCS.md per i dettagli sui calcoli delle case.
+- [x] Implementare la funzione `house_pos(armc, lat, obliquity, hsys, lon, lat_body)` che determina in quale casa si trova un corpo celeste data la sua longitudine e latitudine eclittica. Ritorna un valore decimale dove la parte intera è il numero della casa (1-12) e la parte decimale indica la posizione all'interno della casa (0.0 = inizio cuspide, 0.999 = fine casa). Vedere CALCS.md per i dettagli sui calcoli delle case.
 
-- [ ] Implementare la funzione `gauquelin_sector(jd, planet, lat, lon, altitude, pressure, temperature, flags, method)` che calcola il settore Gauquelin (1-36) in cui si trova un pianeta. I settori Gauquelin sono una divisione dell'eclittica usata nella ricerca statistica astrologica di Michel Gauquelin. Vedere CALCS.md per i dettagli sui calcoli delle case.
+- [x] Implementare la funzione `gauquelin_sector(jd, planet, lat, lon, altitude, pressure, temperature, flags, method)` che calcola il settore Gauquelin (1-36) in cui si trova un pianeta. I settori Gauquelin sono una divisione dell'eclittica usata nella ricerca statistica astrologica di Michel Gauquelin. Vedere CALCS.md per i dettagli sui calcoli delle case.
 
-- [ ] Implementare la funzione `get_ayanamsa_ex(jd, sid_mode, flags)` che ritorna l'ayanamsa (precessione siderale) con componenti aggiuntive. A differenza di get_ayanamsa() che ritorna solo il valore totale, questa ritorna una tupla con (ayanamsa, eps_true, nut_long) includendo obliquità vera e nutazione in longitudine. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Implementare la funzione `get_ayanamsa_ex(jd, sid_mode, flags)` che ritorna l'ayanamsa (precessione siderale) con componenti aggiuntive. A differenza di get_ayanamsa() che ritorna solo il valore totale, questa ritorna una tupla con (ayanamsa, eps_true, nut_long) includendo obliquità vera e nutazione in longitudine. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Implementare la funzione `get_ayanamsa_ex_ut(jd_ut, sid_mode, flags)` che è la versione UT di get_ayanamsa_ex(). Converte internamente da UT a TT prima di calcolare. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Implementare la funzione `get_ayanamsa_ex_ut(jd_ut, sid_mode, flags)` che è la versione UT di get_ayanamsa_ex(). Converte internamente da UT a TT prima di calcolare. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
 - [ ] Implementare la funzione `fixstar(star_name, jd, flags)` che calcola la posizione di una stella fissa in Terrestrial Time (TT). Attualmente è implementata solo fixstar_ut() che usa Universal Time. La differenza è l'applicazione di Delta-T. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
 
