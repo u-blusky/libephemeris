@@ -5,10 +5,10 @@ Finds eclipse events and calculates their circumstances.
 
 Functions:
 - sol_eclipse_when_glob: Find next global solar eclipse
-- (planned) sol_eclipse_when_loc: Find eclipse at specific location
-- (planned) sol_eclipse_where: Calculate path of eclipse
-- (planned) sol_eclipse_how: Eclipse circumstances at location
-- (planned) lun_eclipse_when: Find next lunar eclipse
+- sol_eclipse_when_loc: Find eclipse at specific location
+- sol_eclipse_where: Calculate path of eclipse
+- sol_eclipse_how: Eclipse circumstances at location
+- lun_eclipse_when: Find next lunar eclipse
 
 Algorithm:
     Solar eclipses occur at New Moon when Moon is near the ecliptic plane.
@@ -16,6 +16,12 @@ Algorithm:
     2. Check lunar latitude - if |lat| < ~1.5° eclipse is possible
     3. Calculate eclipse magnitude and type based on distances
     4. Use Besselian elements for precise timing of phases
+
+    Lunar eclipses occur at Full Moon when Moon is near a lunar node.
+    1. Find next Full Moon (Sun-Moon opposition in longitude)
+    2. Check Moon's distance from node - if close, eclipse is possible
+    3. Calculate eclipse type (penumbral, partial, total) based on geometry
+    4. Calculate phase times based on shadow cone sizes
 
 References:
     - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
@@ -36,6 +42,8 @@ from .constants import (
     SE_ECL_ANNULAR_TOTAL,
     SE_ECL_CENTRAL,
     SE_ECL_ALLTYPES_SOLAR,
+    SE_ECL_ALLTYPES_LUNAR,
+    SE_ECL_PENUMBRAL,
     SE_ECL_VISIBLE,
     SE_ECL_MAX_VISIBLE,
     SE_ECL_1ST_VISIBLE,
@@ -1475,3 +1483,428 @@ def sol_eclipse_how(
 
 # Alias for Swiss Ephemeris API compatibility
 swe_sol_eclipse_how = sol_eclipse_how
+
+
+# =============================================================================
+# LUNAR ECLIPSE FUNCTIONS
+# =============================================================================
+
+# Constants for lunar eclipse calculations
+ECLIPSE_LIMIT_LUNAR = 12.0  # Maximum elongation from node for lunar eclipse (degrees)
+
+
+def _find_next_full_moon(jd_start: float) -> float:
+    """
+    Find the next Full Moon (Sun-Moon opposition) after jd_start.
+
+    Uses iterative refinement to find exact moment of opposition.
+
+    Args:
+        jd_start: Julian Day (UT) to start search from
+
+    Returns:
+        Julian Day of next Full Moon
+    """
+    # Get current positions
+    sun_pos, _ = swe_calc_ut(jd_start, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd_start, SE_MOON, SEFLG_SPEED)
+
+    sun_lon = sun_pos[0]
+    moon_lon = moon_pos[0]
+
+    # Calculate elongation from opposition (Moon - Sun - 180°)
+    elongation = (moon_lon - sun_lon - 180.0) % 360.0
+    if elongation > 180:
+        elongation -= 360
+
+    # Moon gains ~12.2° per day on Sun
+    relative_speed = 12.190749  # degrees/day
+
+    # Time until next opposition (elongation from 180° = 0)
+    if elongation > 0:
+        # Past opposition, wait for next cycle
+        dt = (360.0 - elongation) / relative_speed
+    else:
+        dt = (-elongation) / relative_speed
+
+    jd_guess = jd_start + dt
+
+    # Newton-Raphson refinement
+    for _ in range(20):
+        sun_pos, _ = swe_calc_ut(jd_guess, SE_SUN, SEFLG_SPEED)
+        moon_pos, _ = swe_calc_ut(jd_guess, SE_MOON, SEFLG_SPEED)
+
+        sun_lon = sun_pos[0]
+        moon_lon = moon_pos[0]
+        sun_speed = sun_pos[3]
+        moon_speed = moon_pos[3]
+
+        # Elongation from opposition
+        diff = (moon_lon - sun_lon - 180.0) % 360.0
+        if diff > 180:
+            diff -= 360
+
+        # Convergence check (< 0.1 arcsec)
+        if abs(diff) < 1e-5:
+            return jd_guess
+
+        # Newton-Raphson step
+        rel_speed = moon_speed - sun_speed
+        if abs(rel_speed) < 0.1:
+            rel_speed = 12.19
+
+        jd_guess -= diff / rel_speed
+
+    return jd_guess
+
+
+def _calculate_lunar_eclipse_type_and_magnitude(
+    jd: float,
+) -> Tuple[int, float, float, float, float, float]:
+    """
+    Determine lunar eclipse type and magnitude at maximum eclipse.
+
+    Uses geometric calculations based on Earth's shadow cones at the Moon's distance.
+
+    Args:
+        jd: Julian Day of eclipse maximum (UT)
+
+    Returns:
+        Tuple of (eclipse_type_flags, magnitude_umbral, magnitude_penumbral,
+                  gamma, penumbra_radius, umbra_radius)
+        - eclipse_type_flags: Bitmask of SE_ECL_* constants
+        - magnitude_umbral: Eclipse magnitude (fraction of Moon in umbra)
+        - magnitude_penumbral: Penumbral eclipse magnitude
+        - gamma: Gamma parameter (Moon's distance from shadow axis in Earth radii)
+        - penumbra_radius: Penumbral shadow radius at Moon distance (degrees)
+        - umbra_radius: Umbral shadow radius at Moon distance (degrees)
+    """
+    # Get positions
+    sun_pos, _ = swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+
+    # Distances in AU
+    sun_dist = sun_pos[2]
+    moon_dist = moon_pos[2]
+
+    # Moon's ecliptic latitude (how far from the ecliptic)
+    moon_lat = moon_pos[1]
+
+    # Constants for shadow calculations
+    # Sun angular radius at 1 AU: 959.63 arcsec
+    # Earth radius: 6378.137 km = 4.2635e-5 AU
+    SUN_RADIUS_ARCSEC = 959.63
+    EARTH_RADIUS_AU = 4.2635e-5
+    EARTH_RADIUS_KM = 6378.137
+
+    # Sun's angular semi-diameter at actual distance (in degrees)
+    sun_semidiameter = (SUN_RADIUS_ARCSEC / 3600.0) / sun_dist
+
+    # Moon's angular semi-diameter (932.56 arcsec at mean distance 0.002569 AU)
+    moon_semidiameter = (932.56 / 3600.0) * (0.002569 / moon_dist)
+
+    # Earth's angular semi-diameter as seen from Moon (in degrees)
+    earth_semidiameter = math.degrees(math.atan(EARTH_RADIUS_AU / moon_dist))
+
+    # Calculate shadow cone sizes at Moon's distance
+    # Using the geometric relationship of similar triangles
+
+    # Sun's angular radius as seen from Earth
+    sun_angular_radius_from_earth = sun_semidiameter
+
+    # Penumbra radius at Moon's distance (Earth + Sun shadow)
+    # Penumbra outer edge: Earth appears larger, adding Sun's angular size
+    penumbra_radius = earth_semidiameter + sun_angular_radius_from_earth
+
+    # Umbra radius at Moon's distance (Earth minus Sun shadow)
+    # The umbra is smaller because of the Sun's finite size
+    # Using more accurate shadow cone calculation
+    # Shadow cone angle from geometry
+    sun_dist_km = sun_dist * 149597870.7
+    moon_dist_km = moon_dist * 149597870.7
+    sun_radius_km = (SUN_RADIUS_ARCSEC / 206265.0) * sun_dist_km
+
+    # Umbra cone semi-angle
+    umbra_cone_angle = math.atan((sun_radius_km - EARTH_RADIUS_KM) / sun_dist_km)
+    # Umbra radius at Moon distance
+    umbra_radius_km = EARTH_RADIUS_KM - moon_dist_km * math.tan(umbra_cone_angle)
+
+    if umbra_radius_km > 0:
+        umbra_radius = math.degrees(math.atan(umbra_radius_km / moon_dist_km))
+    else:
+        # Umbra doesn't reach Moon (antumbra) - extremely rare for lunar eclipses
+        umbra_radius = 0.0
+
+    # Moon's distance from the shadow axis (in degrees)
+    moon_distance_from_axis = abs(moon_lat)
+
+    # Gamma: Moon's distance from shadow axis in Earth radii
+    gamma = moon_lat / earth_semidiameter
+
+    # Calculate eclipse magnitudes
+    # Penumbral magnitude: how far Moon penetrates into penumbra
+    penumbral_mag = (penumbra_radius + moon_semidiameter - moon_distance_from_axis) / (
+        2 * moon_semidiameter
+    )
+
+    # Umbral magnitude: how far Moon penetrates into umbra
+    umbral_mag = (umbra_radius + moon_semidiameter - moon_distance_from_axis) / (
+        2 * moon_semidiameter
+    )
+
+    # Determine eclipse type
+    eclipse_type = 0
+
+    if penumbral_mag <= 0:
+        # No eclipse
+        return 0, 0.0, 0.0, gamma, penumbra_radius, umbra_radius
+
+    if umbral_mag <= 0:
+        # Penumbral only
+        eclipse_type = SE_ECL_PENUMBRAL
+        penumbral_mag = max(0.0, min(1.0, penumbral_mag))
+        return eclipse_type, 0.0, penumbral_mag, gamma, penumbra_radius, umbra_radius
+
+    if umbral_mag >= 1.0:
+        # Total umbral eclipse
+        eclipse_type = SE_ECL_TOTAL
+        umbral_mag = max(0.0, umbral_mag)
+        penumbral_mag = max(0.0, min(2.0, penumbral_mag))
+    else:
+        # Partial umbral eclipse
+        eclipse_type = SE_ECL_PARTIAL
+        umbral_mag = max(0.0, min(1.0, umbral_mag))
+        penumbral_mag = max(0.0, min(2.0, penumbral_mag))
+
+    return eclipse_type, umbral_mag, penumbral_mag, gamma, penumbra_radius, umbra_radius
+
+
+def _calculate_lunar_eclipse_phases(
+    jd_max: float,
+    eclipse_type: int,
+    moon_semidiameter: float,
+    umbra_radius: float,
+    penumbra_radius: float,
+    moon_lat_at_max: float,
+) -> Tuple[float, float, float, float, float, float, float, float]:
+    """
+    Calculate times of lunar eclipse phases (contacts).
+
+    Phase indices:
+        [0]: Time of maximum eclipse
+        [1]: Time of partial eclipse beginning (Moon enters umbra)
+        [2]: Time of total eclipse beginning (Moon fully in umbra)
+        [3]: Time of total eclipse ending (Moon starts leaving umbra)
+        [4]: Time of partial eclipse ending (Moon leaves umbra)
+        [5]: Time of penumbral eclipse beginning
+        [6]: Time of penumbral eclipse ending
+        [7]: Reserved
+
+    Args:
+        jd_max: Julian Day of maximum eclipse
+        eclipse_type: Eclipse type flags
+        moon_semidiameter: Moon's angular semi-diameter in degrees
+        umbra_radius: Umbral shadow radius in degrees
+        penumbra_radius: Penumbral shadow radius in degrees
+        moon_lat_at_max: Moon's ecliptic latitude at maximum in degrees
+
+    Returns:
+        Tuple of 8 floats with phase times (JD UT)
+    """
+    # Actually calculate from Moon's speed minus Sun's speed
+    sun_pos, _ = swe_calc_ut(jd_max, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd_max, SE_MOON, SEFLG_SPEED)
+
+    # Speed of Moon relative to shadow (in longitude)
+    relative_speed = abs(moon_pos[3] - sun_pos[3])  # degrees/day
+    if relative_speed < 0.1:
+        relative_speed = 0.55  # fallback to typical value
+
+    # Distance from shadow axis at maximum
+    y = abs(moon_lat_at_max)
+
+    # Calculate half-duration of each phase using geometry
+    # The Moon moves through the shadow at an angle
+    # Half-duration = sqrt(R² - y²) / speed where R is radius and y is impact parameter
+
+    def calc_half_duration(radius: float) -> float:
+        """Calculate half-duration for given shadow radius."""
+        r_total = radius + moon_semidiameter
+        if y >= r_total:
+            return 0.0
+        # Calculate chord half-length
+        half_chord = math.sqrt(max(0, r_total * r_total - y * y))
+        return half_chord / relative_speed
+
+    def calc_total_half_duration(radius: float) -> float:
+        """Calculate half-duration of total phase (Moon fully inside)."""
+        r_inner = radius - moon_semidiameter
+        if r_inner <= 0 or y >= r_inner:
+            return 0.0
+        half_chord = math.sqrt(max(0, r_inner * r_inner - y * y))
+        return half_chord / relative_speed
+
+    # Penumbral phase times
+    penumbral_half_dur = calc_half_duration(penumbra_radius)
+    t_pen_begin = jd_max - penumbral_half_dur
+    t_pen_end = jd_max + penumbral_half_dur
+
+    # Partial (umbral) phase times
+    partial_half_dur = calc_half_duration(umbra_radius)
+    if partial_half_dur > 0:
+        t_partial_begin = jd_max - partial_half_dur
+        t_partial_end = jd_max + partial_half_dur
+    else:
+        t_partial_begin = 0.0
+        t_partial_end = 0.0
+
+    # Total phase times
+    if eclipse_type & SE_ECL_TOTAL:
+        total_half_dur = calc_total_half_duration(umbra_radius)
+        if total_half_dur > 0:
+            t_total_begin = jd_max - total_half_dur
+            t_total_end = jd_max + total_half_dur
+        else:
+            t_total_begin = 0.0
+            t_total_end = 0.0
+    else:
+        t_total_begin = 0.0
+        t_total_end = 0.0
+
+    return (
+        jd_max,  # [0] Maximum
+        t_partial_begin,  # [1] Partial begins (enters umbra)
+        t_total_begin,  # [2] Total begins
+        t_total_end,  # [3] Total ends
+        t_partial_end,  # [4] Partial ends (leaves umbra)
+        t_pen_begin,  # [5] Penumbral begins
+        t_pen_end,  # [6] Penumbral ends
+        0.0,  # [7] Reserved
+    )
+
+
+def lun_eclipse_when(
+    jd_start: float,
+    flags: int = SEFLG_SWIEPH,
+    eclipse_type: int = 0,
+) -> Tuple[Tuple[float, ...], int]:
+    """
+    Find the next lunar eclipse after a given date.
+
+    Searches forward in time from jd_start to find the next lunar eclipse.
+    Can filter by eclipse type (total, partial, penumbral).
+
+    Args:
+        jd_start: Julian Day (UT) to start search from
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        eclipse_type: Filter for specific eclipse type(s), bitmask of:
+            - SE_ECL_TOTAL (4): Total lunar eclipse
+            - SE_ECL_PARTIAL (16): Partial lunar eclipse
+            - SE_ECL_PENUMBRAL (64): Penumbral lunar eclipse
+            - 0: Any eclipse type (default)
+
+    Returns:
+        Tuple containing:
+            - times: Tuple of 8 floats with eclipse phase times (JD UT):
+                [0]: Time of maximum eclipse
+                [1]: Time of partial eclipse beginning (Moon enters umbra)
+                [2]: Time of total eclipse beginning (or 0 if not total)
+                [3]: Time of total eclipse ending (or 0 if not total)
+                [4]: Time of partial eclipse ending (Moon leaves umbra)
+                [5]: Time of penumbral eclipse beginning
+                [6]: Time of penumbral eclipse ending
+                [7]: Reserved (0)
+            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
+
+    Raises:
+        RuntimeError: If no eclipse found within search limit
+
+    Algorithm:
+        1. Find next Full Moon after jd_start
+        2. Check if Moon is close enough to node for eclipse
+        3. If not eclipse, advance to next Full Moon
+        4. Calculate eclipse type and magnitude
+        5. If eclipse_type filter set, check if matches
+        6. Calculate phase times
+
+    Precision:
+        Eclipse times accurate to ~1 minute for most eclipses.
+
+    Example:
+        >>> # Find next total lunar eclipse after Jan 1, 2024
+        >>> from libephemeris import julday, SE_ECL_TOTAL
+        >>> jd = julday(2024, 1, 1, 0)
+        >>> times, ecl_type = lun_eclipse_when(jd, eclipse_type=SE_ECL_TOTAL)
+        >>> print(f"Total lunar eclipse at JD {times[0]:.5f}")
+
+    References:
+        - Swiss Ephemeris: swe_lun_eclipse_when()
+        - Meeus "Astronomical Algorithms" Ch. 54
+    """
+    MAX_SEARCH_YEARS = 20  # Maximum search range
+    MAX_FULL_MOONS = int(MAX_SEARCH_YEARS * 12.4)  # ~12.4 lunations per year
+
+    # If eclipse_type is 0, accept any type
+    if eclipse_type == 0:
+        eclipse_type = SE_ECL_ALLTYPES_LUNAR
+
+    jd = jd_start
+
+    for _ in range(MAX_FULL_MOONS):
+        # Find next Full Moon
+        jd_full_moon = _find_next_full_moon(jd)
+
+        # Get Moon position at Full Moon
+        moon_pos, _ = swe_calc_ut(jd_full_moon, SE_MOON, flags | SEFLG_SPEED)
+        moon_lon = moon_pos[0]
+        moon_lat = moon_pos[1]
+
+        # Check if close enough to ecliptic for eclipse
+        # Lunar eclipse possible if Moon is near a node
+        node_dist = _get_moon_node_distance(jd_full_moon, moon_lon)
+
+        if node_dist < ECLIPSE_LIMIT_LUNAR:
+            # Possible eclipse - check magnitude
+            (
+                ecl_type,
+                umbral_mag,
+                penumbral_mag,
+                gamma,
+                penumbra_radius,
+                umbra_radius,
+            ) = _calculate_lunar_eclipse_type_and_magnitude(jd_full_moon)
+
+            if ecl_type != 0:
+                # Eclipse found - check if matches filter
+                type_matches = (
+                    (eclipse_type & SE_ECL_TOTAL and ecl_type & SE_ECL_TOTAL)
+                    or (eclipse_type & SE_ECL_PARTIAL and ecl_type & SE_ECL_PARTIAL)
+                    or (eclipse_type & SE_ECL_PENUMBRAL and ecl_type & SE_ECL_PENUMBRAL)
+                )
+
+                if type_matches:
+                    # Get moon semi-diameter for phase calculations
+                    moon_dist = moon_pos[2]
+                    moon_semidiameter = (932.56 / 3600.0) * (0.002569 / moon_dist)
+
+                    # Calculate phase times
+                    times = _calculate_lunar_eclipse_phases(
+                        jd_full_moon,
+                        ecl_type,
+                        moon_semidiameter,
+                        umbra_radius,
+                        penumbra_radius,
+                        moon_lat,
+                    )
+                    return times, ecl_type
+
+        # Advance to next lunation
+        jd = jd_full_moon + 25  # Skip ahead ~25 days to ensure we find next Full Moon
+
+    raise RuntimeError(
+        f"No matching lunar eclipse found within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+    )
+
+
+# Aliases for compatibility
+swe_lun_eclipse_when = lun_eclipse_when
