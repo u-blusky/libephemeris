@@ -939,6 +939,53 @@ def difrad2n(p1: float, p2: float) -> float:
     return diff
 
 
+# Constants for centiseconds calculations
+# 1 centisecond = 1/100 arcsecond
+# 360 degrees = 360 * 3600 * 100 = 129,600,000 centiseconds
+CS360 = 360 * 3600 * 100  # 129600000 centiseconds in a full circle
+CS180 = 180 * 3600 * 100  # 64800000 centiseconds in a half circle
+
+
+def difcs2n(a: int, b: int) -> int:
+    """
+    Calculate distance in centiseconds a - b normalized to [-180°, +180°].
+
+    This function computes the signed angular difference between two angles
+    expressed in centiseconds (1/100 of an arcsecond), handling 360° wrapping.
+    The result is normalized to the equivalent of [-180°, +180°] in centiseconds.
+
+    Compatible with pyswisseph's swe.difcs2n() function.
+
+    Args:
+        a: First angle in centiseconds
+        b: Second angle in centiseconds
+
+    Returns:
+        Normalized difference in range [-64800000, 64800000) centiseconds
+        (equivalent to [-180°, +180°))
+
+    Notes:
+        - 1 centisecond = 1/100 arcsecond = 1/360000 degree
+        - 360° = 129,600,000 centiseconds
+        - 180° = 64,800,000 centiseconds
+        - When the difference is exactly 180°, returns -180° (matching pyswisseph)
+
+    Examples:
+        >>> difcs2n(360000, 720000)  # 1° - 2° = -1° = -360000 cs
+        -360000
+        >>> difcs2n(129240000, 360000)  # 359° - 1° = -2° = -720000 cs (shorter path)
+        -720000
+        >>> difcs2n(360000, 129240000)  # 1° - 359° = 2° = 720000 cs (shorter path)
+        720000
+        >>> difcs2n(64800000, 0)  # 180° - 0° = -180° (pyswisseph convention)
+        -64800000
+    """
+    diff = (a - b) % CS360
+    if diff >= CS180:
+        diff -= CS360
+    return diff
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
