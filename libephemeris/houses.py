@@ -2359,27 +2359,26 @@ def _houses_krusinski(
     return cusps
 
 
-def _houses_equal_mc(mc: float) -> List[float]:
+def _houses_equal_mc(asc: float, mc: float) -> List[float]:
     """
     Equal houses from MC (Axial Rotation system).
 
-    FIXME: Precision - Approximation without true Ascendant
-        Uses MC+90° as Ascendant approximation, then applies equal 30° divisions.
-        True implementation needs actual Ascendant from observer location.
-        SwissEph returns Equal (Ascendant) for this mode with proper Asc calculation.
-        Impact: Results approximate for latitudes far from equator.
+    This is the Equal house system variant where the MC is placed at the 10th house cusp,
+    but the Ascendant determines the starting point for the equal 30° divisions.
+    In practice, this produces the same cusps as Equal (Ascendant) since both
+    use the true Ascendant as the basis for equal divisions.
 
     Args:
+        asc: Ascendant longitude in degrees (true calculated Ascendant)
         mc: Midheaven longitude in degrees
 
     Returns:
-        List of 13 house cusp longitudes (approximated from MC)
+        List of 13 house cusp longitudes
     """
     cusps = [0.0] * 13
-    # Approximate Ascendant as MC + 90° (exact only at equator)
-    asc_approx = (mc + 90.0) % 360.0
+    # Use the true Ascendant (not an approximation)
     for i in range(1, 13):
-        cusps[i] = (asc_approx + (i - 1) * 30.0) % 360.0
+        cusps[i] = (asc + (i - 1) * 30.0) % 360.0
     return cusps
 
 
