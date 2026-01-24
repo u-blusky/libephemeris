@@ -2277,6 +2277,140 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], 
     return (elements, iflag)
 
 
+def swe_orbit_max_min_true_distance(
+    tjd_ut: float, ipl: int, iflag: int
+) -> Tuple[float, float]:
+    """
+    Calculate the minimum and maximum geocentric distances during a planet's orbit.
+
+    Swiss Ephemeris compatible function.
+
+    This function computes the minimum and maximum true distances from Earth
+    that a planet can reach during its orbital motion. These distances correspond
+    to the planet's perigee (closest approach) and apogee (farthest distance)
+    relative to Earth.
+
+    For outer planets (Mars-Pluto), the minimum distance occurs around opposition
+    and the maximum around conjunction with the Sun.
+
+    For inner planets (Mercury, Venus), the minimum distance occurs near inferior
+    conjunction and the maximum near superior conjunction.
+
+    Note: pyswisseph returns (min_distance, max_distance).
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1) - used to determine current
+                orbital elements, though the min/max are characteristic of the orbit.
+        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        iflag: Calculation flags (currently unused, for API compatibility)
+
+    Returns:
+        Tuple of (min_distance, max_distance) in AU
+
+    Example:
+        >>> from libephemeris import orbit_max_min_true_distance, SE_MARS
+        >>> min_dist, max_dist = orbit_max_min_true_distance(2451545.0, SE_MARS, 0)
+        >>> print(f"Mars distance range: {min_dist:.4f} - {max_dist:.4f} AU")
+
+    Note:
+        - For geocentric calculations, these represent the range of Earth-planet
+          distances possible during the synodic cycle.
+        - The Moon's distance is calculated as geocentric (Earth-Moon distance).
+        - Sun returns (0.0, 0.0) as it has no meaningful geocentric distance range.
+    """
+    ts = get_timescale()
+    t = ts.ut1_jd(tjd_ut)
+    return _calc_orbit_max_min_true_distance(t, ipl, iflag)
+
+
+def _calc_orbit_max_min_true_distance(t, ipl: int, iflag: int) -> Tuple[float, float]:
+    """
+    Internal function to calculate min/max geocentric distances.
+
+    For planets, this computes the theoretical minimum and maximum distances
+    from Earth during the orbital cycle. This is derived from the orbital
+    elements of both the planet and Earth.
+
+    Algorithm:
+        For outer planets (Mars-Pluto):
+            - min_distance ≈ a_planet - a_earth (at opposition, both at same side)
+            - max_distance ≈ a_planet + a_earth (at conjunction, opposite sides)
+
+        For inner planets (Mercury, Venus):
+            - min_distance ≈ a_earth - a_planet (at inferior conjunction)
+            - max_distance ≈ a_earth + a_planet (at superior conjunction)
+
+        Corrections are applied for eccentricity of both orbits.
+
+    Args:
+        t: Skyfield Time object
+        ipl: Planet ID
+        iflag: Calculation flags
+
+    Returns:
+        Tuple of (min_distance, max_distance) in AU
+    """
+    # Sun has no geocentric distance variation
+    if ipl == SE_SUN:
+        return (0.0, 0.0)
+
+    # Earth has no geocentric distance (it's the observer)
+    if ipl == SE_EARTH:
+        return (0.0, 0.0)
+
+    # Moon - use geocentric orbit parameters
+    if ipl == SE_MOON:
+        # Moon's mean distance and eccentricity
+        # Semi-major axis: ~384,400 km = 0.00257 AU
+        # Eccentricity: ~0.0549
+        a_moon = 0.00256955529  # AU (same as in MEAN_ELEMENTS)
+        e_moon = 0.0549
+        min_dist = a_moon * (1 - e_moon)  # Perigee
+        max_dist = a_moon * (1 + e_moon)  # Apogee
+        return (min_dist, max_dist)
+
+    # For planets, we need orbital elements
+    # Get orbital elements from the existing function
+    elements, _ = _calc_orbital_elements(t, ipl, iflag)
+
+    if elements[0] == 0.0:  # Invalid planet
+        return (0.0, 0.0)
+
+    # Extract planet's semi-major axis and eccentricity
+    a_planet = elements[0]  # Semi-major axis in AU
+    e_planet = elements[1]  # Eccentricity
+
+    # Earth's orbital parameters (mean values)
+    a_earth = 1.00000261  # Semi-major axis in AU
+    e_earth = 0.01671123  # Eccentricity
+
+    # Perihelion and aphelion distances
+    r_planet_min = a_planet * (1 - e_planet)  # Planet perihelion
+    r_planet_max = a_planet * (1 + e_planet)  # Planet aphelion
+    r_earth_min = a_earth * (1 - e_earth)  # Earth perihelion
+    r_earth_max = a_earth * (1 + e_earth)  # Earth aphelion
+
+    # Determine if inner or outer planet
+    if a_planet < a_earth:
+        # Inner planet (Mercury, Venus)
+        # Minimum distance: at inferior conjunction when planet is at aphelion
+        # and Earth is at perihelion (closest possible approach)
+        # Actually, minimum occurs when planet is between Earth and Sun
+        # min ≈ r_earth - r_planet (when aligned, planet between)
+        # max ≈ r_earth + r_planet (when aligned, Sun between)
+        min_dist = abs(r_earth_min - r_planet_max)
+        max_dist = r_earth_max + r_planet_max
+    else:
+        # Outer planet (Mars, Jupiter, etc.)
+        # Minimum distance: at opposition when both are aligned on same side of Sun
+        # max ≈ r_planet + r_earth (at conjunction, Sun between)
+        # min ≈ r_planet - r_earth (at opposition, same side)
+        min_dist = abs(r_planet_min - r_earth_max)
+        max_dist = r_planet_max + r_earth_max
+
+    return (min_dist, max_dist)
+
+
 def _calc_nod_aps_osculating(
     t, ipl: int, iflag: int
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
