@@ -986,6 +986,44 @@ def difcs2n(a: int, b: int) -> int:
     return diff
 
 
+def difcsn(a: int, b: int) -> int:
+    """
+    Calculate distance in centiseconds a - b normalized to [0, 360°).
+
+    This function computes the angular difference between two angles
+    expressed in centiseconds (1/100 of an arcsecond), handling 360° wrapping.
+    The result is normalized to the equivalent of [0, 360°) in centiseconds,
+    always returning a non-negative value.
+
+    Compatible with pyswisseph's swe.difcsn() function.
+
+    Args:
+        a: First angle in centiseconds
+        b: Second angle in centiseconds
+
+    Returns:
+        Normalized difference in range [0, 129600000) centiseconds
+        (equivalent to [0°, 360°))
+
+    Notes:
+        - 1 centisecond = 1/100 arcsecond = 1/360000 degree
+        - 360° = 129,600,000 centiseconds
+        - Unlike difcs2n() which returns [-180°, +180°], this function
+          always returns a positive value in [0°, 360°)
+
+    Examples:
+        >>> difcsn(720000, 360000)  # 2° - 1° = 1° = 360000 cs
+        360000
+        >>> difcsn(360000, 720000)  # 1° - 2° = 359° = 129240000 cs (positive)
+        129240000
+        >>> difcsn(360000, 129240000)  # 1° - 359° = 2° = 720000 cs
+        720000
+        >>> difcsn(0, 0)  # 0° - 0° = 0°
+        0
+    """
+    return (a - b) % CS360
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
