@@ -50,6 +50,7 @@ from .state import (
     set_ephemeris_file as swe_set_ephemeris_file,
 )
 from .crossing import swe_solcross_ut, swe_mooncross_ut, swe_cross_ut
+from .eclipse import sol_eclipse_when_glob, swe_sol_eclipse_when_glob
 from .utils import difdeg2n, swe_calc_angles
 from .fixed_stars import (
     swe_fixstar_ut,
@@ -213,6 +214,9 @@ __all__ = [
     "swe_mooncross_ut",
     "mooncross_ut",
     "swe_cross_ut",
+    # Eclipses
+    "sol_eclipse_when_glob",
+    "swe_sol_eclipse_when_glob",
     # Utilities
     "difdeg2n",
     "swe_calc_angles",
