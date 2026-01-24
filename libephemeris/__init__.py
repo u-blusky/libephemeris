@@ -57,6 +57,7 @@ from .state import (
     get_delta_t_userdef as swe_get_delta_t_userdef,
     set_lapse_rate as swe_set_lapse_rate,
     get_lapse_rate as swe_get_lapse_rate,
+    close as swe_close,
 )
 from .crossing import (
     swe_solcross_ut,
@@ -210,6 +211,9 @@ get_delta_t_userdef = swe_get_delta_t_userdef
 set_lapse_rate = swe_set_lapse_rate
 get_lapse_rate = swe_get_lapse_rate
 
+# Close and cleanup
+close = swe_close
+
 # Fixed Stars
 fixstar_ut = swe_fixstar_ut
 fixstar = swe_fixstar
@@ -338,6 +342,9 @@ __all__ = [
     "set_lapse_rate",
     "swe_get_lapse_rate",
     "get_lapse_rate",
+    # Close and cleanup
+    "swe_close",
+    "close",
     # Crossings
     "swe_solcross_ut",
     "solcross_ut",

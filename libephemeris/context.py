@@ -367,3 +367,48 @@ class EphemerisContext:
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)
         return _calc_body_pctr_with_context(t, ipl, iplctr, iflag, self)
+
+    @classmethod
+    def close(cls) -> None:
+        """
+        Close all shared ephemeris resources and release file handles.
+
+        This class method closes the shared SPK kernel file handles and resets
+        all shared resources to their initial values. Call this when you want to:
+        - Free memory and file handles in long-running applications
+        - Switch to a different ephemeris file
+        - Ensure clean state in test suites
+
+        Note:
+            - This affects all EphemerisContext instances since they share
+              resources (ephemeris files, timescale, loader)
+            - After calling close(), the next calculation on any context
+              will automatically reload resources as needed
+            - Instance-specific state (topo, sidereal_mode, angles_cache)
+              is NOT affected - only shared resources are reset
+
+        Example:
+            >>> ctx = EphemerisContext()
+            >>> pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)  # Loads ephemeris
+            >>> EphemerisContext.close()  # Close shared files
+            >>> pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)  # Reloads ephemeris
+        """
+        global _SHARED_LOADER, _SHARED_PLANETS, _SHARED_TS
+        global _SHARED_EPHE_PATH, _SHARED_EPHE_FILE
+
+        with _SHARED_LOCK:
+            # Close the SPK kernel file handles if loaded
+            if _SHARED_PLANETS is not None:
+                try:
+                    _SHARED_PLANETS.close()
+                except (AttributeError, Exception):
+                    # SpiceKernel may not have close() in all versions,
+                    # or may already be closed
+                    pass
+
+            # Reset all shared state to initial values
+            _SHARED_LOADER = None
+            _SHARED_PLANETS = None
+            _SHARED_TS = None
+            _SHARED_EPHE_PATH = None
+            _SHARED_EPHE_FILE = "de421.bsp"

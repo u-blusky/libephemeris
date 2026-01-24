@@ -483,3 +483,55 @@ def get_lapse_rate() -> float:
     if _LAPSE_RATE is None:
         return SE_LAPSE_RATE_DEFAULT
     return _LAPSE_RATE
+
+
+def close() -> None:
+    """
+    Close all opened ephemeris files and release resources.
+
+    This function closes the SPK kernel file handles and resets all global
+    state to its initial values. Call this when you're done using the library
+    or want to reload ephemeris files with different settings.
+
+    Note:
+        - This closes the underlying file handles in the JPL ephemeris kernel
+        - After calling close(), the next ephemeris calculation will
+          automatically reload the ephemeris files as needed
+        - This is useful for:
+          - Freeing memory and file handles in long-running applications
+          - Switching to a different ephemeris file
+          - Ensuring clean state in test suites
+
+    Example:
+        >>> from libephemeris import calc_ut, close, SE_SUN
+        >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # Loads ephemeris
+        >>> close()  # Close files and reset state
+        >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # Reloads ephemeris
+    """
+    global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _LOADER, _PLANETS, _TS
+    global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
+    global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
+
+    # Close the SPK kernel file handles if loaded
+    if _PLANETS is not None:
+        try:
+            _PLANETS.close()
+        except (AttributeError, Exception):
+            # SpiceKernel may not have close() in all versions,
+            # or may already be closed
+            pass
+
+    # Reset all global state to initial values
+    _EPHEMERIS_PATH = None
+    _EPHEMERIS_FILE = "de421.bsp"
+    _LOADER = None
+    _PLANETS = None
+    _TS = None
+    _TOPO = None
+    _SIDEREAL_MODE = None
+    _SIDEREAL_AYAN_T0 = 0.0
+    _SIDEREAL_T0 = 0.0
+    _ANGLES_CACHE = {}
+    _TIDAL_ACCELERATION = None
+    _DELTA_T_USERDEF = None
+    _LAPSE_RATE = None
