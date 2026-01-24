@@ -323,6 +323,110 @@ def swe_mooncross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
     raise RuntimeError("Maximum iterations reached in moon crossing calculation")
 
 
+def swe_mooncross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> float:
+    """
+    Find when the Moon crosses a specific ecliptic longitude (TT version).
+
+    This is the Terrestrial Time version of swe_mooncross_ut(). Takes Julian Day
+    in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
+
+    Searches FORWARD in time for the next crossing after jd_tt.
+
+    Args:
+        x2cross: Target ecliptic longitude in degrees (0-360)
+        jd_tt: Julian Day in Terrestrial Time (TT/ET) to start search from
+        flag: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        float: Julian Day of crossing (TT)
+
+    Raises:
+        RuntimeError: If convergence fails or calculation error occurs
+
+    Note:
+        TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
+        which varies from ~32 seconds (year 2000) to minutes (historical times).
+        For most astrological applications, use swe_mooncross_ut() instead.
+
+        Moon moves ~13° per day (27.3 day cycle).
+        More variable speed than Sun due to orbit eccentricity.
+        Uses 30 iterations vs Sun's 20 for added robustness.
+
+    Algorithm:
+        1. Get current Moon position and velocity
+        2. Linear estimate: dt = (target - current) / velocity
+        3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
+        4. Converge to < 1 arcsecond (~0.1 seconds of time for Moon)
+
+    Precision:
+        Typically < 1 arcsecond (< 0.1 seconds of time for Moon)
+
+    Example:
+        >>> # Find next new moon (Sun-Moon conjunction at same longitude) using TT
+        >>> sun_pos, _ = swe_calc(jd_tt_now, SE_SUN, SEFLG_SWIEPH)
+        >>> jd_new_moon_tt = swe_mooncross(sun_pos[0], jd_tt_now)
+    """
+    x2cross = x2cross % 360.0
+
+    try:
+        pos, _ = swe_calc(jd_tt, SE_MOON, flag | SEFLG_SPEED)
+        lon_start = pos[0]
+        speed = pos[3]  # degrees/day
+    except Exception as e:
+        raise RuntimeError(f"Failed to calculate Moon position: {e}")
+
+    # Calculate initial guess for NEXT crossing
+    diff = (x2cross - lon_start) % 360.0
+
+    if speed < 0 and diff > 0:
+        diff -= 360.0
+
+    if abs(diff) < 1e-5:
+        if speed > 0:
+            diff += 360.0
+        else:
+            diff -= 360.0
+
+    # Initial time estimate
+    if speed == 0:
+        speed = 13.176  # Average Moon motion ~13.18°/day
+
+    dt_guess = diff / speed
+    jd_guess = jd_tt + dt_guess
+
+    jd = jd_guess
+    for iteration in range(30):
+        try:
+            pos, _ = swe_calc(jd, SE_MOON, flag | SEFLG_SPEED)
+            lon = pos[0]
+            speed = pos[3]
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to calculate Moon position during iteration: {e}"
+            )
+
+        # Difference to target
+        diff = (x2cross - lon) % 360.0
+        if diff > 180:
+            diff -= 360
+
+        # Check convergence (< 1 arcsecond)
+        if abs(diff) < 1.0 / 3600.0:
+            return jd
+
+        # Newton-Raphson step
+        if abs(speed) < 0.1:
+            speed = 13.176
+
+        jd += diff / speed
+
+        # Safety check
+        if abs(jd - jd_guess) > 31:  # More than a month
+            raise RuntimeError("Moon crossing search diverged")
+
+    raise RuntimeError("Maximum iterations reached in moon crossing calculation")
+
+
 def swe_cross_ut(
     planet_id: int, x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH
 ) -> float:

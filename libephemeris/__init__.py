@@ -49,7 +49,13 @@ from .state import (
     set_ephe_path as swe_set_ephe_path,
     set_ephemeris_file as swe_set_ephemeris_file,
 )
-from .crossing import swe_solcross_ut, swe_solcross, swe_mooncross_ut, swe_cross_ut
+from .crossing import (
+    swe_solcross_ut,
+    swe_solcross,
+    swe_mooncross_ut,
+    swe_mooncross,
+    swe_cross_ut,
+)
 from .eclipse import (
     sol_eclipse_when_glob,
     swe_sol_eclipse_when_glob,
@@ -145,6 +151,7 @@ fixstar2_mag = swe_fixstar2_mag
 solcross_ut = swe_solcross_ut
 solcross = swe_solcross
 mooncross_ut = swe_mooncross_ut
+mooncross = swe_mooncross
 
 
 # Helper for Arabic parts
@@ -241,6 +248,8 @@ __all__ = [
     "solcross",
     "swe_mooncross_ut",
     "mooncross_ut",
+    "swe_mooncross",
+    "mooncross",
     "swe_cross_ut",
     # Eclipses
     "sol_eclipse_when_glob",
