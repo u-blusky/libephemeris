@@ -257,3 +257,35 @@ def date_conversion(
 
     # Convert via Julian Day to target calendar
     return swe_revjul(jd, target_cal)
+
+
+def day_of_week(jd: float) -> int:
+    """
+    Calculate the day of the week for a given Julian Day number.
+
+    Uses the formula: floor(jd + 0.5) % 7 to get 0=Monday convention.
+    This matches pyswisseph's day_of_week function.
+
+    Args:
+        jd: Julian Day number
+
+    Returns:
+        int: Day of the week where:
+            - 0 = Monday
+            - 1 = Tuesday
+            - 2 = Wednesday
+            - 3 = Thursday
+            - 4 = Friday
+            - 5 = Saturday
+            - 6 = Sunday
+
+    Example:
+        >>> from libephemeris import day_of_week, swe_julday
+        >>> # J2000.0 epoch: Jan 1, 2000 was a Saturday
+        >>> jd = swe_julday(2000, 1, 1, 12.0)
+        >>> day_of_week(jd)
+        5
+    """
+    import math
+
+    return int(math.floor(jd + 0.5)) % 7
