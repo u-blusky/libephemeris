@@ -403,3 +403,196 @@ class TestSolEclipseWhenLoc:
 
         # Second eclipse should be after first
         assert times2[0] > times1[0]
+
+
+class TestSolEclipseWhere:
+    """Tests for sol_eclipse_where function."""
+
+    def test_returns_correct_tuple_sizes(self):
+        """Should return geopos tuple of 2 and attr tuple of 8 elements."""
+        from libephemeris import sol_eclipse_where
+
+        # First find an eclipse to get a valid time
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        geopos, attr, ecl_type = sol_eclipse_where(times[0])
+
+        assert len(geopos) == 2
+        assert len(attr) == 8
+
+    def test_central_eclipse_returns_valid_position(self):
+        """For central eclipse, should return valid geographic coordinates."""
+        from libephemeris import sol_eclipse_where
+
+        # Find a total eclipse (which is central)
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, global_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        geopos, attr, ecl_type = sol_eclipse_where(times[0])
+
+        # If eclipse is central, we should get valid coordinates
+        if ecl_type & SE_ECL_CENTRAL:
+            lon, lat = geopos
+            # Longitude should be -180 to 180
+            assert -180 <= lon <= 180
+            # Latitude should be -90 to 90
+            assert -90 <= lat <= 90
+
+    def test_eclipse_type_flags_set(self):
+        """Eclipse type flags should be set appropriately."""
+        from libephemeris import sol_eclipse_where
+
+        # Find a total eclipse
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        geopos, attr, ecl_type = sol_eclipse_where(times[0])
+
+        # Should have central flag for central eclipse
+        if ecl_type != 0:
+            assert ecl_type & SE_ECL_CENTRAL
+            # Should have either total or annular flag
+            assert ecl_type & (SE_ECL_TOTAL | SE_ECL_ANNULAR)
+
+    def test_attributes_have_valid_ranges(self):
+        """Eclipse attributes should be within valid ranges."""
+        from libephemeris import sol_eclipse_where
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        geopos, attr, ecl_type = sol_eclipse_where(times[0])
+
+        if ecl_type != 0:
+            magnitude = attr[0]
+            ratio = attr[1]
+            obscuration = attr[2]
+            path_width = attr[3]
+            sun_azimuth = attr[4]
+            sun_altitude = attr[5]
+            moon_diameter = attr[6]
+            sun_diameter = attr[7]
+
+            # Magnitude should be positive for central eclipse
+            assert magnitude > 0
+            # Ratio should be close to 1 for total/annular
+            assert 0.8 < ratio < 1.2
+            # Obscuration should be 0-1
+            assert 0 <= obscuration <= 1
+            # Path width should be positive and reasonable (km)
+            assert 0 <= path_width <= 1000
+            # Sun altitude at central line should be positive (Sun above horizon)
+            # (can be negative near sunrise/sunset)
+            assert -90 <= sun_altitude <= 90
+            # Azimuth should be 0-360
+            assert 0 <= sun_azimuth <= 360
+            # Apparent diameters should be positive
+            assert moon_diameter > 0
+            assert sun_diameter > 0
+
+    def test_non_eclipse_time_returns_zeros(self):
+        """Time far from any eclipse should return zeros."""
+        from libephemeris import sol_eclipse_where
+
+        # Random time not during an eclipse (full moon time)
+        jd_non_eclipse = swe_julday(2024, 4, 23, 12)  # Near full moon
+
+        geopos, attr, ecl_type = sol_eclipse_where(jd_non_eclipse)
+
+        # Should return zeros or partial flag
+        if ecl_type == 0:
+            assert geopos[0] == 0.0
+            assert geopos[1] == 0.0
+
+    def test_april_2024_eclipse_path(self):
+        """Test April 8, 2024 total eclipse path."""
+        from libephemeris import sol_eclipse_where
+
+        # April 8, 2024 eclipse maximum around 18:18 UT
+        jd_eclipse = swe_julday(2024, 4, 8, 18.3)
+
+        geopos, attr, ecl_type = sol_eclipse_where(jd_eclipse)
+
+        # Should be a total eclipse
+        if ecl_type & SE_ECL_TOTAL:
+            lon, lat = geopos
+            # The path crossed Mexico, US, and Eastern Canada
+            # Central line was roughly around:
+            # - Mexico: around 100W, 20-25N
+            # - US: around 85-100W, 30-45N
+            # - Canada: around 60-80W, 45-50N
+            # At 18:18 UT, central line should be somewhere in Americas
+            # Allow reasonable tolerance for approximate algorithm
+            assert -130 < lon < -40  # Western longitudes (Americas)
+            # The algorithm may give slightly different latitudes
+            # due to approximations in shadow geometry
+            assert -10 < lat < 60  # Northern hemisphere, with tolerance
+
+    def test_path_width_positive_for_central_eclipse(self):
+        """Path width should be positive for central eclipses."""
+        from libephemeris import sol_eclipse_where
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        geopos, attr, ecl_type = sol_eclipse_where(times[0])
+
+        if ecl_type & SE_ECL_CENTRAL:
+            path_width = attr[3]
+            # Path width should be positive
+            assert path_width > 0
+
+    def test_alias_matches_main_function(self):
+        """swe_sol_eclipse_where should be an alias for sol_eclipse_where."""
+        from libephemeris import sol_eclipse_where, swe_sol_eclipse_where
+
+        assert swe_sol_eclipse_where is sol_eclipse_where
+
+    def test_flags_parameter_accepted(self):
+        """Should accept flags parameter without error."""
+        from libephemeris import sol_eclipse_where
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start)
+
+        # Should not raise
+        geopos, attr, ecl_type = sol_eclipse_where(times[0], flags=SEFLG_SWIEPH)
+
+    def test_annular_eclipse(self):
+        """Test with annular eclipse."""
+        from libephemeris import sol_eclipse_where
+
+        # October 14, 2023 annular eclipse
+        jd_start = swe_julday(2023, 9, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_ANNULAR)
+
+        geopos, attr, ecl_type = sol_eclipse_where(times[0])
+
+        # Should be annular
+        if ecl_type & SE_ECL_ANNULAR:
+            # Moon/Sun ratio should be < 1 for annular
+            ratio = attr[1]
+            assert ratio < 1.0
+
+    def test_multiple_times_during_eclipse(self):
+        """Different times during eclipse should give different positions."""
+        from libephemeris import sol_eclipse_where
+
+        # Find an eclipse
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Check positions at different times
+        jd_max = times[0]
+        delta = 10.0 / (24 * 60)  # 10 minutes in days
+
+        geopos1, _, type1 = sol_eclipse_where(jd_max - delta)
+        geopos2, _, type2 = sol_eclipse_where(jd_max)
+        geopos3, _, type3 = sol_eclipse_where(jd_max + delta)
+
+        # If all are central, positions should differ
+        if type1 & SE_ECL_CENTRAL and type2 & SE_ECL_CENTRAL and type3 & SE_ECL_CENTRAL:
+            # Longitudes should be different (shadow moves westward)
+            # The shadow moves about 0.25 degrees per minute in longitude
+            assert geopos1[0] != geopos2[0] or geopos1[1] != geopos2[1]

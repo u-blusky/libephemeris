@@ -55,6 +55,8 @@ from .eclipse import (
     swe_sol_eclipse_when_glob,
     sol_eclipse_when_loc,
     swe_sol_eclipse_when_loc,
+    sol_eclipse_where,
+    swe_sol_eclipse_where,
 )
 from .utils import difdeg2n, swe_calc_angles
 from .fixed_stars import (
@@ -224,6 +226,8 @@ __all__ = [
     "swe_sol_eclipse_when_glob",
     "sol_eclipse_when_loc",
     "swe_sol_eclipse_when_loc",
+    "sol_eclipse_where",
+    "swe_sol_eclipse_where",
     # Utilities
     "difdeg2n",
     "swe_calc_angles",
