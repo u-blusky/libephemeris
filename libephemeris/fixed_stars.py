@@ -28,7 +28,7 @@ References:
 
 import math
 from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple
 from .constants import SE_REGULUS, SE_SPICA_STAR
 
 
@@ -54,21 +54,57 @@ class StarData:
     pm_dec: float
 
 
+@dataclass
+class StarCatalogEntry:
+    """
+    Extended catalog entry for fixstar2 functions.
+
+    Attributes:
+        id: Internal star ID
+        name: Traditional star name (e.g. "Regulus")
+        nomenclature: Bayer/Flamsteed designation (e.g. "alLeo", "alVir")
+        hip_number: Hipparcos catalog number (e.g. 49669)
+        data: Astrometric data for position calculation
+    """
+
+    id: int
+    name: str
+    nomenclature: str
+    hip_number: int
+    data: StarData
+
+
+# Extended star catalog with names and catalog numbers
+STAR_CATALOG: List[StarCatalogEntry] = [
+    StarCatalogEntry(
+        id=SE_REGULUS,
+        name="Regulus",
+        nomenclature="alLeo",
+        hip_number=49669,
+        data=StarData(
+            ra_j2000=152.092958,  # 10h 08m 22.3s (Alpha Leonis)
+            dec_j2000=11.967208,  # +11° 58' 02"
+            pm_ra=-0.00249,  # -249 mas/yr (westward)
+            pm_dec=0.00152,  # +152 mas/yr (northward)
+        ),
+    ),
+    StarCatalogEntry(
+        id=SE_SPICA_STAR,
+        name="Spica",
+        nomenclature="alVir",
+        hip_number=65474,
+        data=StarData(
+            ra_j2000=201.298247,  # 13h 25m 11.6s (Alpha Virginis)
+            dec_j2000=-11.161319,  # -11° 09' 41"
+            pm_ra=-0.04235,  # -42.35 mas/yr
+            pm_dec=-0.03067,  # -30.67 mas/yr
+        ),
+    ),
+]
+
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
-FIXED_STARS = {
-    SE_REGULUS: StarData(
-        ra_j2000=152.092958,  # 10h 08m 22.3s (Alpha Leonis)
-        dec_j2000=11.967208,  # +11° 58' 02"
-        pm_ra=-0.00249,  # -249 mas/yr (westward)
-        pm_dec=0.00152,  # +152 mas/yr (northward)
-    ),
-    SE_SPICA_STAR: StarData(
-        ra_j2000=201.298247,  # 13h 25m 11.6s (Alpha Virginis)
-        dec_j2000=-11.161319,  # -11° 09' 41"
-        pm_ra=-0.04235,  # -42.35 mas/yr
-        pm_dec=-0.03067,  # -30.67 mas/yr
-    ),
-}
+# Legacy format for backward compatibility
+FIXED_STARS = {entry.id: entry.data for entry in STAR_CATALOG}
 
 
 def calc_fixed_star_position(star_id: int, jd_tt: float) -> Tuple[float, float, float]:
@@ -293,3 +329,210 @@ def swe_fixstar(
         return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
     except Exception as e:
         return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
+
+
+def _format_star_name(entry: StarCatalogEntry) -> str:
+    """
+    Format the full star name for return from fixstar2 functions.
+
+    Returns format: "Name,Nomenclature" (e.g. "Regulus,alLeo")
+    """
+    return f"{entry.name},{entry.nomenclature}"
+
+
+def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]:
+    """
+    Resolve a star identifier with flexible lookup for fixstar2 functions.
+
+    Supports multiple lookup methods:
+    1. Exact star name (case-insensitive): "Regulus", "SPICA"
+    2. Hipparcos catalog number (as string): "49669", ",49669"
+    3. Partial name search (case-insensitive): "Reg", "pic"
+    4. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
+    5. Format with comma: "Regulus,alLeo" (takes first part)
+
+    Args:
+        star_name: Star identifier - can be name, catalog number, or search string
+
+    Returns:
+        Tuple of (StarCatalogEntry, error_message). If error, entry is None.
+
+    Examples:
+        >>> entry, err = _resolve_star2("Regulus")      # Exact name
+        >>> entry, err = _resolve_star2("49669")        # HIP number
+        >>> entry, err = _resolve_star2(",49669")       # HIP with leading comma
+        >>> entry, err = _resolve_star2("Reg")          # Partial match
+        >>> entry, err = _resolve_star2("alLeo")        # Nomenclature
+    """
+    search = star_name.strip()
+
+    if not search:
+        return None, "Empty star name"
+
+    # Check if it's a catalog number (numeric string, possibly with leading comma)
+    number_search = search.lstrip(",").strip()
+    if number_search.isdigit():
+        hip_number = int(number_search)
+        for entry in STAR_CATALOG:
+            if entry.hip_number == hip_number:
+                return entry, None
+        return None, f"Star with HIP number {hip_number} not found"
+
+    # Handle comma-separated format (e.g., "Regulus,alLeo")
+    if "," in search:
+        search = search.split(",")[0].strip()
+
+    search_upper = search.upper()
+
+    # 1. Try exact name match (case-insensitive)
+    for entry in STAR_CATALOG:
+        if entry.name.upper() == search_upper:
+            return entry, None
+
+    # 2. Try exact nomenclature match (case-insensitive)
+    for entry in STAR_CATALOG:
+        if entry.nomenclature.upper() == search_upper:
+            return entry, None
+
+    # 3. Try partial name match (prefix search, case-insensitive)
+    matches: List[StarCatalogEntry] = []
+    for entry in STAR_CATALOG:
+        if entry.name.upper().startswith(search_upper):
+            matches.append(entry)
+
+    if len(matches) == 1:
+        return matches[0], None
+    elif len(matches) > 1:
+        names = ", ".join(m.name for m in matches)
+        return None, f"Ambiguous star name '{star_name}' matches: {names}"
+
+    # 4. Try partial nomenclature match
+    for entry in STAR_CATALOG:
+        if entry.nomenclature.upper().startswith(search_upper):
+            matches.append(entry)
+
+    if len(matches) == 1:
+        return matches[0], None
+    elif len(matches) > 1:
+        names = ", ".join(m.name for m in matches)
+        return None, f"Ambiguous star name '{star_name}' matches: {names}"
+
+    # 5. Try substring match in name (anywhere in the name)
+    for entry in STAR_CATALOG:
+        if search_upper in entry.name.upper():
+            matches.append(entry)
+
+    if len(matches) == 1:
+        return matches[0], None
+    elif len(matches) > 1:
+        names = ", ".join(m.name for m in matches)
+        return None, f"Ambiguous star name '{star_name}' matches: {names}"
+
+    return None, f"Star '{star_name}' not found"
+
+
+def swe_fixstar2_ut(
+    star_name: str, tjd_ut: float, iflag: int
+) -> Tuple[str, Tuple[float, float, float, float, float, float], int, str]:
+    """
+    Calculate position of a fixed star for Universal Time with flexible lookup.
+
+    Enhanced version of swe_fixstar_ut() that supports flexible star lookup:
+    - Star name (full or partial): "Regulus", "Reg"
+    - Hipparcos catalog number: "49669", ",49669"
+    - Bayer/Flamsteed designation: "alLeo", "alVir"
+
+    Returns the full star name along with the position, allowing identification
+    of which star was matched when using partial searches.
+
+    Args:
+        star_name: Star identifier (name, catalog number, or partial search)
+        tjd_ut: Julian Day in Universal Time (UT1)
+        iflag: Calculation flags
+
+    Returns:
+        Tuple containing:
+            - star_name_out: Full star name "Name,Nomenclature" (e.g. "Regulus,alLeo")
+            - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+            - iflag: Return flags
+            - error_msg: Error message if any, empty string on success
+
+    Note:
+        UT (Universal Time) is converted to TT (Terrestrial Time) internally
+        using Delta T before calculating the star position.
+
+    Example:
+        >>> name, pos, retflag, err = swe_fixstar2_ut("Reg", 2451545.0, 0)
+        >>> print(name)  # "Regulus,alLeo"
+        >>> lon, lat, dist = pos[0], pos[1], pos[2]
+
+        >>> name, pos, retflag, err = swe_fixstar2_ut("49669", 2451545.0, 0)
+        >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
+    """
+    entry, error = _resolve_star2(star_name)
+    if error or entry is None:
+        return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error or "Star not found")
+
+    # Convert UT to TT using timescale (applies Delta T)
+    from .state import get_timescale
+
+    ts = get_timescale()
+    t = ts.ut1_jd(tjd_ut)
+
+    try:
+        lon, lat, dist = calc_fixed_star_position(entry.id, t.tt)
+        star_name_out = _format_star_name(entry)
+        return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
+    except Exception as e:
+        return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
+
+
+def swe_fixstar2(
+    star_name: str, jd: float, iflag: int
+) -> Tuple[str, Tuple[float, float, float, float, float, float], int, str]:
+    """
+    Calculate position of a fixed star for Terrestrial Time with flexible lookup.
+
+    Enhanced version of swe_fixstar() that supports flexible star lookup:
+    - Star name (full or partial): "Regulus", "Reg"
+    - Hipparcos catalog number: "49669", ",49669"
+    - Bayer/Flamsteed designation: "alLeo", "alVir"
+
+    Returns the full star name along with the position, allowing identification
+    of which star was matched when using partial searches.
+
+    Args:
+        star_name: Star identifier (name, catalog number, or partial search)
+        jd: Julian Day in Terrestrial Time (TT/ET)
+        iflag: Calculation flags
+
+    Returns:
+        Tuple containing:
+            - star_name_out: Full star name "Name,Nomenclature" (e.g. "Regulus,alLeo")
+            - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+            - iflag: Return flags
+            - error_msg: Error message if any, empty string on success
+
+    Note:
+        TT (Terrestrial Time) differs from UT (Universal Time) by Delta T.
+        For most astrological applications, use swe_fixstar2_ut() instead.
+
+    Example:
+        >>> name, pos, retflag, err = swe_fixstar2("Spica", 2451545.0, 0)
+        >>> print(name)  # "Spica,alVir"
+        >>> lon, lat, dist = pos[0], pos[1], pos[2]
+
+        >>> name, pos, retflag, err = swe_fixstar2("65474", 2451545.0, 0)
+        >>> print(name)  # "Spica,alVir" (looked up by HIP number)
+    """
+    entry, error = _resolve_star2(star_name)
+    if error or entry is None:
+        return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error or "Star not found")
+
+    # Use TT directly - no conversion needed
+    try:
+        lon, lat, dist = calc_fixed_star_position(entry.id, jd)
+        star_name_out = _format_star_name(entry)
+        return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
+    except Exception as e:
+        return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
