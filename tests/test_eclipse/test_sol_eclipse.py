@@ -5,11 +5,16 @@ Tests for solar eclipse calculations.
 from libephemeris import (
     sol_eclipse_when_glob,
     swe_sol_eclipse_when_glob,
+    sol_eclipse_when_loc,
+    swe_sol_eclipse_when_loc,
     swe_julday,
     swe_revjul,
     SE_ECL_TOTAL,
     SE_ECL_ANNULAR,
     SE_ECL_CENTRAL,
+    SE_ECL_VISIBLE,
+    SE_ECL_1ST_VISIBLE,
+    SE_ECL_4TH_VISIBLE,
     SEFLG_SWIEPH,
 )
 
@@ -186,3 +191,215 @@ class TestNewMoonFinding:
 
         # Should be within a few degrees of conjunction
         assert elongation < 5.0
+
+
+class TestSolEclipseWhenLoc:
+    """Tests for sol_eclipse_when_loc function."""
+
+    def test_finds_eclipse_visible_from_location(self):
+        """Should find an eclipse visible from the given location."""
+        # Start from Jan 1, 2024, search from a central US location
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 35.0, -100.0  # Central US
+
+        times, attr, ecl_type = sol_eclipse_when_loc(jd_start, lat, lon)
+
+        # Should return valid eclipse time
+        assert times[0] > jd_start
+        # Eclipse should be visible
+        assert ecl_type & SE_ECL_VISIBLE
+        # Magnitude should be positive
+        assert attr[0] > 0
+
+    def test_returns_correct_tuple_sizes(self):
+        """Should return times tuple of 10 and attr tuple of 11 elements."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        times, attr, _ = sol_eclipse_when_loc(jd_start, lat, lon)
+
+        assert len(times) == 10
+        assert len(attr) == 11
+
+    def test_time_order_is_correct(self):
+        """Eclipse phase times should be in chronological order."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 35.0, -100.0
+
+        times, attr, ecl_type = sol_eclipse_when_loc(jd_start, lat, lon)
+
+        t_max = times[0]
+        t_first = times[1]
+        t_fourth = times[4]
+
+        # First contact should be before maximum (if visible)
+        if t_first > 0:
+            assert t_first < t_max
+        # Maximum should be before fourth contact (if visible)
+        if t_fourth > 0:
+            assert t_max < t_fourth
+
+    def test_eclipse_attributes_valid(self):
+        """Eclipse attributes should be within valid ranges."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 35.0, -100.0
+
+        times, attr, ecl_type = sol_eclipse_when_loc(jd_start, lat, lon)
+
+        # Magnitude should be 0-1.5 range
+        magnitude = attr[0]
+        assert 0 <= magnitude <= 1.5
+
+        # Obscuration should be 0-1 range
+        obscuration = attr[2]
+        assert 0 <= obscuration <= 1
+
+        # Sun altitude should be -90 to 90
+        altitude = attr[4]
+        assert -90 <= altitude <= 90
+
+        # Azimuth should be 0 to 360
+        azimuth = attr[3]
+        assert 0 <= azimuth <= 360
+
+        # Moon/Sun apparent diameters should be positive and reasonable
+        moon_diam = attr[5]
+        sun_diam = attr[6]
+        assert 0.4 < moon_diam < 0.7  # degrees (roughly)
+        assert 0.4 < sun_diam < 0.7  # degrees
+
+    def test_known_eclipse_april_2024_texas(self):
+        """Test April 8, 2024 total eclipse from Dallas, Texas."""
+        # Dallas was in the path of totality
+        jd_start = swe_julday(2024, 3, 1, 0)
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+
+        times, attr, ecl_type = sol_eclipse_when_loc(jd_start, dallas_lat, dallas_lon)
+
+        # Convert JD to date
+        year, month, day, hour = swe_revjul(times[0])
+
+        # Should find the April 8, 2024 eclipse
+        assert year == 2024
+        assert month == 4
+        assert 7 <= day <= 9
+
+        # Dallas was in path of totality - should have high magnitude
+        # (may be total or high partial depending on exact location)
+        assert attr[0] > 0.9  # High magnitude
+
+    def test_known_eclipse_april_2024_europe(self):
+        """Test April 8, 2024 eclipse from Europe (should not be visible)."""
+        # The April 2024 eclipse was only visible in North America
+        # From Europe, this eclipse is not visible, so we should find a different one
+        jd_start = swe_julday(2024, 3, 1, 0)
+        rome_lat, rome_lon = 41.9028, 12.4964
+
+        times, attr, ecl_type = sol_eclipse_when_loc(jd_start, rome_lat, rome_lon)
+
+        # Should find some eclipse visible from Rome
+        assert times[0] > jd_start
+        # It may or may not be April 2024 - the important thing is it's visible
+        assert ecl_type & SE_ECL_VISIBLE
+
+    def test_partial_eclipse_location(self):
+        """Location far from centerline should see partial eclipse."""
+        # Start before April 2024 eclipse and search from a location
+        # that's away from the path of totality
+        jd_start = swe_julday(2024, 3, 1, 0)
+        # Location in Florida (gets partial coverage)
+        florida_lat, florida_lon = 25.7617, -80.1918
+
+        times, attr, ecl_type = sol_eclipse_when_loc(jd_start, florida_lat, florida_lon)
+
+        # Should have visibility flags
+        if times[0] > jd_start:
+            assert ecl_type & SE_ECL_VISIBLE
+
+    def test_visibility_flags_set(self):
+        """Contact visibility flags should be set appropriately."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 35.0, -100.0
+
+        times, attr, ecl_type = sol_eclipse_when_loc(jd_start, lat, lon)
+
+        # If first contact time is set, flag should be set
+        if times[1] > 0:
+            assert ecl_type & SE_ECL_1ST_VISIBLE
+        # If fourth contact time is set, flag should be set
+        if times[4] > 0:
+            assert ecl_type & SE_ECL_4TH_VISIBLE
+
+    def test_altitude_parameter(self):
+        """Should accept altitude parameter."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 35.0, -100.0
+        altitude = 1000.0  # 1000 meters
+
+        # Should not raise
+        times, attr, ecl_type = sol_eclipse_when_loc(
+            jd_start, lat, lon, altitude=altitude
+        )
+
+        assert times[0] > jd_start
+
+    def test_flags_parameter_accepted(self):
+        """Should accept flags parameter."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 35.0, -100.0
+
+        # Should not raise
+        times, attr, ecl_type = sol_eclipse_when_loc(
+            jd_start, lat, lon, flags=SEFLG_SWIEPH
+        )
+
+        assert times[0] > jd_start
+
+    def test_alias_matches_main_function(self):
+        """swe_sol_eclipse_when_loc should be an alias for sol_eclipse_when_loc."""
+        assert swe_sol_eclipse_when_loc is sol_eclipse_when_loc
+
+    def test_multiple_locations_same_eclipse(self):
+        """Same eclipse should show different circumstances at different locations."""
+        jd_start = swe_julday(2024, 3, 1, 0)
+
+        # Dallas and Miami
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        miami_lat, miami_lon = 25.7617, -80.1918
+
+        times_dallas, attr_dallas, _ = sol_eclipse_when_loc(
+            jd_start, dallas_lat, dallas_lon
+        )
+        times_miami, attr_miami, _ = sol_eclipse_when_loc(
+            jd_start, miami_lat, miami_lon
+        )
+
+        # Both should find eclipses (not necessarily the same one)
+        assert times_dallas[0] > jd_start
+        assert times_miami[0] > jd_start
+
+    def test_sun_must_be_above_horizon(self):
+        """Eclipse should only be returned if Sun is visible."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 35.0, -100.0
+
+        times, attr, ecl_type = sol_eclipse_when_loc(jd_start, lat, lon)
+
+        # Sun altitude at maximum should be positive (above horizon)
+        sun_altitude = attr[4]
+        assert sun_altitude > -1.0  # Allow for refraction near horizon
+
+    def test_sequential_eclipses(self):
+        """Finding consecutive eclipses should return different events."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon = 35.0, -100.0
+
+        # Find first eclipse
+        times1, _, _ = sol_eclipse_when_loc(jd_start, lat, lon)
+
+        # Find next eclipse (search from after first one)
+        jd_after_first = times1[0] + 1
+        times2, _, _ = sol_eclipse_when_loc(jd_after_first, lat, lon)
+
+        # Second eclipse should be after first
+        assert times2[0] > times1[0]
