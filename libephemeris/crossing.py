@@ -21,43 +21,40 @@ Algorithm: Initial linear estimate + Newton-Raphson refinement
 References: Meeus "Astronomical Algorithms" Ch. 5 (interpolation)
 """
 
-from typing import Tuple
 from .constants import SEFLG_SWIEPH, SEFLG_SPEED, SE_SUN, SE_MOON
-from .planets import swe_calc_ut
+from .planets import swe_calc_ut, swe_calc
 
 
-def swe_solcross_ut(
-    x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH
-) -> float:
+def swe_solcross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
     """
     Find when the Sun crosses a specific ecliptic longitude.
-    
+
     Searches FORWARD in time for the next crossing after jd_ut.
-    
+
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         jd_ut: Julian Day (UT) to start search from
         flag: Calculation flags (SEFLG_SWIEPH, etc.)
-        
+
     Returns:
         float: Julian Day of crossing (UT)
-        
+
     Raises:
         RuntimeError: If convergence fails or calculation error occurs
-        
+
     Algorithm:
         1. Get current Sun position and velocity
         2. Linear estimate: dt = (target - current) / velocity
         3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
         4. Converge to < 1 arcsecond (~2.8 seconds of time)
-        
+
     Precision:
         Typically < 1 arcsecond (< 5 seconds of time for Sun)
-        
+
     FIXME: Precision - Convergence tolerance 1 arcsec
         For higher precision, reduce tolerance in line 74
         Swiss Ephemeris achieves ~0.001 arcsec with tighter iteration
-        
+
     Example:
         >>> # Find next Aries ingress (0°)
         >>> jd_ingress = swe_solcross_ut(0.0, jd_now)
@@ -103,7 +100,9 @@ def swe_solcross_ut(
             lon = pos[0]
             speed = pos[3]
         except Exception as e:
-            raise RuntimeError(f"Failed to calculate Sun position during iteration: {e}")
+            raise RuntimeError(
+                f"Failed to calculate Sun position during iteration: {e}"
+            )
 
         # Angular difference to target
         diff = (x2cross - lon) % 360.0
@@ -128,33 +127,134 @@ def swe_solcross_ut(
     raise RuntimeError("Maximum iterations reached in solar crossing calculation")
 
 
-def swe_mooncross_ut(
-    x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH
-) -> float:
+def swe_solcross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> float:
+    """
+    Find when the Sun crosses a specific ecliptic longitude (TT version).
+
+    This is the Terrestrial Time version of swe_solcross_ut(). Takes Julian Day
+    in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
+
+    Searches FORWARD in time for the next crossing after jd_tt.
+
+    Args:
+        x2cross: Target ecliptic longitude in degrees (0-360)
+        jd_tt: Julian Day in Terrestrial Time (TT/ET) to start search from
+        flag: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        float: Julian Day of crossing (TT)
+
+    Raises:
+        RuntimeError: If convergence fails or calculation error occurs
+
+    Note:
+        TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
+        which varies from ~32 seconds (year 2000) to minutes (historical times).
+        For most astrological applications, use swe_solcross_ut() instead.
+
+    Algorithm:
+        1. Get current Sun position and velocity
+        2. Linear estimate: dt = (target - current) / velocity
+        3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
+        4. Converge to < 1 arcsecond (~2.8 seconds of time)
+
+    Precision:
+        Typically < 1 arcsecond (< 5 seconds of time for Sun)
+
+    Example:
+        >>> # Find next Aries ingress (0°) using TT
+        >>> jd_ingress_tt = swe_solcross(0.0, jd_tt_now)
+        >>> # Find summer solstice (90°)
+        >>> jd_solstice_tt = swe_solcross(90.0, jd_tt_now)
+    """
+    x2cross = x2cross % 360.0
+
+    try:
+        pos, _ = swe_calc(jd_tt, SE_SUN, flag | SEFLG_SPEED)
+        lon_start = pos[0]
+        speed = pos[3]  # degrees/day
+    except Exception as e:
+        raise RuntimeError(f"Failed to calculate Sun position: {e}")
+
+    # Calculate angular distance to target (always forward)
+    diff = (x2cross - lon_start) % 360.0
+
+    # Handle retrograde motion
+    if speed < 0 and diff > 0:
+        diff -= 360.0
+
+    # If already very close, look for next complete crossing
+    if abs(diff) < 1e-5:
+        if speed > 0:
+            diff += 360.0
+        else:
+            diff -= 360.0
+
+    # Initial time estimate (linear approximation)
+    if speed == 0:
+        speed = 0.9856  # Average Sun motion ~1°/day
+
+    dt_guess = diff / speed
+    jd_guess = jd_tt + dt_guess
+
+    jd = jd_guess
+    for iteration in range(20):
+        try:
+            pos, _ = swe_calc(jd, SE_SUN, flag | SEFLG_SPEED)
+            lon = pos[0]
+            speed = pos[3]
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to calculate Sun position during iteration: {e}"
+            )
+
+        # Angular difference to target
+        diff = (x2cross - lon) % 360.0
+        if diff > 180:
+            diff -= 360
+
+        # Check convergence (< 1 arcsecond = 1/3600 degree)
+        if abs(diff) < 1.0 / 3600.0:
+            return jd
+
+        # Newton-Raphson step
+        if abs(speed) < 0.01:
+            speed = 0.9856
+
+        jd += diff / speed
+
+        # Safety: prevent divergence
+        if abs(jd - jd_guess) > 366:
+            raise RuntimeError("Solar crossing search diverged")
+
+    raise RuntimeError("Maximum iterations reached in solar crossing calculation")
+
+
+def swe_mooncross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
     """
     Find when the Moon crosses a specific ecliptic longitude.
-    
+
     Searches FORWARD in time for the next crossing after jd_ut.
-    
+
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         jd_ut: Julian Day (UT) to start search from
         flag: Calculation flags (SEFLG_SWIEPH, etc.)
-        
+
     Returns:
         float: Julian Day of crossing (UT)
-        
+
     Raises:
         RuntimeError: If convergence fails or calculation error occurs
-        
+
     Note:
         Moon moves ~13° per day (27.3 day cycle).
         More variable speed than Sun due to orbit eccentricity.
         Uses 30 iterations vs Sun's 20 for added robustness.
-        
+
     FIXME: Precision - Same 1 arcsec tolerance as Sun
         Moon's higher speed means ~0.1 seconds time precision
-        
+
     Example:
         >>> # Find next new moon (Sun-Moon conjunction at same longitude)
         >>> sun_pos, _ = swe_calc_ut(jd_now, SE_SUN, SEFLG_SWIEPH)
@@ -197,7 +297,9 @@ def swe_mooncross_ut(
             lon = pos[0]
             speed = pos[3]
         except Exception as e:
-            raise RuntimeError(f"Failed to calculate Moon position during iteration: {e}")
+            raise RuntimeError(
+                f"Failed to calculate Moon position during iteration: {e}"
+            )
 
         # Difference to target
         diff = (x2cross - lon) % 360.0
@@ -226,29 +328,29 @@ def swe_cross_ut(
 ) -> float:
     """
     Find when any planet crosses a specific ecliptic longitude.
-    
+
     Generic version for all planets (Mercury, Venus, Mars, etc.).
-    
+
     Args:
         planet_id: Planet ID (SE_MERCURY, SE_VENUS, etc.)
         x2cross: Target ecliptic longitude in degrees (0-360)
         jd_ut: Julian Day (UT) to start search from
         flag: Calculation flags
-        
+
     Returns:
         float: Julian Day of crossing (UT)
-        
+
     Raises:
         RuntimeError: If convergence fails or calculation error occurs
-        
+
     Note:
         Uses adaptive iteration count based on typical planet speed.
         Slower planets (Jupiter, Saturn) may need more iterations.
-        
+
     FIXME: Precision - Not optimized for retrograde stations
         Near stationary points (speed ~ 0), convergence is slower
         May need adaptive tolerance or damped Newton-Raphson
-        
+
     Example:
         >>> # Mars ingress into Aries
         >>> jd_mars_aries = swe_cross_ut(SE_MARS, 0.0, jd_now)
@@ -304,7 +406,9 @@ def swe_cross_ut(
             lon = pos[0]
             speed = pos[3]
         except Exception as e:
-            raise RuntimeError(f"Failed to calculate planet position during iteration: {e}")
+            raise RuntimeError(
+                f"Failed to calculate planet position during iteration: {e}"
+            )
 
         diff = (x2cross - lon) % 360.0
         if diff > 180:

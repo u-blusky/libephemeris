@@ -53,6 +53,121 @@ class TestSolcrossBasic:
         assert diff < 0.001, f"Sun at {pos[0]}, target {target}, diff {diff}"
 
 
+class TestSolcrossTT:
+    """Tests for swe_solcross (TT version)."""
+
+    @pytest.mark.unit
+    def test_solcross_tt_vernal_equinox(self):
+        """Find when Sun crosses 0° (vernal equinox) using TT."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        # Convert to TT (approximately, for starting point)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        jd_cross_tt = ephem.swe_solcross(0.0, jd_start_tt, 0)
+
+        # Should be around March 20, 2024
+        # Convert back to UT for date check
+        delta_t_cross = ephem.swe_deltat(jd_cross_tt)
+        jd_cross_ut = jd_cross_tt - delta_t_cross
+        year, month, day, hour = ephem.swe_revjul(jd_cross_ut)
+        assert year == 2024
+        assert month == 3
+        assert 19 <= day <= 21
+
+    @pytest.mark.unit
+    def test_solcross_tt_precision(self):
+        """Sun should be very close to target at crossing time (TT)."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        target = 45.0
+        jd_cross_tt = ephem.swe_solcross(target, jd_start_tt, 0)
+
+        # Check Sun position at crossing (using TT version of calc)
+        pos, _ = ephem.swe_calc(jd_cross_tt, SE_SUN, 0)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 0.001, f"Sun at {pos[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_solcross_tt_vs_ut_consistency(self):
+        """TT and UT versions should give consistent results."""
+        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_ut)
+        jd_tt = jd_ut + delta_t
+
+        target = 90.0  # Summer solstice
+
+        # Get crossing time in UT
+        jd_cross_ut = ephem.swe_solcross_ut(target, jd_ut, 0)
+
+        # Get crossing time in TT
+        jd_cross_tt = ephem.swe_solcross(target, jd_tt, 0)
+
+        # Convert UT result to TT for comparison
+        delta_t_cross = ephem.swe_deltat(jd_cross_ut)
+        jd_cross_ut_as_tt = jd_cross_ut + delta_t_cross
+
+        # They should be very close (within seconds)
+        diff_seconds = abs(jd_cross_tt - jd_cross_ut_as_tt) * 86400
+        assert diff_seconds < 10, f"TT vs UT consistency diff {diff_seconds} seconds"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "target", [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+    )
+    def test_solcross_tt_all_signs(self, target):
+        """All zodiac sign ingresses should work with TT version."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        jd_cross_tt = ephem.swe_solcross(float(target), jd_start_tt, 0)
+
+        # Verify Sun is at target
+        pos, _ = ephem.swe_calc(jd_cross_tt, SE_SUN, 0)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 0.01, f"Target {target}° diff {diff}°"
+
+    @pytest.mark.comparison
+    def test_solcross_tt_vs_pyswisseph(self):
+        """TT version should match pyswisseph solcross()."""
+        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = swe.deltat(jd_ut)
+        jd_tt = jd_ut + delta_t
+
+        target = 0.0
+
+        jd_lib = ephem.swe_solcross(target, jd_tt, 0)
+        jd_swe = swe.solcross(target, jd_tt, 0)
+
+        # Difference should be less than 1 minute
+        diff_seconds = abs(jd_lib - jd_swe) * 86400
+        assert diff_seconds < 60, f"Timing diff {diff_seconds} seconds"
+
+    @pytest.mark.edge_case
+    def test_solcross_tt_target_360_equals_0(self):
+        """360° should be same as 0° for TT version."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        jd_360 = ephem.swe_solcross(360.0, jd_start_tt, 0)
+        jd_0 = ephem.swe_solcross(0.0, jd_start_tt, 0)
+
+        # Should be the same crossing
+        assert abs(jd_360 - jd_0) < 0.001
+
+
 class TestSolcrossVsPyswisseph:
     """Compare solcross with pyswisseph."""
 
