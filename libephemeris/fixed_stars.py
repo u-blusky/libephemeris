@@ -36,13 +36,13 @@ from .constants import SE_REGULUS, SE_SPICA_STAR
 class StarData:
     """
     Fixed star astrometric data (ICRS J2000.0 epoch).
-    
+
     Attributes:
         ra_j2000: Right Ascension at J2000.0 in degrees
-        dec_j2000: Declination at J2000.0 in degrees  
+        dec_j2000: Declination at J2000.0 in degrees
         pm_ra: Proper motion in RA (arcsec/year, includes cos(dec) factor)
         pm_dec: Proper motion in Dec (arcsec/year)
-        
+
     Note:
         Proper motions are linearized - good for ±200 years from epoch.
         Does not include parallax or radial velocity effects.
@@ -74,34 +74,34 @@ FIXED_STARS = {
 def calc_fixed_star_position(star_id: int, jd_tt: float) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position of a fixed star at given date.
-    
+
     Applies proper motion and precession to J2000.0 catalog position.
-    
+
     Args:
         star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR)
         jd_tt: Julian Day in Terrestrial Time (TT)
-        
+
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of date in degrees (0-360)
             - latitude: Ecliptic latitude of date in degrees
             - distance: Arbitrary large value (100000 AU) - stars are effectively infinite
-            
+
     Raises:
         ValueError: If star_id not in catalog
-        
+
     Algorithm:
         1. Apply linear proper motion from J2000 to date
         2. Precess equatorial coordinates using IAU 2006 formula
         3. Calculate true obliquity (mean + nutation)
         4. Transform to ecliptic coordinates
-        
+
     FIXME: Precision - Linear proper motion approximation
         - Ignores radial velocity (parallax effect)
         - Assumes constant proper motion (no acceleration)
         - No annual parallax (star distance not modeled)
         Typical error: 1-5 arcsec over ±100 years
-        
+
     References:
         IAU 2006 precession (Capitaine et al.)
         Nutation simplified from IAU 2000B
@@ -187,42 +187,109 @@ def calc_fixed_star_position(star_id: int, jd_tt: float) -> Tuple[float, float, 
     return lon, lat_deg, dist
 
 
+def _resolve_star_id(star_name: str) -> tuple[int, str | None]:
+    """
+    Resolve a star name to its ID.
+
+    Args:
+        star_name: Name of star (e.g. "Regulus", "Spica")
+
+    Returns:
+        Tuple of (star_id, error_message). If error, star_id is -1.
+    """
+    name_upper = star_name.upper().strip()
+    if "," in name_upper:
+        name_upper = name_upper.split(",")[0].strip()
+
+    if name_upper == "REGULUS":
+        return SE_REGULUS, None
+    elif name_upper == "SPICA":
+        return SE_SPICA_STAR, None
+    else:
+        return -1, f"Star {star_name} not found"
+
+
 def swe_fixstar_ut(
     star_name: str, tjd_ut: float, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int, str]:
     """
-    Calculate position of a fixed star.
-    
+    Calculate position of a fixed star for Universal Time.
+
+    Swiss Ephemeris compatible function.
+
     Args:
         star_name: Name of star (e.g. "Regulus", "Spica")
-        tjd_ut: Julian Day in UT
+        tjd_ut: Julian Day in Universal Time (UT1)
         iflag: Calculation flags
-        
-    Returns:
-        ((lon, lat, dist, speed_lon, speed_lat, speed_dist), iflag, error_msg)
-    """
-    # Map name to ID
-    star_id = -1
-    name_upper = star_name.upper().strip()
-    if "," in name_upper:
-        name_upper = name_upper.split(",")[0].strip()
-        
-    if name_upper == "REGULUS":
-        star_id = SE_REGULUS
-    elif name_upper == "SPICA":
-        star_id = SE_SPICA_STAR
-    else:
-        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, f"Star {star_name} not found")
 
-    # Calculate position (simplified, no speed)
-    # We use TT for calculation (approximate UT=TT for stars is fine? No, use deltat)
+    Returns:
+        Tuple containing:
+            - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+            - iflag: Return flags
+            - error_msg: Error message if any, empty string on success
+
+    Note:
+        UT (Universal Time) is converted to TT (Terrestrial Time) internally
+        using Delta T before calculating the star position. For most modern dates,
+        Delta T is about 69 seconds (as of 2020).
+
+    Example:
+        >>> pos, retflag, err = swe_fixstar_ut("Regulus", 2451545.0, 0)
+        >>> lon, lat, dist = pos[0], pos[1], pos[2]
+    """
+    star_id, error = _resolve_star_id(star_name)
+    if error:
+        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error)
+
+    # Convert UT to TT using timescale (applies Delta T)
     from .state import get_timescale
+
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
-    
+
     try:
         lon, lat, dist = calc_fixed_star_position(star_id, t.tt)
         return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
     except Exception as e:
         return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
+
+def swe_fixstar(
+    star_name: str, jd: float, iflag: int
+) -> Tuple[Tuple[float, float, float, float, float, float], int, str]:
+    """
+    Calculate position of a fixed star for Terrestrial Time (TT).
+
+    Swiss Ephemeris compatible function. Similar to swe_fixstar_ut() but takes
+    Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
+
+    Args:
+        star_name: Name of star (e.g. "Regulus", "Spica")
+        jd: Julian Day in Terrestrial Time (TT/ET)
+        iflag: Calculation flags
+
+    Returns:
+        Tuple containing:
+            - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+            - iflag: Return flags
+            - error_msg: Error message if any, empty string on success
+
+    Note:
+        TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
+        which varies from ~32 seconds (year 2000) to minutes (historical times).
+        For most astrological applications, use swe_fixstar_ut() instead.
+
+    Example:
+        >>> pos, retflag, err = swe_fixstar("Regulus", 2451545.0, 0)
+        >>> lon, lat, dist = pos[0], pos[1], pos[2]
+    """
+    star_id, error = _resolve_star_id(star_name)
+    if error:
+        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error)
+
+    # Use TT directly - no conversion needed
+    try:
+        lon, lat, dist = calc_fixed_star_position(star_id, jd)
+        return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
+    except Exception as e:
+        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
