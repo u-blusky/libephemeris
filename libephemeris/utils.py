@@ -1124,6 +1124,67 @@ def csroundsec(cs: int) -> int:
     return result
 
 
+def cs2degstr(cs: int) -> str:
+    """
+    Convert a value in centiseconds to a formatted degrees string.
+
+    This function converts an angular measurement in centiseconds (1/100 of an
+    arcsecond) to a human-readable string in the format "D°M'S.ss\"" where D is
+    degrees, M is arcminutes, S is arcseconds, and ss is centiseconds (hundredths
+    of arcsecond).
+
+    Compatible with pyswisseph's swe.cs2degstr() function.
+
+    Args:
+        cs: Angle in centiseconds (any integer value)
+
+    Returns:
+        Formatted string representing the angle in degrees, minutes, seconds.
+        Format: "DDD°MM'SS.ss\"" (e.g., "123°45'06.78\"")
+
+    Notes:
+        - 1 centisecond = 1/100 arcsecond = 1/360000 degree
+        - 360° = 129,600,000 centiseconds
+        - Negative values produce negative degree strings (e.g., "-1°00'00.00\"")
+        - The seconds field includes two decimal places for centiseconds
+
+    Examples:
+        >>> cs2degstr(0)
+        '  0° 0\\' 0.00"'
+        >>> cs2degstr(360000)  # 1 degree
+        '  1° 0\\' 0.00"'
+        >>> cs2degstr(3723456)  # 10°20'34.56"
+        ' 10°20\\'34.56"'
+        >>> cs2degstr(-360000)  # -1 degree
+        ' -1° 0\\' 0.00"'
+    """
+    # Handle sign
+    if cs < 0:
+        sign = -1
+        cs = -cs
+    else:
+        sign = 1
+
+    # Extract degrees, minutes, seconds, and centiseconds
+    # 1 degree = 3600 * 100 = 360000 centiseconds
+    # 1 minute = 60 * 100 = 6000 centiseconds
+    # 1 second = 100 centiseconds
+    degrees = cs // 360000
+    remainder = cs % 360000
+    minutes = remainder // 6000
+    remainder = remainder % 6000
+    seconds = remainder // 100
+    centisecs = remainder % 100
+
+    # Apply sign to degrees
+    if sign < 0:
+        degrees = -degrees
+
+    # Format the string matching Swiss Ephemeris format
+    # Format: "%3d°%2d'%2d.%02d"" with proper spacing
+    return f"{degrees:3d}°{minutes:2d}'{seconds:2d}.{centisecs:02d}\""
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
@@ -1266,6 +1327,182 @@ def d2l(value: float) -> int:
         return int(value + 0.5)
     else:
         return int(value - 0.5)
+
+
+# Split degree flags (imported from constants for convenience)
+SPLIT_DEG_ROUND_SEC: int = 1  # Round to seconds
+SPLIT_DEG_ROUND_MIN: int = 2  # Round to minutes
+SPLIT_DEG_ROUND_DEG: int = 4  # Round to degrees
+SPLIT_DEG_ZODIACAL: int = 8  # Return zodiac sign number (0-11)
+SPLIT_DEG_NAKSHATRA: int = 1024  # Return nakshatra number (0-26)
+SPLIT_DEG_KEEP_SIGN: int = 16  # Don't round to next zodiac sign/nakshatra
+SPLIT_DEG_KEEP_DEG: int = 32  # Don't round to next degree
+
+
+def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float, int]:
+    """
+    Split a degree value into sign/nakshatra, degrees, minutes, seconds, and fraction.
+
+    This function decomposes an ecliptic longitude (or any angle in degrees) into
+    its constituent parts: zodiac sign (or nakshatra), degrees within that sign,
+    minutes, seconds, and fraction of second.
+
+    Compatible with pyswisseph's swe.split_deg() function.
+
+    Args:
+        degrees: Position in decimal degrees (can be negative or > 360)
+        roundflag: Bit flags combination indicating how to round and format:
+            - 0: Don't round, return all components with full precision
+            - SPLIT_DEG_ROUND_SEC (1): Round to nearest second
+            - SPLIT_DEG_ROUND_MIN (2): Round to nearest minute
+            - SPLIT_DEG_ROUND_DEG (4): Round to nearest degree
+            - SPLIT_DEG_ZODIACAL (8): Return zodiac sign number (0-11, each 30 deg)
+            - SPLIT_DEG_NAKSHATRA (1024): Return nakshatra number (0-26, each 13deg20')
+            - SPLIT_DEG_KEEP_SIGN (16): Don't round to next zodiac sign/nakshatra
+            - SPLIT_DEG_KEEP_DEG (32): Don't round to next degree
+
+    Returns:
+        Tuple of (deg, min, sec, secfr, sign) where:
+        - deg: Degrees within sign (0-29 with ZODIACAL, 0-13 with NAKSHATRA,
+               or total degrees without either flag)
+        - min: Arc minutes (0-59)
+        - sec: Arc seconds (0-59)
+        - secfr: Fraction of arc second (0.0-0.999...), or the rounded seconds
+                 value when rounding flags are used
+        - sign: Zodiac sign (0-11), nakshatra (0-26), or +1/-1 for positive/negative
+
+    Notes:
+        - Without ZODIACAL or NAKSHATRA flag, sign returns +1 (positive) or -1 (negative)
+        - With ZODIACAL flag: uses absolute value, sign is 0-11
+          (0=Aries, 1=Taurus, ..., 11=Pisces)
+        - With NAKSHATRA flag: uses absolute value, sign is 0-26
+          (each nakshatra spans 13 deg 20 min = 13.333... degrees)
+        - Rounding flags affect how values are truncated/rounded
+        - KEEP_SIGN prevents rounding from advancing to the next sign
+        - KEEP_DEG prevents rounding from advancing to the next degree
+
+    Examples:
+        >>> split_deg(45.5, 0)  # No flags: 45deg 30min
+        (45, 30, 0, 0.0, 1)
+        >>> split_deg(45.5, SPLIT_DEG_ZODIACAL)  # With zodiac: 15deg 30min Taurus
+        (15, 30, 0, 0.0, 1)
+        >>> split_deg(-30.5, 0)  # Negative: sign = -1
+        (30, 30, 0, 0.0, -1)
+        >>> split_deg(-30.5, SPLIT_DEG_ZODIACAL)  # Negative with zodiac: uses absolute
+        (0, 30, 0, 0.0, 1)
+    """
+    # Handle sign/negative values
+    is_negative = degrees < 0
+
+    # Determine if we should use zodiacal or nakshatra division
+    use_zodiacal = bool(roundflag & SPLIT_DEG_ZODIACAL)
+    use_nakshatra = bool(roundflag & SPLIT_DEG_NAKSHATRA)
+    round_sec = bool(roundflag & SPLIT_DEG_ROUND_SEC)
+    round_min = bool(roundflag & SPLIT_DEG_ROUND_MIN)
+    round_deg = bool(roundflag & SPLIT_DEG_ROUND_DEG)
+    keep_sign = bool(roundflag & SPLIT_DEG_KEEP_SIGN)
+    keep_deg = bool(roundflag & SPLIT_DEG_KEEP_DEG)
+
+    # For zodiacal/nakshatra modes, pyswisseph uses absolute value
+    if use_zodiacal or use_nakshatra:
+        # Use absolute value (pyswisseph behavior for negative values)
+        deg_abs = abs(degrees)
+
+        if use_nakshatra:
+            # Nakshatra: 27 divisions, each 13°20' = 13.333... degrees
+            nakshatra_size = 360.0 / 27.0  # 13.333...
+            sign_num = int(deg_abs / nakshatra_size)
+            deg_in_sign = deg_abs - (sign_num * nakshatra_size)
+            # Handle wraparound for values >= 360
+            if sign_num >= 27:
+                sign_num = sign_num % 27
+        else:
+            # Zodiacal: 12 signs, each 30 degrees
+            sign_num = int(deg_abs / 30.0)
+            deg_in_sign = deg_abs - (sign_num * 30.0)
+            # Handle wraparound for values >= 360
+            if sign_num >= 12:
+                sign_num = sign_num % 12
+    else:
+        # No zodiacal/nakshatra: use absolute degrees with sign indicator
+        deg_in_sign = abs(degrees)
+        sign_num = 1 if not is_negative else -1
+
+    # Split into degrees, minutes, seconds, fraction
+    deg_part = int(deg_in_sign)
+    remainder = (deg_in_sign - deg_part) * 60.0
+    min_part = int(remainder)
+    remainder = (remainder - min_part) * 60.0
+    sec_part = int(remainder)
+    secfr = remainder - sec_part
+
+    # Store original values for ROUND_MIN and ROUND_DEG behavior
+    orig_sec_part = sec_part
+    orig_min_part = min_part
+
+    # Apply rounding if requested
+    if round_sec or round_min or round_deg:
+        if round_sec:
+            # Round to nearest second
+            if secfr >= 0.5:
+                sec_part += 1
+            secfr = float(sec_part)  # pyswisseph copies sec value to secfr
+
+            # Handle overflow: sec >= 60
+            if sec_part >= 60:
+                sec_part = 0
+                min_part += 1
+                # Handle overflow: min >= 60
+                if min_part >= 60:
+                    min_part = 0
+                    deg_part += 1
+
+        elif round_min:
+            # Round to nearest minute
+            # Check if seconds >= 30 to round up
+            total_sec = orig_sec_part + secfr
+            if total_sec >= 30.0:
+                min_part += 1
+            # pyswisseph: sec = original sec, secfr = original sec
+            sec_part = orig_sec_part
+            secfr = float(orig_sec_part)
+
+            # Handle overflow: min >= 60
+            if min_part >= 60:
+                min_part = 0
+                deg_part += 1
+
+        elif round_deg:
+            # Round to nearest degree
+            # Check if minutes >= 30 to round up
+            total_min = orig_min_part + (orig_sec_part + secfr) / 60.0
+            if total_min >= 30.0:
+                deg_part += 1
+            # pyswisseph: min = 0 (not original), sec = original sec, secfr = original sec
+            min_part = 0
+            sec_part = orig_sec_part
+            secfr = float(orig_sec_part)
+
+        # Handle degree overflow for zodiacal/nakshatra
+        if use_zodiacal or use_nakshatra:
+            max_deg = 30 if use_zodiacal else 14
+            max_signs = 12 if use_zodiacal else 27
+
+            if deg_part >= max_deg:
+                if keep_sign:
+                    # Don't advance to next sign - cap at max
+                    deg_part = max_deg - 1 if use_zodiacal else 13
+                    min_part = 59
+                    sec_part = 59
+                    secfr = 59.0
+                else:
+                    # Advance to next sign
+                    deg_part = 0
+                    sign_num += 1
+                    if sign_num >= max_signs:
+                        sign_num = 0
+
+    return (deg_part, min_part, sec_part, secfr, sign_num)
 
 
 def swe_calc_angles(jd_ut: float, lat: float, lon: float):
