@@ -13,7 +13,7 @@ All algorithms follow Meeus "Astronomical Algorithms" (1998).
 from typing import Any
 
 from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH, SEFLG_MOSEPH
-from .state import get_timescale
+from .state import get_timescale, get_delta_t_userdef
 
 # Julian Day of Gregorian calendar reform: Oct 15, 1582
 JD_GREGORIAN_REFORM = 2299161
@@ -134,7 +134,15 @@ def swe_deltat(tjd: float) -> float:
 
         For modern dates: ~0.0008 days (~69 seconds as of 2024)
         For historical dates: Calculated from polynomial models
+
+        If a user-defined Delta T has been set via set_delta_t_userdef(),
+        that value will be returned instead of the computed value.
     """
+    # Check for user-defined Delta T first
+    userdef_dt = get_delta_t_userdef()
+    if userdef_dt is not None:
+        return userdef_dt
+
     ts = get_timescale()
     t = ts.ut1_jd(tjd)
     # Skyfield returns delta_t in seconds, convert to days for Swiss Ephemeris API compatibility
@@ -168,12 +176,20 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
         SEFLG_MOSEPH is not supported and will return the default Delta T
         with a warning message.
 
+        If a user-defined Delta T has been set via set_delta_t_userdef(),
+        that value will be returned instead of the computed value.
+
     Example:
         >>> from libephemeris import swe_deltat_ex, SEFLG_SWIEPH, SEFLG_JPLEPH
         >>> dt, err = swe_deltat_ex(2451545.0, SEFLG_SWIEPH)
         >>> print(f"Delta T: {dt * 86400:.2f} seconds")
         Delta T: 63.83 seconds
     """
+    # Check for user-defined Delta T first
+    userdef_dt = get_delta_t_userdef()
+    if userdef_dt is not None:
+        return userdef_dt, ""
+
     ts = get_timescale()
     t = ts.ut1_jd(tjd)
     # Skyfield returns delta_t in seconds, convert to days for Swiss Ephemeris API compatibility

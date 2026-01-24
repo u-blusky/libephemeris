@@ -34,6 +34,7 @@ _SIDEREAL_AYAN_T0: float = 0.0  # Ayanamsha value at reference epoch
 _SIDEREAL_T0: float = 0.0  # Reference epoch (JD) for ayanamsha
 _ANGLES_CACHE: dict[str, float] = {}  # Pre-calculated angles {name: longitude}
 _TIDAL_ACCELERATION: Optional[float] = None  # Tidal acceleration for Delta T
+_DELTA_T_USERDEF: Optional[float] = None  # User-defined Delta T value
 
 
 def get_loader() -> Loader:
@@ -352,3 +353,68 @@ def get_tid_acc() -> float:
     if _TIDAL_ACCELERATION is None:
         return SE_TIDAL_DEFAULT
     return _TIDAL_ACCELERATION
+
+
+def set_delta_t_userdef(dt: Optional[float]) -> None:
+    """
+    Set a user-defined Delta T value to use instead of computed values.
+
+    When set, swe_deltat() and swe_deltat_ex() will return this fixed value
+    instead of computing Delta T from IERS data. This is useful for:
+    - Testing and reproducibility
+    - Very ancient dates where Delta T is highly uncertain
+    - Very future dates where Delta T cannot be predicted
+    - Experimentation with different Delta T assumptions
+
+    Args:
+        dt: Delta T value in days (TT - UT1), or None to clear and resume
+            using computed values. The value should be in the same units
+            as returned by swe_deltat() (days, not seconds).
+
+    Note:
+        - To convert from seconds to days, divide by 86400
+        - Modern Delta T (year 2000) is approximately 64 seconds (~0.00074 days)
+        - For ancient dates, Delta T can be hours or even days
+        - Use get_delta_t_userdef() to check if a user-defined value is active
+
+    Example:
+        >>> from libephemeris import set_delta_t_userdef, get_delta_t_userdef, swe_deltat
+        >>> # Set a fixed Delta T of 65 seconds (in days)
+        >>> set_delta_t_userdef(65.0 / 86400.0)
+        >>> get_delta_t_userdef()
+        7.523148148148148e-04
+        >>> swe_deltat(2451545.0)  # Now returns fixed value
+        7.523148148148148e-04
+        >>> # Clear to resume computed values
+        >>> set_delta_t_userdef(None)
+        >>> get_delta_t_userdef() is None
+        True
+    """
+    global _DELTA_T_USERDEF
+    _DELTA_T_USERDEF = dt
+
+
+def get_delta_t_userdef() -> Optional[float]:
+    """
+    Get the current user-defined Delta T value.
+
+    Returns:
+        Optional[float]: The user-defined Delta T in days if set,
+                        or None if using computed values.
+
+    Note:
+        When this returns None, swe_deltat() computes Delta T from IERS data.
+        When this returns a float, that value is used directly by swe_deltat().
+
+    Example:
+        >>> from libephemeris import set_delta_t_userdef, get_delta_t_userdef
+        >>> get_delta_t_userdef()  # No user-defined value
+        None
+        >>> set_delta_t_userdef(0.001)  # Set ~86 seconds
+        >>> get_delta_t_userdef()
+        0.001
+        >>> set_delta_t_userdef(None)  # Clear
+        >>> get_delta_t_userdef()
+        None
+    """
+    return _DELTA_T_USERDEF

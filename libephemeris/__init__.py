@@ -53,6 +53,8 @@ from .state import (
     set_jpl_file as swe_set_jpl_file,
     set_tid_acc as swe_set_tid_acc,
     get_tid_acc as swe_get_tid_acc,
+    set_delta_t_userdef as swe_set_delta_t_userdef,
+    get_delta_t_userdef as swe_get_delta_t_userdef,
 )
 from .crossing import (
     swe_solcross_ut,
@@ -198,6 +200,10 @@ set_jpl_file = swe_set_jpl_file
 set_tid_acc = swe_set_tid_acc
 get_tid_acc = swe_get_tid_acc
 
+# User-defined Delta T
+set_delta_t_userdef = swe_set_delta_t_userdef
+get_delta_t_userdef = swe_get_delta_t_userdef
+
 # Fixed Stars
 fixstar_ut = swe_fixstar_ut
 fixstar = swe_fixstar
@@ -316,6 +322,11 @@ __all__ = [
     "set_tid_acc",
     "swe_get_tid_acc",
     "get_tid_acc",
+    # User-defined Delta T
+    "swe_set_delta_t_userdef",
+    "set_delta_t_userdef",
+    "swe_get_delta_t_userdef",
+    "get_delta_t_userdef",
     # Crossings
     "swe_solcross_ut",
     "solcross_ut",
