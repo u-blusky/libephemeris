@@ -8,6 +8,10 @@ angular calculations and other mathematical utilities.
 import math
 from typing import Tuple
 
+# Azalt calculation method flags (compatible with pyswisseph)
+SE_ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
+SE_EQU2HOR: int = 1  # Equatorial coordinates to horizontal
+
 
 def cotrans_sp(
     coord: Tuple[float, float, float],
@@ -139,6 +143,191 @@ def cotrans_sp(
         (new_lon, new_lat, dist),
         (new_lon_speed, new_lat_speed, dist_speed),
     )
+
+
+def azalt(
+    jd: float,
+    calc_flag: int,
+    lat: float,
+    lon: float,
+    altitude: float,
+    pressure: float,
+    temperature: float,
+    coord: Tuple[float, float, float],
+) -> Tuple[float, float, float]:
+    """
+    Convert equatorial or ecliptic coordinates to horizontal (azimuth/altitude).
+
+    This function transforms celestial coordinates to horizontal coordinates
+    (azimuth and altitude) for a given observer location and time.
+    It accounts for atmospheric refraction.
+
+    Compatible with pyswisseph's swe.azalt() function.
+
+    Args:
+        jd: Julian Day in Universal Time (UT1)
+        calc_flag: Coordinate type flag:
+            - SE_ECL2HOR (0): Input is ecliptic (longitude, latitude, distance)
+            - SE_EQU2HOR (1): Input is equatorial (RA, Dec, distance)
+        lat: Geographic latitude of observer in degrees (North positive)
+        lon: Geographic longitude of observer in degrees (East positive)
+        altitude: Observer altitude above sea level in meters
+        pressure: Atmospheric pressure in mbar (hPa). Use 0 for no refraction.
+        temperature: Atmospheric temperature in Celsius
+        coord: Tuple of (longitude/RA, latitude/Dec, distance) in degrees
+
+    Returns:
+        Tuple of (azimuth, true_altitude, apparent_altitude) where:
+            - azimuth: Degrees from South, westward (0=South, 90=West, 180=North, 270=East)
+            - true_altitude: Geometric altitude without refraction (degrees)
+            - apparent_altitude: Altitude with atmospheric refraction applied (degrees)
+
+    Note:
+        - Swiss Ephemeris convention: Azimuth is measured from South, westward.
+          This differs from the common convention (from North, eastward).
+          To convert: az_from_north = (azimuth + 180) % 360
+        - Refraction is calculated using the Bennett formula, which is accurate
+          to about 0.07 arcmin for altitudes above 15°.
+        - When pressure=0, no refraction is applied (apparent_alt = true_alt)
+        - For objects below the horizon (negative altitude), refraction is
+          extrapolated but becomes less accurate.
+
+    Example:
+        >>> from libephemeris import azalt, SE_EQU2HOR, julday
+        >>> jd = julday(2024, 6, 15, 12.0)
+        >>> # RA=90°, Dec=23.5°, observer at lat=41.9°N, lon=12.5°E
+        >>> az, alt_true, alt_app = azalt(jd, SE_EQU2HOR, 41.9, 12.5, 0, 1013.25, 15, (90, 23.5, 1))
+    """
+    from .time_utils import sidtime
+    from skyfield.nutationlib import iau2000b_radians
+    from .state import get_timescale
+
+    # Get true obliquity (mean obliquity + nutation in obliquity)
+    # This is needed for accurate ecliptic to equatorial conversion
+    T = (jd - 2451545.0) / 36525.0
+
+    # Mean obliquity (Laskar 1986 formula)
+    eps0 = (
+        84381.406 - 46.836769 * T - 0.0001831 * T * T + 0.00200340 * T * T * T
+    ) / 3600.0  # Convert arcsec to degrees
+
+    # Add nutation in obliquity for true obliquity
+    ts = get_timescale()
+    t = ts.ut1_jd(jd)
+    dpsi_rad, deps_rad = iau2000b_radians(t)
+    deps_deg = math.degrees(deps_rad)
+    eps = eps0 + deps_deg  # True obliquity
+
+    # Convert input coordinates to equatorial (RA, Dec) if ecliptic
+    if calc_flag == SE_ECL2HOR:
+        # Input is ecliptic: convert to equatorial
+        ecl_lon = coord[0]
+        ecl_lat = coord[1]
+        dist = coord[2]
+
+        # Convert ecliptic to equatorial
+        # Note: cotrans uses convention where NEGATIVE obliquity converts
+        # ecliptic to equatorial with correct sign (matching astronomical convention)
+        eq_coord = cotrans((ecl_lon, ecl_lat, dist), -eps)
+        ra = eq_coord[0]
+        dec = eq_coord[1]
+    else:
+        # Input is already equatorial (RA, Dec)
+        ra = coord[0]
+        dec = coord[1]
+
+    # Calculate Local Sidereal Time
+    # We need nutation for proper sidereal time, but for azalt we can use mean
+    nutation = 0.0  # Mean sidereal time approximation
+    lst_hours = sidtime(jd, lon, eps, nutation)
+    lst_deg = lst_hours * 15.0  # Convert hours to degrees
+
+    # Calculate Hour Angle
+    # H = LST - RA
+    ha = (lst_deg - ra) % 360.0
+
+    # Convert to radians for calculation
+    ha_rad = math.radians(ha)
+    dec_rad = math.radians(dec)
+    lat_rad = math.radians(lat)
+
+    # Calculate altitude (geometric/true)
+    # sin(alt) = sin(lat) * sin(dec) + cos(lat) * cos(dec) * cos(H)
+    sin_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
+        dec_rad
+    ) * math.cos(ha_rad)
+    # Clamp to avoid numerical issues with asin
+    sin_alt = max(-1.0, min(1.0, sin_alt))
+    alt_true = math.degrees(math.asin(sin_alt))
+
+    # Calculate azimuth
+    # tan(A) = sin(H) / (cos(H) * sin(lat) - tan(dec) * cos(lat))
+    # Using atan2 for proper quadrant handling
+    sin_ha = math.sin(ha_rad)
+    cos_ha = math.cos(ha_rad)
+    cos_dec = math.cos(dec_rad)
+
+    # Numerator and denominator for azimuth calculation
+    # Swiss Ephemeris convention: azimuth from South, westward
+    y = sin_ha * cos_dec
+    x = cos_ha * cos_dec * math.sin(lat_rad) - math.sin(dec_rad) * math.cos(lat_rad)
+
+    az_rad = math.atan2(y, x)
+    azimuth = math.degrees(az_rad)
+
+    # Normalize azimuth to 0-360 range
+    azimuth = azimuth % 360.0
+    if azimuth < 0:
+        azimuth += 360.0
+
+    # Calculate atmospheric refraction
+    if pressure > 0 and alt_true > -2.0:
+        # Bennett formula for atmospheric refraction
+        # R = 1.02 / tan(h + 10.3/(h + 5.11)) [arcminutes]
+        # Where h is apparent altitude in degrees
+        # This is an iterative formula since R depends on apparent altitude
+
+        # For true altitude, we use a modified approach:
+        # Start with true altitude and calculate refraction
+        # Refraction is applied as: apparent_alt = true_alt + R
+
+        # Pressure and temperature correction factors
+        # Standard conditions: 1010 mbar, 10°C
+        pressure_factor = pressure / 1010.0
+        temperature_factor = 283.0 / (273.0 + temperature)
+        correction = pressure_factor * temperature_factor
+
+        if alt_true > 15.0:
+            # Simple formula for high altitudes
+            # R = 58.1" * tan(z) - 0.07" * tan^3(z)  where z = zenith angle
+            z_rad = math.radians(90.0 - alt_true)
+            tan_z = math.tan(z_rad)
+            refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
+            refraction = refraction_arcsec / 3600.0 * correction
+        elif alt_true > -1.0:
+            # Bennett formula for lower altitudes
+            # More accurate near the horizon
+            h = alt_true
+            if h < 0.01:
+                h = 0.01  # Avoid division issues
+            # Refraction in arcminutes
+            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+            refraction = r_arcmin / 60.0 * correction
+        else:
+            # Below horizon: extrapolate carefully
+            # Use a simple linear extrapolation from horizon value
+            h = -1.0
+            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+            refraction_at_horizon = r_arcmin / 60.0 * correction
+            # Linear decrease below horizon
+            refraction = refraction_at_horizon + (alt_true + 1.0) * 0.1
+
+        alt_apparent = alt_true + refraction
+    else:
+        # No refraction correction
+        alt_apparent = alt_true
+
+    return (azimuth, alt_true, alt_apparent)
 
 
 def cotrans(

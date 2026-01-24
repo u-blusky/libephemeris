@@ -86,7 +86,15 @@ from .eclipse import (
     rise_trans_true_hor,
     swe_rise_trans_true_hor,
 )
-from .utils import difdeg2n, swe_calc_angles, cotrans, cotrans_sp
+from .utils import (
+    difdeg2n,
+    swe_calc_angles,
+    cotrans,
+    cotrans_sp,
+    azalt,
+    SE_ECL2HOR,
+    SE_EQU2HOR,
+)
 from .fixed_stars import (
     swe_fixstar_ut,
     swe_fixstar,
@@ -298,6 +306,9 @@ __all__ = [
     "swe_calc_angles",
     "cotrans",
     "cotrans_sp",
+    "azalt",
+    "SE_ECL2HOR",
+    "SE_EQU2HOR",
     # Helpers
     "calc_all_arabic_parts",
     # Fixed Stars
