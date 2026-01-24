@@ -12,6 +12,7 @@ from .time_utils import (
     utc_time_zone,
     time_equ,
     lat_to_lmt,
+    lmt_to_lat,
 )
 from .planets import (
     swe_calc_ut,
@@ -116,6 +117,7 @@ __all__ = [
     "utc_time_zone",
     "time_equ",
     "lat_to_lmt",
+    "lmt_to_lat",
     # Planet calculation
     "swe_calc_ut",
     "calc_ut",

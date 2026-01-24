@@ -645,6 +645,59 @@ def lat_to_lmt(jd_lat: float, longitude: float) -> float:
     return jd_lmt
 
 
+def lmt_to_lat(jd_lmt: float, longitude: float) -> float:
+    """
+    Convert Local Mean Time (LMT) to Local Apparent Time (LAT).
+
+    This is the inverse operation of lat_to_lmt(). Local Mean Time (LMT) is
+    the mean solar time for a specific longitude, which runs at a uniform
+    rate. Local Apparent Time (LAT) is the time as shown by a sundial - it
+    is the true solar time based on the actual position of the Sun.
+
+    The difference between LAT and LMT is the Equation of Time, which
+    accounts for Earth's elliptical orbit and axial tilt.
+
+    Args:
+        jd_lmt: Julian Day number in Local Mean Time
+        longitude: Geographic longitude in degrees (positive East, negative West)
+
+    Returns:
+        float: Julian Day number in Local Apparent Time (sundial time)
+
+    Note:
+        - The longitude parameter is used to calculate the proper Julian Day
+          for the Equation of Time lookup. Since the input is in Local Mean
+          Time, the longitude is used to convert to UT for the EoT
+          calculation, then the result is converted back to local time.
+        - The Equation of Time varies from approximately -14 to +16 minutes
+          throughout the year.
+
+    Example:
+        >>> from libephemeris import lmt_to_lat, swe_julday
+        >>> # Convert LMT to LAT for Rome (12.5°E longitude)
+        >>> jd_lmt = swe_julday(2000, 6, 15, 12.0)  # Noon LMT
+        >>> jd_lat = lmt_to_lat(jd_lmt, 12.5)
+        >>> # The difference should be approximately the Equation of Time
+    """
+    # Convert longitude to time offset in days (360° = 24h = 1 day)
+    # Positive longitude (East) means local time is ahead of UT
+    longitude_offset_days = longitude / 360.0
+
+    # Convert from local time to UT for EoT calculation
+    # LMT (local) = UT + longitude_offset
+    # So UT ≈ LMT - longitude_offset
+    jd_ut_approx = jd_lmt - longitude_offset_days
+
+    # Calculate the Equation of Time at this UT
+    eot = time_equ(jd_ut_approx)
+
+    # LAT = LMT + EoT
+    # (This is the inverse of LMT = LAT - EoT)
+    jd_lat = jd_lmt + eot
+
+    return jd_lat
+
+
 def utc_time_zone(
     year: int,
     month: int,
