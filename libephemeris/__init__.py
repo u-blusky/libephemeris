@@ -31,6 +31,8 @@ from .planets import (
     swe_get_orbital_elements,
     swe_get_orbital_elements_ut,
     swe_orbit_max_min_true_distance,
+    swe_pheno,
+    swe_pheno_ut,
 )
 from .houses import (
     swe_houses,
@@ -135,6 +137,8 @@ nod_aps_ut = swe_nod_aps_ut
 get_orbital_elements = swe_get_orbital_elements
 get_orbital_elements_ut = swe_get_orbital_elements_ut
 orbit_max_min_true_distance = swe_orbit_max_min_true_distance
+pheno = swe_pheno
+pheno_ut = swe_pheno_ut
 
 # Houses
 houses = swe_houses
@@ -227,6 +231,11 @@ __all__ = [
     "get_orbital_elements_ut",
     "swe_orbit_max_min_true_distance",
     "orbit_max_min_true_distance",
+    # Planetary phenomena
+    "swe_pheno",
+    "pheno",
+    "swe_pheno_ut",
+    "pheno_ut",
     # Houses
     "swe_houses",
     "houses",

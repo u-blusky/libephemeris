@@ -2665,3 +2665,384 @@ def _calc_nod_aps_osculating(
     xaphe: PosTuple = ((varpi_deg + 180.0) % 360.0, lat_aphe, r_aphe, 0.0, 0.0, 0.0)
 
     return (xnasc, xndsc, xperi, xaphe)
+
+
+# =============================================================================
+# PLANETARY PHENOMENA: Phase, Elongation, Magnitude
+# =============================================================================
+
+# Semi-diameters of planets at 1 AU (in arcseconds)
+# Used for apparent diameter calculations
+# From Astronomical Almanac and planetary data
+_PLANET_SEMI_DIAMETER_AU = {
+    SE_SUN: 959.63,  # Sun's semi-diameter at 1 AU
+    SE_MOON: 358.473,  # Moon's semi-diameter (adjusted for geocentric distance ~0.00257 AU)
+    SE_MERCURY: 3.36,  # Mercury at 1 AU
+    SE_VENUS: 8.34,  # Venus at 1 AU
+    SE_MARS: 4.68,  # Mars at 1 AU
+    SE_JUPITER: 98.44,  # Jupiter at 1 AU
+    SE_SATURN: 82.73,  # Saturn (disk only) at 1 AU
+    SE_URANUS: 35.02,  # Uranus at 1 AU
+    SE_NEPTUNE: 33.50,  # Neptune at 1 AU
+    SE_PLUTO: 1.64,  # Pluto at 1 AU (approximate)
+}
+
+# Visual magnitude parameters for planets
+# Format: (V(1,0), B1, B2) - absolute magnitude and phase coefficients
+# V(1,0) = magnitude at 1 AU from Sun, 1 AU from Earth, phase angle 0
+# Phase function: V = V(1,0) + 5*log10(r*d) + B1*i + B2*i^2
+# where r = heliocentric distance, d = geocentric distance, i = phase angle in degrees
+# From Astronomical Algorithms (Meeus) and Harris (1961)
+_PLANET_MAG_PARAMS = {
+    SE_MERCURY: (-0.42, 0.0380, -0.000273, 0.000002),  # Mercury: 4th order polynomial
+    SE_VENUS: (-4.40, 0.0009, 0.000239, -0.00000065),  # Venus: 4th order polynomial
+    SE_MARS: (-1.52, 0.016, 0.0, 0.0),  # Mars: linear phase
+    SE_JUPITER: (-9.40, 0.005, 0.0, 0.0),  # Jupiter: nearly constant
+    SE_SATURN: (-8.88, 0.044, 0.0, 0.0),  # Saturn (ring contribution varies)
+    SE_URANUS: (-7.19, 0.002, 0.0, 0.0),  # Uranus
+    SE_NEPTUNE: (-6.87, 0.0, 0.0, 0.0),  # Neptune: nearly constant
+    SE_PLUTO: (-1.00, 0.041, 0.0, 0.0),  # Pluto (approximate)
+}
+
+
+def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
+    """
+    Compute planetary phenomena for Universal Time.
+
+    Calculates phase angle, illuminated fraction, elongation, apparent diameter,
+    and visual magnitude for planets and the Moon.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Planet/body ID (SE_SUN, SE_MOON, SE_MERCURY, etc.)
+        iflag: Calculation flags (SEFLG_TRUEPOS, SEFLG_HELCTR, etc.)
+
+    Returns:
+        Tuple containing:
+            - attr: Tuple of at least 5 doubles:
+                - attr[0]: Phase angle (Earth-planet-Sun) in degrees
+                - attr[1]: Phase (illuminated fraction of disc, 0.0 to 1.0)
+                - attr[2]: Elongation of planet from Sun in degrees
+                - attr[3]: Apparent diameter of disc in arcseconds
+                - attr[4]: Apparent visual magnitude
+            - retflag: Return flag value
+
+    Note:
+        - For the Sun: phase angle = 0, phase = 1.0, elongation = 0
+        - For the Moon: simplified magnitude calculation based on phase and distance
+        - Phase = 0.0 means new (fully dark), Phase = 1.0 means full (fully illuminated)
+        - Elongation is measured from the Sun (0° = conjunction, 180° = opposition)
+
+    Example:
+        >>> attr, flag = swe_pheno_ut(2451545.0, SE_MARS, 0)
+        >>> print(f"Phase angle: {attr[0]:.2f}°")
+        >>> print(f"Illumination: {attr[1]*100:.1f}%")
+        >>> print(f"Elongation: {attr[2]:.2f}°")
+        >>> print(f"Diameter: {attr[3]:.2f} arcsec")
+        >>> print(f"Magnitude: {attr[4]:.2f}")
+    """
+    ts = get_timescale()
+    t = ts.ut1_jd(tjd_ut)
+    return _calc_pheno(t, ipl, iflag)
+
+
+def swe_pheno(tjd_et: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
+    """
+    Compute planetary phenomena for Ephemeris Time (TT/ET).
+
+    Same as swe_pheno_ut() but takes Terrestrial Time instead of Universal Time.
+
+    Args:
+        tjd_et: Julian Day in Ephemeris Time (TT/ET)
+        ipl: Planet/body ID (SE_SUN, SE_MOON, SE_MERCURY, etc.)
+        iflag: Calculation flags
+
+    Returns:
+        Tuple containing:
+            - attr: Tuple of phenomenon values (phase_angle, phase, elongation, diameter, magnitude)
+            - retflag: Return flag value
+
+    See Also:
+        swe_pheno_ut: Same function for Universal Time input
+    """
+    ts = get_timescale()
+    t = ts.tt_jd(tjd_et)
+    return _calc_pheno(t, ipl, iflag)
+
+
+def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
+    """
+    Internal function to compute planetary phenomena.
+
+    Calculates:
+    1. Phase angle: angle Sun-Planet-Earth (for inner planets) or Earth-Planet-Sun (for outer)
+    2. Phase: illuminated fraction using (1 + cos(phase_angle)) / 2
+    3. Elongation: angular separation between planet and Sun as seen from Earth
+    4. Apparent diameter: angular size of planet's disc
+    5. Visual magnitude: brightness using empirical formulas
+
+    Args:
+        t: Skyfield Time object
+        ipl: Planet/body ID
+        iflag: Calculation flags
+
+    Returns:
+        Tuple of (attr_tuple, return_flag)
+    """
+    from skyfield.positionlib import ICRF
+
+    planets = get_planets()
+
+    # Initialize return values
+    phase_angle = 0.0
+    phase = 1.0
+    elongation = 0.0
+    diameter = 0.0
+    magnitude = 0.0
+
+    # Special case: Sun
+    if ipl == SE_SUN:
+        # Sun is always "full" from Earth's perspective
+        # Get Sun distance
+        earth = planets["earth"]
+        sun = planets["sun"]
+        sun_pos = earth.at(t).observe(sun).apparent()
+        _, _, sun_dist = sun_pos.radec()
+
+        phase_angle = 0.0
+        phase = 1.0
+        elongation = 0.0
+
+        # Apparent diameter of Sun
+        sun_dist_au = sun_dist.au
+        if sun_dist_au > 0:
+            diameter = 2.0 * _PLANET_SEMI_DIAMETER_AU.get(SE_SUN, 959.63) / sun_dist_au
+        else:
+            diameter = 1919.26  # Default solar diameter in arcsec
+
+        # Sun magnitude (approximately -26.74 at 1 AU)
+        magnitude = (
+            -26.74 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.74
+        )
+
+        attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
+        return attr, iflag
+
+    # Get Earth, Sun, and target body positions
+    earth = planets["earth"]
+    sun = planets["sun"]
+
+    # Get geocentric position of target
+    if ipl == SE_MOON:
+        target = planets["moon"]
+    elif ipl in _PLANET_MAP:
+        target_name = _PLANET_MAP[ipl]
+        target = planets[target_name]
+    else:
+        # Unsupported body - return zeros
+        attr = (0.0,) * 20
+        return attr, iflag
+
+    # Observer depends on flags
+    if iflag & SEFLG_HELCTR:
+        observer = sun
+    else:
+        observer = earth
+
+    # Get apparent positions
+    if iflag & SEFLG_TRUEPOS:
+        # Geometric position (no light time)
+        target_pos_geo = observer.at(t).observe(target)
+        sun_pos_geo = observer.at(t).observe(sun) if ipl != SE_MOON else None
+    else:
+        # Apparent position
+        target_pos_geo = observer.at(t).observe(target).apparent()
+        sun_pos_geo = (
+            observer.at(t).observe(sun).apparent()
+            if not (iflag & SEFLG_HELCTR)
+            else None
+        )
+
+    # Get heliocentric position of target for phase calculations
+    target_helio = sun.at(t).observe(target)
+    target_helio_dist = math.sqrt(sum(x**2 for x in target_helio.position.au))
+
+    # Get geocentric distance
+    target_geo_dist = math.sqrt(sum(x**2 for x in target_pos_geo.position.au))
+
+    # Special handling for Moon
+    if ipl == SE_MOON:
+        # For Moon, we need Sun position from Earth
+        sun_from_earth = earth.at(t).observe(sun).apparent()
+
+        # Get RA/Dec of Moon and Sun
+        moon_ra, moon_dec, moon_dist = target_pos_geo.radec()
+        sun_ra, sun_dec, sun_dist = sun_from_earth.radec()
+
+        # Elongation: angular distance between Moon and Sun
+        # Using spherical trigonometry
+        moon_ra_rad = moon_ra.radians
+        moon_dec_rad = moon_dec.radians
+        sun_ra_rad = sun_ra.radians
+        sun_dec_rad = sun_dec.radians
+
+        cos_elong = math.sin(moon_dec_rad) * math.sin(sun_dec_rad) + math.cos(
+            moon_dec_rad
+        ) * math.cos(sun_dec_rad) * math.cos(moon_ra_rad - sun_ra_rad)
+        cos_elong = max(-1.0, min(1.0, cos_elong))
+        elongation = math.degrees(math.acos(cos_elong))
+
+        # Phase angle for Moon
+        # Using the formula from Meeus "Astronomical Algorithms"
+        # Phase angle i is approximately: cos(i) = -cos(elongation)
+        # More precisely, use triangle Sun-Moon-Earth
+        r_sun = sun_dist.au  # Earth-Sun distance
+        r_moon = moon_dist.au  # Earth-Moon distance
+
+        # Get Moon's heliocentric distance
+        moon_helio = sun.at(t).observe(planets["moon"])
+        R_moon = math.sqrt(
+            sum(x**2 for x in moon_helio.position.au)
+        )  # Sun-Moon distance
+
+        # Use law of cosines to get phase angle
+        # In triangle Sun-Moon-Earth: i is at Moon vertex
+        # cos(i) = (R^2 + r_moon^2 - r_sun^2) / (2 * R * r_moon)
+        if R_moon > 0 and r_moon > 0:
+            cos_phase = (R_moon**2 + r_moon**2 - r_sun**2) / (2 * R_moon * r_moon)
+            cos_phase = max(-1.0, min(1.0, cos_phase))
+            phase_angle = math.degrees(math.acos(cos_phase))
+        else:
+            phase_angle = 180.0 - elongation
+
+        # Phase (illuminated fraction)
+        phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
+
+        # Moon's apparent diameter
+        # Moon's mean semi-diameter at mean distance (384400 km) is about 15.5 arcmin = 930 arcsec
+        # At distance r (in AU), semi-diameter = 930 * (mean_dist / r)
+        # Mean distance in AU ≈ 0.00257 AU
+        mean_moon_dist_au = 0.00257
+        moon_semi_diam = 930.0 * mean_moon_dist_au / r_moon if r_moon > 0 else 930.0
+        diameter = 2.0 * moon_semi_diam
+
+        # Moon's magnitude (simplified formula)
+        # Full Moon is about -12.7, varies with phase
+        # Approximate: m = -12.7 + 2.5 * log10(1/phase) when phase > 0
+        if phase > 0.001:
+            magnitude = -12.7 + 2.5 * math.log10(1.0 / phase)
+        else:
+            magnitude = 0.0  # Very thin crescent
+
+        attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
+        return attr, iflag
+
+    # For planets: calculate elongation, phase angle, etc.
+    if sun_pos_geo is not None:
+        # Get RA/Dec of planet and Sun
+        planet_ra, planet_dec, planet_dist = target_pos_geo.radec()
+        sun_ra, sun_dec, sun_dist = sun_pos_geo.radec()
+
+        # Elongation: angular distance between planet and Sun
+        planet_ra_rad = planet_ra.radians
+        planet_dec_rad = planet_dec.radians
+        sun_ra_rad = sun_ra.radians
+        sun_dec_rad = sun_dec.radians
+
+        cos_elong = math.sin(planet_dec_rad) * math.sin(sun_dec_rad) + math.cos(
+            planet_dec_rad
+        ) * math.cos(sun_dec_rad) * math.cos(planet_ra_rad - sun_ra_rad)
+        cos_elong = max(-1.0, min(1.0, cos_elong))
+        elongation = math.degrees(math.acos(cos_elong))
+
+        # Phase angle calculation using triangle Sun-Planet-Earth
+        # r = geocentric distance of planet
+        # R = heliocentric distance of planet
+        # d_sun = geocentric distance of Sun (≈ 1 AU)
+        r = target_geo_dist
+        R = target_helio_dist
+        d_sun = sun_dist.au
+
+        # Law of cosines: phase angle i is at the planet vertex
+        # cos(i) = (R^2 + r^2 - d_sun^2) / (2 * R * r)
+        if R > 0 and r > 0:
+            cos_phase = (R**2 + r**2 - d_sun**2) / (2 * R * r)
+            cos_phase = max(-1.0, min(1.0, cos_phase))
+            phase_angle = math.degrees(math.acos(cos_phase))
+        else:
+            phase_angle = 0.0
+    else:
+        # Heliocentric case - no elongation from Sun
+        elongation = 0.0
+        phase_angle = 0.0
+
+    # Phase (illuminated fraction)
+    phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
+
+    # Apparent diameter
+    semi_diam = _PLANET_SEMI_DIAMETER_AU.get(ipl, 1.0)
+    diameter = 2.0 * semi_diam / target_geo_dist if target_geo_dist > 0 else 0.0
+
+    # Visual magnitude
+    magnitude = _calc_planet_magnitude(
+        ipl, target_helio_dist, target_geo_dist, phase_angle
+    )
+
+    # Return tuple with at least 20 elements (Swiss Ephemeris compatibility)
+    attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
+    return attr, iflag
+
+
+def _calc_planet_magnitude(
+    ipl: int, helio_dist: float, geo_dist: float, phase_angle: float
+) -> float:
+    """
+    Calculate visual magnitude of a planet.
+
+    Uses empirical formulas from Astronomical Algorithms (Meeus) and
+    Harris (1961) for phase corrections.
+
+    Args:
+        ipl: Planet ID
+        helio_dist: Heliocentric distance in AU
+        geo_dist: Geocentric distance in AU
+        phase_angle: Phase angle in degrees
+
+    Returns:
+        Visual magnitude (smaller = brighter)
+    """
+    if ipl not in _PLANET_MAG_PARAMS:
+        # Unknown planet - return approximate magnitude
+        # Using generic formula: V = 5 * log10(r * d) + H
+        H = 10.0  # Assumed absolute magnitude
+        if helio_dist > 0 and geo_dist > 0:
+            return H + 5.0 * math.log10(helio_dist * geo_dist)
+        return H
+
+    V0, B1, B2, B3 = _PLANET_MAG_PARAMS[ipl]
+
+    # Distance factor: 5 * log10(r * d)
+    if helio_dist > 0 and geo_dist > 0:
+        dist_factor = 5.0 * math.log10(helio_dist * geo_dist)
+    else:
+        dist_factor = 0.0
+
+    # Phase factor (polynomial in phase angle)
+    i = phase_angle
+    phase_factor = B1 * i + B2 * i**2 + B3 * i**3
+
+    magnitude = V0 + dist_factor + phase_factor
+
+    # Special handling for Saturn's rings
+    if ipl == SE_SATURN:
+        # Ring contribution varies with tilt - simplified approximation
+        # Full ring opening adds about -1 mag, edge-on adds +1 mag
+        # This would require ring tilt calculation - using average for now
+        pass
+
+    return magnitude
+
+
+# Aliases for pyswisseph compatibility
+pheno_ut = swe_pheno_ut
+pheno = swe_pheno
