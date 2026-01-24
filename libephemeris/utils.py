@@ -1254,6 +1254,76 @@ def cs2lonlatstr(cs: int, plus_char: str, minus_char: str) -> str:
     return f"{degrees:3d}°{minutes:2d}'{seconds:2d}\" {direction}"
 
 
+def cs2timestr(cs: int) -> str:
+    """
+    Convert a value in centiseconds to a formatted time string.
+
+    This function converts a time measurement in centiseconds (1/100 of a second)
+    to a human-readable string in the format "HH:MM:SS" where HH is hours, MM is
+    minutes, and SS is seconds.
+
+    Compatible with pyswisseph's swe.cs2timestr() function.
+
+    Args:
+        cs: Time in centiseconds (any integer value)
+
+    Returns:
+        Formatted string representing the time in hours, minutes, seconds.
+        Format: "HH:MM:SS" (e.g., "12:34:56")
+
+    Notes:
+        - 1 centisecond = 1/100 second
+        - 1 second = 100 centiseconds
+        - 1 minute = 6000 centiseconds
+        - 1 hour = 360000 centiseconds
+        - Negative values produce negative hour strings (e.g., "-1:00:00")
+        - Seconds are rounded to whole numbers (centiseconds are rounded)
+
+    Examples:
+        >>> cs2timestr(0)
+        ' 0:00:00'
+        >>> cs2timestr(360000)  # 1 hour
+        ' 1:00:00'
+        >>> cs2timestr(4526050)  # 12:34:21 (with rounding from .50)
+        '12:34:21'
+        >>> cs2timestr(-360000)  # -1 hour
+        '-1:00:00'
+    """
+    # Handle sign
+    if cs < 0:
+        sign = -1
+        cs = -cs
+    else:
+        sign = 1
+
+    # Extract hours, minutes, and seconds
+    # 1 hour = 60 * 60 * 100 = 360000 centiseconds
+    # 1 minute = 60 * 100 = 6000 centiseconds
+    # 1 second = 100 centiseconds
+    hours = cs // 360000
+    remainder = cs % 360000
+    minutes = remainder // 6000
+    remainder = remainder % 6000
+    # Round centiseconds to nearest second
+    seconds = (remainder + 50) // 100
+
+    # Handle carry-over from rounding
+    if seconds >= 60:
+        seconds = 0
+        minutes += 1
+        if minutes >= 60:
+            minutes = 0
+            hours += 1
+
+    # Apply sign to hours
+    if sign < 0:
+        hours = -hours
+
+    # Format the string matching Swiss Ephemeris format
+    # Format: "%2d:%02d:%02d" with proper spacing
+    return f"{hours:2d}:{minutes:02d}:{seconds:02d}"
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
