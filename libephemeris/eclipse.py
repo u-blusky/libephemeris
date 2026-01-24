@@ -1908,3 +1908,272 @@ def lun_eclipse_when(
 
 # Aliases for compatibility
 swe_lun_eclipse_when = lun_eclipse_when
+
+
+def lun_eclipse_when_loc(
+    jd_start: float,
+    lat: float,
+    lon: float,
+    altitude: float = 0.0,
+    flags: int = SEFLG_SWIEPH,
+) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+    """
+    Find the next lunar eclipse visible from a specific location.
+
+    Searches forward in time from jd_start to find the next lunar eclipse
+    where the Moon is above the horizon during at least part of the eclipse.
+    The Moon must be above the horizon for the eclipse to be visible.
+
+    Args:
+        jd_start: Julian Day (UT) to start search from
+        lat: Observer latitude in degrees (positive = North, negative = South)
+        lon: Observer longitude in degrees (positive = East, negative = West)
+        altitude: Observer altitude in meters above sea level (default 0)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Tuple containing:
+            - times: Tuple of 10 floats with eclipse phase times (JD UT):
+                [0]: Time of maximum eclipse (local visibility)
+                [1]: Time of partial eclipse beginning (Moon enters umbra)
+                [2]: Time of total eclipse beginning (or 0 if not total)
+                [3]: Time of total eclipse ending (or 0 if not total)
+                [4]: Time of partial eclipse ending (Moon leaves umbra)
+                [5]: Time of penumbral eclipse beginning
+                [6]: Time of penumbral eclipse ending
+                [7]: Time of moonrise (if Moon rises during eclipse, else 0)
+                [8]: Time of moonset (if Moon sets during eclipse, else 0)
+                [9]: Reserved (0)
+            - attr: Tuple of 11 floats with eclipse attributes:
+                [0]: Umbral magnitude
+                [1]: Penumbral magnitude
+                [2]: Reserved (0)
+                [3]: Azimuth of Moon at maximum eclipse (degrees)
+                [4]: Altitude of Moon at maximum eclipse (degrees)
+                [5]: Apparent diameter of Moon (degrees)
+                [6]: Apparent diameter of umbral shadow (degrees)
+                [7]: Apparent diameter of penumbral shadow (degrees)
+                [8]: Saros series number (0, not implemented)
+                [9-10]: Reserved (0)
+            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
+                Includes visibility flags (SE_ECL_VISIBLE, SE_ECL_*_VISIBLE)
+
+    Raises:
+        RuntimeError: If no eclipse visible from location within search limit
+
+    Algorithm:
+        1. Use lun_eclipse_when to find next global lunar eclipse
+        2. Calculate Moon's altitude at observer's location during eclipse
+        3. If Moon is below horizon during entire eclipse, continue to next
+        4. Return local phase times, visibility flags, and attributes
+
+    Precision:
+        Eclipse times accurate to ~1 minute. Visibility depends on
+        accurate horizon calculations.
+
+    Example:
+        >>> # Find next lunar eclipse visible from Rome
+        >>> from libephemeris import julday, lun_eclipse_when_loc
+        >>> jd = julday(2024, 1, 1, 0)
+        >>> rome_lat, rome_lon = 41.9028, 12.4964
+        >>> times, attr, ecl_type = lun_eclipse_when_loc(jd, rome_lat, rome_lon)
+        >>> print(f"Eclipse maximum at JD {times[0]:.5f}")
+        >>> print(f"Moon altitude: {attr[4]:.1f}°")
+
+    References:
+        - Swiss Ephemeris: swe_lun_eclipse_when_loc()
+        - Meeus "Astronomical Algorithms" Ch. 54
+    """
+    MAX_SEARCH_YEARS = 50  # Maximum search range
+    MAX_ECLIPSES = int(
+        MAX_SEARCH_YEARS * 2.4
+    )  # ~2.4 lunar eclipses per year on average
+
+    from .state import get_planets, get_timescale
+    from skyfield.api import wgs84
+
+    # Get ephemeris
+    eph = get_planets()
+    ts = get_timescale()
+
+    # Create observer
+    earth = eph["earth"]
+    moon = eph["moon"]
+    observer = wgs84.latlon(lat, lon, altitude)
+
+    def _get_moon_altaz(jd: float) -> Tuple[float, float]:
+        """Get Moon altitude and azimuth at given JD from observer location."""
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+        moon_app = observer_at.at(t).observe(moon).apparent()
+        alt, az, _ = moon_app.altaz()
+        return alt.degrees, az.degrees
+
+    def _is_moon_visible(jd: float, min_alt: float = -1.0) -> bool:
+        """Check if Moon is above horizon (with margin for refraction)."""
+        alt, _ = _get_moon_altaz(jd)
+        return alt > min_alt
+
+    jd = jd_start
+
+    for _ in range(MAX_ECLIPSES):
+        # Find next global lunar eclipse
+        try:
+            global_times, global_type = lun_eclipse_when(jd, flags)
+        except RuntimeError:
+            raise RuntimeError(
+                f"No lunar eclipse visible from lat={lat}, lon={lon} "
+                f"within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+            )
+
+        jd_max = global_times[0]
+        jd_pen_begin = global_times[5]
+        jd_pen_end = global_times[6]
+        jd_partial_begin = global_times[1]
+        jd_partial_end = global_times[4]
+        jd_total_begin = global_times[2]
+        jd_total_end = global_times[3]
+
+        # Check if Moon is visible during any part of the eclipse
+        # Sample at key phases: penumbral begin/end, partial begin/end, maximum
+        check_times = [jd_max]
+        if jd_pen_begin > 0:
+            check_times.append(jd_pen_begin)
+        if jd_pen_end > 0:
+            check_times.append(jd_pen_end)
+        if jd_partial_begin > 0:
+            check_times.append(jd_partial_begin)
+        if jd_partial_end > 0:
+            check_times.append(jd_partial_end)
+        if jd_total_begin > 0:
+            check_times.append(jd_total_begin)
+        if jd_total_end > 0:
+            check_times.append(jd_total_end)
+
+        # Also sample at several intermediate points
+        eclipse_start = jd_pen_begin if jd_pen_begin > 0 else jd_max - 2 / 24
+        eclipse_end = jd_pen_end if jd_pen_end > 0 else jd_max + 2 / 24
+        for i in range(5):
+            t = eclipse_start + (eclipse_end - eclipse_start) * i / 4
+            if t not in check_times:
+                check_times.append(t)
+
+        moon_visible = any(_is_moon_visible(t) for t in check_times)
+
+        if not moon_visible:
+            # Eclipse not visible from this location, try next
+            jd = jd_max + 25  # Skip ahead to find next eclipse
+            continue
+
+        # Eclipse visible! Calculate local circumstances
+
+        # Get Moon position at maximum
+        moon_pos, _ = swe_calc_ut(jd_max, SE_MOON, SEFLG_SPEED)
+        moon_dist = moon_pos[2]
+
+        # Get eclipse type and magnitude
+        (
+            ecl_type_flags,
+            umbral_mag,
+            penumbral_mag,
+            gamma,
+            penumbra_radius,
+            umbra_radius,
+        ) = _calculate_lunar_eclipse_type_and_magnitude(jd_max)
+
+        # Get Moon's alt/az at maximum
+        moon_alt, moon_az = _get_moon_altaz(jd_max)
+
+        # Calculate apparent diameters
+        # Moon semi-diameter: 932.56 arcsec at mean distance 0.002569 AU
+        moon_diameter = 2 * (932.56 / 3600.0) * (0.002569 / moon_dist)
+        umbra_diameter = 2 * umbra_radius
+        penumbra_diameter = 2 * penumbra_radius
+
+        # Determine which phases are visible
+        ecl_type = ecl_type_flags
+
+        # Check visibility at each phase
+        if jd_pen_begin > 0 and _is_moon_visible(jd_pen_begin):
+            ecl_type |= SE_ECL_1ST_VISIBLE
+        if jd_partial_begin > 0 and _is_moon_visible(jd_partial_begin):
+            ecl_type |= SE_ECL_2ND_VISIBLE
+        if jd_partial_end > 0 and _is_moon_visible(jd_partial_end):
+            ecl_type |= SE_ECL_3RD_VISIBLE
+        if jd_pen_end > 0 and _is_moon_visible(jd_pen_end):
+            ecl_type |= SE_ECL_4TH_VISIBLE
+        if _is_moon_visible(jd_max):
+            ecl_type |= SE_ECL_MAX_VISIBLE
+        ecl_type |= SE_ECL_VISIBLE
+
+        # Find moonrise/moonset during eclipse (simplified - we just check endpoints)
+        moonrise_time = 0.0
+        moonset_time = 0.0
+
+        # Check if Moon rises during eclipse
+        if jd_pen_begin > 0 and jd_pen_end > 0:
+            alt_begin, _ = _get_moon_altaz(jd_pen_begin)
+            alt_end, _ = _get_moon_altaz(jd_pen_end)
+            if alt_begin < 0 < alt_end:
+                # Moon rises during eclipse - find approximate time
+                # Simple binary search
+                t_low, t_high = jd_pen_begin, jd_pen_end
+                for _ in range(20):
+                    t_mid = (t_low + t_high) / 2
+                    alt_mid, _ = _get_moon_altaz(t_mid)
+                    if alt_mid < 0:
+                        t_low = t_mid
+                    else:
+                        t_high = t_mid
+                moonrise_time = (t_low + t_high) / 2
+            elif alt_begin > 0 > alt_end:
+                # Moon sets during eclipse - find approximate time
+                t_low, t_high = jd_pen_begin, jd_pen_end
+                for _ in range(20):
+                    t_mid = (t_low + t_high) / 2
+                    alt_mid, _ = _get_moon_altaz(t_mid)
+                    if alt_mid > 0:
+                        t_low = t_mid
+                    else:
+                        t_high = t_mid
+                moonset_time = (t_low + t_high) / 2
+
+        # Prepare times tuple (10 elements)
+        times = (
+            global_times[0],  # [0] Maximum
+            global_times[1],  # [1] Partial begins (enters umbra)
+            global_times[2],  # [2] Total begins
+            global_times[3],  # [3] Total ends
+            global_times[4],  # [4] Partial ends (leaves umbra)
+            global_times[5],  # [5] Penumbral begins
+            global_times[6],  # [6] Penumbral ends
+            moonrise_time,  # [7] Moonrise during eclipse
+            moonset_time,  # [8] Moonset during eclipse
+            0.0,  # [9] Reserved
+        )
+
+        # Prepare attributes tuple (11 elements)
+        attr = (
+            umbral_mag,  # [0] Umbral magnitude
+            penumbral_mag,  # [1] Penumbral magnitude
+            0.0,  # [2] Reserved
+            moon_az,  # [3] Azimuth of Moon at maximum
+            moon_alt,  # [4] Altitude of Moon at maximum
+            moon_diameter,  # [5] Apparent diameter of Moon
+            umbra_diameter,  # [6] Apparent diameter of umbra
+            penumbra_diameter,  # [7] Apparent diameter of penumbra
+            0.0,  # [8] Saros (not implemented)
+            0.0,  # [9] Reserved
+            0.0,  # [10] Reserved
+        )
+
+        return times, attr, ecl_type
+
+    raise RuntimeError(
+        f"No lunar eclipse visible from lat={lat}, lon={lon} "
+        f"within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+    )
+
+
+# Alias for Swiss Ephemeris API compatibility
+swe_lun_eclipse_when_loc = lun_eclipse_when_loc
