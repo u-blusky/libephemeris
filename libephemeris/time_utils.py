@@ -698,6 +698,104 @@ def lmt_to_lat(jd_lmt: float, longitude: float) -> float:
     return jd_lat
 
 
+def sidtime(jd: float, longitude: float, obliquity: float, nutation: float) -> float:
+    """
+    Calculate Local Sidereal Time for a given Julian Day and geographic longitude.
+
+    Sidereal time is the hour angle of the vernal equinox (First Point of Aries)
+    and is used to determine which stars are visible at a given time and location.
+    This function calculates the local apparent sidereal time (LAST), which
+    includes nutation effects.
+
+    The calculation proceeds as:
+    1. Compute Greenwich Mean Sidereal Time (GMST) from Julian Day
+    2. Apply equation of equinoxes (nutation * cos(obliquity)) to get GAST
+    3. Add longitude offset to get Local Apparent Sidereal Time (LAST)
+
+    Args:
+        jd: Julian Day number in UT (Universal Time)
+        longitude: Geographic longitude in degrees (positive East, negative West)
+        obliquity: Obliquity of the ecliptic in degrees (typically ~23.44°)
+        nutation: Nutation in longitude in degrees (typically small, ~±0.005°)
+
+    Returns:
+        float: Local sidereal time in hours (0.0 to 24.0)
+
+    Note:
+        - GMST is computed using the IAU 1982 formula from Meeus
+          "Astronomical Algorithms" Chapter 12
+        - The equation of equinoxes = nutation_in_longitude * cos(obliquity)
+        - For most applications, obliquity ≈ 23.44° and nutation is small
+        - Result is normalized to the range 0-24 hours
+
+    Example:
+        >>> from libephemeris import sidtime
+        >>> # Calculate LST for J2000.0 at Greenwich (0° longitude)
+        >>> lst = sidtime(2451545.0, 0.0, 23.4393, 0.0)
+        >>> print(f"LST: {lst:.4f} hours")
+        LST: 18.6974 hours
+        >>> # Calculate LST for Rome (12.5°E longitude)
+        >>> lst_rome = sidtime(2451545.0, 12.5, 23.4393, 0.0)
+        >>> print(f"LST Rome: {lst_rome:.4f} hours")
+        LST Rome: 19.5307 hours
+    """
+    import math
+
+    # Get JD at 0h UT of this day
+    # JD has noon as integer, so 0h UT = JD - 0.5 rounded
+    jd_0h = math.floor(jd + 0.5) - 0.5
+
+    # Calculate centuries from J2000.0 for the 0h UT moment
+    # J2000.0 is 2451545.0 = Jan 1, 2000, 12:00 TT (noon)
+    T = (jd_0h - 2451545.0) / 36525.0
+
+    # Calculate Greenwich Mean Sidereal Time at 0h UT using IAU 1982 formula
+    # Reference: Meeus "Astronomical Algorithms" Chapter 12, equation 12.4
+    # GMST at 0h UT in seconds
+    theta0_seconds = (
+        24110.54841 + 8640184.812866 * T + 0.093104 * T**2 - 0.0000062 * T**3
+    )
+
+    # Convert to hours
+    theta0_hours = theta0_seconds / 3600.0
+
+    # Calculate UT hours since 0h UT
+    ut_hours = (jd - jd_0h) * 24.0
+
+    # Convert UT hours to sidereal hours
+    # Sidereal rate: 1.00273790935 sidereal hours per solar hour
+    sidereal_from_ut = ut_hours * 1.00273790935
+
+    # Greenwich Mean Sidereal Time
+    gmst = theta0_hours + sidereal_from_ut
+
+    # Apply equation of equinoxes to get Greenwich Apparent Sidereal Time (GAST)
+    # Equation of equinoxes = nutation in longitude * cos(obliquity)
+    # Convert obliquity to radians for cos calculation
+    obliquity_rad = math.radians(obliquity)
+
+    # Nutation contribution to sidereal time (convert from degrees to hours)
+    # Nutation in longitude (degrees) * cos(obliquity) gives the correction in degrees
+    # 15 degrees = 1 hour, so divide by 15 to get hours
+    equation_of_equinoxes = (nutation * math.cos(obliquity_rad)) / 15.0
+
+    gast = gmst + equation_of_equinoxes
+
+    # Convert longitude to hours (15° = 1 hour)
+    # Positive longitude (East) means local time is ahead of Greenwich
+    longitude_hours = longitude / 15.0
+
+    # Local Apparent Sidereal Time
+    last = gast + longitude_hours
+
+    # Normalize to 0-24 hours range
+    last = last % 24.0
+    if last < 0:
+        last += 24.0
+
+    return last
+
+
 def utc_time_zone(
     year: int,
     month: int,

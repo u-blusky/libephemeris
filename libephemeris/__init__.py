@@ -13,6 +13,7 @@ from .time_utils import (
     time_equ,
     lat_to_lmt,
     lmt_to_lat,
+    sidtime,
 )
 from .planets import (
     swe_calc_ut,
@@ -118,6 +119,7 @@ __all__ = [
     "time_equ",
     "lat_to_lmt",
     "lmt_to_lat",
+    "sidtime",
     # Planet calculation
     "swe_calc_ut",
     "calc_ut",
