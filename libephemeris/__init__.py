@@ -55,6 +55,8 @@ from .state import (
     get_tid_acc as swe_get_tid_acc,
     set_delta_t_userdef as swe_set_delta_t_userdef,
     get_delta_t_userdef as swe_get_delta_t_userdef,
+    set_lapse_rate as swe_set_lapse_rate,
+    get_lapse_rate as swe_get_lapse_rate,
 )
 from .crossing import (
     swe_solcross_ut,
@@ -204,6 +206,10 @@ get_tid_acc = swe_get_tid_acc
 set_delta_t_userdef = swe_set_delta_t_userdef
 get_delta_t_userdef = swe_get_delta_t_userdef
 
+# Lapse rate for refraction calculations
+set_lapse_rate = swe_set_lapse_rate
+get_lapse_rate = swe_get_lapse_rate
+
 # Fixed Stars
 fixstar_ut = swe_fixstar_ut
 fixstar = swe_fixstar
@@ -327,6 +333,11 @@ __all__ = [
     "set_delta_t_userdef",
     "swe_get_delta_t_userdef",
     "get_delta_t_userdef",
+    # Lapse rate for refraction
+    "swe_set_lapse_rate",
+    "set_lapse_rate",
+    "swe_get_lapse_rate",
+    "get_lapse_rate",
     # Crossings
     "swe_solcross_ut",
     "solcross_ut",

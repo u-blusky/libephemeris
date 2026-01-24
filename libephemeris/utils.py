@@ -6,7 +6,7 @@ angular calculations and other mathematical utilities.
 """
 
 import math
-from typing import Tuple
+from typing import Optional, Tuple
 
 # Azalt calculation method flags (compatible with pyswisseph)
 SE_ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
@@ -594,7 +594,7 @@ def refrac_extended(
     altitude_geo: float,
     pressure: float = 1013.25,
     temperature: float = 15.0,
-    lapse_rate: float = 0.0065,
+    lapse_rate: Optional[float] = None,
     calc_flag: int = SE_TRUE_TO_APP,
 ) -> Tuple[float, Tuple[float, float, float, float]]:
     """
@@ -617,7 +617,8 @@ def refrac_extended(
         temperature: Atmospheric temperature at observer in degrees Celsius.
                      Default is 15.0.
         lapse_rate: Temperature lapse rate dT/dh in degrees Kelvin per meter.
-                    Default is 0.0065 K/m (standard atmosphere).
+                    Default is None (uses global value from set_lapse_rate(),
+                    or 0.0065 K/m if not set).
                     Typical values range from 0.0034 to 0.010 K/m.
         calc_flag: Direction of conversion:
             - SE_TRUE_TO_APP (0): Convert true altitude to apparent altitude
@@ -655,6 +656,12 @@ def refrac_extended(
         >>> round(dip, 2)
         -0.88
     """
+    from .state import get_lapse_rate
+
+    # Use global lapse rate if none provided
+    if lapse_rate is None:
+        lapse_rate = get_lapse_rate()
+
     # Earth's radius in meters
     EARTH_RADIUS = 6371000.0
 

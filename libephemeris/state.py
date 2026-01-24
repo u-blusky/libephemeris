@@ -35,6 +35,7 @@ _SIDEREAL_T0: float = 0.0  # Reference epoch (JD) for ayanamsha
 _ANGLES_CACHE: dict[str, float] = {}  # Pre-calculated angles {name: longitude}
 _TIDAL_ACCELERATION: Optional[float] = None  # Tidal acceleration for Delta T
 _DELTA_T_USERDEF: Optional[float] = None  # User-defined Delta T value
+_LAPSE_RATE: Optional[float] = None  # Atmospheric lapse rate for refraction
 
 
 def get_loader() -> Loader:
@@ -418,3 +419,67 @@ def get_delta_t_userdef() -> Optional[float]:
         None
     """
     return _DELTA_T_USERDEF
+
+
+# Default atmospheric lapse rate in K/m (standard atmosphere)
+SE_LAPSE_RATE_DEFAULT: float = 0.0065
+
+
+def set_lapse_rate(lapse_rate: Optional[float]) -> None:
+    """
+    Set the atmospheric temperature lapse rate for refraction calculations.
+
+    The lapse rate is the rate at which temperature decreases with altitude
+    in the atmosphere. It affects the calculation of atmospheric refraction,
+    particularly the dip of the horizon for elevated observers.
+
+    Args:
+        lapse_rate: Temperature lapse rate dT/dh in degrees Kelvin per meter.
+                    Use None to reset to the default value (0.0065 K/m).
+                    Typical values range from 0.0034 to 0.010 K/m.
+
+    Note:
+        - Standard atmospheric lapse rate is 0.0065 K/m (6.5°C per 1000m)
+        - This setting affects refrac_extended() calculations
+        - Higher lapse rates result in less refraction of the horizon
+        - The lapse rate is used in calculating the dip of the horizon
+          for elevated observers
+
+    Example:
+        >>> from libephemeris import set_lapse_rate, get_lapse_rate
+        >>> get_lapse_rate()  # Default value
+        0.0065
+        >>> set_lapse_rate(0.005)  # Set custom lapse rate
+        >>> get_lapse_rate()
+        0.005
+        >>> set_lapse_rate(None)  # Reset to default
+        >>> get_lapse_rate()
+        0.0065
+    """
+    global _LAPSE_RATE
+    _LAPSE_RATE = lapse_rate
+
+
+def get_lapse_rate() -> float:
+    """
+    Get the current atmospheric temperature lapse rate.
+
+    Returns:
+        float: The lapse rate in degrees Kelvin per meter.
+               Returns 0.0065 K/m (standard atmosphere) if not explicitly set.
+
+    Note:
+        The lapse rate affects refrac_extended() calculations, particularly
+        the dip of the horizon for elevated observers.
+
+    Example:
+        >>> from libephemeris import get_lapse_rate, set_lapse_rate
+        >>> get_lapse_rate()  # Default value
+        0.0065
+        >>> set_lapse_rate(0.008)
+        >>> get_lapse_rate()
+        0.008
+    """
+    if _LAPSE_RATE is None:
+        return SE_LAPSE_RATE_DEFAULT
+    return _LAPSE_RATE
