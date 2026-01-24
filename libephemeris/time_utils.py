@@ -10,8 +10,11 @@ Functions match the Swiss Ephemeris API for compatibility.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 
-from .constants import SE_GREG_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH, SEFLG_MOSEPH
+from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH, SEFLG_MOSEPH
 from .state import get_timescale
+
+# Julian Day of Gregorian calendar reform: Oct 15, 1582
+JD_GREGORIAN_REFORM = 2299161
 
 
 def swe_julday(
@@ -191,3 +194,66 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
     # so no warning is needed for those
 
     return delta_t, serr
+
+
+def date_conversion(
+    year: int, month: int, day: int, hour: float, calendar: str
+) -> tuple[int, int, int, float]:
+    """
+    Convert a date between Julian and Gregorian calendars.
+
+    The function automatically detects the input calendar based on the date:
+    - Dates before Oct 15, 1582 are assumed to be Julian calendar
+    - Dates from Oct 15, 1582 onwards are assumed to be Gregorian calendar
+
+    Args:
+        year: Calendar year
+        month: Month (1-12)
+        day: Day of month (1-31)
+        hour: Decimal hour (0.0-23.999...)
+        calendar: Target calendar - 'j' for Julian or 'g' for Gregorian
+
+    Returns:
+        tuple: (year, month, day, hour) in the requested calendar
+
+    Raises:
+        ValueError: If calendar is not 'j' or 'g'
+
+    Note:
+        The Gregorian calendar reform occurred on Oct 15, 1582. On this date,
+        the Julian calendar was 10 days behind. The function uses Julian Day
+        numbers as an intermediate representation to convert between calendars.
+
+    Example:
+        >>> # Convert first Gregorian date to Julian
+        >>> date_conversion(1582, 10, 15, 12.0, 'j')
+        (1582, 10, 5, 12.0)
+        >>> # Convert Julian date to Gregorian
+        >>> date_conversion(1582, 10, 5, 12.0, 'g')
+        (1582, 10, 15, 12.0)
+    """
+    calendar = calendar.lower()
+    if calendar not in ("j", "g"):
+        raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")
+
+    # Determine the input calendar based on the date
+    # First convert to JD using Gregorian to check the date
+    jd_as_greg = swe_julday(year, month, day, hour, SE_GREG_CAL)
+
+    # If the date is before Oct 15, 1582, assume Julian input
+    if jd_as_greg < JD_GREGORIAN_REFORM:
+        input_cal = SE_JUL_CAL
+        jd = swe_julday(year, month, day, hour, SE_JUL_CAL)
+    else:
+        input_cal = SE_GREG_CAL
+        jd = jd_as_greg
+
+    # Determine target calendar flag
+    target_cal = SE_JUL_CAL if calendar == "j" else SE_GREG_CAL
+
+    # If input and target are the same, just return the original values
+    if input_cal == target_cal:
+        return year, month, day, hour
+
+    # Convert via Julian Day to target calendar
+    return swe_revjul(jd, target_cal)
