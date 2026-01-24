@@ -549,6 +549,244 @@ def swe_houses(
     return tuple(cusps[1:13]), tuple(ascmc)
 
 
+def swe_houses_armc(
+    armc: float, lat: float, eps: float, hsys: int
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """
+    Calculate house cusps and angles from ARMC (Right Ascension of Medium Coeli).
+
+    This function calculates house cusps directly from the ARMC value instead of
+    from a Julian Day. This is useful when you have a pre-calculated ARMC or when
+    working with house systems that depend only on ARMC, latitude, and obliquity.
+
+    Swiss Ephemeris compatible function (swe_houses_armc equivalent).
+
+    Args:
+        armc: Right Ascension of Medium Coeli in degrees (0-360)
+        lat: Geographic latitude in degrees (positive North, negative South)
+        eps: True obliquity of the ecliptic in degrees
+        hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
+
+    Returns:
+        Tuple containing:
+            - cusps: Tuple of 12 house cusp longitudes (houses 1-12) in degrees
+            - ascmc: Tuple of 8 angles: [Asc, MC, ARMC, Vertex, EquAsc, CoAsc, CoAscKoch, PolarAsc]
+
+    House Systems Supported:
+        'P' = Placidus, 'K' = Koch, 'R' = Regiomontanus, 'C' = Campanus,
+        'E'/'A' = Equal, 'W' = Whole Sign, 'O' = Porphyry, 'B' = Alcabitius,
+        'T' = Topocentric, 'M' = Morinus, 'X' = Meridian, 'H' = Horizontal,
+        'V' = Vehlow, 'G' = Gauquelin, 'U' = Krusinski, 'F' = Carter,
+        'Y' = APC, 'N' = Natural Gradient
+
+    Example:
+        >>> # Calculate obliquity for J2000.0
+        >>> eps = 23.4393  # approximate true obliquity
+        >>> armc = 292.957  # ARMC in degrees
+        >>> cusps, ascmc = swe_houses_armc(armc, 41.9, eps, ord('P'))
+        >>> asc, mc = ascmc[0], ascmc[1]
+    """
+    # Normalize ARMC to 0-360
+    armc_deg = armc % 360.0
+
+    # Convert house system identifier to character
+    hsys_char = hsys
+    if isinstance(hsys, int):
+        hsys_char = chr(hsys)
+    elif isinstance(hsys, bytes):
+        hsys_char = hsys.decode("utf-8")
+
+    # Determine if we need to flip MC (and thus ARMC) for specific systems
+    # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
+    armc_active = armc_deg
+
+    if hsys_char in ["R", "C", "T"]:
+        # Check altitude of MC calculated from original ARMC
+        mc_dec_rad = math.atan(
+            math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
+        )
+        lat_rad = math.radians(lat)
+        sin_alt = math.sin(lat_rad) * math.sin(mc_dec_rad) + math.cos(
+            lat_rad
+        ) * math.cos(mc_dec_rad)
+
+        if sin_alt < 0:
+            armc_active = (armc_deg + 180.0) % 360.0
+
+    # Calculate MC from armc_active (flipped if needed)
+    mc_rad = math.atan2(
+        math.tan(math.radians(armc_active)), math.cos(math.radians(eps))
+    )
+    mc = math.degrees(mc_rad)
+    # Adjust quadrant to match armc_active
+    if mc < 0:
+        mc += 360.0
+
+    if 90.0 < armc_active <= 270.0:
+        if mc < 90.0 or mc > 270.0:
+            mc += 180.0
+    elif armc_active > 270.0:
+        if mc < 270.0:
+            mc += 180.0
+    elif armc_active <= 90.0:
+        if mc > 90.0:
+            mc += 180.0
+
+    mc = mc % 360.0
+
+    # Ascendant uses armc_deg (Original)
+    num = math.cos(math.radians(armc_deg))
+    den = -(
+        math.sin(math.radians(armc_deg)) * math.cos(math.radians(eps))
+        + math.tan(math.radians(lat)) * math.sin(math.radians(eps))
+    )
+    asc_rad = math.atan2(num, den)
+    asc = math.degrees(asc_rad)
+    asc = asc % 360.0
+
+    # Ensure Ascendant is on the Eastern Horizon (Azimuth in [0, 180])
+    # We check Azimuth relative to the TRUE ARMC (armc_deg)
+    asc_r = math.radians(asc)
+    eps_r = math.radians(eps)
+
+    # RA
+    y = math.cos(eps_r) * math.sin(asc_r)
+    x = math.cos(asc_r)
+    ra_r = math.atan2(y, x)
+    ra = math.degrees(ra_r) % 360.0
+
+    # Dec
+    dec_r = math.asin(math.sin(eps_r) * math.sin(asc_r))
+
+    # Hour Angle using TRUE ARMC
+    h_deg = (armc_deg - ra + 360.0) % 360.0
+    h_r = math.radians(h_deg)
+
+    # Azimuth
+    # tan(Az) = sin(H) / (sin(lat)cos(H) - cos(lat)tan(Dec))
+    lat_r = math.radians(lat)
+
+    num_az = math.sin(h_r)
+    den_az = math.sin(lat_r) * math.cos(h_r) - math.cos(lat_r) * math.tan(dec_r)
+    az_r = math.atan2(num_az, den_az)
+    az = math.degrees(az_r)
+    az = (az + 180.0) % 360.0
+
+    # Check if H is West (0-180). If so, Asc is Setting (Descendant).
+    # We want Rising.
+    if 0.0 < h_deg < 180.0:
+        asc = (asc + 180.0) % 360.0
+
+    # Ensure ASC is in [0, 360) range (handle edge case of exactly 360.0)
+    if asc >= 360.0:
+        asc = 0.0
+
+    # Vertex uses armc_deg (Original)
+    # Hemisphere check relative to TRUE ARMC (West of True ARMC)
+    vertex = _calc_vertex(armc_deg, eps, lat, armc_deg)
+
+    # Equatorial Ascendant (East Point)
+    # This is the intersection of the ecliptic with the celestial equator in the east
+    # It's the ecliptic longitude where RA = ARMC + 90°
+    equ_asc_ra = (armc_deg + 90.0) % 360.0
+    # Convert RA to ecliptic longitude
+    equ_asc_ra_r = math.radians(equ_asc_ra)
+    eps_r = math.radians(eps)
+    y = math.sin(equ_asc_ra_r)
+    x = math.cos(equ_asc_ra_r) * math.cos(eps_r)
+    equ_asc = math.degrees(math.atan2(y, x)) % 360.0
+
+    # Co-Ascendant W. Koch (coasc1)
+    # Formula from Swiss Ephemeris: coasc1 = Asc(ARMC - 90°, latitude) + 180°
+    coasc_armc = (armc_deg - 90.0) % 360.0
+    co_asc_koch = _calc_ascendant(coasc_armc, eps, lat, lat)
+
+    # Add 180° to get opposite point (per Swiss Ephemeris formula)
+    co_asc_koch = (co_asc_koch + 180.0) % 360.0
+
+    # Co-Ascendant M. Munkasey (coasc2)
+    # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
+    # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
+    coasc2_armc = (armc_deg + 90.0) % 360.0
+    if lat >= 0:
+        coasc2_lat = 90.0 - lat
+    else:
+        coasc2_lat = -90.0 - lat
+    co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
+
+    # Polar Ascendant M. Munkasey (polasc)
+    # polasc = Asc(ARMC - 90°, latitude)
+    # Note: This is the same as coasc1 but WITHOUT the +180°
+    polar_asc = _calc_ascendant(coasc_armc, eps, lat, lat)
+
+    # Build ASCMC array with 8 elements (pyswisseph compatible)
+    ascmc = [0.0] * 8
+    ascmc[0] = asc
+    ascmc[1] = mc
+    ascmc[2] = armc_deg
+    ascmc[3] = vertex
+    ascmc[4] = equ_asc
+    ascmc[5] = co_asc_koch  # Swiss Ephemeris: coasc1 (W. Koch) at index 5
+    ascmc[6] = co_asc  # Swiss Ephemeris: coasc2 (M. Munkasey) at index 6
+    ascmc[7] = polar_asc
+
+    # House Cusps
+    # Use armc_active for house calculations
+    # If MC was flipped, we might need to flip latitude for intermediate cusps
+    calc_lat = lat
+    if armc_active != armc_deg:
+        # MC was flipped. Flip latitude for intermediate cusp calculations.
+        calc_lat = -lat
+
+    cusps = [0.0] * 13
+
+    if hsys_char == "P":  # Placidus
+        cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "K":  # Koch
+        cusps = _houses_koch(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "R":  # Regiomontanus
+        cusps = _houses_regiomontanus(armc_active, calc_lat, eps, asc, mc)
+    elif hsys_char == "C":  # Campanus
+        cusps = _houses_campanus(armc_active, calc_lat, eps, asc, mc)
+    elif hsys_char == "E":  # Equal (Ascendant)
+        cusps = _houses_equal(asc)
+    elif hsys_char == "A":  # Equal (MC)
+        cusps = _houses_equal(asc)  # Equal MC is same as Equal Asc in SwissEph
+    elif hsys_char == "W":  # Whole Sign
+        cusps = _houses_whole_sign(asc)
+    elif hsys_char == "O":  # Porphyry
+        cusps = _houses_porphyry(asc, mc)
+    elif hsys_char == "B":  # Alcabitius
+        cusps = _houses_alcabitius(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "T":  # Polich/Page (Topocentric)
+        cusps = _houses_polich_page(armc_active, calc_lat, eps, asc, mc)
+    elif hsys_char == "M":  # Morinus
+        cusps = _houses_morinus(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "X":  # Meridian (Axial)
+        cusps = _houses_meridian(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "V":  # Vehlow
+        cusps = _houses_vehlow(asc)
+    elif hsys_char == "H":  # Horizontal (Azimuthal)
+        cusps = _houses_horizontal(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "Y":  # APC Houses
+        cusps = _houses_apc(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "F":  # Carter (Poli-Equatorial)
+        cusps = _houses_carter(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "U":  # Krusinski
+        cusps = _houses_krusinski(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "N":  # Natural Gradient
+        cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "G":  # Gauquelin
+        cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
+    else:
+        # Default to Placidus
+        cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
+
+    # Return 12-element cusps array (pyswisseph compatible: no padding at index 0)
+    # cusps[1:13] contains houses 1-12
+    return tuple(cusps[1:13]), tuple(ascmc)
+
+
 def swe_houses_ex(
     tjdut: float, lat: float, lon: float, hsys: int, flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
