@@ -10,6 +10,8 @@ Functions match the Swiss Ephemeris API for compatibility.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 
+from typing import Any
+
 from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH, SEFLG_MOSEPH
 from .state import get_timescale
 
@@ -324,6 +326,76 @@ def utc_to_jd(
 
     # Explicit float cast to satisfy type checker (Skyfield uses lazy reify decorator)
     return float(t.tt), float(t.ut1)
+
+
+def jdet_to_utc(
+    jd_et: float, calendar: int = SE_GREG_CAL
+) -> tuple[int, int, int, int, int, float]:
+    """
+    Convert Julian Day in Ephemeris Time (TT/ET) to UTC date/time.
+
+    This is the inverse of utc_to_jd(): it converts a Julian Day number
+    in Terrestrial Time (TT, formerly known as Ephemeris Time/ET) back to
+    a UTC calendar date and time. The conversion properly accounts for
+    Delta-T and leap seconds.
+
+    Args:
+        jd_et: Julian Day number in TT (Terrestrial Time / Ephemeris Time)
+        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+
+    Returns:
+        tuple: (year, month, day, hour, minute, second) where:
+            - year: Calendar year (negative for BCE)
+            - month: Month (1-12)
+            - day: Day of month (1-31)
+            - hour: Hour (0-23)
+            - minute: Minute (0-59)
+            - second: Second (0.0-59.999..., or 60.x during leap second)
+
+    Note:
+        - TT (Terrestrial Time) is the modern successor to Ephemeris Time (ET)
+        - TT = TAI + 32.184 seconds, where TAI is International Atomic Time
+        - UTC may include leap seconds (second = 60) on certain dates
+        - Delta-T (TT - UT1) is automatically applied using IERS data
+
+    Example:
+        >>> from libephemeris import jdet_to_utc, utc_to_jd, SE_GREG_CAL
+        >>> # Convert J2000.0 epoch (JD 2451545.0 TT) to UTC
+        >>> year, month, day, hour, minute, second = jdet_to_utc(2451545.0)
+        >>> print(f"{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:05.2f}")
+        2000-01-01 11:58:55.82
+    """
+    ts = get_timescale()
+
+    # Create a Skyfield Time object from TT Julian Day
+    t = ts.tt_jd(jd_et)
+
+    # Get UTC components from Skyfield (handles leap seconds automatically)
+    # The .utc attribute returns a tuple: (year, month, day, hour, minute, second)
+    # We cast to Any to work around Skyfield's reify decorator type annotation issues
+    utc_data: Any = t.utc
+    g_year = int(utc_data[0])
+    g_month = int(utc_data[1])
+    g_day = int(utc_data[2])
+    g_hour = int(utc_data[3])
+    g_minute = int(utc_data[4])
+    g_second = float(utc_data[5])
+
+    if calendar == SE_JUL_CAL:
+        # Convert Gregorian date to Julian calendar
+        # First compute the JD for this Gregorian date
+        decimal_hour = g_hour + g_minute / 60.0 + g_second / 3600.0
+        jd_greg = swe_julday(g_year, g_month, g_day, decimal_hour, SE_GREG_CAL)
+        # Convert to Julian calendar
+        j_year, j_month, j_day, j_decimal_hour = swe_revjul(jd_greg, SE_JUL_CAL)
+        # Extract time components from decimal hour
+        j_hour = int(j_decimal_hour)
+        j_minute_frac = (j_decimal_hour - j_hour) * 60.0
+        j_minute = int(j_minute_frac)
+        j_second = (j_minute_frac - j_minute) * 60.0
+        return j_year, j_month, j_day, j_hour, j_minute, j_second
+
+    return g_year, g_month, g_day, g_hour, g_minute, g_second
 
 
 def day_of_week(jd: float) -> int:
