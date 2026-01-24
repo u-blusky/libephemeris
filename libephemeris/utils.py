@@ -877,6 +877,37 @@ def difdeg2n(p1: float, p2: float) -> float:
     return diff
 
 
+def difdegn(p1: float, p2: float) -> float:
+    """
+    Calculate distance in degrees p1 - p2 normalized to [0, 360).
+
+    Compatible with pyswisseph's swe.difdegn() function.
+    Computes the difference between two angles, always returning a positive
+    value in the range [0, 360). Unlike difdeg2n() which returns [-180, 180],
+    this function always returns a positive value.
+
+    Args:
+        p1: First angle in degrees
+        p2: Second angle in degrees
+
+    Returns:
+        Normalized difference in range [0, 360)
+
+    Examples:
+        >>> difdegn(10, 20)
+        350.0
+        >>> difdegn(20, 10)
+        10.0
+        >>> difdegn(350, 10)
+        340.0
+        >>> difdegn(10, 350)
+        20.0
+        >>> difdegn(0, 0)
+        0.0
+    """
+    return (p1 - p2) % 360.0
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
