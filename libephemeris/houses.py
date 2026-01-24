@@ -80,6 +80,28 @@ from .constants import SEFLG_SIDEREAL, SEFLG_SPEED
 from .state import get_timescale
 from .planets import swe_get_ayanamsa_ut
 from skyfield.nutationlib import iau2000b_radians
+from .exceptions import Error
+
+
+def _is_polar_circle(lat: float, eps: float) -> bool:
+    """
+    Check if latitude is within the polar circle for house calculations.
+
+    At polar latitudes (approximately >66.5°), some house systems like Placidus
+    and Koch cannot be calculated because the ecliptic does not properly
+    intersect the horizon. This occurs when abs(lat) + eps > 90°.
+
+    Args:
+        lat: Geographic latitude in degrees
+        eps: True obliquity of the ecliptic in degrees
+
+    Returns:
+        True if within polar circle (house calculation will fail)
+    """
+    # The polar circle is where the sun can be circumpolar
+    # This happens when |lat| + obliquity > 90°
+    # For typical obliquity of ~23.44°, this is lat > ~66.56°
+    return abs(lat) + eps > 90.0
 
 
 def angular_diff(a: float, b: float) -> float:
@@ -498,6 +520,12 @@ def swe_houses(
         # MC was flipped. Flip latitude for intermediate cusp calculations.
         calc_lat = -lat
 
+    # Check for polar circle condition for Placidus/Koch
+    # These systems cannot be calculated when abs(lat) + eps > 90°
+    # Swiss Ephemeris raises an error in this case
+    if hsys_char in ["P", "K"] and _is_polar_circle(lat, eps):
+        raise Error("swe_houses: within polar circle, switched to Porphyry")
+
     cusps = [0.0] * 13
 
     if hsys_char == "P":  # Placidus
@@ -737,6 +765,12 @@ def swe_houses_armc(
     if armc_active != armc_deg:
         # MC was flipped. Flip latitude for intermediate cusp calculations.
         calc_lat = -lat
+
+    # Check for polar circle condition for Placidus/Koch
+    # These systems cannot be calculated when abs(lat) + eps > 90°
+    # Swiss Ephemeris raises an error in this case
+    if hsys_char in ["P", "K"] and _is_polar_circle(lat, eps):
+        raise Error("swe_houses_armc: within polar circle, switched to Porphyry")
 
     cusps = [0.0] * 13
 

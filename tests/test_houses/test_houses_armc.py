@@ -185,9 +185,9 @@ class TestHousesArmcEdgeCases:
         assert 0 <= ascmc[1] < 360
 
     @pytest.mark.edge_case
-    @pytest.mark.parametrize("lat", [60.0, 65.0, 70.0])
+    @pytest.mark.parametrize("lat", [60.0, 65.0])
     def test_houses_armc_high_latitude(self, lat):
-        """houses_armc should handle high latitudes."""
+        """houses_armc should handle high latitudes below polar circle."""
         armc = 100.0
         eps = 23.44
 
@@ -196,6 +196,22 @@ class TestHousesArmcEdgeCases:
         # Should return valid values (even if approximation)
         assert 0 <= ascmc[0] < 360
         assert 0 <= ascmc[1] < 360
+
+    @pytest.mark.edge_case
+    def test_houses_armc_polar_circle_raises_error(self):
+        """houses_armc should raise Error for Placidus at polar latitudes."""
+        armc = 100.0
+        eps = 23.44
+
+        # 70° is within the polar circle - Placidus should raise an error
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses_armc(armc, 70.0, eps, ord("P"))
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+        # But Porphyry should work
+        cusps, ascmc = ephem.swe_houses_armc(armc, 70.0, eps, ord("O"))
+        assert 0 <= ascmc[0] < 360
 
     @pytest.mark.edge_case
     @pytest.mark.parametrize("armc", [0.0, 90.0, 180.0, 270.0, 359.99])

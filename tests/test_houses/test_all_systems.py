@@ -129,27 +129,67 @@ class TestHouseSystemsPolarLatitudes:
     """Test house systems at polar latitudes."""
 
     @pytest.mark.edge_case
-    @pytest.mark.parametrize("lat", [65.0, 70.0, 80.0])
-    def test_placidus_polar_fallback(self, lat):
-        """Placidus should fall back or handle polar latitudes."""
+    def test_placidus_below_polar_circle(self):
+        """Placidus should work below the polar circle (~66.5°)."""
         jd = 2451545.0
 
-        # Should not crash
-        cusps, ascmc = ephem.swe_houses(jd, lat, 0.0, ord("P"))
-
-        # Should return valid values (even if approximation)
+        # At 65° latitude, Placidus should work normally
+        cusps, ascmc = ephem.swe_houses(jd, 65.0, 0.0, ord("P"))
         assert 0 <= ascmc[0] < 360
         assert 0 <= ascmc[1] < 360
 
     @pytest.mark.edge_case
-    @pytest.mark.parametrize("lat", [65.0, 70.0, 80.0])
-    def test_koch_polar_fallback(self, lat):
-        """Koch should fall back or handle polar latitudes."""
-        jd = 2451545.0
-        cusps, ascmc = ephem.swe_houses(jd, lat, 0.0, ord("K"))
+    @pytest.mark.parametrize("lat", [67.0, 70.0, 80.0])
+    def test_placidus_polar_raises_error(self, lat):
+        """Placidus should raise Error at polar latitudes (>66.5°).
 
-        assert 0 <= ascmc[0] < 360
-        assert 0 <= ascmc[1] < 360
+        This matches Swiss Ephemeris behavior which raises an error
+        with message 'within polar circle, switched to Porphyry'.
+        """
+        jd = 2451545.0
+
+        # Should raise an Error for polar latitudes
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, ord("P"))
+
+        # Error message should mention polar circle
+        assert "polar circle" in str(exc_info.value).lower()
+
+    @pytest.mark.edge_case
+    @pytest.mark.parametrize("lat", [67.0, 70.0, 80.0])
+    def test_koch_polar_raises_error(self, lat):
+        """Koch should raise Error at polar latitudes (>66.5°).
+
+        This matches Swiss Ephemeris behavior.
+        """
+        jd = 2451545.0
+
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, ord("K"))
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+    @pytest.mark.edge_case
+    @pytest.mark.parametrize("lat", [-67.0, -70.0, -80.0])
+    def test_placidus_polar_southern_raises_error(self, lat):
+        """Placidus should raise Error at Southern polar latitudes."""
+        jd = 2451545.0
+
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, ord("P"))
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+    @pytest.mark.edge_case
+    def test_porphyry_works_at_polar(self):
+        """Porphyry should work at polar latitudes (user fallback)."""
+        jd = 2451545.0
+
+        # Users can catch the Placidus error and use Porphyry instead
+        for lat in [67.0, 70.0, 80.0]:
+            cusps, ascmc = ephem.swe_houses(jd, lat, 0.0, ord("O"))
+            assert 0 <= ascmc[0] < 360
+            assert 0 <= ascmc[1] < 360
 
     @pytest.mark.edge_case
     def test_equal_works_at_poles(self):
@@ -159,6 +199,39 @@ class TestHouseSystemsPolarLatitudes:
         for lat in [89.0, -89.0]:
             cusps, ascmc = ephem.swe_houses(jd, lat, 0.0, ord("E"))
             assert 0 <= ascmc[0] < 360
+
+    @pytest.mark.edge_case
+    def test_houses_armc_polar_raises_error(self):
+        """swe_houses_armc should also raise Error at polar latitudes."""
+        armc = 280.46
+        eps = 23.44
+        lat = 70.0
+
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+    @pytest.mark.edge_case
+    def test_polar_error_matches_swisseph(self):
+        """Error behavior should match Swiss Ephemeris for polar latitudes."""
+        jd = 2451545.0
+        lat = 70.0
+
+        # Both should raise Error
+        with pytest.raises(swe.Error):
+            swe.houses(jd, lat, 0.0, b"P")
+
+        with pytest.raises(ephem.Error):
+            ephem.swe_houses(jd, lat, 0.0, ord("P"))
+
+        # Both should succeed with Porphyry
+        cusps_swe, ascmc_swe = swe.houses(jd, lat, 0.0, b"O")
+        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, 0.0, ord("O"))
+
+        # Values should match
+        assert abs(ascmc_swe[0] - ascmc_lib[0]) < 0.1
+        assert abs(ascmc_swe[1] - ascmc_lib[1]) < 0.1
 
 
 class TestHouseAscMcRelationship:
