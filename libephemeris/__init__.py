@@ -8,6 +8,8 @@ from .planets import (
     swe_get_ayanamsa,
     swe_get_ayanamsa_name,
     swe_set_sid_mode,
+    swe_nod_aps,
+    swe_nod_aps_ut,
 )
 from .houses import swe_houses, swe_houses_ex, swe_house_name
 from .state import (
@@ -36,6 +38,8 @@ deltat = swe_deltat
 calc_ut = swe_calc_ut
 calc = swe_calc
 calc_pctr = swe_calc_pctr
+nod_aps = swe_nod_aps
+nod_aps_ut = swe_nod_aps_ut
 
 # Houses
 houses = swe_houses
@@ -88,6 +92,10 @@ __all__ = [
     "calc",
     "swe_calc_pctr",
     "calc_pctr",
+    "swe_nod_aps",
+    "nod_aps",
+    "swe_nod_aps_ut",
+    "nod_aps_ut",
     # Houses
     "swe_houses",
     "houses",

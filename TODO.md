@@ -4,9 +4,9 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 ## Missing pyswisseph Functions
 
-- [ ] Implementare la funzione `calc_pctr(jd, planet, center, flags)` che calcola la posizione di un pianeta rispetto a un altro corpo come centro (planet-centric), invece che rispetto alla Terra (geocentric) o al Sole (heliocentric). Questa funzione è usata per calcolare ad esempio la posizione della Luna vista da Marte. pyswisseph la espone come `swe.calc_pctr()`. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Implementare la funzione `calc_pctr(jd, planet, center, flags)` che calcola la posizione di un pianeta rispetto a un altro corpo come centro (planet-centric), invece che rispetto alla Terra (geocentric) o al Sole (heliocentric). Questa funzione è usata per calcolare ad esempio la posizione della Luna vista da Marte. pyswisseph la espone come `swe.calc_pctr()`. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Implementare le funzioni `nod_aps(jd, planet, flags, method)` e `nod_aps_ut(jd_ut, planet, flags, method)` che calcolano i nodi (ascending/descending) e le apsidi (perihelion/aphelion) orbitali di qualsiasi pianeta. Il parametro method specifica se usare nodi medi o osculanti. pyswisseph ritorna una tupla con (ascending_node, descending_node, perihelion, aphelion). Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Implementare le funzioni `nod_aps(jd, planet, flags, method)` e `nod_aps_ut(jd_ut, planet, flags, method)` che calcolano i nodi (ascending/descending) e le apsidi (perihelion/aphelion) orbitali di qualsiasi pianeta. Il parametro method specifica se usare nodi medi o osculanti. pyswisseph ritorna una tupla con (ascending_node, descending_node, perihelion, aphelion). Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
 - [ ] Implementare la funzione `get_orbital_elements(jd, planet, flags)` che ritorna gli elementi orbitali kepleriani di un corpo: semiasse maggiore (a), eccentricità (e), inclinazione (i), longitudine del nodo ascendente (Ω), argomento del perielio (ω), anomalia media (M), e altri parametri derivati. pyswisseph ritorna questi come una tupla di 17 elementi. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 

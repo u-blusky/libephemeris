@@ -3,7 +3,7 @@ Swiss Ephemeris API-compatible constants for libephemeris.
 
 This module defines all constants used for planetary calculations, including:
 - Planet/Body IDs: Numeric identifiers for celestial bodies
-- Calculation Flags: Bitwise flags controlling observation parameters  
+- Calculation Flags: Bitwise flags controlling observation parameters
 - Sidereal Modes: Ayanamsha systems for sidereal astrology
 - Calendar Systems: Julian vs Gregorian calendar selection
 - Eclipse Types: Classification of solar and lunar eclipses
@@ -59,9 +59,7 @@ SE_VARUNA: int = SE_AST_OFFSET + 20000  # TNO Varuna
 SE_FICT_OFFSET: int = 40  # Offset for fictitious bodies
 SE_NFICT_ELEM: int = 15  # Number of fictitious elements
 SE_COMET_OFFSET: int = 1000  # Offset for comet IDs
-SE_NALL_NAT_POINTS: int = (
-    SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
-)
+SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
 # Trans-Neptunian Objects (TNOs) - Catalog number + offset
 SE_ERIS: int = 136199 + SE_AST_OFFSET  # Largest known dwarf planet
@@ -184,7 +182,7 @@ SE_SIDM_TRUE_MULA: int = 35  # True position of Mula (λ Scorpii)
 SE_SIDM_TRUE_SHEORAN: int = 39  # True Sheoran
 
 # Historical epochs
-SE_SIDM_HIPPARCHOS: int = 15  # Hipparchos (128 BC)  
+SE_SIDM_HIPPARCHOS: int = 15  # Hipparchos (128 BC)
 SE_SIDM_SASSANIAN: int = 16  # Sassanian
 SE_SIDM_J2000: int = 18  # J2000.0 (no ayanamsha)
 SE_SIDM_J1900: int = 19  # J1900.0
@@ -294,7 +292,9 @@ SE_ECL_NONCENTRAL: int = 2  # Non-central eclipse
 SE_ECL_TOTAL: int = 4  # Total eclipse (Sun/Earth completely covered)
 SE_ECL_ANNULAR: int = 8  # Annular eclipse (ring of fire)
 SE_ECL_PARTIAL: int = 16  # Partial eclipse
-SE_ECL_ANNULAR_TOTAL: int = 32  # Hybrid eclipse (annular at some locations, total at others)
+SE_ECL_ANNULAR_TOTAL: int = (
+    32  # Hybrid eclipse (annular at some locations, total at others)
+)
 SE_ECL_PENUMBRAL: int = 64  # Penumbral lunar eclipse
 
 # Composite eclipse type masks
@@ -316,3 +316,19 @@ SE_ECL_2ND_VISIBLE: int = 1024  # Second contact visible
 SE_ECL_3RD_VISIBLE: int = 2048  # Third contact visible
 SE_ECL_4TH_VISIBLE: int = 4096  # Fourth contact visible
 SE_ECL_ONE_TRY: int = 32768  # Try only once (optimization flag)
+
+# =============================================================================
+# NODAL/APSIDAL CALCULATION METHOD FLAGS
+# =============================================================================
+# Method flags for nod_aps() and nod_aps_ut() functions
+
+SE_NODBIT_MEAN: int = 1  # Mean orbital elements (averaged over perturbations)
+SE_NODBIT_OSCU: int = 2  # Osculating elements (instantaneous/perturbed)
+SE_NODBIT_OSCU_BAR: int = 4  # Barycentric osculating elements
+SE_NODBIT_FOPOINT: int = 256  # Focal point (second focus of ellipse)
+
+# pyswisseph-compatible aliases (without SE_ prefix)
+NODBIT_MEAN: int = SE_NODBIT_MEAN
+NODBIT_OSCU: int = SE_NODBIT_OSCU
+NODBIT_OSCU_BAR: int = SE_NODBIT_OSCU_BAR
+NODBIT_FOPOINT: int = SE_NODBIT_FOPOINT

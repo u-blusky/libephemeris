@@ -40,7 +40,7 @@ References:
 """
 
 import math
-from typing import Tuple, Optional
+from typing import Tuple
 from skyfield.api import Star
 from skyfield.framelib import ecliptic_frame
 from skyfield.nutationlib import iau2000b_radians
@@ -1602,3 +1602,470 @@ def swe_get_ayanamsa(tjd_et: float) -> float:
     t_tt = ts.tt_jd(tjd_et)
     tjd_ut = t_tt.ut1  # Proper TT to UT1 conversion using Delta T
     return swe_get_ayanamsa_ut(tjd_ut)
+
+
+# Position tuple type for nod_aps results
+PosTuple = Tuple[float, float, float, float, float, float]
+
+
+def swe_nod_aps_ut(
+    tjd_ut: float,
+    ipl: int,
+    iflag: int,
+    method: int,
+) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
+    """
+    Calculate planetary nodes and apsides for Universal Time.
+
+    Swiss Ephemeris compatible function.
+
+    This function computes the orbital nodes (ascending/descending) and apsides
+    (perihelion/aphelion) for any planet. The nodes are the points where the
+    planet's orbital plane intersects the ecliptic plane. The apsides are the
+    points of closest (perihelion) and farthest (aphelion) approach to the Sun.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        iflag: Calculation flags (SEFLG_SPEED, etc.)
+        method: Method for node/apse calculation:
+            - SE_NODBIT_MEAN (1): Mean orbital elements (averaged)
+            - SE_NODBIT_OSCU (2): Osculating elements (instantaneous)
+            - SE_NODBIT_OSCU_BAR (4): Barycentric osculating elements
+            - SE_NODBIT_FOPOINT (256): Include focal point
+
+    Returns:
+        Tuple of 4 position tuples, each containing 6 floats:
+            - xnasc: Ascending node (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+            - xndsc: Descending node (same format)
+            - xperi: Perihelion (same format)
+            - xaphe: Aphelion (same format)
+
+    Example:
+        >>> from libephemeris import swe_nod_aps_ut, SE_MARS, SE_NODBIT_MEAN
+        >>> nasc, ndsc, peri, aphe = swe_nod_aps_ut(2451545.0, SE_MARS, 0, SE_NODBIT_MEAN)
+        >>> print(f"Mars ascending node: {nasc[0]:.4f}°")
+        >>> print(f"Mars perihelion: {peri[0]:.4f}°")
+
+    Note:
+        This function uses mean orbital elements for reliable results.
+        For planets, the mean elements provide smooth, predictable values.
+        Osculating elements can show rapid variations due to perturbations.
+    """
+    ts = get_timescale()
+    t = ts.ut1_jd(tjd_ut)
+    return _calc_nod_aps(t, ipl, iflag, method)
+
+
+def swe_nod_aps(
+    tjd_et: float,
+    ipl: int,
+    method: int,
+    iflag: int = SEFLG_SPEED,
+) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
+    """
+    Calculate planetary nodes and apsides for Ephemeris Time (ET/TT).
+
+    Swiss Ephemeris compatible function. Similar to swe_nod_aps_ut() but takes
+    Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
+
+    Note: pyswisseph uses a different argument order than swe_nod_aps_ut.
+    nod_aps(tjdet, planet, method, flags) vs nod_aps_ut(tjdut, planet, flags, method)
+
+    Args:
+        tjd_et: Julian Day in Terrestrial Time (TT/ET)
+        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        method: Method for node/apse calculation (SE_NODBIT_MEAN, etc.)
+        iflag: Calculation flags (default: SEFLG_SPEED)
+
+    Returns:
+        Same as swe_nod_aps_ut: (xnasc, xndsc, xperi, xaphe)
+
+    Example:
+        >>> from libephemeris import swe_nod_aps, SE_JUPITER, SE_NODBIT_OSCU
+        >>> nasc, ndsc, peri, aphe = swe_nod_aps(2451545.0, SE_JUPITER, SE_NODBIT_OSCU)
+    """
+    ts = get_timescale()
+    t = ts.tt_jd(tjd_et)
+    return _calc_nod_aps(t, ipl, iflag, method)
+
+
+def _calc_nod_aps(
+    t, ipl: int, iflag: int, method: int
+) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
+    """
+    Internal function to calculate orbital nodes and apsides.
+
+    Uses mean orbital elements from JPL/IERS tables (Standish, 1992) to compute
+    the positions of orbital nodes and apsides. The mean elements are given as
+    polynomial expansions in time from J2000.0.
+
+    For SE_NODBIT_MEAN: Uses mean orbital elements (averaged over perturbations)
+    For SE_NODBIT_OSCU: Uses osculating elements from current state vector
+
+    Args:
+        t: Skyfield Time object
+        ipl: Planet ID
+        iflag: Calculation flags
+        method: Node/apse calculation method
+
+    Returns:
+        Tuple of (ascending_node, descending_node, perihelion, aphelion)
+    """
+    # Zero position for unsupported bodies
+    zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    # Get planet name from map
+    if ipl not in _PLANET_MAP:
+        return (zero_pos, zero_pos, zero_pos, zero_pos)
+
+    # Sun and Earth don't have orbital nodes/apsides in heliocentric sense
+    if ipl in [SE_SUN, SE_EARTH]:
+        return (zero_pos, zero_pos, zero_pos, zero_pos)
+
+    # Mean orbital elements at J2000.0 and their rates per Julian century
+    # From "Keplerian Elements for Approximate Positions of the Major Planets"
+    # (Standish, E.M., 1992, JPL/IERS)
+    # Format: {planet_id: (a, e, i, L, varpi, Omega, da, de, di, dL, dvarpi, dOmega)}
+    # where L = mean longitude, varpi = longitude of perihelion, Omega = longitude of ascending node
+    # Rates are per Julian century from J2000.0
+    # Values in AU, degrees, and AU/century, degrees/century
+    MEAN_ELEMENTS = {
+        SE_MERCURY: (
+            0.38709927,
+            0.20563593,
+            7.00497902,
+            252.25032350,
+            77.45779628,
+            48.33076593,
+            0.00000037,
+            0.00001906,
+            -0.00594749,
+            149472.67411175,
+            0.16047689,
+            -0.12534081,
+        ),
+        SE_VENUS: (
+            0.72333566,
+            0.00677672,
+            3.39467605,
+            181.97909950,
+            131.60246718,
+            76.67984255,
+            0.00000390,
+            -0.00004107,
+            -0.00078890,
+            58517.81538729,
+            0.00268329,
+            -0.27769418,
+        ),
+        SE_MARS: (
+            1.52371034,
+            0.09339410,
+            1.84969142,
+            -4.55343205,
+            -23.94362959,
+            49.55953891,
+            0.00001847,
+            0.00007882,
+            -0.00813131,
+            19140.30268499,
+            0.44441088,
+            -0.29257343,
+        ),
+        SE_JUPITER: (
+            5.20288700,
+            0.04838624,
+            1.30439695,
+            34.39644051,
+            14.72847983,
+            100.47390909,
+            -0.00011607,
+            -0.00013253,
+            -0.00183714,
+            3034.74612775,
+            0.21252668,
+            0.20469106,
+        ),
+        SE_SATURN: (
+            9.53667594,
+            0.05386179,
+            2.48599187,
+            49.95424423,
+            92.59887831,
+            113.66242448,
+            -0.00125060,
+            -0.00050991,
+            0.00193609,
+            1222.49362201,
+            -0.41897216,
+            -0.28867794,
+        ),
+        SE_URANUS: (
+            19.18916464,
+            0.04725744,
+            0.77263783,
+            313.23810451,
+            170.95427630,
+            74.01692503,
+            -0.00196176,
+            -0.00004397,
+            -0.00242939,
+            428.48202785,
+            0.40805281,
+            0.04240589,
+        ),
+        SE_NEPTUNE: (
+            30.06992276,
+            0.00859048,
+            1.77004347,
+            -55.12002969,
+            44.96476227,
+            131.78422574,
+            0.00026291,
+            0.00005105,
+            0.00035372,
+            218.45945325,
+            -0.32241464,
+            -0.00508664,
+        ),
+        SE_PLUTO: (
+            39.48211675,
+            0.24882730,
+            17.14001206,
+            238.92903833,
+            224.06891629,
+            110.30393684,
+            -0.00031596,
+            0.00005170,
+            0.00004818,
+            145.20780515,
+            -0.04062942,
+            -0.01183482,
+        ),
+        SE_MOON: (
+            # Moon uses different parameters - orbital elements around Earth
+            # a (in AU), e, i (to ecliptic), L, varpi, Omega
+            # Values for Moon are geocentric, not heliocentric
+            0.00256955529,
+            0.0549,
+            5.145,
+            0.0,
+            0.0,
+            0.0,  # Approximate values
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ),
+    }
+
+    # Check if we have mean elements for this planet
+    if ipl not in MEAN_ELEMENTS:
+        # For unsupported bodies, use osculating elements
+        return _calc_nod_aps_osculating(t, ipl, iflag)
+
+    # Calculate Julian centuries from J2000.0
+    T = (t.tt - 2451545.0) / 36525.0
+
+    # Get mean elements
+    a0, e0, i0, L0, varpi0, Omega0, da, de, di, dL, dvarpi, dOmega = MEAN_ELEMENTS[ipl]
+
+    # Calculate current mean elements
+    a = a0 + da * T  # Semi-major axis
+    e = e0 + de * T  # Eccentricity
+    incl = i0 + di * T  # Inclination (degrees)
+    L = (L0 + dL * T) % 360.0  # Mean longitude (degrees)
+    varpi = (varpi0 + dvarpi * T) % 360.0  # Longitude of perihelion (degrees)
+    Omega = (Omega0 + dOmega * T) % 360.0  # Longitude of ascending node (degrees)
+
+    # Argument of perihelion: omega = varpi - Omega
+    omega = varpi - Omega
+    if omega < 0:
+        omega += 360.0
+
+    # Convert inclination and omega to radians for latitude calculation
+    incl_rad = math.radians(incl)
+    omega_rad = math.radians(omega)
+
+    # Distances at nodes and apsides
+    # Semi-latus rectum: p = a * (1 - e^2)
+    p = a * (1 - e**2)
+
+    # Distance at ascending node (true anomaly = -omega)
+    nu_asc = -omega_rad
+    r_asc = (
+        p / (1 + e * math.cos(nu_asc)) if abs(1 + e * math.cos(nu_asc)) > 1e-10 else a
+    )
+
+    # Distance at descending node (true anomaly = pi - omega)
+    nu_dsc = math.pi - omega_rad
+    r_dsc = (
+        p / (1 + e * math.cos(nu_dsc)) if abs(1 + e * math.cos(nu_dsc)) > 1e-10 else a
+    )
+
+    # Distance at perihelion: r_peri = a * (1 - e)
+    r_peri = a * (1 - e)
+
+    # Distance at aphelion: r_aphe = a * (1 + e)
+    r_aphe = a * (1 + e)
+
+    # Latitude at perihelion (true anomaly = 0, measured from ascending node)
+    # latitude = arcsin(sin(i) * sin(omega))
+    lat_peri = math.degrees(math.asin(math.sin(incl_rad) * math.sin(omega_rad)))
+
+    # Latitude at aphelion (true anomaly = pi)
+    # latitude = arcsin(sin(i) * sin(omega + pi)) = -arcsin(sin(i) * sin(omega))
+    lat_aphe = -lat_peri
+
+    # Normalize angles
+    Omega_deg = Omega % 360.0
+    Omega_dsc_deg = (Omega + 180.0) % 360.0
+    varpi_deg = varpi % 360.0
+    aphe_deg = (varpi + 180.0) % 360.0
+
+    # Create position tuples (lon, lat, dist, dlon, dlat, ddist)
+    # For mean elements, the latitude of nodes is 0 (by definition)
+    xnasc: PosTuple = (Omega_deg, 0.0, r_asc, 0.0, 0.0, 0.0)
+    xndsc: PosTuple = (Omega_dsc_deg, 0.0, r_dsc, 0.0, 0.0, 0.0)
+    xperi: PosTuple = (varpi_deg, lat_peri, r_peri, 0.0, 0.0, 0.0)
+    xaphe: PosTuple = (aphe_deg, lat_aphe, r_aphe, 0.0, 0.0, 0.0)
+
+    return (xnasc, xndsc, xperi, xaphe)
+
+
+def _calc_nod_aps_osculating(
+    t, ipl: int, iflag: int
+) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
+    """
+    Calculate orbital nodes and apsides using osculating (instantaneous) elements.
+
+    Uses the planet's current position and velocity to compute orbital elements.
+    These are the "true" instantaneous orbital parameters that include short-term
+    perturbations from other planets.
+    """
+    planets = get_planets()
+    zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    target_name = _PLANET_MAP.get(ipl)
+    if not target_name:
+        return (zero_pos, zero_pos, zero_pos, zero_pos)
+
+    target = planets[target_name]
+    sun = planets["sun"]
+
+    # Get heliocentric position and velocity
+    sun_pos = sun.at(t)
+    target_pos = target.at(t)
+
+    # Heliocentric vectors in AU and AU/day (ICRS frame)
+    r_icrs = target_pos.position.au - sun_pos.position.au
+    v_icrs = target_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
+
+    # Convert from ICRS (equatorial) to ecliptic coordinates
+    eps = 23.4392911  # Mean obliquity at J2000.0
+    eps_rad = math.radians(eps)
+    cos_eps = math.cos(eps_rad)
+    sin_eps = math.sin(eps_rad)
+
+    # Rotate to ecliptic
+    x_ecl = r_icrs[0]
+    y_ecl = r_icrs[1] * cos_eps + r_icrs[2] * sin_eps
+    z_ecl = -r_icrs[1] * sin_eps + r_icrs[2] * cos_eps
+
+    vx_ecl = v_icrs[0]
+    vy_ecl = v_icrs[1] * cos_eps + v_icrs[2] * sin_eps
+    vz_ecl = -v_icrs[1] * sin_eps + v_icrs[2] * cos_eps
+
+    # GM_sun in AU^3/day^2
+    GM_sun = 0.01720209895**2
+
+    r_mag = math.sqrt(x_ecl**2 + y_ecl**2 + z_ecl**2)
+    v_mag = math.sqrt(vx_ecl**2 + vy_ecl**2 + vz_ecl**2)
+
+    # Angular momentum
+    hx = y_ecl * vz_ecl - z_ecl * vy_ecl
+    hy = z_ecl * vx_ecl - x_ecl * vz_ecl
+    hz = x_ecl * vy_ecl - y_ecl * vx_ecl
+    h_mag = math.sqrt(hx**2 + hy**2 + hz**2)
+
+    # Node vector
+    nx = -hy
+    ny = hx
+    n_mag = math.sqrt(nx**2 + ny**2)
+
+    # Eccentricity vector
+    r_dot_v = x_ecl * vx_ecl + y_ecl * vy_ecl + z_ecl * vz_ecl
+    coef1 = v_mag**2 / GM_sun - 1.0 / r_mag
+    coef2 = r_dot_v / GM_sun
+
+    ex = coef1 * x_ecl - coef2 * vx_ecl
+    ey = coef1 * y_ecl - coef2 * vy_ecl
+    ez = coef1 * z_ecl - coef2 * vz_ecl
+    e_mag = math.sqrt(ex**2 + ey**2 + ez**2)
+
+    # Semi-major axis
+    a = 1.0 / (2.0 / r_mag - v_mag**2 / GM_sun)
+
+    # Inclination
+    incl = math.acos(hz / h_mag) if h_mag > 0 else 0.0
+
+    # Longitude of ascending node
+    if n_mag > 1e-10:
+        Omega = math.atan2(ny, nx)
+        if Omega < 0:
+            Omega += 2 * math.pi
+    else:
+        Omega = 0.0
+
+    # Argument of perihelion
+    if n_mag > 1e-10 and e_mag > 1e-10:
+        n_dot_e = nx * ex + ny * ey
+        cos_omega = n_dot_e / (n_mag * e_mag)
+        cos_omega = max(-1.0, min(1.0, cos_omega))
+        omega = math.acos(cos_omega)
+        if ez < 0:
+            omega = 2 * math.pi - omega
+    else:
+        omega = 0.0
+
+    # Longitude of perihelion
+    varpi = Omega + omega
+
+    # Calculate positions
+    Omega_deg = math.degrees(Omega) % 360.0
+    varpi_deg = math.degrees(varpi) % 360.0
+
+    # Distances
+    if e_mag < 1.0:
+        p = a * (1 - e_mag**2)
+        r_asc = (
+            p / (1 + e_mag * math.cos(-omega))
+            if abs(1 + e_mag * math.cos(-omega)) > 1e-10
+            else a
+        )
+        r_dsc = (
+            p / (1 + e_mag * math.cos(math.pi - omega))
+            if abs(1 + e_mag * math.cos(math.pi - omega)) > 1e-10
+            else a
+        )
+    else:
+        r_asc = r_dsc = a
+
+    r_peri = a * (1 - e_mag)
+    r_aphe = a * (1 + e_mag)
+
+    # Latitudes at apsides
+    lat_peri = (
+        math.degrees(math.asin(math.sin(incl) * math.sin(omega))) if incl > 0 else 0.0
+    )
+    lat_aphe = -lat_peri
+
+    xnasc: PosTuple = (Omega_deg, 0.0, r_asc, 0.0, 0.0, 0.0)
+    xndsc: PosTuple = ((Omega_deg + 180.0) % 360.0, 0.0, r_dsc, 0.0, 0.0, 0.0)
+    xperi: PosTuple = (varpi_deg, lat_peri, r_peri, 0.0, 0.0, 0.0)
+    xaphe: PosTuple = ((varpi_deg + 180.0) % 360.0, lat_aphe, r_aphe, 0.0, 0.0, 0.0)
+
+    return (xnasc, xndsc, xperi, xaphe)
