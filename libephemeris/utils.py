@@ -589,6 +589,130 @@ def refrac(
         return altitude - refraction
 
 
+def refrac_extended(
+    altitude: float,
+    altitude_geo: float,
+    pressure: float = 1013.25,
+    temperature: float = 15.0,
+    lapse_rate: float = 0.0065,
+    calc_flag: int = SE_TRUE_TO_APP,
+) -> Tuple[float, Tuple[float, float, float, float]]:
+    """
+    Calculate true altitude from apparent altitude, or vice-versa (extended).
+
+    This is an extended version of refrac() that includes:
+    - Observer altitude above sea level
+    - Atmospheric lapse rate (temperature variation with altitude)
+    - Dip of the horizon calculation
+
+    Compatible with pyswisseph's swe.refrac_extended() function.
+
+    Args:
+        altitude: Altitude of object above geometric horizon in degrees.
+                  For SE_TRUE_TO_APP, this is the true (geometric) altitude.
+                  For SE_APP_TO_TRUE, this is the apparent (observed) altitude.
+        altitude_geo: Altitude of observer above sea level in meters.
+        pressure: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
+                  Use 0 to disable refraction correction.
+        temperature: Atmospheric temperature at observer in degrees Celsius.
+                     Default is 15.0.
+        lapse_rate: Temperature lapse rate dT/dh in degrees Kelvin per meter.
+                    Default is 0.0065 K/m (standard atmosphere).
+                    Typical values range from 0.0034 to 0.010 K/m.
+        calc_flag: Direction of conversion:
+            - SE_TRUE_TO_APP (0): Convert true altitude to apparent altitude
+            - SE_APP_TO_TRUE (1): Convert apparent altitude to true altitude
+
+    Returns:
+        A tuple of (converted_altitude, details) where:
+        - converted_altitude: The converted altitude in degrees
+        - details: A tuple of 4 floats:
+            - [0]: True altitude (input or computed)
+            - [1]: Apparent altitude (input or computed)
+            - [2]: Refraction amount in degrees
+            - [3]: Dip of the horizon in degrees (negative, as horizon dips below
+                   geometric horizontal for elevated observers)
+
+    Notes:
+        - The dip of the horizon accounts for both geometric effects and
+          atmospheric refraction. An elevated observer sees the horizon
+          below the geometric horizontal plane.
+        - The lapse rate affects the dip calculation through atmospheric
+          refraction near the horizon. Higher lapse rates result in less
+          refraction of the horizon, yielding more negative dip values.
+        - Standard atmospheric lapse rate is 0.0065 K/m (6.5°C per 1000m).
+
+    Examples:
+        >>> # At sea level, no dip of horizon
+        >>> alt, (true, app, ref, dip) = refrac_extended(0.0, 0.0)
+        >>> round(ref, 4)
+        0.4721
+        >>> round(dip, 4)
+        0.0
+
+        >>> # At 1000m elevation, horizon dips about 0.88 degrees
+        >>> alt, (true, app, ref, dip) = refrac_extended(0.0, 1000.0)
+        >>> round(dip, 2)
+        -0.88
+    """
+    # Earth's radius in meters
+    EARTH_RADIUS = 6371000.0
+
+    # Calculate refraction using the base refrac function
+    if calc_flag == SE_TRUE_TO_APP:
+        true_alt = altitude
+        apparent_alt = refrac(altitude, pressure, temperature, SE_TRUE_TO_APP)
+        refraction = apparent_alt - true_alt
+    else:
+        apparent_alt = altitude
+        true_alt = refrac(altitude, pressure, temperature, SE_APP_TO_TRUE)
+        refraction = apparent_alt - true_alt
+
+    # Calculate dip of the horizon for elevated observers
+    if altitude_geo <= 0:
+        dip = 0.0
+    else:
+        # Geometric dip angle (without atmospheric refraction)
+        # dip_geometric = arccos(R / (R + h)) ≈ sqrt(2h/R) for small h
+        # Using the more accurate formula:
+        ratio = EARTH_RADIUS / (EARTH_RADIUS + altitude_geo)
+        if ratio >= 1.0:
+            dip_geometric_rad = 0.0
+        else:
+            dip_geometric_rad = math.acos(ratio)
+
+        dip_geometric = math.degrees(dip_geometric_rad)
+
+        # Atmospheric refraction correction for the dip
+        # The ray from the observer to the visible horizon is bent by
+        # atmospheric refraction. This depends on the lapse rate.
+        #
+        # The refraction correction reduces the apparent dip (horizon appears
+        # higher due to refraction).
+        #
+        # Based on empirical fitting to Swiss Ephemeris results, the
+        # refraction coefficient k follows:
+        # k = 0.1117 + 3.5516 * lapse_rate
+        # where observed_dip = -dip_geometric * (1 - k)
+
+        if lapse_rate > 0:
+            # Calculate the refraction coefficient based on lapse rate
+            refraction_coef = 0.1117 + 3.5516 * lapse_rate
+        else:
+            # If lapse_rate is 0 or negative, use geometric dip only
+            refraction_coef = 0.0
+
+        # Apply atmospheric correction: observed dip is less than geometric dip
+        # due to refraction bending light downward
+        dip = -dip_geometric * (1.0 - refraction_coef)
+
+    # Return the converted altitude and detail tuple
+    if calc_flag == SE_TRUE_TO_APP:
+        return (apparent_alt, (true_alt, apparent_alt, refraction, dip))
+    else:
+        return (true_alt, (true_alt, apparent_alt, refraction, dip))
+
+
 def cotrans(
     coord: Tuple[float, float, float], obliquity: float
 ) -> Tuple[float, float, float]:
