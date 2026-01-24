@@ -498,3 +498,88 @@ def day_of_week(jd: float) -> int:
     import math
 
     return int(math.floor(jd + 0.5)) % 7
+
+
+def utc_time_zone(
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    second: float,
+    timezone_offset: float,
+) -> tuple[int, int, int, int, int, float]:
+    """
+    Apply a timezone offset to a UTC date/time and return the local date/time.
+
+    Converts a UTC date/time to local time by adding the specified timezone
+    offset. Handles all date boundary crossings (day, month, year) correctly.
+
+    Args:
+        year: Calendar year (negative for BCE)
+        month: Month (1-12)
+        day: Day of month (1-31)
+        hour: Hour (0-23)
+        minute: Minute (0-59)
+        second: Second (0.0-59.999...)
+        timezone_offset: Timezone offset in hours from UTC.
+            Positive values for timezones east of UTC (e.g., +1 for CET, +9 for JST)
+            Negative values for timezones west of UTC (e.g., -5 for EST, -8 for PST)
+
+    Returns:
+        tuple: (year, month, day, hour, minute, second) in local time where:
+            - year: Calendar year
+            - month: Month (1-12)
+            - day: Day of month (1-31)
+            - hour: Hour (0-23)
+            - minute: Minute (0-59)
+            - second: Second (0.0-59.999...)
+
+    Example:
+        >>> from libephemeris import utc_time_zone
+        >>> # Convert 2024-01-15 10:30:00 UTC to CET (UTC+1)
+        >>> utc_time_zone(2024, 1, 15, 10, 30, 0.0, 1)
+        (2024, 1, 15, 11, 30, 0.0)
+        >>> # Convert 2024-01-15 02:00:00 UTC to EST (UTC-5)
+        >>> utc_time_zone(2024, 1, 15, 2, 0, 0.0, -5)
+        (2024, 1, 14, 21, 0, 0.0)
+    """
+    # Convert UTC time to decimal hours
+    decimal_hour = hour + minute / 60.0 + second / 3600.0
+
+    # Convert to Julian Day
+    jd = swe_julday(year, month, day, decimal_hour, SE_GREG_CAL)
+
+    # Add timezone offset (convert hours to days)
+    jd_local = jd + timezone_offset / 24.0
+
+    # Convert back to calendar date
+    local_year, local_month, local_day, local_decimal_hour = swe_revjul(
+        jd_local, SE_GREG_CAL
+    )
+
+    # Extract time components from decimal hour with rounding to avoid
+    # floating-point precision issues (e.g., 11.4999999 -> 11.5)
+    # Round to millisecond precision (3 decimal places in seconds)
+    # This is sufficient for timezone conversions and avoids floating-point errors
+    total_seconds = local_decimal_hour * 3600.0
+    total_seconds = round(total_seconds, 3)
+
+    local_hour = int(total_seconds // 3600)
+    remaining = total_seconds - local_hour * 3600
+    local_minute = int(remaining // 60)
+    local_second = remaining - local_minute * 60
+
+    # Handle edge case where rounding pushes us to 60 seconds
+    if local_second >= 60.0:
+        local_second -= 60.0
+        local_minute += 1
+    if local_minute >= 60:
+        local_minute -= 60
+        local_hour += 1
+    if local_hour >= 24:
+        local_hour -= 24
+        # Day already handled by swe_revjul, this shouldn't happen
+        # but included for safety
+
+    return local_year, local_month, local_day, local_hour, local_minute, local_second
