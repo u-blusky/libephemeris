@@ -100,6 +100,51 @@ _PLANET_MAP = {
     SE_EARTH: "earth",
 }
 
+# Planet ID to human-readable name mapping for error messages and debugging
+_PLANET_NAMES = {
+    SE_SUN: "Sun",
+    SE_MOON: "Moon",
+    SE_MERCURY: "Mercury",
+    SE_VENUS: "Venus",
+    SE_MARS: "Mars",
+    SE_JUPITER: "Jupiter",
+    SE_SATURN: "Saturn",
+    SE_URANUS: "Uranus",
+    SE_NEPTUNE: "Neptune",
+    SE_PLUTO: "Pluto",
+    SE_MEAN_NODE: "Mean Node",
+    SE_TRUE_NODE: "True Node",
+    SE_MEAN_APOG: "Mean Apogee",
+    SE_OSCU_APOG: "Osculating Apogee",
+    SE_EARTH: "Earth",
+}
+
+
+def get_planet_name(planet_id: int) -> str:
+    """
+    Get the human-readable name of a planet given its ID.
+
+    Useful for error messages and debugging output.
+
+    Args:
+        planet_id: Planet/body ID (SE_SUN, SE_MOON, etc.)
+
+    Returns:
+        Human-readable planet name as a string.
+        Returns "Unknown (ID)" for unrecognized planet IDs.
+
+    Example:
+        >>> get_planet_name(0)
+        'Sun'
+        >>> get_planet_name(1)
+        'Moon'
+        >>> get_planet_name(4)
+        'Mars'
+    """
+    if planet_id in _PLANET_NAMES:
+        return _PLANET_NAMES[planet_id]
+    return f"Unknown ({planet_id})"
+
 
 def swe_calc_ut(
     tjd_ut: float, ipl: int, iflag: int
@@ -2789,7 +2834,6 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
     Returns:
         Tuple of (attr_tuple, return_flag)
     """
-    from skyfield.positionlib import ICRF
 
     planets = get_planets()
 

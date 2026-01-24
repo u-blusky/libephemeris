@@ -33,6 +33,7 @@ from .planets import (
     swe_orbit_max_min_true_distance,
     swe_pheno,
     swe_pheno_ut,
+    get_planet_name,
 )
 from .houses import (
     swe_houses,
@@ -447,6 +448,7 @@ __all__ = [
     "SPLIT_DEG_KEEP_DEG",
     # Helpers
     "calc_all_arabic_parts",
+    "get_planet_name",
     # Fixed Stars
     "swe_fixstar_ut",
     "fixstar_ut",
