@@ -51,6 +51,8 @@ from .state import (
     set_ephe_path as swe_set_ephe_path,
     set_ephemeris_file as swe_set_ephemeris_file,
     set_jpl_file as swe_set_jpl_file,
+    set_tid_acc as swe_set_tid_acc,
+    get_tid_acc as swe_get_tid_acc,
 )
 from .crossing import (
     swe_solcross_ut,
@@ -192,6 +194,10 @@ set_ephe_path = swe_set_ephe_path
 set_ephemeris_file = swe_set_ephemeris_file
 set_jpl_file = swe_set_jpl_file
 
+# Tidal acceleration for Delta T
+set_tid_acc = swe_set_tid_acc
+get_tid_acc = swe_get_tid_acc
+
 # Fixed Stars
 fixstar_ut = swe_fixstar_ut
 fixstar = swe_fixstar
@@ -305,6 +311,11 @@ __all__ = [
     "set_ephemeris_file",
     "swe_set_jpl_file",
     "set_jpl_file",
+    # Tidal acceleration
+    "swe_set_tid_acc",
+    "set_tid_acc",
+    "swe_get_tid_acc",
+    "get_tid_acc",
     # Crossings
     "swe_solcross_ut",
     "solcross_ut",

@@ -33,6 +33,7 @@ _SIDEREAL_MODE: Optional[int] = None  # Active sidereal mode ID
 _SIDEREAL_AYAN_T0: float = 0.0  # Ayanamsha value at reference epoch
 _SIDEREAL_T0: float = 0.0  # Reference epoch (JD) for ayanamsha
 _ANGLES_CACHE: dict[str, float] = {}  # Pre-calculated angles {name: longitude}
+_TIDAL_ACCELERATION: Optional[float] = None  # Tidal acceleration for Delta T
 
 
 def get_loader() -> Loader:
@@ -283,3 +284,71 @@ def set_jpl_file(filename: str) -> None:
         >>> set_jpl_file("de441.bsp")  # Use local de441.bsp file
     """
     set_ephemeris_file(filename)
+
+
+def set_tid_acc(value: float) -> None:
+    """
+    Set the tidal acceleration used in Delta T calculations.
+
+    The tidal acceleration of the Moon affects the long-term extrapolation
+    of Delta T (TT - UT1), which is important for historical astronomical
+    calculations. Different JPL ephemeris files assume different values.
+
+    Args:
+        value: Tidal acceleration in arcsec/century^2.
+               Use SE_TIDAL_* constants for standard ephemeris values,
+               or SE_TIDAL_AUTOMATIC (0.0) to use the default.
+
+    Note:
+        - The default value is based on DE431 (-25.80 arcsec/cy^2)
+        - This setting primarily affects Delta T calculations for dates
+          far from the present (historical studies, ancient astronomy)
+        - For modern dates (1900-2100), the effect is negligible
+        - Common values:
+          - DE421: -25.85 arcsec/cy^2
+          - DE431: -25.80 arcsec/cy^2 (default)
+          - DE441: -25.936 arcsec/cy^2
+
+    Example:
+        >>> from libephemeris import set_tid_acc, get_tid_acc
+        >>> from libephemeris import SE_TIDAL_DE421, SE_TIDAL_DE431
+        >>> set_tid_acc(SE_TIDAL_DE421)  # Use DE421 tidal acceleration
+        >>> get_tid_acc()
+        -25.85
+        >>> set_tid_acc(SE_TIDAL_DE431)  # Use DE431 tidal acceleration
+        >>> get_tid_acc()
+        -25.8
+    """
+    global _TIDAL_ACCELERATION
+    _TIDAL_ACCELERATION = value if value != 0.0 else None
+
+
+def get_tid_acc() -> float:
+    """
+    Get the current tidal acceleration used in Delta T calculations.
+
+    Returns:
+        float: The tidal acceleration in arcsec/century^2.
+               Returns SE_TIDAL_DEFAULT (-25.80, based on DE431) if not explicitly set.
+
+    Note:
+        The tidal acceleration affects how Delta T is extrapolated for dates
+        outside the range of direct observations. This is particularly
+        important for historical astronomical calculations.
+
+        If set_tid_acc() was called with SE_TIDAL_AUTOMATIC (0.0),
+        this returns the default value (DE431-based).
+
+    Example:
+        >>> from libephemeris import get_tid_acc, set_tid_acc, SE_TIDAL_DE441
+        >>> get_tid_acc()  # Default value
+        -25.8
+        >>> set_tid_acc(SE_TIDAL_DE441)
+        >>> get_tid_acc()
+        -25.936
+    """
+    from .constants import SE_TIDAL_DEFAULT
+
+    if _TIDAL_ACCELERATION is None:
+        return SE_TIDAL_DEFAULT
+    return _TIDAL_ACCELERATION

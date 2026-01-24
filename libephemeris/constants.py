@@ -411,3 +411,50 @@ HELFLAG_BELOW_HORIZON: int = SE_HELFLAG_BELOW_HORIZON
 HELFLAG_PHOTOPIC: int = SE_HELFLAG_PHOTOPIC
 HELFLAG_SCOTOPIC: int = SE_HELFLAG_SCOTOPIC
 HELFLAG_MIXED: int = SE_HELFLAG_MIXED
+
+# =============================================================================
+# SPLIT_DEG FLAGS
+# =============================================================================
+# Flags for split_deg() function to control output format and rounding
+
+SPLIT_DEG_ROUND_SEC: int = 1  # Round to seconds
+SPLIT_DEG_ROUND_MIN: int = 2  # Round to minutes
+SPLIT_DEG_ROUND_DEG: int = 4  # Round to degrees
+SPLIT_DEG_ZODIACAL: int = 8  # Return zodiac sign number (0-11)
+SPLIT_DEG_NAKSHATRA: int = 1024  # Return nakshatra number (0-26)
+SPLIT_DEG_KEEP_SIGN: int = 16  # Don't round to next zodiac sign/nakshatra
+SPLIT_DEG_KEEP_DEG: int = 32  # Don't round to next degree
+
+# =============================================================================
+# TIDAL ACCELERATION CONSTANTS
+# =============================================================================
+# Tidal acceleration of the Moon in arcsec/century^2, for Delta T calculations.
+# Different JPL ephemeris files use different tidal acceleration values.
+# These affect the polynomial extrapolation of Delta T for historical dates.
+
+SE_TIDAL_DE200: float = -23.8946  # DE200 (older ephemeris)
+SE_TIDAL_DE403: float = -25.580  # DE403
+SE_TIDAL_DE404: float = -25.580  # DE404
+SE_TIDAL_DE405: float = -25.826  # DE405
+SE_TIDAL_DE406: float = -25.826  # DE406
+SE_TIDAL_DE421: float = -25.85  # DE421 (default in libephemeris)
+SE_TIDAL_DE422: float = -25.85  # DE422
+SE_TIDAL_DE430: float = -25.82  # DE430
+SE_TIDAL_DE431: float = -25.80  # DE431
+SE_TIDAL_DE441: float = -25.936  # DE441 (latest)
+SE_TIDAL_DEFAULT: float = SE_TIDAL_DE431  # Default value based on DE431
+SE_TIDAL_AUTOMATIC: float = 0.0  # Let library choose based on ephemeris file
+
+# pyswisseph-compatible aliases (without SE_ prefix)
+TIDAL_DE200: float = SE_TIDAL_DE200
+TIDAL_DE403: float = SE_TIDAL_DE403
+TIDAL_DE404: float = SE_TIDAL_DE404
+TIDAL_DE405: float = SE_TIDAL_DE405
+TIDAL_DE406: float = SE_TIDAL_DE406
+TIDAL_DE421: float = SE_TIDAL_DE421
+TIDAL_DE422: float = SE_TIDAL_DE422
+TIDAL_DE430: float = SE_TIDAL_DE430
+TIDAL_DE431: float = SE_TIDAL_DE431
+TIDAL_DE441: float = SE_TIDAL_DE441
+TIDAL_DEFAULT: float = SE_TIDAL_DEFAULT
+TIDAL_AUTOMATIC: float = SE_TIDAL_AUTOMATIC
