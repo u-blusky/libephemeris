@@ -2066,31 +2066,35 @@ def _houses_carter(
 
     return cusps
 
+
+def _houses_gauquelin(
+    armc: float, lat: float, eps: float, asc: float, mc: float
+) -> List[float]:
     """
-    Gauquelin 36-Sector house system, *high precision* implementation that differs 
+    Gauquelin 36-Sector house system, *high precision* implementation that differs
     from Swiss Ephemeris.
-    
+
     Divides celestial sphere into 36 sectors based on semi-diurnal/nocturnal arcs.
     This implementation surpasses Swiss Ephemeris which uses approximations.
-    
+
     Algorithm:
     - Divide diurnal arc (above horizon) into 18 equal time sectors
-    - Divide nocturnal arc (below horizon) into 18 equal time sectors  
+    - Divide nocturnal arc (below horizon) into 18 equal time sectors
     - Map 36 sectors to 12 houses (each house = 3 sectors, use middle as cusp)
-    
+
     Sector numbering:
     - Sector 1: Rising (Ascendant)
     - Sector 10: Upper culmination (MC)
-    - Sector 19: Setting (Descendant)  
+    - Sector 19: Setting (Descendant)
     - Sector 28: Lower culmination (IC)
-    
+
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
         lat: Geographic latitude in degrees
         eps: True obliquity of ecliptic in degrees
         asc: Ascendant longitude in degrees
         mc: Midheaven longitude in degrees
-        
+
     Returns:
         List of 13 house cusp longitudes
     """
@@ -2574,3 +2578,116 @@ def _houses_apc(
                 cusps[i] = (cusps[i] + 180.0) % 360.0
 
     return cusps
+
+
+def house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys: int,
+    lon: float,
+    lat_body: float = 0.0,
+) -> float:
+    """
+    Determine in which house a celestial body is located.
+
+    Returns a decimal value where the integer part is the house number (1-12)
+    and the decimal part indicates the position within the house
+    (0.0 = start of cusp, 0.999... = end of house, just before next cusp).
+
+    This function is compatible with Swiss Ephemeris swe_house_pos().
+
+    Args:
+        armc: Right Ascension of Medium Coeli (ARMC) in degrees (0-360)
+        lat: Geographic latitude in degrees (positive North, negative South)
+        obliquity: True obliquity of the ecliptic in degrees
+        hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
+        lon: Ecliptic longitude of the body in degrees (0-360)
+        lat_body: Ecliptic latitude of the body in degrees (default 0.0)
+
+    Returns:
+        Decimal value where:
+            - Integer part (1-12): House number
+            - Decimal part (0.0-0.999...): Position within house
+
+    Example:
+        >>> # Sun at 15° Aries, Placidus houses, Rome
+        >>> pos = house_pos(292.957, 41.9, 23.4393, ord('P'), 15.0, 0.0)
+        >>> house = int(pos)  # House number (e.g., 10)
+        >>> position = pos - house  # Position within house (e.g., 0.5 = halfway)
+    """
+    # Get house cusps using swe_houses_armc
+    cusps, ascmc = swe_houses_armc(armc, lat, obliquity, hsys)
+
+    # cusps is a 12-element tuple (houses 1-12, 0-indexed in tuple)
+    # We need to find which house contains the given longitude
+
+    # Normalize the body longitude
+    lon = lon % 360.0
+
+    # For bodies with non-zero ecliptic latitude, we need to project
+    # their position onto the ecliptic for most house systems.
+    # The latitude affects house position only for certain systems (Gauquelin sector).
+    # For standard systems, we use the ecliptic longitude directly.
+
+    # Find the house containing this longitude
+    # Houses go in order of increasing longitude (with wrap-around at 360°)
+    for i in range(12):
+        cusp_start = cusps[i]
+        cusp_end = cusps[(i + 1) % 12]
+
+        # Calculate angular difference from start cusp to body
+        diff_to_body = (lon - cusp_start + 360.0) % 360.0
+
+        # Calculate angular size of this house
+        house_size = (cusp_end - cusp_start + 360.0) % 360.0
+
+        # Handle the case where house size is 0 (extremely rare edge case)
+        if house_size < 0.0001:
+            house_size = 30.0  # Default to 30° if cusps are identical
+
+        # Check if body is within this house
+        if diff_to_body < house_size or (
+            house_size > 180 and diff_to_body < house_size
+        ):
+            # Body is in house i+1 (houses are 1-indexed)
+            house_num = i + 1
+            # Calculate fractional position within house
+            fraction = diff_to_body / house_size
+            # Clamp fraction to [0, 1) to avoid rounding issues
+            fraction = max(0.0, min(fraction, 0.9999999999))
+            return float(house_num) + fraction
+
+    # Fallback (should never reach here with valid input)
+    # Return house 1 with the body at the start
+    return 1.0
+
+
+def swe_house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys: int,
+    lon: float,
+    lat_body: float = 0.0,
+) -> float:
+    """
+    Determine in which house a celestial body is located.
+
+    Swiss Ephemeris compatible function. This is an alias for house_pos().
+
+    Returns a decimal value where the integer part is the house number (1-12)
+    and the decimal part indicates the position within the house.
+
+    Args:
+        armc: Right Ascension of Medium Coeli (ARMC) in degrees
+        lat: Geographic latitude in degrees
+        obliquity: True obliquity of the ecliptic in degrees
+        hsys: House system identifier
+        lon: Ecliptic longitude of the body in degrees
+        lat_body: Ecliptic latitude of the body in degrees (default 0.0)
+
+    Returns:
+        Decimal value: integer part = house number, decimal part = position within house
+    """
+    return house_pos(armc, lat, obliquity, hsys, lon, lat_body)

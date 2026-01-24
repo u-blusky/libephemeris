@@ -37,6 +37,8 @@ from .houses import (
     swe_houses_ex,
     swe_houses_ex2,
     swe_house_name,
+    swe_house_pos,
+    house_pos,
 )
 from .state import (
     set_topo as swe_set_topo,
@@ -79,6 +81,7 @@ houses_armc_ex2 = swe_houses_armc_ex2
 houses_ex = swe_houses_ex
 houses_ex2 = swe_houses_ex2
 house_name = swe_house_name
+# house_pos is already the main function name (matching pyswisseph)
 
 # Ayanamsa (sidereal)
 get_ayanamsa_ut = swe_get_ayanamsa_ut
@@ -162,6 +165,8 @@ __all__ = [
     "houses_ex2",
     "swe_house_name",
     "house_name",
+    "swe_house_pos",
+    "house_pos",
     # Ayanamsa (sidereal)
     "swe_set_sid_mode",
     "set_sid_mode",
