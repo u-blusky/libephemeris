@@ -104,7 +104,7 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 - [x] Implementare la funzione `heliacal_ut(jd_start, lat, lon, altitude, pressure, temperature, humidity, body, event_type, flags)` che calcola quando un corpo celeste ha la sua levata o tramonto eliacale (prima/ultima visibilità all'alba/tramonto). Questo era fondamentale per i calendari antichi. Ritorna il Julian Day dell'evento. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Implementare la funzione `heliacal_pheno_ut(jd, lat, lon, altitude, pressure, temperature, humidity, body, flags)` che calcola le circostanze dettagliate di un evento eliacale: altezza del corpo, altezza del Sole, azimut, magnitudine limite, visibilità. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Implementare la funzione `heliacal_pheno_ut(jd, lat, lon, altitude, pressure, temperature, humidity, body, flags)` che calcola le circostanze dettagliate di un evento eliacale: altezza del corpo, altezza del Sole, azimut, magnitudine limite, visibilità. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
 - [ ] Implementare la funzione `vis_limit_mag(jd, lat, lon, altitude, pressure, temperature, humidity, body, flags)` che calcola la magnitudine limite per la visibilità di un corpo celeste date le condizioni atmosferiche. Utile per determinare se una stella o pianeta debole sarà visibile.
 

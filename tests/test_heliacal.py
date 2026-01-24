@@ -16,6 +16,8 @@ from libephemeris import (
     revjul,
     heliacal_ut,
     swe_heliacal_ut,
+    heliacal_pheno_ut,
+    swe_heliacal_pheno_ut,
     SE_MERCURY,
     SE_VENUS,
     SE_MARS,
@@ -315,3 +317,378 @@ class TestHeliacalDateValidation:
             # Month and day should be valid
             assert 1 <= month <= 12
             assert 1 <= day <= 31
+
+
+# =============================================================================
+# HELIACAL_PHENO_UT TESTS
+# =============================================================================
+
+
+class TestHeliacalPhenoBasic:
+    """Basic tests for heliacal_pheno_ut function."""
+
+    def test_venus_pheno_returns_valid_result(self):
+        """Test that Venus heliacal phenomena returns a valid result tuple."""
+        jd = julday(2024, 1, 1, 12)  # Noon
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        # Should return a tuple of 50 floats
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+        assert all(isinstance(x, float) for x in dret)
+        assert retflag > 0
+
+    def test_mercury_pheno_returns_valid_result(self):
+        """Test that Mercury heliacal phenomena returns a valid result."""
+        jd = julday(2024, 3, 15, 5)  # Morning
+        lat, lon = 51.5074, -0.1278  # London
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_MERCURY, event_type=SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+        assert retflag > 0
+
+    def test_jupiter_pheno_returns_valid_result(self):
+        """Test that Jupiter heliacal phenomena returns a valid result."""
+        jd = julday(2024, 6, 1, 4)  # Early morning
+        lat, lon = 40.7128, -74.0060  # New York
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_mars_pheno_evening(self):
+        """Test Mars heliacal phenomena for evening setting."""
+        jd = julday(2024, 7, 20, 20)  # Evening
+        lat, lon = 35.6762, 139.6503  # Tokyo
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_SETTING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+
+class TestHeliacalPhenoValues:
+    """Test that heliacal_pheno_ut returns sensible values."""
+
+    def test_altitude_values_are_reasonable(self):
+        """Test that altitude values are within valid range."""
+        jd = julday(2024, 1, 15, 6)  # Dawn
+        lat, lon = 41.9028, 12.4964  # Rome
+
+        dret, _ = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        # Altitudes should be in -90 to +90 range
+        alt_o = dret[0]  # Object topocentric altitude
+        app_alt_o = dret[1]  # Object apparent altitude
+        geo_alt_o = dret[2]  # Object geocentric altitude
+        alt_s = dret[4]  # Sun altitude
+
+        assert -90 <= alt_o <= 90
+        assert -90 <= app_alt_o <= 90
+        assert -90 <= geo_alt_o <= 90
+        assert -90 <= alt_s <= 90
+
+    def test_azimuth_values_are_reasonable(self):
+        """Test that azimuth values are within valid range."""
+        jd = julday(2024, 1, 15, 6)
+        lat, lon = 41.9028, 12.4964
+
+        dret, _ = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        azi_o = dret[3]  # Object azimuth
+        azi_s = dret[5]  # Sun azimuth
+
+        assert 0 <= azi_o <= 360
+        assert 0 <= azi_s <= 360
+
+    def test_arcus_visionis_values(self):
+        """Test that arcus visionis values are calculated."""
+        jd = julday(2024, 1, 15, 6)
+        lat, lon = 41.9028, 12.4964
+
+        dret, _ = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        tav_act = dret[6]  # Topocentric arcus visionis
+        arcv_act = dret[7]  # Geocentric arcus visionis
+
+        # TAV is the altitude difference between body and Sun
+        # Should be a reasonable value (typically -180 to +180)
+        assert -180 <= tav_act <= 180
+        assert -180 <= arcv_act <= 180
+
+    def test_extinction_coefficient_is_positive(self):
+        """Test that extinction coefficient is a sensible positive value."""
+        jd = julday(2024, 1, 15, 6)
+        lat, lon = 41.9028, 12.4964
+
+        dret, _ = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        k_act = dret[10]  # Extinction coefficient
+
+        # Extinction coefficient typically 0.1 to 0.6
+        assert 0 < k_act < 1.0
+
+    def test_magnitude_for_venus(self):
+        """Test that magnitude is calculated for Venus."""
+        jd = julday(2024, 1, 15, 6)
+        lat, lon = 41.9028, 12.4964
+
+        dret, _ = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        magnitude = dret[20]
+
+        # Venus magnitude typically -4.5 to -3
+        # But can vary, so just check it's a number
+        assert isinstance(magnitude, float)
+
+    def test_parallax_is_small(self):
+        """Test that parallax is a small positive value."""
+        jd = julday(2024, 1, 15, 6)
+        lat, lon = 41.9028, 12.4964
+
+        dret, _ = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        parallax = dret[19]
+
+        # Parallax for planets is typically < 1 degree
+        assert 0 <= parallax < 1.0
+
+
+class TestHeliacalPhenoEventTypes:
+    """Test different event types for heliacal_pheno_ut."""
+
+    def test_morning_first_event(self):
+        """Test SE_HELIACAL_RISING (morning first) event type."""
+        jd = julday(2024, 3, 1, 5)
+        lat, lon = 41.9028, 12.4964
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        assert len(dret) == 50
+        assert retflag > 0
+
+    def test_evening_last_event(self):
+        """Test SE_HELIACAL_SETTING (evening last) event type."""
+        jd = julday(2024, 3, 1, 19)
+        lat, lon = 41.9028, 12.4964
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_SETTING
+        )
+
+        assert len(dret) == 50
+        assert retflag > 0
+
+    def test_evening_first_event(self):
+        """Test SE_EVENING_FIRST event type."""
+        jd = julday(2024, 3, 1, 19)
+        lat, lon = 41.9028, 12.4964
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_MERCURY, event_type=SE_EVENING_FIRST
+        )
+
+        assert len(dret) == 50
+
+    def test_morning_last_event(self):
+        """Test SE_MORNING_LAST event type."""
+        jd = julday(2024, 3, 1, 5)
+        lat, lon = 41.9028, 12.4964
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_MERCURY, event_type=SE_MORNING_LAST
+        )
+
+        assert len(dret) == 50
+
+
+class TestHeliacalPhenoValidation:
+    """Test input validation for heliacal_pheno_ut."""
+
+    def test_invalid_body_raises_error(self):
+        """Test that invalid body ID raises ValueError."""
+        jd = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        with pytest.raises(ValueError, match="Invalid body ID"):
+            heliacal_pheno_ut(jd, lat, lon, body=999, event_type=SE_HELIACAL_RISING)
+
+    def test_invalid_event_type_raises_error(self):
+        """Test that invalid event type raises ValueError."""
+        jd = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        with pytest.raises(ValueError, match="Invalid event_type"):
+            heliacal_pheno_ut(jd, lat, lon, body=SE_VENUS, event_type=99)
+
+
+class TestHeliacalPhenoLocations:
+    """Test heliacal_pheno_ut at various locations."""
+
+    def test_northern_hemisphere(self):
+        """Test at northern latitude."""
+        jd = julday(2024, 6, 1, 3)  # Summer morning
+        lat, lon = 60.1699, 24.9384  # Helsinki
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_RISING
+        )
+
+        assert len(dret) == 50
+
+    def test_southern_hemisphere(self):
+        """Test at southern latitude."""
+        jd = julday(2024, 1, 15, 5)  # Summer morning (S. hemisphere)
+        lat, lon = -33.8688, 151.2093  # Sydney
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_SATURN, event_type=SE_HELIACAL_RISING
+        )
+
+        assert len(dret) == 50
+
+    def test_equatorial_location(self):
+        """Test at equatorial location."""
+        jd = julday(2024, 4, 1, 6)
+        lat, lon = 0.3476, 32.5825  # Kampala, Uganda
+
+        dret, retflag = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_RISING
+        )
+
+        assert len(dret) == 50
+
+
+class TestHeliacalPhenoAtmospheric:
+    """Test heliacal_pheno_ut with different atmospheric conditions."""
+
+    def test_with_altitude(self):
+        """Test with observer at high altitude."""
+        jd = julday(2024, 1, 15, 5)
+        lat, lon = 41.9028, 12.4964
+        altitude = 2000.0  # 2000 meters
+
+        dret, retflag = heliacal_pheno_ut(
+            jd,
+            lat,
+            lon,
+            altitude=altitude,
+            body=SE_VENUS,
+            event_type=SE_HELIACAL_RISING,
+        )
+
+        assert len(dret) == 50
+        # Extinction should be lower at high altitude
+        k_high = dret[10]
+
+        dret_low, _ = heliacal_pheno_ut(
+            jd, lat, lon, altitude=0, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+        k_low = dret_low[10]
+
+        assert k_high < k_low  # Lower extinction at higher altitude
+
+    def test_with_high_humidity(self):
+        """Test with high humidity."""
+        jd = julday(2024, 1, 15, 5)
+        lat, lon = 41.9028, 12.4964
+
+        dret_low, _ = heliacal_pheno_ut(
+            jd, lat, lon, humidity=0.2, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+        dret_high, _ = heliacal_pheno_ut(
+            jd, lat, lon, humidity=0.9, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        # Higher humidity should increase extinction
+        k_low = dret_low[10]
+        k_high = dret_high[10]
+
+        assert k_high > k_low
+
+    def test_with_low_pressure(self):
+        """Test with low atmospheric pressure."""
+        jd = julday(2024, 1, 15, 5)
+        lat, lon = 41.9028, 12.4964
+
+        dret_normal, _ = heliacal_pheno_ut(
+            jd, lat, lon, pressure=1013.25, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+        dret_low, _ = heliacal_pheno_ut(
+            jd, lat, lon, pressure=800.0, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        # Lower pressure should decrease extinction
+        k_normal = dret_normal[10]
+        k_low = dret_low[10]
+
+        assert k_low < k_normal
+
+
+class TestHeliacalPhenoAlias:
+    """Test swe_heliacal_pheno_ut alias."""
+
+    def test_swe_alias_works(self):
+        """Test that swe_heliacal_pheno_ut is an alias for heliacal_pheno_ut."""
+        jd = julday(2024, 1, 15, 6)
+        lat, lon = 41.9028, 12.4964
+
+        result1 = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+        result2 = swe_heliacal_pheno_ut(
+            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        )
+
+        assert result1 == result2
+
+
+class TestHeliacalPhenoMoon:
+    """Test heliacal_pheno_ut specifically for Moon (crescent calculations)."""
+
+    def test_moon_crescent_values(self):
+        """Test that Moon-specific crescent values are calculated."""
+        jd = julday(2024, 1, 12, 18)  # Near new moon
+        lat, lon = 41.9028, 12.4964
+
+        dret, _ = heliacal_pheno_ut(
+            jd, lat, lon, body=SE_MOON, event_type=SE_EVENING_FIRST
+        )
+
+        w_moon = dret[16]  # Crescent width
+        l_moon = dret[25]  # Crescent length
+        q_yallop = dret[17]  # Yallop q-test
+        illumination = dret[27]  # Illumination percentage
+
+        # These values should be calculated for Moon
+        assert isinstance(w_moon, float)
+        assert isinstance(l_moon, float)
+        assert isinstance(q_yallop, float)
+        assert isinstance(illumination, float)

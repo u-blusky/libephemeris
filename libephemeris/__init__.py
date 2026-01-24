@@ -89,6 +89,8 @@ from .eclipse import (
     swe_rise_trans_true_hor,
     heliacal_ut,
     swe_heliacal_ut,
+    heliacal_pheno_ut,
+    swe_heliacal_pheno_ut,
 )
 from .utils import (
     difdeg2n,
@@ -322,6 +324,8 @@ __all__ = [
     # Heliacal events
     "heliacal_ut",
     "swe_heliacal_ut",
+    "heliacal_pheno_ut",
+    "swe_heliacal_pheno_ut",
     # Utilities
     "difdeg2n",
     "swe_calc_angles",
