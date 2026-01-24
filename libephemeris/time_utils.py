@@ -398,6 +398,76 @@ def jdet_to_utc(
     return g_year, g_month, g_day, g_hour, g_minute, g_second
 
 
+def jdut1_to_utc(
+    jd_ut1: float, calendar: int = SE_GREG_CAL
+) -> tuple[int, int, int, int, int, float]:
+    """
+    Convert Julian Day in UT1 (Universal Time) to UTC date/time.
+
+    Converts a Julian Day number in UT1 back to a UTC calendar date and time.
+    The difference between UT1 and UTC is always less than 0.9 seconds by
+    definition (maintained by adding leap seconds to UTC).
+
+    Args:
+        jd_ut1: Julian Day number in UT1 (Universal Time)
+        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+
+    Returns:
+        tuple: (year, month, day, hour, minute, second) where:
+            - year: Calendar year (negative for BCE)
+            - month: Month (1-12)
+            - day: Day of month (1-31)
+            - hour: Hour (0-23)
+            - minute: Minute (0-59)
+            - second: Second (0.0-59.999..., or 60.x during leap second)
+
+    Note:
+        - UT1 is based on Earth's rotation and is not perfectly uniform
+        - UTC is atomic time adjusted to stay within 0.9s of UT1
+        - The difference DUT1 = UT1 - UTC is published by IERS
+        - For high-precision astronomical work, this difference matters
+
+    Example:
+        >>> from libephemeris import jdut1_to_utc, utc_to_jd, SE_GREG_CAL
+        >>> # Get JD(UT1) for a date, then convert back
+        >>> jd_tt, jd_ut1 = utc_to_jd(2020, 6, 15, 14, 30, 0.0)
+        >>> year, month, day, hour, minute, second = jdut1_to_utc(jd_ut1)
+        >>> print(f"{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:05.2f}")
+        2020-06-15 14:30:00.00
+    """
+    ts = get_timescale()
+
+    # Create a Skyfield Time object from UT1 Julian Day
+    t = ts.ut1_jd(jd_ut1)
+
+    # Get UTC components from Skyfield (handles leap seconds automatically)
+    # The .utc attribute returns a tuple: (year, month, day, hour, minute, second)
+    # We cast to Any to work around Skyfield's reify decorator type annotation issues
+    utc_data: Any = t.utc
+    g_year = int(utc_data[0])
+    g_month = int(utc_data[1])
+    g_day = int(utc_data[2])
+    g_hour = int(utc_data[3])
+    g_minute = int(utc_data[4])
+    g_second = float(utc_data[5])
+
+    if calendar == SE_JUL_CAL:
+        # Convert Gregorian date to Julian calendar
+        # First compute the JD for this Gregorian date
+        decimal_hour = g_hour + g_minute / 60.0 + g_second / 3600.0
+        jd_greg = swe_julday(g_year, g_month, g_day, decimal_hour, SE_GREG_CAL)
+        # Convert to Julian calendar
+        j_year, j_month, j_day, j_decimal_hour = swe_revjul(jd_greg, SE_JUL_CAL)
+        # Extract time components from decimal hour
+        j_hour = int(j_decimal_hour)
+        j_minute_frac = (j_decimal_hour - j_hour) * 60.0
+        j_minute = int(j_minute_frac)
+        j_second = (j_minute_frac - j_minute) * 60.0
+        return j_year, j_month, j_day, j_hour, j_minute, j_second
+
+    return g_year, g_month, g_day, g_hour, g_minute, g_second
+
+
 def day_of_week(jd: float) -> int:
     """
     Calculate the day of the week for a given Julian Day number.

@@ -8,6 +8,7 @@ from .time_utils import (
     day_of_week,
     utc_to_jd,
     jdet_to_utc,
+    jdut1_to_utc,
 )
 from .planets import (
     swe_calc_ut,
@@ -108,6 +109,7 @@ __all__ = [
     "day_of_week",
     "utc_to_jd",
     "jdet_to_utc",
+    "jdut1_to_utc",
     # Planet calculation
     "swe_calc_ut",
     "calc_ut",
