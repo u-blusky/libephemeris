@@ -39,6 +39,8 @@ from .houses import (
     swe_house_name,
     swe_house_pos,
     house_pos,
+    gauquelin_sector,
+    swe_gauquelin_sector,
 )
 from .state import (
     set_topo as swe_set_topo,
@@ -167,6 +169,8 @@ __all__ = [
     "house_name",
     "swe_house_pos",
     "house_pos",
+    "gauquelin_sector",
+    "swe_gauquelin_sector",
     # Ayanamsa (sidereal)
     "swe_set_sid_mode",
     "set_sid_mode",
