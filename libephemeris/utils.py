@@ -1024,6 +1024,46 @@ def difcsn(a: int, b: int) -> int:
     return (a - b) % CS360
 
 
+def csnorm(cs: int) -> int:
+    """
+    Normalize a value in centiseconds to the range [0, 360°).
+
+    This function normalizes an angle expressed in centiseconds (1/100 of an
+    arcsecond) to the equivalent of [0°, 360°) in centiseconds, i.e., the range
+    [0, 129600000). Correctly handles negative numbers.
+
+    Compatible with pyswisseph's swe.csnorm() function.
+
+    Args:
+        cs: Angle in centiseconds (any value)
+
+    Returns:
+        Normalized angle in range [0, 129600000) centiseconds
+        (equivalent to [0°, 360°))
+
+    Notes:
+        - 1 centisecond = 1/100 arcsecond = 1/360000 degree
+        - 360° = 129,600,000 centiseconds
+        - This is the centisecond equivalent of degnorm() for degrees
+          and radnorm() for radians
+
+    Examples:
+        >>> csnorm(360000)  # 1° stays as 1°
+        360000
+        >>> csnorm(-360000)  # -1° -> 359° = 129240000 cs
+        129240000
+        >>> csnorm(129960000)  # 361° -> 1° = 360000 cs
+        360000
+        >>> csnorm(-129960000)  # -361° -> 359° = 129240000 cs
+        129240000
+        >>> csnorm(129600000)  # 360° -> 0°
+        0
+        >>> csnorm(0)
+        0
+    """
+    return cs % CS360
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
