@@ -6,6 +6,7 @@ from .time_utils import (
     swe_deltat_ex,
     date_conversion,
     day_of_week,
+    utc_to_jd,
 )
 from .planets import (
     swe_calc_ut,
@@ -104,6 +105,7 @@ __all__ = [
     "deltat_ex",
     "date_conversion",
     "day_of_week",
+    "utc_to_jd",
     # Planet calculation
     "swe_calc_ut",
     "calc_ut",

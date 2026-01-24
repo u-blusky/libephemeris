@@ -259,6 +259,73 @@ def date_conversion(
     return swe_revjul(jd, target_cal)
 
 
+def utc_to_jd(
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    second: float,
+    calendar: int = SE_GREG_CAL,
+) -> tuple[float, float]:
+    """
+    Convert UTC date/time to Julian Day numbers, properly handling leap seconds.
+
+    Unlike julday() which assumes UT1 input, this function takes UTC input and
+    correctly accounts for the difference between UTC and UT1 (DUT1) and between
+    UTC and TT (including leap seconds).
+
+    Args:
+        year: Calendar year (negative for BCE)
+        month: Month (1-12)
+        day: Day of month (1-31)
+        hour: Hour (0-23)
+        minute: Minute (0-59)
+        second: Second (0-60, allowing for leap seconds)
+        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+
+    Returns:
+        tuple: (jd_et, jd_ut) where:
+            - jd_et: Julian Day in TT (Terrestrial Time / Ephemeris Time)
+            - jd_ut: Julian Day in UT1 (Universal Time)
+
+    Note:
+        - UTC includes leap seconds while UT1 follows Earth's rotation
+        - |UTC - UT1| is always < 0.9 seconds by definition
+        - TT = TAI + 32.184 seconds, where TAI is atomic time
+        - For dates before 1972 (when UTC was standardized), the function
+          treats the input as UT1 approximation and still provides proper
+          TT/UT1 conversion using historical Delta T values
+
+    Example:
+        >>> from libephemeris import utc_to_jd, SE_GREG_CAL
+        >>> # J2000.0 epoch: Jan 1, 2000 12:00:00 UTC
+        >>> jd_tt, jd_ut = utc_to_jd(2000, 1, 1, 12, 0, 0.0, SE_GREG_CAL)
+        >>> print(f"JD(TT): {jd_tt:.6f}, JD(UT1): {jd_ut:.6f}")
+        JD(TT): 2451545.000743, JD(UT1): 2451545.000004
+    """
+    ts = get_timescale()
+
+    if calendar == SE_JUL_CAL:
+        # Convert Julian calendar date to Gregorian for Skyfield
+        # Skyfield's utc() expects proleptic Gregorian calendar
+        decimal_hour = hour + minute / 60.0 + second / 3600.0
+        jd = swe_julday(year, month, day, decimal_hour, SE_JUL_CAL)
+        g_year, g_month, g_day, g_hour = swe_revjul(jd, SE_GREG_CAL)
+        # Extract hour, minute, second from decimal hour
+        g_minute_frac = (g_hour % 1) * 60
+        g_second = (g_minute_frac % 1) * 60
+        g_hour_int = int(g_hour)
+        g_minute_int = int(g_minute_frac)
+        t = ts.utc(g_year, g_month, g_day, g_hour_int, g_minute_int, g_second)
+    else:
+        # Gregorian calendar - use directly with Skyfield
+        t = ts.utc(year, month, day, hour, minute, second)
+
+    # Explicit float cast to satisfy type checker (Skyfield uses lazy reify decorator)
+    return float(t.tt), float(t.ut1)
+
+
 def day_of_week(jd: float) -> int:
     """
     Calculate the day of the week for a given Julian Day number.
