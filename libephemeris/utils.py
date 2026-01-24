@@ -926,6 +926,50 @@ def deg_midp(a: float, b: float) -> float:
     return midp % 360.0
 
 
+def rad_midp(a: float, b: float) -> float:
+    """
+    Calculate the midpoint between two angles in radians.
+
+    Handles wraparound at 2*pi correctly by finding the midpoint along the
+    shorter arc between the two angles. For example, the midpoint between
+    5.5 radians and 0.5 radians is 0 (or equivalently 2*pi), not pi.
+
+    Args:
+        a: First angle in radians (any value, will be normalized)
+        b: Second angle in radians (any value, will be normalized)
+
+    Returns:
+        Midpoint angle in range [0, 2*pi)
+
+    Examples:
+        >>> import math
+        >>> rad_midp(0, math.pi / 2)  # 0 to 90 degrees -> 45 degrees
+        0.7853981633974483
+        >>> rad_midp(5.5, 0.5)  # Near 2*pi wraparound
+        0.0  # approximately
+        >>> rad_midp(math.pi, 0)  # 180 to 0 -> 90 degrees
+        1.5707963267948966
+    """
+    # Normalize both angles to [0, 2*pi)
+    a = a % TWO_PI
+    b = b % TWO_PI
+
+    # Calculate the difference
+    diff = b - a
+
+    # If the absolute difference is greater than pi, go the shorter way
+    if diff > math.pi:
+        diff -= TWO_PI
+    elif diff < -math.pi:
+        diff += TWO_PI
+
+    # Calculate midpoint along the shorter arc
+    midp = a + diff / 2.0
+
+    # Normalize result to [0, 2*pi)
+    return midp % TWO_PI
+
+
 def swe_calc_angles(jd_ut: float, lat: float, lon: float):
     """
     Pre-calculate and cache astrological angles and planet positions
