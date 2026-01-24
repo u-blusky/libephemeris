@@ -1604,6 +1604,127 @@ def swe_get_ayanamsa(tjd_et: float) -> float:
     return swe_get_ayanamsa_ut(tjd_ut)
 
 
+def swe_get_ayanamsa_ex(
+    tjd_et: float, sid_mode: int, flags: int = 0
+) -> Tuple[float, float, float]:
+    """
+    Calculate ayanamsa with additional astronomical components.
+
+    Unlike swe_get_ayanamsa() which returns only the ayanamsa value, this function
+    returns a tuple including true obliquity and nutation in longitude, which are
+    useful for advanced sidereal calculations.
+
+    This is a libephemeris extension. The sid_mode parameter allows specifying
+    the sidereal mode directly without relying on global state from swe_set_sid_mode().
+
+    Args:
+        tjd_et: Julian Day in Ephemeris Time (TT/ET)
+        sid_mode: Sidereal mode constant (SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, etc.)
+        flags: Calculation flags (currently unused, reserved for future extensions)
+
+    Returns:
+        Tuple of (ayanamsa, eps_true, nut_long):
+            - ayanamsa: Ayanamsa value in degrees (tropical_lon - sidereal_lon)
+            - eps_true: True obliquity of ecliptic in degrees (mean + nutation)
+            - nut_long: Nutation in longitude in degrees (Δψ)
+
+    Example:
+        >>> from libephemeris import swe_get_ayanamsa_ex, SE_SIDM_LAHIRI
+        >>> aya, eps, nut = swe_get_ayanamsa_ex(2451545.0, SE_SIDM_LAHIRI)
+        >>> print(f"Ayanamsa: {aya:.6f}°")
+        >>> print(f"True obliquity: {eps:.6f}°")
+        >>> print(f"Nutation in longitude: {nut:.6f}°")
+
+    Note:
+        - eps_true = mean_obliquity + nutation_in_obliquity
+        - nut_long is the nutation in longitude (Δψ), not obliquity (Δε)
+        - Uses IAU 2000B nutation model (77 terms, ~0.1" precision)
+    """
+    return _calc_ayanamsa_ex(tjd_et, sid_mode, flags)
+
+
+def swe_get_ayanamsa_ex_ut(
+    tjd_ut: float, sid_mode: int, flags: int = 0
+) -> Tuple[float, float, float]:
+    """
+    Calculate ayanamsa with additional components for Universal Time.
+
+    This is the UT version of swe_get_ayanamsa_ex(). It internally converts
+    from UT to TT before calculating.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        sid_mode: Sidereal mode constant (SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, etc.)
+        flags: Calculation flags (currently unused, reserved for future extensions)
+
+    Returns:
+        Tuple of (ayanamsa, eps_true, nut_long):
+            - ayanamsa: Ayanamsa value in degrees (tropical_lon - sidereal_lon)
+            - eps_true: True obliquity of ecliptic in degrees (mean + nutation)
+            - nut_long: Nutation in longitude in degrees (Δψ)
+
+    Example:
+        >>> from libephemeris import swe_get_ayanamsa_ex_ut, SE_SIDM_LAHIRI
+        >>> aya, eps, nut = swe_get_ayanamsa_ex_ut(2451545.0, SE_SIDM_LAHIRI)
+        >>> print(f"Ayanamsa: {aya:.6f}°")
+
+    Note:
+        Internally converts UT to TT using Delta T before calculation.
+    """
+    ts = get_timescale()
+    t_ut = ts.ut1_jd(tjd_ut)
+    tjd_tt = t_ut.tt  # Convert UT1 to TT
+    return _calc_ayanamsa_ex(tjd_tt, sid_mode, flags)
+
+
+def _calc_ayanamsa_ex(
+    tjd_tt: float, sid_mode: int, flags: int = 0
+) -> Tuple[float, float, float]:
+    """
+    Internal function to calculate ayanamsa with astronomical components.
+
+    This function computes the ayanamsa value along with true obliquity and
+    nutation in longitude for a given sidereal mode.
+
+    Args:
+        tjd_tt: Julian Day in Terrestrial Time (TT)
+        sid_mode: Sidereal mode constant
+        flags: Calculation flags (reserved)
+
+    Returns:
+        Tuple of (ayanamsa, eps_true, nut_long)
+    """
+    # Reference date J2000 = JD 2451545.0 = 2000-01-01 12:00 TT
+    J2000 = 2451545.0
+    T = (tjd_tt - J2000) / 36525.0  # Julian centuries from J2000 in TT
+
+    # Calculate Mean Obliquity using IAU formula
+    # ε₀ = 84381.406" - 46.836769"T - 0.0001831"T² + 0.00200340"T³ - ...
+    # Simplified version (sufficient for ayanamsa precision):
+    eps0 = 23.43929111 - (46.8150 + (0.00059 - 0.001813 * T) * T) * T / 3600.0
+
+    # Use Skyfield's full IAU 2000B nutation model (77 terms)
+    ts = get_timescale()
+    t_obj = ts.tt_jd(tjd_tt)
+    dpsi_rad, deps_rad = iau2000b_radians(t_obj)
+
+    # Convert from radians to degrees
+    nut_long = math.degrees(dpsi_rad)  # Nutation in longitude (Δψ)
+    deps_deg = math.degrees(deps_rad)  # Nutation in obliquity (Δε)
+
+    # True obliquity = mean obliquity + nutation in obliquity
+    eps_true = eps0 + deps_deg
+
+    # Convert TT to UT for ayanamsa calculation (some modes need UT)
+    tjd_ut = t_obj.ut1
+
+    # Calculate the ayanamsa value using the internal function
+    # We need to temporarily work with this sid_mode
+    ayanamsa = _calc_ayanamsa(tjd_ut, sid_mode)
+
+    return (ayanamsa, eps_true, nut_long)
+
+
 # Position tuple type for nod_aps results
 PosTuple = Tuple[float, float, float, float, float, float]
 

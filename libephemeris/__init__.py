@@ -22,6 +22,8 @@ from .planets import (
     swe_calc_pctr,
     swe_get_ayanamsa_ut,
     swe_get_ayanamsa,
+    swe_get_ayanamsa_ex,
+    swe_get_ayanamsa_ex_ut,
     swe_get_ayanamsa_name,
     swe_set_sid_mode,
     swe_nod_aps,
@@ -88,6 +90,8 @@ house_name = swe_house_name
 # Ayanamsa (sidereal)
 get_ayanamsa_ut = swe_get_ayanamsa_ut
 get_ayanamsa = swe_get_ayanamsa
+get_ayanamsa_ex = swe_get_ayanamsa_ex
+get_ayanamsa_ex_ut = swe_get_ayanamsa_ex_ut
 get_ayanamsa_name = swe_get_ayanamsa_name
 set_sid_mode = swe_set_sid_mode
 
@@ -178,6 +182,10 @@ __all__ = [
     "get_ayanamsa_ut",
     "swe_get_ayanamsa",
     "get_ayanamsa",
+    "swe_get_ayanamsa_ex",
+    "get_ayanamsa_ex",
+    "swe_get_ayanamsa_ex_ut",
+    "get_ayanamsa_ex_ut",
     "swe_get_ayanamsa_name",
     "get_ayanamsa_name",
     # Observer location

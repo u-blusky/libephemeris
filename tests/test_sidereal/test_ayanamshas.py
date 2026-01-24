@@ -199,3 +199,154 @@ class TestAllAyanamshas:
             assert -360 < ayan < 360  # Very permissive
         except Exception as e:
             pytest.fail(f"Mode {sid_mode} failed: {e}")
+
+
+class TestAyanamsaEx:
+    """Test swe_get_ayanamsa_ex and swe_get_ayanamsa_ex_ut functions."""
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_returns_tuple(self):
+        """get_ayanamsa_ex should return a tuple of 3 floats."""
+        jd = 2451545.0
+        result = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 3
+        assert all(isinstance(x, float) for x in result)
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_ut_returns_tuple(self):
+        """get_ayanamsa_ex_ut should return a tuple of 3 floats."""
+        jd = 2451545.0
+        result = ephem.swe_get_ayanamsa_ex_ut(jd, SE_SIDM_LAHIRI)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 3
+        assert all(isinstance(x, float) for x in result)
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_ayanamsa_matches_standard(self):
+        """Ayanamsa from get_ayanamsa_ex should match get_ayanamsa."""
+        jd = 2451545.0
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+
+        aya_standard = ephem.swe_get_ayanamsa(jd)
+        aya_ex, _, _ = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+
+        assert abs(aya_ex - aya_standard) < 0.0001
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_ut_ayanamsa_matches_standard(self):
+        """Ayanamsa from get_ayanamsa_ex_ut should match get_ayanamsa_ut."""
+        jd = 2451545.0
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+
+        aya_standard = ephem.swe_get_ayanamsa_ut(jd)
+        aya_ex, _, _ = ephem.swe_get_ayanamsa_ex_ut(jd, SE_SIDM_LAHIRI)
+
+        assert abs(aya_ex - aya_standard) < 0.0001
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_eps_true_reasonable(self):
+        """True obliquity should be around 23.4 degrees for modern dates."""
+        jd = 2451545.0  # J2000.0
+        _, eps_true, _ = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+
+        # True obliquity at J2000 should be approximately 23.44°
+        assert 23.0 < eps_true < 24.0
+        assert abs(eps_true - 23.44) < 0.1
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_nut_long_reasonable(self):
+        """Nutation in longitude should be small (typically -0.02° to +0.02°)."""
+        jd = 2451545.0
+        _, _, nut_long = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+
+        # Nutation in longitude is typically between -20" and +20"
+        # (about -0.006° to +0.006°). Can be larger up to ~17" = ~0.005°
+        assert abs(nut_long) < 0.05  # 0.05° = 180" max
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "sid_mode,name",
+        [
+            (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+            (SE_SIDM_LAHIRI, "Lahiri"),
+            (SE_SIDM_RAMAN, "Raman"),
+            (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
+            (SE_SIDM_J2000, "J2000"),
+            (SE_SIDM_B1950, "B1950"),
+        ],
+    )
+    def test_get_ayanamsa_ex_different_modes(self, sid_mode, name):
+        """Test get_ayanamsa_ex works with different sidereal modes."""
+        jd = 2451545.0
+        aya, eps, nut = ephem.swe_get_ayanamsa_ex(jd, sid_mode)
+
+        # Ayanamsa should be valid
+        assert isinstance(aya, float)
+        assert -360 < aya < 360
+
+        # Obliquity should always be around 23.44° regardless of mode
+        assert 23.0 < eps < 24.0
+
+        # Nutation should be the same for all modes
+        assert abs(nut) < 0.05
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_sid_mode_independent(self):
+        """get_ayanamsa_ex should not depend on global swe_set_sid_mode."""
+        jd = 2451545.0
+
+        # Set global mode to Fagan-Bradley
+        ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+
+        # But ask for Lahiri explicitly
+        aya_ex, _, _ = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+
+        # Compare with Lahiri value
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        aya_lahiri = ephem.swe_get_ayanamsa(jd)
+
+        # Should match Lahiri, not Fagan-Bradley
+        assert abs(aya_ex - aya_lahiri) < 0.0001
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_with_flags(self):
+        """Test that flags parameter is accepted (reserved for future use)."""
+        jd = 2451545.0
+        # Flags currently unused, but should be accepted
+        result = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI, 0)
+        assert len(result) == 3
+
+        result_with_flag = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI, 256)
+        assert len(result_with_flag) == 3
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_eps_changes_over_time(self):
+        """True obliquity should change over time due to precession and nutation."""
+        jd_2000 = 2451545.0  # J2000.0
+        jd_2020 = 2459215.5  # 2020-12-01
+
+        _, eps_2000, _ = ephem.swe_get_ayanamsa_ex(jd_2000, SE_SIDM_LAHIRI)
+        _, eps_2020, _ = ephem.swe_get_ayanamsa_ex(jd_2020, SE_SIDM_LAHIRI)
+
+        # Obliquity decreases slowly (~0.47"/year) but nutation causes oscillation
+        # Just check they're not identical
+        assert eps_2000 != eps_2020
+
+    @pytest.mark.unit
+    def test_get_ayanamsa_ex_aliases(self):
+        """Test that the non-swe_ aliases work."""
+        jd = 2451545.0
+
+        # Test alias without swe_ prefix
+        result1 = ephem.get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+        result2 = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+
+        assert result1 == result2
+
+        result3 = ephem.get_ayanamsa_ex_ut(jd, SE_SIDM_LAHIRI)
+        result4 = ephem.swe_get_ayanamsa_ex_ut(jd, SE_SIDM_LAHIRI)
+
+        assert result3 == result4
