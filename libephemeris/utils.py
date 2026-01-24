@@ -1185,6 +1185,75 @@ def cs2degstr(cs: int) -> str:
     return f"{degrees:3d}°{minutes:2d}'{seconds:2d}.{centisecs:02d}\""
 
 
+def cs2lonlatstr(cs: int, plus_char: str, minus_char: str) -> str:
+    """
+    Convert a value in centiseconds to a formatted longitude/latitude string.
+
+    This function converts an angular measurement in centiseconds (1/100 of an
+    arcsecond) to a human-readable string with a directional character suffix.
+    The format is "D°M'S\" X" where D is degrees, M is arcminutes, S is arcseconds,
+    and X is the directional character (e.g., N/S for latitude, E/W for longitude).
+
+    Compatible with pyswisseph's swe.cs2lonlatstr() function.
+
+    Args:
+        cs: Angle in centiseconds (any integer value)
+        plus_char: Character to use for positive values (e.g., "N" or "E")
+        minus_char: Character to use for negative values (e.g., "S" or "W")
+
+    Returns:
+        Formatted string representing the angle with directional character.
+        Format: "DDD°MM'SS\" X" (e.g., "45°30'00\" N" or "122°15'30\" W")
+
+    Notes:
+        - 1 centisecond = 1/100 arcsecond = 1/360000 degree
+        - Positive values use plus_char, negative values use minus_char
+        - Seconds are rounded to whole numbers (no centiseconds shown)
+        - Commonly used for geographic coordinates:
+          - Latitude: plus_char="N", minus_char="S"
+          - Longitude: plus_char="E", minus_char="W"
+
+    Examples:
+        >>> cs2lonlatstr(163800000, "N", "S")  # 45°30'00" North
+        ' 45°30\\' 0" N'
+        >>> cs2lonlatstr(-163800000, "N", "S")  # 45°30'00" South
+        ' 45°30\\' 0" S'
+        >>> cs2lonlatstr(440154000, "E", "W")  # 122°15'30" East
+        '122°15\\'30" E'
+        >>> cs2lonlatstr(-440154000, "E", "W")  # 122°15'30" West
+        '122°15\\'30" W'
+    """
+    # Determine direction character based on sign
+    if cs >= 0:
+        direction = plus_char
+    else:
+        direction = minus_char
+        cs = -cs
+
+    # Extract degrees, minutes, and seconds
+    # 1 degree = 3600 * 100 = 360000 centiseconds
+    # 1 minute = 60 * 100 = 6000 centiseconds
+    # 1 second = 100 centiseconds
+    degrees = cs // 360000
+    remainder = cs % 360000
+    minutes = remainder // 6000
+    remainder = remainder % 6000
+    # Round centiseconds to nearest arcsecond
+    seconds = (remainder + 50) // 100
+
+    # Handle carry-over from rounding
+    if seconds >= 60:
+        seconds = 0
+        minutes += 1
+        if minutes >= 60:
+            minutes = 0
+            degrees += 1
+
+    # Format the string matching Swiss Ephemeris format
+    # Format: "%3d°%2d'%2d\" %c" with proper spacing
+    return f"{degrees:3d}°{minutes:2d}'{seconds:2d}\" {direction}"
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
