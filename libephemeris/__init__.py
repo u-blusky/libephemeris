@@ -3,6 +3,7 @@ from .time_utils import swe_julday, swe_revjul, swe_deltat
 from .planets import (
     swe_calc_ut,
     swe_calc,
+    swe_calc_pctr,
     swe_get_ayanamsa_ut,
     swe_get_ayanamsa,
     swe_get_ayanamsa_name,
@@ -34,6 +35,7 @@ deltat = swe_deltat
 # Planet calculation
 calc_ut = swe_calc_ut
 calc = swe_calc
+calc_pctr = swe_calc_pctr
 
 # Houses
 houses = swe_houses
@@ -57,8 +59,6 @@ fixstar_ut = swe_fixstar_ut
 # Crossings
 solcross_ut = swe_solcross_ut
 mooncross_ut = swe_mooncross_ut
-
-
 
 
 # Helper for Arabic parts
@@ -86,6 +86,8 @@ __all__ = [
     "calc_ut",
     "swe_calc",
     "calc",
+    "swe_calc_pctr",
+    "calc_pctr",
     # Houses
     "swe_houses",
     "houses",

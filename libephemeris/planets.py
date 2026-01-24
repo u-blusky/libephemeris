@@ -46,14 +46,38 @@ from skyfield.framelib import ecliptic_frame
 from skyfield.nutationlib import iau2000b_radians
 from dataclasses import dataclass
 from .constants import (
-    SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER,
-    SE_SATURN, SE_URANUS, SE_NEPTUNE, SE_PLUTO, SE_EARTH,
-    SE_MEAN_NODE, SE_TRUE_NODE, SE_MEAN_APOG, SE_OSCU_APOG,
-    SEFLG_SPEED, SEFLG_HELCTR, SEFLG_TOPOCTR, SEFLG_SIDEREAL,
-    SE_ANGLE_OFFSET, SE_ARABIC_OFFSET, SEFLG_BARYCTR, SEFLG_TRUEPOS,
-    SEFLG_NOABERR, SEFLG_EQUATORIAL, SEFLG_J2000, SE_PARS_FORTUNAE,
-    SE_PARS_SPIRITUS, SE_PARS_AMORIS, SE_PARS_FIDEI,
+    SE_SUN,
+    SE_MOON,
+    SE_MERCURY,
+    SE_VENUS,
+    SE_MARS,
+    SE_JUPITER,
+    SE_SATURN,
+    SE_URANUS,
+    SE_NEPTUNE,
+    SE_PLUTO,
+    SE_EARTH,
+    SE_MEAN_NODE,
+    SE_TRUE_NODE,
+    SE_MEAN_APOG,
+    SE_OSCU_APOG,
+    SEFLG_SPEED,
+    SEFLG_HELCTR,
+    SEFLG_TOPOCTR,
+    SEFLG_SIDEREAL,
+    SE_ANGLE_OFFSET,
+    SE_ARABIC_OFFSET,
+    SEFLG_BARYCTR,
+    SEFLG_TRUEPOS,
+    SEFLG_NOABERR,
+    SEFLG_EQUATORIAL,
+    SEFLG_J2000,
+    SE_PARS_FORTUNAE,
+    SE_PARS_SPIRITUS,
+    SE_PARS_AMORIS,
+    SE_PARS_FIDEI,
 )
+
 # Import all sidereal mode constants (SE_SIDM_*)
 from .constants import *  # noqa: F403, F401
 from .state import get_planets, get_timescale, get_topo, get_sid_mode
@@ -82,31 +106,31 @@ def swe_calc_ut(
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """
     Calculate planetary position for Universal Time.
-    
+
     Swiss Ephemeris compatible function.
-    
+
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
         ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
         iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
-        
+
     Returns:
         Tuple containing:
             - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
             - Return flag: iflag value on success
-            
+
     Coordinate Output:
         - longitude: Ecliptic longitude in degrees (0-360)
-        - latitude: Ecliptic latitude in degrees  
+        - latitude: Ecliptic latitude in degrees
         - distance: Distance in AU
         - speed_*: Daily motion in respective coordinates
-        
+
     Flags:
         - SEFLG_SPEED: Include velocity (default, always calculated)
         - SEFLG_HELCTR: Heliocentric instead of geocentric
         - SEFLG_TOPOCTR: Topocentric (requires swe_set_topo)
         - SEFLG_SIDEREAL: Sidereal zodiac (requires swe_set_sid_mode)
-        
+
     Example:
         >>> pos, retflag = swe_calc_ut(2451545.0, SE_MARS, SEFLG_SPEED)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
@@ -121,25 +145,25 @@ def swe_calc(
 ) -> tuple[tuple[float, float, float, float, float, float], int]:
     """
     Calculate planetary position for Ephemeris Time (ET/TT).
-    
+
     Swiss Ephemeris compatible function. Similar to swe_calc_ut() but takes
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
-    
+
     Args:
         tjd: Julian Day in Terrestrial Time (TT/ET)
         ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
         iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
-        
+
     Returns:
         Tuple containing:
             - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
             - Return flag: iflag value on success
-            
+
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
         which varies from ~32 seconds (year 2000) to minutes (historical times).
         For most astrological applications, use swe_calc_ut() instead.
-        
+
     Example:
         >>> pos, retflag = swe_calc(2451545.0, SE_JUPITER, SEFLG_SPEED)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
@@ -149,13 +173,193 @@ def swe_calc(
     return _calc_body(t, ipl, iflag)
 
 
-def _calc_body(t, ipl: int, iflag: int) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+def swe_calc_pctr(
+    tjd_ut: float, ipl: int, iplctr: int, iflag: int
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+    """
+    Calculate planetary position as seen from another planet (planet-centric).
+
+    Swiss Ephemeris compatible function.
+
+    This function calculates the position of a target body (ipl) as observed
+    from another body (iplctr) rather than from Earth (geocentric) or Sun
+    (heliocentric). Useful for calculating, e.g., the position of Moon as
+    seen from Mars, or Venus as seen from Jupiter.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Target planet/body ID (SE_SUN, SE_MOON, etc.)
+        iplctr: Observer/center planet ID (the body from which to observe)
+        iflag: Calculation flags (SEFLG_SPEED, etc.)
+
+    Returns:
+        Tuple containing:
+            - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
+            - Return flag: iflag value on success
+
+    Note:
+        - SEFLG_HELCTR and SEFLG_BARYCTR flags are ignored (observer is always iplctr)
+        - SEFLG_TOPOCTR is ignored (no topocentric correction on other planets)
+        - Distance is the distance from iplctr to ipl in AU
+
+    Example:
+        >>> # Position of Moon as seen from Mars
+        >>> pos, retflag = swe_calc_pctr(2451545.0, SE_MOON, SE_MARS, SEFLG_SPEED)
+        >>> print(f"Moon longitude from Mars: {pos[0]:.2f}°")
+    """
+    ts = get_timescale()
+    t = ts.ut1_jd(tjd_ut)
+    return _calc_body_pctr(t, ipl, iplctr, iflag)
+
+
+def _calc_body_pctr(
+    t, ipl: int, iplctr: int, iflag: int
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+    """
+    Calculate planet-centric position (internal function).
+
+    Calculates the position of target body (ipl) as seen from center body (iplctr).
+    Uses vector subtraction: position = target_SSB - observer_SSB.
+
+    Args:
+        t: Skyfield Time object (UT1 or TT)
+        ipl: Target planet/body ID
+        iplctr: Observer/center planet ID
+        iflag: Calculation flags (SEFLG_SPEED, etc.)
+
+    Returns:
+        Tuple of (position_tuple, flags)
+    """
+    from skyfield.framelib import ecliptic_frame
+    from skyfield.positionlib import ICRF
+
+    planets = get_planets()
+
+    # Validate that both bodies are in _PLANET_MAP (standard planets only for now)
+    if ipl not in _PLANET_MAP:
+        # Target not supported
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+
+    if iplctr not in _PLANET_MAP:
+        # Observer not supported
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+
+    target_name = _PLANET_MAP[ipl]
+    observer_name = _PLANET_MAP[iplctr]
+
+    target = planets[target_name]
+    observer = planets[observer_name]
+
+    # Helper function to get position vector at time t_
+    def get_vector(t_):
+        # Both positions relative to SSB (Solar System Barycenter)
+        tgt_pos = target.at(t_).position.au
+        tgt_vel = target.at(t_).velocity.au_per_d
+        obs_pos = observer.at(t_).position.au
+        obs_vel = observer.at(t_).velocity.au_per_d
+
+        # Target position relative to observer
+        p_ = tgt_pos - obs_pos
+        v_ = tgt_vel - obs_vel
+        return p_, v_
+
+    # Get position vector
+    p, v = get_vector(t)
+
+    # Create position object for coordinate conversion
+    # Center doesn't matter for coordinate conversion, just for documentation
+    pos = ICRF(p, v, t=t, center=399)
+
+    # Extract coordinates based on flags
+    is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
+    is_sidereal = bool(iflag & SEFLG_SIDEREAL)
+
+    p1, p2, p3 = 0.0, 0.0, 0.0
+    dp1, dp2, dp3 = 0.0, 0.0, 0.0
+
+    if is_equatorial:
+        # Equatorial coordinates (RA/Dec)
+        if iflag & SEFLG_J2000:
+            ra, dec, dist = pos.radec()
+        else:
+            ra, dec, dist = pos.radec(epoch="date")
+        p1 = ra.hours * 15.0  # Convert hours to degrees
+        p2 = dec.degrees
+        p3 = dist.au
+    else:
+        # Ecliptic coordinates (default)
+        if iflag & SEFLG_J2000:
+            # J2000 ecliptic frame
+            eps_j2000 = 23.4392911  # Mean obliquity at J2000.0
+            x, y, z = pos.position.au
+            eps_rad = math.radians(eps_j2000)
+            ce = math.cos(eps_rad)
+            se = math.sin(eps_rad)
+
+            xe = x
+            ye = y * ce + z * se
+            ze = -y * se + z * ce
+
+            dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+            lon = math.degrees(math.atan2(ye, xe)) % 360.0
+            lat = math.degrees(math.asin(ze / dist)) if dist > 0 else 0.0
+
+            p1, p2, p3 = lon, lat, dist
+        else:
+            # Ecliptic of date
+            lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
+            p1 = lon_.degrees
+            p2 = lat_.degrees
+            p3 = dist_.au
+
+    # Calculate speed using numerical differentiation if requested
+    dt = 1.0 / 86400.0  # 1 second timestep
+
+    if iflag & SEFLG_SPEED:
+        ts_inner = get_timescale()
+        t_next = ts_inner.tt_jd(t.tt + dt)
+
+        # Get position at t + dt using the same method (without speed or sidereal)
+        flags_no_speed_no_sidereal = (iflag & ~SEFLG_SPEED) & ~SEFLG_SIDEREAL
+        result_next, _ = _calc_body_pctr(
+            t_next, ipl, iplctr, flags_no_speed_no_sidereal
+        )
+        p1_next, p2_next, p3_next = result_next[0], result_next[1], result_next[2]
+
+        # Calculate derivatives
+        dp1 = (p1_next - p1) / dt
+        dp2 = (p2_next - p2) / dt
+        dp3 = (p3_next - p3) / dt
+
+        # Handle longitude wrap-around
+        if dp1 > 18000:
+            dp1 -= 360.0 / dt
+        elif dp1 < -18000:
+            dp1 += 360.0 / dt
+
+    # Apply sidereal offset if requested (ecliptic only)
+    if is_sidereal and not is_equatorial:
+        ayanamsa = swe_get_ayanamsa_ut(t.ut1)
+        p1 = (p1 - ayanamsa) % 360.0
+
+        # Correct velocity for ayanamsha rate if speed was calculated
+        if iflag & SEFLG_SPEED:
+            ayanamsa_next = swe_get_ayanamsa_ut(t.ut1 + dt)
+            da = (ayanamsa_next - ayanamsa) / dt
+            dp1 -= da
+
+    return (p1, p2, p3, dp1, dp2, dp3), iflag
+
+
+def _calc_body(
+    t, ipl: int, iflag: int
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """
     Calculate position of any celestial body or point (internal dispatcher).
-    
+
     This is the core calculation function that routes requests to appropriate
     sub-modules based on body type. Supports all Swiss Ephemeris body types.
-    
+
     Supported body types:
         - Classical planets (Sun, Moon, Mercury-Pluto) via JPL DE421 ephemeris
         - Lunar nodes (Mean/True North/South) via lunar.py
@@ -164,24 +368,24 @@ def _calc_body(t, ipl: int, iflag: int) -> Tuple[Tuple[float, float, float, floa
         - Fixed stars (Regulus, Spica) via fixed_stars.py
         - Astrological angles (ASC, MC, Vertex, etc.) via angles.py
         - Arabic parts (Fortune, Spirit, etc.) via arabic_parts.py
-    
+
     Args:
         t: Skyfield Time object (UT1 or TT)
         ipl: Planet/body ID (SE_SUN, SE_MOON, SE_MARS, etc.)
         iflag: Calculation flags bitmask (SEFLG_SPEED, SEFLG_HELCTR, etc.)
-        
+
     Returns:
         Tuple containing:
             - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
             - Return flag: iflag value on success
-            
+
     Coordinate Systems:
         - Ecliptic (default): Longitude/Latitude relative to ecliptic plane
         - Equatorial (SEFLG_EQUATORIAL): Right Ascension/Declination
         - Heliocentric (SEFLG_HELCTR): Sun-centered coordinates
         - Topocentric (SEFLG_TOPOCTR): Observer location on Earth surface
         - Sidereal (SEFLG_SIDEREAL): Fixed zodiac (requires swe_set_sid_mode)
-        
+
     Precision:
         - Minor body geocentric conversion uses Skyfield's frame transformations
         - Properly handles precession, nutation, and true obliquity of date
@@ -239,18 +443,18 @@ def _calc_body(t, ipl: int, iflag: int) -> Tuple[Tuple[float, float, float, floa
             x_hel_ecl = r_hel * math.cos(lat_rad) * math.cos(lon_rad)
             y_hel_ecl = r_hel * math.cos(lat_rad) * math.sin(lon_rad)
             z_hel_ecl = r_hel * math.sin(lat_rad)
-            
+
             # Get Earth position and convert from ICRS to ecliptic frame
             # Using Skyfield's rigorous frame conversion with true obliquity of date
             earth = planets["earth"]
             sun = planets["sun"]
             earth_bary = earth.at(t)
-            
+
             # For geocentric minor body, we need heliocentric Earth
             # Earth relative to Sun in ecliptic frame
             earth_helio = sun.at(t).observe(earth)
             earth_xyz_ecl = earth_helio.frame_xyz(ecliptic_frame).au
-            
+
             # Geocentric position: minor body heliocentric - Earth heliocentric
             x_geo_ecl = x_hel_ecl - earth_xyz_ecl[0]
             y_geo_ecl = y_hel_ecl - earth_xyz_ecl[1]
@@ -349,8 +553,6 @@ def _calc_body(t, ipl: int, iflag: int) -> Tuple[Tuple[float, float, float, floa
     else:
         # Geocentric
         observer = planets["earth"]
-
-
 
     # 3. Compute Position
     # Helper to get vector at time t
@@ -505,7 +707,6 @@ def _calc_body(t, ipl: int, iflag: int) -> Tuple[Tuple[float, float, float, floa
                 if dp1 < -18000:
                     dp1 += 360 / dt
 
-
     else:
         # Ecliptic (Long/Lat)
         if iflag & SEFLG_J2000:
@@ -515,7 +716,7 @@ def _calc_body(t, ipl: int, iflag: int) -> Tuple[Tuple[float, float, float, floa
             # x_ecl = x_eq
             # y_ecl = y_eq * cos(eps) + z_eq * sin(eps)
             # z_ecl = -y_eq * sin(eps) + z_eq * cos(eps)
-            
+
             eps_j2000 = 23.4392911  # Mean obliquity at J2000.0 (IAU 1976)
             x, y, z = pos.position.au
             eps_rad = math.radians(eps_j2000)
@@ -583,24 +784,26 @@ def _calc_body(t, ipl: int, iflag: int) -> Tuple[Tuple[float, float, float, floa
     return (p1, p2, p3, dp1, dp2, dp3), iflag
 
 
-def _calc_body_with_context(t, ipl: int, iflag: int, ctx) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+def _calc_body_with_context(
+    t, ipl: int, iflag: int, ctx
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """
     Calculate position using an explicit EphemerisContext (thread-safe).
-    
+
     This is a context-aware wrapper around the core calculation logic.
     It temporarily sets global state from context, calls _calc_body, then
     restores global state. This allows context-based thread-safe usage while
     reusing the existing calculation code.
-    
+
     Args:
         t: Skyfield Time object (UT1 or TT)
         ipl: Planet/body ID
         iflag: Calculation flags
         ctx: EphemerisContext instance containing state
-        
+
     Returns:
         Same as _calc_body: ((lon, lat, dist, dlon, dlat, ddist), retflag)
-        
+
     Note:
         This function is thread-safe when each thread uses its own context.
         It temporarily modifies global state but this is safe because:
@@ -609,14 +812,14 @@ def _calc_body_with_context(t, ipl: int, iflag: int, ctx) -> Tuple[Tuple[float, 
         3. Global state is only read by _calc_body, not modified
     """
     from . import state
-    
+
     # Save current global state
     old_topo = state._TOPO
     old_sid_mode = state._SIDEREAL_MODE
     old_sid_t0 = state._SIDEREAL_T0
     old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
     old_angles_cache = state._ANGLES_CACHE
-    
+
     try:
         # Temporarily set global state from context
         state._TOPO = ctx.topo
@@ -624,9 +827,55 @@ def _calc_body_with_context(t, ipl: int, iflag: int, ctx) -> Tuple[Tuple[float, 
         state._SIDEREAL_T0 = ctx.sidereal_t0
         state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
         state._ANGLES_CACHE = ctx._angles_cache
-        
+
         # Use existing calculation logic
         return _calc_body(t, ipl, iflag)
+    finally:
+        # Restore global state
+        state._TOPO = old_topo
+        state._SIDEREAL_MODE = old_sid_mode
+        state._SIDEREAL_T0 = old_sid_t0
+        state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
+        state._ANGLES_CACHE = old_angles_cache
+
+
+def _calc_body_pctr_with_context(
+    t, ipl: int, iplctr: int, iflag: int, ctx
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+    """
+    Calculate planet-centric position using an explicit EphemerisContext (thread-safe).
+
+    This is a context-aware wrapper around _calc_body_pctr.
+
+    Args:
+        t: Skyfield Time object (UT1 or TT)
+        ipl: Target planet/body ID
+        iplctr: Observer/center planet ID
+        iflag: Calculation flags
+        ctx: EphemerisContext instance containing state
+
+    Returns:
+        Same as _calc_body_pctr: ((lon, lat, dist, dlon, dlat, ddist), retflag)
+    """
+    from . import state
+
+    # Save current global state
+    old_topo = state._TOPO
+    old_sid_mode = state._SIDEREAL_MODE
+    old_sid_t0 = state._SIDEREAL_T0
+    old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
+    old_angles_cache = state._ANGLES_CACHE
+
+    try:
+        # Temporarily set global state from context
+        state._TOPO = ctx.topo
+        state._SIDEREAL_MODE = ctx.sidereal_mode
+        state._SIDEREAL_T0 = ctx.sidereal_t0
+        state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+        state._ANGLES_CACHE = ctx._angles_cache
+
+        # Use existing calculation logic
+        return _calc_body_pctr(t, ipl, iplctr, iflag)
     finally:
         # Restore global state
         state._TOPO = old_topo
@@ -639,17 +888,17 @@ def _calc_body_with_context(t, ipl: int, iflag: int, ctx) -> Tuple[Tuple[float, 
 def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
     """
     Calculate ayanamsa (sidereal offset) for a given Universal Time date.
-    
+
     Returns the ayanamsa in degrees for the currently set sidereal mode.
     The ayanamsa represents the longitudinal offset between tropical and
     sidereal zodiacs. Use swe_set_sid_mode() to select the ayanamsa system.
-    
+
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
-        
+
     Returns:
         Ayanamsa value in degrees (tropical_longitude - sidereal_longitude)
-        
+
     Example:
         >>> swe_set_sid_mode(SE_SIDM_LAHIRI)  # Set Lahiri ayanamsa
         >>> ayanamsa = swe_get_ayanamsa_ut(2451545.0)  # J2000.0
@@ -737,23 +986,23 @@ def _get_star_position_ecliptic(
 ) -> float:
     """
     Calculate ecliptic longitude of a fixed star at given date.
-    
+
     Applies proper motion and IAU 2006 precession to transform J2000.0 catalog
     coordinates to date. Used for star-based ayanamsha calculations.
-    
+
     Algorithm:
         1. Apply linear proper motion from J2000.0 epoch to target date
         2. Precess equatorial coordinates using IAU 2006 three-angle formulation
         3. Transform precessed equatorial (RA, Dec) to ecliptic (Lon, Lat) using true obliquity
-    
+
     Args:
         star: Star catalog data (J2000.0 ICRS coordinates and proper motion)
         tjd_tt: Julian Day in Terrestrial Time (TT)
         eps_true: True obliquity of ecliptic at date (mean + nutation) in degrees
-        
+
     Returns:
         Ecliptic longitude of date in degrees (0-360)
-        
+
     FIXME: Precision - Linear proper motion approximation
         - Uses simple linear extrapolation: RA/Dec += (PM * years)
         - Ignores radial velocity (parallax causes small position shift)
@@ -761,7 +1010,7 @@ def _get_star_position_ecliptic(
         - No annual parallax correction (distance effect negligible for distant stars)
         Typical error: ~0.1-0.5 arcsec over ±50 years from J2000
         For research-grade precision, use Gaia DR3 or SIMBAD ephemerides.
-        
+
     References:
         - IAU 2006 precession: Capitaine et al. A&A 412, 567-586 (2003)
         - Rotation matrices: Kaplan "The IAU Resolutions on Astronomical Reference Systems"
@@ -774,10 +1023,10 @@ def _get_star_position_ecliptic(
     #   - No annual parallax correction (negligible for distant stars)
     # Typical error: ~0.1-0.5 arcsec over ±50 years from J2000
     # For research precision beyond ±50 years, use Gaia DR3 or full ephemeris.
-    
+
     # 1. Apply Proper Motion
     t_years = (tjd_tt - 2451545.0) / 365.25  # Julian years from J2000.0
-    
+
     # Linear proper motion correction (arcsec/year converted to degrees)
     ra_pm = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
     dec_pm = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
@@ -785,7 +1034,7 @@ def _get_star_position_ecliptic(
     # 2. Precess from J2000 to Date
     # Using IAU 2006 precession formulas (Capitaine et al. 2003)
     # Applies three-rotation matrix to account for precession of equinoxes
-    
+
     T = (tjd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
     zeta = (2306.2181 * T + 0.30188 * T**2 + 0.017998 * T**3) / 3600.0
     z = (2306.2181 * T + 1.09468 * T**2 + 0.018203 * T**3) / 3600.0
@@ -824,7 +1073,7 @@ def _get_star_position_ecliptic(
     # Apply IAU 2006 precession using three-rotation formula (Kaplan 2005):
     # P_date = R_z(-z) * R_y(theta) * R_z(-zeta) * P_J2000
     # where R_z = rotation around Z-axis, R_y = rotation around Y-axis
-    
+
     # Initial position vector in J2000 frame
     x0 = math.cos(dec_r) * math.cos(ra_r)
     y0 = math.cos(dec_r) * math.sin(ra_r)
@@ -870,22 +1119,22 @@ def _get_star_position_ecliptic(
 def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     """
     Calculate ayanamsha (sidereal zodiac offset) for a specific mode.
-    
+
     Implements all 43 ayanamsha modes from Swiss Ephemeris, covering traditional
     Indian (Lahiri, Krishnamurti), Western sidereal (Fagan-Bradley), astronomical
     (Galactic Center), and historical (Babylonian, Hipparchos) systems.
-    
+
     The ayanamsha represents the longitudinal offset between the tropical zodiac
     (seasons-based, precessing) and the sidereal zodiac (stars-fixed). Most modes
     use a fixed epoch value plus precession rate; some use actual star positions.
-    
+
     Algorithm:
         1. Convert UT to TT (Terrestrial Time) for astronomical precision
         2. Calculate Julian centuries T from J2000.0 epoch
         3. For formula-based modes: ayanamsha = value_at_J2000 + (rate * T)
         4. For star-based modes: calculate using actual stellar positions
         5. Apply IAU 2000B nutation (77 terms) for true obliquity
-        
+
     Supported modes (43 total):
         - Traditional Indian: Lahiri (23), Krishnamurti (1), Raman, etc.
         - Western Sidereal: Fagan-Bradley (0), De Luce, Djwhal Khul
@@ -893,19 +1142,19 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         - Astronomical: Galactic Center (0° Sag), Galactic Equator variants
         - Historical: Babylonian (Kugler, Huber, Britton), Sassanian, Hipparchos
         - Epoch-based: J2000 (no offset), J1900, B1950
-        
+
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
         sid_mode: Sidereal mode constant (SE_SIDM_FAGAN_BRADLEY, etc.)
-        
+
     Returns:
         Ayanamsha value in degrees (tropical_lon - sidereal_lon)
-        
+
     Precision:
         - Uses full IAU 2000B nutation model (77 terms, ~0.1" precision)
         - IAU 2006 precession formulas for star-based modes
         - Consistent with Swiss Ephemeris precision
-        
+
     References:
         - Swiss Ephemeris documentation (ayanamshas)
         - IAU 2000B nutation model via Skyfield
@@ -1007,14 +1256,14 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         # Calculate Obliquity of Date (eps_true)
         # Calculate Mean Obliquity (IAU formula)
         eps0 = 23.43929111 - (46.8150 + (0.00059 - 0.001813 * T) * T) * T / 3600.0
-        
+
         # Use Skyfield's full IAU 2000B nutation model (77 terms)
         # Provides ~0.4" better precision than 4-term approximation
         # Consistent with line 1135 and Swiss Ephemeris precision
         ts = get_timescale()
         t_obj = ts.tt_jd(tjd_tt)
         dpsi_rad, deps_rad = iau2000b_radians(t_obj)
-        
+
         # Convert from radians to degrees
         dpsi_deg = math.degrees(dpsi_rad)
         deps_deg = math.degrees(deps_rad)
@@ -1170,11 +1419,11 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
     """
     Calculate ayanamsha based on actual stellar positions ("True" modes).
-    
+
     Unlike formula-based ayanamshas that use fixed epoch values and precession
     rates, True ayanamshas align sidereal 0° with actual star positions at the
     observation date. This accounts for proper motion, precession, and nutation.
-    
+
     Supported True modes:
         - True Citra (SE_SIDM_TRUE_CITRA): Spica at 0° Libra (180°)
         - True Revati (SE_SIDM_TRUE_REVATI): Zeta Piscium at 29°50' Pisces
@@ -1183,19 +1432,19 @@ def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
         - Galactic Center modes: Sgr A* at specified ecliptic longitude
         - Galactic Equator modes: Galactic pole alignments
         - True Sheoran: Zeta Piscium variant
-    
+
     Algorithm:
         1. Calculate true obliquity (mean + nutation) for coordinate transformation
         2. Get actual ecliptic longitude of reference star/point at date
         3. Calculate offset: ayanamsha = star_lon - target_sidereal_lon
-        
+
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
         sid_mode: Sidereal mode constant (SE_SIDM_TRUE_*)
-        
+
     Returns:
         Ayanamsha value in degrees based on star's current position
-        
+
     References:
         - Star positions from STARS catalog (Hipparcos J2000.0 + proper motion)
         - Galactic Center: Sgr A* radio position (Reid & Brunthaler 2004)
@@ -1302,7 +1551,7 @@ def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
 def swe_set_sid_mode(sid_mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
     """
     Set the sidereal zodiac mode for calculations.
-    
+
     Configures which ayanamsa system to use for sidereal calculations.
     Affects all subsequent position calculations with SEFLG_SIDEREAL flag.
 
@@ -1310,19 +1559,19 @@ def swe_set_sid_mode(sid_mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
         sid_mode: Sidereal mode constant (SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, etc.)
         t0: Reference time (JD) for user-defined ayanamsa (only for SE_SIDM_USER)
         ayan_t0: Ayanamsa value at reference time t0 in degrees (only for SE_SIDM_USER)
-        
+
     Supported Modes:
         - Traditional Indian: SE_SIDM_LAHIRI (default), SE_SIDM_KRISHNAMURTI, etc.
         - Western Sidereal: SE_SIDM_FAGAN_BRADLEY, SE_SIDM_DELUCE
         - True (star-based): SE_SIDM_TRUE_CITRA, SE_SIDM_TRUE_REVATI, etc.
         - Galactic: SE_SIDM_GALCENT_0SAG, SE_SIDM_GALEQU_IAU1958, etc.
         - Historical: SE_SIDM_BABYLONIAN, SE_SIDM_HIPPARCHOS
-        
+
     Example:
         >>> swe_set_sid_mode(SE_SIDM_LAHIRI)  # Set Lahiri (Chitrapaksha) ayanamsa
         >>> pos, _ = swe_calc_ut(2451545.0, SE_SUN, SEFLG_SIDEREAL)
         >>> print(f"Sidereal Sun: {pos[0]:.6f}°")
-        
+
         >>> # Custom ayanamsa: 24° at J2000.0, precessing at standard rate
         >>> swe_set_sid_mode(SE_SIDM_USER, t0=2451545.0, ayan_t0=24.0)
     """
@@ -1334,15 +1583,15 @@ def swe_set_sid_mode(sid_mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
 def swe_get_ayanamsa(tjd_et: float) -> float:
     """
     Calculate ayanamsa for a given Ephemeris Time (ET/TT) date.
-    
+
     Similar to swe_get_ayanamsa_ut() but takes Terrestrial Time instead of UT.
-    
+
     Args:
         tjd_et: Julian Day in Ephemeris Time (TT/ET)
-        
+
     Returns:
         Ayanamsa value in degrees
-        
+
     Note:
         Properly converts TT to UT1 using Skyfield's timescale with Delta T correction.
         Delta T (TT - UT) varies from ~32s (year 2000) to minutes (historical times).
