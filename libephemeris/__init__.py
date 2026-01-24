@@ -67,6 +67,8 @@ from .eclipse import (
     swe_lun_eclipse_how,
     lun_occult_when_glob,
     swe_lun_occult_when_glob,
+    lun_occult_when_loc,
+    swe_lun_occult_when_loc,
 )
 from .utils import difdeg2n, swe_calc_angles
 from .fixed_stars import (
@@ -248,6 +250,8 @@ __all__ = [
     "swe_lun_eclipse_how",
     "lun_occult_when_glob",
     "swe_lun_occult_when_glob",
+    "lun_occult_when_loc",
+    "swe_lun_occult_when_loc",
     # Utilities
     "difdeg2n",
     "swe_calc_angles",
