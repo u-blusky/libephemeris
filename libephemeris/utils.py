@@ -1064,6 +1064,66 @@ def csnorm(cs: int) -> int:
     return cs % CS360
 
 
+def csroundsec(cs: int) -> int:
+    """
+    Round a value in centiseconds to the nearest arcsecond.
+
+    This function rounds a centisecond value to the nearest arcsecond,
+    returning the result still in centiseconds (i.e., rounded to the
+    nearest multiple of 100).
+
+    Compatible with pyswisseph's swe.csroundsec() function.
+
+    Args:
+        cs: Angle in centiseconds (1/100 arcsecond)
+
+    Returns:
+        Centisecond value rounded to the nearest arcsecond (multiple of 100)
+
+    Notes:
+        - 1 centisecond = 1/100 arcsecond
+        - Uses C-style integer division (truncation toward zero) with +50 offset
+        - Special handling at degree boundaries (30° for positive, 90° for negative)
+
+    Examples:
+        >>> csroundsec(150)  # 1.50 arcseconds -> 2 arcseconds = 200 cs
+        200
+        >>> csroundsec(149)  # 1.49 arcseconds -> 1 arcsecond = 100 cs
+        100
+        >>> csroundsec(50)   # 0.50 arcseconds -> 1 arcsecond = 100 cs
+        100
+        >>> csroundsec(100)  # 1.00 arcsecond -> 1 arcsecond = 100 cs
+        100
+        >>> csroundsec(0)    # 0 centiseconds -> 0 arcseconds
+        0
+        >>> csroundsec(-150) # -1.50 arcseconds -> -1 arcsecond = -100 cs
+        -100
+    """
+    # C-style integer division: truncates toward zero
+    # For cs + 50, we need to use truncation toward zero, not floor division
+    cs_plus_50 = cs + 50
+    if cs_plus_50 >= 0:
+        result = (cs_plus_50 // 100) * 100
+    else:
+        # C-style truncation toward zero for negative values
+        result = -((-cs_plus_50) // 100) * 100
+
+    # Special case for positive values at 30-degree boundaries (10800000 cs = 30°)
+    # Values just below these boundaries round down instead of up
+    if cs > 0 and result % 10800000 == 0 and result != 0 and cs < result:
+        return result - 100
+
+    # Special case for negative values at 90-degree boundaries (32400000 cs = 90°)
+    if cs < 0:
+        if result != 0 and result % 32400000 == 0 and cs <= result - 100:
+            return result - 100
+        # Values in (-100, 0) round to 0, values <= -100 round to -100 when formula gives 0
+        if cs <= -100 and result == 0:
+            return -100
+
+    return result
+
+
 def deg_midp(a: float, b: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
@@ -1155,6 +1215,57 @@ def rad_midp(a: float, b: float) -> float:
 
     # Normalize result to [0, 2*pi)
     return midp % TWO_PI
+
+
+def d2l(value: float) -> int:
+    """
+    Convert a double (float) to a long integer with rounding.
+
+    This function rounds a floating-point number to the nearest integer using
+    "round half away from zero" semantics (also known as commercial rounding).
+    This is the behavior used by the Swiss Ephemeris library internally.
+
+    Compatible with pyswisseph's swe.d2l() function.
+
+    Args:
+        value: A floating-point number to convert.
+
+    Returns:
+        The nearest integer to value. For values exactly halfway between two
+        integers, rounds away from zero (e.g., 0.5 -> 1, -0.5 -> -1).
+
+    Notes:
+        - This differs from Python's built-in round() function, which uses
+          "round half to even" (banker's rounding) for Python 3.
+        - Swiss Ephemeris uses this for internal conversions, but also exposes
+          it publicly for consistency.
+
+    Examples:
+        >>> d2l(1.4)
+        1
+        >>> d2l(1.5)
+        2
+        >>> d2l(1.6)
+        2
+        >>> d2l(-1.4)
+        -1
+        >>> d2l(-1.5)
+        -2
+        >>> d2l(-1.6)
+        -2
+        >>> d2l(0.5)
+        1
+        >>> d2l(-0.5)
+        -1
+        >>> d2l(2.5)
+        3
+        >>> d2l(-2.5)
+        -3
+    """
+    if value >= 0:
+        return int(value + 0.5)
+    else:
+        return int(value - 0.5)
 
 
 def swe_calc_angles(jd_ut: float, lat: float, lon: float):
