@@ -10,6 +10,7 @@ from .time_utils import (
     jdet_to_utc,
     jdut1_to_utc,
     utc_time_zone,
+    time_equ,
 )
 from .planets import (
     swe_calc_ut,
@@ -112,6 +113,7 @@ __all__ = [
     "jdet_to_utc",
     "jdut1_to_utc",
     "utc_time_zone",
+    "time_equ",
     # Planet calculation
     "swe_calc_ut",
     "calc_ut",

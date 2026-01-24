@@ -500,6 +500,97 @@ def day_of_week(jd: float) -> int:
     return int(math.floor(jd + 0.5)) % 7
 
 
+def time_equ(jd: float) -> float:
+    """
+    Calculate the Equation of Time.
+
+    The Equation of Time is the difference between apparent solar time
+    (sundial time) and mean solar time (clock time). It arises from:
+    1. Earth's orbital eccentricity (elliptical orbit)
+    2. The obliquity of the ecliptic (Earth's axial tilt)
+
+    Args:
+        jd: Julian Day number in UT
+
+    Returns:
+        float: Equation of Time in days (multiply by 1440 for minutes)
+               Positive values mean the sundial is ahead of the clock.
+
+    Note:
+        The equation of time varies from approximately -14 to +16 minutes
+        throughout the year. The extremes occur around:
+        - Early November: ~+16 minutes (sundial ahead)
+        - Early February: ~-14 minutes (sundial behind)
+        - Mid-April, mid-June, early September, late December: ~0 minutes
+
+    Example:
+        >>> from libephemeris import time_equ, swe_julday
+        >>> # Calculate equation of time for Jan 1, 2000
+        >>> jd = swe_julday(2000, 1, 1, 12.0)
+        >>> eot = time_equ(jd)
+        >>> eot_minutes = eot * 1440
+        >>> print(f"Equation of Time: {eot_minutes:.2f} minutes")
+        Equation of Time: -3.05 minutes
+    """
+    from typing import Any
+
+    from .state import get_planets, get_timescale
+
+    ts = get_timescale()
+    planets = get_planets()
+
+    # Create time object
+    t = ts.ut1_jd(jd)
+
+    # Get Earth and Sun
+    earth = planets["earth"]
+    sun = planets["sun"]
+
+    # Calculate apparent position of Sun from Earth
+    # Type ignore needed for Skyfield's lazy reify decorator
+    astrometric: Any = earth.at(t).observe(sun)
+    apparent = astrometric.apparent()
+
+    # Get apparent right ascension in degrees
+    ra, _, _ = apparent.radec()
+    apparent_ra_deg = float(ra.hours) * 15.0  # Convert hours to degrees
+
+    # Calculate Sun's mean longitude using algorithm from
+    # Meeus "Astronomical Algorithms" Chapter 28
+    # T is Julian centuries from J2000.0
+    T = (jd - 2451545.0) / 36525.0
+
+    # Mean longitude of the Sun (in degrees), from Meeus Ch. 25
+    L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T**2
+
+    # Normalize to 0-360 degrees
+    L0 = L0 % 360.0
+    if L0 < 0:
+        L0 += 360.0
+
+    # Normalize apparent RA to 0-360 degrees
+    apparent_ra_deg = apparent_ra_deg % 360.0
+    if apparent_ra_deg < 0:
+        apparent_ra_deg += 360.0
+
+    # Equation of time: E = L0 - 0.0057183° - α (all in degrees)
+    # The constant 0.0057183° corrects for aberration and nutation
+    # already included in apparent position, so we skip it.
+    # E = Mean solar longitude - Apparent right ascension (in degrees)
+    eot_deg = L0 - apparent_ra_deg
+
+    # Normalize to ±180 degrees
+    while eot_deg > 180.0:
+        eot_deg -= 360.0
+    while eot_deg < -180.0:
+        eot_deg += 360.0
+
+    # Convert degrees to time (360° = 24h = 1 day)
+    eot_days = eot_deg / 360.0
+
+    return eot_days
+
+
 def utc_time_zone(
     year: int,
     month: int,
