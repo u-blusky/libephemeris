@@ -4,7 +4,7 @@ Fixed star position calculations for libephemeris.
 Computes ecliptic positions for bright fixed stars with:
 - Proper motion correction (rigorous space motion approach)
 - IAU 2006 precession from J2000 to date
-- Nutation correction for obliquity
+- IAU 2000A nutation model (1365 terms) for sub-milliarcsecond precision
 - Equatorial to ecliptic coordinate transformation
 
 Supported stars:
@@ -38,6 +38,9 @@ References:
 import math
 from dataclasses import dataclass
 from typing import List, Tuple
+
+from skyfield.nutationlib import iau2000a_radians
+
 from .constants import SE_REGULUS, SE_SPICA_STAR
 
 
@@ -165,7 +168,7 @@ def calc_fixed_star_position(star_id: int, jd_tt: float) -> Tuple[float, float, 
 
     References:
         IAU 2006 precession (Capitaine et al.)
-        Nutation simplified from IAU 2000B
+        IAU 2000A nutation model (1365 terms) via Skyfield
     """
     if star_id not in FIXED_STARS:
         raise ValueError(f"Unknown star ID: {star_id}")
@@ -284,14 +287,16 @@ def calc_fixed_star_position(star_id: int, jd_tt: float) -> Tuple[float, float, 
     # Calculate mean obliquity of date (IAU 2006)
     eps0 = 23.43929111 - (46.8150 + (0.00059 - 0.001813 * T) * T) * T / 3600.0
 
-    # FIXME: Precision - Simplified nutation (2-term approximation)
-    # Full IAU 2000B has 77 terms. This captures ~99% of effect.
-    omega = 125.04452 - 1934.136261 * T  # Longitude of lunar ascending node
-    L = 280.4665 + 36000.7698 * T  # Mean longitude of Sun
+    # Use full IAU 2000A nutation model (1365 terms) for sub-milliarcsecond precision
+    # Reference: IERS Conventions 2010, Skyfield iau2000a_radians implementation
+    from .state import get_timescale
 
-    # Nutation in obliquity (arcseconds)
-    deps = 9.20 * math.cos(math.radians(omega)) + 0.57 * math.cos(math.radians(2 * L))
-    deps_deg = deps / 3600.0
+    ts = get_timescale()
+    t_obj = ts.tt_jd(jd_tt)
+    dpsi_rad, deps_rad = iau2000a_radians(t_obj)
+
+    # Convert nutation in obliquity from radians to degrees
+    deps_deg = math.degrees(deps_rad)
     eps_true = eps0 + deps_deg
     eps_r = math.radians(eps_true)
 
