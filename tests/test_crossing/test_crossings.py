@@ -8,6 +8,196 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
+from libephemeris.crossing import NR_TOLERANCE
+
+
+class TestSubArcsecondPrecision:
+    """Tests to verify sub-arcsecond convergence (0.1 arcsecond tolerance)."""
+
+    # 0.1 arcsecond = 0.1/3600 degrees = ~2.78e-5 degrees
+    SUB_ARCSEC = 0.1 / 3600.0
+
+    @pytest.mark.unit
+    def test_nr_tolerance_constant(self):
+        """Verify NR_TOLERANCE is set to 0.1 arcsecond."""
+        assert NR_TOLERANCE == self.SUB_ARCSEC, (
+            f"NR_TOLERANCE should be {self.SUB_ARCSEC}, got {NR_TOLERANCE}"
+        )
+
+    @pytest.mark.unit
+    def test_solcross_sub_arcsecond_precision(self):
+        """Sun crossing should achieve sub-arcsecond precision."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 45.0
+        jd_cross = ephem.swe_solcross_ut(target, jd_start, 0)
+
+        # Check Sun position at crossing
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        # Verify sub-arcsecond precision
+        diff_arcsec = diff * 3600.0
+        assert diff_arcsec < 0.1, (
+            f"Sun at {pos[0]}, target {target}, diff {diff_arcsec:.4f} arcsec (should be < 0.1)"
+        )
+
+    @pytest.mark.unit
+    def test_mooncross_sub_arcsecond_precision(self):
+        """Moon crossing should achieve sub-arcsecond precision."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 123.456
+        jd_cross = ephem.swe_mooncross_ut(target, jd_start, 0)
+
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        # Verify sub-arcsecond precision
+        diff_arcsec = diff * 3600.0
+        assert diff_arcsec < 0.1, (
+            f"Moon at {pos[0]}, target {target}, diff {diff_arcsec:.4f} arcsec (should be < 0.1)"
+        )
+
+    @pytest.mark.unit
+    def test_mooncross_node_sub_arcsecond_precision(self):
+        """Moon node crossing should achieve sub-arcsecond precision."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_cross = ephem.swe_mooncross_node_ut(jd_start, 0)
+
+        # Check Moon latitude at crossing (should be ~0)
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+
+        # Latitude should be within 0.1 arcsecond of zero
+        lat_arcsec = abs(pos[1]) * 3600.0
+        assert lat_arcsec < 0.1, (
+            f"Moon latitude at node: {lat_arcsec:.4f} arcsec (should be < 0.1)"
+        )
+
+    @pytest.mark.unit
+    def test_cross_ut_sub_arcsecond_precision(self):
+        """Generic planet crossing should achieve sub-arcsecond precision."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 30.0
+
+        jd_cross = ephem.swe_cross_ut(SE_MARS, target, jd_start, 0)
+
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MARS, 0)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        # Verify sub-arcsecond precision
+        diff_arcsec = diff * 3600.0
+        assert diff_arcsec < 0.1, (
+            f"Mars at {pos[0]}, target {target}, diff {diff_arcsec:.4f} arcsec (should be < 0.1)"
+        )
+
+    @pytest.mark.unit
+    def test_helio_cross_sub_arcsecond_precision(self):
+        """Heliocentric crossing should achieve sub-arcsecond precision."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 90.0
+
+        jd_cross = ephem.swe_helio_cross_ut(SE_EARTH, target, jd_start, 0)
+
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_EARTH, SEFLG_HELCTR)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        # Verify sub-arcsecond precision
+        diff_arcsec = diff * 3600.0
+        assert diff_arcsec < 0.1, (
+            f"Earth helio at {pos[0]}, target {target}, diff {diff_arcsec:.4f} arcsec (should be < 0.1)"
+        )
+
+    @pytest.mark.comparison
+    def test_solcross_vs_pyswisseph_sub_arcsecond(self):
+        """Verify libephemeris matches pyswisseph within sub-arcsecond tolerance."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 0.0  # Vernal equinox
+
+        jd_lib = ephem.swe_solcross_ut(target, jd_start, 0)
+        jd_swe = swe.solcross_ut(target, jd_start, 0)
+
+        # Get positions at both crossing times
+        pos_lib, _ = ephem.swe_calc_ut(jd_lib, SE_SUN, 0)
+        pos_swe = swe.calc_ut(jd_swe, swe.SUN)[0]
+
+        # Both should be very close to target (handle 0/360 wraparound)
+        diff_lib = abs(pos_lib[0] - target)
+        if diff_lib > 180:
+            diff_lib = 360 - diff_lib
+        diff_lib_arcsec = diff_lib * 3600.0
+
+        diff_swe = abs(pos_swe[0] - target)
+        if diff_swe > 180:
+            diff_swe = 360 - diff_swe
+        diff_swe_arcsec = diff_swe * 3600.0
+
+        # libephemeris should achieve sub-arcsecond precision
+        assert diff_lib_arcsec < 0.1, f"libephemeris diff {diff_lib_arcsec:.4f} arcsec"
+        # pyswisseph should also achieve sub-arcsecond precision
+        assert diff_swe_arcsec < 0.1, f"pyswisseph diff {diff_swe_arcsec:.4f} arcsec"
+
+        # Crossing times should be within 1 second of each other
+        diff_time_seconds = abs(jd_lib - jd_swe) * 86400.0
+        assert diff_time_seconds < 1.0, (
+            f"Timing diff {diff_time_seconds:.4f} seconds (should be < 1)"
+        )
+
+    @pytest.mark.comparison
+    def test_mooncross_vs_pyswisseph_sub_arcsecond(self):
+        """Verify Moon crossing matches pyswisseph within sub-arcsecond tolerance."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 180.0
+
+        jd_lib = ephem.swe_mooncross_ut(target, jd_start, 0)
+        jd_swe = swe.mooncross_ut(target, jd_start, 0)
+
+        # Get positions at both crossing times
+        pos_lib, _ = ephem.swe_calc_ut(jd_lib, SE_MOON, 0)
+
+        # Both should be very close to target
+        diff_lib = abs(pos_lib[0] - target)
+        if diff_lib > 180:
+            diff_lib = 360 - diff_lib
+        diff_lib_arcsec = diff_lib * 3600.0
+
+        # libephemeris should achieve sub-arcsecond precision
+        assert diff_lib_arcsec < 0.1, f"libephemeris diff {diff_lib_arcsec:.4f} arcsec"
+
+        # Crossing times should be within 3 seconds of each other
+        # (slight differences in underlying ephemeris calculations)
+        diff_time_seconds = abs(jd_lib - jd_swe) * 86400.0
+        assert diff_time_seconds < 3.0, (
+            f"Timing diff {diff_time_seconds:.4f} seconds (should be < 3)"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "target", [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+    )
+    def test_solcross_all_signs_sub_arcsecond(self, target):
+        """All zodiac sign ingresses should achieve sub-arcsecond precision."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        jd_cross = ephem.swe_solcross_ut(float(target), jd_start, 0)
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
+
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        diff_arcsec = diff * 3600.0
+        assert diff_arcsec < 0.1, f"Target {target}° diff {diff_arcsec:.4f} arcsec"
 
 
 class TestSolcrossBasic:
