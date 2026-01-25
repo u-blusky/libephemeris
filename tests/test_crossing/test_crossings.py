@@ -1727,3 +1727,269 @@ class TestStationDetectionAndBrentsFallback:
         # Should still achieve sub-arcsecond precision
         diff_arcsec = diff * 3600.0
         assert diff_arcsec < 0.1, f"Precision: {diff_arcsec:.4f} arcsec"
+
+
+class TestKnownAstronomicalEvents:
+    """Tests verifying solstices/equinoxes against Swiss Ephemeris reference values.
+
+    These tests verify that the crossing functions produce results that match
+    Swiss Ephemeris calculated astronomical events with precision < 1 second.
+
+    Reference dates calculated using Swiss Ephemeris (pyswisseph) which uses
+    JPL DE431 ephemeris data. These values are the authoritative reference for
+    this library since libephemeris is designed to match Swiss Ephemeris behavior.
+
+    Swiss Ephemeris calculated values (2023-2025):
+    - 2024 Vernal Equinox: March 20, 03:06:24.243 UTC (Sun at 0°)
+    - 2024 Summer Solstice: June 20, 20:51:00.170 UTC (Sun at 90°)
+    - 2024 Autumnal Equinox: September 22, 12:43:39.036 UTC (Sun at 180°)
+    - 2024 Winter Solstice: December 21, 09:20:34.132 UTC (Sun at 270°)
+
+    Note: These values may differ by ~3-5 seconds from other sources (USNO, etc.)
+    due to different ephemeris models and definitions of "crossing" (apparent vs
+    geometric Sun position).
+    """
+
+    # 1 second precision threshold (in days)
+    ONE_SECOND_DAYS = 1.0 / 86400.0
+
+    @staticmethod
+    def _time_to_hours(hour: int, minute: int, second: float) -> float:
+        """Convert time to decimal hours."""
+        return hour + minute / 60.0 + second / 3600.0
+
+    @pytest.mark.unit
+    def test_vernal_equinox_2024(self):
+        """Verify 2024 vernal equinox (Sun at 0°) matches Swiss Ephemeris within 1 second.
+
+        Swiss Ephemeris: March 20, 2024 at 03:06:24.243 UTC
+        """
+        # Start search from beginning of 2024
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find when Sun crosses 0° (vernal equinox)
+        jd_cross = ephem.swe_solcross_ut(0.0, jd_start, 0)
+
+        # Swiss Ephemeris reference: March 20, 2024 at 03:06:24.243 UTC
+        jd_known = ephem.swe_julday(2024, 3, 20, self._time_to_hours(3, 6, 24.243))
+
+        # Difference should be less than 1 second
+        diff_seconds = abs(jd_cross - jd_known) * 86400.0
+        assert diff_seconds < 1.0, (
+            f"Vernal equinox 2024: calculated JD {jd_cross:.8f}, "
+            f"known JD {jd_known:.8f}, diff {diff_seconds:.3f} seconds "
+            f"(should be < 1 second)"
+        )
+
+    @pytest.mark.unit
+    def test_summer_solstice_2024(self):
+        """Verify 2024 summer solstice (Sun at 90°) matches Swiss Ephemeris within 1 second.
+
+        Swiss Ephemeris: June 20, 2024 at 20:51:00.170 UTC
+        """
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find when Sun crosses 90° (summer solstice)
+        jd_cross = ephem.swe_solcross_ut(90.0, jd_start, 0)
+
+        # Swiss Ephemeris reference: June 20, 2024 at 20:51:00.170 UTC
+        jd_known = ephem.swe_julday(2024, 6, 20, self._time_to_hours(20, 51, 0.170))
+
+        diff_seconds = abs(jd_cross - jd_known) * 86400.0
+        assert diff_seconds < 1.0, (
+            f"Summer solstice 2024: calculated JD {jd_cross:.8f}, "
+            f"known JD {jd_known:.8f}, diff {diff_seconds:.3f} seconds "
+            f"(should be < 1 second)"
+        )
+
+    @pytest.mark.unit
+    def test_autumnal_equinox_2024(self):
+        """Verify 2024 autumnal equinox (Sun at 180°) matches Swiss Ephemeris within 1 second.
+
+        Swiss Ephemeris: September 22, 2024 at 12:43:39.036 UTC
+        """
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find when Sun crosses 180° (autumnal equinox)
+        jd_cross = ephem.swe_solcross_ut(180.0, jd_start, 0)
+
+        # Swiss Ephemeris reference: September 22, 2024 at 12:43:39.036 UTC
+        jd_known = ephem.swe_julday(2024, 9, 22, self._time_to_hours(12, 43, 39.036))
+
+        diff_seconds = abs(jd_cross - jd_known) * 86400.0
+        assert diff_seconds < 1.0, (
+            f"Autumnal equinox 2024: calculated JD {jd_cross:.8f}, "
+            f"known JD {jd_known:.8f}, diff {diff_seconds:.3f} seconds "
+            f"(should be < 1 second)"
+        )
+
+    @pytest.mark.unit
+    def test_winter_solstice_2024(self):
+        """Verify 2024 winter solstice (Sun at 270°) matches Swiss Ephemeris within 1 second.
+
+        Swiss Ephemeris: December 21, 2024 at 09:20:34.132 UTC
+        """
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find when Sun crosses 270° (winter solstice)
+        jd_cross = ephem.swe_solcross_ut(270.0, jd_start, 0)
+
+        # Swiss Ephemeris reference: December 21, 2024 at 09:20:34.132 UTC
+        jd_known = ephem.swe_julday(2024, 12, 21, self._time_to_hours(9, 20, 34.132))
+
+        diff_seconds = abs(jd_cross - jd_known) * 86400.0
+        assert diff_seconds < 1.0, (
+            f"Winter solstice 2024: calculated JD {jd_cross:.8f}, "
+            f"known JD {jd_known:.8f}, diff {diff_seconds:.3f} seconds "
+            f"(should be < 1 second)"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "event_name,target_lon,year,month,day,hour,minute,second",
+        [
+            # 2024 events (Swiss Ephemeris calculated)
+            ("Vernal Equinox 2024", 0.0, 2024, 3, 20, 3, 6, 24.243),
+            ("Summer Solstice 2024", 90.0, 2024, 6, 20, 20, 51, 0.170),
+            ("Autumnal Equinox 2024", 180.0, 2024, 9, 22, 12, 43, 39.036),
+            ("Winter Solstice 2024", 270.0, 2024, 12, 21, 9, 20, 34.132),
+            # 2023 events (Swiss Ephemeris calculated)
+            ("Vernal Equinox 2023", 0.0, 2023, 3, 20, 21, 24, 25.767),
+            ("Summer Solstice 2023", 90.0, 2023, 6, 21, 14, 57, 50.739),
+            ("Autumnal Equinox 2023", 180.0, 2023, 9, 23, 6, 49, 59.279),
+            ("Winter Solstice 2023", 270.0, 2023, 12, 22, 3, 27, 22.795),
+            # 2025 events (Swiss Ephemeris calculated)
+            ("Vernal Equinox 2025", 0.0, 2025, 3, 20, 9, 1, 29.361),
+            ("Summer Solstice 2025", 90.0, 2025, 6, 21, 2, 42, 16.474),
+            ("Autumnal Equinox 2025", 180.0, 2025, 9, 22, 18, 19, 20.085),
+            ("Winter Solstice 2025", 270.0, 2025, 12, 21, 15, 3, 5.075),
+        ],
+    )
+    def test_solstice_equinox_parametrized(
+        self, event_name, target_lon, year, month, day, hour, minute, second
+    ):
+        """Verify multiple years of solstices/equinoxes match Swiss Ephemeris within 1.5 seconds.
+
+        Uses a 1.5 second tolerance to account for minor floating-point precision
+        differences in the Newton-Raphson iteration between libephemeris and pyswisseph.
+        The direct comparison test (test_solcross_matches_pyswisseph_for_known_events)
+        verifies the core algorithm matches pyswisseph within 1 second.
+        """
+        # Start search from beginning of the year
+        jd_start = ephem.swe_julday(year, 1, 1, 0.0)
+
+        # Find crossing
+        jd_cross = ephem.swe_solcross_ut(target_lon, jd_start, 0)
+
+        # Swiss Ephemeris reference time
+        jd_known = ephem.swe_julday(
+            year, month, day, self._time_to_hours(hour, minute, second)
+        )
+
+        diff_seconds = abs(jd_cross - jd_known) * 86400.0
+        # Allow 1.5 second tolerance for floating-point precision differences
+        assert diff_seconds < 1.5, (
+            f"{event_name}: diff {diff_seconds:.3f} seconds (should be < 1.5 seconds)"
+        )
+
+    @pytest.mark.unit
+    def test_new_moon_january_2024(self):
+        """Verify new moon calculation using mooncross_ut.
+
+        New Moon: January 11, 2024 at 11:57:38 UTC
+        At new moon, Moon longitude equals Sun longitude.
+        """
+        # Start of January 2024
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Get Sun position and find when Moon crosses that longitude
+        sun_pos, _ = ephem.swe_calc_ut(jd_start, SE_SUN, 0)
+        sun_lon = sun_pos[0]
+
+        # Find when Moon crosses the Sun's longitude (approximately new moon)
+        # Note: For precise new moon, we'd need to track Sun's motion too,
+        # but this test verifies mooncross_ut precision
+        jd_new_moon = ephem.swe_mooncross_ut(sun_lon, jd_start, 0)
+
+        # Verify Moon is at target position with sub-arcsecond precision
+        moon_pos, _ = ephem.swe_calc_ut(jd_new_moon, SE_MOON, 0)
+        diff = abs(moon_pos[0] - sun_lon)
+        if diff > 180:
+            diff = 360 - diff
+        diff_arcsec = diff * 3600.0
+
+        assert diff_arcsec < 0.05, (
+            f"Moon longitude precision: {diff_arcsec:.4f} arcsec (should be < 0.05)"
+        )
+
+    @pytest.mark.unit
+    def test_full_moon_january_2024(self):
+        """Verify full moon calculation using mooncross_ut.
+
+        Full Moon: January 25, 2024 at 17:54:01 UTC
+        At full moon, Moon longitude = Sun longitude + 180°.
+        """
+        # After new moon, find full moon
+        jd_start = ephem.swe_julday(2024, 1, 12, 0.0)  # Day after new moon
+
+        # Get Sun position at start
+        sun_pos, _ = ephem.swe_calc_ut(jd_start, SE_SUN, 0)
+        # Full moon target: opposite the Sun
+        target_lon = (sun_pos[0] + 180.0) % 360.0
+
+        # Find when Moon crosses the opposite point
+        jd_full_moon = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
+
+        # Verify Moon is at target position
+        moon_pos, _ = ephem.swe_calc_ut(jd_full_moon, SE_MOON, 0)
+        diff = abs(moon_pos[0] - target_lon)
+        if diff > 180:
+            diff = 360 - diff
+        diff_arcsec = diff * 3600.0
+
+        assert diff_arcsec < 0.05, (
+            f"Moon longitude precision: {diff_arcsec:.4f} arcsec (should be < 0.05)"
+        )
+
+        # Verify the date is in late January 2024
+        year, month, day, hour = ephem.swe_revjul(jd_full_moon)
+        assert year == 2024
+        assert month == 1
+        assert 24 <= day <= 26  # Full moon around Jan 25
+
+    @pytest.mark.unit
+    def test_mooncross_longitude_precision_multiple_targets(self):
+        """Verify mooncross_ut achieves sub-arcsecond precision for various longitudes."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Test multiple target longitudes
+        targets = [0, 45, 90, 135, 180, 225, 270, 315]
+
+        for target in targets:
+            jd_cross = ephem.swe_mooncross_ut(float(target), jd_start, 0)
+
+            # Verify Moon is at target
+            moon_pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+            diff = abs(moon_pos[0] - target)
+            if diff > 180:
+                diff = 360 - diff
+            diff_arcsec = diff * 3600.0
+
+            assert diff_arcsec < 0.05, (
+                f"Target {target}°: diff {diff_arcsec:.4f} arcsec (should be < 0.05)"
+            )
+
+    @pytest.mark.unit
+    def test_solcross_matches_pyswisseph_for_known_events(self):
+        """Verify libephemeris matches pyswisseph for known astronomical events."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        for target in [0.0, 90.0, 180.0, 270.0]:
+            jd_lib = ephem.swe_solcross_ut(target, jd_start, 0)
+            jd_swe = swe.solcross_ut(target, jd_start, 0)
+
+            # Should match within 1 second
+            diff_seconds = abs(jd_lib - jd_swe) * 86400.0
+            assert diff_seconds < 1.0, (
+                f"Target {target}°: libephemeris vs pyswisseph diff {diff_seconds:.3f} seconds"
+            )
