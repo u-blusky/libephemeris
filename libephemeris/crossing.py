@@ -10,7 +10,7 @@ Functions:
 - swe_cross_ut: Generic planet crossing
 
 Precision: Newton-Raphson convergence tolerance
-Tolerance: 0.1 arcsecond (1/36000°) for pyswisseph compatibility
+Tolerance: 0.001 arcsecond for Sun (sub-milliarcsecond), 0.1 arcsecond for Moon/planets
 Iterations: 50 max for Sun/Moon, 60 for slow/helio planets
 Typical convergence: 5-8 iterations for Sun, 7-12 for Moon
 
@@ -24,6 +24,8 @@ from .planets import swe_calc_ut, swe_calc
 # Newton-Raphson convergence constants
 # 0.1 arcsecond tolerance for pyswisseph compatibility
 NR_TOLERANCE = 0.1 / 3600.0  # 0.1 arcsecond in degrees
+# Tighter tolerance for Sun: pyswisseph achieves < 0.001 arcsec (sub-milliarcsecond)
+NR_TOLERANCE_SUN = 0.001 / 3600.0  # 0.001 arcsecond in degrees
 NR_MAX_ITER_SUN = 50  # Max iterations for Sun
 NR_MAX_ITER_MOON = 50  # Max iterations for Moon
 NR_MAX_ITER_PLANET = 50  # Max iterations for generic planets
@@ -51,10 +53,10 @@ def swe_solcross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> f
         1. Get current Sun position and velocity
         2. Linear estimate: dt = (target - current) / velocity
         3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
-        4. Converge to < 0.1 arcsecond (~0.28 seconds of time)
+        4. Converge to < 0.001 arcsecond (sub-milliarcsecond precision)
 
     Precision:
-        Typically < 0.1 arcsecond (< 0.5 seconds of time for Sun)
+        Typically < 0.001 arcsecond (< 0.03 seconds of time for Sun)
 
     Example:
         >>> # Find next Aries ingress (0°)
@@ -109,8 +111,8 @@ def swe_solcross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> f
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.1 arcsecond = 0.1/3600 degree)
-        if abs(diff) < NR_TOLERANCE:
+        # Check convergence (< 0.001 arcsecond = 0.001/3600 degree for Sun)
+        if abs(diff) < NR_TOLERANCE_SUN:
             return jd
 
         # Newton-Raphson step
@@ -155,10 +157,10 @@ def swe_solcross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> floa
         1. Get current Sun position and velocity
         2. Linear estimate: dt = (target - current) / velocity
         3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
-        4. Converge to < 0.1 arcsecond (~0.28 seconds of time)
+        4. Converge to < 0.001 arcsecond (sub-milliarcsecond precision)
 
     Precision:
-        Typically < 0.1 arcsecond (< 0.5 seconds of time for Sun)
+        Typically < 0.001 arcsecond (< 0.03 seconds of time for Sun)
 
     Example:
         >>> # Find next Aries ingress (0°) using TT
@@ -212,8 +214,8 @@ def swe_solcross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> floa
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.1 arcsecond)
-        if abs(diff) < NR_TOLERANCE:
+        # Check convergence (< 0.001 arcsecond for Sun)
+        if abs(diff) < NR_TOLERANCE_SUN:
             return jd
 
         # Newton-Raphson step

@@ -8,14 +8,16 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
-from libephemeris.crossing import NR_TOLERANCE
+from libephemeris.crossing import NR_TOLERANCE, NR_TOLERANCE_SUN
 
 
 class TestSubArcsecondPrecision:
-    """Tests to verify sub-arcsecond convergence (0.1 arcsecond tolerance)."""
+    """Tests to verify sub-arcsecond convergence (0.1 arcsecond for Moon/planets, 0.001 for Sun)."""
 
     # 0.1 arcsecond = 0.1/3600 degrees = ~2.78e-5 degrees
     SUB_ARCSEC = 0.1 / 3600.0
+    # 0.001 arcsecond = 0.001/3600 degrees = ~2.78e-7 degrees (Sun tolerance)
+    SUB_MILLIARCSEC = 0.001 / 3600.0
 
     @pytest.mark.unit
     def test_nr_tolerance_constant(self):
@@ -25,8 +27,15 @@ class TestSubArcsecondPrecision:
         )
 
     @pytest.mark.unit
-    def test_solcross_sub_arcsecond_precision(self):
-        """Sun crossing should achieve sub-arcsecond precision."""
+    def test_nr_tolerance_sun_constant(self):
+        """Verify NR_TOLERANCE_SUN is set to 0.001 arcsecond."""
+        assert NR_TOLERANCE_SUN == self.SUB_MILLIARCSEC, (
+            f"NR_TOLERANCE_SUN should be {self.SUB_MILLIARCSEC}, got {NR_TOLERANCE_SUN}"
+        )
+
+    @pytest.mark.unit
+    def test_solcross_sub_milliarcsecond_precision(self):
+        """Sun crossing should achieve sub-milliarcsecond precision (0.001 arcsec)."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
         target = 45.0
         jd_cross = ephem.swe_solcross_ut(target, jd_start, 0)
@@ -38,10 +47,10 @@ class TestSubArcsecondPrecision:
         if diff > 180:
             diff = 360 - diff
 
-        # Verify sub-arcsecond precision
+        # Verify sub-milliarcsecond precision (0.001 arcsecond)
         diff_arcsec = diff * 3600.0
-        assert diff_arcsec < 0.1, (
-            f"Sun at {pos[0]}, target {target}, diff {diff_arcsec:.4f} arcsec (should be < 0.1)"
+        assert diff_arcsec < 0.001, (
+            f"Sun at {pos[0]}, target {target}, diff {diff_arcsec:.6f} arcsec (should be < 0.001)"
         )
 
     @pytest.mark.unit
@@ -119,8 +128,8 @@ class TestSubArcsecondPrecision:
         )
 
     @pytest.mark.comparison
-    def test_solcross_vs_pyswisseph_sub_arcsecond(self):
-        """Verify libephemeris matches pyswisseph within sub-arcsecond tolerance."""
+    def test_solcross_vs_pyswisseph_sub_milliarcsecond(self):
+        """Verify libephemeris matches pyswisseph and achieves sub-milliarcsecond precision."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
         target = 0.0  # Vernal equinox
 
@@ -142,10 +151,12 @@ class TestSubArcsecondPrecision:
             diff_swe = 360 - diff_swe
         diff_swe_arcsec = diff_swe * 3600.0
 
-        # libephemeris should achieve sub-arcsecond precision
-        assert diff_lib_arcsec < 0.1, f"libephemeris diff {diff_lib_arcsec:.4f} arcsec"
-        # pyswisseph should also achieve sub-arcsecond precision
-        assert diff_swe_arcsec < 0.1, f"pyswisseph diff {diff_swe_arcsec:.4f} arcsec"
+        # libephemeris should achieve sub-milliarcsecond precision (0.001 arcsec)
+        assert diff_lib_arcsec < 0.001, (
+            f"libephemeris diff {diff_lib_arcsec:.6f} arcsec"
+        )
+        # pyswisseph should also achieve sub-milliarcsecond precision
+        assert diff_swe_arcsec < 0.001, f"pyswisseph diff {diff_swe_arcsec:.6f} arcsec"
 
         # Crossing times should be within 1 second of each other
         diff_time_seconds = abs(jd_lib - jd_swe) * 86400.0
@@ -185,8 +196,8 @@ class TestSubArcsecondPrecision:
     @pytest.mark.parametrize(
         "target", [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
     )
-    def test_solcross_all_signs_sub_arcsecond(self, target):
-        """All zodiac sign ingresses should achieve sub-arcsecond precision."""
+    def test_solcross_all_signs_sub_milliarcsecond(self, target):
+        """All zodiac sign ingresses should achieve sub-milliarcsecond precision (0.001 arcsec)."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
 
         jd_cross = ephem.swe_solcross_ut(float(target), jd_start, 0)
@@ -197,7 +208,9 @@ class TestSubArcsecondPrecision:
             diff = 360 - diff
 
         diff_arcsec = diff * 3600.0
-        assert diff_arcsec < 0.1, f"Target {target}° diff {diff_arcsec:.4f} arcsec"
+        assert diff_arcsec < 0.001, (
+            f"Target {target}° diff {diff_arcsec:.6f} arcsec (should be < 0.001)"
+        )
 
 
 class TestSolcrossBasic:
