@@ -162,35 +162,35 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 - [x] Correggere il secondo caso di fallimento per latitudini polari in houses.py linea 1003. Stesso problema del precedente ma in un diverso sistema di case. Vedere CALCS.md per i dettagli sui calcoli delle case.
 
-- [ ] Correggere l'approssimazione nel sistema di case Alcabitus in houses.py linea 1918 dove viene usata un'approssimazione perché non si ha accesso al vero Ascendente calcolato. Bisogna refactorizzare per passare l'Ascendente già calcolato. Vedere CALCS.md per i dettagli sui calcoli delle case.
+- [x] Correggere l'approssimazione nel sistema di case Alcabitus in houses.py linea 1918 dove viene usata un'approssimazione perché non si ha accesso al vero Ascendente calcolato. Bisogna refactorizzare per passare l'Ascendente già calcolato. Vedere CALCS.md per i dettagli sui calcoli delle case.
 
-- [ ] Correggere l'uso dei baricentri invece dei centri planetari per i giganti gassosi in planets.py linea 61. Attualmente Skyfield ritorna la posizione del baricentro Jupiter-system invece del centro di Giove, causando errori di alcune migliaia di km. Bisogna usare gli ID corretti per i centri planetari (599 per Giove invece di 5). Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Correggere l'uso dei baricentri invece dei centri planetari per i giganti gassosi in planets.py linea 61. Attualmente Skyfield ritorna la posizione del baricentro Jupiter-system invece del centro di Giove, causando errori di alcune migliaia di km. Bisogna usare gli ID corretti per i centri planetari (599 per Giove invece di 5). Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Correggere l'approssimazione lineare del moto proprio delle stelle in planets.py linea 757. Attualmente si usa `pos = pos_j2000 + proper_motion * years` ma per precisione sub-arcsecond su lunghi periodi serve un'espansione polinomiale che tenga conto della curvatura del moto. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Correggere l'approssimazione lineare del moto proprio delle stelle in planets.py linea 757. Attualmente si usa `pos = pos_j2000 + proper_motion * years` ma per precisione sub-arcsecond su lunghi periodi serve un'espansione polinomiale che tenga conto della curvatura del moto. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Correggere la stessa approssimazione lineare del moto proprio in planets.py linea 769. È lo stesso problema del precedente ma in un punto diverso del codice. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Correggere la stessa approssimazione lineare del moto proprio in planets.py linea 769. È lo stesso problema del precedente ma in un punto diverso del codice. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Migliorare la tolleranza di convergenza Newton-Raphson in crossing.py linea 12. Attualmente la tolleranza è 1 arcsecondo ma per compatibilità con pyswisseph serve precisione sub-arcsecond (0.1" o meglio). Ridurre la tolleranza e aumentare le iterazioni massime se necessario. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Migliorare la tolleranza di convergenza Newton-Raphson in crossing.py linea 12. Attualmente la tolleranza è 1 arcsecondo ma per compatibilità con pyswisseph serve precisione sub-arcsecond (0.1" o meglio). Ridurre la tolleranza e aumentare le iterazioni massime se necessario. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Stringere la tolleranza di convergenza da 1 arcsec in crossing.py linea 57 per il calcolo degli attraversamenti solari (solcross). pyswisseph raggiunge precisione di circa 0.001 arcsec. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Stringere la tolleranza di convergenza da 1 arcsec in crossing.py linea 57 per il calcolo degli attraversamenti solari (solcross). pyswisseph raggiunge precisione di circa 0.001 arcsec. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Aumentare il numero massimo di iterazioni da 20 in crossing.py linea 97. Per pianeti lenti come Plutone o per attraversamenti vicini a stazioni retrograde, 20 iterazioni potrebbero non bastare per convergere. Usare un valore adattivo basato sulla velocità del pianeta. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Aumentare il numero massimo di iterazioni da 20 in crossing.py linea 97. Per pianeti lenti come Plutone o per attraversamenti vicini a stazioni retrograde, 20 iterazioni potrebbero non bastare per convergere. Usare un valore adattivo basato sulla velocità del pianeta. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Stringere la tolleranza di convergenza in crossing.py linea 113 che attualmente è 1 arcsecondo. Stesso problema dei precedenti. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Stringere la tolleranza di convergenza in crossing.py linea 113 che attualmente è 1 arcsecondo. Stesso problema dei precedenti. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Correggere la tolleranza di 1 arcsec per gli attraversamenti lunari in crossing.py linea 155. La Luna si muove velocemente (~13°/giorno) quindi la convergenza dovrebbe essere veloce, ma la tolleranza finale deve comunque essere sub-arcsecond. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Correggere la tolleranza di 1 arcsec per gli attraversamenti lunari in crossing.py linea 155. La Luna si muove velocemente (~13°/giorno) quindi la convergenza dovrebbe essere veloce, ma la tolleranza finale deve comunque essere sub-arcsecond. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Rivedere il numero di iterazioni (30) per la Luna in crossing.py linea 191. Potrebbe essere eccessivo dato che la Luna converge rapidamente, o potrebbe servire ancora di più per casi edge vicino ai nodi. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Rivedere il numero di iterazioni (30) per la Luna in crossing.py linea 191. Potrebbe essere eccessivo dato che la Luna converge rapidamente, o potrebbe servire ancora di più per casi edge vicino ai nodi. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Ottimizzare la gestione delle stazioni retrograde in crossing.py linea 248. Quando un pianeta è vicino a una stazione (velocità ~0), l'algoritmo Newton-Raphson può avere problemi di convergenza. Bisogna detectare questa situazione e usare un metodo alternativo (bisection o Brent). Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Ottimizzare la gestione delle stazioni retrograde in crossing.py linea 248. Quando un pianeta è vicino a una stazione (velocità ~0), l'algoritmo Newton-Raphson può avere problemi di convergenza. Bisogna detectare questa situazione e usare un metodo alternativo (bisection o Brent). Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Implementare iterazioni adattive per pianeti lenti in crossing.py linea 298. Plutone si muove di soli 0.01°/giorno quindi serve più precisione e più iterazioni rispetto a Mercurio. Il numero di iterazioni dovrebbe dipendere dalla velocità media del pianeta. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Implementare iterazioni adattive per pianeti lenti in crossing.py linea 298. Plutone si muove di soli 0.01°/giorno quindi serve più precisione e più iterazioni rispetto a Mercurio. Il numero di iterazioni dovrebbe dipendere dalla velocità media del pianeta. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Correggere l'approssimazione lineare del moto proprio in fixed_stars.py linea 14. Per le stelle con alto moto proprio (come Barnard's Star) l'errore diventa significativo su scale di secoli. Usare espansione al secondo ordine. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
+- [x] Correggere l'approssimazione lineare del moto proprio in fixed_stars.py linea 14. Per le stelle con alto moto proprio (come Barnard's Star) l'errore diventa significativo su scale di secoli. Usare espansione al secondo ordine. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
 
-- [ ] Correggere la stessa approssimazione in fixed_stars.py linea 99. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
+- [x] Correggere la stessa approssimazione in fixed_stars.py linea 99. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
 
-- [ ] Correggere il moto proprio che ignora la curvatura in fixed_stars.py linea 118. Per precisione massima bisogna considerare che il moto proprio cambia direzione nel tempo a causa della curvatura della sfera celeste. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
+- [x] Correggere il moto proprio che ignora la curvatura in fixed_stars.py linea 118. Per precisione massima bisogna considerare che il moto proprio cambia direzione nel tempo a causa della curvatura della sfera celeste. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
 
 - [ ] Sostituire l'approssimazione a 2 termini della nutazione con il modello IAU completo in fixed_stars.py linea 162. Attualmente si usano solo i termini principali (18.6 anni e 6 mesi) ma il modello IAU 2000A ha 1365 termini per precisione sub-milliarcsecond. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
 
