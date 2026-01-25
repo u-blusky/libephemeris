@@ -10,7 +10,7 @@ Functions:
 - swe_cross_ut: Generic planet crossing
 
 Precision: Newton-Raphson convergence tolerance
-Tolerance: 0.001 arcsecond for Sun (sub-milliarcsecond), 0.1 arcsecond for Moon/planets
+Tolerance: 0.001 arcsecond for Sun (sub-milliarcsecond), 0.05 arcsecond for Moon, 0.1 arcsecond for planets
 Iterations: Adaptive based on planet speed:
     - 50 for Sun/Moon/fast planets (speed >= 0.1°/day)
     - 60 for slow planets like Saturn (0.01 <= speed < 0.1°/day)
@@ -30,6 +30,9 @@ from .planets import swe_calc_ut, swe_calc
 NR_TOLERANCE = 0.1 / 3600.0  # 0.1 arcsecond in degrees
 # Tighter tolerance for Sun: pyswisseph achieves < 0.001 arcsec (sub-milliarcsecond)
 NR_TOLERANCE_SUN = 0.001 / 3600.0  # 0.001 arcsecond in degrees
+# Moon tolerance: 0.05 arcsecond - sub-arcsecond precision with fast convergence
+# due to Moon's high speed (~13°/day). Tighter than generic planets.
+NR_TOLERANCE_MOON = 0.05 / 3600.0  # 0.05 arcsecond in degrees
 NR_MAX_ITER_SUN = 50  # Max iterations for Sun
 NR_MAX_ITER_MOON = 50  # Max iterations for Moon
 NR_MAX_ITER_PLANET = 50  # Max iterations for generic planets
@@ -291,7 +294,7 @@ def swe_mooncross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
         More variable speed than Sun due to orbit eccentricity.
 
     Precision:
-        Typically < 0.1 arcsecond (< 0.01 seconds of time for Moon)
+        Typically < 0.05 arcsecond (sub-arcsecond) for fast convergence
 
     Example:
         >>> # Find next new moon (Sun-Moon conjunction at same longitude)
@@ -343,8 +346,8 @@ def swe_mooncross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.1 arcsecond)
-        if abs(diff) < NR_TOLERANCE:
+        # Check convergence (< 0.05 arcsecond for Moon)
+        if abs(diff) < NR_TOLERANCE_MOON:
             return jd
 
         # Newton-Raphson step
@@ -392,10 +395,10 @@ def swe_mooncross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> flo
         1. Get current Moon position and velocity
         2. Linear estimate: dt = (target - current) / velocity
         3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
-        4. Converge to < 0.1 arcsecond (~0.01 seconds of time for Moon)
+        4. Converge to < 0.05 arcsecond (sub-arcsecond precision)
 
     Precision:
-        Typically < 0.1 arcsecond (< 0.01 seconds of time for Moon)
+        Typically < 0.05 arcsecond (sub-arcsecond) for fast convergence
 
     Example:
         >>> # Find next new moon (Sun-Moon conjunction at same longitude) using TT
@@ -446,8 +449,8 @@ def swe_mooncross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> flo
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.1 arcsecond)
-        if abs(diff) < NR_TOLERANCE:
+        # Check convergence (< 0.05 arcsecond for Moon)
+        if abs(diff) < NR_TOLERANCE_MOON:
             return jd
 
         # Newton-Raphson step
@@ -487,7 +490,7 @@ def swe_mooncross_node_ut(jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
         1. Get current Moon latitude and latitude velocity
         2. Linear estimate: dt = -latitude / latitude_velocity
         3. Refine with Newton-Raphson until latitude is ~0
-        4. Converge to < 0.1 arcsecond
+        4. Converge to < 0.05 arcsecond (sub-arcsecond precision)
 
     Note:
         The function finds the NEXT node crossing regardless of whether it's
@@ -563,8 +566,8 @@ def swe_mooncross_node_ut(jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
                 f"Failed to calculate Moon position during iteration: {e}"
             )
 
-        # Check convergence (< 0.1 arcsecond = 0.1/3600 degree)
-        if abs(lat) < NR_TOLERANCE:
+        # Check convergence (< 0.05 arcsecond for Moon)
+        if abs(lat) < NR_TOLERANCE_MOON:
             # Make sure we found a crossing that's actually in the future
             if jd > jd_ut + 0.001:  # At least ~1.4 minutes in future
                 return jd
@@ -669,8 +672,8 @@ def swe_mooncross_node(jd_tt: float, flag: int = SEFLG_SWIEPH) -> float:
                 f"Failed to calculate Moon position during iteration: {e}"
             )
 
-        # Check convergence (< 0.1 arcsecond = 0.1/3600 degree)
-        if abs(lat) < NR_TOLERANCE:
+        # Check convergence (< 0.05 arcsecond for Moon)
+        if abs(lat) < NR_TOLERANCE_MOON:
             if jd > jd_tt + 0.001:
                 return jd
             jd = jd + HALF_NODAL_MONTH / 2

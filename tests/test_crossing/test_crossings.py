@@ -11,6 +11,7 @@ from libephemeris.constants import *
 from libephemeris.crossing import (
     NR_TOLERANCE,
     NR_TOLERANCE_SUN,
+    NR_TOLERANCE_MOON,
     NR_MAX_ITER_PLANET,
     NR_MAX_ITER_HELIO,
     NR_MAX_ITER_VERY_SLOW,
@@ -20,10 +21,12 @@ from libephemeris.crossing import (
 
 
 class TestSubArcsecondPrecision:
-    """Tests to verify sub-arcsecond convergence (0.1 arcsecond for Moon/planets, 0.001 for Sun)."""
+    """Tests to verify sub-arcsecond convergence (0.05 arcsecond for Moon, 0.1 for planets, 0.001 for Sun)."""
 
     # 0.1 arcsecond = 0.1/3600 degrees = ~2.78e-5 degrees
     SUB_ARCSEC = 0.1 / 3600.0
+    # 0.05 arcsecond = 0.05/3600 degrees (Moon tolerance)
+    SUB_ARCSEC_MOON = 0.05 / 3600.0
     # 0.001 arcsecond = 0.001/3600 degrees = ~2.78e-7 degrees (Sun tolerance)
     SUB_MILLIARCSEC = 0.001 / 3600.0
 
@@ -39,6 +42,13 @@ class TestSubArcsecondPrecision:
         """Verify NR_TOLERANCE_SUN is set to 0.001 arcsecond."""
         assert NR_TOLERANCE_SUN == self.SUB_MILLIARCSEC, (
             f"NR_TOLERANCE_SUN should be {self.SUB_MILLIARCSEC}, got {NR_TOLERANCE_SUN}"
+        )
+
+    @pytest.mark.unit
+    def test_nr_tolerance_moon_constant(self):
+        """Verify NR_TOLERANCE_MOON is set to 0.05 arcsecond (sub-arcsecond)."""
+        assert NR_TOLERANCE_MOON == self.SUB_ARCSEC_MOON, (
+            f"NR_TOLERANCE_MOON should be {self.SUB_ARCSEC_MOON}, got {NR_TOLERANCE_MOON}"
         )
 
     @pytest.mark.unit
@@ -63,7 +73,7 @@ class TestSubArcsecondPrecision:
 
     @pytest.mark.unit
     def test_mooncross_sub_arcsecond_precision(self):
-        """Moon crossing should achieve sub-arcsecond precision."""
+        """Moon crossing should achieve sub-arcsecond precision (0.05 arcsec)."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
         target = 123.456
         jd_cross = ephem.swe_mooncross_ut(target, jd_start, 0)
@@ -74,25 +84,25 @@ class TestSubArcsecondPrecision:
         if diff > 180:
             diff = 360 - diff
 
-        # Verify sub-arcsecond precision
+        # Verify sub-arcsecond precision (0.05 arcsec for Moon)
         diff_arcsec = diff * 3600.0
-        assert diff_arcsec < 0.1, (
-            f"Moon at {pos[0]}, target {target}, diff {diff_arcsec:.4f} arcsec (should be < 0.1)"
+        assert diff_arcsec < 0.05, (
+            f"Moon at {pos[0]}, target {target}, diff {diff_arcsec:.4f} arcsec (should be < 0.05)"
         )
 
     @pytest.mark.unit
     def test_mooncross_node_sub_arcsecond_precision(self):
-        """Moon node crossing should achieve sub-arcsecond precision."""
+        """Moon node crossing should achieve sub-arcsecond precision (0.05 arcsec)."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
         jd_cross = ephem.swe_mooncross_node_ut(jd_start, 0)
 
         # Check Moon latitude at crossing (should be ~0)
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
 
-        # Latitude should be within 0.1 arcsecond of zero
+        # Latitude should be within 0.05 arcsecond of zero (Moon tolerance)
         lat_arcsec = abs(pos[1]) * 3600.0
-        assert lat_arcsec < 0.1, (
-            f"Moon latitude at node: {lat_arcsec:.4f} arcsec (should be < 0.1)"
+        assert lat_arcsec < 0.05, (
+            f"Moon latitude at node: {lat_arcsec:.4f} arcsec (should be < 0.05)"
         )
 
     @pytest.mark.unit
@@ -174,7 +184,7 @@ class TestSubArcsecondPrecision:
 
     @pytest.mark.comparison
     def test_mooncross_vs_pyswisseph_sub_arcsecond(self):
-        """Verify Moon crossing matches pyswisseph within sub-arcsecond tolerance."""
+        """Verify Moon crossing matches pyswisseph within sub-arcsecond tolerance (0.05 arcsec)."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
         target = 180.0
 
@@ -190,8 +200,8 @@ class TestSubArcsecondPrecision:
             diff_lib = 360 - diff_lib
         diff_lib_arcsec = diff_lib * 3600.0
 
-        # libephemeris should achieve sub-arcsecond precision
-        assert diff_lib_arcsec < 0.1, f"libephemeris diff {diff_lib_arcsec:.4f} arcsec"
+        # libephemeris should achieve sub-arcsecond precision (0.05 arcsec for Moon)
+        assert diff_lib_arcsec < 0.05, f"libephemeris diff {diff_lib_arcsec:.4f} arcsec"
 
         # Crossing times should be within 3 seconds of each other
         # (slight differences in underlying ephemeris calculations)
