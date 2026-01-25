@@ -12,6 +12,7 @@ from libephemeris.crossing import (
     NR_TOLERANCE,
     NR_TOLERANCE_SUN,
     NR_TOLERANCE_MOON,
+    NR_MAX_ITER_MOON,
     NR_MAX_ITER_PLANET,
     NR_MAX_ITER_HELIO,
     NR_MAX_ITER_VERY_SLOW,
@@ -49,6 +50,19 @@ class TestSubArcsecondPrecision:
         """Verify NR_TOLERANCE_MOON is set to 0.05 arcsecond (sub-arcsecond)."""
         assert NR_TOLERANCE_MOON == self.SUB_ARCSEC_MOON, (
             f"NR_TOLERANCE_MOON should be {self.SUB_ARCSEC_MOON}, got {NR_TOLERANCE_MOON}"
+        )
+
+    @pytest.mark.unit
+    def test_nr_max_iter_moon_constant(self):
+        """Verify NR_MAX_ITER_MOON is set to 30.
+
+        30 iterations is sufficient for Moon due to rapid convergence:
+        - Longitude crossings (~13°/day): typically 7-12 iterations
+        - Node crossings (~1°/day latitude speed): up to 15-20 iterations
+        - 30 provides adequate safety margin (1.5-2.5x typical cases)
+        """
+        assert NR_MAX_ITER_MOON == 30, (
+            f"NR_MAX_ITER_MOON should be 30, got {NR_MAX_ITER_MOON}"
         )
 
     @pytest.mark.unit
@@ -1250,3 +1264,140 @@ class TestAdaptiveIterations:
             if diff > 180:
                 diff = 360 - diff
             assert diff < 0.1
+
+
+class TestMoonNodeEdgeCases:
+    """Test Moon node crossing edge cases to verify 30 iterations is sufficient.
+
+    The Moon's latitude speed varies:
+    - ~1°/day at node crossings (slowest, hardest to converge)
+    - Higher speeds away from nodes
+    These tests verify convergence works with 30 iterations even in worst cases.
+    """
+
+    @pytest.mark.unit
+    def test_mooncross_node_when_starting_very_close_to_node(self):
+        """Test convergence when starting very close to a node crossing."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # First find a node crossing
+        jd_node = ephem.swe_mooncross_node_ut(jd_start, 0)
+
+        # Now start very close to it (1 hour before) - tests edge case
+        jd_near_node = jd_node - 1 / 24  # 1 hour before
+        jd_next = ephem.swe_mooncross_node_ut(jd_near_node, 0)
+
+        # Should find the same node (or the next one if we're past it)
+        pos, _ = ephem.swe_calc_ut(jd_next, SE_MOON, 0)
+        lat_arcsec = abs(pos[1]) * 3600.0
+        assert lat_arcsec < 0.05, f"Latitude at node: {lat_arcsec:.4f} arcsec"
+
+    @pytest.mark.unit
+    def test_mooncross_node_multiple_consecutive_near_nodes(self):
+        """Test finding multiple consecutive node crossings (6 crossings = ~81 days)."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        crossings = []
+
+        jd = jd_start
+        for i in range(6):
+            jd_cross = ephem.swe_mooncross_node_ut(jd, 0)
+            crossings.append(jd_cross)
+
+            # Verify latitude is near zero
+            pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+            lat_arcsec = abs(pos[1]) * 3600.0
+            assert lat_arcsec < 0.05, (
+                f"Crossing {i + 1}: latitude {lat_arcsec:.4f} arcsec"
+            )
+
+            jd = jd_cross + 0.5  # Move past this crossing
+
+        # Verify crossings are ~13.6 days apart
+        for i in range(1, len(crossings)):
+            diff = crossings[i] - crossings[i - 1]
+            assert 12 < diff < 15, f"Gap between crossings {i} and {i + 1}: {diff} days"
+
+    @pytest.mark.unit
+    def test_mooncross_node_at_minimum_latitude_speed(self):
+        """Test convergence when Moon latitude speed is at minimum (~1°/day).
+
+        This is the hardest case for Newton-Raphson convergence.
+        At node crossings, latitude speed is approximately 1°/day.
+        """
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find a node crossing
+        jd_node = ephem.swe_mooncross_node_ut(jd_start, 0)
+
+        # Verify we got good convergence
+        pos, _ = ephem.swe_calc_ut(jd_node, SE_MOON, SEFLG_SPEED)
+        lat_arcsec = abs(pos[1]) * 3600.0
+
+        # Latitude should be within tolerance
+        assert lat_arcsec < 0.05, f"Latitude: {lat_arcsec:.4f} arcsec"
+
+        # Confirm latitude speed is around the expected ~1°/day
+        lat_speed = abs(pos[4])
+        assert 0.5 < lat_speed < 1.5, f"Latitude speed: {lat_speed}°/day"
+
+    @pytest.mark.unit
+    def test_mooncross_at_true_node_longitude(self):
+        """Test Moon longitude crossing at the true node position.
+
+        When Moon is at its true node, latitude is ~0 and this is
+        an edge case for longitude crossing calculations.
+        """
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Get true node position
+        node_pos, _ = ephem.swe_calc_ut(jd_start, SE_TRUE_NODE, 0)
+        node_lon = node_pos[0]
+
+        # Find when Moon crosses the true node longitude
+        jd_cross = ephem.swe_mooncross_ut(node_lon, jd_start, 0)
+
+        # Verify Moon is at target longitude
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+        diff = abs(pos[0] - node_lon)
+        if diff > 180:
+            diff = 360 - diff
+        diff_arcsec = diff * 3600.0
+
+        assert diff_arcsec < 0.05, (
+            f"Moon at {pos[0]:.6f}, node at {node_lon:.6f}, diff {diff_arcsec:.4f} arcsec"
+        )
+
+    @pytest.mark.unit
+    def test_mooncross_node_tt_edge_case_near_node(self):
+        """Test TT version convergence when starting near a node."""
+        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_tt = jd_start_ut + delta_t
+
+        # Find node crossing in TT
+        jd_node_tt = ephem.swe_mooncross_node(jd_start_tt, 0)
+
+        # Start very close to it (30 minutes before)
+        jd_near = jd_node_tt - 0.5 / 24
+        jd_next_tt = ephem.swe_mooncross_node(jd_near, 0)
+
+        # Verify convergence
+        pos, _ = ephem.swe_calc(jd_next_tt, SE_MOON, 0)
+        lat_arcsec = abs(pos[1]) * 3600.0
+        assert lat_arcsec < 0.05, f"Latitude: {lat_arcsec:.4f} arcsec"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("year", [2020, 2024, 2028, 2032])
+    def test_mooncross_node_convergence_different_years(self, year):
+        """Test node crossing convergence across different years.
+
+        The true node position oscillates ±1.5° around mean node,
+        so testing different years covers different orbital phases.
+        """
+        jd_start = ephem.swe_julday(year, 6, 15, 0.0)  # Mid-year
+
+        jd_node = ephem.swe_mooncross_node_ut(jd_start, 0)
+
+        pos, _ = ephem.swe_calc_ut(jd_node, SE_MOON, 0)
+        lat_arcsec = abs(pos[1]) * 3600.0
+        assert lat_arcsec < 0.05, f"Year {year}: latitude {lat_arcsec:.4f} arcsec"

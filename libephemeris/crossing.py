@@ -12,11 +12,12 @@ Functions:
 Precision: Newton-Raphson convergence tolerance
 Tolerance: 0.001 arcsecond for Sun (sub-milliarcsecond), 0.05 arcsecond for Moon, 0.1 arcsecond for planets
 Iterations: Adaptive based on planet speed:
-    - 50 for Sun/Moon/fast planets (speed >= 0.1°/day)
+    - 50 for Sun/fast planets (speed >= 0.1°/day)
+    - 30 for Moon (rapid convergence due to high speed ~13°/day)
     - 60 for slow planets like Saturn (0.01 <= speed < 0.1°/day)
     - 80 for very slow planets like Pluto (0.001 <= speed < 0.01°/day)
     - 100 near retrograde stations (speed < 0.001°/day)
-Typical convergence: 5-8 iterations for Sun, 7-12 for Moon
+Typical convergence: 5-8 iterations for Sun, 7-12 for Moon (up to 20 near nodes)
 
 Algorithm: Initial linear estimate + Newton-Raphson refinement
 References: Meeus "Astronomical Algorithms" Ch. 5 (interpolation)
@@ -34,7 +35,12 @@ NR_TOLERANCE_SUN = 0.001 / 3600.0  # 0.001 arcsecond in degrees
 # due to Moon's high speed (~13°/day). Tighter than generic planets.
 NR_TOLERANCE_MOON = 0.05 / 3600.0  # 0.05 arcsecond in degrees
 NR_MAX_ITER_SUN = 50  # Max iterations for Sun
-NR_MAX_ITER_MOON = 50  # Max iterations for Moon
+# Moon iterations: 30 is sufficient given rapid convergence.
+# - Longitude crossings: Moon moves ~13°/day, typical 7-12 iterations
+# - Node crossings: latitude speed ~1°/day at nodes, up to 15-20 iterations
+# - 30 provides 1.5-2.5x safety margin for edge cases near nodes
+# See CALCS.md for Moon motion details (±5.15° latitude, ~27 day cycle)
+NR_MAX_ITER_MOON = 30  # Max iterations for Moon
 NR_MAX_ITER_PLANET = 50  # Max iterations for generic planets
 NR_MAX_ITER_HELIO = 60  # Max iterations for heliocentric (slow planets)
 NR_MAX_ITER_VERY_SLOW = 80  # Max iterations for very slow planets (Pluto, TNOs)
