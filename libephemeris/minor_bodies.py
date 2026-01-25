@@ -19,7 +19,7 @@ This is intentionally simpler than Swiss Ephemeris's full dynamical model for:
 - No external data files required
 - Acceptable precision for most astrological applications
 
-Orbital elements source: JPL Small-Body Database (epoch 2023.0)
+Orbital elements source: JPL Small-Body Database (epoch 2025.0, JD 2461000.5)
 Algorithm: Standard Keplerian orbital mechanics (Curtis, Vallado)
 """
 
@@ -47,7 +47,7 @@ from .constants import (
 class OrbitalElements:
     """
     Classical Keplerian orbital elements for a minor body.
-    
+
     Attributes:
         name: Body name
         epoch: Reference epoch (Julian Day in TT)
@@ -58,7 +58,7 @@ class OrbitalElements:
         Omega: Longitude of ascending node (Ω) in degrees
         M0: Mean anomaly at epoch in degrees
         n: Mean motion in degrees/day
-        
+
     Note:
         These are osculating elements at the given epoch.
         They drift over time due to planetary perturbations.
@@ -76,155 +76,158 @@ class OrbitalElements:
 
 
 # =============================================================================
-# ORBITAL ELEMENTS DATABASE (Epoch 2023.0 = JD 2459945.5)
+# ORBITAL ELEMENTS DATABASE (Epoch 2025.0 = JD 2461000.5)
 # =============================================================================
-# FIXME: Precision - Elements are osculating at epoch 2023.0
-# Accuracy degrades ~10-50 arcsec/year due to secular perturbations
-# For dates >10 years from epoch, update elements or use Swiss Ephemeris
+# Source: NASA JPL Small-Body Database (sbdb.api), retrieved 2025
+# Epoch: JD 2461000.5 TDB (2025-Sep-19)
+#
+# Note: Elements are osculating at the given epoch.
+# Accuracy degrades ~10-50 arcsec/year due to secular perturbations.
+# For dates >10 years from epoch, consider updating elements.
 
 MINOR_BODY_ELEMENTS = {
     SE_CHIRON: OrbitalElements(
         name="Chiron",
-        epoch=2459945.5,
-        a=13.633,  # AU - between Saturn and Uranus
-        e=0.380,
-        i=6.935,
-        omega=209.35,
-        Omega=339.53,
-        M0=354.07,
-        n=0.0136,  # ~72 year period
+        epoch=2461000.5,
+        a=13.6922,  # AU - between Saturn and Uranus
+        e=0.378979,
+        i=6.926,
+        omega=339.254,  # argument of perihelion
+        Omega=209.298,  # longitude of ascending node
+        M0=212.840,
+        n=0.01945,  # ~51 year period
     ),
     SE_PHOLUS: OrbitalElements(
         name="Pholus",
-        epoch=2459945.5,
-        a=20.246,
-        e=0.574,  # Highly eccentric
-        i=24.686,
-        omega=354.80,
-        Omega=119.48,
-        M0=286.10,
-        n=0.00763,  # ~90 year period
+        epoch=2461000.5,
+        a=20.2834,
+        e=0.574745,  # Highly eccentric
+        i=24.757,
+        omega=354.730,
+        Omega=119.290,
+        M0=134.471,
+        n=0.01079,  # ~91 year period
     ),
     SE_CERES: OrbitalElements(
         name="Ceres",
-        epoch=2459945.5,
-        a=2.767,
-        e=0.076,
-        i=10.587,
-        omega=73.68,
-        Omega=80.31,
-        M0=352.21,
-        n=0.214,  # ~4.6 year period
+        epoch=2461000.5,
+        a=2.7656,
+        e=0.079576,
+        i=10.588,
+        omega=73.300,
+        Omega=80.250,
+        M0=231.540,
+        n=0.21430,  # ~4.6 year period
     ),
     SE_PALLAS: OrbitalElements(
         name="Pallas",
-        epoch=2459945.5,
-        a=2.772,
-        e=0.231,
-        i=34.841,  # High inclination
-        omega=310.25,
-        Omega=173.14,
-        M0=180.73,
-        n=0.213,
+        epoch=2461000.5,
+        a=2.7699,
+        e=0.230643,
+        i=34.928,  # High inclination
+        omega=310.933,
+        Omega=172.889,
+        M0=211.530,
+        n=0.21380,  # ~4.6 year period
     ),
     SE_JUNO: OrbitalElements(
         name="Juno",
-        epoch=2459945.5,
-        a=2.669,
-        e=0.257,
-        i=12.982,
-        omega=248.21,
-        Omega=170.13,
-        M0=92.57,
-        n=0.225,  # ~4.4 year period
+        epoch=2461000.5,
+        a=2.6709,
+        e=0.255826,
+        i=12.986,
+        omega=247.884,
+        Omega=169.820,
+        M0=217.591,
+        n=0.22580,  # ~4.4 year period
     ),
     SE_VESTA: OrbitalElements(
         name="Vesta",
-        epoch=2459945.5,
-        a=2.362,
-        e=0.089,
-        i=7.141,
-        omega=151.43,
-        Omega=103.91,
-        M0=205.66,
-        n=0.272,  # ~3.6 year period
+        epoch=2461000.5,
+        a=2.3615,
+        e=0.090168,
+        i=7.144,
+        omega=151.537,
+        Omega=103.702,
+        M0=26.810,
+        n=0.27159,  # ~3.6 year period
     ),
     SE_ERIS: OrbitalElements(
         name="Eris",
-        epoch=2459945.5,
-        a=67.781,  # Highly distant
-        e=0.442,
-        i=44.040,  # Extreme inclination
-        omega=151.64,
-        Omega=35.93,
-        M0=204.48,
-        n=0.00174,  # ~558 year period
+        epoch=2461000.5,
+        a=67.9964,  # Highly distant
+        e=0.436965,
+        i=43.869,  # Extreme inclination
+        omega=150.732,
+        Omega=36.027,
+        M0=211.449,
+        n=0.001758,  # ~561 year period
     ),
     SE_SEDNA: OrbitalElements(
         name="Sedna",
-        epoch=2459945.5,
-        a=506.0,  # Extreme distance (detached object)
-        e=0.851,  # Very eccentric
-        i=11.928,
-        omega=311.29,
-        Omega=144.25,
-        M0=358.10,
-        n=0.000155,  # ~11,400 year period
+        epoch=2461000.5,
+        a=549.541,  # Extreme distance (detached object)
+        e=0.861297,  # Very eccentric
+        i=11.926,
+        omega=311.010,
+        Omega=144.479,
+        M0=358.607,
+        n=0.0000765,  # ~12,880 year period
     ),
     SE_HAUMEA: OrbitalElements(
         name="Haumea",
-        epoch=2459945.5,
-        a=43.116,
-        e=0.191,
-        i=28.214,
-        omega=239.23,
-        Omega=121.90,
-        M0=217.89,
-        n=0.00312,  # ~283 year period
+        epoch=2461000.5,
+        a=43.0055,
+        e=0.195775,
+        i=28.208,
+        omega=240.888,
+        Omega=121.797,
+        M0=222.328,
+        n=0.003495,  # ~282 year period
     ),
     SE_MAKEMAKE: OrbitalElements(
         name="Makemake",
-        epoch=2459945.5,
-        a=45.430,
-        e=0.158,
-        i=28.983,
-        omega=294.84,
-        Omega=79.37,
-        M0=160.33,
-        n=0.00287,  # ~306 year period
+        epoch=2461000.5,
+        a=45.5107,
+        e=0.160425,
+        i=29.032,
+        omega=297.075,
+        Omega=79.269,
+        M0=169.320,
+        n=0.003210,  # ~307 year period
     ),
     SE_IXION: OrbitalElements(
         name="Ixion",
-        epoch=2459945.5,
-        a=39.480,  # Plutino (2:3 resonance with Neptune)
-        e=0.242,
-        i=19.593,
-        omega=299.24,
-        Omega=71.01,
-        M0=267.49,
-        n=0.00371,  # ~248 year period
+        epoch=2461000.5,
+        a=39.3505,  # Plutino (2:3 resonance with Neptune)
+        e=0.244233,
+        i=19.670,
+        omega=300.659,
+        Omega=71.093,
+        M0=294.200,
+        n=0.003993,  # ~247 year period
     ),
     SE_ORCUS: OrbitalElements(
         name="Orcus",
-        epoch=2459945.5,
-        a=39.177,  # Plutino (anti-Pluto phase)
-        e=0.227,
-        i=20.573,
-        omega=73.28,
-        Omega=268.66,
-        M0=145.95,
-        n=0.00376,  # ~245 year period
+        epoch=2461000.5,
+        a=39.3358,  # Plutino (anti-Pluto phase)
+        e=0.221730,
+        i=20.556,
+        omega=73.722,
+        Omega=268.386,
+        M0=188.111,
+        n=0.003995,  # ~247 year period
     ),
     SE_QUAOAR: OrbitalElements(
         name="Quaoar",
-        epoch=2459945.5,
-        a=43.406,
-        e=0.039,  # Nearly circular
-        i=8.005,
-        omega=147.10,
-        Omega=188.85,
-        M0=21.70,
-        n=0.00307,  # ~287 year period
+        epoch=2461000.5,
+        a=43.1477,
+        e=0.035839,  # Nearly circular
+        i=7.991,
+        omega=163.923,
+        Omega=188.963,
+        M0=291.482,
+        n=0.003478,  # ~284 year period
     ),
 }
 
@@ -232,26 +235,26 @@ MINOR_BODY_ELEMENTS = {
 def solve_kepler_equation(M: float, e: float, tol: float = 1e-8) -> float:
     """
     Solve Kepler's equation M = E - e·sin(E) for eccentric anomaly E.
-    
+
     Uses Newton-Raphson iteration for robust convergence.
-    
+
     Args:
         M: Mean anomaly in radians
         e: Eccentricity (0 ≤ e < 1)
         tol: Convergence tolerance (default 1e-8 ~ 0.002 arcsec)
-        
+
     Returns:
         float: Eccentric anomaly E in radians
-        
+
     Algorithm:
         Newton-Raphson: E_{n+1} = E_n - f(E_n)/f'(E_n)
         where f(E) = E - e·sin(E) - M
         and f'(E) = 1 - e·cos(E)
-        
+
     Note:
         Converges in ~3-6 iterations for typical eccentricities (e < 0.8).
         Initial guess: M for e < 0.8, π for highly eccentric orbits.
-        
+
     References:
         Curtis "Orbital Mechanics for Engineering Students" §3.1
         Vallado "Fundamentals of Astrodynamics" Algorithm 2
@@ -277,30 +280,30 @@ def calc_minor_body_position(
 ) -> Tuple[float, float, float]:
     """
     Calculate heliocentric position using Keplerian orbital elements.
-    
+
     Propagates orbit from epoch to target time using mean motion.
-    
+
     Args:
         elements: Orbital elements at epoch
         jd_tt: Target Julian Day in Terrestrial Time (TT)
-        
+
     Returns:
         Tuple[float, float, float]: (x, y, z) heliocentric position in AU
             Coordinates in ecliptic J2000.0 frame
-            
+
     Algorithm:
         1. Propagate mean anomaly: M(t) = M0 + n·Δt
         2. Solve Kepler's equation for eccentric anomaly E
         3. Calculate true anomaly ν from E
         4. Compute position in orbital plane
         5. Rotate to ecliptic frame using Ω, i, ω
-        
+
     FIXME: Precision - 2-body Keplerian propagation ignores:
         - Planetary perturbations (Jupiter, Saturn especially)
         - Non-gravitational forces (radiation pressure, Yarkovsky)
         - Relativistic effects (minor for asteroids)
         Typical errors: 1-5 arcminutes for asteroids, worse for TNOs
-        
+
     References:
         Curtis §3 (orbital elements)
         Vallado §2.3 (coordinate transformations)
@@ -360,24 +363,24 @@ def calc_minor_body_heliocentric(
 ) -> Tuple[float, float, float]:
     """
     Calculate heliocentric ecliptic coordinates for a minor body.
-    
+
     Args:
         body_id: Minor body identifier (SE_CHIRON, SE_ERIS, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
-        
+
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude in degrees (0-360)
             - latitude: Ecliptic latitude in degrees (-90 to +90)
             - distance: Heliocentric distance in AU
-            
+
     Raises:
         ValueError: If body_id is not in the database
-        
+
     Note:
         Returns HELIOCENTRIC coordinates. For geocentric, caller must
         subtract Earth's heliocentric position (see planets.py).
-        
+
     Precision:
         Asteroids (Ceres, etc.): ~1-3 arcminutes typical
         TNOs (Eris, etc.): ~3-10 arcminutes typical
@@ -395,4 +398,3 @@ def calc_minor_body_heliocentric(
     lat = math.degrees(math.asin(z / r))
 
     return lon, lat, r
-
