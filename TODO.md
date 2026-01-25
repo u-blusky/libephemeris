@@ -192,17 +192,17 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 - [x] Correggere il moto proprio che ignora la curvatura in fixed_stars.py linea 118. Per precisione massima bisogna considerare che il moto proprio cambia direzione nel tempo a causa della curvatura della sfera celeste. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
 
-- [ ] Sostituire l'approssimazione a 2 termini della nutazione con il modello IAU completo in fixed_stars.py linea 162. Attualmente si usano solo i termini principali (18.6 anni e 6 mesi) ma il modello IAU 2000A ha 1365 termini per precisione sub-milliarcsecond. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
+- [x] Sostituire l'approssimazione a 2 termini della nutazione con il modello IAU completo in fixed_stars.py linea 162. Attualmente si usano solo i termini principali (18.6 anni e 6 mesi) ma il modello IAU 2000A ha 1365 termini per precisione sub-milliarcsecond. Vedere CALCS.md per i dettagli sui calcoli di posizione delle stelle fisse.
 
-- [ ] Rivedere il range di validità del polinomio di Meeus per il nodo lunare medio in lunar.py linea 49. Il polinomio è ottimizzato per date vicine a J2000; per date molto antiche o future l'errore cresce. Documentare i limiti o usare una formula più robusta. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Rivedere il range di validità del polinomio di Meeus per il nodo lunare medio in lunar.py linea 49. Il polinomio è ottimizzato per date vicine a J2000; per date molto antiche o future l'errore cresce. Documentare i limiti o usare una formula più robusta. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Sostituire l'obliquità fissa J2000 (23.4392911°) con l'obliquità dinamica in lunar.py linea 114. L'obliquità dell'eclittica cambia nel tempo a causa della precessione; usare il valore fisso introduce un errore che cresce con la distanza da J2000. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Sostituire l'obliquità fissa J2000 (23.4392911°) con l'obliquità dinamica in lunar.py linea 114. L'obliquità dell'eclittica cambia nel tempo a causa della precessione; usare il valore fisso introduce un errore che cresce con la distanza da J2000. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Aggiungere le perturbazioni planetarie alla formula semplificata in lunar.py linea 157. La posizione della Luna è perturbata principalmente da Giove e dal Sole; ignorare queste perturbazioni può causare errori di diversi arcminuti. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Aggiungere le perturbazioni planetarie alla formula semplificata in lunar.py linea 157. La posizione della Luna è perturbata principalmente da Giove e dal Sole; ignorare queste perturbazioni può causare errori di diversi arcminuti. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Usare un parametro gravitazionale più preciso in lunar.py linea 234. Il valore di GM (costante gravitazionale × massa) della Terra è noto con precisione molto alta da misure satellitari; usare il valore più recente IAU. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Usare un parametro gravitazionale più preciso in lunar.py linea 234. Il valore di GM (costante gravitazionale × massa) della Terra è noto con precisione molto alta da misure satellitari; usare il valore più recente IAU. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Sostituire l'obliquità fissa J2000 in lunar.py linea 250. Stesso problema della linea 114. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Sostituire l'obliquità fissa J2000 in lunar.py linea 250. Stesso problema della linea 114. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
 - [ ] Aggiornare gli elementi orbitali osculanti dalla epoca 2023.0 in minor_bodies.py linea 81. Gli elementi kepleriani degli asteroidi cambiano nel tempo a causa delle perturbazioni; bisogna o usare elementi più recenti o implementare l'integrazione delle perturbazioni. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
