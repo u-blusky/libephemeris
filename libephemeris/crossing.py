@@ -11,7 +11,11 @@ Functions:
 
 Precision: Newton-Raphson convergence tolerance
 Tolerance: 0.001 arcsecond for Sun (sub-milliarcsecond), 0.1 arcsecond for Moon/planets
-Iterations: 50 max for Sun/Moon, 60 for slow/helio planets
+Iterations: Adaptive based on planet speed:
+    - 50 for Sun/Moon/fast planets (speed >= 0.1°/day)
+    - 60 for slow planets like Saturn (0.01 <= speed < 0.1°/day)
+    - 80 for very slow planets like Pluto (0.001 <= speed < 0.01°/day)
+    - 100 near retrograde stations (speed < 0.001°/day)
 Typical convergence: 5-8 iterations for Sun, 7-12 for Moon
 
 Algorithm: Initial linear estimate + Newton-Raphson refinement
@@ -30,6 +34,40 @@ NR_MAX_ITER_SUN = 50  # Max iterations for Sun
 NR_MAX_ITER_MOON = 50  # Max iterations for Moon
 NR_MAX_ITER_PLANET = 50  # Max iterations for generic planets
 NR_MAX_ITER_HELIO = 60  # Max iterations for heliocentric (slow planets)
+NR_MAX_ITER_VERY_SLOW = 80  # Max iterations for very slow planets (Pluto, TNOs)
+NR_MAX_ITER_STATION = 100  # Max iterations near retrograde stations
+
+
+def _get_adaptive_max_iterations(speed: float) -> int:
+    """
+    Calculate adaptive iteration limit based on planet speed.
+
+    For slow planets like Pluto (~0.004°/day) or near retrograde stations
+    (speed approaching 0), more iterations are needed for Newton-Raphson
+    convergence.
+
+    Args:
+        speed: Planet speed in degrees/day
+
+    Returns:
+        int: Maximum iterations to use
+
+    Speed thresholds:
+        |speed| >= 0.1: 50 iterations (normal planets)
+        0.01 <= |speed| < 0.1: 60 iterations (slow planets like outer planets)
+        0.001 <= |speed| < 0.01: 80 iterations (very slow: Pluto, TNOs)
+        |speed| < 0.001: 100 iterations (near station/retrograde)
+    """
+    abs_speed = abs(speed)
+
+    if abs_speed >= 0.1:
+        return NR_MAX_ITER_PLANET
+    elif abs_speed >= 0.01:
+        return NR_MAX_ITER_HELIO
+    elif abs_speed >= 0.001:
+        return NR_MAX_ITER_VERY_SLOW
+    else:
+        return NR_MAX_ITER_STATION
 
 
 def swe_solcross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
@@ -723,8 +761,8 @@ def swe_cross_ut(
     dt_guess = diff / effective_speed
     jd_guess = jd_ut + dt_guess
 
-    # Adaptive iteration count
-    max_iter = NR_MAX_ITER_HELIO if abs(speed) < 0.1 else NR_MAX_ITER_PLANET
+    # Adaptive iteration count based on planet speed
+    max_iter = _get_adaptive_max_iterations(speed)
 
     # Newton-Raphson iteration
     jd = jd_guess
@@ -745,6 +783,9 @@ def swe_cross_ut(
         # Check convergence (< 0.1 arcsecond)
         if abs(diff) < NR_TOLERANCE:
             return jd
+
+        # Update max_iter based on current speed (may change near stations)
+        max_iter = max(max_iter, _get_adaptive_max_iterations(speed))
 
         if abs(speed) < 0.001:
             speed = speed_default
@@ -851,8 +892,8 @@ def swe_helio_cross_ut(
     dt_guess = diff / speed
     jd_guess = jd_ut + dt_guess
 
-    # Adaptive iteration count
-    max_iter = NR_MAX_ITER_HELIO if abs(speed) < 0.05 else NR_MAX_ITER_PLANET
+    # Adaptive iteration count based on planet speed
+    max_iter = _get_adaptive_max_iterations(speed)
 
     jd = jd_guess
     for iteration in range(max_iter):
@@ -872,6 +913,9 @@ def swe_helio_cross_ut(
         # Check convergence (< 0.1 arcsecond = 0.1/3600 degree)
         if abs(diff) < NR_TOLERANCE:
             return jd
+
+        # Update max_iter based on current speed (may change during iteration)
+        max_iter = max(max_iter, _get_adaptive_max_iterations(speed))
 
         if abs(speed) < 0.0001:
             speed = speed_default
@@ -967,8 +1011,8 @@ def swe_helio_cross(
     dt_guess = diff / speed
     jd_guess = jd_tt + dt_guess
 
-    # Adaptive iteration count
-    max_iter = NR_MAX_ITER_HELIO if abs(speed) < 0.05 else NR_MAX_ITER_PLANET
+    # Adaptive iteration count based on planet speed
+    max_iter = _get_adaptive_max_iterations(speed)
 
     jd = jd_guess
     for iteration in range(max_iter):
@@ -988,6 +1032,9 @@ def swe_helio_cross(
         # Check convergence (< 0.1 arcsecond = 0.1/3600 degree)
         if abs(diff) < NR_TOLERANCE:
             return jd
+
+        # Update max_iter based on current speed (may change during iteration)
+        max_iter = max(max_iter, _get_adaptive_max_iterations(speed))
 
         if abs(speed) < 0.0001:
             speed = speed_default

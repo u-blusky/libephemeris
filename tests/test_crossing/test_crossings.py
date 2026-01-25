@@ -8,7 +8,15 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
-from libephemeris.crossing import NR_TOLERANCE, NR_TOLERANCE_SUN
+from libephemeris.crossing import (
+    NR_TOLERANCE,
+    NR_TOLERANCE_SUN,
+    NR_MAX_ITER_PLANET,
+    NR_MAX_ITER_HELIO,
+    NR_MAX_ITER_VERY_SLOW,
+    NR_MAX_ITER_STATION,
+    _get_adaptive_max_iterations,
+)
 
 
 class TestSubArcsecondPrecision:
@@ -1067,3 +1075,168 @@ class TestMooncrossNodeEclipseRelevance:
         assert min(diff_before, diff_after) < 2, (
             f"Eclipse not near node: before={diff_before}, after={diff_after}"
         )
+
+
+class TestAdaptiveIterations:
+    """Test the adaptive iteration limit functionality based on planet speed."""
+
+    @pytest.mark.unit
+    def test_adaptive_iterations_fast_planet(self):
+        """Fast planets (speed >= 0.1°/day) should use base iteration count."""
+        assert _get_adaptive_max_iterations(1.0) == NR_MAX_ITER_PLANET
+        assert _get_adaptive_max_iterations(0.5) == NR_MAX_ITER_PLANET
+        assert _get_adaptive_max_iterations(0.1) == NR_MAX_ITER_PLANET
+        # Also test negative speeds (retrograde)
+        assert _get_adaptive_max_iterations(-0.5) == NR_MAX_ITER_PLANET
+
+    @pytest.mark.unit
+    def test_adaptive_iterations_slow_planet(self):
+        """Slow planets (0.01 <= speed < 0.1°/day) should use helio iteration count."""
+        assert _get_adaptive_max_iterations(0.05) == NR_MAX_ITER_HELIO
+        assert _get_adaptive_max_iterations(0.03) == NR_MAX_ITER_HELIO
+        assert _get_adaptive_max_iterations(0.01) == NR_MAX_ITER_HELIO
+        # Also test negative speeds
+        assert _get_adaptive_max_iterations(-0.03) == NR_MAX_ITER_HELIO
+
+    @pytest.mark.unit
+    def test_adaptive_iterations_very_slow_planet(self):
+        """Very slow planets (0.001 <= speed < 0.01°/day) like Pluto should use more iterations."""
+        assert _get_adaptive_max_iterations(0.005) == NR_MAX_ITER_VERY_SLOW
+        assert (
+            _get_adaptive_max_iterations(0.004) == NR_MAX_ITER_VERY_SLOW
+        )  # Pluto typical
+        assert _get_adaptive_max_iterations(0.001) == NR_MAX_ITER_VERY_SLOW
+        # Also test negative speeds
+        assert _get_adaptive_max_iterations(-0.004) == NR_MAX_ITER_VERY_SLOW
+
+    @pytest.mark.unit
+    def test_adaptive_iterations_near_station(self):
+        """Near retrograde stations (speed < 0.001°/day) should use maximum iterations."""
+        assert _get_adaptive_max_iterations(0.0005) == NR_MAX_ITER_STATION
+        assert _get_adaptive_max_iterations(0.0001) == NR_MAX_ITER_STATION
+        assert _get_adaptive_max_iterations(0.0) == NR_MAX_ITER_STATION
+        # Also test negative speeds (very slow retrograde)
+        assert _get_adaptive_max_iterations(-0.0005) == NR_MAX_ITER_STATION
+
+    @pytest.mark.unit
+    def test_iteration_constants_ordering(self):
+        """Iteration limits should increase as speed decreases."""
+        assert NR_MAX_ITER_PLANET < NR_MAX_ITER_HELIO
+        assert NR_MAX_ITER_HELIO < NR_MAX_ITER_VERY_SLOW
+        assert NR_MAX_ITER_VERY_SLOW < NR_MAX_ITER_STATION
+
+    @pytest.mark.unit
+    def test_pluto_crossing_converges(self):
+        """Pluto crossing should converge with adaptive iteration limits."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 300.0
+
+        # This should not raise "Maximum iterations reached"
+        jd_cross = ephem.swe_cross_ut(SE_PLUTO, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        # Verify Pluto is at target
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, 0)
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1, f"Pluto at {pos[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_pluto_helio_crossing_converges(self):
+        """Pluto heliocentric crossing should converge with adaptive iteration limits."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        target = 300.0
+
+        # This should not raise "Maximum iterations reached"
+        jd_cross = ephem.swe_helio_cross_ut(SE_PLUTO, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        # Verify Pluto is at target (heliocentric)
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, SEFLG_HELCTR)
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1, f"Pluto helio at {pos[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_neptune_crossing_converges(self):
+        """Neptune crossing (very slow ~0.006°/day) should converge."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        # Neptune is around 355° in early 2024, heading towards 0° (Aries)
+        # Target slightly ahead at 356°
+        target = 356.0
+
+        jd_cross = ephem.swe_cross_ut(SE_NEPTUNE, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        # Verify Neptune is at target
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_NEPTUNE, 0)
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1, f"Neptune at {pos[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_uranus_crossing_converges(self):
+        """Uranus crossing (~0.012°/day) should converge."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        # Uranus is around 49° in early 2024 and retrograde, so it will eventually
+        # turn direct and cross 50°
+        target = 50.0
+
+        jd_cross = ephem.swe_cross_ut(SE_URANUS, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        # Verify Uranus is at target
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_URANUS, 0)
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1, f"Uranus at {pos[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_saturn_crossing_converges(self):
+        """Saturn crossing (~0.034°/day) should converge."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        # Saturn is around 333° in early 2024, heading towards 334°
+        target = 334.0
+
+        jd_cross = ephem.swe_cross_ut(SE_SATURN, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        # Verify Saturn is at target
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SATURN, 0)
+        diff = abs(pos[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1, f"Saturn at {pos[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_slow_planet_multiple_crossings(self):
+        """Test that slow planets can find multiple consecutive crossings."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Find 3 consecutive crossings for Saturn (starting at 333°)
+        crossings = []
+        jd = jd_start
+        for target in [334.0, 335.0, 336.0]:
+            jd_cross = ephem.swe_cross_ut(SE_SATURN, target, jd, 0)
+            crossings.append(jd_cross)
+            jd = jd_cross + 1
+
+        # All crossings should be in chronological order
+        assert crossings[0] < crossings[1] < crossings[2]
+
+        # Verify each crossing is accurate
+        for i, target in enumerate([334.0, 335.0, 336.0]):
+            pos, _ = ephem.swe_calc_ut(crossings[i], SE_SATURN, 0)
+            diff = abs(pos[0] - target)
+            if diff > 180:
+                diff = 360 - diff
+            assert diff < 0.1
