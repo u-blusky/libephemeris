@@ -29,6 +29,45 @@ MEEUS_VALID_CENTURIES = 10.0  # ±1000 years: <0.01° error
 MEEUS_MAX_CENTURIES = 20.0  # ±2000 years: error grows significantly beyond
 
 
+def _mean_obliquity_radians(jd_tt: float) -> float:
+    """
+    Calculate mean obliquity of the ecliptic (IAU 2006).
+
+    The obliquity of the ecliptic changes over time due to precession.
+    Using a fixed J2000 value introduces an error that grows with distance
+    from J2000.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        float: Mean obliquity in radians
+
+    Formula (IAU 2006):
+        ε = 84381.406" - 46.836769"×T - 0.0001831"×T² + 0.00200340"×T³
+            - 0.000000576"×T⁴ - 0.0000000434"×T⁵
+        where T = Julian centuries since J2000.0
+
+    References:
+        - Capitaine et al. (2003), "Expressions for IAU 2000 precession quantities"
+        - CALCS.md, section "Conversione coordinate ICRS → Eclittiche"
+    """
+    T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
+
+    # Mean obliquity in arcseconds (IAU 2006)
+    eps_arcsec = (
+        84381.406
+        - 46.836769 * T
+        - 0.0001831 * T**2
+        + 0.00200340 * T**3
+        - 0.000000576 * T**4
+        - 0.0000000434 * T**5
+    )
+
+    # Convert arcseconds to radians: arcsec -> degrees -> radians
+    return math.radians(eps_arcsec / 3600.0)
+
+
 class MeeusPolynomialWarning(UserWarning):
     """Warning issued when Meeus polynomial is used outside its optimal range."""
 
@@ -166,9 +205,8 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
         moon_geo_pos[0] * moon_geo_vel[1] - moon_geo_pos[1] * moon_geo_vel[0],
     ]
 
-    # FIXME: Precision - Using fixed J2000 obliquity (23.4392911°)
-    # For highest precision over millennia, use time-variable obliquity.
-    eps = math.radians(23.4392911)  # J2000.0 mean obliquity
+    # Dynamic mean obliquity (IAU 2006) - varies with time due to precession
+    eps = _mean_obliquity_radians(jd_tt)
 
     # Rotate angular momentum vector from ICRS (equatorial) to ecliptic frame
     h_ecl = [
@@ -339,9 +377,8 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     # Apogee is opposite to perigee (180° from eccentricity vector)
     apogee_vec = [-e for e in e_vec]
 
-    # FIXME: Precision - Using fixed J2000 obliquity
-    # For dates far from J2000, use time-variable obliquity
-    eps = math.radians(23.4392911)  # J2000.0 mean obliquity
+    # Dynamic mean obliquity (IAU 2006) - varies with time due to precession
+    eps = _mean_obliquity_radians(jd_tt)
 
     # Rotate from ICRS (equatorial) to ecliptic coordinates
     apogee_ecl = [
