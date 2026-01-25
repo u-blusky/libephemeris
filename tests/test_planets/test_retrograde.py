@@ -5,12 +5,111 @@ Tests cover:
 - Known retrograde periods
 - Station points (velocity near zero)
 - Velocity sign changes
+- Precise station time comparison with pyswisseph (within 1 minute)
 """
 
 import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
+
+
+# ============================================================================
+# HELPER FUNCTIONS FOR STATION TIME DETECTION
+# ============================================================================
+
+
+def find_station_time_bisection(calc_func, jd_start, jd_end, tolerance_days=1e-6):
+    """
+    Find exact station time (velocity = 0) using bisection method.
+
+    Args:
+        calc_func: Function that takes JD and returns velocity
+        jd_start: Start of interval (velocity has one sign)
+        jd_end: End of interval (velocity has opposite sign)
+        tolerance_days: Precision in days (default ~0.1 seconds)
+
+    Returns:
+        Julian Day of station point
+    """
+    vel_start = calc_func(jd_start)
+    vel_end = calc_func(jd_end)
+
+    # Ensure we have a sign change
+    if vel_start * vel_end > 0:
+        raise ValueError("No sign change in velocity between jd_start and jd_end")
+
+    while (jd_end - jd_start) > tolerance_days:
+        jd_mid = (jd_start + jd_end) / 2
+        vel_mid = calc_func(jd_mid)
+
+        if vel_mid * vel_start < 0:
+            jd_end = jd_mid
+        else:
+            jd_start = jd_mid
+            vel_start = vel_mid
+
+    return (jd_start + jd_end) / 2
+
+
+def find_all_stations_in_period(
+    calc_func, jd_start, jd_end, step_days=1.0, tolerance_days=1e-6
+):
+    """
+    Find all station points (velocity = 0) in a given period.
+
+    Args:
+        calc_func: Function that takes JD and returns velocity
+        jd_start: Start of search period
+        jd_end: End of search period
+        step_days: Coarse search step size
+        tolerance_days: Final precision in days
+
+    Returns:
+        List of (jd_station, is_retrograde_station) tuples.
+        is_retrograde_station=True means station retrograde (+ to - velocity)
+    """
+    stations = []
+    jd = jd_start
+    prev_vel = calc_func(jd)
+
+    while jd < jd_end:
+        jd_next = min(jd + step_days, jd_end)
+        curr_vel = calc_func(jd_next)
+
+        if prev_vel * curr_vel < 0:
+            # Sign change detected - refine with bisection
+            station_jd = find_station_time_bisection(
+                calc_func, jd, jd_next, tolerance_days
+            )
+            # Station retrograde (+ to -) or station direct (- to +)
+            is_retrograde_station = prev_vel > 0
+            stations.append((station_jd, is_retrograde_station))
+
+        jd = jd_next
+        prev_vel = curr_vel
+
+    return stations
+
+
+def get_velocity_libephemeris(planet_id):
+    """Create a velocity function for libephemeris."""
+
+    def velocity_func(jd):
+        pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+        return pos[3]  # Longitude velocity in degrees/day
+
+    return velocity_func
+
+
+def get_velocity_swisseph(planet_id):
+    """Create a velocity function for pyswisseph."""
+
+    def velocity_func(jd):
+        pos, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
+        return pos[3]  # Longitude velocity in degrees/day
+
+    return velocity_func
 
 
 class TestMercuryRetrograde:
@@ -232,3 +331,407 @@ class TestRetrogradeVelocitySign:
                 change += 360
 
             assert change < 0, "During retrograde, longitude should decrease"
+
+
+# ============================================================================
+# RETROGRADE STATION TIME COMPARISON TESTS (libephemeris vs pyswisseph)
+# ============================================================================
+
+
+class TestRetrogradeStationTimeComparison:
+    """
+    Compare retrograde station times between libephemeris and pyswisseph.
+
+    Station times (when velocity = 0) should match within 1 minute (60 seconds).
+    This tests both station retrograde (direct -> retrograde) and
+    station direct (retrograde -> direct) events.
+    """
+
+    # Tolerance: 1 minute = 60 seconds = 60/86400 days
+    TOLERANCE_DAYS = 60.0 / 86400.0  # ~0.000694 days
+    TOLERANCE_SECONDS = 60.0
+
+    # Base Julian Day: J2000.0 (2000-01-01 12:00 TT)
+    JD_2000 = 2451545.0
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "planet_id,planet_name,search_days,expected_min_stations",
+        [
+            (SE_MERCURY, "Mercury", 365, 4),  # ~3-4 retrogrades per year
+            (SE_VENUS, "Venus", 600, 1),  # ~1 retrograde per 18 months
+            (SE_MARS, "Mars", 800, 1),  # ~1 retrograde per 2 years
+            (SE_JUPITER, "Jupiter", 400, 2),  # ~1 retrograde per year
+            (SE_SATURN, "Saturn", 400, 2),  # ~1 retrograde per year
+        ],
+    )
+    def test_station_times_match_within_one_minute(
+        self, planet_id, planet_name, search_days, expected_min_stations
+    ):
+        """
+        Verify that station retrograde/direct times match pyswisseph within 1 minute.
+        """
+        jd_start = self.JD_2000
+        jd_end = jd_start + search_days
+
+        # Find stations with libephemeris
+        vel_lib = get_velocity_libephemeris(planet_id)
+        stations_lib = find_all_stations_in_period(vel_lib, jd_start, jd_end)
+
+        # Find stations with pyswisseph
+        vel_swe = get_velocity_swisseph(planet_id)
+        stations_swe = find_all_stations_in_period(vel_swe, jd_start, jd_end)
+
+        # Verify we found the expected minimum number of stations
+        assert len(stations_lib) >= expected_min_stations, (
+            f"{planet_name}: Expected at least {expected_min_stations} stations, "
+            f"found {len(stations_lib)}"
+        )
+
+        # Verify both libraries found the same number of stations
+        assert len(stations_lib) == len(stations_swe), (
+            f"{planet_name}: libephemeris found {len(stations_lib)} stations, "
+            f"pyswisseph found {len(stations_swe)}"
+        )
+
+        # Compare each station time
+        for i, ((jd_lib, is_retro_lib), (jd_swe, is_retro_swe)) in enumerate(
+            zip(stations_lib, stations_swe)
+        ):
+            # Verify same station type
+            lib_type = "R" if is_retro_lib else "D"
+            swe_type = "R" if is_retro_swe else "D"
+            assert is_retro_lib == is_retro_swe, (
+                f"{planet_name} station {i + 1}: type mismatch "
+                f"(lib={lib_type}, swe={swe_type})"
+            )
+
+            # Calculate time difference
+            diff_days = abs(jd_lib - jd_swe)
+            diff_seconds = diff_days * 86400.0
+
+            station_type = "retrograde" if is_retro_lib else "direct"
+            assert diff_seconds <= self.TOLERANCE_SECONDS, (
+                f"{planet_name} station {station_type} {i + 1}: "
+                f"diff {diff_seconds:.2f}s > {self.TOLERANCE_SECONDS}s tolerance"
+            )
+
+    @pytest.mark.comparison
+    def test_mercury_retrograde_periods_2020_2021(self):
+        """
+        Test Mercury retrograde station times for known periods in 2020-2021.
+
+        Mercury retrogrades approximately 3-4 times per year.
+        This test verifies station times for a well-documented period.
+        """
+        # JD for 2020-01-01 00:00 UT
+        jd_2020 = 2458849.5
+        # JD for 2022-01-01 00:00 UT (2 year span)
+        jd_2022 = jd_2020 + 730
+
+        vel_lib = get_velocity_libephemeris(SE_MERCURY)
+        vel_swe = get_velocity_swisseph(SE_MERCURY)
+
+        stations_lib = find_all_stations_in_period(vel_lib, jd_2020, jd_2022)
+        stations_swe = find_all_stations_in_period(vel_swe, jd_2020, jd_2022)
+
+        # Should have 6-8 retrogrades in 2 years (12-16 stations total)
+        assert len(stations_lib) >= 12, (
+            f"Expected >=12 Mercury stations in 2 years, found {len(stations_lib)}"
+        )
+        assert len(stations_lib) == len(stations_swe)
+
+        # Verify all stations match within tolerance
+        max_diff_seconds = 0
+        for i, ((jd_lib, _), (jd_swe, _)) in enumerate(zip(stations_lib, stations_swe)):
+            diff_seconds = abs(jd_lib - jd_swe) * 86400.0
+            max_diff_seconds = max(max_diff_seconds, diff_seconds)
+            assert diff_seconds <= self.TOLERANCE_SECONDS, (
+                f"Mercury station {i + 1}: {diff_seconds:.2f}s difference"
+            )
+
+    @pytest.mark.comparison
+    def test_venus_retrograde_period_2020(self):
+        """
+        Test Venus retrograde in 2020 (May-June 2020).
+
+        Venus retrograde is less frequent (~every 18 months) but lasts longer.
+        """
+        # Search around the 2020 Venus retrograde period
+        jd_2020_jan = 2458849.5  # 2020-01-01
+        jd_2020_dec = jd_2020_jan + 365
+
+        vel_lib = get_velocity_libephemeris(SE_VENUS)
+        vel_swe = get_velocity_swisseph(SE_VENUS)
+
+        stations_lib = find_all_stations_in_period(vel_lib, jd_2020_jan, jd_2020_dec)
+        stations_swe = find_all_stations_in_period(vel_swe, jd_2020_jan, jd_2020_dec)
+
+        # Should have exactly 2 stations (retrograde + direct) in 2020
+        assert len(stations_lib) == 2, (
+            f"Expected 2 Venus stations in 2020, found {len(stations_lib)}"
+        )
+        assert len(stations_lib) == len(stations_swe)
+
+        for i, ((jd_lib, is_retro), (jd_swe, _)) in enumerate(
+            zip(stations_lib, stations_swe)
+        ):
+            diff_seconds = abs(jd_lib - jd_swe) * 86400.0
+            station_type = "retrograde" if is_retro else "direct"
+            assert diff_seconds <= self.TOLERANCE_SECONDS, (
+                f"Venus station {station_type}: {diff_seconds:.2f}s difference"
+            )
+
+    @pytest.mark.comparison
+    def test_mars_retrograde_period_2020(self):
+        """
+        Test Mars retrograde in 2020 (September-November 2020).
+
+        Mars retrograde occurs approximately every 2 years.
+        """
+        jd_2020_jan = 2458849.5  # 2020-01-01
+        jd_2021_jan = jd_2020_jan + 365
+
+        vel_lib = get_velocity_libephemeris(SE_MARS)
+        vel_swe = get_velocity_swisseph(SE_MARS)
+
+        stations_lib = find_all_stations_in_period(vel_lib, jd_2020_jan, jd_2021_jan)
+        stations_swe = find_all_stations_in_period(vel_swe, jd_2020_jan, jd_2021_jan)
+
+        # Should have 2 stations in 2020 (retrograde + direct)
+        assert len(stations_lib) == 2, (
+            f"Expected 2 Mars stations in 2020, found {len(stations_lib)}"
+        )
+        assert len(stations_lib) == len(stations_swe)
+
+        for i, ((jd_lib, is_retro), (jd_swe, _)) in enumerate(
+            zip(stations_lib, stations_swe)
+        ):
+            diff_seconds = abs(jd_lib - jd_swe) * 86400.0
+            station_type = "retrograde" if is_retro else "direct"
+            assert diff_seconds <= self.TOLERANCE_SECONDS, (
+                f"Mars station {station_type}: {diff_seconds:.2f}s difference"
+            )
+
+    @pytest.mark.comparison
+    def test_jupiter_retrograde_annual(self):
+        """
+        Test Jupiter retrograde - occurs annually for ~4 months.
+        """
+        jd_start = self.JD_2000
+        jd_end = jd_start + 400  # ~13 months
+
+        vel_lib = get_velocity_libephemeris(SE_JUPITER)
+        vel_swe = get_velocity_swisseph(SE_JUPITER)
+
+        stations_lib = find_all_stations_in_period(vel_lib, jd_start, jd_end)
+        stations_swe = find_all_stations_in_period(vel_swe, jd_start, jd_end)
+
+        # Should have 2 stations (1 retrograde period)
+        assert len(stations_lib) >= 2, (
+            f"Expected at least 2 Jupiter stations, found {len(stations_lib)}"
+        )
+        assert len(stations_lib) == len(stations_swe)
+
+        for i, ((jd_lib, is_retro), (jd_swe, _)) in enumerate(
+            zip(stations_lib, stations_swe)
+        ):
+            diff_seconds = abs(jd_lib - jd_swe) * 86400.0
+            station_type = "retrograde" if is_retro else "direct"
+            assert diff_seconds <= self.TOLERANCE_SECONDS, (
+                f"Jupiter station {station_type}: {diff_seconds:.2f}s difference"
+            )
+
+    @pytest.mark.comparison
+    def test_saturn_retrograde_annual(self):
+        """
+        Test Saturn retrograde - occurs annually for ~4.5 months.
+        """
+        jd_start = self.JD_2000
+        jd_end = jd_start + 400  # ~13 months
+
+        vel_lib = get_velocity_libephemeris(SE_SATURN)
+        vel_swe = get_velocity_swisseph(SE_SATURN)
+
+        stations_lib = find_all_stations_in_period(vel_lib, jd_start, jd_end)
+        stations_swe = find_all_stations_in_period(vel_swe, jd_start, jd_end)
+
+        # Should have 2 stations (1 retrograde period)
+        assert len(stations_lib) >= 2, (
+            f"Expected at least 2 Saturn stations, found {len(stations_lib)}"
+        )
+        assert len(stations_lib) == len(stations_swe)
+
+        for i, ((jd_lib, is_retro), (jd_swe, _)) in enumerate(
+            zip(stations_lib, stations_swe)
+        ):
+            diff_seconds = abs(jd_lib - jd_swe) * 86400.0
+            station_type = "retrograde" if is_retro else "direct"
+            assert diff_seconds <= self.TOLERANCE_SECONDS, (
+                f"Saturn station {station_type}: {diff_seconds:.2f}s difference"
+            )
+
+
+class TestRetrogradeVelocityComparison:
+    """
+    Compare velocity values during retrograde between libephemeris and pyswisseph.
+    """
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "planet_id,planet_name",
+        [
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
+        ],
+    )
+    def test_velocity_values_match_during_retrograde(self, planet_id, planet_name):
+        """
+        Verify velocity values match between libraries during retrograde periods.
+        """
+        jd_start = 2451545.0  # J2000.0
+        search_days = 800 if planet_id in (SE_VENUS, SE_MARS) else 400
+
+        # Find a retrograde period
+        retrograde_jd = None
+        for jd in range(int(jd_start), int(jd_start + search_days)):
+            pos_lib, _ = ephem.swe_calc_ut(float(jd), planet_id, SEFLG_SPEED)
+            if pos_lib[3] < -0.01:  # Clearly retrograde
+                retrograde_jd = float(jd)
+                break
+
+        assert retrograde_jd is not None, (
+            f"Could not find retrograde period for {planet_name}"
+        )
+
+        # Compare velocities at multiple points during retrograde
+        for offset in [0, 0.25, 0.5, 0.75, 1.0, 2.0, 5.0]:
+            jd = retrograde_jd + offset
+            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+            pos_swe, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
+
+            vel_lib = pos_lib[3]
+            vel_swe = pos_swe[3]
+            vel_diff = abs(vel_lib - vel_swe)
+
+            # Velocity should match within 0.0001 degrees/day
+            assert vel_diff < 0.0001, (
+                f"{planet_name} at JD {jd}: velocity diff {vel_diff:.6f} deg/day "
+                f"(lib={vel_lib:.6f}, swe={vel_swe:.6f})"
+            )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "planet_id,planet_name",
+        [
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
+        ],
+    )
+    def test_station_velocity_near_zero_matches(self, planet_id, planet_name):
+        """
+        Verify that at station points, both libraries show velocity near zero.
+        """
+        jd_start = 2451545.0
+        search_days = 800 if planet_id in (SE_VENUS, SE_MARS) else 400
+
+        vel_lib_func = get_velocity_libephemeris(planet_id)
+        stations = find_all_stations_in_period(
+            vel_lib_func, jd_start, jd_start + search_days
+        )
+
+        assert len(stations) > 0, f"No stations found for {planet_name}"
+
+        for jd_station, is_retro in stations[:4]:  # Check first 4 stations
+            # Get velocity from both libraries at station time
+            pos_lib, _ = ephem.swe_calc_ut(jd_station, planet_id, SEFLG_SPEED)
+            pos_swe, _ = swe.calc_ut(jd_station, planet_id, swe.FLG_SPEED)
+
+            vel_lib = pos_lib[3]
+            vel_swe = pos_swe[3]
+
+            # Both should be very close to zero
+            assert abs(vel_lib) < 0.001, (
+                f"{planet_name} station: lib velocity {vel_lib:.6f} not near zero"
+            )
+            assert abs(vel_swe) < 0.001, (
+                f"{planet_name} station: swe velocity {vel_swe:.6f} not near zero"
+            )
+
+            # And they should match each other
+            assert abs(vel_lib - vel_swe) < 0.0001, (
+                f"{planet_name} station: velocity mismatch at station "
+                f"(lib={vel_lib:.6f}, swe={vel_swe:.6f})"
+            )
+
+
+class TestRetrogradePeriodDuration:
+    """
+    Test that retrograde period durations are consistent between libraries.
+    """
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "planet_id,planet_name,expected_min_days,expected_max_days",
+        [
+            (SE_MERCURY, "Mercury", 18, 26),  # Mercury retrogrades ~20-24 days
+            (SE_VENUS, "Venus", 38, 45),  # Venus retrogrades ~40-43 days
+            (SE_MARS, "Mars", 58, 82),  # Mars retrogrades ~60-80 days
+            (SE_JUPITER, "Jupiter", 115, 125),  # Jupiter retrogrades ~120 days
+            (SE_SATURN, "Saturn", 130, 145),  # Saturn retrogrades ~134-140 days
+        ],
+    )
+    def test_retrograde_duration_matches(
+        self, planet_id, planet_name, expected_min_days, expected_max_days
+    ):
+        """
+        Verify retrograde period duration is within expected range and matches.
+        """
+        jd_start = 2451545.0  # J2000.0
+        search_days = 800 if planet_id in (SE_VENUS, SE_MARS) else 400
+
+        vel_lib = get_velocity_libephemeris(planet_id)
+        vel_swe = get_velocity_swisseph(planet_id)
+
+        stations_lib = find_all_stations_in_period(
+            vel_lib, jd_start, jd_start + search_days
+        )
+        stations_swe = find_all_stations_in_period(
+            vel_swe, jd_start, jd_start + search_days
+        )
+
+        assert len(stations_lib) >= 2, f"Need at least 2 stations for {planet_name}"
+        assert len(stations_lib) == len(stations_swe)
+
+        # Find retrograde duration (from station retrograde to station direct)
+        for i in range(len(stations_lib) - 1):
+            jd_station1_lib, is_retro1 = stations_lib[i]
+            jd_station2_lib, is_retro2 = stations_lib[i + 1]
+
+            if is_retro1 and not is_retro2:
+                # This is a complete retrograde period
+                duration_lib = jd_station2_lib - jd_station1_lib
+
+                jd_station1_swe, _ = stations_swe[i]
+                jd_station2_swe, _ = stations_swe[i + 1]
+                duration_swe = jd_station2_swe - jd_station1_swe
+
+                # Check duration is within expected range
+                assert expected_min_days <= duration_lib <= expected_max_days, (
+                    f"{planet_name} retrograde duration {duration_lib:.1f} days "
+                    f"outside expected range [{expected_min_days}, {expected_max_days}]"
+                )
+
+                # Check durations match between libraries (within 2 minutes)
+                duration_diff_seconds = abs(duration_lib - duration_swe) * 86400.0
+                assert duration_diff_seconds < 120, (
+                    f"{planet_name} retrograde duration mismatch: "
+                    f"{duration_diff_seconds:.1f}s between libraries"
+                )
+                break
