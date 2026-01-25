@@ -2,7 +2,8 @@
 Crossing event calculations for libephemeris.
 
 Finds exact times when the Sun or Moon cross specific ecliptic longitudes.
-Uses Newton-Raphson iteration for sub-arcsecond precision.
+Uses Newton-Raphson iteration for sub-arcsecond precision, with Brent's method
+as a fallback near retrograde stations.
 
 Functions:
 - swe_solcross_ut: Sun crossing events (e.g., ingresses, equinoxes)
@@ -19,12 +20,27 @@ Iterations: Adaptive based on planet speed:
     - 100 near retrograde stations (speed < 0.001°/day)
 Typical convergence: 5-8 iterations for Sun, 7-12 for Moon (up to 20 near nodes)
 
-Algorithm: Initial linear estimate + Newton-Raphson refinement
-References: Meeus "Astronomical Algorithms" Ch. 5 (interpolation)
+Station Handling:
+    When a planet is near a retrograde station (velocity ~0°/day), Newton-Raphson
+    can have convergence problems due to dividing by near-zero derivatives. In these
+    cases, the algorithm automatically switches to Brent's method, which is more
+    robust as it only requires bracketing the root, not computing derivatives.
+
+Algorithm: Initial linear estimate + Newton-Raphson refinement + Brent's fallback
+References:
+    - Meeus "Astronomical Algorithms" Ch. 5 (interpolation)
+    - Brent, R.P. (1973) "Algorithms for Minimization without Derivatives"
 """
+
+from typing import Callable, Tuple
 
 from .constants import SEFLG_SWIEPH, SEFLG_SPEED, SEFLG_HELCTR, SE_SUN, SE_MOON
 from .planets import swe_calc_ut, swe_calc
+
+# Station detection threshold: speed below this indicates proximity to retrograde station
+# At stations, Newton-Raphson can fail due to near-zero derivative (speed)
+# Typical station speeds: Mercury ~0.05°/day slowing to 0, outer planets much slower
+STATION_SPEED_THRESHOLD = 0.001  # degrees/day
 
 # Newton-Raphson convergence constants
 # 0.1 arcsecond tolerance for pyswisseph compatibility
@@ -77,6 +93,197 @@ def _get_adaptive_max_iterations(speed: float) -> int:
         return NR_MAX_ITER_VERY_SLOW
     else:
         return NR_MAX_ITER_STATION
+
+
+def _is_near_station(speed: float) -> bool:
+    """
+    Check if a planet is near a retrograde station.
+
+    Near stations, the planet's speed approaches zero, causing Newton-Raphson
+    to have convergence issues (division by near-zero). This function detects
+    when we should switch to a more robust method like Brent's.
+
+    Args:
+        speed: Planet speed in degrees/day
+
+    Returns:
+        bool: True if near station (speed below threshold)
+    """
+    return abs(speed) < STATION_SPEED_THRESHOLD
+
+
+def _brent_find_crossing(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    x2cross: float,
+    jd_a: float,
+    jd_b: float,
+    tolerance: float,
+    max_iter: int = 100,
+) -> float:
+    """
+    Find exact crossing time using Brent's method.
+
+    Brent's method combines bisection, secant, and inverse quadratic interpolation.
+    It's more robust than Newton-Raphson when derivatives are unreliable (near stations).
+
+    Args:
+        get_position_func: Function(jd) -> (longitude, speed) in degrees
+        x2cross: Target ecliptic longitude in degrees
+        jd_a: Start of bracket (Julian Day)
+        jd_b: End of bracket (Julian Day)
+        tolerance: Convergence tolerance in degrees
+        max_iter: Maximum iterations
+
+    Returns:
+        float: Julian Day of crossing
+
+    Raises:
+        RuntimeError: If no root is bracketed or convergence fails
+
+    Algorithm:
+        Brent's method is guaranteed to converge if the function changes sign
+        in [a, b]. It uses:
+        - Bisection for safety
+        - Secant method for faster convergence when applicable
+        - Inverse quadratic interpolation when even faster
+
+    References:
+        Brent, R. P. (1973). Algorithms for Minimization without Derivatives.
+    """
+
+    def f(jd: float) -> float:
+        """Return angular difference from target (signed, -180 to 180)."""
+        lon, _ = get_position_func(jd)
+        diff = (lon - x2cross) % 360.0
+        if diff > 180:
+            diff -= 360
+        return diff
+
+    fa = f(jd_a)
+    fb = f(jd_b)
+
+    # Check if root is bracketed
+    if fa * fb > 0:
+        # Root not bracketed - try to expand the bracket
+        # This can happen if we guessed the bracket wrong
+        raise RuntimeError(
+            f"Brent's method: root not bracketed. f(a)={fa:.6f}, f(b)={fb:.6f}"
+        )
+
+    # Ensure |f(a)| >= |f(b)| (b is the better guess)
+    if abs(fa) < abs(fb):
+        jd_a, jd_b = jd_b, jd_a
+        fa, fb = fb, fa
+
+    c = jd_a
+    fc = fa
+    mflag = True
+    d = 0.0  # Will be set before use
+
+    for _ in range(max_iter):
+        if abs(fb) < tolerance:
+            return jd_b
+
+        if fa != fc and fb != fc:
+            # Inverse quadratic interpolation
+            s = (
+                jd_a * fb * fc / ((fa - fb) * (fa - fc))
+                + jd_b * fa * fc / ((fb - fa) * (fb - fc))
+                + c * fa * fb / ((fc - fa) * (fc - fb))
+            )
+        else:
+            # Secant method
+            s = jd_b - fb * (jd_b - jd_a) / (fb - fa)
+
+        # Conditions for using bisection instead
+        cond1 = not (
+            (3 * jd_a + jd_b) / 4 < s < jd_b or jd_b < s < (3 * jd_a + jd_b) / 4
+        )
+        cond2 = mflag and abs(s - jd_b) >= abs(jd_b - c) / 2
+        cond3 = not mflag and abs(s - jd_b) >= abs(c - d) / 2
+        cond4 = mflag and abs(jd_b - c) < tolerance
+        cond5 = not mflag and abs(c - d) < tolerance
+
+        if cond1 or cond2 or cond3 or cond4 or cond5:
+            # Bisection
+            s = (jd_a + jd_b) / 2
+            mflag = True
+        else:
+            mflag = False
+
+        fs = f(s)
+        d = c
+        c = jd_b
+        fc = fb
+
+        if fa * fs < 0:
+            jd_b = s
+            fb = fs
+        else:
+            jd_a = s
+            fa = fs
+
+        # Ensure |f(a)| >= |f(b)|
+        if abs(fa) < abs(fb):
+            jd_a, jd_b = jd_b, jd_a
+            fa, fb = fb, fa
+
+    # Return best estimate if max iterations reached
+    return jd_b
+
+
+def _find_bracket_for_crossing(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    x2cross: float,
+    jd_start: float,
+    jd_end: float,
+    num_samples: int = 20,
+) -> Tuple[float, float]:
+    """
+    Find a bracket [jd_a, jd_b] where the crossing occurs.
+
+    Samples the position at regular intervals to find where the difference
+    from target changes sign (indicating a crossing).
+
+    Args:
+        get_position_func: Function(jd) -> (longitude, speed) in degrees
+        x2cross: Target ecliptic longitude in degrees
+        jd_start: Start of search interval
+        jd_end: End of search interval
+        num_samples: Number of samples to take
+
+    Returns:
+        Tuple[float, float]: (jd_a, jd_b) bracket containing the crossing
+
+    Raises:
+        RuntimeError: If no crossing is found in the interval
+    """
+    step = (jd_end - jd_start) / num_samples
+
+    def get_diff(jd: float) -> float:
+        lon, _ = get_position_func(jd)
+        diff = (lon - x2cross) % 360.0
+        if diff > 180:
+            diff -= 360
+        return diff
+
+    prev_jd = jd_start
+    prev_diff = get_diff(jd_start)
+
+    for i in range(1, num_samples + 1):
+        curr_jd = jd_start + i * step
+        curr_diff = get_diff(curr_jd)
+
+        # Check for sign change (crossing)
+        if prev_diff * curr_diff <= 0:
+            return (prev_jd, curr_jd)
+
+        prev_jd = curr_jd
+        prev_diff = curr_diff
+
+    raise RuntimeError(
+        f"No crossing found in interval [{jd_start}, {jd_end}] for target {x2cross}°"
+    )
 
 
 def swe_solcross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
@@ -773,8 +980,43 @@ def swe_cross_ut(
     # Adaptive iteration count based on planet speed
     max_iter = _get_adaptive_max_iterations(speed)
 
+    # Helper function for Brent's method fallback
+    def get_position(jd_time: float) -> Tuple[float, float]:
+        pos_result, _ = swe_calc_ut(jd_time, planet_id, flag | SEFLG_SPEED)
+        return pos_result[0], pos_result[3]
+
+    # Check if we're near a retrograde station - use Brent's method for robustness
+    if _is_near_station(speed):
+        # Near station: Newton-Raphson may fail due to division by near-zero speed
+        # Use Brent's method which only requires bracketing, not derivatives
+        try:
+            # Estimate search window based on typical speeds
+            # At stations, planet barely moves, so we need a wider bracket
+            search_window = (
+                max(30.0, abs(diff / speed_default) * 1.5)
+                if speed_default > 0
+                else 60.0
+            )
+            jd_bracket_start = jd_ut
+            jd_bracket_end = jd_ut + search_window
+
+            # Find bracket containing the crossing
+            jd_a, jd_b = _find_bracket_for_crossing(
+                get_position, x2cross, jd_bracket_start, jd_bracket_end
+            )
+
+            # Use Brent's method to find the exact crossing
+            return _brent_find_crossing(
+                get_position, x2cross, jd_a, jd_b, NR_TOLERANCE, max_iter
+            )
+        except RuntimeError:
+            # If Brent's method fails, fall through to Newton-Raphson as last resort
+            pass
+
     # Newton-Raphson iteration
     jd = jd_guess
+    station_fallback_triggered = False
+
     for iteration in range(max_iter):
         try:
             pos, _ = swe_calc_ut(jd, planet_id, flag | SEFLG_SPEED)
@@ -792,6 +1034,30 @@ def swe_cross_ut(
         # Check convergence (< 0.1 arcsecond)
         if abs(diff) < NR_TOLERANCE:
             return jd
+
+        # Detect if we've encountered a station during iteration
+        if _is_near_station(speed) and not station_fallback_triggered:
+            station_fallback_triggered = True
+            # Switch to Brent's method for robustness
+            try:
+                # Create a bracket around current position
+                bracket_size = max(
+                    5.0, abs(diff / speed_default) if speed_default > 0 else 10.0
+                )
+                jd_a, jd_b = _find_bracket_for_crossing(
+                    get_position, x2cross, jd - bracket_size / 2, jd + bracket_size
+                )
+                return _brent_find_crossing(
+                    get_position,
+                    x2cross,
+                    jd_a,
+                    jd_b,
+                    NR_TOLERANCE,
+                    max_iter - iteration,
+                )
+            except RuntimeError:
+                # If Brent fails, continue with Newton-Raphson
+                pass
 
         # Update max_iter based on current speed (may change near stations)
         max_iter = max(max_iter, _get_adaptive_max_iterations(speed))
@@ -903,6 +1169,34 @@ def swe_helio_cross_ut(
 
     # Adaptive iteration count based on planet speed
     max_iter = _get_adaptive_max_iterations(speed)
+
+    # Helper function for Brent's method fallback (heliocentric)
+    def get_helio_position(jd_time: float) -> Tuple[float, float]:
+        pos_result, _ = swe_calc_ut(jd_time, planet_id, helio_flag)
+        return pos_result[0], pos_result[3]
+
+    # Check if we're dealing with a very slow planet - use Brent's method for robustness
+    # Heliocentric planets don't have true stations but very slow planets can still
+    # benefit from the more robust method
+    if _is_near_station(speed):
+        try:
+            search_window = (
+                max(60.0, abs(diff / speed_default) * 1.5)
+                if speed_default > 0
+                else 120.0
+            )
+            jd_bracket_start = jd_ut
+            jd_bracket_end = jd_ut + search_window
+
+            jd_a, jd_b = _find_bracket_for_crossing(
+                get_helio_position, x2cross, jd_bracket_start, jd_bracket_end
+            )
+
+            return _brent_find_crossing(
+                get_helio_position, x2cross, jd_a, jd_b, NR_TOLERANCE, max_iter
+            )
+        except RuntimeError:
+            pass  # Fall through to Newton-Raphson
 
     jd = jd_guess
     for iteration in range(max_iter):
@@ -1022,6 +1316,32 @@ def swe_helio_cross(
 
     # Adaptive iteration count based on planet speed
     max_iter = _get_adaptive_max_iterations(speed)
+
+    # Helper function for Brent's method fallback (heliocentric TT)
+    def get_helio_position_tt(jd_time: float) -> Tuple[float, float]:
+        pos_result, _ = swe_calc(jd_time, planet_id, helio_flag)
+        return pos_result[0], pos_result[3]
+
+    # Check if we're dealing with a very slow planet - use Brent's method for robustness
+    if _is_near_station(speed):
+        try:
+            search_window = (
+                max(60.0, abs(diff / speed_default) * 1.5)
+                if speed_default > 0
+                else 120.0
+            )
+            jd_bracket_start = jd_tt
+            jd_bracket_end = jd_tt + search_window
+
+            jd_a, jd_b = _find_bracket_for_crossing(
+                get_helio_position_tt, x2cross, jd_bracket_start, jd_bracket_end
+            )
+
+            return _brent_find_crossing(
+                get_helio_position_tt, x2cross, jd_a, jd_b, NR_TOLERANCE, max_iter
+            )
+        except RuntimeError:
+            pass  # Fall through to Newton-Raphson
 
     jd = jd_guess
     for iteration in range(max_iter):

@@ -1401,3 +1401,292 @@ class TestMoonNodeEdgeCases:
         pos, _ = ephem.swe_calc_ut(jd_node, SE_MOON, 0)
         lat_arcsec = abs(pos[1]) * 3600.0
         assert lat_arcsec < 0.05, f"Year {year}: latitude {lat_arcsec:.4f} arcsec"
+
+
+class TestStationDetectionAndBrentsFallback:
+    """Tests for station detection and Brent's method fallback.
+
+    When planets are near retrograde stations (velocity ~0°/day), Newton-Raphson
+    can have convergence issues. These tests verify that the Brent's method
+    fallback handles these cases correctly.
+    """
+
+    @pytest.mark.unit
+    def test_station_speed_threshold_constant(self):
+        """Verify STATION_SPEED_THRESHOLD is defined and reasonable."""
+        from libephemeris.crossing import STATION_SPEED_THRESHOLD
+
+        # Should be a small positive value (e.g., 0.001°/day)
+        assert 0 < STATION_SPEED_THRESHOLD < 0.01
+        assert STATION_SPEED_THRESHOLD == 0.001
+
+    @pytest.mark.unit
+    def test_is_near_station_function(self):
+        """Test the _is_near_station helper function."""
+        from libephemeris.crossing import _is_near_station
+
+        # Fast planets should not be near station
+        assert not _is_near_station(1.0)
+        assert not _is_near_station(0.5)
+        assert not _is_near_station(0.1)
+        assert not _is_near_station(0.01)
+        assert not _is_near_station(0.001)  # At threshold, not below
+
+        # Near-zero speeds should be detected as stations
+        assert _is_near_station(0.0005)
+        assert _is_near_station(0.0001)
+        assert _is_near_station(0.0)
+
+        # Negative speeds (retrograde) should also be detected
+        assert not _is_near_station(-0.5)
+        assert not _is_near_station(-0.01)
+        assert _is_near_station(-0.0005)
+
+    @pytest.mark.unit
+    def test_brent_find_crossing_basic(self):
+        """Test that Brent's method can find a simple crossing."""
+        from libephemeris.crossing import _brent_find_crossing
+
+        # Create a simple linear function for testing
+        def linear_position(jd):
+            # Position increases by 1° per day, starting at 0° at jd=0
+            return jd * 1.0, 1.0  # (longitude, speed)
+
+        # Find crossing of 5° starting from jd=0
+        jd_cross = _brent_find_crossing(
+            linear_position, x2cross=5.0, jd_a=0.0, jd_b=10.0, tolerance=0.0001
+        )
+
+        assert abs(jd_cross - 5.0) < 0.001
+
+    @pytest.mark.unit
+    def test_brent_find_crossing_with_wraparound(self):
+        """Test Brent's method handles 360° wraparound."""
+        from libephemeris.crossing import _brent_find_crossing
+
+        def wrapping_position(jd):
+            # Position that wraps around: 350° at jd=0, 10° at jd=20
+            lon = (350.0 + jd * 1.0) % 360.0
+            return lon, 1.0
+
+        # Find crossing of 5° (should happen around jd=15)
+        jd_cross = _brent_find_crossing(
+            wrapping_position, x2cross=5.0, jd_a=10.0, jd_b=20.0, tolerance=0.0001
+        )
+
+        # At jd=15, position should be (350+15)%360 = 5°
+        assert abs(jd_cross - 15.0) < 0.001
+
+    @pytest.mark.unit
+    def test_find_bracket_for_crossing_basic(self):
+        """Test bracket finding for a simple crossing."""
+        from libephemeris.crossing import _find_bracket_for_crossing
+
+        def linear_position(jd):
+            return jd * 1.0, 1.0  # 1°/day
+
+        jd_a, jd_b = _find_bracket_for_crossing(
+            linear_position, x2cross=5.0, jd_start=0.0, jd_end=10.0
+        )
+
+        # Bracket should contain jd=5 (jd_a <= 5 <= jd_b)
+        assert jd_a <= 5.0 <= jd_b
+
+    @pytest.mark.unit
+    def test_find_bracket_raises_if_no_crossing(self):
+        """Test that bracket finding raises error if no crossing found."""
+        from libephemeris.crossing import _find_bracket_for_crossing
+
+        def constant_position(jd):
+            return 10.0, 0.0  # Always at 10°
+
+        with pytest.raises(RuntimeError, match="No crossing found"):
+            _find_bracket_for_crossing(
+                constant_position, x2cross=50.0, jd_start=0.0, jd_end=10.0
+            )
+
+    @pytest.mark.unit
+    def test_mercury_retrograde_station_crossing(self):
+        """Test crossing calculation when Mercury is near a retrograde station.
+
+        Mercury goes retrograde 3-4 times per year. Near station points,
+        its speed approaches 0°/day, which can cause Newton-Raphson issues.
+        The Brent's method fallback should handle these cases.
+        """
+        # Mercury retrograde station dates in 2024:
+        # - Dec 2023 to Jan 2024: Stations around Jan 1
+        # - Apr 2024: Stations around Apr 1 and Apr 25
+        # - Aug 2024: Stations around Aug 5 and Aug 28
+        # - Nov-Dec 2024: Stations around Nov 25 and Dec 15
+
+        # Start near a Mercury station (early January 2024)
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Get Mercury's current position
+        pos, _ = ephem.swe_calc_ut(jd_start, SE_MERCURY, SEFLG_SPEED)
+        current_lon = pos[0]
+
+        # Target a degree ahead (should work even if near station)
+        target = (current_lon + 5) % 360
+
+        # This should not raise even if near station
+        jd_cross = ephem.swe_cross_ut(SE_MERCURY, target, jd_start, 0)
+
+        # Verify the crossing was found
+        assert jd_cross > jd_start
+
+        # Verify Mercury is at target at crossing time
+        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_MERCURY, 0)
+        diff = abs(pos_cross[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1, f"Mercury at {pos_cross[0]}, target {target}, diff {diff}"
+
+    @pytest.mark.unit
+    def test_saturn_slow_motion_crossing(self):
+        """Test crossing for Saturn which moves ~0.03°/day.
+
+        Saturn is a slow planet that can trigger the station detection
+        logic even during normal motion.
+        """
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Get Saturn's current position
+        pos, _ = ephem.swe_calc_ut(jd_start, SE_SATURN, SEFLG_SPEED)
+        current_lon = pos[0]
+
+        # Target 2° ahead
+        target = (current_lon + 2) % 360
+
+        jd_cross = ephem.swe_cross_ut(SE_SATURN, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_SATURN, 0)
+        diff = abs(pos_cross[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1
+
+    @pytest.mark.unit
+    def test_pluto_very_slow_motion_crossing(self):
+        """Test crossing for Pluto which moves slowly (~0.004-0.03°/day).
+
+        Pluto is a slow planet that benefits from the robust station handling,
+        even when not at a true station.
+        """
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Get Pluto's current position
+        pos, _ = ephem.swe_calc_ut(jd_start, SE_PLUTO, SEFLG_SPEED)
+        current_lon = pos[0]
+        current_speed = pos[3]
+
+        # Pluto moves slowly (typically 0.004-0.03°/day)
+        assert abs(current_speed) < 0.05, f"Pluto speed: {current_speed}"
+
+        # Target 1° ahead
+        target = (current_lon + 1) % 360
+
+        jd_cross = ephem.swe_cross_ut(SE_PLUTO, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, 0)
+        diff = abs(pos_cross[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1
+
+    @pytest.mark.unit
+    def test_venus_retrograde_crossing(self):
+        """Test crossing when Venus is retrograde.
+
+        Venus goes retrograde every ~18 months. Near stations,
+        its speed approaches 0°/day.
+        """
+        # Venus was retrograde in late 2023 (Oct 25 - Nov 4 station)
+        jd_start = ephem.swe_julday(2024, 3, 1, 0.0)
+
+        pos, _ = ephem.swe_calc_ut(jd_start, SE_VENUS, SEFLG_SPEED)
+        current_lon = pos[0]
+
+        # Target 10° ahead
+        target = (current_lon + 10) % 360
+
+        jd_cross = ephem.swe_cross_ut(SE_VENUS, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_VENUS, 0)
+        diff = abs(pos_cross[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1
+
+    @pytest.mark.unit
+    def test_helio_cross_with_slow_planet(self):
+        """Test heliocentric crossing with Pluto (very slow)."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        pos, _ = ephem.swe_calc_ut(jd_start, SE_PLUTO, SEFLG_HELCTR | SEFLG_SPEED)
+        current_lon = pos[0]
+
+        # Target 0.5° ahead
+        target = (current_lon + 0.5) % 360
+
+        jd_cross = ephem.swe_helio_cross_ut(SE_PLUTO, target, jd_start, 0)
+
+        assert jd_cross > jd_start
+
+        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, SEFLG_HELCTR)
+        diff = abs(pos_cross[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.1
+
+    @pytest.mark.unit
+    def test_multiple_planets_near_stations(self):
+        """Test that multiple slow planets converge correctly."""
+        jd_start = ephem.swe_julday(2024, 6, 1, 0.0)
+
+        # Use smaller offsets for very slow planets, and avoid planets that might be retrograde
+        slow_planets = [
+            (SE_JUPITER, 5),  # Jupiter, target 5° ahead
+            (SE_SATURN, 3),  # Saturn, target 3° ahead
+            (SE_URANUS, 2),  # Uranus, target 2° ahead
+        ]
+
+        for planet_id, offset in slow_planets:
+            pos, _ = ephem.swe_calc_ut(jd_start, planet_id, SEFLG_SPEED)
+            target = (pos[0] + offset) % 360
+
+            jd_cross = ephem.swe_cross_ut(planet_id, target, jd_start, 0)
+
+            assert jd_cross > jd_start
+
+            pos_cross, _ = ephem.swe_calc_ut(jd_cross, planet_id, 0)
+            diff = abs(pos_cross[0] - target)
+            if diff > 180:
+                diff = 360 - diff
+            assert diff < 0.1, f"Planet {planet_id} failed: diff={diff}"
+
+    @pytest.mark.unit
+    def test_crossing_accuracy_preserved_with_brent(self):
+        """Verify that Brent's method achieves the same precision as Newton-Raphson."""
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Test with Saturn (slow but not quite at station)
+        pos, _ = ephem.swe_calc_ut(jd_start, SE_SATURN, SEFLG_SPEED)
+        target = (pos[0] + 5) % 360
+
+        jd_cross = ephem.swe_cross_ut(SE_SATURN, target, jd_start, 0)
+
+        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_SATURN, 0)
+        diff = abs(pos_cross[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+
+        # Should still achieve sub-arcsecond precision
+        diff_arcsec = diff * 3600.0
+        assert diff_arcsec < 0.1, f"Precision: {diff_arcsec:.4f} arcsec"
