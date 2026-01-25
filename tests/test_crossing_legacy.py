@@ -71,7 +71,7 @@ class TestSunCrossing:
         assert diff < 0.01, f"Sun at {pos[0]:.4f}° vs target {target_lon}°"
 
     def test_solcross_precision(self):
-        """Test sub-arcsecond precision of crossing."""
+        """Test sub-milliarcsecond precision of crossing."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
 
         jd_cross = ephem.swe_solcross_ut(45.0, jd_start, 0)
@@ -79,8 +79,9 @@ class TestSunCrossing:
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
         diff = abs(pos[0] - 45.0)
 
-        # Should be within 1 arcsecond = 1/3600 degree
-        assert diff < 1.0 / 3600.0, f"Precision: {diff * 3600:.2f} arcseconds"
+        # Sun should achieve 0.001 arcsecond precision (sub-milliarcsecond)
+        # See CALCS.md: "Precisione attesa: < 0.001" (sub-milliarcsecondo)"
+        assert diff < 0.001 / 3600.0, f"Precision: {diff * 3600:.6f} arcseconds"
 
 
 @pytest.mark.unit
@@ -131,7 +132,7 @@ class TestMoonCrossing:
         assert diff < 0.01, f"Moon at {pos[0]:.4f}° vs target {target_lon}°"
 
     def test_mooncross_precision(self):
-        """Test precision of Moon crossing."""
+        """Test sub-arcsecond precision of Moon crossing."""
         jd_start = ephem.swe_julday(2024, 11, 28, 0.0)
 
         jd_cross = ephem.swe_mooncross_ut(123.456, jd_start, 0)
@@ -139,8 +140,9 @@ class TestMoonCrossing:
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
         diff = abs(pos[0] - 123.456)
 
-        # Moon precision should be sub-arcsecond
-        assert diff < 1.0 / 3600.0, f"Precision: {diff * 3600:.2f} arcseconds"
+        # Moon precision should be 0.1 arcsecond (sub-arcsecond)
+        # See crossing.py: NR_TOLERANCE = 0.1 / 3600.0
+        assert diff < 0.1 / 3600.0, f"Precision: {diff * 3600:.4f} arcseconds"
 
     def test_mooncross_speed(self):
         """Test that Moon crossing is found quickly (near start date)."""
@@ -183,7 +185,7 @@ class TestCrossingIntegration:
         jd_cross = ephem.swe_solcross_ut(400.0, jd_start, 0)  # >360°
         # Function should normalize (400° = 40°)
         assert isinstance(jd_cross, float)
-        
+
         # Verify it actually found 40° crossing
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
         expected = 400.0 % 360.0
@@ -191,4 +193,3 @@ class TestCrossingIntegration:
         if diff > 180:
             diff = 360 - diff
         assert diff < 0.01, f"Expected {expected}°, got {pos[0]:.4f}°"
-
