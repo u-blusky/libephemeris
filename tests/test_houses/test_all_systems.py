@@ -297,6 +297,254 @@ class TestHouseSystemsPolarLatitudes:
         assert abs(ascmc_swe[1] - ascmc_lib[1]) < 0.1
 
 
+class TestAllHouseSystemsPolarLatitudes:
+    """Comprehensive polar latitude tests for all 13+ house systems.
+
+    Tests verify that libephemeris matches pyswisseph behavior at polar
+    latitudes (>66.5 N/S) where some systems fail or produce flat/degenerate
+    houses.
+
+    Systems tested:
+    - Fail at polar (raise Error): P (Placidus), K (Koch), G (Gauquelin)
+    - Work at polar (return valid cusps): O, R, C, E, A, W, B, T, M, X, V, H, U, F, Y, N
+    """
+
+    # House systems that should raise Error at polar latitudes
+    POLAR_FAIL_SYSTEMS = [
+        (ord("P"), "Placidus"),
+        (ord("K"), "Koch"),
+        (ord("G"), "Gauquelin"),
+    ]
+
+    # House systems that should work at polar latitudes
+    # with tolerance for comparison with pyswisseph
+    POLAR_WORK_SYSTEMS = [
+        (ord("O"), "Porphyry", 0.1),
+        (ord("R"), "Regiomontanus", 0.1),
+        (ord("C"), "Campanus", 0.1),
+        (ord("E"), "Equal", 0.1),
+        (ord("A"), "Equal MC", 0.1),
+        (ord("W"), "Whole Sign", 0.1),
+        (ord("B"), "Alcabitius", 0.1),
+        (ord("T"), "Topocentric", 1.0),  # Higher tolerance for topocentric
+        (ord("M"), "Morinus", 0.1),
+        (ord("X"), "Meridian", 0.1),
+        (ord("V"), "Vehlow", 0.1),
+        (ord("H"), "Horizontal", 0.5),  # Higher tolerance for horizontal
+        (ord("U"), "Krusinski", 0.1),
+        (ord("F"), "Carter", 0.1),
+        (ord("N"), "Natural Gradient", 0.1),
+    ]
+
+    # Test latitudes for polar tests (North and South)
+    POLAR_LATITUDES_NORTH = [67.0, 70.0, 80.0, 89.0]
+    POLAR_LATITUDES_SOUTH = [-67.0, -70.0, -80.0, -89.0]
+    POLAR_LATITUDES_ALL = POLAR_LATITUDES_NORTH + POLAR_LATITUDES_SOUTH
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("hsys,name", POLAR_FAIL_SYSTEMS)
+    @pytest.mark.parametrize("lat", POLAR_LATITUDES_NORTH)
+    def test_failing_systems_raise_error_north(self, hsys, name, lat):
+        """House systems P/K/G should raise Error at northern polar latitudes.
+
+        These systems cannot be calculated when abs(lat) + obliquity > 90.
+        This matches Swiss Ephemeris behavior.
+        """
+        jd = 2451545.0
+
+        # libephemeris should raise Error
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, hsys)
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+        # pyswisseph should also raise Error
+        with pytest.raises(swe.Error):
+            swe.houses(jd, lat, 0.0, bytes([hsys]))
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("hsys,name", POLAR_FAIL_SYSTEMS)
+    @pytest.mark.parametrize("lat", POLAR_LATITUDES_SOUTH)
+    def test_failing_systems_raise_error_south(self, hsys, name, lat):
+        """House systems P/K/G should raise Error at southern polar latitudes."""
+        jd = 2451545.0
+
+        # libephemeris should raise Error
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, hsys)
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+        # pyswisseph should also raise Error
+        with pytest.raises(swe.Error):
+            swe.houses(jd, lat, 0.0, bytes([hsys]))
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("hsys,name,tolerance", POLAR_WORK_SYSTEMS)
+    @pytest.mark.parametrize("lat", POLAR_LATITUDES_ALL)
+    def test_working_systems_at_polar_latitudes(self, hsys, name, tolerance, lat):
+        """House systems that work at polar latitudes should match pyswisseph.
+
+        These systems can produce valid house cusps even at extreme latitudes.
+        The cusps and angles should match pyswisseph within tolerance.
+        """
+        jd = 2451545.0
+        lon = 0.0
+
+        # Both should succeed
+        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, bytes([hsys]))
+
+        # Verify cusps are valid longitudes
+        for i, cusp in enumerate(cusps_lib[:12]):
+            assert 0 <= cusp < 360, (
+                f"{name} cusp {i + 1} = {cusp} out of range at lat {lat}"
+            )
+
+        # Compare ASC
+        asc_diff = abs(ascmc_lib[0] - ascmc_swe[0])
+        if asc_diff > 180:
+            asc_diff = 360 - asc_diff
+        assert asc_diff < tolerance, (
+            f"{name} ASC diff {asc_diff}° at lat {lat}° "
+            f"(lib={ascmc_lib[0]:.4f}, swe={ascmc_swe[0]:.4f})"
+        )
+
+        # Compare MC
+        mc_diff = abs(ascmc_lib[1] - ascmc_swe[1])
+        if mc_diff > 180:
+            mc_diff = 360 - mc_diff
+        assert mc_diff < tolerance, (
+            f"{name} MC diff {mc_diff}° at lat {lat}° "
+            f"(lib={ascmc_lib[1]:.4f}, swe={ascmc_swe[1]:.4f})"
+        )
+
+        # Compare all 12 cusps
+        for i in range(12):
+            cusp_diff = abs(cusps_lib[i] - cusps_swe[i])
+            if cusp_diff > 180:
+                cusp_diff = 360 - cusp_diff
+            assert cusp_diff < tolerance, (
+                f"{name} cusp {i + 1} diff {cusp_diff}° at lat {lat}° "
+                f"(lib={cusps_lib[i]:.4f}, swe={cusps_swe[i]:.4f})"
+            )
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("hsys,name,tolerance", POLAR_WORK_SYSTEMS)
+    def test_working_systems_produce_valid_houses_at_89deg(self, hsys, name, tolerance):
+        """House systems should produce 12 distinct cusps at 89 latitude.
+
+        Even near the pole, house systems should produce reasonable cusps,
+        not flat/degenerate results where all cusps are the same.
+        """
+        jd = 2451545.0
+        lat = 89.0
+
+        cusps, ascmc = ephem.swe_houses(jd, lat, 0.0, hsys)
+
+        # Should have 12 cusps
+        assert len(cusps) >= 12, f"{name} returned fewer than 12 cusps"
+
+        # Check that cusps are not all degenerate (same value)
+        unique_cusps = len(set(round(c, 1) for c in cusps[:12]))
+        assert unique_cusps >= 10, (
+            f"{name} produced only {unique_cusps} unique cusps at 89°, "
+            "possible degenerate/flat houses"
+        )
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("hsys,name", POLAR_FAIL_SYSTEMS)
+    def test_failing_systems_work_below_polar_circle(self, hsys, name):
+        """P/K/G systems should work below the polar circle (~66.5)."""
+        jd = 2451545.0
+        lat = 65.0  # Below polar circle
+
+        # Should succeed at 65 latitude
+        cusps, ascmc = ephem.swe_houses(jd, lat, 0.0, hsys)
+
+        assert 0 <= ascmc[0] < 360, f"{name} ASC out of range at 65°"
+        assert 0 <= ascmc[1] < 360, f"{name} MC out of range at 65°"
+
+        # Compare with pyswisseph
+        cusps_swe, ascmc_swe = swe.houses(jd, lat, 0.0, bytes([hsys]))
+        asc_diff = abs(ascmc[0] - ascmc_swe[0])
+        if asc_diff > 180:
+            asc_diff = 360 - asc_diff
+        assert asc_diff < 0.1, f"{name} ASC diff {asc_diff}° at 65° lat"
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    def test_houses_armc_polar_failing_systems(self):
+        """swe_houses_armc should raise Error for P/K/G at polar latitudes."""
+        armc = 280.46
+        eps = 23.44
+        lat = 70.0
+
+        for hsys, name in self.POLAR_FAIL_SYSTEMS:
+            with pytest.raises(ephem.Error) as exc_info:
+                ephem.swe_houses_armc(armc, lat, eps, hsys)
+
+            assert "polar circle" in str(exc_info.value).lower(), (
+                f"{name} did not raise polar circle error"
+            )
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("hsys,name,tolerance", POLAR_WORK_SYSTEMS)
+    def test_houses_armc_polar_working_systems(self, hsys, name, tolerance):
+        """swe_houses_armc should work for polar-compatible systems at 70 lat."""
+        armc = 280.46
+        eps = 23.44
+        lat = 70.0
+
+        # Should succeed
+        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, hsys)
+
+        # Verify valid output
+        assert len(cusps) >= 12, f"{name} returned fewer than 12 cusps"
+        for i, cusp in enumerate(cusps[:12]):
+            assert 0 <= cusp < 360, f"{name} cusp {i + 1} = {cusp} out of range"
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("lat", [70.0, -70.0, 89.0, -89.0])
+    def test_koch_polar_southern_raises_error(self, lat):
+        """Koch should raise Error at all polar latitudes (N and S)."""
+        jd = 2451545.0
+
+        with pytest.raises(ephem.Error) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, ord("K"))
+
+        assert "polar circle" in str(exc_info.value).lower()
+
+    @pytest.mark.edge_case
+    @pytest.mark.comparison
+    def test_polar_latitude_boundary(self):
+        """Test behavior exactly at the polar circle boundary.
+
+        The polar circle is approximately at abs(lat) + obliquity = 90.
+        With typical obliquity of ~23.44, this is around lat = 66.56.
+        """
+        jd = 2451545.0
+
+        # 66.5 should be borderline - may work or fail depending on obliquity
+        lat_below = 66.0
+        lat_above = 67.0
+
+        # Below should work
+        cusps, ascmc = ephem.swe_houses(jd, lat_below, 0.0, ord("P"))
+        assert 0 <= ascmc[0] < 360
+
+        # Above should fail
+        with pytest.raises(ephem.Error):
+            ephem.swe_houses(jd, lat_above, 0.0, ord("P"))
+
+
 class TestHouseAscMcRelationship:
     """Test relationship between ASC, MC, and cusps."""
 
