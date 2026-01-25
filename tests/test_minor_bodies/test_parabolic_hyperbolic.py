@@ -292,13 +292,19 @@ class TestEllipticPositionCalculation:
         )
 
     def test_elliptic_orbital_period(self, elliptic_asteroid):
-        """After one orbital period, position should return to start."""
+        """After one orbital period, position should return to start (pure Keplerian)."""
         # Period in days
         period_days = 360.0 / elliptic_asteroid.n
 
-        pos1 = calc_minor_body_position(elliptic_asteroid, elliptic_asteroid.epoch)
+        # Use include_perturbations=False to test pure Keplerian behavior
+        # With perturbations, omega and Omega precess, so position drifts slightly
+        pos1 = calc_minor_body_position(
+            elliptic_asteroid, elliptic_asteroid.epoch, include_perturbations=False
+        )
         pos2 = calc_minor_body_position(
-            elliptic_asteroid, elliptic_asteroid.epoch + period_days
+            elliptic_asteroid,
+            elliptic_asteroid.epoch + period_days,
+            include_perturbations=False,
         )
 
         # Positions should be nearly identical
