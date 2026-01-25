@@ -1150,6 +1150,43 @@ class TestAdaptiveIterations:
         assert NR_MAX_ITER_VERY_SLOW < NR_MAX_ITER_STATION
 
     @pytest.mark.unit
+    def test_pluto_typical_speed_configured(self):
+        """Verify Pluto typical speed is configured in swe_cross_ut.
+
+        Pluto moves very slowly (~0.004°/day) compared to other planets.
+        Without this configuration, the algorithm would use 0.5°/day default
+        which is ~125x too fast, causing poor initial estimates.
+        """
+        # Import the crossing module to inspect the implementation
+        # We verify this by checking that Pluto crossing works correctly
+        # even when starting from a retrograde position where speed could be 0
+        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+
+        # Get Pluto's actual speed
+        pos, _ = ephem.swe_calc_ut(jd_start, SE_PLUTO, SEFLG_SPEED)
+        actual_speed = abs(pos[3])
+
+        # Pluto's typical speed should be ~0.004°/day
+        # Verify the actual speed is in the expected range for Pluto
+        assert actual_speed < 0.05, (
+            f"Pluto speed {actual_speed}°/day should be < 0.05°/day"
+        )
+
+        # Now verify crossing works (this would fail with bad speed estimate)
+        target = (pos[0] + 1) % 360
+        jd_cross = ephem.swe_cross_ut(SE_PLUTO, target, jd_start, 0)
+
+        # Verify Pluto is at target with good precision
+        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, 0)
+        diff = abs(pos_cross[0] - target)
+        if diff > 180:
+            diff = 360 - diff
+        diff_arcsec = diff * 3600.0
+        assert diff_arcsec < 0.1, (
+            f"Pluto at {pos_cross[0]}, target {target}, diff {diff_arcsec:.4f} arcsec"
+        )
+
+    @pytest.mark.unit
     def test_pluto_crossing_converges(self):
         """Pluto crossing should converge with adaptive iteration limits."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)

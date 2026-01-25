@@ -948,6 +948,9 @@ def swe_cross_ut(
         raise RuntimeError(f"Failed to calculate planet position: {e}")
 
     # Estimate typical speed if near zero
+    # Geocentric average speeds (°/day) - slower planets need more iterations
+    # Note: geocentric speeds are affected by retrograde motion, values are
+    # approximate averages during direct motion
     typical_speeds = {
         2: 1.4,  # Mercury
         3: 1.2,  # Venus
@@ -956,6 +959,7 @@ def swe_cross_ut(
         6: 0.03,  # Saturn
         7: 0.01,  # Uranus
         8: 0.006,  # Neptune
+        9: 0.004,  # Pluto (very slow, ~0.004°/day)
     }
     speed_default = typical_speeds.get(planet_id, 0.5)
 
