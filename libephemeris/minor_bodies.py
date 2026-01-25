@@ -232,9 +232,9 @@ MINOR_BODY_ELEMENTS = {
 }
 
 
-def solve_kepler_equation(M: float, e: float, tol: float = 1e-8) -> float:
+def solve_kepler_equation_elliptic(M: float, e: float, tol: float = 1e-8) -> float:
     """
-    Solve Kepler's equation M = E - e·sin(E) for eccentric anomaly E.
+    Solve Kepler's equation M = E - e·sin(E) for eccentric anomaly E (elliptic orbits).
 
     Uses Newton-Raphson iteration for robust convergence.
 
@@ -259,8 +259,6 @@ def solve_kepler_equation(M: float, e: float, tol: float = 1e-8) -> float:
         Curtis "Orbital Mechanics for Engineering Students" §3.1
         Vallado "Fundamentals of Astrodynamics" Algorithm 2
     """
-    # FIXME: Precision - For parabolic/hyperbolic orbits (e ≥ 1), use different equation
-    # This implementation assumes elliptical orbits (0 ≤ e < 1)
     E = M if e < 0.8 else math.pi
 
     for _ in range(30):
@@ -275,6 +273,130 @@ def solve_kepler_equation(M: float, e: float, tol: float = 1e-8) -> float:
     return E
 
 
+def solve_kepler_equation_hyperbolic(M: float, e: float, tol: float = 1e-8) -> float:
+    """
+    Solve hyperbolic Kepler's equation M = e·sinh(H) - H for hyperbolic anomaly H.
+
+    Uses Newton-Raphson iteration for robust convergence.
+
+    Args:
+        M: Mean anomaly in radians (can be any value for hyperbolic orbits)
+        e: Eccentricity (e > 1)
+        tol: Convergence tolerance (default 1e-8)
+
+    Returns:
+        float: Hyperbolic anomaly H in radians
+
+    Algorithm:
+        Newton-Raphson: H_{n+1} = H_n - f(H_n)/f'(H_n)
+        where f(H) = e·sinh(H) - H - M
+        and f'(H) = e·cosh(H) - 1
+
+    References:
+        Curtis "Orbital Mechanics for Engineering Students" §3.4
+        Vallado "Fundamentals of Astrodynamics" Algorithm 4
+    """
+    # Initial guess
+    if e < 1.6:
+        H = M if abs(M) < math.pi else math.copysign(math.pi, M)
+    else:
+        H = math.copysign(math.log(2 * abs(M) / e + 1.8), M) if abs(M) > 1e-10 else 0.0
+
+    for _ in range(50):
+        sinh_H = math.sinh(H)
+        cosh_H = math.cosh(H)
+        f = e * sinh_H - H - M
+        fp = e * cosh_H - 1
+
+        if abs(fp) < 1e-15:
+            break
+
+        H_new = H - f / fp
+
+        if abs(H_new - H) < tol:
+            return H_new
+        H = H_new
+
+    return H
+
+
+def solve_barker_equation(M: float) -> float:
+    """
+    Solve Barker's equation for parabolic orbits to find true anomaly.
+
+    For parabolic orbits (e = 1), the relationship between mean anomaly M
+    and true anomaly ν is given by Barker's equation.
+
+    Args:
+        M: Mean anomaly in radians
+
+    Returns:
+        float: True anomaly ν in radians
+
+    Algorithm:
+        Uses the cubic solution for Barker's equation:
+        tan(ν/2) = s where s³ + 3s - 6M/√2 = 0
+
+        Solving via Cardano's formula or the closed-form solution.
+
+    References:
+        Vallado "Fundamentals of Astrodynamics" Algorithm 3
+        Danby "Fundamentals of Celestial Mechanics" §6.6
+    """
+    # Barker's equation: M = (1/2) * tan(ν/2) + (1/6) * tan³(ν/2)
+    # Let s = tan(ν/2), then: s + s³/3 = 2M
+    # Rearranging: s³ + 3s - 6M = 0
+
+    # Use the closed-form solution (Cardano's formula for depressed cubic)
+    W = 3.0 * M
+    # s = (W + sqrt(W^2 + 1))^(1/3) - (W + sqrt(W^2 + 1))^(-1/3) won't work directly
+    # Use: s = 2 * sinh(asinh(W) / 3)
+    s = 2.0 * math.sinh(math.asinh(W) / 3.0)
+
+    # True anomaly from tan(ν/2) = s
+    nu = 2.0 * math.atan(s)
+
+    return nu
+
+
+def solve_kepler_equation(M: float, e: float, tol: float = 1e-8) -> float:
+    """
+    Solve Kepler's equation for the appropriate anomaly based on orbit type.
+
+    Handles elliptic, parabolic, and hyperbolic orbits.
+
+    Args:
+        M: Mean anomaly in radians
+        e: Eccentricity (e ≥ 0)
+        tol: Convergence tolerance (default 1e-8 ~ 0.002 arcsec)
+
+    Returns:
+        float: For e < 1: Eccentric anomaly E in radians
+               For e = 1: True anomaly ν in radians (special case)
+               For e > 1: Hyperbolic anomaly H in radians
+
+    Note:
+        For parabolic orbits (e = 1), returns TRUE anomaly directly since
+        the eccentric anomaly is not defined for parabolas.
+
+    References:
+        Curtis "Orbital Mechanics for Engineering Students" §3.1-3.4
+        Vallado "Fundamentals of Astrodynamics" Algorithms 2-4
+    """
+    # Parabolic orbit (e ≈ 1)
+    if abs(e - 1.0) < 1e-10:
+        # For parabolic orbits, solve Barker's equation
+        # Returns true anomaly directly
+        return solve_barker_equation(M)
+
+    # Elliptic orbit (e < 1)
+    if e < 1.0:
+        return solve_kepler_equation_elliptic(M, e, tol)
+
+    # Hyperbolic orbit (e > 1)
+    return solve_kepler_equation_hyperbolic(M, e, tol)
+
+
 def calc_minor_body_position(
     elements: OrbitalElements, jd_tt: float
 ) -> Tuple[float, float, float]:
@@ -282,6 +404,7 @@ def calc_minor_body_position(
     Calculate heliocentric position using Keplerian orbital elements.
 
     Propagates orbit from epoch to target time using mean motion.
+    Supports elliptic, parabolic, and hyperbolic orbits.
 
     Args:
         elements: Orbital elements at epoch
@@ -293,12 +416,18 @@ def calc_minor_body_position(
 
     Algorithm:
         1. Propagate mean anomaly: M(t) = M0 + n·Δt
-        2. Solve Kepler's equation for eccentric anomaly E
-        3. Calculate true anomaly ν from E
+        2. Solve Kepler's equation for eccentric/hyperbolic/true anomaly
+        3. Calculate true anomaly ν from E (or H for hyperbolic)
         4. Compute position in orbital plane
         5. Rotate to ecliptic frame using Ω, i, ω
 
-    FIXME: Precision - 2-body Keplerian propagation ignores:
+    Note:
+        - For elliptic orbits (e < 1): Uses standard Kepler equation
+        - For parabolic orbits (e = 1): Uses Barker's equation
+        - For hyperbolic orbits (e > 1): Uses hyperbolic Kepler equation
+
+    Precision:
+        2-body Keplerian propagation ignores:
         - Planetary perturbations (Jupiter, Saturn especially)
         - Non-gravitational forces (radiation pressure, Yarkovsky)
         - Relativistic effects (minor for asteroids)
@@ -308,22 +437,50 @@ def calc_minor_body_position(
         Curtis §3 (orbital elements)
         Vallado §2.3 (coordinate transformations)
     """
+    e = elements.e
     dt = jd_tt - elements.epoch
 
-    # Propagate mean anomaly
-    M = math.radians((elements.M0 + elements.n * dt) % 360.0)
+    # Propagate mean anomaly (handle differently for each orbit type)
+    if abs(e - 1.0) < 1e-10:
+        # Parabolic orbit: mean anomaly grows linearly
+        M = math.radians(elements.M0 + elements.n * dt)
+    elif e < 1.0:
+        # Elliptic orbit: wrap to [0, 360)
+        M = math.radians((elements.M0 + elements.n * dt) % 360.0)
+    else:
+        # Hyperbolic orbit: no wrapping needed
+        M = math.radians(elements.M0 + elements.n * dt)
 
-    # Solve Kepler's equation
-    E = solve_kepler_equation(M, elements.e)
+    # Solve the appropriate Kepler equation
+    anomaly = solve_kepler_equation(M, e)
 
-    # True anomaly from eccentric anomaly
-    nu = 2.0 * math.atan2(
-        math.sqrt(1 + elements.e) * math.sin(E / 2),
-        math.sqrt(1 - elements.e) * math.cos(E / 2),
-    )
-
-    # Heliocentric distance
-    r = elements.a * (1 - elements.e * math.cos(E))
+    # Calculate true anomaly and distance based on orbit type
+    if abs(e - 1.0) < 1e-10:
+        # Parabolic orbit: solve_kepler_equation returns true anomaly directly
+        nu = anomaly
+        # For parabolic orbits: r = p / (1 + cos(ν)) where p = 2 * q (q = perihelion)
+        # Since a is undefined for parabolas, we use q (stored in 'a' field as perihelion)
+        # p = 2 * q, so r = 2 * q / (1 + cos(ν))
+        p = 2.0 * elements.a  # elements.a is perihelion distance q for parabolic orbits
+        r = p / (1.0 + math.cos(nu))
+    elif e < 1.0:
+        # Elliptic orbit: anomaly is eccentric anomaly E
+        E = anomaly
+        nu = 2.0 * math.atan2(
+            math.sqrt(1 + e) * math.sin(E / 2),
+            math.sqrt(1 - e) * math.cos(E / 2),
+        )
+        r = elements.a * (1 - e * math.cos(E))
+    else:
+        # Hyperbolic orbit: anomaly is hyperbolic anomaly H
+        H = anomaly
+        # True anomaly from hyperbolic anomaly
+        nu = 2.0 * math.atan2(
+            math.sqrt(e + 1) * math.sinh(H / 2),
+            math.sqrt(e - 1) * math.cosh(H / 2),
+        )
+        # Distance from hyperbolic anomaly
+        r = elements.a * (e * math.cosh(H) - 1)
 
     # Position in orbital plane (perifocal frame)
     x_orb = r * math.cos(nu)
