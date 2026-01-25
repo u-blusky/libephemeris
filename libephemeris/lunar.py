@@ -526,7 +526,8 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
         True Lilith can vary ±10° from mean Lilith in days/weeks.
         The osculating apogee is sensitive to momentary perturbations.
 
-        μ (GM_Earth) = 398600.4418 km³/s² converted to AU³/day²
+        μ (GM_Earth) = 398600.435436 km³/s² (IAU 2015 Resolution B3,
+        TDB-compatible, from DE440) converted to AU³/day²
 
     References:
         Eccentricity vector method: Vallado "Fundamentals of Astrodynamics"
@@ -563,7 +564,8 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     # This assumes 2-body problem (Earth-Moon). For highest precision,
     # account for Sun's perturbations via 3-body dynamics.
     # GM_Earth in AU³/day² (converted from km³/s²)
-    mu = 398600.4418 / (149597870.7**3) * (86400**2)
+    # IAU 2015 Resolution B3, TDB-compatible value from DE440 ephemeris
+    mu = 398600.435436 / (149597870.7**3) * (86400**2)
 
     # Eccentricity vector e = (v × h)/μ - r/|r| (points toward perigee)
     e_vec = [
