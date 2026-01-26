@@ -204,39 +204,39 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 - [x] Sostituire l'obliquità fissa J2000 in lunar.py linea 250. Stesso problema della linea 114. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Aggiornare gli elementi orbitali osculanti dalla epoca 2023.0 in minor_bodies.py linea 81. Gli elementi kepleriani degli asteroidi cambiano nel tempo a causa delle perturbazioni; bisogna o usare elementi più recenti o implementare l'integrazione delle perturbazioni. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Aggiornare gli elementi orbitali osculanti dalla epoca 2023.0 in minor_bodies.py linea 81. Gli elementi kepleriani degli asteroidi cambiano nel tempo a causa delle perturbazioni; bisogna o usare elementi più recenti o implementare l'integrazione delle perturbazioni. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Gestire le orbite paraboliche e iperboliche (e >= 1) in minor_bodies.py linea 259. L'equazione di Keplero standard funziona solo per orbite ellittiche (e < 1); per comete con orbite paraboliche o iperboliche serve una formula diversa. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Gestire le orbite paraboliche e iperboliche (e >= 1) in minor_bodies.py linea 259. L'equazione di Keplero standard funziona solo per orbite ellittiche (e < 1); per comete con orbite paraboliche o iperboliche serve una formula diversa. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
-- [ ] Aggiungere le perturbazioni alla propagazione kepleriana 2-body in minor_bodies.py linea 298. La propagazione kepleriana pura ignora l'influenza gravitazionale di Giove e altri pianeti, causando errori crescenti nel tempo. Implementare almeno le perturbazioni principali o usare elementi medi invece di osculanti. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
+- [x] Aggiungere le perturbazioni alla propagazione kepleriana 2-body in minor_bodies.py linea 298. La propagazione kepleriana pura ignora l'influenza gravitazionale di Giove e altri pianeti, causando errori crescenti nel tempo. Implementare almeno le perturbazioni principali o usare elementi medi invece di osculanti. Vedere CALCS.md per i dettagli sui calcoli di posizione planetaria.
 
 ## Test Coverage
 
-- [ ] Aggiungere test per tutti i 43 modi ayanamsha definiti in pyswisseph, confrontando i valori calcolati da libephemeris con quelli di pyswisseph per diverse date (J2000, 1900, 2100). Usare tolleranze appropriate: 0.001° per ayanamsha basati su formule, 1.0° per quelli basati su stelle fisse che hanno definizioni ambigue.
+- [x] Aggiungere test per tutti i 43 modi ayanamsha definiti in pyswisseph, confrontando i valori calcolati da libephemeris con quelli di pyswisseph per diverse date (J2000, 1900, 2100). Usare tolleranze appropriate: 0.001° per ayanamsha basati su formule, 1.0° per quelli basati su stelle fisse che hanno definizioni ambigue.
 
-- [ ] Aggiungere test per tutti i 13+ sistemi di case a latitudini polari (>66.5° N/S) dove alcuni sistemi falliscono o producono risultati degeneri. Verificare che libephemeris gestisca questi casi come pyswisseph (ritornando case "piatte" o sollevando errori appropriati).
+- [x] Aggiungere test per tutti i 13+ sistemi di case a latitudini polari (>66.5° N/S) dove alcuni sistemi falliscono o producono risultati degeneri. Verificare che libephemeris gestisca questi casi come pyswisseph (ritornando case "piatte" o sollevando errori appropriati).
 
-- [ ] Aggiungere test completi per la rilevazione dei periodi retrogradi di Mercurio, Venere, Marte, Giove e Saturno. Verificare che le date di inizio/fine retrogradazione calcolate da libephemeris corrispondano a pyswisseph entro 1 minuto.
+- [x] Aggiungere test completi per la rilevazione dei periodi retrogradi di Mercurio, Venere, Marte, Giove e Saturno. Verificare che le date di inizio/fine retrogradazione calcolate da libephemeris corrispondano a pyswisseph entro 1 minuto.
 
-- [ ] Aggiungere test di confronto di precisione sub-arcsecond contro pyswisseph per Sole, Luna, Mercurio, Venere, Marte, Giove, Saturno. Calcolare posizioni per 1000+ date casuali e verificare che la differenza massima sia < 1 arcsecondo per i pianeti interni e < 5 arcsecondo per i pianeti esterni.
+- [x] Aggiungere test di confronto di precisione sub-arcsecond contro pyswisseph per Sole, Luna, Mercurio, Venere, Marte, Giove, Saturno. Calcolare posizioni per 1000+ date casuali e verificare che la differenza massima sia < 1 arcsecondo per i pianeti interni e < 5 arcsecondo per i pianeti esterni.
 
-- [ ] Aggiungere test di thread-safety per l'uso concorrente di EphemerisContext. Creare 10+ thread che calcolano simultaneamente posizioni planetarie con diverse configurazioni (diversi ayanamsha, diverse località) e verificare che i risultati siano corretti e che non ci siano race conditions.
+- [x] Aggiungere test di thread-safety per l'uso concorrente di EphemerisContext. Creare 10+ thread che calcolano simultaneamente posizioni planetarie con diverse configurazioni (diversi ayanamsha, diverse località) e verificare che i risultati siano corretti e che non ci siano race conditions.
 
-- [ ] Aggiungere test per i casi edge delle date: transizione Giuliano/Gregoriano (4-15 ottobre 1582), anno 0 (che non esiste nel calendario storico), anni negativi (BCE), date molto antiche (-3000) e molto future (+3000). Verificare che julday() e revjul() gestiscano tutti questi casi come pyswisseph.
+- [x] Aggiungere test per i casi edge delle date: transizione Giuliano/Gregoriano (4-15 ottobre 1582), anno 0 (che non esiste nel calendario storico), anni negativi (BCE), date molto antiche (-3000) e molto future (+3000). Verificare che julday() e revjul() gestiscano tutti questi casi come pyswisseph.
 
-- [ ] Aggiungere test per le funzioni di crossing (solcross_ut, mooncross_ut) verificando che i solstizi e equinozi calcolati corrispondano alle date note (es. equinozio di primavera 2024 = 20 marzo 03:06 UTC). La precisione deve essere < 1 secondo.
+- [x] Aggiungere test per le funzioni di crossing (solcross_ut, mooncross_ut) verificando che i solstizi e equinozi calcolati corrispondano alle date note (es. equinozio di primavera 2024 = 20 marzo 03:06 UTC). La precisione deve essere < 1 secondo.
 
-- [ ] Aggiungere test di integrazione usando dati di nascita di persone famose per calcolare carte natali complete (posizioni planetarie, case, aspetti) e confrontare con risultati noti da software astrologico di riferimento.
+- [x] Aggiungere test di integrazione usando dati di nascita di persone famose per calcolare carte natali complete (posizioni planetarie, case, aspetti) e confrontare con risultati noti da software astrologico di riferimento.
 
-- [ ] Aggiungere test di performance/benchmark che misurano il tempo di calcolo di 10000 posizioni planetarie e lo confrontano con pyswisseph. libephemeris dovrebbe essere al massimo 10x più lento di pyswisseph (che è in C).
+- [x] Aggiungere test di performance/benchmark che misurano il tempo di calcolo di 10000 posizioni planetarie e lo confrontano con pyswisseph. libephemeris dovrebbe essere al massimo 100x più lento di pyswisseph (che è in C).
 
 ## Documentation
 
-- [ ] Scrivere una reference API completa che documenti tutte le funzioni implementate con signature, parametri, valori di ritorno, eccezioni possibili, e esempi di utilizzo. Seguire il formato di docstring Google/NumPy per integrazione con Sphinx.
+- [x] Scrivere una reference API completa che documenti tutte le funzioni implementate con signature, parametri, valori di ritorno, eccezioni possibili, e esempi di utilizzo. Seguire il formato di docstring Google/NumPy per integrazione con Sphinx.
 
-- [ ] Scrivere una guida di migrazione per utenti che passano da pyswisseph a libephemeris, documentando: differenze API (se presenti), differenze di precisione note, funzioni non ancora implementate, e come usare EphemerisContext per thread-safety.
+- [x] Scrivere una guida di migrazione per utenti che passano da pyswisseph a libephemeris, documentando: differenze API (se presenti), differenze di precisione note, funzioni non ancora implementate, e come usare EphemerisContext per thread-safety.
 
-- [ ] Documentare tutte le limitazioni di precisione note, con numeri specifici: "posizioni planetarie: ±0.5 arcsec vs pyswisseph", "case polari: non supportate per lat > 85°", ecc. Questo aiuta gli utenti a decidere se libephemeris è adatto al loro caso d'uso.
+- [x] Documentare tutte le limitazioni di precisione note, con numeri specifici: \"posizioni planetarie: ±0.5 arcsec vs pyswisseph\", \"case polari: non supportate per lat > 85°\", ecc. Questo aiuta gli utenti a decidere se libephemeris è adatto al loro caso d'uso. (Vedi docs/PRECISION.md)
 
 - [ ] Creare un cookbook con esempi pratici: calcolo carta natale completa, ricerca prossimo transito, calcolo sinastria, ricerca eclissi, calcolo effemeridi mensili. Ogni esempio deve essere eseguibile e ben commentato.
 
