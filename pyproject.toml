@@ -4,30 +4,47 @@ version = "0.1.8"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "LGPL-3.0-only"
+license-files = ["LICENSE"]
 authors = [
-    { name = "Giacomo Battaglia", email = "giacomo.battaglia@example.com" }
+    { name = "Giacomo Battaglia", email = "giacomo@libephemeris.dev" }
+]
+maintainers = [
+    { name = "Giacomo Battaglia", email = "giacomo@libephemeris.dev" }
+]
+keywords = [
+    "astronomy",
+    "ephemeris",
+    "astrology",
+    "planetary",
+    "skyfield",
+    "swiss-ephemeris",
+    "astrological",
+    "celestial",
+    "horoscope",
+    "zodiac",
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Intended Audience :: Education",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Typing :: Typed",
 ]
 dependencies = [
     "skyfield>=1.53",
     "skyfield-data>=7.0.0",
 ]
 
-[project.urls]
-Homepage = "https://github.com/g-battaglia/libephemeris"
-Repository = "https://github.com/g-battaglia/libephemeris"
-Issues = "https://github.com/g-battaglia/libephemeris/issues"
-
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "black>=25.1.0",
     "mypy>=1.0.0",
@@ -38,10 +55,25 @@ dev = [
     "pytest-xdist>=3.5.0",
     "ruff>=0.14.6",
     "pytest-cov>=6.0.0",
+    "build>=1.0.0",
+    "twine>=5.0.0",
+]
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=2.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/g-battaglia/libephemeris"
+Documentation = "https://github.com/g-battaglia/libephemeris#readme"
+Repository = "https://github.com/g-battaglia/libephemeris"
+Issues = "https://github.com/g-battaglia/libephemeris/issues"
+Changelog = "https://github.com/g-battaglia/libephemeris/blob/main/CHANGELOG.md"
+
+
+
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
