@@ -60,13 +60,15 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests with pytest
-        run: uv run pytest --cov=libephemeris --cov-report=xml
+        run: uv run pytest --cov=libephemeris --cov-report=xml --cov-branch
 
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
         if: matrix.python-version == '3.12'
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
+          flags: core,utilities
           fail_ci_if_error: false
+          verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

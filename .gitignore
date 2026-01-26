@@ -11,3 +11,9 @@ wheels/
 de421.bsp
 swisseph
 stuff
+
+# Coverage reports
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/

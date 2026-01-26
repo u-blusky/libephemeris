@@ -53,7 +53,7 @@ format = "ruff format ."
 lint = "ruff check . --fix"
 test = "pytest"
 test-fast = "pytest -n auto"
-coverage = "pytest --cov=libephemeris --cov-report=term-missing"
+coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"
 typecheck = "mypy libephemeris"
 
 [tool.mypy]
@@ -72,3 +72,33 @@ exclude = ["compare_scripts"]
 ignore = ["F403", "F405", "F401", "E402"]
 # Also ignore unused local variables (F841) for now - complex astronomical calculations
 extend-ignore = ["F841"]
+
+[tool.coverage.run]
+source = ["libephemeris"]
+branch = true
+parallel = true
+omit = [
+    "libephemeris/__pycache__/*",
+]
+
+[tool.coverage.paths]
+source = [
+    "libephemeris/",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+precision = 2
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.coverage.html]
+directory = "htmlcov"
