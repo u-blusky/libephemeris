@@ -167,9 +167,10 @@ def get_sid_mode(full: bool = False) -> Union[int, tuple[int, float, float]]:
     Note:
         Returns SE_SIDM_LAHIRI (1) by default if never set.
     """
+    mode = _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 1
     if full:
-        return _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
-    return _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 1
+        return mode, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
+    return mode
 
 
 def get_angles_cache() -> dict[str, float]:

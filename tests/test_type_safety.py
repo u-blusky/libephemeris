@@ -1,0 +1,120 @@
+"""
+Tests for type safety and mypy compliance.
+
+These tests verify that the type annotations in libephemeris are correct
+and that functions return values with the expected types.
+"""
+
+import libephemeris as ephem
+from libephemeris import EphemerisContext
+from libephemeris.state import get_sid_mode, set_sid_mode, close
+from libephemeris.houses import swe_houses, swe_houses_ex, swe_house_name
+from libephemeris.constants import SE_SIDM_LAHIRI
+
+
+class TestGetSidMode:
+    """Tests for get_sid_mode type safety."""
+
+    def setup_method(self):
+        """Reset state before each test."""
+        close()
+
+    def teardown_method(self):
+        """Reset state after each test."""
+        close()
+
+    def test_get_sid_mode_returns_int_when_not_set(self):
+        """get_sid_mode() should return int even when mode is not set."""
+        # After close(), _SIDEREAL_MODE is None but get_sid_mode() should default to 1
+        close()
+        mode = get_sid_mode()
+        assert isinstance(mode, int)
+        assert mode == 1  # Default to SE_SIDM_LAHIRI
+
+    def test_get_sid_mode_returns_int_when_set(self):
+        """get_sid_mode() should return int when mode is explicitly set."""
+        set_sid_mode(SE_SIDM_LAHIRI)
+        mode = get_sid_mode()
+        assert isinstance(mode, int)
+        assert mode == SE_SIDM_LAHIRI
+
+    def test_get_sid_mode_full_returns_tuple(self):
+        """get_sid_mode(full=True) should return a tuple of (int, float, float)."""
+        set_sid_mode(SE_SIDM_LAHIRI, 2451545.0, 23.5)
+        result = get_sid_mode(full=True)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
+        mode, t0, ayan_t0 = result
+        assert isinstance(mode, int)
+        assert isinstance(t0, float)
+        assert isinstance(ayan_t0, float)
+
+    def test_get_sid_mode_full_returns_default_int_when_not_set(self):
+        """get_sid_mode(full=True) returns int (not None) for mode even when unset."""
+        close()
+        result = get_sid_mode(full=True)
+        assert isinstance(result, tuple)
+        mode, t0, ayan_t0 = result
+        # Mode should be an int (default 1), not None
+        assert isinstance(mode, int)
+        assert mode == 1
+
+
+class TestHousesReturnTypes:
+    """Tests for house calculation return types."""
+
+    def test_swe_houses_returns_tuples(self):
+        """swe_houses should return tuple of tuples, not lists."""
+        cusps, ascmc = swe_houses(2451545.0, 51.5, -0.12, ord("P"))
+        assert isinstance(cusps, tuple)
+        assert isinstance(ascmc, tuple)
+        assert len(cusps) == 12
+        assert len(ascmc) == 8
+
+    def test_swe_houses_ex_returns_tuples(self):
+        """swe_houses_ex should return tuple of tuples."""
+        cusps, ascmc = swe_houses_ex(2451545.0, 51.5, -0.12, ord("P"), 0)
+        assert isinstance(cusps, tuple)
+        assert isinstance(ascmc, tuple)
+
+    def test_swe_house_name_with_int(self):
+        """swe_house_name should accept int and return str."""
+        name = swe_house_name(ord("P"))
+        assert isinstance(name, str)
+        assert name == "Placidus"
+
+    def test_swe_house_name_with_unknown(self):
+        """swe_house_name should return 'Unknown' for unknown systems."""
+        name = swe_house_name(ord("Z"))  # Unknown system
+        assert isinstance(name, str)
+        assert name == "Unknown"
+
+
+class TestEphemerisContextHouses:
+    """Tests for EphemerisContext.houses return types."""
+
+    def test_context_houses_returns_tuples(self):
+        """EphemerisContext.houses should return tuple of tuples."""
+        ctx = EphemerisContext()
+        cusps, ascmc = ctx.houses(2451545.0, 51.5, -0.12, ord("P"))
+        assert isinstance(cusps, tuple)
+        assert isinstance(ascmc, tuple)
+        assert len(cusps) == 12
+        assert len(ascmc) == 8
+
+
+class TestAyanamsaTypes:
+    """Tests for ayanamsa calculation types."""
+
+    def test_get_ayanamsa_ut_returns_float(self):
+        """swe_get_ayanamsa_ut should return float."""
+        set_sid_mode(SE_SIDM_LAHIRI)
+        ayanamsa = ephem.swe_get_ayanamsa_ut(2451545.0)
+        assert isinstance(ayanamsa, float)
+
+    def test_get_ayanamsa_ut_with_unset_mode(self):
+        """swe_get_ayanamsa_ut works even when mode was never explicitly set."""
+        close()
+        # Should use default mode (1 = Lahiri)
+        ayanamsa = ephem.swe_get_ayanamsa_ut(2451545.0)
+        assert isinstance(ayanamsa, float)

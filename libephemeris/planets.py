@@ -1009,6 +1009,8 @@ def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
         >>> print(f"Lahiri ayanamsa: {ayanamsa:.6f}°")
     """
     sid_mode = get_sid_mode()
+    # get_sid_mode() without full=True always returns int
+    assert isinstance(sid_mode, int)
     return _calc_ayanamsa(tjd_ut, sid_mode)
 
 

@@ -317,7 +317,7 @@ class EphemerisContext:
 
     def houses(
         self, tjd_ut: float, lat: float, lon: float, hsys: int
-    ) -> Tuple[list[float], list[float]]:
+    ) -> Tuple[Tuple[float, ...], Tuple[float, ...]]:
         """
         Calculate house cusps and angles.
 

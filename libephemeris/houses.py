@@ -363,11 +363,13 @@ def swe_houses(
     # Determine if we need to flip MC (and thus ARMC) for specific systems
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
 
-    hsys_char = hsys
+    hsys_char: str
     if isinstance(hsys, int):
         hsys_char = chr(hsys)
     elif isinstance(hsys, bytes):
         hsys_char = hsys.decode("utf-8")
+    else:
+        hsys_char = str(hsys)
 
     # Determine if we need to flip MC (and thus ARMC) for specific systems
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
@@ -618,11 +620,13 @@ def swe_houses_armc(
     armc_deg = armc % 360.0
 
     # Convert house system identifier to character
-    hsys_char = hsys
+    hsys_char: str
     if isinstance(hsys, int):
         hsys_char = chr(hsys)
     elif isinstance(hsys, bytes):
         hsys_char = hsys.decode("utf-8")
+    else:
+        hsys_char = str(hsys)
 
     # Determine if we need to flip MC (and thus ARMC) for specific systems
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
@@ -934,10 +938,10 @@ def swe_houses_ex(
         ayanamsa = swe_get_ayanamsa_ut(tjdut)
         # cusps is now 12 elements (houses 1-12), apply ayanamsa to all
         cusps = tuple([(c - ayanamsa) % 360.0 for c in cusps])
-        ascmc = list(ascmc)
-        ascmc[0] = (ascmc[0] - ayanamsa) % 360.0  # Asc
-        ascmc[1] = (ascmc[1] - ayanamsa) % 360.0  # MC
-        ascmc = tuple(ascmc)
+        ascmc_list = list(ascmc)
+        ascmc_list[0] = (ascmc_list[0] - ayanamsa) % 360.0  # Asc
+        ascmc_list[1] = (ascmc_list[1] - ayanamsa) % 360.0  # MC
+        ascmc = tuple(ascmc_list)
 
     return cusps, ascmc
 
@@ -1058,11 +1062,13 @@ def swe_house_name(hsys: int) -> str:
     """
     Get the name of a house system.
     """
-    hsys_char = hsys
+    hsys_char: str
     if isinstance(hsys, int):
         hsys_char = chr(hsys)
     elif isinstance(hsys, bytes):
         hsys_char = hsys.decode("utf-8")
+    else:
+        hsys_char = str(hsys)
 
     names = {
         "P": "Placidus",
