@@ -94,6 +94,7 @@ from .constants import (
     SE_DENEBOLA,
     SE_MARKAB,
     SE_SCHEAT,
+    SEFLG_SPEED,
 )
 
 
@@ -1589,6 +1590,72 @@ def calc_fixed_star_position(star_id: int, jd_tt: float) -> Tuple[float, float, 
     return lon, lat_deg, dist
 
 
+def calc_fixed_star_velocity(
+    star_id: int, jd_tt: float
+) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate ecliptic position and velocity of a fixed star at given date.
+
+    Uses numerical differentiation to compute velocities. The velocity represents
+    the rate of change of the star's ecliptic coordinates due to:
+    1. Proper motion of the star itself through space
+    2. Precession of the equinoxes (ecliptic coordinate grid rotation)
+    3. Nutation (small periodic oscillations)
+
+    The dominant contribution is precession at ~50.3 arcseconds/year = 0.0001378
+    degrees/day in longitude.
+
+    Args:
+        star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR, etc.)
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple[float, float, float, float, float, float]:
+            (longitude, latitude, distance, speed_lon, speed_lat, speed_dist) where:
+            - longitude: Ecliptic longitude of date in degrees (0-360)
+            - latitude: Ecliptic latitude of date in degrees
+            - distance: Arbitrary large value (100000 AU)
+            - speed_lon: Velocity in longitude in degrees/day
+            - speed_lat: Velocity in latitude in degrees/day
+            - speed_dist: Velocity in distance (always 0.0 for fixed stars)
+
+    Raises:
+        ValueError: If star_id not in catalog
+
+    Algorithm:
+        Uses numerical differentiation with a one-day interval:
+        1. Calculate position at jd_tt
+        2. Calculate position at jd_tt + 1.0 (one day later)
+        3. speed_lon = (lon2 - lon1) with 360° wraparound handling
+        4. speed_lat = (lat2 - lat1)
+        5. speed_dist = 0 (stellar distances don't measurably change)
+
+    References:
+        Precession rate: ~50.3 arcsec/year ≈ 0.0001378 deg/day in longitude
+    """
+    # Calculate position at current time
+    lon1, lat1, dist = calc_fixed_star_position(star_id, jd_tt)
+
+    # Calculate position one day later
+    lon2, lat2, _ = calc_fixed_star_position(star_id, jd_tt + 1.0)
+
+    # Compute longitude velocity with 360° wraparound handling
+    speed_lon = lon2 - lon1
+    # Handle wraparound at 360° (e.g., 359° -> 1° should give +2°, not -358°)
+    if speed_lon > 180.0:
+        speed_lon -= 360.0
+    elif speed_lon < -180.0:
+        speed_lon += 360.0
+
+    # Compute latitude velocity (no wraparound needed for latitude)
+    speed_lat = lat2 - lat1
+
+    # Distance velocity is 0 (stellar distances don't measurably change)
+    speed_dist = 0.0
+
+    return lon1, lat1, dist, speed_lon, speed_lat, speed_dist
+
+
 def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
     """
     Resolve a star name to its ID with pyswisseph-compatible name resolution.
@@ -1654,9 +1721,20 @@ def swe_fixstar_ut(
     t = ts.ut1_jd(tjd_ut)
 
     try:
-        lon, lat, dist = calc_fixed_star_position(star_id, t.tt)
-        # Return canonical star name on success (pyswisseph behavior)
-        return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, canonical_name or "")
+        # Check if SEFLG_SPEED flag is set to compute velocities
+        if iflag & SEFLG_SPEED:
+            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
+                star_id, t.tt
+            )
+            return (
+                (lon, lat, dist, speed_lon, speed_lat, speed_dist),
+                iflag,
+                canonical_name or "",
+            )
+        else:
+            lon, lat, dist = calc_fixed_star_position(star_id, t.tt)
+            # Return canonical star name on success (pyswisseph behavior)
+            return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, canonical_name or "")
     except Exception as e:
         return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
@@ -1696,9 +1774,20 @@ def swe_fixstar(
 
     # Use TT directly - no conversion needed
     try:
-        lon, lat, dist = calc_fixed_star_position(star_id, jd)
-        # Return canonical star name on success (pyswisseph behavior)
-        return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, canonical_name or "")
+        # Check if SEFLG_SPEED flag is set to compute velocities
+        if iflag & SEFLG_SPEED:
+            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
+                star_id, jd
+            )
+            return (
+                (lon, lat, dist, speed_lon, speed_lat, speed_dist),
+                iflag,
+                canonical_name or "",
+            )
+        else:
+            lon, lat, dist = calc_fixed_star_position(star_id, jd)
+            # Return canonical star name on success (pyswisseph behavior)
+            return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, canonical_name or "")
     except Exception as e:
         return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
@@ -1857,9 +1946,22 @@ def swe_fixstar2_ut(
     t = ts.ut1_jd(tjd_ut)
 
     try:
-        lon, lat, dist = calc_fixed_star_position(entry.id, t.tt)
-        star_name_out = _format_star_name(entry)
-        return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
+        # Check if SEFLG_SPEED flag is set to compute velocities
+        if iflag & SEFLG_SPEED:
+            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
+                entry.id, t.tt
+            )
+            star_name_out = _format_star_name(entry)
+            return (
+                star_name_out,
+                (lon, lat, dist, speed_lon, speed_lat, speed_dist),
+                iflag,
+                "",
+            )
+        else:
+            lon, lat, dist = calc_fixed_star_position(entry.id, t.tt)
+            star_name_out = _format_star_name(entry)
+            return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
     except Exception as e:
         return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
@@ -1913,9 +2015,22 @@ def swe_fixstar2(
 
     # Use TT directly - no conversion needed
     try:
-        lon, lat, dist = calc_fixed_star_position(entry.id, jd)
-        star_name_out = _format_star_name(entry)
-        return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
+        # Check if SEFLG_SPEED flag is set to compute velocities
+        if iflag & SEFLG_SPEED:
+            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
+                entry.id, jd
+            )
+            star_name_out = _format_star_name(entry)
+            return (
+                star_name_out,
+                (lon, lat, dist, speed_lon, speed_lat, speed_dist),
+                iflag,
+                "",
+            )
+        else:
+            lon, lat, dist = calc_fixed_star_position(entry.id, jd)
+            star_name_out = _format_star_name(entry)
+            return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
     except Exception as e:
         return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
