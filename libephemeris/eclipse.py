@@ -263,26 +263,28 @@ def _calculate_eclipse_type_and_magnitude(
 
 def _calculate_eclipse_phases(
     jd_max: float, eclipse_type: int
-) -> Tuple[float, float, float, float, float, float, float, float]:
+) -> Tuple[float, float, float, float, float, float, float, float, float, float]:
     """
     Calculate times of eclipse phases (contacts) for a global eclipse.
 
-    Phase indices:
-        [0]: Time of maximum eclipse
-        [1]: Time of first contact (partial eclipse begins)
-        [2]: Time of second contact (total/annular begins, if central)
-        [3]: Time of third contact (total/annular ends, if central)
-        [4]: Time of fourth contact (partial eclipse ends)
-        [5]: Time of sunrise on central line
-        [6]: Time of sunset on central line
-        [7]: Reserved
+    Phase indices (matching pyswisseph tret array):
+        [0]: Time of maximum eclipse (tret[0])
+        [1]: Time of first contact - eclipse begins (tret[1])
+        [2]: Time of second contact - total/annular begins, if central (tret[2])
+        [3]: Time of third contact - total/annular ends, if central (tret[3])
+        [4]: Time of fourth contact - eclipse ends (tret[4])
+        [5]: Time of sunrise on central line (tret[5])
+        [6]: Time of sunset on central line (tret[6])
+        [7]: Time when annular-total eclipse starts (tret[7])
+        [8]: Time when annular-total eclipse ends (tret[8])
+        [9]: Reserved (tret[9])
 
     Args:
         jd_max: Julian Day of maximum eclipse
         eclipse_type: Eclipse type flags
 
     Returns:
-        Tuple of 8 floats with phase times (JD UT)
+        Tuple of 10 floats with phase times (JD UT), matching pyswisseph format
     """
     # For a simplified implementation, estimate durations
     # based on typical eclipse characteristics
@@ -326,6 +328,8 @@ def _calculate_eclipse_phases(
         t_fourth_contact,
         t_sunrise,
         t_sunset,
+        0.0,  # Reserved for annular-total start
+        0.0,  # Reserved for annular-total end
         0.0,  # Reserved
     )
 
@@ -353,7 +357,8 @@ def sol_eclipse_when_glob(
 
     Returns:
         Tuple containing:
-            - times: Tuple of 8 floats with eclipse phase times (JD UT):
+            - times: Tuple of 10 floats with eclipse phase times (JD UT),
+                     matching pyswisseph format:
                 [0]: Time of maximum eclipse
                 [1]: Time of first contact (partial begins)
                 [2]: Time of second contact (central phase begins, or 0)
@@ -361,7 +366,9 @@ def sol_eclipse_when_glob(
                 [4]: Time of fourth contact (partial ends)
                 [5]: Time of sunrise on central line (or 0)
                 [6]: Time of sunset on central line (or 0)
-                [7]: Reserved (0)
+                [7]: Time when annular-total eclipse starts (or 0)
+                [8]: Time when annular-total eclipse ends (or 0)
+                [9]: Reserved (0)
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
 
     Raises:

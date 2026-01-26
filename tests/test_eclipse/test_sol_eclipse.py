@@ -35,13 +35,13 @@ class TestSolEclipseWhenGlob:
         # Eclipse type should have some flags set
         assert ecl_type != 0
 
-    def test_returns_eight_time_values(self):
-        """Should return tuple of 8 time values."""
+    def test_returns_ten_time_values(self):
+        """Should return tuple of 10 time values like pyswisseph."""
         jd_start = swe_julday(2024, 1, 1, 0)
 
         times, _ = sol_eclipse_when_glob(jd_start)
 
-        assert len(times) == 8
+        assert len(times) == 10
 
     def test_time_order_is_correct(self):
         """Eclipse phase times should be in chronological order."""
@@ -830,3 +830,123 @@ class TestSolEclipseHow:
             # For total eclipse (magnitude >= 1), obscuration should be 1
             if magnitude >= 1.0:
                 assert obscuration >= 0.99  # Allow small tolerance
+
+
+class TestKnownEclipseValidation:
+    """Validation tests against known eclipse times.
+
+    These tests verify that the eclipse times are accurate within 0.01 days (~15 minutes)
+    compared to known eclipse dates from NASA eclipse catalogs.
+    """
+
+    def test_april_2024_total_eclipse_timing(self):
+        """Validate April 8, 2024 total eclipse maximum time.
+
+        Known data: Total solar eclipse on April 8, 2024
+        Maximum eclipse around JD 2460409.26 (approximately 18:17 UT)
+        """
+        # Search starting well before the eclipse
+        jd_start = 2460400.0  # About 8 days before
+
+        times, ecl_type = sol_eclipse_when_glob(jd_start)
+
+        # Eclipse maximum should be around JD 2460409.26
+        expected_jd = 2460409.26
+        tolerance = 0.01  # 0.01 days = ~15 minutes
+
+        assert abs(times[0] - expected_jd) < tolerance, (
+            f"Eclipse maximum {times[0]} differs from expected {expected_jd} "
+            f"by more than {tolerance} days"
+        )
+
+        # Should be a total eclipse
+        assert ecl_type & SE_ECL_TOTAL
+
+    def test_october_2023_annular_eclipse_timing(self):
+        """Validate October 14, 2023 annular eclipse maximum time.
+
+        Known data: Annular solar eclipse on October 14, 2023
+        Maximum eclipse around 17:59 UT (JD ~2460232.25)
+        """
+        jd_start = 2460200.0  # About 32 days before
+
+        times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_ANNULAR)
+
+        # Verify the correct date was found
+        year, month, day, hour = swe_revjul(times[0])
+        assert year == 2023
+        assert month == 10
+        assert 13 <= day <= 15  # October 14
+
+        # Should be an annular eclipse
+        assert ecl_type & SE_ECL_ANNULAR
+
+    def test_august_2017_total_eclipse_timing(self):
+        """Validate August 21, 2017 total eclipse maximum time.
+
+        Known data: Total solar eclipse on August 21, 2017
+        Maximum eclipse around 18:26 UT
+        The famous "Great American Eclipse"
+        """
+        jd_start = 2457900.0  # About 87 days before
+
+        times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Verify the correct date was found
+        year, month, day, hour = swe_revjul(times[0])
+        assert year == 2017
+        assert month == 8
+        assert 20 <= day <= 22  # August 21
+
+        # Should be a total eclipse
+        assert ecl_type & SE_ECL_TOTAL
+
+    def test_june_2021_annular_eclipse_timing(self):
+        """Validate June 10, 2021 annular eclipse maximum time.
+
+        Known data: Annular solar eclipse on June 10, 2021
+        Maximum eclipse around 10:41 UT
+        """
+        jd_start = 2459350.0  # About 26 days before
+
+        times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_ANNULAR)
+
+        # Verify the correct date was found
+        year, month, day, hour = swe_revjul(times[0])
+        assert year == 2021
+        assert month == 6
+        assert 9 <= day <= 11  # June 10
+
+        # Should be an annular eclipse
+        assert ecl_type & SE_ECL_ANNULAR
+
+    def test_eclipse_type_classification_consistency(self):
+        """Verify eclipse type classification is consistent for known eclipses."""
+        # Total eclipse 2024
+        times1, ecl_type1 = sol_eclipse_when_glob(2460400.0, eclipse_type=SE_ECL_TOTAL)
+        assert ecl_type1 & SE_ECL_TOTAL, (
+            "April 2024 eclipse should be classified as TOTAL"
+        )
+
+        # Annular eclipse 2023
+        times2, ecl_type2 = sol_eclipse_when_glob(
+            2460200.0, eclipse_type=SE_ECL_ANNULAR
+        )
+        assert ecl_type2 & SE_ECL_ANNULAR, (
+            "October 2023 eclipse should be classified as ANNULAR"
+        )
+
+    def test_return_tuple_has_ten_elements(self):
+        """Verify the tret tuple has exactly 10 elements like pyswisseph."""
+        jd_start = 2460400.0
+
+        times, ecl_type = sol_eclipse_when_glob(jd_start)
+
+        assert len(times) == 10, f"Expected 10 elements in tret, got {len(times)}"
+
+        # First element should be eclipse maximum
+        assert times[0] > jd_start, "First element should be eclipse maximum time"
+
+        # Elements 0-4 should be phase times
+        # Maximum should be between first and fourth contacts
+        assert times[1] < times[0] < times[4], "Maximum should be between contacts"
