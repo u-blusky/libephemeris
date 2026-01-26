@@ -30,7 +30,7 @@ References:
 """
 
 import math
-from typing import Tuple
+from typing import Sequence, Tuple
 from .constants import (
     SE_SUN,
     SE_MOON,
@@ -951,8 +951,594 @@ def sol_eclipse_when_loc(
     )
 
 
-# Alias for Swiss Ephemeris API compatibility
-swe_sol_eclipse_when_loc = sol_eclipse_when_loc
+# Legacy alias for original implementation
+_sol_eclipse_when_loc_legacy = sol_eclipse_when_loc
+
+
+def swe_sol_eclipse_when_loc(
+    tjd_start: float,
+    ifl: int,
+    geopos: "Sequence[float]",
+    backward: bool = False,
+) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+    """
+    Find the next solar eclipse visible from a specific geographic location.
+
+    This function matches the pyswisseph signature exactly. It searches forward
+    (or backward if specified) in time from tjd_start to find the next solar
+    eclipse visible from the observer's location specified by geopos.
+
+    Args:
+        tjd_start: Julian Day (UT) to start search from
+        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+        geopos: Sequence of [longitude_degrees, latitude_degrees, altitude_meters]
+                NOTE: longitude comes first (this matches pyswisseph convention)
+        backward: If True, search backward in time instead of forward
+
+    Returns:
+        Tuple containing:
+            - tret: Tuple of 7 floats with eclipse phase times (JD UT):
+                [0]: Time of maximum eclipse (local)
+                [1]: Time of first contact (partial begins)
+                [2]: Time of second contact (totality/annularity begins, or 0)
+                [3]: Time of third contact (totality/annularity ends, or 0)
+                [4]: Time of fourth contact (partial ends)
+                [5]: Time of sunrise if eclipse at sunrise (or 0)
+                [6]: Time of sunset if eclipse at sunset (or 0)
+            - attr: Tuple of 8 floats with eclipse attributes:
+                [0]: Fraction of solar diameter covered by Moon
+                [1]: Ratio of lunar diameter to solar diameter
+                [2]: Fraction of solar disc area covered (obscuration)
+                [3]: Core shadow width in km (0 for partial eclipses)
+                [4]: Azimuth of Sun at maximum eclipse (degrees)
+                [5]: True altitude of Sun at maximum eclipse (degrees)
+                [6]: Apparent altitude of Sun with refraction (degrees)
+                [7]: Angular distance of Moon center from Sun center (degrees)
+            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
+                SE_ECL_VISIBLE if any part visible, combined with eclipse type
+
+    Raises:
+        RuntimeError: If no eclipse visible from location within search limit
+        ValueError: If geopos has wrong length
+
+    Algorithm:
+        1. Use swe_sol_eclipse_when_glob to find candidate global eclipses
+        2. For each candidate, calculate topocentric positions using set_topo()
+           and SEFLG_TOPOCTR flag
+        3. Check if the eclipse is visible from the observer location
+        4. Calculate contact times by solving for when lunar limb touches solar limb
+        5. Calculate obscuration fraction as area covered / total solar disc area
+        6. Verify Sun is above horizon at observer location during eclipse
+
+    Precision:
+        Eclipse times accurate to ~1-2 minutes. Contact times depend on
+        accurate Moon and Sun ephemeris positions with topocentric corrections.
+
+    Example:
+        >>> # Find next eclipse visible from Dallas, TX (Apr 8, 2024 eclipse)
+        >>> from libephemeris import swe_sol_eclipse_when_loc, julday, SEFLG_SWIEPH
+        >>> jd = julday(2024, 1, 1, 0)
+        >>> dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
+        >>> tret, attr, ecl_type = swe_sol_eclipse_when_loc(jd, SEFLG_SWIEPH, dallas_geopos)
+        >>> print(f"Eclipse maximum at JD {tret[0]:.5f}")
+        >>> print(f"Obscuration: {attr[2]:.3f}")
+
+    References:
+        - Swiss Ephemeris: swe_sol_eclipse_when_loc()
+        - Meeus "Astronomical Algorithms" Ch. 54
+    """
+    from typing import Sequence
+
+    from skyfield.api import wgs84
+
+    from .state import get_planets, get_timescale, set_topo
+
+    # Validate geopos
+    if len(geopos) < 3:
+        raise ValueError("geopos must be a sequence of [longitude, latitude, altitude]")
+
+    # Extract geographic position (longitude first, then latitude - pyswisseph convention)
+    lon = float(geopos[0])
+    lat = float(geopos[1])
+    altitude = float(geopos[2])
+
+    MAX_SEARCH_YEARS = 50
+    MAX_ECLIPSES = int(MAX_SEARCH_YEARS * 2.4)
+
+    # Get ephemeris
+    eph = get_planets()
+    ts = get_timescale()
+
+    # Set topocentric position for later calculations
+    set_topo(lon, lat, altitude)
+
+    # Create observer
+    earth = eph["earth"]
+    sun = eph["sun"]
+    moon = eph["moon"]
+    observer = wgs84.latlon(lat, lon, altitude)
+
+    def _get_sun_moon_data(
+        jd: float,
+    ) -> Tuple[float, float, float, float, float, float, float]:
+        """Get Sun-Moon separation and Sun position data at given JD."""
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+
+        # Get apparent positions from observer (topocentric)
+        sun_app = observer_at.at(t).observe(sun).apparent()
+        moon_app = observer_at.at(t).observe(moon).apparent()
+
+        # Angular separation
+        sep = sun_app.separation_from(moon_app).degrees
+
+        # Sun altitude and azimuth
+        sun_alt, sun_az, _ = sun_app.altaz()
+
+        # Distances
+        sun_dist_au = sun_app.distance().au
+        moon_dist_au = moon_app.distance().au
+
+        return (
+            sep,
+            sun_alt.degrees,
+            sun_az.degrees,
+            sun_dist_au,
+            moon_dist_au,
+            sun_alt.degrees,
+            sun_az.degrees,
+        )
+
+    def _get_sun_altaz(jd: float) -> Tuple[float, float, float]:
+        """Get Sun altitude, azimuth, and apparent altitude at given JD."""
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+
+        sun_app = observer_at.at(t).observe(sun).apparent()
+        alt, az, _ = sun_app.altaz()
+
+        # Calculate apparent altitude with refraction
+        # Using standard atmospheric refraction formula
+        true_alt = alt.degrees
+        if true_alt > -1.0:
+            # Bennett's formula for refraction
+            if true_alt > 0:
+                refraction = 1.0 / math.tan(
+                    math.radians(true_alt + 7.31 / (true_alt + 4.4))
+                )
+                apparent_alt = true_alt + refraction / 60.0
+            else:
+                # Near horizon, use approximation
+                apparent_alt = true_alt + 0.58
+        else:
+            apparent_alt = true_alt
+
+        return true_alt, az.degrees, apparent_alt
+
+    def _get_angular_sizes(jd: float) -> Tuple[float, float, float, float]:
+        """Get angular radii and diameters of Sun and Moon."""
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+
+        sun_app = observer_at.at(t).observe(sun).apparent()
+        moon_app = observer_at.at(t).observe(moon).apparent()
+
+        sun_dist_au = sun_app.distance().au
+        moon_dist_au = moon_app.distance().au
+
+        # Angular radii in degrees
+        sun_angular_radius = (959.63 / 3600.0) / sun_dist_au
+        moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_dist_au)
+
+        return (
+            sun_angular_radius,
+            moon_angular_radius,
+            2 * sun_angular_radius,
+            2 * moon_angular_radius,
+        )
+
+    def _get_separation(jd: float) -> float:
+        """Get angular separation between Sun and Moon."""
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+
+        sun_app = observer_at.at(t).observe(sun).apparent()
+        moon_app = observer_at.at(t).observe(moon).apparent()
+
+        return sun_app.separation_from(moon_app).degrees
+
+    def _find_local_maximum(
+        jd_center: float, search_range: float = 3.0 / 24.0
+    ) -> float:
+        """Find local eclipse maximum (minimum separation) using golden section search."""
+        phi = (1 + math.sqrt(5)) / 2
+
+        jd_low = jd_center - search_range
+        jd_high = jd_center + search_range
+
+        jd_a = jd_high - (jd_high - jd_low) / phi
+        jd_b = jd_low + (jd_high - jd_low) / phi
+
+        sep_a = _get_separation(jd_a)
+        sep_b = _get_separation(jd_b)
+
+        for _ in range(40):
+            if sep_a < sep_b:
+                jd_high = jd_b
+                jd_b = jd_a
+                sep_b = sep_a
+                jd_a = jd_high - (jd_high - jd_low) / phi
+                sep_a = _get_separation(jd_a)
+            else:
+                jd_low = jd_a
+                jd_a = jd_b
+                sep_a = sep_b
+                jd_b = jd_low + (jd_high - jd_low) / phi
+                sep_b = _get_separation(jd_b)
+
+            if jd_high - jd_low < 1e-7:
+                break
+
+        return (jd_low + jd_high) / 2
+
+    def _find_contact_time(
+        jd_start_search: float,
+        jd_end_search: float,
+        target_sep: float,
+        is_increasing: bool,
+    ) -> float:
+        """Find time when separation equals target using bisection."""
+        jd_low = jd_start_search
+        jd_high = jd_end_search
+
+        for _ in range(50):
+            jd_mid = (jd_low + jd_high) / 2
+            sep = _get_separation(jd_mid)
+
+            if abs(sep - target_sep) < 1e-6:
+                return jd_mid
+
+            if is_increasing:
+                if sep < target_sep:
+                    jd_low = jd_mid
+                else:
+                    jd_high = jd_mid
+            else:
+                if sep > target_sep:
+                    jd_low = jd_mid
+                else:
+                    jd_high = jd_mid
+
+            if jd_high - jd_low < 1e-8:
+                break
+
+        return (jd_low + jd_high) / 2
+
+    def _calculate_obscuration(
+        sun_radius: float, moon_radius: float, separation: float
+    ) -> float:
+        """Calculate fraction of solar disc area covered by Moon."""
+        r_sun = sun_radius
+        r_moon = moon_radius
+        d = separation
+
+        if d >= r_sun + r_moon:
+            return 0.0
+        elif d <= abs(r_sun - r_moon):
+            if r_moon >= r_sun:
+                return 1.0
+            else:
+                return (r_moon / r_sun) ** 2
+        else:
+            # Partial overlap - lens formula
+            d1 = (d * d + r_sun * r_sun - r_moon * r_moon) / (2 * d)
+            d2 = d - d1
+
+            if abs(d1) <= r_sun and abs(d2) <= r_moon:
+                cos_arg1 = max(-1, min(1, d1 / r_sun))
+                cos_arg2 = max(-1, min(1, d2 / r_moon))
+
+                area1 = r_sun * r_sun * math.acos(cos_arg1) - d1 * math.sqrt(
+                    max(0, r_sun * r_sun - d1 * d1)
+                )
+                area2 = r_moon * r_moon * math.acos(cos_arg2) - d2 * math.sqrt(
+                    max(0, r_moon * r_moon - d2 * d2)
+                )
+                return (area1 + area2) / (math.pi * r_sun * r_sun)
+            else:
+                return 0.0
+
+    def _find_previous_new_moon(jd: float) -> float:
+        """Find the previous New Moon before jd."""
+        # Start searching backward
+        jd_search = jd
+        for _ in range(30):  # At most ~2 years back
+            jd_nm = _find_next_new_moon(jd_search - 35)
+            if jd_nm < jd:
+                # Found a new moon before jd, but we want the most recent one
+                # Keep searching forward from here until we pass jd
+                while jd_nm < jd:
+                    jd_candidate = jd_nm
+                    jd_nm = _find_next_new_moon(jd_nm + 25)
+                return jd_candidate
+            jd_search -= 30
+        return jd - 29.5  # Fallback
+
+    # Main search loop
+    jd = tjd_start
+
+    # For backward search, we need to find eclipses before tjd_start
+    if backward:
+        # Find the most recent global eclipse before tjd_start
+        # We need to search backward in time
+        search_direction = -1
+    else:
+        search_direction = 1
+
+    for _ in range(MAX_ECLIPSES):
+        # Find next/previous global eclipse
+        try:
+            if backward:
+                # For backward search, find a new moon before current position
+                # and check if there's an eclipse there
+                # We use a simpler approach: search forward from an earlier date
+                # and find eclipses until we get one before tjd_start
+                earlier_jd = jd - 400  # About 1 year before
+                eclipses_found = []
+                temp_jd = earlier_jd
+                while temp_jd < jd:
+                    try:
+                        global_times, global_type = sol_eclipse_when_glob(temp_jd, ifl)
+                        if global_times[0] < jd:
+                            eclipses_found.append((global_times, global_type))
+                        temp_jd = global_times[0] + 25
+                    except RuntimeError:
+                        break
+                if not eclipses_found:
+                    jd -= 400
+                    continue
+                # Take the most recent eclipse before jd
+                global_times, global_type = eclipses_found[-1]
+            else:
+                global_times, global_type = sol_eclipse_when_glob(jd, ifl)
+        except RuntimeError:
+            raise RuntimeError(
+                f"No solar eclipse visible from lon={lon}, lat={lat} "
+                f"within {MAX_SEARCH_YEARS} years of JD {tjd_start}"
+            )
+
+        jd_max_global = global_times[0]
+
+        # Find local maximum at this location
+        jd_local_max = _find_local_maximum(jd_max_global)
+
+        # Check if Sun is above horizon
+        true_alt, sun_az, apparent_alt = _get_sun_altaz(jd_local_max)
+
+        if true_alt < -1.0:
+            # Sun below horizon - eclipse not visible
+            if backward:
+                jd = jd_max_global - 1
+            else:
+                jd = jd_max_global + 25
+            continue
+
+        # Get angular sizes at local maximum
+        sun_radius, moon_radius, sun_diam, moon_diam = _get_angular_sizes(jd_local_max)
+        min_separation = _get_separation(jd_local_max)
+
+        # Check if eclipse is visible (Moon overlaps Sun)
+        sum_radii = sun_radius + moon_radius
+        if min_separation > sum_radii:
+            # No eclipse visible from this location
+            if backward:
+                jd = jd_max_global - 1
+            else:
+                jd = jd_max_global + 25
+            continue
+
+        # Eclipse visible! Calculate all parameters
+
+        # Calculate magnitude (fraction of Sun diameter covered)
+        overlap = sum_radii - min_separation
+        magnitude = overlap / sun_diam
+        magnitude = max(0.0, min(magnitude, 1.0 + moon_diam / sun_diam))
+
+        # Calculate obscuration (area fraction)
+        obscuration = _calculate_obscuration(sun_radius, moon_radius, min_separation)
+
+        # Ratio of diameters
+        ratio = moon_diam / sun_diam
+
+        # Calculate contact times
+        contact_search_range = 2.0 / 24.0  # 2 hours
+
+        # First contact (separation decreasing to sum of radii)
+        jd_first = _find_contact_time(
+            jd_local_max - contact_search_range,
+            jd_local_max,
+            sum_radii,
+            is_increasing=False,
+        )
+
+        # Fourth contact (separation increasing from sum of radii)
+        jd_fourth = _find_contact_time(
+            jd_local_max,
+            jd_local_max + contact_search_range,
+            sum_radii,
+            is_increasing=True,
+        )
+
+        # Second and third contacts (for central eclipses)
+        diff_radii = abs(moon_radius - sun_radius)
+        if min_separation < diff_radii:
+            # Central eclipse at this location
+            jd_second = _find_contact_time(
+                jd_local_max - contact_search_range / 4,
+                jd_local_max,
+                diff_radii,
+                is_increasing=False,
+            )
+            jd_third = _find_contact_time(
+                jd_local_max,
+                jd_local_max + contact_search_range / 4,
+                diff_radii,
+                is_increasing=True,
+            )
+        else:
+            jd_second = 0.0
+            jd_third = 0.0
+
+        # Check visibility of each contact
+        first_alt, _, _ = _get_sun_altaz(jd_first)
+        fourth_alt, _, _ = _get_sun_altaz(jd_fourth)
+
+        if first_alt < -1.0:
+            jd_first = 0.0
+        if fourth_alt < -1.0:
+            jd_fourth = 0.0
+
+        if jd_second > 0:
+            second_alt, _, _ = _get_sun_altaz(jd_second)
+            if second_alt < -1.0:
+                jd_second = 0.0
+
+        if jd_third > 0:
+            third_alt, _, _ = _get_sun_altaz(jd_third)
+            if third_alt < -1.0:
+                jd_third = 0.0
+
+        # Check for sunrise/sunset during eclipse
+        jd_sunrise = 0.0
+        jd_sunset = 0.0
+
+        # Check if Sun rises during eclipse
+        if jd_first > 0 and jd_fourth > 0:
+            alt_first, _, _ = _get_sun_altaz(jd_first)
+            alt_fourth, _, _ = _get_sun_altaz(jd_fourth)
+
+            if alt_first < 0 < alt_fourth:
+                # Sun rises during eclipse - find approximate time
+                t_low, t_high = jd_first, jd_fourth
+                for _ in range(30):
+                    t_mid = (t_low + t_high) / 2
+                    alt_mid, _, _ = _get_sun_altaz(t_mid)
+                    if alt_mid < 0:
+                        t_low = t_mid
+                    else:
+                        t_high = t_mid
+                    if t_high - t_low < 1e-7:
+                        break
+                jd_sunrise = (t_low + t_high) / 2
+
+            elif alt_first > 0 > alt_fourth:
+                # Sun sets during eclipse
+                t_low, t_high = jd_first, jd_fourth
+                for _ in range(30):
+                    t_mid = (t_low + t_high) / 2
+                    alt_mid, _, _ = _get_sun_altaz(t_mid)
+                    if alt_mid > 0:
+                        t_low = t_mid
+                    else:
+                        t_high = t_mid
+                    if t_high - t_low < 1e-7:
+                        break
+                jd_sunset = (t_low + t_high) / 2
+
+        # Calculate core shadow width (for central eclipses only)
+        if min_separation < diff_radii:
+            # This is a central eclipse - calculate shadow width
+            # Shadow width depends on umbra/antumbra cone geometry
+            moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, ifl | SEFLG_SPEED)
+            sun_pos, _ = swe_calc_ut(jd_local_max, SE_SUN, ifl | SEFLG_SPEED)
+
+            moon_dist_au = moon_pos[2]
+            sun_dist_au = sun_pos[2]
+
+            sun_radius_km = 696340.0
+            moon_radius_km = 1737.4
+            sun_dist_km = sun_dist_au * 149597870.7
+            moon_dist_km = moon_dist_au * 149597870.7
+
+            # Umbra/antumbra cone geometry
+            alpha = math.atan((sun_radius_km - moon_radius_km) / sun_dist_km)
+
+            if ratio >= 1.0:
+                # Total eclipse - umbra
+                umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
+                umbra_radius_km = max(0, umbra_radius_km)
+            else:
+                # Annular - antumbra
+                umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
+                umbra_radius_km = max(0, abs(umbra_radius_km))
+
+            # Path width affected by Sun altitude
+            if true_alt > 0:
+                cos_alt = math.cos(math.radians(90 - true_alt))
+                cos_alt = max(0.1, cos_alt)
+                shadow_width_km = 2 * umbra_radius_km / cos_alt
+            else:
+                shadow_width_km = 0.0
+
+            shadow_width_km = max(0.0, min(1000.0, shadow_width_km))
+        else:
+            shadow_width_km = 0.0
+
+        # Determine eclipse type flags
+        ecl_type = SE_ECL_VISIBLE
+
+        is_central = jd_second > 0 and jd_third > 0
+        if is_central:
+            ecl_type |= SE_ECL_CENTRAL
+            if ratio >= 1.0:
+                ecl_type |= SE_ECL_TOTAL
+            elif ratio > 0.99:
+                ecl_type |= SE_ECL_ANNULAR_TOTAL
+            else:
+                ecl_type |= SE_ECL_ANNULAR
+        else:
+            ecl_type |= SE_ECL_PARTIAL
+
+        # Add visibility flags
+        if jd_first > 0:
+            ecl_type |= SE_ECL_1ST_VISIBLE
+        if jd_second > 0:
+            ecl_type |= SE_ECL_2ND_VISIBLE
+        if jd_third > 0:
+            ecl_type |= SE_ECL_3RD_VISIBLE
+        if jd_fourth > 0:
+            ecl_type |= SE_ECL_4TH_VISIBLE
+        ecl_type |= SE_ECL_MAX_VISIBLE
+
+        # Prepare tret tuple (7 elements matching pyswisseph)
+        tret = (
+            jd_local_max,  # [0] Maximum eclipse
+            jd_first,  # [1] First contact
+            jd_second,  # [2] Second contact
+            jd_third,  # [3] Third contact
+            jd_fourth,  # [4] Fourth contact
+            jd_sunrise,  # [5] Sunrise during eclipse
+            jd_sunset,  # [6] Sunset during eclipse
+        )
+
+        # Prepare attr tuple (8 elements matching pyswisseph)
+        attr = (
+            magnitude,  # [0] Fraction of solar diameter covered
+            ratio,  # [1] Ratio of lunar to solar diameter
+            obscuration,  # [2] Fraction of solar disc area covered
+            shadow_width_km,  # [3] Core shadow width in km
+            sun_az,  # [4] Azimuth of sun at maximum
+            true_alt,  # [5] True altitude of sun at maximum
+            apparent_alt,  # [6] Apparent altitude with refraction
+            min_separation,  # [7] Angular distance of moon center from sun center
+        )
+
+        return tret, attr, ecl_type
+
+    raise RuntimeError(
+        f"No solar eclipse visible from lon={lon}, lat={lat} "
+        f"within {MAX_SEARCH_YEARS} years of JD {tjd_start}"
+    )
 
 
 def sol_eclipse_where(
