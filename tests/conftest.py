@@ -587,14 +587,16 @@ def reset_ephemeris_state():
     """Reset ephemeris state before each test."""
     # Reset to default sidereal mode
     ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-    swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
+    if hasattr(swe, "set_sid_mode"):
+        swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
 
     yield
 
     # Cleanup after test
     # Reset again for next test
     ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-    swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
+    if hasattr(swe, "set_sid_mode"):
+        swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
 
 
 # ============================================================================
