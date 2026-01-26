@@ -51,6 +51,7 @@ LibEphemeris is born from the need for a **truly open, maintainable, and scienti
 -   **House systems (19)**: Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Polich/Page (Topocentric), Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural Gradient, and more.
 -   **Sidereal zodiac (43 ayanamshas)**: Fagan/Bradley, Lahiri, Raman, Krishnamurti, star-based and historical variants.
 -   **Extended points**: Lunar nodes, Lilith (mean and true), major asteroids (Chiron, Pholus, Ceres, Pallas, Juno, Vesta), TNOs (Orcus, Haumea, Quaoar, Makemake, Gonggong, Eris, Sedna), major fixed stars and Arabic parts.
+-   **High-precision minor bodies via SPK**: Download SPK kernels from JPL Horizons for arcsecond-level precision on asteroids and TNOs.
 -   **Event finding**: Sun/Moon longitude crossings (e.g. ingress), with additional events planned (eclipses, etc.).
 -   **Thread safety**: Optional thread-safe `EphemerisContext` API for concurrent calculations.
 -   **Swiss Ephemeris compatibility**: Same function names, flags and result structure as `pyswisseph` in most common use cases.
@@ -266,6 +267,115 @@ If you try to compute positions outside the date range covered by the selected k
 
 ---
 
+## High-Precision Minor Bodies with SPK Kernels
+
+By default, minor bodies (asteroids, TNOs like Chiron, Eris, Sedna) are calculated using **Keplerian orbital elements** with secular perturbations. This provides arcminute-level accuracy, which may not be sufficient for precise astrological or astronomical work.
+
+For **arcsecond-level precision**, you can download **SPK kernels** directly from NASA JPL Horizons and use them for calculations.
+
+### Quick example
+
+```python
+import libephemeris as eph
+
+# Download SPK for Chiron covering 2000-2100
+spk_path = eph.download_spk(
+    body="Chiron",
+    start="2000-01-01",
+    end="2100-01-01",
+    directory="./spk_kernels"
+)
+
+# Register the SPK for Chiron calculations
+eph.register_spk_body(
+    ipl=eph.SE_CHIRON,
+    spk_path=spk_path,
+    naif_id=eph.NAIF_CHIRON  # 2002060
+)
+
+# Now calc_ut automatically uses the SPK kernel
+pos, _ = eph.calc_ut(2451545.0, eph.SE_CHIRON, eph.SEFLG_SPEED)
+print(f"Chiron (SPK): {pos[0]:.6f}°")
+```
+
+### Convenience function
+
+For a one-liner approach:
+
+```python
+import libephemeris as eph
+
+# Download and register in one call
+eph.download_and_register_spk(
+    body="Eris",
+    ipl=eph.SE_ERIS,
+    start="2000-01-01",
+    end="2100-01-01",
+)
+
+# Calculations now use SPK automatically
+pos, _ = eph.calc_ut(2460000.0, eph.SE_ERIS, 0)
+```
+
+### Available functions
+
+| Function | Description |
+|----------|-------------|
+| `download_spk(body, start, end, ...)` | Download SPK from JPL Horizons |
+| `register_spk_body(ipl, spk_path, naif_id)` | Register SPK for a body |
+| `unregister_spk_body(ipl)` | Remove SPK registration |
+| `download_and_register_spk(...)` | Download and register in one call |
+| `list_spk_bodies()` | List all registered SPK bodies |
+| `get_spk_body_info(ipl)` | Get SPK info for a body |
+| `get_spk_coverage(spk_path)` | Get date range covered by SPK |
+
+### NAIF ID constants
+
+SPK kernels use NASA NAIF IDs. LibEphemeris provides constants for common bodies:
+
+```python
+NAIF_ASTEROID_OFFSET = 2000000  # asteroid_number + offset = NAIF ID
+NAIF_CHIRON = 2002060           # Chiron (2060)
+NAIF_CERES = 2000001            # Ceres (1)
+NAIF_PALLAS = 2000002           # Pallas (2)
+NAIF_JUNO = 2000003             # Juno (3)
+NAIF_VESTA = 2000004            # Vesta (4)
+NAIF_PHOLUS = 2005145           # Pholus (5145)
+NAIF_ERIS = 2136199             # Eris (136199)
+NAIF_SEDNA = 2090377            # Sedna (90377)
+```
+
+For any numbered asteroid, the NAIF ID is `asteroid_number + 2000000`.
+
+### Thread-safe usage with EphemerisContext
+
+```python
+from libephemeris import EphemerisContext, SE_CHIRON
+
+ctx = EphemerisContext()
+
+# Register SPK in this context only
+ctx.register_spk_body(SE_CHIRON, "./chiron.bsp", 2002060)
+
+pos, _ = ctx.calc_ut(2451545.0, SE_CHIRON, 0)
+```
+
+### Precision comparison
+
+| Method | Typical Accuracy | Use Case |
+|--------|------------------|----------|
+| Keplerian (default) | ~1-10 arcminutes | Quick estimates, historical charts |
+| SPK kernel | ~1-5 arcseconds | Precise calculations, transit timing |
+
+### Notes
+
+- SPK files can be large (1-50 MB depending on date range)
+- Files are cached locally after download
+- If a date is outside SPK coverage, an exception is raised (no silent fallback)
+- SPK kernels are downloaded from JPL Horizons API (requires internet for download)
+
+---
+
 ## Scientific Accuracy and Validation
 
 ### Ephemeris data
@@ -346,7 +456,8 @@ libephemeris/
 │   ├── planets.py        # Planetary calculations
 │   ├── houses.py         # House systems
 │   ├── lunar.py          # Nodes and Lilith
-│   ├── minor_bodies.py   # Asteroids and TNOs
+│   ├── minor_bodies.py   # Asteroids and TNOs (Keplerian)
+│   ├── spk.py            # SPK kernel support for high-precision minor bodies
 │   ├── fixed_stars.py    # Fixed stars and points
 │   ├── crossing.py       # Longitude crossing events
 │   ├── angles.py         # Angle helpers (Asc, MC, etc.)

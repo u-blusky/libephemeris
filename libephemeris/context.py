@@ -81,6 +81,9 @@ class EphemerisContext:
         self.sidereal_t0: float = 2451545.0  # J2000.0
         self.sidereal_ayan_t0: float = 0.0
         self._angles_cache: dict[str, float] = {}
+        self._spk_body_map: dict[
+            int, tuple[str, int]
+        ] = {}  # Context-local SPK mappings
 
         # Ephemeris configuration (for this context)
         self._ephe_path = ephe_path
@@ -252,6 +255,119 @@ class EphemerisContext:
         Use this between unrelated calculation contexts to prevent stale data.
         """
         self._angles_cache = {}
+
+    # =========================================================================
+    # SPK Body Registration (Context-local)
+    # =========================================================================
+
+    def register_spk_body(
+        self, ipl: int, spk_file: str, naif_id: Union[int, str]
+    ) -> None:
+        """
+        Register a mapping between a body ID and an SPK kernel target.
+
+        This is a context-local registration that only affects calculations
+        performed through this context instance.
+
+        Args:
+            ipl: libephemeris body ID (e.g., SE_CHIRON, SE_ERIS)
+            spk_file: Path to the SPK file, or filename if in library path
+            naif_id: NAIF ID of the body in the SPK kernel
+
+        Raises:
+            FileNotFoundError: If SPK file not found
+            ValueError: If naif_id not found in SPK kernel
+
+        Example:
+            >>> ctx = EphemerisContext()
+            >>> ctx.register_spk_body(SE_CHIRON, "chiron.bsp", 2002060)
+        """
+        from . import state
+
+        # Convert naif_id to int if string
+        if isinstance(naif_id, str):
+            naif_id = int(naif_id)
+
+        # Resolve file path
+        if not os.path.isabs(spk_file):
+            lib_path = state.get_library_path()
+            full_path = os.path.join(lib_path, spk_file)
+            if os.path.exists(full_path):
+                spk_file = full_path
+            elif not os.path.exists(spk_file):
+                raise FileNotFoundError(f"SPK file not found: {spk_file}")
+
+        if not os.path.exists(spk_file):
+            raise FileNotFoundError(f"SPK file not found: {spk_file}")
+
+        # Load kernel using shared loader
+        state._load_spk_kernel(spk_file)
+
+        # Validate that naif_id exists in kernel
+        kernel = state._SPK_KERNELS.get(spk_file)
+        if kernel is not None:
+            try:
+                _ = kernel[naif_id]
+            except KeyError:
+                try:
+                    _ = kernel[str(naif_id)]
+                except KeyError:
+                    available = []
+                    if hasattr(kernel, "names"):
+                        available = list(kernel.names())[:10]
+                    raise ValueError(
+                        f"NAIF ID {naif_id} not found in SPK kernel {spk_file}. "
+                        f"Available targets (first 10): {available}"
+                    )
+
+        # Register in context-local map
+        self._spk_body_map[ipl] = (spk_file, naif_id)
+
+    def unregister_spk_body(self, ipl: int) -> None:
+        """
+        Remove SPK registration for a body from this context.
+
+        Args:
+            ipl: libephemeris body ID (e.g., SE_CHIRON)
+        """
+        if ipl in self._spk_body_map:
+            del self._spk_body_map[ipl]
+
+    def get_spk_body_info(self, ipl: int) -> Optional[Tuple[str, int]]:
+        """
+        Get SPK registration info for a body in this context.
+
+        First checks context-local registrations, then falls back to global.
+
+        Args:
+            ipl: libephemeris body ID
+
+        Returns:
+            Tuple of (spk_file, naif_id) if registered, None otherwise.
+        """
+        # Check context-local first
+        if ipl in self._spk_body_map:
+            return self._spk_body_map[ipl]
+        # Fall back to global
+        from . import state
+
+        return state._SPK_BODY_MAP.get(ipl)
+
+    def list_spk_bodies(self) -> dict[int, Tuple[str, int]]:
+        """
+        List all SPK body mappings visible to this context.
+
+        Merges global registrations with context-local ones (local takes precedence).
+
+        Returns:
+            Dict mapping ipl -> (spk_file, naif_id)
+        """
+        from . import state
+
+        # Start with global, overlay with local
+        result = dict(state._SPK_BODY_MAP)
+        result.update(self._spk_body_map)
+        return result
 
     # =========================================================================
     # Calculation Methods (delegate to planets.py with context)

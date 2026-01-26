@@ -8,6 +8,7 @@ This module maintains the library's singleton state including:
 - Observer topocentric location
 - Sidereal mode configuration
 - Cached angles for Arabic parts calculations
+- SPK kernel registry for minor body calculations
 
 All state is stored in module-level globals to provide SwissEphemeris-compatible
 stateful API behavior. This is thread-unsafe by design, matching SwissEph behavior.
@@ -45,6 +46,12 @@ _ANGLES_CACHE: dict[str, float] = {}  # Pre-calculated angles {name: longitude}
 _TIDAL_ACCELERATION: Optional[float] = None  # Tidal acceleration for Delta T
 _DELTA_T_USERDEF: Optional[float] = None  # User-defined Delta T value
 _LAPSE_RATE: Optional[float] = None  # Atmospheric lapse rate for refraction
+
+# SPK kernel state for minor body calculations
+_SPK_KERNELS: dict[str, SpiceKernel] = {}  # Cached SPK kernels {filepath: kernel}
+_SPK_BODY_MAP: dict[
+    int, tuple[str, int]
+] = {}  # Body mappings {ipl: (spk_file, naif_id)}
 
 
 def get_loader() -> Loader:
@@ -555,6 +562,7 @@ def close() -> None:
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _LOADER, _PLANETS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
+    global _SPK_KERNELS, _SPK_BODY_MAP
 
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:
@@ -579,6 +587,15 @@ def close() -> None:
     _TIDAL_ACCELERATION = None
     _DELTA_T_USERDEF = None
     _LAPSE_RATE = None
+
+    # Close and clear SPK kernels
+    for kernel in _SPK_KERNELS.values():
+        try:
+            kernel.close()
+        except (AttributeError, Exception):
+            pass
+    _SPK_KERNELS = {}
+    _SPK_BODY_MAP = {}
 
 
 def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
@@ -668,3 +685,70 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
     except Exception:
         # Return empty data on any error
         return ("", 0.0, 0.0, 0)
+
+
+# =============================================================================
+# SPK KERNEL MANAGEMENT
+# =============================================================================
+
+
+def _load_spk_kernel(filepath: str) -> SpiceKernel:
+    """
+    Load and cache an SPK kernel file.
+
+    Internal function used by spk.py to load SPK kernels for minor bodies.
+
+    Args:
+        filepath: Full path to the SPK file
+
+    Returns:
+        SpiceKernel: Loaded Skyfield SpiceKernel object
+
+    Raises:
+        FileNotFoundError: If file does not exist
+        ValueError: If file cannot be loaded as SPK
+    """
+    global _SPK_KERNELS
+
+    # Return cached kernel if available
+    if filepath in _SPK_KERNELS:
+        return _SPK_KERNELS[filepath]
+
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"SPK file not found: {filepath}")
+
+    # Load using Skyfield loader
+    load = get_loader()
+    try:
+        kernel = load(filepath)
+        _SPK_KERNELS[filepath] = kernel
+        return kernel
+    except Exception as e:
+        raise ValueError(f"Failed to load SPK file {filepath}: {e}") from e
+
+
+def _get_spk_target(ipl: int):
+    """
+    Get Skyfield target object from registered SPK for a body.
+
+    Internal function used by planets.py for SPK-based calculations.
+
+    Args:
+        ipl: libephemeris body ID (e.g., SE_CHIRON)
+
+    Returns:
+        Skyfield ephemeris target object, or None if not registered.
+    """
+    if ipl not in _SPK_BODY_MAP:
+        return None
+
+    spk_file, naif_id = _SPK_BODY_MAP[ipl]
+
+    kernel = _SPK_KERNELS.get(spk_file)
+    if kernel is None:
+        return None
+
+    try:
+        return kernel[naif_id]
+    except KeyError:
+        return None

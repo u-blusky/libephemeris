@@ -71,6 +71,30 @@ SE_ORCUS: int = 90482 + SE_AST_OFFSET  # Plutino, "anti-Pluto"
 SE_QUAOAR: int = 50000 + SE_AST_OFFSET  # Classical KBO
 
 # =============================================================================
+# NAIF IDS FOR SPK KERNELS
+# =============================================================================
+# NAIF IDs used in JPL SPK kernels for minor bodies.
+# Convention: For numbered asteroids, NAIF ID = asteroid_number + 2000000
+# These constants simplify registration of SPK bodies.
+
+NAIF_ASTEROID_OFFSET: int = 2000000  # Add asteroid number to get NAIF ID
+
+# Common minor body NAIF IDs (asteroid_number + 2000000)
+NAIF_CERES: int = 2000001  # 1 Ceres
+NAIF_PALLAS: int = 2000002  # 2 Pallas
+NAIF_JUNO: int = 2000003  # 3 Juno
+NAIF_VESTA: int = 2000004  # 4 Vesta
+NAIF_CHIRON: int = 2002060  # 2060 Chiron
+NAIF_PHOLUS: int = 2005145  # 5145 Pholus
+NAIF_ERIS: int = 2136199  # 136199 Eris
+NAIF_SEDNA: int = 2090377  # 90377 Sedna
+NAIF_HAUMEA: int = 2136108  # 136108 Haumea
+NAIF_MAKEMAKE: int = 2136472  # 136472 Makemake
+NAIF_IXION: int = 2028978  # 28978 Ixion
+NAIF_ORCUS: int = 2090482  # 90482 Orcus
+NAIF_QUAOAR: int = 2050000  # 50000 Quaoar
+
+# =============================================================================
 # VIRTUAL POINTS AND CALCULATED POSITIONS
 # =============================================================================
 

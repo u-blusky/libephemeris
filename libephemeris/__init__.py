@@ -153,6 +153,15 @@ from .fixed_stars import (
     swe_fixstar2_mag,
 )
 from .context import EphemerisContext  # NEW: Thread-safe context API
+from .spk import (  # SPK kernel support for high-precision minor body calculations
+    download_spk,
+    register_spk_body,
+    unregister_spk_body,
+    get_spk_body_info,
+    list_spk_bodies,
+    get_spk_coverage,
+    download_and_register_spk,
+)
 
 
 # =============================================================================
@@ -465,4 +474,12 @@ __all__ = [
     "fixstar_mag",
     "swe_fixstar2_mag",
     "fixstar2_mag",
+    # SPK kernel support
+    "download_spk",
+    "register_spk_body",
+    "unregister_spk_body",
+    "get_spk_body_info",
+    "list_spk_bodies",
+    "get_spk_coverage",
+    "download_and_register_spk",
 ]

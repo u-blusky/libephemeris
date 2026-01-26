@@ -527,6 +527,14 @@ def _calc_body(
 
     # Handle minor bodies (asteroids and TNOs)
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
+        # Try SPK kernel first (high precision)
+        from . import spk
+
+        spk_result = spk.calc_spk_body_position(t, ipl, iflag)
+        if spk_result is not None:
+            return spk_result, iflag
+
+        # Fallback to Keplerian approximation
         jd_tt = t.tt
         # Get heliocentric position in ecliptic coordinates
         lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(ipl, jd_tt)
