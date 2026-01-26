@@ -34,6 +34,7 @@ from libephemeris.constants import (
     SE_SATURN,
     SEFLG_SPEED,
     SEFLG_SIDEREAL,
+    SEFLG_TOPOCTR,
     SE_SIDM_FAGAN_BRADLEY,
     SE_SIDM_LAHIRI,
     SE_SIDM_RAMAN,
@@ -675,3 +676,365 @@ class TestLongRunningSessions:
 
         # Should complete in reasonable time (not hang)
         assert elapsed < 60, f"Took too long: {elapsed:.1f}s"
+
+
+# =============================================================================
+# TEST: EphemerisContext Thread-Safe Calculations (with Lock Protection)
+# =============================================================================
+
+
+class TestEphemerisContextThreadSafety:
+    """
+    Tests that verify EphemerisContext calculations are thread-safe.
+
+    These tests specifically verify that the _CONTEXT_SWAP_LOCK in state.py
+    properly protects the save-set-restore cycle during context-aware calculations.
+    Without this lock, concurrent calls could interleave and corrupt each other's state.
+    """
+
+    def test_concurrent_contexts_with_different_sidereal_modes(self, test_ayanamshas):
+        """
+        Critical test: Multiple threads using different ayanamsha systems.
+
+        This is the key test that validates the thread-safety fix. Before the
+        _CONTEXT_SWAP_LOCK was added, concurrent calls with different sidereal
+        modes could interfere with each other, causing incorrect results.
+
+        Each thread:
+        1. Creates its own EphemerisContext
+        2. Sets a unique sidereal mode
+        3. Calculates Sun position in sidereal coordinates
+        4. Verifies the result matches sequential calculation
+
+        If the lock is working correctly, each thread should get the same result
+        as if it were calculated sequentially.
+        """
+        jd = 2451545.0
+        num_threads = 12
+        errors: list[str] = []
+        results: dict[int, float] = {}
+        results_lock = threading.Lock()
+
+        # First, calculate expected results sequentially
+        expected: dict[int, float] = {}
+        for mode, _ in test_ayanamshas:
+            ctx = EphemerisContext()
+            ctx.set_sid_mode(mode)
+            pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+            expected[mode] = pos[0]
+
+        def calculate_with_context(thread_id: int, mode: int, mode_name: str):
+            try:
+                ctx = EphemerisContext()
+                ctx.set_sid_mode(mode)
+
+                # Perform calculation
+                pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+
+                with results_lock:
+                    results[mode] = pos[0]
+
+                    # Verify result matches expected
+                    if abs(pos[0] - expected[mode]) > 1e-6:
+                        errors.append(
+                            f"Thread {thread_id} ({mode_name}): got {pos[0]:.6f}, "
+                            f"expected {expected[mode]:.6f}"
+                        )
+
+            except Exception as e:
+                with results_lock:
+                    errors.append(f"Thread {thread_id} ({mode_name}): {e}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as ex:
+            futures = [
+                ex.submit(calculate_with_context, i, mode, name)
+                for i, (mode, name) in enumerate(test_ayanamshas)
+            ]
+            concurrent.futures.wait(futures)
+
+        assert not errors, f"Thread-safety violations: {errors}"
+        assert len(results) == len(test_ayanamshas), (
+            f"Expected {len(test_ayanamshas)} results, got {len(results)}"
+        )
+
+    def test_concurrent_contexts_with_different_topo_locations(self, test_locations_12):
+        """
+        Multiple threads using different topocentric locations.
+
+        This test verifies that the lock protects the _TOPO state during
+        concurrent context-aware calculations.
+        """
+        jd = 2451545.0
+        num_threads = 12
+        errors: list[str] = []
+        results: dict[int, tuple[float, float]] = {}  # thread_id -> (lat, sun_lon)
+        results_lock = threading.Lock()
+
+        def calculate_with_context(
+            thread_id: int, name: str, lon: float, lat: float, alt: int
+        ):
+            try:
+                ctx = EphemerisContext()
+                ctx.set_topo(lon, lat, alt)
+
+                # Perform topocentric calculation
+                pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_TOPOCTR | SEFLG_SPEED)
+
+                with results_lock:
+                    results[thread_id] = (lat, pos[0])
+
+            except Exception as e:
+                with results_lock:
+                    errors.append(f"Thread {thread_id} ({name}): {e}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as ex:
+            futures = [
+                ex.submit(calculate_with_context, tid, name, lon, lat, alt)
+                for tid, name, lon, lat, alt in test_locations_12
+            ]
+            concurrent.futures.wait(futures)
+
+        assert not errors, f"Errors: {errors}"
+        assert len(results) == 12
+
+        # Different locations should produce slightly different topocentric positions
+        positions = [r[1] for r in results.values()]
+        unique = len(set(round(p, 4) for p in positions))
+        assert unique >= 8, (
+            f"Expected varied topocentric positions, got {unique} unique"
+        )
+
+    def test_concurrent_context_house_calculations(self, test_locations_12):
+        """
+        Multiple threads calculating houses with different sidereal modes.
+
+        Tests that _swe_houses_with_context properly uses the lock.
+        """
+        jd = 2451545.0
+        sidereal_modes = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN]
+        errors: list[str] = []
+        results: list[tuple[int, int, float]] = []  # (loc_id, mode, asc)
+        results_lock = threading.Lock()
+
+        def calculate_houses(loc_id: int, mode: int, lat: float, lon: float):
+            try:
+                ctx = EphemerisContext()
+                ctx.set_sid_mode(mode)
+
+                # Use context's houses method
+                cusps, ascmc = ctx.houses(jd, lat, lon, ord("P"))
+
+                with results_lock:
+                    # Record location, mode, and Ascendant
+                    results.append((loc_id, mode, ascmc[0]))
+
+            except Exception as e:
+                with results_lock:
+                    errors.append(f"Loc {loc_id}, Mode {mode}: {e}")
+
+        # Create tasks for each location with each sidereal mode
+        tasks = []
+        for tid, name, lon, lat, alt in test_locations_12[:4]:  # Use 4 locations
+            for mode in sidereal_modes:
+                tasks.append((tid, mode, lat, lon))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
+            futures = [
+                ex.submit(calculate_houses, loc_id, mode, lat, lon)
+                for loc_id, mode, lat, lon in tasks
+            ]
+            concurrent.futures.wait(futures)
+
+        assert not errors, f"Errors: {errors}"
+        assert len(results) == len(tasks)
+
+    def test_repeated_concurrent_context_calculations(self):
+        """
+        Stress test: Repeated batches of concurrent context calculations.
+
+        This test runs multiple rounds of concurrent calculations to
+        increase the probability of catching race conditions.
+        """
+        jd = 2451545.0
+        num_batches = 10
+        threads_per_batch = 10
+        all_errors: list[str] = []
+
+        # Create contexts with different configurations
+        configs = [
+            (SE_SIDM_LAHIRI, 12.5, 41.9),  # Rome, Lahiri
+            (SE_SIDM_FAGAN_BRADLEY, -0.1, 51.5),  # London, Fagan-Bradley
+            (SE_SIDM_RAMAN, 139.7, 35.7),  # Tokyo, Raman
+            (SE_SIDM_KRISHNAMURTI, -74.0, 40.7),  # New York, Krishnamurti
+            (SE_SIDM_YUKTESHWAR, 151.2, -33.9),  # Sydney, Yukteshwar
+        ]
+
+        for batch in range(num_batches):
+            errors: list[str] = []
+            results: list[float] = []
+            results_lock = threading.Lock()
+
+            def calc_with_config(thread_id: int):
+                try:
+                    config = configs[thread_id % len(configs)]
+                    mode, lon, lat = config
+
+                    ctx = EphemerisContext()
+                    ctx.set_sid_mode(mode)
+                    ctx.set_topo(lon, lat, 0)
+
+                    pos, _ = ctx.calc_ut(
+                        jd + batch * 0.1, SE_SUN, SEFLG_SIDEREAL | SEFLG_TOPOCTR
+                    )
+
+                    with results_lock:
+                        results.append(pos[0])
+
+                except Exception as e:
+                    with results_lock:
+                        errors.append(f"Batch {batch} Thread {thread_id}: {e}")
+
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=threads_per_batch
+            ) as ex:
+                futures = [
+                    ex.submit(calc_with_config, i) for i in range(threads_per_batch)
+                ]
+                concurrent.futures.wait(futures)
+
+            all_errors.extend(errors)
+            assert len(results) == threads_per_batch, (
+                f"Batch {batch}: expected {threads_per_batch} results"
+            )
+
+        assert not all_errors, f"Errors: {all_errors[:10]}"
+
+    def test_lock_prevents_state_corruption(self):
+        """
+        Verify that the lock prevents observable state corruption.
+
+        This test creates a scenario where two threads with very different
+        configurations calculate simultaneously. We verify each thread gets
+        results consistent with its own configuration, not the other's.
+        """
+        jd = 2451545.0
+        num_iterations = 50
+        errors: list[str] = []
+
+        # Two very different configurations
+        config_a = (SE_SIDM_LAHIRI, "Lahiri")  # ~23° ayanamsha
+        config_b = (SE_SIDM_GALCENT_0SAG, "GalCent0Sag")  # ~25° ayanamsha
+
+        # Pre-calculate expected values
+        ctx_a = EphemerisContext()
+        ctx_a.set_sid_mode(config_a[0])
+        expected_a, _ = ctx_a.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+
+        ctx_b = EphemerisContext()
+        ctx_b.set_sid_mode(config_b[0])
+        expected_b, _ = ctx_b.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+
+        # Verify they're different enough to detect corruption
+        diff = abs(expected_a[0] - expected_b[0])
+        assert diff > 1.0, f"Expected positions to differ by >1°, got {diff:.4f}°"
+
+        results_a: list[float] = []
+        results_b: list[float] = []
+        results_lock = threading.Lock()
+
+        def worker_a():
+            try:
+                ctx = EphemerisContext()
+                ctx.set_sid_mode(config_a[0])
+                for _ in range(num_iterations):
+                    pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+                    # Check result is close to expected_a, not expected_b
+                    if abs(pos[0] - expected_a[0]) > 0.001:
+                        with results_lock:
+                            errors.append(
+                                f"Worker A: got {pos[0]:.6f}, expected {expected_a[0]:.6f}"
+                            )
+                        return
+                    with results_lock:
+                        results_a.append(pos[0])
+            except Exception as e:
+                with results_lock:
+                    errors.append(f"Worker A exception: {e}")
+
+        def worker_b():
+            try:
+                ctx = EphemerisContext()
+                ctx.set_sid_mode(config_b[0])
+                for _ in range(num_iterations):
+                    pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+                    # Check result is close to expected_b, not expected_a
+                    if abs(pos[0] - expected_b[0]) > 0.001:
+                        with results_lock:
+                            errors.append(
+                                f"Worker B: got {pos[0]:.6f}, expected {expected_b[0]:.6f}"
+                            )
+                        return
+                    with results_lock:
+                        results_b.append(pos[0])
+            except Exception as e:
+                with results_lock:
+                    errors.append(f"Worker B exception: {e}")
+
+        # Run workers concurrently
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            future_a = ex.submit(worker_a)
+            future_b = ex.submit(worker_b)
+            concurrent.futures.wait([future_a, future_b])
+
+        assert not errors, f"State corruption detected: {errors}"
+        assert len(results_a) == num_iterations
+        assert len(results_b) == num_iterations
+
+    def test_context_swap_lock_exists_and_is_rlock(self):
+        """
+        Verify that _CONTEXT_SWAP_LOCK exists in state module and is an RLock.
+
+        We use RLock (reentrant lock) to allow nested locking when functions
+        need to call other state-accessing functions while holding the lock.
+        """
+        from libephemeris import state
+
+        assert hasattr(state, "_CONTEXT_SWAP_LOCK"), (
+            "_CONTEXT_SWAP_LOCK not found in state module"
+        )
+        assert isinstance(state._CONTEXT_SWAP_LOCK, type(threading.RLock())), (
+            "_CONTEXT_SWAP_LOCK should be a threading.RLock"
+        )
+
+    def test_calc_pctr_thread_safety(self):
+        """
+        Test thread-safety of planet-centric calculations via context.
+        """
+        jd = 2451545.0
+        errors: list[str] = []
+        results: list[float] = []
+        results_lock = threading.Lock()
+
+        def calc_pctr(thread_id: int, mode: int):
+            try:
+                ctx = EphemerisContext()
+                ctx.set_sid_mode(mode)
+
+                # Calculate Moon as seen from Mars
+                pos, _ = ctx.calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SIDEREAL)
+
+                with results_lock:
+                    results.append(pos[0])
+
+            except Exception as e:
+                with results_lock:
+                    errors.append(f"Thread {thread_id}: {e}")
+
+        modes = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=9) as ex:
+            futures = [ex.submit(calc_pctr, i, modes[i % 3]) for i in range(9)]
+            concurrent.futures.wait(futures)
+
+        assert not errors, f"Errors: {errors}"
+        assert len(results) == 9

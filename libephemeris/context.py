@@ -38,7 +38,7 @@ _SHARED_PLANETS: Optional[SpiceKernel] = None
 _SHARED_TS: Optional[Timescale] = None
 _SHARED_EPHE_PATH: Optional[str] = None
 _SHARED_EPHE_FILE: str = "de421.bsp"
-_SHARED_LOCK = threading.Lock()
+_SHARED_LOCK = threading.RLock()
 
 
 class EphemerisContext:

@@ -908,39 +908,38 @@ def _calc_body_with_context(
     Returns:
         Same as _calc_body: ((lon, lat, dist, dlon, dlat, ddist), retflag)
 
-    Note:
-        This function is thread-safe when each thread uses its own context.
-        It temporarily modifies global state but this is safe because:
-        1. Each call is atomic within the GIL
-        2. Each thread has its own context
-        3. Global state is only read by _calc_body, not modified
+    Thread Safety:
+        This function acquires state._CONTEXT_SWAP_LOCK to ensure that the
+        save-set-restore cycle is atomic across threads. Without this lock,
+        concurrent calls could interleave and corrupt each other's state.
     """
     from . import state
 
-    # Save current global state
-    old_topo = state._TOPO
-    old_sid_mode = state._SIDEREAL_MODE
-    old_sid_t0 = state._SIDEREAL_T0
-    old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
-    old_angles_cache = state._ANGLES_CACHE
+    with state._CONTEXT_SWAP_LOCK:
+        # Save current global state
+        old_topo = state._TOPO
+        old_sid_mode = state._SIDEREAL_MODE
+        old_sid_t0 = state._SIDEREAL_T0
+        old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
+        old_angles_cache = state._ANGLES_CACHE
 
-    try:
-        # Temporarily set global state from context
-        state._TOPO = ctx.topo
-        state._SIDEREAL_MODE = ctx.sidereal_mode
-        state._SIDEREAL_T0 = ctx.sidereal_t0
-        state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
-        state._ANGLES_CACHE = ctx._angles_cache
+        try:
+            # Temporarily set global state from context
+            state._TOPO = ctx.topo
+            state._SIDEREAL_MODE = ctx.sidereal_mode
+            state._SIDEREAL_T0 = ctx.sidereal_t0
+            state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+            state._ANGLES_CACHE = ctx._angles_cache
 
-        # Use existing calculation logic
-        return _calc_body(t, ipl, iflag)
-    finally:
-        # Restore global state
-        state._TOPO = old_topo
-        state._SIDEREAL_MODE = old_sid_mode
-        state._SIDEREAL_T0 = old_sid_t0
-        state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
-        state._ANGLES_CACHE = old_angles_cache
+            # Use existing calculation logic
+            return _calc_body(t, ipl, iflag)
+        finally:
+            # Restore global state
+            state._TOPO = old_topo
+            state._SIDEREAL_MODE = old_sid_mode
+            state._SIDEREAL_T0 = old_sid_t0
+            state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
+            state._ANGLES_CACHE = old_angles_cache
 
 
 def _calc_body_pctr_with_context(
@@ -960,33 +959,38 @@ def _calc_body_pctr_with_context(
 
     Returns:
         Same as _calc_body_pctr: ((lon, lat, dist, dlon, dlat, ddist), retflag)
+
+    Thread Safety:
+        This function acquires state._CONTEXT_SWAP_LOCK to ensure that the
+        save-set-restore cycle is atomic across threads.
     """
     from . import state
 
-    # Save current global state
-    old_topo = state._TOPO
-    old_sid_mode = state._SIDEREAL_MODE
-    old_sid_t0 = state._SIDEREAL_T0
-    old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
-    old_angles_cache = state._ANGLES_CACHE
+    with state._CONTEXT_SWAP_LOCK:
+        # Save current global state
+        old_topo = state._TOPO
+        old_sid_mode = state._SIDEREAL_MODE
+        old_sid_t0 = state._SIDEREAL_T0
+        old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
+        old_angles_cache = state._ANGLES_CACHE
 
-    try:
-        # Temporarily set global state from context
-        state._TOPO = ctx.topo
-        state._SIDEREAL_MODE = ctx.sidereal_mode
-        state._SIDEREAL_T0 = ctx.sidereal_t0
-        state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
-        state._ANGLES_CACHE = ctx._angles_cache
+        try:
+            # Temporarily set global state from context
+            state._TOPO = ctx.topo
+            state._SIDEREAL_MODE = ctx.sidereal_mode
+            state._SIDEREAL_T0 = ctx.sidereal_t0
+            state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+            state._ANGLES_CACHE = ctx._angles_cache
 
-        # Use existing calculation logic
-        return _calc_body_pctr(t, ipl, iplctr, iflag)
-    finally:
-        # Restore global state
-        state._TOPO = old_topo
-        state._SIDEREAL_MODE = old_sid_mode
-        state._SIDEREAL_T0 = old_sid_t0
-        state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
-        state._ANGLES_CACHE = old_angles_cache
+            # Use existing calculation logic
+            return _calc_body_pctr(t, ipl, iplctr, iflag)
+        finally:
+            # Restore global state
+            state._TOPO = old_topo
+            state._SIDEREAL_MODE = old_sid_mode
+            state._SIDEREAL_T0 = old_sid_t0
+            state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
+            state._ANGLES_CACHE = old_angles_cache
 
 
 def swe_get_ayanamsa_ut(tjd_ut: float) -> float:

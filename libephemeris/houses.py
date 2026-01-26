@@ -1035,27 +1035,32 @@ def _swe_houses_with_context(
 
     Returns:
         Same as swe_houses: (cusps, ascmc)
+
+    Thread Safety:
+        This function acquires state._CONTEXT_SWAP_LOCK to ensure that the
+        save-set-restore cycle is atomic across threads.
     """
     from . import state
 
-    # Save current global state
-    old_sid_mode = state._SIDEREAL_MODE
-    old_sid_t0 = state._SIDEREAL_T0
-    old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
+    with state._CONTEXT_SWAP_LOCK:
+        # Save current global state
+        old_sid_mode = state._SIDEREAL_MODE
+        old_sid_t0 = state._SIDEREAL_T0
+        old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
 
-    try:
-        # Temporarily set global state from context
-        state._SIDEREAL_MODE = ctx.sidereal_mode
-        state._SIDEREAL_T0 = ctx.sidereal_t0
-        state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+        try:
+            # Temporarily set global state from context
+            state._SIDEREAL_MODE = ctx.sidereal_mode
+            state._SIDEREAL_T0 = ctx.sidereal_t0
+            state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
 
-        # Use existing house calculation logic
-        return swe_houses(tjdut, lat, lon, hsys)
-    finally:
-        # Restore global state
-        state._SIDEREAL_MODE = old_sid_mode
-        state._SIDEREAL_T0 = old_sid_t0
-        state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
+            # Use existing house calculation logic
+            return swe_houses(tjdut, lat, lon, hsys)
+        finally:
+            # Restore global state
+            state._SIDEREAL_MODE = old_sid_mode
+            state._SIDEREAL_T0 = old_sid_t0
+            state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
 
 
 def swe_house_name(hsys: int) -> str:

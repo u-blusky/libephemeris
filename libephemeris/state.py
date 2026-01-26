@@ -14,6 +14,7 @@ stateful API behavior. This is thread-unsafe by design, matching SwissEph behavi
 """
 
 import os
+import threading
 from typing import Optional, Union
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
@@ -22,6 +23,14 @@ from skyfield.jpllib import SpiceKernel
 # =============================================================================
 # GLOBAL STATE VARIABLES
 # =============================================================================
+
+# Lock to protect global state during context-swap operations.
+# This ensures thread-safety when EphemerisContext temporarily swaps
+# global state for calculations. Without this lock, concurrent threads
+# could interfere with each other's state during the save-set-restore cycle.
+# We use RLock (reentrant lock) to allow nested locking in case any
+# calculation function internally calls other state-swapping functions.
+_CONTEXT_SWAP_LOCK = threading.RLock()
 
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de421.bsp"  # Ephemeris file to use (default: DE421)
