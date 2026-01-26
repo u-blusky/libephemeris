@@ -6,7 +6,6 @@ This ensures 100% API compatibility at the constant level.
 
 import pytest
 import swisseph as swe
-import libephemeris as ephem
 from libephemeris import constants
 
 

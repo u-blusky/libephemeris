@@ -2,7 +2,6 @@
 Tests for get_planet_name function.
 """
 
-import pytest
 from libephemeris import (
     get_planet_name,
     SE_SUN,

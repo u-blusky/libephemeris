@@ -5,7 +5,6 @@ Tests boundary conditions, invalid inputs, and error handling.
 """
 
 import pytest
-import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
 

@@ -10,7 +10,7 @@ import sys
 import os
 
 # Add docs directory to path for importing cookbook
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "docs"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from docs.cookbook import (
     format_longitude,

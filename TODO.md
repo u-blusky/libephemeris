@@ -238,28 +238,28 @@ Questa libreria è un drop-in replacement puro Python per pyswisseph (Swiss Ephe
 
 - [x] Documentare tutte le limitazioni di precisione note, con numeri specifici: \"posizioni planetarie: ±0.5 arcsec vs pyswisseph\", \"case polari: non supportate per lat > 85°\", ecc. Questo aiuta gli utenti a decidere se libephemeris è adatto al loro caso d'uso. (Vedi docs/PRECISION.md)
 
-- [ ] Creare un cookbook con esempi pratici: calcolo carta natale completa, ricerca prossimo transito, calcolo sinastria, ricerca eclissi, calcolo effemeridi mensili. Ogni esempio deve essere eseguibile e ben commentato.
+- [x] Creare un cookbook con esempi pratici: calcolo carta natale completa, ricerca prossimo transito, calcolo sinastria, ricerca eclissi, calcolo effemeridi mensili. Ogni esempio deve essere eseguibile e ben commentato.
 
-- [ ] Creare e mantenere un CHANGELOG.md che documenti tutte le modifiche per ogni versione: nuove funzioni, bug fix, breaking changes, miglioramenti di precisione. Seguire il formato Keep a Changelog.
+- [x] Creare e mantenere un CHANGELOG.md che documenti tutte le modifiche per ogni versione: nuove funzioni, bug fix, breaking changes, miglioramenti di precisione. Seguire il formato Keep a Changelog.
 
 ## Quality and Infrastructure
 
-- [ ] Correggere tutti gli errori LSP/mypy nei file context.py, state.py, houses.py, planets.py. Gli errori principali sono: tipi incompatibili con SpiceKernel, operatori non supportati per tipi Skyfield, variabili potenzialmente non definite. Aggiungere type hints corretti e cast dove necessario.
+- [x] Correggere tutti gli errori LSP/mypy nei file context.py, state.py, houses.py, planets.py. Gli errori principali sono: tipi incompatibili con SpiceKernel, operatori non supportati per tipi Skyfield, variabili potenzialmente non definite. Aggiungere type hints corretti e cast dove necessario.
 
-- [ ] Aggiungere il file py.typed nella root del package per indicare supporto PEP 561 per type hints. Questo permette a mypy e altri type checker di usare i type hints di libephemeris quando è usato come dipendenza.
+- [x] Aggiungere il file py.typed nella root del package per indicare supporto PEP 561 per type hints. Questo permette a mypy e altri type checker di usare i type hints di libephemeris quando è usato come dipendenza.
 
-- [ ] Configurare GitHub Actions per CI/CD automatico: eseguire pytest su ogni push/PR, testare su Python 3.9/3.10/3.11/3.12, eseguire mypy per type checking, eseguire ruff/black per linting/formatting.
+- [x] Configurare GitHub Actions per CI/CD automatico: eseguire pytest su ogni push/PR, testare su Python 3.9/3.10/3.11/3.12, eseguire mypy per type checking, eseguire ruff/black per linting/formatting.
 
-- [ ] Aggiungere code coverage con pytest-cov e pubblicare i risultati su Codecov o Coveralls. Obiettivo: >80% coverage per il codice core, >60% per utilities.
+- [x] Aggiungere code coverage con pytest-cov e pubblicare i risultati su Codecov o Coveralls. Obiettivo: >80% coverage per il codice core, >60% per utilities.
 
-- [ ] Creare una suite di benchmark che confronta le performance di libephemeris vs pyswisseph per le operazioni più comuni: calc_ut, houses, get_ayanamsa. Pubblicare i risultati nel README.
+- [x] Creare una suite di benchmark che confronta le performance di libephemeris vs pyswisseph per le operazioni più comuni: calc_ut, houses, get_ayanamsa. Pubblicare i risultati nel README.
 
-- [ ] Configurare pre-commit hooks per eseguire automaticamente prima di ogni commit: ruff (linting), black (formatting), mypy (type checking), pytest (test veloci).
+- [x] Configurare pre-commit hooks per eseguire automaticamente prima di ogni commit: ruff (linting), black (formatting), mypy (type checking), pytest (test veloci).
 
-- [ ] Preparare il package per la distribuzione su PyPI: pyproject.toml completo con metadata, README.md come descrizione, LICENSE, classifiers appropriati. Testare con `pip install -e .` e `python -m build`.
+- [x] Preparare il package per la distribuzione su PyPI: pyproject.toml completo con metadata, README.md come descrizione, LICENSE, classifiers appropriati. Testare con `pip install -e .` e `python -m build`.
 
-- [ ] Profilare l'uso di memoria per calcoli lunghi (es. 10000 posizioni in loop) per verificare che non ci siano memory leak. Skyfield carica file di effemeridi grandi; verificare che la cache sia gestita correttamente.
+- [x] Profilare l'uso di memoria per calcoli lunghi (es. 10000 posizioni in loop) per verificare che non ci siano memory leak. Skyfield carica file di effemeridi grandi; verificare che la cache sia gestita correttamente.
 
-- [ ] Audit completo della thread-safety: identificare tutte le variabili globali/modulo-level (in state.py, constants.py), verificare che EphemerisContext le isoli correttamente, aggiungere lock dove necessario.
+- [x] Audit completo della thread-safety: identificare tutte le variabili globali/modulo-level (in state.py, constants.py), verificare che EphemerisContext le isoli correttamente, aggiungere lock dove necessario.
 
-- [ ] Assicurarsi che tutti i messaggi di errore corrispondano al formato di pyswisseph per permettere al codice client esistente di fare pattern matching sugli errori. Es. "illegal planet number" invece di "invalid planet".
+- [x] Assicurarsi che tutti i messaggi di errore corrispondano al formato di pyswisseph per permettere al codice client esistente di fare pattern matching sugli errori. Es. "illegal planet number" invece di "invalid planet".

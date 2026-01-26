@@ -147,7 +147,7 @@ class TestMassiveComparisonHouses:
                 assert asc_diff < 0.5, (
                     f"Location {name} ({lat}, {lon}): ASC diff {asc_diff}"
                 )
-            except Exception as e:
+            except Exception:
                 pass  # Some locations may fail for Placidus
 
             progress.update(i, f"{name}")

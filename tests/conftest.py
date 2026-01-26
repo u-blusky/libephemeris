@@ -7,7 +7,6 @@ with pyswisseph (Swiss Ephemeris).
 
 import pytest
 import random
-import math
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *

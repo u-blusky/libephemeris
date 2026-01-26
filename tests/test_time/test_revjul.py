@@ -10,7 +10,7 @@ Tests cover:
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_GREG_CAL, SE_JUL_CAL
+from libephemeris.constants import SE_JUL_CAL
 
 
 class TestRevjulStandardEpochs:

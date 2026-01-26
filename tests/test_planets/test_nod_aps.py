@@ -18,11 +18,9 @@ Note on precision:
 """
 
 import pytest
-import math
 import libephemeris as ephem
 from libephemeris.constants import (
     SE_SUN,
-    SE_MOON,
     SE_MERCURY,
     SE_VENUS,
     SE_MARS,
@@ -34,7 +32,6 @@ from libephemeris.constants import (
     SE_EARTH,
     SE_NODBIT_MEAN,
     SE_NODBIT_OSCU,
-    SEFLG_HELCTR,
 )
 
 

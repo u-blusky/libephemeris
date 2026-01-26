@@ -77,22 +77,28 @@ Creare una libreria Python **pure Python** (nessuna estensione C) che sostituisc
 **Procedura identica per tutti**:
 
 1. Identificare il target nel file DE440 (es. "mercury", "venus", ecc.)
-2. Per i pianeti esterni, DE440 usa il **baricentro** del sistema (pianeta + lune)
+2. Per i pianeti esterni, utilizzare il **centro planetario** (NAIF ID x99) non il baricentro del sistema
 3. Calcolare posizione apparente geocentrica con correzione tempo-luce
 4. Convertire a eclittiche
 
 **Mappatura target DE440**:
 
-| Pianeta | Target DE440 |
-|---------|--------------|
-| Mercurio | `mercury` |
-| Venere | `venus` |
-| Marte | `mars barycenter` |
-| Giove | `jupiter barycenter` |
-| Saturno | `saturn barycenter` |
-| Urano | `uranus barycenter` |
-| Nettuno | `neptune barycenter` |
-| Plutone | `pluto barycenter` |
+| Pianeta | Target DE440 | NAIF ID |
+|---------|--------------|---------|
+| Mercurio | `mercury` | 199 |
+| Venere | `venus` | 299 |
+| Marte | `mars` | 499 |
+| Giove | `jupiter` | 599 |
+| Saturno | `saturn` | 699 |
+| Urano | `uranus` | 799 |
+| Nettuno | `neptune` | 899 |
+| Plutone | `pluto` | 999 |
+
+**Nota importante sui baricentri**:
+- I baricentri del sistema (NAIF ID x, es. 5 per Jupiter system) includono la massa delle lune
+- Per i giganti gassosi, il baricentro può essere migliaia di km dal centro del pianeta
+- Il baricentro di Giove-sistema è ~7000 km dal centro di Giove a causa dell'influenza di Io, Europa, Ganimede e Callisto
+- Per posizioni planetarie accurate, usare sempre i centri planetari (NAIF ID x99)
 
 **Retrogradazione**: Determinata dal segno della velocità (negativo = retrogrado)
 
@@ -589,14 +595,14 @@ Ogni ayanamsa ha la propria formula.
 |---|-------|--------|------------|------|
 | 0 | Sun | Skyfield | DE440 | Posizione geocentrica |
 | 1 | Moon | Skyfield | DE440 | Alta precisione LLR |
-| 2 | Mercury | Skyfield | DE440 | |
-| 3 | Venus | Skyfield | DE440 | |
-| 4 | Mars | Skyfield | DE440 | Barycenter |
-| 5 | Jupiter | Skyfield | DE440 | Barycenter |
-| 6 | Saturn | Skyfield | DE440 | Barycenter |
-| 7 | Uranus | Skyfield | DE440 | Barycenter |
-| 8 | Neptune | Skyfield | DE440 | Barycenter |
-| 9 | Pluto | Skyfield | DE440 | Barycenter |
+| 2 | Mercury | Skyfield | DE440 | Centro planetario (199) |
+| 3 | Venus | Skyfield | DE440 | Centro planetario (299) |
+| 4 | Mars | Skyfield | DE440 | Centro planetario (499) |
+| 5 | Jupiter | Skyfield | DE440 | Centro planetario (599) |
+| 6 | Saturn | Skyfield | DE440 | Centro planetario (699) |
+| 7 | Uranus | Skyfield | DE440 | Centro planetario (799) |
+| 8 | Neptune | Skyfield | DE440 | Centro planetario (899) |
+| 9 | Pluto | Skyfield | DE440 | Centro planetario (999) |
 | 10 | Mean Node | Formula | Meeus Cap.47 | Analitico |
 | 11 | True Node | Geometria | Orbita Luna | Osculante |
 | 12 | Mean Lilith | Formula | SWE docs | Apogeo medio |
