@@ -289,6 +289,30 @@ LibEphemeris has been tested against Swiss Ephemeris using an automated test sui
 
 These comparisons are implemented in the `tests/` and `compare_scripts/` directories, and are run regularly during development.
 
+### Performance Benchmarks
+
+LibEphemeris is a pure Python implementation, while pyswisseph is a C library. The performance difference reflects this architectural choice, prioritizing readability and maintainability over raw speed. Future Rust core implementation (Milestone 2) will significantly improve performance.
+
+| Operation       | Iterations | pyswisseph (C)       | libephemeris (Python) | Slowdown |
+| --------------- | ---------- | -------------------- | --------------------- | -------- |
+| calc_ut         | 5000       | 0.04s (~138,000/s)   | 4.2s (~1,180/s)       | ~117x    |
+| houses          | 1200       | 0.004s (~296,000/s)  | 0.13s (~9,400/s)      | ~31x     |
+| get_ayanamsa_ut | 1500       | 0.001s (~1,300,000/s)| 0.03s (~45,000/s)     | ~29x     |
+
+*Benchmarks run on Apple M1 Pro, Python 3.10. Results may vary depending on hardware and system load.*
+
+**Key observations:**
+
+-   **House calculations** are the fastest operation, with only ~31x slowdown.
+-   **Ayanamsa calculations** are similarly efficient at ~29x slowdown.
+-   **Planetary positions** (calc_ut) are the most computationally intensive, as they involve JPL ephemeris file lookups via Skyfield.
+
+Run the benchmarks yourself:
+
+```bash
+pytest tests/test_precision/test_benchmark_comparison.py -v -s
+```
+
 ---
 
 ## Swiss Ephemeris Compatibility
