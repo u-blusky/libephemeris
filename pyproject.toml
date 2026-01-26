@@ -29,8 +29,10 @@ Issues = "https://github.com/g-battaglia/libephemeris/issues"
 
 [dependency-groups]
 dev = [
+    "black>=25.1.0",
     "mypy>=1.0.0",
     "poethepoet>=0.38.0",
+    "pre-commit>=4.0.0",
     "pyswisseph>=2.10.3.2",
     "pytest>=9.0.1",
     "pytest-xdist>=3.5.0",
@@ -50,11 +52,14 @@ libephemeris = ["py.typed"]
 
 [tool.poe.tasks]
 format = "ruff format ."
+format-black = "black libephemeris tests"
 lint = "ruff check . --fix"
 test = "pytest"
 test-fast = "pytest -n auto"
 coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"
 typecheck = "mypy libephemeris"
+pre-commit-install = "pre-commit install"
+pre-commit-run = "pre-commit run --all-files"
 
 [tool.mypy]
 python_version = "3.10"
@@ -64,6 +69,16 @@ ignore_missing_imports = true
 
 [tool.ruff]
 exclude = ["compare_scripts"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  compare_scripts
+)/
+'''
 
 [tool.ruff.lint]
 # Ignore star imports (F403, F405) - the library uses star imports for constants
