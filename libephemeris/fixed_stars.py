@@ -171,7 +171,7 @@ def calc_fixed_star_position(star_id: int, jd_tt: float) -> Tuple[float, float, 
         IAU 2000A nutation model (1365 terms) via Skyfield
     """
     if star_id not in FIXED_STARS:
-        raise ValueError(f"Unknown star ID: {star_id}")
+        raise ValueError(f"could not find star name {star_id}")
 
     star = FIXED_STARS[star_id]
 
@@ -336,7 +336,7 @@ def _resolve_star_id(star_name: str) -> tuple[int, str | None]:
     elif name_upper == "SPICA":
         return SE_SPICA_STAR, None
     else:
-        return -1, f"Star {star_name} not found"
+        return -1, f"could not find star name {star_name.lower()}"
 
 
 def swe_fixstar_ut(
@@ -470,7 +470,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         for entry in STAR_CATALOG:
             if entry.hip_number == hip_number:
                 return entry, None
-        return None, f"Star with HIP number {hip_number} not found"
+        return None, f"could not find star name {hip_number}"
 
     # Handle comma-separated format (e.g., "Regulus,alLeo")
     if "," in search:
@@ -522,7 +522,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         names = ", ".join(m.name for m in matches)
         return None, f"Ambiguous star name '{star_name}' matches: {names}"
 
-    return None, f"Star '{star_name}' not found"
+    return None, f"could not find star name {star_name.lower()}"
 
 
 def swe_fixstar2_ut(
@@ -565,7 +565,12 @@ def swe_fixstar2_ut(
     """
     entry, error = _resolve_star2(star_name)
     if error or entry is None:
-        return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error or "Star not found")
+        return (
+            "",
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            iflag,
+            error or "could not find star name",
+        )
 
     # Convert UT to TT using timescale (applies Delta T)
     from .state import get_timescale
@@ -621,7 +626,12 @@ def swe_fixstar2(
     """
     entry, error = _resolve_star2(star_name)
     if error or entry is None:
-        return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error or "Star not found")
+        return (
+            "",
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            iflag,
+            error or "could not find star name",
+        )
 
     # Use TT directly - no conversion needed
     try:
@@ -698,7 +708,7 @@ def swe_fixstar2_mag(star_name: str) -> Tuple[str, float, str]:
     """
     entry, error = _resolve_star2(star_name)
     if error or entry is None:
-        return ("", 0.0, error or "Star not found")
+        return ("", 0.0, error or "could not find star name")
 
     star_name_out = _format_star_name(entry)
     return (star_name_out, entry.magnitude, "")

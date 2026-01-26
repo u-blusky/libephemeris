@@ -97,7 +97,9 @@ class TestFixstar2TT:
         """Test handling of unknown star name."""
         name, pos, retflag, err = ephem.swe_fixstar2("UnknownStar", standard_jd, 0)
 
-        assert "not found" in err, "Should report star not found"
+        assert "could not find star name" in err, (
+            "Should report star not found (pyswisseph format)"
+        )
         assert name == "", "Name should be empty on error"
         assert pos == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), "Position should be zero tuple"
 
@@ -105,7 +107,9 @@ class TestFixstar2TT:
         """Test handling of unknown HIP number."""
         name, pos, retflag, err = ephem.swe_fixstar2("99999", standard_jd, 0)
 
-        assert "not found" in err, "Should report star not found"
+        assert "could not find star name" in err, (
+            "Should report star not found (pyswisseph format)"
+        )
         assert name == "", "Name should be empty on error"
 
     def test_fixstar2_empty_string(self, standard_jd):
@@ -206,7 +210,7 @@ class TestFixstar2UT:
         """Test fixstar2_ut handling of unknown star."""
         name, pos, retflag, err = ephem.swe_fixstar2_ut("UnknownStar", standard_jd, 0)
 
-        assert "not found" in err
+        assert "could not find star name" in err
         assert name == ""
         assert pos == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 

@@ -2478,7 +2478,7 @@ def lun_occult_when_glob(
             # Fixed star
             pos, retflag, err = swe_fixstar_ut(star_name, jd, flags)
             if err:
-                raise ValueError(f"Star '{star_name}' not found: {err}")
+                raise ValueError(f"could not find star name {star_name.lower()}: {err}")
             # For fixed stars, we need to convert ecliptic to equatorial
             # swe_fixstar_ut returns ecliptic coordinates, but we need RA/Dec
             # Use the planets module to get proper equatorial coords
@@ -2490,7 +2490,7 @@ def lun_occult_when_glob(
 
             star_id, _ = _resolve_star_id(star_name)
             if star_id < 0:
-                raise ValueError(f"Star '{star_name}' not found")
+                raise ValueError(f"could not find star name {star_name.lower()}")
 
             star = FIXED_STARS[star_id]
 
@@ -2506,7 +2506,7 @@ def lun_occult_when_glob(
         else:
             # Planet
             if planet not in _PLANET_MAP:
-                raise ValueError(f"Unknown planet ID: {planet}")
+                raise ValueError(f"illegal planet number {planet}.")
 
             target_name = _PLANET_MAP[planet]
             target = eph[target_name]
@@ -2880,7 +2880,7 @@ def lun_occult_when_loc(
             # Fixed star - calculate alt/az from RA/Dec
             star_id, _ = _resolve_star_id(star_name)
             if star_id < 0:
-                raise ValueError(f"Star '{star_name}' not found")
+                raise ValueError(f"could not find star name {star_name.lower()}")
 
             star = FIXED_STARS[star_id]
 
@@ -2904,7 +2904,7 @@ def lun_occult_when_loc(
         else:
             # Planet
             if planet not in _PLANET_MAP:
-                raise ValueError(f"Unknown planet ID: {planet}")
+                raise ValueError(f"illegal planet number {planet}.")
 
             target_name = _PLANET_MAP[planet]
             target = eph[target_name]
@@ -3259,7 +3259,7 @@ def lun_occult_where(
             # Fixed star
             star_id, _ = _resolve_star_id(star_name)
             if star_id < 0:
-                raise ValueError(f"Star '{star_name}' not found")
+                raise ValueError(f"could not find star name {star_name.lower()}")
 
             star = FIXED_STARS[star_id]
 
@@ -3275,7 +3275,7 @@ def lun_occult_where(
         else:
             # Planet
             if planet not in _PLANET_MAP:
-                raise ValueError(f"Unknown planet ID: {planet}")
+                raise ValueError(f"illegal planet number {planet}.")
 
             target_name = _PLANET_MAP[planet]
             target = eph[target_name]
@@ -3605,7 +3605,7 @@ def rise_trans(
 
     # Validate planet and get target body
     if planet not in _PLANET_MAP:
-        raise ValueError(f"Invalid planet ID: {planet}")
+        raise ValueError(f"illegal planet number {planet}.")
 
     target_name = _PLANET_MAP[planet]
     # Try planet center first, fall back to barycenter if not available
@@ -4033,7 +4033,7 @@ def rise_trans_true_hor(
 
     # Validate planet and get target body
     if planet not in _PLANET_MAP:
-        raise ValueError(f"Invalid planet ID: {planet}")
+        raise ValueError(f"illegal planet number {planet}.")
 
     target_name = _PLANET_MAP[planet]
     target = eph[target_name]
@@ -4245,7 +4245,7 @@ def heliacal_ut(
 
     # Validate body
     if body not in _PLANET_MAP:
-        raise ValueError(f"Invalid body ID: {body}")
+        raise ValueError(f"illegal planet number {body}.")
 
     # Get ephemeris and timescale
     eph = get_planets()
@@ -4734,7 +4734,7 @@ def heliacal_pheno_ut(
 
     # Validate body
     if body not in _PLANET_MAP:
-        raise ValueError(f"Invalid body ID: {body}")
+        raise ValueError(f"illegal planet number {body}.")
 
     # Get ephemeris and timescale
     eph = get_planets()
@@ -5230,7 +5230,7 @@ def vis_limit_mag(
                 objname, jd, flags & 0xFF
             )
             if error:
-                raise ValueError(f"Fixed star '{objname}' not found: {error}")
+                raise ValueError(f"could not find star name {objname.lower()}: {error}")
 
             # star_result is (lon, lat, dist, lon_speed, lat_speed, dist_speed)
             # We need to convert ecliptic to horizontal
@@ -5265,7 +5265,7 @@ def vis_limit_mag(
             raise
         except Exception as e:
             # Star not found or other error
-            raise ValueError(f"Fixed star '{objname}' not found: {e}")
+            raise ValueError(f"could not find star name {objname.lower()}: {e}")
     else:
         # Planet calculation
         if body_id is None:
@@ -5298,7 +5298,7 @@ def vis_limit_mag(
             except Exception:
                 obj_mag = 0.0  # Default bright
         else:
-            raise ValueError(f"Invalid body ID: {body_id}")
+            raise ValueError(f"illegal planet number {body_id}.")
 
     # Check if object is below horizon
     if obj_alt < 0:

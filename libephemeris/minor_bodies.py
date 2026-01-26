@@ -827,7 +827,7 @@ def calc_minor_body_heliocentric(
         Errors increase with time from epoch (2023.0)
     """
     if body_id not in MINOR_BODY_ELEMENTS:
-        raise ValueError(f"Unknown minor body ID: {body_id}")
+        raise ValueError(f"illegal planet number {body_id}.")
 
     elements = MINOR_BODY_ELEMENTS[body_id]
     x, y, z = calc_minor_body_position(elements, jd_tt)

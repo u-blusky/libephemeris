@@ -40,7 +40,9 @@ class TestFixstarMag:
         """Test handling of unknown star name."""
         mag, err = ephem.swe_fixstar_mag("UnknownStar")
 
-        assert "not found" in err, "Should report star not found"
+        assert "could not find star name" in err, (
+            "Should report star not found (pyswisseph format)"
+        )
         assert mag == 0.0, "Magnitude should be 0.0 on error"
 
     def test_fixstar_mag_with_comma_in_name(self):
@@ -159,7 +161,9 @@ class TestFixstar2Mag:
         """Test handling of unknown star name."""
         name, mag, err = ephem.swe_fixstar2_mag("UnknownStar")
 
-        assert "not found" in err, "Should report star not found"
+        assert "could not find star name" in err, (
+            "Should report star not found (pyswisseph format)"
+        )
         assert name == "", "Name should be empty on error"
         assert mag == 0.0, "Magnitude should be 0.0 on error"
 
@@ -167,7 +171,9 @@ class TestFixstar2Mag:
         """Test handling of unknown HIP number."""
         name, mag, err = ephem.swe_fixstar2_mag("99999")
 
-        assert "not found" in err, "Should report star not found"
+        assert "could not find star name" in err, (
+            "Should report star not found (pyswisseph format)"
+        )
         assert name == "", "Name should be empty on error"
 
     def test_fixstar2_mag_empty_string(self):

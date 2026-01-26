@@ -36,7 +36,9 @@ class TestFixstarTT:
         """Test handling of unknown star name."""
         pos, retflag, err = ephem.swe_fixstar("UnknownStar", standard_jd, 0)
 
-        assert "not found" in err, "Should report star not found"
+        assert "could not find star name" in err, (
+            "Should report star not found (pyswisseph format)"
+        )
         assert pos == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), "Position should be zero tuple"
 
     def test_fixstar_case_insensitive(self, standard_jd):
