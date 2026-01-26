@@ -1548,50 +1548,69 @@ def sol_eclipse_where(
     """
     Calculate the geographic location where a solar eclipse is central at a given time.
 
-    This function determines where on Earth the Moon's shadow axis intersects
-    the surface at the specified Julian Day. Used for tracing the path of
-    totality/annularity across the Earth's surface.
+    This is the legacy function signature. For pyswisseph compatibility,
+    use swe_sol_eclipse_where().
 
     Args:
         jd: Julian Day (UT) of the moment to calculate
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
+        See swe_sol_eclipse_where() for full return specification.
+    """
+    return swe_sol_eclipse_where(jd, flags)
+
+
+def swe_sol_eclipse_where(
+    tjd_ut: float,
+    ifl: int,
+) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+    """
+    Find the geographic location where a solar eclipse is at maximum at a given time.
+
+    This function determines where on Earth the Moon's shadow axis intersects
+    the Earth's surface at the specified Julian Day, using the WGS84 ellipsoid
+    for accurate geodetic calculations.
+
+    Args:
+        tjd_ut: Julian Day (UT) during a solar eclipse
+        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
         Tuple containing:
-            - geopos: Tuple of 2 floats with geographic position:
-                [0]: Geographic longitude of central eclipse (degrees, East positive)
-                [1]: Geographic latitude of central eclipse (degrees, North positive)
-            - attr: Tuple of 8 floats with eclipse attributes:
+            - geopos: Tuple of 3 floats with geographic position:
+                [0]: Geographic longitude (degrees, East positive)
+                [1]: Geographic latitude (degrees, North positive)
+                [2]: Always 0 (reserved for altitude)
+            - attr: Tuple of 8+ floats with eclipse attributes:
                 [0]: Fraction of solar diameter covered by Moon (magnitude)
                 [1]: Ratio of lunar diameter to solar diameter
                 [2]: Fraction of Sun's area obscured (obscuration)
                 [3]: Width of totality/annularity path (km)
                 [4]: Sun's azimuth at central line (degrees)
-                [5]: Sun's altitude at central line (degrees)
-                [6]: Apparent diameter of Moon (degrees)
-                [7]: Apparent diameter of Sun (degrees)
+                [5]: True altitude of Sun at central line (degrees)
+                [6]: Apparent altitude with refraction (degrees)
+                [7]: Angular distance Moon center from Sun center (degrees)
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
                 Returns 0 if no central eclipse at this time
 
     Note:
-        If there is no central eclipse at the given time (either no eclipse
-        at all, or the shadow axis misses the Earth), geopos will contain
-        zeros and retflag will be 0.
+        If the shadow axis misses the Earth (partial eclipse or no eclipse),
+        the function finds the point of maximum penumbral coverage instead.
+        Uses WGS84 ellipsoid: a=6378.137 km, b=6356.752 km, f=1/298.257223563
 
     Algorithm:
-        1. Calculate Sun and Moon positions at the given time
-        2. Compute the Moon's shadow axis direction
-        3. Find intersection of shadow axis with Earth's surface
+        1. Start with sub-lunar point as initial guess
+        2. Iteratively refine to find point of minimum Sun-Moon separation
+        3. This accounts for parallax and gives accurate central line position
         4. Calculate eclipse attributes at that location
-        5. Determine path width from umbra/penumbra cone geometry
 
     Example:
         >>> # Find central line location during April 8, 2024 eclipse
-        >>> from libephemeris import julday, sol_eclipse_where
-        >>> jd = julday(2024, 4, 8, 18.2)  # Approximate maximum
-        >>> geopos, attr, ecl_type = sol_eclipse_where(jd)
-        >>> print(f"Central line at lon={geopos[0]:.2f}, lat={geopos[1]:.2f}")
-        >>> print(f"Path width: {attr[3]:.1f} km")
+        >>> from libephemeris import julday, swe_sol_eclipse_where, SEFLG_SWIEPH
+        >>> jd = 2460409.26  # ~18:18 UTC during maximum
+        >>> geopos, attr, ecl_type = swe_sol_eclipse_where(jd, SEFLG_SWIEPH)
+        >>> print(f"Central at lon={geopos[0]:.2f}, lat={geopos[1]:.2f}")
 
     References:
         - Swiss Ephemeris: swe_sol_eclipse_where()
@@ -1599,108 +1618,92 @@ def sol_eclipse_where(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
     """
     from skyfield.api import wgs84
-
     from .state import get_planets, get_timescale
+
+    AU_TO_KM = 149597870.7  # AU to km conversion
 
     # Get ephemeris and timescale
     eph = get_planets()
     ts = get_timescale()
-
-    # Get Sun and Moon positions
-    sun_pos, _ = swe_calc_ut(jd, SE_SUN, flags | SEFLG_SPEED)
-    moon_pos, _ = swe_calc_ut(jd, SE_MOON, flags | SEFLG_SPEED)
-
-    # Check if eclipse is possible (Sun-Moon conjunction)
-    elongation = abs((moon_pos[0] - sun_pos[0] + 180) % 360 - 180)
-    if elongation > 5.0:  # Too far from conjunction for eclipse
-        return (0.0, 0.0), (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
-
-    # Get distances in AU
-    sun_dist = sun_pos[2]
-    moon_dist = moon_pos[2]
-    moon_lat = moon_pos[1]  # Ecliptic latitude
-
-    # Constants
-    EARTH_RADIUS_AU = 4.2635e-5
-
-    # Calculate gamma (Moon shadow axis distance from Earth center, in Earth radii)
-    # Using improved geometric calculation
-    lat_rad = math.radians(moon_lat)
-    z_moon = moon_dist * math.sin(lat_rad)
-    gamma = z_moon / EARTH_RADIUS_AU
-
-    # Check if shadow axis intersects Earth
-    GAMMA_LIMIT = 1.55  # Maximum gamma for any eclipse visibility
-    if abs(gamma) > GAMMA_LIMIT:
-        return (0.0, 0.0), (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
-
-    # Determine eclipse type
-    GAMMA_LIMIT_CENTRAL = 0.997
-    if abs(gamma) > GAMMA_LIMIT_CENTRAL:
-        # Non-central eclipse - no central line on Earth
-        return (0.0, 0.0), (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), SE_ECL_PARTIAL
-
-    # Central eclipse - calculate central line position
-
-    # Get Skyfield time
-    t = ts.ut1_jd(jd)
+    t = ts.ut1_jd(tjd_ut)
 
     # Get Earth, Sun, Moon objects
     earth = eph["earth"]
     sun = eph["sun"]
     moon = eph["moon"]
 
-    # Calculate geocentric positions of Sun and Moon
-    sun_geo = earth.at(t).observe(sun).apparent()
-    moon_geo = earth.at(t).observe(moon).apparent()
+    earth_at = earth.at(t)
 
-    # Get RA/Dec of Moon (sub-lunar point calculation)
+    # Get geocentric Moon position for initial guess
+    moon_geo = earth_at.observe(moon).apparent()
     moon_ra, moon_dec, _ = moon_geo.radec()
-    moon_ra_deg = moon_ra.hours * 15.0  # Convert hours to degrees
-    moon_dec_deg = moon_dec.degrees
 
-    # Calculate GMST (Greenwich Mean Sidereal Time)
-    gmst = t.gmst  # in hours
-    gmst_deg = gmst * 15.0  # Convert to degrees
+    # Calculate sub-lunar point as initial guess
+    gmst = t.gmst  # Greenwich Mean Sidereal Time in hours
+    init_lon = moon_ra.hours * 15.0 - gmst * 15.0
+    init_lon = ((init_lon + 180) % 360) - 180
+    init_lat = moon_dec.degrees
 
-    # Sub-lunar point longitude
-    # The Moon is directly overhead where:
-    # Local sidereal time = Moon's RA
-    # longitude = RA - GMST
-    central_lon = moon_ra_deg - gmst_deg
-    # Normalize to -180 to +180
+    # Function to calculate Sun-Moon separation at a given location
+    def get_separation(lat: float, lon: float) -> float:
+        """Get angular separation between Sun and Moon from observer location."""
+        try:
+            observer = wgs84.latlon(lat, lon, 0.0)
+            observer_at = earth + observer
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+            return sun_app.separation_from(moon_app).degrees
+        except Exception:
+            return 999.0  # Return large value on error
+
+    # Gradient descent to find minimum separation (eclipse center)
+    # This finds the point on Earth where Sun and Moon appear closest
+    central_lat = init_lat
+    central_lon = init_lon
+
+    # Use a multi-scale search: start coarse, then refine
+    for scale in [5.0, 1.0, 0.1, 0.01, 0.001]:
+        best_sep = get_separation(central_lat, central_lon)
+
+        # Search in a small grid around current best
+        improved = True
+        iterations = 0
+        while improved and iterations < 50:
+            improved = False
+            iterations += 1
+
+            for dlat, dlon in [
+                (scale, 0),
+                (-scale, 0),
+                (0, scale),
+                (0, -scale),
+                (scale, scale),
+                (scale, -scale),
+                (-scale, scale),
+                (-scale, -scale),
+            ]:
+                test_lat = max(-89.0, min(89.0, central_lat + dlat))
+                test_lon = central_lon + dlon
+                # Normalize longitude
+                test_lon = ((test_lon + 180) % 360) - 180
+
+                sep = get_separation(test_lat, test_lon)
+                if sep < best_sep:
+                    best_sep = sep
+                    central_lat = test_lat
+                    central_lon = test_lon
+                    improved = True
+
+    # Normalize longitude to -180 to +180
     central_lon = ((central_lon + 180) % 360) - 180
+    is_central = True
 
-    # Sub-lunar point latitude = Moon's declination
-    # But for eclipse central line, we need to account for Moon's shadow direction
-    # The central line is where the Moon's shadow axis hits Earth
-    # Simplified: the latitude is approximately the Moon's declination
-    # adjusted for the Moon's ecliptic latitude
-
-    # More accurate central latitude calculation:
-    # Account for the Moon being slightly off the ecliptic plane
-    central_lat = moon_dec_deg
-
-    # Adjust for the shadow cone geometry
-    # The shadow axis points from Moon toward Sun, so we trace backwards
-    # Simplified approximation for now
-    sun_ra, sun_dec, _ = sun_geo.radec()
-
-    # The central line position is affected by Moon's displacement from ecliptic
-    # Apply a correction based on moon latitude
-    central_lat -= moon_lat * 0.5  # Simplified correction factor
-
-    # Clamp latitude to valid range
-    central_lat = max(-90.0, min(90.0, central_lat))
-
-    # Calculate eclipse attributes at central line location
-
-    # Create observer at central line
+    # Now calculate eclipse attributes at this location
     try:
         observer = wgs84.latlon(central_lat, central_lon, 0.0)
         observer_at = earth + observer
 
-        # Get apparent positions from observer
+        # Get apparent positions from observer (topocentric)
         sun_app = observer_at.at(t).observe(sun).apparent()
         moon_app = observer_at.at(t).observe(moon).apparent()
 
@@ -1709,6 +1712,19 @@ def sol_eclipse_where(
         sun_altitude = sun_alt.degrees
         sun_azimuth = sun_az.degrees
 
+        # Calculate apparent altitude with refraction
+        if sun_altitude > -1.0:
+            if sun_altitude > 0:
+                # Bennett's formula for refraction
+                refraction = 1.0 / math.tan(
+                    math.radians(sun_altitude + 7.31 / (sun_altitude + 4.4))
+                )
+                apparent_alt = sun_altitude + refraction / 60.0
+            else:
+                apparent_alt = sun_altitude + 0.58
+        else:
+            apparent_alt = sun_altitude
+
         # Calculate angular separation
         separation = sun_app.separation_from(moon_app).degrees
 
@@ -1716,22 +1732,25 @@ def sol_eclipse_where(
         local_sun_dist = sun_app.distance().au
         local_moon_dist = moon_app.distance().au
 
-        # Local angular radii
+        # Local angular radii (in degrees)
         local_sun_radius = (959.63 / 3600.0) / local_sun_dist
         local_moon_radius = (932.56 / 3600.0) * (0.002569 / local_moon_dist)
         local_ratio = local_moon_radius / local_sun_radius
 
         # Calculate magnitude at central line
-        if separation < abs(local_moon_radius - local_sun_radius):
+        sum_radii = local_sun_radius + local_moon_radius
+        if separation >= sum_radii:
+            magnitude = 0.0
+        elif separation <= abs(local_moon_radius - local_sun_radius):
             # Total or annular
             magnitude = local_moon_radius / local_sun_radius
         else:
-            overlap = (local_sun_radius + local_moon_radius) - separation
+            overlap = sum_radii - separation
             magnitude = overlap / (2 * local_sun_radius)
         magnitude = max(0.0, min(1.5, magnitude))
 
-        # Calculate obscuration
-        if separation >= local_sun_radius + local_moon_radius:
+        # Calculate obscuration (area fraction)
+        if separation >= sum_radii:
             obscuration = 0.0
         elif separation <= abs(local_moon_radius - local_sun_radius):
             if local_moon_radius >= local_sun_radius:
@@ -1744,93 +1763,82 @@ def sol_eclipse_where(
             d = separation
             d1 = (d * d + r_sun * r_sun - r_moon * r_moon) / (2 * d)
             d2 = d - d1
-            area1 = r_sun * r_sun * math.acos(
-                max(-1, min(1, d1 / r_sun))
-            ) - d1 * math.sqrt(max(0, r_sun * r_sun - d1 * d1))
-            area2 = r_moon * r_moon * math.acos(
-                max(-1, min(1, d2 / r_moon))
-            ) - d2 * math.sqrt(max(0, r_moon * r_moon - d2 * d2))
+            cos_arg1 = max(-1, min(1, d1 / r_sun))
+            cos_arg2 = max(-1, min(1, d2 / r_moon))
+            area1 = r_sun * r_sun * math.acos(cos_arg1) - d1 * math.sqrt(
+                max(0, r_sun * r_sun - d1 * d1)
+            )
+            area2 = r_moon * r_moon * math.acos(cos_arg2) - d2 * math.sqrt(
+                max(0, r_moon * r_moon - d2 * d2)
+            )
             obscuration = (area1 + area2) / (math.pi * r_sun * r_sun)
         obscuration = max(0.0, min(1.0, obscuration))
 
-        # Calculate path width
-        # Path width depends on umbra/penumbra cone geometry and shadow angle
-        # Simplified formula: width ≈ 2 * umbra_radius * cos(sun_alt)
-        # where umbra_radius depends on Moon/Sun distance ratio
-
-        # Shadow cone geometry
-        sun_radius_km = 696340.0  # km
-        moon_radius_km = 1737.4  # km
-        sun_dist_km = sun_dist * 149597870.7  # AU to km
-        moon_dist_km = moon_dist * 149597870.7  # AU to km
-        earth_moon_dist_km = moon_dist_km
+        # Calculate path width (km)
+        sun_radius_km = 696340.0
+        moon_radius_km = 1737.4
+        sun_dist_km = local_sun_dist * AU_TO_KM
+        moon_dist_km = local_moon_dist * AU_TO_KM
 
         # Umbra cone semi-angle
         alpha = math.atan((sun_radius_km - moon_radius_km) / sun_dist_km)
 
-        # For total eclipse, umbra touches Earth
-        # Umbra radius at Earth's surface
-        d_to_earth = earth_moon_dist_km
-
         if local_ratio >= 1.0:
             # Total eclipse - umbra reaches Earth
-            # Umbra radius at Earth = Moon radius - (distance * tan(alpha))
-            umbra_radius_km = moon_radius_km - d_to_earth * math.tan(alpha)
+            umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
             umbra_radius_km = max(0, umbra_radius_km)
         else:
             # Annular eclipse - antumbra
-            # Antumbra starts after umbra vertex
-            umbra_radius_km = d_to_earth * math.tan(alpha) - moon_radius_km
+            umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
             umbra_radius_km = max(0, abs(umbra_radius_km))
 
-        # Path width affected by shadow angle (Sun altitude)
+        # Path width affected by Sun altitude
         if sun_altitude > 0:
-            cos_alt = math.cos(math.radians(90 - sun_altitude))
-            cos_alt = max(0.1, cos_alt)  # Prevent extreme values near horizon
-            path_width_km = 2 * umbra_radius_km / cos_alt
+            sin_alt = math.sin(math.radians(sun_altitude))
+            sin_alt = max(0.1, sin_alt)
+            path_width_km = 2 * umbra_radius_km / sin_alt
         else:
             path_width_km = 0.0
 
-        # Sanity check: typical path widths are 50-270 km for total,
-        # 50-400+ km for annular
         path_width_km = max(0.0, min(1000.0, path_width_km))
-
-        # Apparent diameters in degrees
-        moon_diameter = 2 * local_moon_radius
-        sun_diameter = 2 * local_sun_radius
 
     except Exception:
         # If calculation fails, return zeros
-        return (0.0, 0.0), (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
+        return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
 
     # Determine eclipse type flags
-    eclipse_type = SE_ECL_CENTRAL
-    if local_ratio >= 1.0:
-        eclipse_type |= SE_ECL_TOTAL
-    elif local_ratio > 0.99:
-        eclipse_type |= SE_ECL_ANNULAR_TOTAL  # Hybrid
+    if magnitude <= 0:
+        return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
+
+    eclipse_type = 0
+    if is_central and separation <= abs(local_moon_radius - local_sun_radius):
+        eclipse_type |= SE_ECL_CENTRAL
+        if local_ratio >= 1.0:
+            eclipse_type |= SE_ECL_TOTAL
+        elif local_ratio > 0.99:
+            eclipse_type |= SE_ECL_ANNULAR_TOTAL
+        else:
+            eclipse_type |= SE_ECL_ANNULAR
     else:
-        eclipse_type |= SE_ECL_ANNULAR
+        eclipse_type |= SE_ECL_PARTIAL
 
-    # Prepare return tuples
-    geopos = (central_lon, central_lat)
+    # Prepare return tuples (pyswisseph format)
+    # geopos: [longitude, latitude, 0]
+    geopos = (central_lon, central_lat, 0.0)
 
+    # attr: [magnitude, ratio, obscuration, path_width, azimuth, true_alt, app_alt, separation]
     attr = (
-        magnitude,  # [0] Magnitude
+        magnitude,  # [0] Fraction of solar diameter covered
         local_ratio,  # [1] Moon/Sun diameter ratio
-        obscuration,  # [2] Obscuration
-        path_width_km,  # [3] Path width in km
-        sun_azimuth,  # [4] Sun azimuth
-        sun_altitude,  # [5] Sun altitude
-        moon_diameter,  # [6] Moon apparent diameter
-        sun_diameter,  # [7] Sun apparent diameter
+        obscuration,  # [2] Fraction of solar disc area covered
+        path_width_km,  # [3] Core shadow width in km
+        sun_azimuth,  # [4] Azimuth of sun at maximum
+        sun_altitude,  # [5] True altitude of sun
+        apparent_alt,  # [6] Apparent altitude with refraction
+        separation,  # [7] Angular distance Moon-Sun centers
     )
 
     return geopos, attr, eclipse_type
-
-
-# Alias for Swiss Ephemeris API compatibility
-swe_sol_eclipse_where = sol_eclipse_where
 
 
 def sol_eclipse_how(
@@ -1843,10 +1851,8 @@ def sol_eclipse_how(
     """
     Calculate the circumstances of a solar eclipse at a specific location and time.
 
-    This function determines how a solar eclipse appears from a given geographic
-    position at a specific Julian Day. Unlike sol_eclipse_when_loc which finds the
-    next eclipse, this function calculates the eclipse magnitude, obscuration, and
-    Sun position for a known eclipse time.
+    This is the legacy function signature. For pyswisseph compatibility,
+    use swe_sol_eclipse_how().
 
     Args:
         jd: Julian Day (UT) of the moment to calculate
@@ -1856,25 +1862,49 @@ def sol_eclipse_how(
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
+        See swe_sol_eclipse_how() for full specification.
+    """
+    geopos = (lon, lat, altitude)
+    return swe_sol_eclipse_how(jd, flags, geopos)
+
+
+def swe_sol_eclipse_how(
+    tjd_ut: float,
+    ifl: int,
+    geopos: Sequence[float],
+) -> Tuple[Tuple[float, ...], int]:
+    """
+    Calculate the circumstances of a solar eclipse at a specific location and time.
+
+    This function does NOT search for eclipses - it assumes the caller knows
+    an eclipse is happening at tjd_ut and just calculates the circumstances
+    at that exact moment from the specified location.
+
+    Args:
+        tjd_ut: Julian Day (UT) of a specific time during an eclipse
+        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+        geopos: Sequence of [longitude, latitude, altitude]:
+            - longitude in degrees (East positive)
+            - latitude in degrees (North positive)
+            - altitude in meters above sea level
+
+    Returns:
         Tuple containing:
-            - attr: Tuple of 11 floats with eclipse attributes:
-                [0]: Eclipse magnitude (fraction of Sun's diameter covered)
-                [1]: Fraction of Sun's diameter covered by Moon at maximum
-                [2]: Fraction of Sun's area obscured (obscuration)
-                [3]: Azimuth of Sun at the given time (degrees)
-                [4]: Altitude of Sun at the given time (degrees)
-                [5]: Apparent diameter of Moon (degrees)
-                [6]: Apparent diameter of Sun (degrees)
-                [7]: Saros series number (0, not implemented)
-                [8]: Inex number (0, not implemented)
-                [9]: Reserved (0)
-                [10]: Reserved (0)
+            - attr: Tuple of 8+ floats with eclipse attributes:
+                [0]: Fraction of solar diameter covered by Moon (magnitude)
+                [1]: Ratio of lunar diameter to solar diameter
+                [2]: Fraction of solar disc area obscured (obscuration)
+                [3]: Core shadow width in km (0 for partial eclipses)
+                [4]: Azimuth of Sun at maximum eclipse (degrees)
+                [5]: True altitude of Sun (degrees)
+                [6]: Apparent altitude of Sun with refraction (degrees)
+                [7]: Angular distance Moon center from Sun center (degrees)
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
                 Returns 0 if no eclipse is visible from this location at this time
 
     Note:
         This function is intended for use when you already know an eclipse is
-        occurring (e.g., from sol_eclipse_when_glob or sol_eclipse_when_loc).
+        occurring (e.g., from swe_sol_eclipse_when_glob or swe_sol_eclipse_when_loc).
         For a random time when no eclipse is occurring, magnitude will be 0
         and retflag will be 0.
 
@@ -1884,6 +1914,7 @@ def sol_eclipse_how(
         3. Calculate eclipse magnitude from overlap of disks
         4. Determine eclipse type based on whether Moon fully covers Sun
         5. Calculate obscuration (area ratio)
+        6. Include atmospheric refraction in altitude calculations
 
     Precision:
         Eclipse magnitude accurate to ~0.001 for central eclipses.
@@ -1891,20 +1922,26 @@ def sol_eclipse_how(
 
     Example:
         >>> # Calculate eclipse circumstances at Dallas during April 8, 2024 eclipse
-        >>> from libephemeris import julday, sol_eclipse_how
-        >>> jd = julday(2024, 4, 8, 18.5)  # During eclipse
-        >>> dallas_lat, dallas_lon = 32.7767, -96.7970
-        >>> attr, ecl_type = sol_eclipse_how(jd, dallas_lat, dallas_lon)
-        >>> print(f"Magnitude: {attr[0]:.3f}")
-        >>> print(f"Sun altitude: {attr[4]:.1f}°")
+        >>> from libephemeris import swe_sol_eclipse_how, SEFLG_SWIEPH
+        >>> jd = 2460409.26  # During eclipse maximum
+        >>> dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
+        >>> attr, ecl_type = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, dallas_geopos)
+        >>> print(f"Obscuration: {attr[2]:.3f}")
 
     References:
         - Swiss Ephemeris: swe_sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     from skyfield.api import wgs84
-
     from .state import get_planets, get_timescale
+
+    # Validate and extract geopos
+    if len(geopos) < 3:
+        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+
+    lon = float(geopos[0])
+    lat = float(geopos[1])
+    altitude = float(geopos[2])
 
     # Get ephemeris and timescale
     eph = get_planets()
@@ -1919,7 +1956,7 @@ def sol_eclipse_how(
     earth = eph["earth"]
 
     # Get Skyfield time
-    t = ts.ut1_jd(jd)
+    t = ts.ut1_jd(tjd_ut)
 
     # Create observer position
     observer_at = earth + observer
@@ -1930,28 +1967,30 @@ def sol_eclipse_how(
         moon_app = observer_at.at(t).observe(moon).apparent()
     except Exception:
         # If calculation fails, return zeros
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
 
     # Get Sun altitude and azimuth
     sun_alt, sun_az, _ = sun_app.altaz()
     sun_altitude = sun_alt.degrees
     sun_azimuth = sun_az.degrees
 
+    # Calculate apparent altitude with refraction
+    if sun_altitude > -1.0:
+        if sun_altitude > 0:
+            # Bennett's formula for refraction
+            refraction = 1.0 / math.tan(
+                math.radians(sun_altitude + 7.31 / (sun_altitude + 4.4))
+            )
+            apparent_alt = sun_altitude + refraction / 60.0
+        else:
+            # Near horizon, use approximation
+            apparent_alt = sun_altitude + 0.58
+    else:
+        apparent_alt = sun_altitude
+
     # If Sun is below horizon, no visible eclipse
     if sun_altitude < -1.0:  # Allow for refraction near horizon
-        return (
-            0.0,
-            0.0,
-            0.0,
-            sun_azimuth,
-            sun_altitude,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ), 0
+        return (0.0, 0.0, 0.0, 0.0, sun_azimuth, sun_altitude, apparent_alt, 0.0), 0
 
     # Calculate angular separation between Sun and Moon
     separation = sun_app.separation_from(moon_app).degrees
@@ -1968,6 +2007,7 @@ def sol_eclipse_how(
 
     sun_diameter = 2 * sun_angular_radius
     moon_diameter = 2 * moon_angular_radius
+    ratio = moon_diameter / sun_diameter
 
     # Check if there's any eclipse (disks overlapping)
     sum_radii = sun_angular_radius + moon_angular_radius
@@ -1975,16 +2015,13 @@ def sol_eclipse_how(
         # No eclipse - Sun and Moon too far apart
         return (
             0.0,  # magnitude
-            0.0,  # fraction covered
+            ratio,  # ratio
             0.0,  # obscuration
-            sun_azimuth,  # Sun azimuth
-            sun_altitude,  # Sun altitude
-            moon_diameter,  # Moon diameter
-            sun_diameter,  # Sun diameter
-            0.0,  # Saros
-            0.0,  # Inex
-            0.0,  # Reserved
-            0.0,  # Reserved
+            0.0,  # shadow width
+            sun_azimuth,  # azimuth
+            sun_altitude,  # true altitude
+            apparent_alt,  # apparent altitude
+            separation,  # separation
         ), 0
 
     # Calculate eclipse magnitude
@@ -1992,9 +2029,6 @@ def sol_eclipse_how(
     overlap = sum_radii - separation
     magnitude = overlap / sun_diameter
     magnitude = max(0.0, min(magnitude, 1.0 + moon_diameter / sun_diameter))
-
-    # Fraction covered (same as magnitude for partial, can exceed 1 for total)
-    fraction_covered = magnitude
 
     # Calculate obscuration (fraction of Sun's area covered)
     r_sun = sun_angular_radius
@@ -2034,10 +2068,42 @@ def sol_eclipse_how(
 
     obscuration = max(0.0, min(1.0, obscuration))
 
+    # Calculate core shadow width (for central eclipses only)
+    shadow_width_km = 0.0
+    diff_radii = abs(moon_angular_radius - sun_angular_radius)
+
+    if separation < diff_radii:
+        # Central eclipse - calculate shadow width
+        AU_TO_KM = 149597870.7
+        sun_radius_km = 696340.0
+        moon_radius_km = 1737.4
+        sun_dist_km = sun_dist_au * AU_TO_KM
+        moon_dist_km = moon_dist_au * AU_TO_KM
+
+        # Umbra cone semi-angle
+        alpha = math.atan((sun_radius_km - moon_radius_km) / sun_dist_km)
+
+        if ratio >= 1.0:
+            # Total eclipse - umbra
+            umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
+            umbra_radius_km = max(0, umbra_radius_km)
+        else:
+            # Annular - antumbra
+            umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
+            umbra_radius_km = max(0, abs(umbra_radius_km))
+
+        # Path width affected by Sun altitude
+        if sun_altitude > 0:
+            sin_alt = math.sin(math.radians(sun_altitude))
+            sin_alt = max(0.1, sin_alt)
+            shadow_width_km = 2 * umbra_radius_km / sin_alt
+        else:
+            shadow_width_km = 0.0
+
+        shadow_width_km = max(0.0, min(1000.0, shadow_width_km))
+
     # Determine eclipse type flags
     eclipse_type = SE_ECL_VISIBLE
-
-    diff_radii = abs(moon_angular_radius - sun_angular_radius)
     moon_sun_ratio = moon_angular_radius / sun_angular_radius
 
     if separation < diff_radii:
@@ -2053,29 +2119,19 @@ def sol_eclipse_how(
         # Partial eclipse
         eclipse_type |= SE_ECL_PARTIAL
 
-    # Add maximum visibility flag
-    eclipse_type |= SE_ECL_MAX_VISIBLE
-
-    # Prepare attributes tuple (11 elements)
+    # Prepare attributes tuple (8 elements matching pyswisseph format)
     attr = (
-        magnitude,  # [0] Magnitude
-        fraction_covered,  # [1] Fraction covered
-        obscuration,  # [2] Obscuration
-        sun_azimuth,  # [3] Azimuth
-        sun_altitude,  # [4] Altitude
-        moon_diameter,  # [5] Moon diameter
-        sun_diameter,  # [6] Sun diameter
-        0.0,  # [7] Saros (not implemented)
-        0.0,  # [8] Inex (not implemented)
-        0.0,  # [9] Reserved
-        0.0,  # [10] Reserved
+        magnitude,  # [0] Fraction of solar diameter covered
+        ratio,  # [1] Ratio of lunar to solar diameter
+        obscuration,  # [2] Fraction of solar disc area covered
+        shadow_width_km,  # [3] Core shadow width in km
+        sun_azimuth,  # [4] Azimuth of sun
+        sun_altitude,  # [5] True altitude of sun
+        apparent_alt,  # [6] Apparent altitude with refraction
+        separation,  # [7] Angular distance Moon-Sun centers
     )
 
     return attr, eclipse_type
-
-
-# Alias for Swiss Ephemeris API compatibility
-swe_sol_eclipse_how = sol_eclipse_how
 
 
 # =============================================================================
