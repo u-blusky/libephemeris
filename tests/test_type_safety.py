@@ -5,11 +5,37 @@ These tests verify that the type annotations in libephemeris are correct
 and that functions return values with the expected types.
 """
 
+from pathlib import Path
+
 import libephemeris as ephem
 from libephemeris import EphemerisContext
 from libephemeris.state import get_sid_mode, set_sid_mode, close
 from libephemeris.houses import swe_houses, swe_houses_ex, swe_house_name
 from libephemeris.constants import SE_SIDM_LAHIRI
+
+
+class TestPEP561Compliance:
+    """Tests for PEP 561 py.typed marker file."""
+
+    def test_py_typed_exists_in_package(self):
+        """py.typed marker file must exist in the package directory for PEP 561 compliance."""
+        package_dir = Path(ephem.__file__).parent
+        py_typed_path = package_dir / "py.typed"
+        assert py_typed_path.exists(), (
+            f"py.typed marker file not found at {py_typed_path}. "
+            "This file is required for PEP 561 compliance so type checkers "
+            "can use libephemeris type hints."
+        )
+
+    def test_py_typed_is_empty_or_minimal(self):
+        """py.typed should be an empty marker file."""
+        package_dir = Path(ephem.__file__).parent
+        py_typed_path = package_dir / "py.typed"
+        content = py_typed_path.read_text()
+        # py.typed should be empty or contain only whitespace/comments
+        assert content.strip() == "" or content.startswith("#"), (
+            "py.typed should be empty or contain only comments"
+        )
 
 
 class TestGetSidMode:

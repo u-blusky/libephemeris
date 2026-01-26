@@ -2,6 +2,7 @@ include LICENSE
 include README.md
 include pyproject.toml
 recursive-include libephemeris *.py
+include libephemeris/py.typed
 exclude tests/*
 exclude compare_scripts/*
 exclude .gitignore
