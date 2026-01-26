@@ -3608,7 +3608,16 @@ def rise_trans(
         raise ValueError(f"Invalid planet ID: {planet}")
 
     target_name = _PLANET_MAP[planet]
-    target = eph[target_name]
+    # Try planet center first, fall back to barycenter if not available
+    from .planets import _PLANET_FALLBACK
+
+    try:
+        target = eph[target_name]
+    except KeyError:
+        if target_name in _PLANET_FALLBACK:
+            target = eph[_PLANET_FALLBACK[target_name]]
+        else:
+            raise
     earth = eph["earth"]
 
     # Create observer location
@@ -3877,6 +3886,9 @@ def _calculate_rise_set(
     if jd_cross_start is None:
         # No crossing found in search range - might be circumpolar or rare case
         return 0.0, -2
+
+    # jd_cross_end is always set when jd_cross_start is set
+    assert jd_cross_end is not None
 
     # Bisection to narrow down the crossing
     for _ in range(30):
@@ -4241,7 +4253,16 @@ def heliacal_ut(
 
     # Get celestial bodies
     target_name = _PLANET_MAP[body]
-    target = eph[target_name]
+    # Try planet center first, fall back to barycenter if not available
+    from .planets import _PLANET_FALLBACK
+
+    try:
+        target = eph[target_name]
+    except KeyError:
+        if target_name in _PLANET_FALLBACK:
+            target = eph[_PLANET_FALLBACK[target_name]]
+        else:
+            raise
     sun = eph["sun"]
     earth = eph["earth"]
 
@@ -4721,7 +4742,16 @@ def heliacal_pheno_ut(
 
     # Get celestial bodies
     target_name = _PLANET_MAP[body]
-    target = eph[target_name]
+    # Try planet center first, fall back to barycenter if not available
+    from .planets import _PLANET_FALLBACK
+
+    try:
+        target = eph[target_name]
+    except KeyError:
+        if target_name in _PLANET_FALLBACK:
+            target = eph[_PLANET_FALLBACK[target_name]]
+        else:
+            raise
     sun = eph["sun"]
     earth = eph["earth"]
 
@@ -5244,7 +5274,16 @@ def vis_limit_mag(
         # Get planet name from _PLANET_MAP
         if body_id in _PLANET_MAP:
             target_name = _PLANET_MAP[body_id]
-            target = eph[target_name]
+            # Try planet center first, fall back to barycenter if not available
+            from .planets import _PLANET_FALLBACK
+
+            try:
+                target = eph[target_name]
+            except KeyError:
+                if target_name in _PLANET_FALLBACK:
+                    target = eph[_PLANET_FALLBACK[target_name]]
+                else:
+                    raise
 
             # Calculate position
             body_app = observer_at.at(t).observe(target).apparent()

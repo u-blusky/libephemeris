@@ -29,6 +29,7 @@ Issues = "https://github.com/g-battaglia/libephemeris/issues"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.0.0",
     "poethepoet>=0.38.0",
     "pyswisseph>=2.10.3.2",
     "pytest>=9.0.1",
@@ -53,3 +54,21 @@ lint = "ruff check . --fix"
 test = "pytest"
 test-fast = "pytest -n auto"
 coverage = "pytest --cov=libephemeris --cov-report=term-missing"
+typecheck = "mypy libephemeris"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.ruff]
+exclude = ["compare_scripts"]
+
+[tool.ruff.lint]
+# Ignore star imports (F403, F405) - the library uses star imports for constants
+# Ignore unused imports in __init__.py (F401) - re-exports for public API
+# Ignore module level imports not at top of file (E402) - intentional for __init__.py
+ignore = ["F403", "F405", "F401", "E402"]
+# Also ignore unused local variables (F841) for now - complex astronomical calculations
+extend-ignore = ["F841"]
