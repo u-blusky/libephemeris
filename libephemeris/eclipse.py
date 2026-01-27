@@ -1993,15 +1993,19 @@ def swe_sol_eclipse_how(
 
     Returns:
         Tuple containing:
-            - attr: Tuple of 8+ floats with eclipse attributes:
+            - attr: Tuple of 20 floats with eclipse attributes per pyswisseph spec:
                 [0]: Fraction of solar diameter covered by Moon (magnitude)
                 [1]: Ratio of lunar diameter to solar diameter
                 [2]: Fraction of solar disc area obscured (obscuration)
-                [3]: Core shadow width in km (0 for partial eclipses)
-                [4]: Azimuth of Sun at maximum eclipse (degrees)
+                [3]: Diameter of core shadow in km (0 for partial eclipses)
+                [4]: Azimuth of Sun (degrees)
                 [5]: True altitude of Sun (degrees)
                 [6]: Apparent altitude of Sun with refraction (degrees)
-                [7]: Angular distance Moon center from Sun center (degrees)
+                [7]: Elongation of Moon from Sun (degrees)
+                [8]: Magnitude according to NASA (currently 0.0, reserved)
+                [9]: Saros series number (currently 0.0, reserved)
+                [10]: Saros series member number (currently 0.0, reserved)
+                [11-19]: Reserved for future use
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
                 Returns 0 if no eclipse is visible from this location at this time
 
