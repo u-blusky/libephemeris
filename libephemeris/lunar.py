@@ -1542,6 +1542,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     **Step 2: Compute Eccentricity Vector**
         - h = r × v (angular momentum)
         - e = (v × h)/μ - r/|r| (points toward perigee)
+        - Apply solar gravitational perturbation to rotate e-vector
         - Apogee direction = -e (opposite to perigee)
 
     **Step 3: Transform to Ecliptic**
@@ -1555,23 +1556,28 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     Keplerian orbit that passes through the Moon's current position with its
     current velocity. This differs from the mean apogee due to:
 
-    1. **Evection**: Solar perturbation modulates lunar eccentricity
+    1. **Solar Gravitational Perturbation on Eccentricity Vector**: The Sun's
+       gravity continuously perturbs the lunar eccentricity vector direction
+       in a three-body effect. This is applied directly to the eccentricity
+       vector using the solar tidal quadrupole (amplitude ~0.01148 in e-units)
+    2. **Evection**: Solar perturbation modulates lunar eccentricity
        (amplitude 1.274°, period ~31.8 days)
-    2. **Evection-Related Secondary Terms**: Additional terms from Meeus
+    3. **Evection-Related Secondary Terms**: Additional terms from Meeus
        Table 47.B involving l-2D, l+2D, 2l, and 2l-2D arguments that affect
        the lunar eccentricity and apogee direction (amplitudes 0.10-0.21°)
-    3. **Variation**: Transverse solar tidal force at quadrature
+    4. **Variation**: Transverse solar tidal force at quadrature
        (amplitude 0.658°, period ~14.77 days)
-    4. **Annual Equation**: Earth's orbital eccentricity effect
+    5. **Annual Equation**: Earth's orbital eccentricity effect
        (amplitude 0.186°, period ~1 year)
-    5. **Parallactic Inequality**: Effect of Moon's varying parallax
+    6. **Parallactic Inequality**: Effect of Moon's varying parallax
        (amplitude 0.125°, period ~29.53 days)
-    6. **Reduction to Ecliptic**: Projection effect from inclined lunar
+    7. **Reduction to Ecliptic**: Projection effect from inclined lunar
        orbital plane onto ecliptic (amplitude 0.116°, period ~4.5 years)
 
-    Evection, evection-related secondary terms, variation, annual equation,
-    parallactic inequality, and reduction to ecliptic corrections are applied
-    to improve accuracy.
+    Solar gravitational perturbation on the eccentricity vector, evection,
+    evection-related secondary terms, variation, annual equation, parallactic
+    inequality, and reduction to ecliptic corrections are applied to improve
+    accuracy.
     The true apogee can vary ±30° from the mean apogee.
 
     Args:
@@ -1660,6 +1666,92 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
         (v[2] * h_vec[0] - v[0] * h_vec[2]) / mu - r[1] / r_mag,
         (v[0] * h_vec[1] - v[1] * h_vec[0]) / mu - r[2] / r_mag,
     ]
+
+    # ========================================================================
+    # SOLAR GRAVITATIONAL PERTURBATION ON ECCENTRICITY VECTOR
+    # ========================================================================
+    # The eccentricity vector calculation above assumes pure two-body dynamics,
+    # but the Sun's gravity continuously perturbs the lunar eccentricity vector
+    # direction. This three-body effect causes the apsidal line to oscillate
+    # and precess in ways not captured by the two-body formalism.
+    #
+    # The solar tidal force creates a quadrupole field at the Earth that
+    # affects the Moon's orbital elements. The primary effect on the
+    # eccentricity vector is the evection, which causes direction oscillations
+    # with period ~31.8 days and amplitude ~0.01148 in eccentricity units.
+    #
+    # We apply this perturbation directly to the eccentricity vector in the
+    # orbital frame, which correctly accounts for the 3D nature of the effect
+    # including the latitude component that post-hoc longitude corrections
+    # cannot capture.
+    #
+    # References:
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+    # - Brouwer, D. & Clemence, G.M. "Methods of Celestial Mechanics" (1961)
+    # - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+
+    # Get solar position from Earth (for tidal force direction)
+    sun = planets["sun"]
+    sun_obs = (sun - earth).at(t)
+    sun_r = sun_obs.position.au
+
+    # Compute solar direction unit vector
+    sun_mag = math.sqrt(sun_r[0] ** 2 + sun_r[1] ** 2 + sun_r[2] ** 2)
+    sun_unit = [sun_r[i] / sun_mag for i in range(3)]
+
+    # Normalize angular momentum (orbital plane normal)
+    h_mag = math.sqrt(h_vec[0] ** 2 + h_vec[1] ** 2 + h_vec[2] ** 2)
+    h_unit = [h_vec[i] / h_mag for i in range(3)]
+
+    # Project sun direction onto the lunar orbital plane
+    # sun_proj = sun_unit - (sun_unit · h_unit) * h_unit
+    dot_sh = sum(sun_unit[i] * h_unit[i] for i in range(3))
+    sun_proj = [sun_unit[i] - dot_sh * h_unit[i] for i in range(3)]
+    sun_proj_mag = math.sqrt(sum(s**2 for s in sun_proj))
+
+    # Current eccentricity magnitude (before perturbation)
+    e_mag_initial = math.sqrt(e_vec[0] ** 2 + e_vec[1] ** 2 + e_vec[2] ** 2)
+
+    if sun_proj_mag > 1e-10 and e_mag_initial > 1e-10:
+        sun_proj_unit = [s / sun_proj_mag for s in sun_proj]
+
+        # Compute the angle between eccentricity vector and solar direction
+        # in the orbital plane. The solar tidal perturbation depends on
+        # twice this angle (quadrupole nature of tidal force).
+        e_unit = [e_vec[i] / e_mag_initial for i in range(3)]
+        dot_es = sum(e_unit[i] * sun_proj_unit[i] for i in range(3))
+
+        # Cross product e_unit × sun_proj_unit for sin(θ)
+        cross_es = [
+            e_unit[1] * sun_proj_unit[2] - e_unit[2] * sun_proj_unit[1],
+            e_unit[2] * sun_proj_unit[0] - e_unit[0] * sun_proj_unit[2],
+            e_unit[0] * sun_proj_unit[1] - e_unit[1] * sun_proj_unit[0],
+        ]
+
+        # Determine sign based on alignment with orbital normal
+        cross_dot_h = sum(cross_es[i] * h_unit[i] for i in range(3))
+        sin_theta = cross_dot_h  # Signed sin(θ)
+
+        # sin(2θ) = 2 sin(θ) cos(θ) for the quadrupole effect
+        sin_2theta = 2.0 * sin_theta * dot_es
+
+        # Evection amplitude in eccentricity units
+        # This is the amplitude of the eccentricity oscillation due to solar gravity
+        # Value from lunar theory: δe ≈ 0.01148
+        evection_amplitude = 0.01148
+
+        # The perturbation rotates the eccentricity vector in the orbital plane
+        # Direction: tangent to the orbit (h × e gives this direction)
+        h_cross_e = [
+            h_unit[1] * e_vec[2] - h_unit[2] * e_vec[1],
+            h_unit[2] * e_vec[0] - h_unit[0] * e_vec[2],
+            h_unit[0] * e_vec[1] - h_unit[1] * e_vec[0],
+        ]
+
+        # Apply tangential perturbation to rotate the eccentricity vector
+        # δe_tangential = amplitude * sin(2θ)
+        delta_e = evection_amplitude * sin_2theta
+        e_vec = [e_vec[i] + delta_e * h_cross_e[i] for i in range(3)]
 
     e_mag = math.sqrt(e_vec[0] ** 2 + e_vec[1] ** 2 + e_vec[2] ** 2)
 
