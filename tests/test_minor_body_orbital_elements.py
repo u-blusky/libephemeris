@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 21 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 22 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -32,6 +32,7 @@ from libephemeris.constants import (
     SE_APOPHIS,
     SE_HYGIEA,
     SE_INTERAMNIA,
+    SE_DAVIDA,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -70,6 +71,7 @@ def all_minor_body_ids():
         SE_APOPHIS,
         SE_HYGIEA,
         SE_INTERAMNIA,
+        SE_DAVIDA,
     ]
 
 
@@ -87,8 +89,8 @@ class TestOrbitalElementsEpoch:
 
     def test_expected_number_of_bodies(self):
         """Verify we have 21 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 21, (
-            f"Expected 21 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        assert len(MINOR_BODY_ELEMENTS) == 22, (
+            f"Expected 22 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -337,6 +339,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 16.5 < elements.i < 18.0, f"Interamnia i={elements.i} unexpected"
         # Mean motion consistent with ~5.3 year period
         assert 0.18 < elements.n < 0.19, f"Interamnia n={elements.n} unexpected"
+
+    def test_davida_main_belt_asteroid(self):
+        """Davida: Seventh largest main belt asteroid."""
+        elements = MINOR_BODY_ELEMENTS[SE_DAVIDA]
+        assert elements.name == "Davida"
+        # Semi-major axis ~3.16 AU (main belt)
+        assert 3.10 < elements.a < 3.20, f"Davida a={elements.a} unexpected"
+        # Moderate eccentricity ~0.19
+        assert 0.18 < elements.e < 0.20, f"Davida e={elements.e} unexpected"
+        # Moderate inclination ~16 degrees
+        assert 15.5 < elements.i < 16.5, f"Davida i={elements.i} unexpected"
+        # Mean motion consistent with ~5.6 year period
+        assert 0.17 < elements.n < 0.18, f"Davida n={elements.n} unexpected"
 
 
 @pytest.mark.unit

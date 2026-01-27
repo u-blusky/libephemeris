@@ -150,7 +150,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD INTERAMNIA ASTEROID TO CATALOG: Add asteroid 704 Interamnia to MINOR_BODY_ELEMENTS, one of the largest main belt asteroids, add SE_INTERAMNIA = 704 + SE_AST_OFFSET.
 
-- [ ] ADD DAVIDA ASTEROID TO CATALOG: Add asteroid 511 Davida to MINOR_BODY_ELEMENTS, another large main belt asteroid, add SE_DAVIDA = 511 + SE_AST_OFFSET.
+- [x] ADD DAVIDA ASTEROID TO CATALOG: Add asteroid 511 Davida to MINOR_BODY_ELEMENTS, another large main belt asteroid, add SE_DAVIDA = 511 + SE_AST_OFFSET.
 
 - [ ] ADD EUROPA ASTEROID TO CATALOG: Add asteroid 52 Europa (not to be confused with Jupiter's moon) to MINOR_BODY_ELEMENTS, add SE_EUROPA_AST = 52 + SE_AST_OFFSET.
 

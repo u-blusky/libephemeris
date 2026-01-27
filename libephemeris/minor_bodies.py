@@ -2,7 +2,7 @@
 Minor body calculations for asteroids and Trans-Neptunian Objects (TNOs).
 
 This module computes positions for:
-- Main belt asteroids: Ceres, Pallas, Juno, Vesta, Hygiea, Interamnia
+- Main belt asteroids: Ceres, Pallas, Juno, Vesta, Hygiea, Interamnia, Davida
 - Centaurs: Chiron, Pholus, Nessus, Asbolus, Chariklo
 - Trans-Neptunian Objects (TNOs): Eris, Sedna, Haumea, Makemake, Orcus, Quaoar, Ixion, Gonggong, Varuna
 - Near-Earth asteroids: Apophis
@@ -55,6 +55,7 @@ from .constants import (
     SE_APOPHIS,
     SE_HYGIEA,
     SE_INTERAMNIA,
+    SE_DAVIDA,
 )
 
 
@@ -950,6 +951,17 @@ MINOR_BODY_ELEMENTS = {
         Omega=280.1660768334629,
         M0=184.2054144782699,
         n=0.1844707074261051,  # ~5.3 year period
+    ),
+    SE_DAVIDA: OrbitalElements(
+        name="Davida",
+        epoch=2461000.5,
+        a=3.163619117539836,  # Seventh largest asteroid (~270 km diameter)
+        e=0.1896284393751952,  # Moderate eccentricity
+        i=15.95004792439553,  # Moderate inclination
+        omega=336.666946405915,
+        Omega=107.5554381931758,
+        M0=35.24757453107242,
+        n=0.1751571164581395,  # ~5.6 year period
     ),
 }
 

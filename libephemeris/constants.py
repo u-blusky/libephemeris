@@ -90,6 +90,7 @@ SE_GONGGONG: int = (
 SE_APOPHIS: int = 99942 + SE_AST_OFFSET  # Near-Earth asteroid, close approach 2029
 SE_HYGIEA: int = 10 + SE_AST_OFFSET  # Fourth largest asteroid, dwarf planet candidate
 SE_INTERAMNIA: int = 704 + SE_AST_OFFSET  # Fifth largest asteroid, main belt
+SE_DAVIDA: int = 511 + SE_AST_OFFSET  # Seventh largest asteroid, main belt
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
