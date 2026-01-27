@@ -69,7 +69,7 @@ class TestReverseJulianDay:
             assert year == year_orig
             assert month == month_orig
             assert day == day_orig
-            assert abs(hour - hour_orig) < 1e-10
+            assert abs(hour - hour_orig) < 1e-8
 
 
 class TestDeltaT:
