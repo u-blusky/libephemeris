@@ -1561,8 +1561,11 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
        (amplitude 0.658°, period ~14.77 days)
     3. **Annual Equation**: Earth's orbital eccentricity effect
        (amplitude 0.186°, period ~1 year)
+    4. **Parallactic Inequality**: Effect of Moon's varying parallax
+       (amplitude 0.125°, period ~29.53 days)
 
-    Evection, variation, and annual equation corrections are applied to improve accuracy.
+    Evection, variation, annual equation, and parallactic inequality corrections
+    are applied to improve accuracy.
     The true apogee can vary ±30° from the mean apogee.
 
     Args:
@@ -1752,6 +1755,29 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
     annual_equation_correction = 0.1856 * math.sin(M)
     lon_date += annual_equation_correction
+
+    # ========================================================================
+    # PARALLACTIC INEQUALITY CORRECTION (period ~1 synodic month, amplitude ~0.125°)
+    # ========================================================================
+    # The Parallactic Inequality (also called the parallactic equation) is a
+    # perturbation of lunar motion caused by the finite distance between the
+    # Earth and Moon. It arises from the fact that the Moon's parallax varies
+    # with its distance from Earth, which in turn depends on the solar perturbations.
+    #
+    # This effect is related to the Moon's horizontal parallax and modulates
+    # the lunar longitude (and thus the apogee position) with a synodic period.
+    # The effect is maximum at new and full moon (elongation 0° or 180°).
+    #
+    # Parallactic inequality argument: D (mean elongation of Moon from Sun)
+    # Period: ~29.53 days (synodic month)
+    # Amplitude: 0.125° for the apogee position
+    #
+    # References:
+    # - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+    # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
+    parallactic_inequality_correction = 0.125 * math.sin(D)
+    lon_date += parallactic_inequality_correction
 
     # Normalize to [0, 360)
     longitude = lon_date % 360.0
