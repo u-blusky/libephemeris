@@ -142,9 +142,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD GONGGONG TNO TO CATALOG: Add dwarf planet candidate 225088 Gonggong (formerly 2007 OR10) to MINOR_BODY_ELEMENTS with orbital elements from JPL SBDB (a≈67 AU, e≈0.50, i≈30.7°), this is one of the largest TNOs, add SE_GONGGONG = 225088 + SE_AST_OFFSET to constants.py.
 
-- [ ] ADD VARUNA TNO TO CATALOG: Add asteroid 20000 Varuna to MINOR_BODY_ELEMENTS, Varuna is a large classical Kuiper belt object with diameter ~670 km, the constant SE_VARUNA is already defined in constants.py line 58 but verify orbital elements are in MINOR_BODY_ELEMENTS.
+- [x] ADD VARUNA TNO TO CATALOG: Add asteroid 20000 Varuna to MINOR_BODY_ELEMENTS, Varuna is a large classical Kuiper belt object with diameter ~670 km, the constant SE_VARUNA is already defined in constants.py line 58 but verify orbital elements are in MINOR_BODY_ELEMENTS.
 
-- [ ] ADD APOPHIS NEAR EARTH ASTEROID TO CATALOG: Add asteroid 99942 Apophis to MINOR_BODY_ELEMENTS with very current orbital elements as this asteroid's orbit is being actively refined due to close Earth approaches in 2029 and 2036, add SE_APOPHIS = 99942 + SE_AST_OFFSET to constants.py, note that Apophis orbital elements change measurably with each update.
+- [x] ADD APOPHIS NEAR EARTH ASTEROID TO CATALOG: Add asteroid 99942 Apophis to MINOR_BODY_ELEMENTS with very current orbital elements as this asteroid's orbit is being actively refined due to close Earth approaches in 2029 and 2036, add SE_APOPHIS = 99942 + SE_AST_OFFSET to constants.py, note that Apophis orbital elements change measurably with each update.
 
 - [ ] ADD HYGIEA ASTEROID TO CATALOG: Add asteroid 10 Hygiea to MINOR_BODY_ELEMENTS, Hygiea is the fourth largest asteroid in the main belt and a dwarf planet candidate, add SE_HYGIEA = 10 + SE_AST_OFFSET to constants.py.
 
