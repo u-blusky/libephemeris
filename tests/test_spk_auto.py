@@ -417,3 +417,250 @@ class TestSpkAutoDownloadIntegration:
 
         assert 0 <= pos[0] < 360
         assert pos[2] > 0
+
+
+# =============================================================================
+# TESTS FOR auto_get_spk FUNCTION
+# =============================================================================
+
+
+class TestJdToIsoDate:
+    """Test Julian Day to ISO date conversion."""
+
+    def test_j2000_epoch(self):
+        """Test J2000.0 epoch conversion."""
+        # J2000.0 = 2451545.0 = 2000-01-01 12:00 TT
+        # The function converts to date (ignoring time)
+        result = spk_auto._jd_to_iso_date(2451545.0)
+        assert result == "2000-01-01"
+
+    def test_2020_epoch(self):
+        """Test a date in 2020."""
+        # 2020-01-01 = JD 2458849.5
+        result = spk_auto._jd_to_iso_date(2458849.5)
+        assert result == "2020-01-01"
+
+    def test_2030_epoch(self):
+        """Test a date in 2030."""
+        # 2030-01-01 = JD 2462502.5
+        result = spk_auto._jd_to_iso_date(2462502.5)
+        assert result == "2030-01-01"
+
+
+class TestGenerateSpkCacheFilename:
+    """Test SPK cache filename generation."""
+
+    def test_basic_filename(self):
+        """Test basic filename generation."""
+        filename = spk_auto._generate_spk_cache_filename("2060", 2458849.5, 2462502.5)
+        assert filename == "2060_2458849_2462502.bsp"
+
+    def test_filename_with_name(self):
+        """Test filename with body name."""
+        filename = spk_auto._generate_spk_cache_filename("Chiron", 2458849.5, 2462502.5)
+        assert filename == "chiron_2458849_2462502.bsp"
+
+    def test_filename_sanitization(self):
+        """Test that special characters are sanitized."""
+        filename = spk_auto._generate_spk_cache_filename(
+            "2060 Chiron", 2458849.5, 2462502.5
+        )
+        assert " " not in filename
+        assert filename.endswith(".bsp")
+
+
+class TestFindCoveringSpk:
+    """Test finding existing SPK files that cover a date range."""
+
+    def test_no_cache_dir(self, tmp_path):
+        """Returns None if cache directory doesn't exist."""
+        result = spk_auto._find_covering_spk(
+            "2060", 2458849.5, 2462502.5, str(tmp_path / "nonexistent")
+        )
+        assert result is None
+
+    def test_empty_cache_dir(self, tmp_path):
+        """Returns None if cache directory is empty."""
+        result = spk_auto._find_covering_spk(
+            "2060", 2458849.5, 2462502.5, str(tmp_path)
+        )
+        assert result is None
+
+    def test_finds_exact_match(self, tmp_path):
+        """Finds an SPK file with exact matching range."""
+        # Create a dummy SPK file with matching name
+        spk_file = tmp_path / "2060_2458849_2462502.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        result = spk_auto._find_covering_spk(
+            "2060", 2458849.5, 2462502.5, str(tmp_path)
+        )
+        assert result == str(spk_file)
+
+    def test_finds_covering_file(self, tmp_path):
+        """Finds an SPK file that covers the requested range."""
+        # Create a file with wider range
+        spk_file = tmp_path / "2060_2450000_2470000.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        result = spk_auto._find_covering_spk(
+            "2060", 2458849.5, 2462502.5, str(tmp_path)
+        )
+        assert result == str(spk_file)
+
+    def test_ignores_non_covering_file(self, tmp_path):
+        """Ignores an SPK file that doesn't cover the range."""
+        # Create a file with narrower range
+        spk_file = tmp_path / "2060_2459000_2460000.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        result = spk_auto._find_covering_spk(
+            "2060", 2458849.5, 2462502.5, str(tmp_path)
+        )
+        assert result is None
+
+    def test_ignores_different_body(self, tmp_path):
+        """Ignores SPK files for different bodies."""
+        # Create a file for different body
+        spk_file = tmp_path / "5145_2458849_2462502.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        result = spk_auto._find_covering_spk(
+            "2060", 2458849.5, 2462502.5, str(tmp_path)
+        )
+        assert result is None
+
+
+class TestAutoGetSpkValidation:
+    """Test auto_get_spk input validation."""
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=False)
+    def test_raises_import_error_without_astroquery(self, mock_check, tmp_path):
+        """Raises ImportError when astroquery is not available."""
+        with pytest.raises(ImportError) as exc_info:
+            spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
+
+        assert "astroquery" in str(exc_info.value)
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_raises_value_error_for_invalid_range(self, mock_check, tmp_path):
+        """Raises ValueError when jd_end <= jd_start."""
+        with pytest.raises(ValueError) as exc_info:
+            spk_auto.auto_get_spk("2060", 2462502.5, 2458849.5, str(tmp_path))
+
+        assert "must be greater than" in str(exc_info.value)
+
+
+class TestAutoGetSpkCaching:
+    """Test auto_get_spk caching behavior."""
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_returns_cached_file(self, mock_check, tmp_path):
+        """Returns existing cached file without downloading."""
+        # Create a cached SPK file
+        spk_file = tmp_path / "2060_2458849_2462502.bsp"
+        spk_file.write_bytes(b"cached SPK data")
+
+        # Should return cached file without calling download
+        with patch.object(spk_auto, "_download_spk_astroquery") as mock_download:
+            result = spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
+
+            assert result == str(spk_file)
+            mock_download.assert_not_called()
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_uses_covering_file(self, mock_check, tmp_path):
+        """Uses a file that covers the requested range."""
+        # Create a file with wider range
+        wide_file = tmp_path / "2060_2450000_2470000.bsp"
+        wide_file.write_bytes(b"wide range SPK")
+
+        with patch.object(spk_auto, "_download_spk_astroquery") as mock_download:
+            result = spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
+
+            assert result == str(wide_file)
+            mock_download.assert_not_called()
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    @patch.object(spk_auto, "_download_spk_astroquery")
+    def test_downloads_when_not_cached(self, mock_download, mock_check, tmp_path):
+        """Downloads SPK when not in cache."""
+        result = spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
+
+        # Should have called download
+        mock_download.assert_called_once()
+
+        # Check that the correct dates were passed
+        call_args = mock_download.call_args
+        assert call_args[1]["body_id"] == "2060"
+        assert call_args[1]["start"] == "2020-01-01"
+        assert call_args[1]["end"] == "2030-01-01"
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    @patch.object(spk_auto, "_download_spk_astroquery")
+    def test_creates_cache_directory(self, mock_download, mock_check, tmp_path):
+        """Creates cache directory if it doesn't exist."""
+        cache_dir = tmp_path / "new_cache"
+        assert not cache_dir.exists()
+
+        spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(cache_dir))
+
+        assert cache_dir.exists()
+
+
+class TestAutoGetSpkDefaultDirectory:
+    """Test auto_get_spk default cache directory."""
+
+    def test_default_cache_dir_constant(self):
+        """Default cache directory is set correctly."""
+        expected = os.path.join(os.path.expanduser("~"), ".libephemeris", "spk")
+        assert spk_auto.DEFAULT_AUTO_SPK_DIR == expected
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    @patch.object(spk_auto, "_download_spk_astroquery")
+    def test_uses_default_directory(
+        self, mock_download, mock_check, tmp_path, monkeypatch
+    ):
+        """Uses default directory when none specified."""
+        # Monkeypatch the default directory
+        test_default = str(tmp_path / "default_cache")
+        monkeypatch.setattr(spk_auto, "DEFAULT_AUTO_SPK_DIR", test_default)
+
+        spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5)
+
+        # Check that the output path is in the default directory
+        call_args = mock_download.call_args
+        assert test_default in call_args[1]["output_path"]
+
+
+# Network-dependent tests for auto_get_spk
+@pytest.mark.skipif(
+    os.environ.get("LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD") != "1",
+    reason="Set LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD=1 to run network tests",
+)
+class TestAutoGetSpkIntegration:
+    """Integration tests for auto_get_spk that require network access."""
+
+    def test_auto_get_spk_chiron(self, tmp_path):
+        """Download Chiron SPK via auto_get_spk."""
+        jd_start = 2459215.5  # 2021-01-01
+        jd_end = 2460676.5  # 2025-01-01
+
+        spk_path = spk_auto.auto_get_spk("2060", jd_start, jd_end, str(tmp_path))
+
+        assert os.path.exists(spk_path)
+        assert spk_path.endswith(".bsp")
+        assert os.path.getsize(spk_path) > 0
+
+    def test_auto_get_spk_cached(self, tmp_path):
+        """Second call returns cached file."""
+        jd_start = 2459215.5
+        jd_end = 2460676.5
+
+        # First call downloads
+        path1 = spk_auto.auto_get_spk("2060", jd_start, jd_end, str(tmp_path))
+
+        # Second call should return cached file
+        path2 = spk_auto.auto_get_spk("2060", jd_start, jd_end, str(tmp_path))
+
+        assert path1 == path2

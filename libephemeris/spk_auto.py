@@ -560,3 +560,232 @@ def disable_all() -> None:
     """
     with _AUTO_SPK_LOCK:
         _AUTO_SPK_REGISTRY.clear()
+
+
+# =============================================================================
+# DEFAULT CACHE DIRECTORY
+# =============================================================================
+
+# Default cache directory for auto_get_spk
+DEFAULT_AUTO_SPK_DIR = os.path.join(os.path.expanduser("~"), ".libephemeris", "spk")
+
+
+def _jd_to_iso_date(jd: float) -> str:
+    """
+    Convert Julian Day to ISO date string (YYYY-MM-DD).
+
+    Args:
+        jd: Julian Day number
+
+    Returns:
+        str: ISO date string (YYYY-MM-DD)
+    """
+    # Julian Day to calendar date conversion
+    # Algorithm from Meeus, Astronomical Algorithms
+    jd = jd + 0.5
+    z = int(jd)
+    f = jd - z
+
+    if z < 2299161:
+        a = z
+    else:
+        alpha = int((z - 1867216.25) / 36524.25)
+        a = z + 1 + alpha - int(alpha / 4)
+
+    b = a + 1524
+    c = int((b - 122.1) / 365.25)
+    d = int(365.25 * c)
+    e = int((b - d) / 30.6001)
+
+    day = b - d - int(30.6001 * e)
+
+    if e < 14:
+        month = e - 1
+    else:
+        month = e - 13
+
+    if month > 2:
+        year = c - 4716
+    else:
+        year = c - 4715
+
+    return f"{year:04d}-{month:02d}-{day:02d}"
+
+
+def _generate_spk_cache_filename(
+    body_id: Union[int, str], jd_start: float, jd_end: float
+) -> str:
+    """
+    Generate a cache filename for an SPK file.
+
+    The filename includes body identifier and truncated Julian Day range
+    to enable cache lookup.
+
+    Args:
+        body_id: Body identifier
+        jd_start: Start Julian Day
+        jd_end: End Julian Day
+
+    Returns:
+        str: Filename like "2060_2458849_2462502.bsp"
+    """
+    # Sanitize body_id for filename
+    body_str = str(body_id).lower()
+    safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
+
+    # Truncate JD to integer for filename (sufficient precision for cache lookup)
+    jd_start_int = int(jd_start)
+    jd_end_int = int(jd_end)
+
+    return f"{safe_body_id}_{jd_start_int}_{jd_end_int}.bsp"
+
+
+def _find_covering_spk(
+    body_id: Union[int, str],
+    jd_start: float,
+    jd_end: float,
+    cache_dir: str,
+) -> Optional[str]:
+    """
+    Find an existing SPK file in the cache that covers the requested date range.
+
+    Searches the cache directory for any SPK file for the given body that
+    covers the requested Julian Day range.
+
+    Args:
+        body_id: Body identifier
+        jd_start: Start Julian Day
+        jd_end: End Julian Day
+        cache_dir: Cache directory path
+
+    Returns:
+        str: Path to covering SPK file if found, None otherwise
+    """
+    if not os.path.exists(cache_dir):
+        return None
+
+    # Sanitize body_id to match filename pattern
+    body_str = str(body_id).lower()
+    safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
+
+    # Look for files matching this body
+    for filename in os.listdir(cache_dir):
+        if not filename.endswith(".bsp"):
+            continue
+
+        # Check if filename matches our body
+        if not filename.startswith(safe_body_id + "_"):
+            continue
+
+        # Extract JD range from filename (format: body_jdstart_jdend.bsp)
+        parts = filename[:-4].split("_")  # Remove .bsp
+        if len(parts) >= 3:
+            try:
+                # Get the last two parts as JD values
+                file_jd_start = float(parts[-2])
+                file_jd_end = float(parts[-1])
+
+                # Check if this file covers our requested range
+                # We compare truncated integer values since filenames use truncated JDs
+                # Add 1 to file_jd_end to account for the truncation (covers the full day)
+                if file_jd_start <= int(jd_start) and file_jd_end >= int(jd_end):
+                    return os.path.join(cache_dir, filename)
+            except ValueError:
+                continue
+
+    return None
+
+
+def auto_get_spk(
+    body_id: Union[int, str],
+    jd_start: float,
+    jd_end: float,
+    cache_dir: Optional[str] = None,
+) -> str:
+    """
+    Automatically get SPK file for a body and date range, downloading if needed.
+
+    This function checks if an SPK file for the requested body and date range
+    exists in the local cache directory. If not, it automatically downloads
+    the file from JPL Horizons using the Horizons class.
+
+    Args:
+        body_id: JPL Horizons body identifier. Can be:
+            - Asteroid number (int): 2060, 136199
+            - Name (str): "Chiron", "Eris"
+            - Combined: "2060 Chiron"
+        jd_start: Start of the date range (Julian Day)
+        jd_end: End of the date range (Julian Day)
+        cache_dir: Directory for storing/finding SPK files.
+            Default: ~/.libephemeris/spk/
+
+    Returns:
+        str: Path to the SPK file (either existing cached or newly downloaded)
+
+    Raises:
+        ImportError: If astroquery is not installed
+        ValueError: If body not found or download fails
+
+    Example:
+        >>> from libephemeris.spk_auto import auto_get_spk
+        >>> # Get SPK for Chiron covering 2020-2030
+        >>> jd_start = 2458849.5  # 2020-01-01
+        >>> jd_end = 2462502.5    # 2030-01-01
+        >>> spk_path = auto_get_spk("2060", jd_start, jd_end)
+        >>> print(spk_path)
+        /home/user/.libephemeris/spk/2060_2458849_2462502.bsp
+    """
+    # Check if astroquery is available
+    if not _check_astroquery_available():
+        raise ImportError(
+            "astroquery is required for automatic SPK downloads. "
+            "Install it with: pip install astroquery"
+        )
+
+    # Validate inputs
+    if jd_end <= jd_start:
+        raise ValueError(
+            f"jd_end ({jd_end}) must be greater than jd_start ({jd_start})"
+        )
+
+    # Determine cache directory
+    if cache_dir is None:
+        cache_dir = DEFAULT_AUTO_SPK_DIR
+
+    # Create cache directory if it doesn't exist
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, exist_ok=True)
+
+    # Check if we already have a cached SPK that covers this range
+    existing_spk = _find_covering_spk(body_id, jd_start, jd_end, cache_dir)
+    if existing_spk is not None:
+        return existing_spk
+
+    # Need to download - convert Julian Days to date strings
+    start_date = _jd_to_iso_date(jd_start)
+    end_date = _jd_to_iso_date(jd_end)
+
+    # Generate cache filename
+    filename = _generate_spk_cache_filename(body_id, jd_start, jd_end)
+    output_path = os.path.join(cache_dir, filename)
+
+    # Download using astroquery
+    with _AUTO_SPK_LOCK:
+        # Double-check after acquiring lock (another thread may have downloaded)
+        if os.path.exists(output_path):
+            return output_path
+
+        # Check again for covering SPK (may have been downloaded with different range)
+        existing_spk = _find_covering_spk(body_id, jd_start, jd_end, cache_dir)
+        if existing_spk is not None:
+            return existing_spk
+
+        # Download SPK file
+        _download_spk_astroquery(
+            body_id=str(body_id),
+            start=start_date,
+            end=end_date,
+            output_path=output_path,
+        )
+
+    return output_path
