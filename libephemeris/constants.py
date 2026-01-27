@@ -113,6 +113,9 @@ SE_TORO: int = 1685 + SE_AST_OFFSET  # 1685 Toro (Apollo asteroid, near-Earth as
 SE_SAPPHO: int = (
     80 + SE_AST_OFFSET
 )  # 80 Sappho (main belt asteroid, artistic expression and same-sex love)
+SE_PANDORA_AST: int = (
+    55 + SE_AST_OFFSET
+)  # 55 Pandora (main belt asteroid, distinct from Saturn moon Pandora)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS

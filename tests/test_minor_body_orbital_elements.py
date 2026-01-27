@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 30 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 31 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -41,6 +41,7 @@ from libephemeris.constants import (
     SE_ICARUS,
     SE_TORO,
     SE_SAPPHO,
+    SE_PANDORA_AST,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -88,6 +89,7 @@ def all_minor_body_ids():
         SE_ICARUS,
         SE_TORO,
         SE_SAPPHO,
+        SE_PANDORA_AST,
     ]
 
 
@@ -104,9 +106,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 30 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 30, (
-            f"Expected 30 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 31 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 31, (
+            f"Expected 31 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -472,6 +474,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 8.5 < elements.i < 8.9, f"Sappho i={elements.i} unexpected"
         # Mean motion consistent with ~3.5 year period (1271 days)
         assert 0.28 < elements.n < 0.29, f"Sappho n={elements.n} unexpected"
+
+    def test_pandora_main_belt_asteroid(self):
+        """Pandora: Main belt asteroid (distinct from Saturn moon Pandora)."""
+        elements = MINOR_BODY_ELEMENTS[SE_PANDORA_AST]
+        assert elements.name == "Pandora"
+        # Semi-major axis ~2.76 AU (main belt asteroid)
+        assert 2.75 < elements.a < 2.77, f"Pandora a={elements.a} unexpected"
+        # Moderate eccentricity ~0.145
+        assert 0.14 < elements.e < 0.15, f"Pandora e={elements.e} unexpected"
+        # Low inclination ~7.2 degrees
+        assert 7.0 < elements.i < 7.5, f"Pandora i={elements.i} unexpected"
+        # Mean motion consistent with ~4.6 year period (1673 days)
+        assert 0.21 < elements.n < 0.22, f"Pandora n={elements.n} unexpected"
 
 
 @pytest.mark.unit
