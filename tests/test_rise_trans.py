@@ -386,7 +386,7 @@ class TestRiseTransErrors:
         """Test that invalid planet ID raises ValueError."""
         jd_start = julday(2024, 6, 21, 0)
 
-        with pytest.raises(ValueError, match="Invalid planet ID"):
+        with pytest.raises(ValueError, match="illegal planet number"):
             rise_trans(jd_start, 9999, 41.9, 12.5, rsmi=SE_CALC_RISE)
 
     def test_invalid_rsmi_raises_error(self):

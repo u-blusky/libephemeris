@@ -537,7 +537,7 @@ class TestHeliacalPhenoValidation:
         jd = julday(2024, 1, 1, 0)
         lat, lon = 41.9028, 12.4964
 
-        with pytest.raises(ValueError, match="Invalid body ID"):
+        with pytest.raises(ValueError, match="illegal planet number"):
             heliacal_pheno_ut(jd, lat, lon, body=999, event_type=SE_HELIACAL_RISING)
 
     def test_invalid_event_type_raises_error(self):
