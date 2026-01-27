@@ -162,6 +162,7 @@ from .spk import (  # SPK kernel support for high-precision minor body calculati
     get_spk_coverage,
     download_and_register_spk,
 )
+from . import spk_auto  # Automatic SPK download and caching
 
 
 # =============================================================================
@@ -482,4 +483,6 @@ __all__ = [
     "list_spk_bodies",
     "get_spk_coverage",
     "download_and_register_spk",
+    # Automatic SPK download module
+    "spk_auto",
 ]
