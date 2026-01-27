@@ -103,6 +103,9 @@ SE_PSYCHE: int = (
 SE_EROS: int = (
     433 + SE_AST_OFFSET
 )  # 433 Eros (near-Earth asteroid, NEAR Shoemaker mission target)
+SE_AMOR: int = (
+    1221 + SE_AST_OFFSET
+)  # 1221 Amor (prototype of the Amor near-Earth asteroid class)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS

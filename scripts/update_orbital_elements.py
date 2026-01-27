@@ -89,6 +89,7 @@ BODY_SBDB_IDS: dict[str, str] = {
     "Sylvia": "87",  # 87 Sylvia (triple asteroid system with moons Romulus and Remus)
     "Psyche": "16",  # 16 Psyche (metallic M-type asteroid, NASA Psyche mission target)
     "Eros": "433",  # 433 Eros (near-Earth asteroid, NEAR Shoemaker mission target)
+    "Amor": "1221",  # 1221 Amor (prototype of the Amor near-Earth asteroid class)
 }
 
 

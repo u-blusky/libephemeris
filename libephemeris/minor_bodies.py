@@ -60,6 +60,7 @@ from .constants import (
     SE_SYLVIA,
     SE_PSYCHE,
     SE_EROS,
+    SE_AMOR,
 )
 
 
@@ -1010,6 +1011,17 @@ MINOR_BODY_ELEMENTS = {
         Omega=304.2701025753316,
         M0=310.5543277370992,
         n=0.5597752949285997,  # ~1.76 year period
+    ),
+    SE_AMOR: OrbitalElements(
+        name="Amor",
+        epoch=2461000.5,
+        a=1.919831260906931,  # Amor-class NEA prototype (~1 km diameter)
+        e=0.4346323375284623,  # Moderate eccentricity
+        i=11.86882308811668,  # Moderate inclination
+        omega=26.75822531564864,
+        Omega=171.2371875175307,
+        M0=59.87048521279021,
+        n=0.3705181485730381,  # ~2.66 year period (972 days)
     ),
 }
 

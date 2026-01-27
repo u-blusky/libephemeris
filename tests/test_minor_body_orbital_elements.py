@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 26 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 27 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -37,6 +37,7 @@ from libephemeris.constants import (
     SE_SYLVIA,
     SE_PSYCHE,
     SE_EROS,
+    SE_AMOR,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -80,6 +81,7 @@ def all_minor_body_ids():
         SE_SYLVIA,
         SE_PSYCHE,
         SE_EROS,
+        SE_AMOR,
     ]
 
 
@@ -96,9 +98,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 26 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 26, (
-            f"Expected 26 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 27 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 27, (
+            f"Expected 27 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -412,6 +414,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 10.5 < elements.i < 11.5, f"Eros i={elements.i} unexpected"
         # Mean motion consistent with ~1.76 year period (643 days)
         assert 0.55 < elements.n < 0.57, f"Eros n={elements.n} unexpected"
+
+    def test_amor_near_earth_asteroid(self):
+        """Amor: Prototype of the Amor near-Earth asteroid class."""
+        elements = MINOR_BODY_ELEMENTS[SE_AMOR]
+        assert elements.name == "Amor"
+        # Semi-major axis ~1.92 AU (Amor-class NEA prototype)
+        assert 1.90 < elements.a < 1.94, f"Amor a={elements.a} unexpected"
+        # Moderate eccentricity ~0.43
+        assert 0.42 < elements.e < 0.45, f"Amor e={elements.e} unexpected"
+        # Moderate inclination ~11.9 degrees
+        assert 11.5 < elements.i < 12.5, f"Amor i={elements.i} unexpected"
+        # Mean motion consistent with ~2.66 year period (972 days)
+        assert 0.36 < elements.n < 0.38, f"Amor n={elements.n} unexpected"
 
 
 @pytest.mark.unit
