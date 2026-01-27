@@ -69,6 +69,7 @@ SE_MAKEMAKE: int = 136472 + SE_AST_OFFSET  # Classical Kuiper belt object
 SE_IXION: int = 28978 + SE_AST_OFFSET  # Plutino
 SE_ORCUS: int = 90482 + SE_AST_OFFSET  # Plutino, "anti-Pluto"
 SE_QUAOAR: int = 50000 + SE_AST_OFFSET  # Classical KBO
+SE_NESSUS: int = 7066 + SE_AST_OFFSET  # Centaur, astrologically important
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
@@ -93,6 +94,7 @@ NAIF_MAKEMAKE: int = 2136472  # 136472 Makemake
 NAIF_IXION: int = 2028978  # 28978 Ixion
 NAIF_ORCUS: int = 2090482  # 90482 Orcus
 NAIF_QUAOAR: int = 2050000  # 50000 Quaoar
+NAIF_NESSUS: int = 2007066  # 7066 Nessus (Centaur)
 
 # =============================================================================
 # SPK BODY NAME MAPPING
@@ -118,6 +120,7 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
     SE_ORCUS: ("90482", NAIF_ORCUS),  # 90482 Orcus (plutino)
     SE_QUAOAR: ("50000", NAIF_QUAOAR),  # 50000 Quaoar (classical KBO)
     SE_VARUNA: ("20000", 2020000),  # 20000 Varuna (classical KBO)
+    SE_NESSUS: ("7066", NAIF_NESSUS),  # 7066 Nessus (centaur)
 }
 
 

@@ -24,6 +24,7 @@ from libephemeris.constants import (
     SE_IXION,
     SE_ORCUS,
     SE_QUAOAR,
+    SE_NESSUS,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -54,6 +55,7 @@ def all_minor_body_ids():
         SE_IXION,
         SE_ORCUS,
         SE_QUAOAR,
+        SE_NESSUS,
     ]
 
 
@@ -70,9 +72,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 13 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 13, (
-            f"Expected 13 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 14 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 14, (
+            f"Expected 14 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -223,6 +225,17 @@ class TestSpecificBodiesOrbitalElements:
         assert elements.e < 0.05, (
             f"Quaoar e={elements.e} too high for 'nearly circular'"
         )
+
+    def test_nessus_centaur(self):
+        """Nessus: Centaur with orbit between Saturn and Pluto."""
+        elements = MINOR_BODY_ELEMENTS[SE_NESSUS]
+        assert elements.name == "Nessus"
+        # Semi-major axis ~24.5 AU (between Saturn ~9.5 AU and Pluto ~39.5 AU)
+        assert 24.0 < elements.a < 25.0, f"Nessus a={elements.a} unexpected"
+        # Moderately eccentric orbit
+        assert 0.51 < elements.e < 0.53, f"Nessus e={elements.e} unexpected"
+        # Inclination ~15.6 degrees
+        assert 15.0 < elements.i < 16.5, f"Nessus i={elements.i} unexpected"
 
 
 @pytest.mark.unit
