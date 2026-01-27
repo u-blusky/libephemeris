@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 34 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 35 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -45,6 +45,7 @@ from libephemeris.constants import (
     SE_LILITH_AST,
     SE_HIDALGO,
     SE_TOUTATIS,
+    SE_ITOKAWA,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -96,6 +97,7 @@ def all_minor_body_ids():
         SE_LILITH_AST,
         SE_HIDALGO,
         SE_TOUTATIS,
+        SE_ITOKAWA,
     ]
 
 
@@ -112,9 +114,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 34 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 34, (
-            f"Expected 34 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 35 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 35, (
+            f"Expected 35 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -532,6 +534,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 0.4 < elements.i < 0.5, f"Toutatis i={elements.i} unexpected"
         # Mean motion consistent with ~4.05 year period (1481 days)
         assert 0.24 < elements.n < 0.25, f"Toutatis n={elements.n} unexpected"
+
+    def test_itokawa_apollo_asteroid(self):
+        """Itokawa: Apollo PHA, target of Hayabusa sample return mission."""
+        elements = MINOR_BODY_ELEMENTS[SE_ITOKAWA]
+        assert elements.name == "Itokawa"
+        # Semi-major axis ~1.32 AU (Apollo asteroid)
+        assert 1.32 < elements.a < 1.33, f"Itokawa a={elements.a} unexpected"
+        # Moderate eccentricity ~0.28 (q=0.95 AU, Q=1.70 AU)
+        assert 0.27 < elements.e < 0.29, f"Itokawa e={elements.e} unexpected"
+        # Very low inclination ~1.6 degrees
+        assert 1.5 < elements.i < 1.7, f"Itokawa i={elements.i} unexpected"
+        # Mean motion consistent with ~1.52 year period (557 days)
+        assert 0.64 < elements.n < 0.66, f"Itokawa n={elements.n} unexpected"
 
 
 @pytest.mark.unit

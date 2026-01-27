@@ -176,7 +176,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD TOUTATIS ASTEROID TO CATALOG: Add asteroid 4179 Toutatis to MINOR_BODY_ELEMENTS, a potentially hazardous asteroid studied by radar and spacecraft, add SE_TOUTATIS = 4179 + SE_AST_OFFSET.
 
-- [ ] ADD ITOKAWA ASTEROID TO CATALOG: Add asteroid 25143 Itokawa to MINOR_BODY_ELEMENTS, target of the Hayabusa sample return mission, add SE_ITOKAWA = 25143 + SE_AST_OFFSET.
+- [x] ADD ITOKAWA ASTEROID TO CATALOG: Add asteroid 25143 Itokawa to MINOR_BODY_ELEMENTS, target of the Hayabusa sample return mission, add SE_ITOKAWA = 25143 + SE_AST_OFFSET.
 
 - [ ] ADD BENNU ASTEROID TO CATALOG: Add asteroid 101955 Bennu to MINOR_BODY_ELEMENTS, target of OSIRIS-REx sample return mission, add SE_BENNU = 101955 + SE_AST_OFFSET.
 

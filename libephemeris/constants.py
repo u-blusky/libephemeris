@@ -125,6 +125,9 @@ SE_HIDALGO: int = (
 SE_TOUTATIS: int = (
     4179 + SE_AST_OFFSET
 )  # 4179 Toutatis (Apollo PHA, radar and spacecraft target, tumbling rotation)
+SE_ITOKAWA: int = (
+    25143 + SE_AST_OFFSET
+)  # 25143 Itokawa (Apollo PHA, Hayabusa sample return mission target)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS

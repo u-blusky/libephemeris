@@ -5,7 +5,7 @@ This module computes positions for:
 - Main belt asteroids: Ceres, Pallas, Juno, Vesta, Hygiea, Interamnia, Davida, Europa, Sylvia, Psyche, Sappho, Pandora, Lilith
 - Centaurs: Chiron, Pholus, Nessus, Asbolus, Chariklo, Hidalgo
 - Trans-Neptunian Objects (TNOs): Eris, Sedna, Haumea, Makemake, Orcus, Quaoar, Ixion, Gonggong, Varuna
-- Near-Earth asteroids: Apophis, Eros, Amor, Icarus, Toro, Toutatis
+- Near-Earth asteroids: Apophis, Eros, Amor, Icarus, Toro, Toutatis, Itokawa
 
 Method: Keplerian orbital elements with first-order secular perturbations from
 Jupiter, Saturn, Uranus, and Neptune. This provides significantly improved accuracy over pure
@@ -68,6 +68,7 @@ from .constants import (
     SE_LILITH_AST,
     SE_HIDALGO,
     SE_TOUTATIS,
+    SE_ITOKAWA,
 )
 
 
@@ -1106,6 +1107,17 @@ MINOR_BODY_ELEMENTS = {
         Omega=125.3653430437421,
         M0=76.89343773316328,
         n=0.2430395129094619,  # ~4.05 year period (1481 days), tumbling rotation
+    ),
+    SE_ITOKAWA: OrbitalElements(
+        name="Itokawa",
+        epoch=2461000.5,
+        a=1.324135178668783,  # Apollo PHA, Hayabusa sample return mission target (~535 m)
+        e=0.2801500981413037,  # Moderate eccentricity (q=0.95 AU, Q=1.70 AU)
+        i=1.620938690165939,  # Very low inclination
+        omega=162.853569017811,
+        Omega=69.07562356929041,
+        M0=41.26158479412086,
+        n=0.646852987504302,  # ~1.52 year period (557 days), elongated shape
     ),
 }
 
