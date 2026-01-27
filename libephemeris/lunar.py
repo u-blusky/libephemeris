@@ -2315,56 +2315,90 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
 
     The interpolated apogee is a smoothed version of the osculating apogee that
     removes the spurious short-period oscillations caused by the instantaneous
-    nature of osculating orbital elements. This is done by sampling the osculating
-    apogee at multiple points across the Moon's orbital period and fitting a
-    polynomial through these samples to extract the underlying "natural" motion.
+    nature of osculating orbital elements.
 
     Physical Background
-    ==================
+    ===================
 
     The osculating apogee (True Lilith) is calculated from instantaneous orbital
-    elements that change rapidly due to solar perturbations. These rapid changes
-    create oscillations with periods shorter than the Moon's orbital period
-    (~27.3 days) that are computational artifacts rather than physically meaningful
-    motions of the actual apogee point.
+    elements that change rapidly due to solar perturbations. As described in the
+    Swiss Ephemeris documentation (section 2.2.4):
 
-    The interpolated apogee removes these spurious oscillations by:
-    1. Sampling the osculating apogee at multiple points over ~1 lunar orbit
-    2. Fitting a polynomial through these samples
-    3. Evaluating the polynomial at the target time to get a smoothed position
+        "The solar perturbation results in gigantic monthly oscillations in the
+        ephemeris of the osculating apsides (the amplitude is 30 degrees). These
+        oscillations have to be considered an artifact of the insufficient model,
+        they do not really show a motion of the apsides."
 
-    This gives the "natural" apogee - the position that represents the true
-    apsidal line orientation averaged over the orbital perturbation cycle.
+    The interpolated apogee removes these spurious oscillations to reveal the
+    "natural" apogee position - representing the true apsidal line orientation.
 
-    Algorithm
-    =========
+    Key Characteristics of the Natural Apogee
+    ==========================================
 
-    **Step 1: Define Sampling Window**
-        - Use 15 sample points spanning approximately 1 lunar orbital period
-        - Half-window of ~13.5 days on each side of target time
-        - This captures one complete cycle of short-period perturbations
+    According to Swiss Ephemeris research:
 
-    **Step 2: Sample Osculating Apogee Positions**
-        - Calculate the osculating apogee at each sample point
-        - Unwrap longitude to handle 0°/360° discontinuities
+    1. **Apogee oscillates ~5° from mean position** (vs. perigee which oscillates ~25°)
+    2. **Apogee and perigee are not exactly opposite** - they are only roughly
+       opposite when the Sun is in conjunction with one of them or at 90° angle
+    3. **The curves should be continuous** - both position and velocity
 
-    **Step 3: Polynomial Fit**
-        - Fit a 4th-degree polynomial to the sampled positions
-        - This smooths out oscillations with periods < half the window size
+    Swiss Ephemeris Algorithm
+    =========================
 
-    **Step 4: Evaluate at Target Time**
-        - Evaluate the polynomial at the target Julian Day
-        - This gives the interpolated (smoothed) apogee longitude
+    Swiss Ephemeris (from version 1.70) uses an "interpolation method" derived from
+    analytical lunar theory (Moshier's lunar ephemeris). As they explain:
 
-    Comparison with Swiss Ephemeris
-    ===============================
+        "Conventional interpolation algorithms do not work well in the case of
+        the lunar apsides. The supporting points are too far away from each other
+        in order to provide a good interpolation, the error estimation is greater
+        than 1 degree for the perigee. Therefore, [we] derived an 'interpolation
+        method' from the analytical lunar theory which we have in the form of
+        Moshier's lunar ephemeris. This 'interpolation method' has not only the
+        advantage that it probably makes more sense, but also that the curve and
+        its derivation are both continuous."
 
-    Swiss Ephemeris uses a similar approach but with a more sophisticated
-    B-spline or Chebyshev polynomial method. The differences are:
-    - Polynomial degree and sampling strategy may differ
-    - Swiss Ephemeris may use pre-computed coefficient tables
+    Our Implementation
+    ==================
 
-    Expected agreement: ~0.5-2° compared to Swiss Ephemeris SE_INTP_APOG
+    Since implementing the full analytical method from Moshier's lunar theory is
+    complex, we use a polynomial regression approach that approximates the
+    smooth "natural" curve:
+
+    **Sampling Strategy:**
+        - Sample osculating apogee positions at 7 points spanning approximately
+          half a synodic month (~14.77 days)
+        - Sample times: t-7d, t-4.67d, t-2.33d, t, t+2.33d, t+4.67d, t+7d
+        - This captures the dominant ~14.77-day (2D) oscillation cycle
+
+    **Polynomial Regression (Least Squares):**
+        - Fit a 2nd-degree polynomial through the sampled points
+        - The low-degree polynomial smooths out high-frequency oscillations
+        - 7 points with degree 2 gives 5 degrees of freedom for smoothing
+        - This averages out the spurious ~30° oscillations
+
+    **Longitude Handling:**
+        - Unwrap longitude to handle 0°/360° discontinuity
+        - Normalize result back to [0, 360)
+
+    Rationale for Time Window
+    =========================
+
+    The half-synodic-month window (~14.77 days) is chosen because:
+
+    1. The dominant spurious oscillation has argument 2D (twice mean elongation)
+       with period = synodic_month / 2 ≈ 14.77 days
+
+    2. Sampling over one complete cycle of this oscillation allows effective
+       averaging/smoothing
+
+    3. The 7-point sampling at ~2.33-day intervals provides adequate resolution
+       while remaining computationally efficient
+
+    Expected Precision
+    ==================
+
+    - Agreement with Swiss Ephemeris SE_INTP_APOG: ~0.5-2°
+    - Smoothness: variance in daily motion significantly reduced vs. osculating
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT).
@@ -2379,17 +2413,19 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
         - Swiss Ephemeris documentation, section 2.2.4 "The Interpolated or
           Natural Apogee and Perigee"
         - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+        - Dieter Koch, "Was ist Lilith und welche Ephemeride ist richtig", Meridian 1/95
+        - Dieter Koch & Bernhard Rindgen, "Lilith und Priapus", Frankfurt/Main, 2000
     """
     # Sampling parameters
-    # Use approximately one lunar orbital period (27.32 days) as the window
-    # 15 samples provide good polynomial fit while remaining computationally efficient
-    num_samples = 15
-    half_window_days = 13.5  # ~half a lunar orbital period
+    # Half synodic month ≈ 14.77 days; use 7 days on each side
+    # 7 sample points at approximately 2.33-day intervals
+    num_samples = 7
+    half_window_days = 7.0  # ~half a synodic half-month
 
     # Generate sample times centered on the target time
+    # Positions: t-7d, t-4.67d, t-2.33d, t, t+2.33d, t+4.67d, t+7d
     sample_times = []
     for i in range(num_samples):
-        # Evenly space samples across the window
         offset = -half_window_days + (2 * half_window_days * i / (num_samples - 1))
         sample_times.append(jd_tt + offset)
 
@@ -2415,44 +2451,44 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
             diff += 360
         unwrapped_lons.append(unwrapped_lons[-1] + diff)
 
-    # Fit a 4th-degree polynomial to the unwrapped longitudes
-    # Using least-squares polynomial fit (Vandermonde matrix approach)
+    # Use polynomial regression (least squares) for smoothing
+    # A 2nd-degree polynomial (quadratic) will smooth out the ~14.77-day oscillations
+    # while capturing the underlying linear motion of the apogee
+    # Using degree 2 with 7 points gives 5 degrees of freedom for smoothing
+    poly_degree = 2
+
     # Normalize time to [-1, 1] for numerical stability
     t_center = jd_tt
     t_scale = half_window_days
 
-    # Build Vandermonde matrix for polynomial fit
-    poly_degree = 4
-    n_samples = len(sample_times)
-
     # Normalized time values
     t_norm = [(t - t_center) / t_scale for t in sample_times]
 
-    # Build the Vandermonde matrix (each row is [1, t, t², t³, t⁴])
+    # Build Vandermonde matrix for polynomial fit (least squares)
+    # Each row is [1, t, t²] for quadratic fit
     V = []
     for t in t_norm:
         row = [t**j for j in range(poly_degree + 1)]
         V.append(row)
 
     # Solve the normal equations: (V^T V) c = V^T y
-    # Using explicit matrix operations for simplicity
+    # Using explicit matrix operations
     VTV = [[0.0] * (poly_degree + 1) for _ in range(poly_degree + 1)]
     VTy = [0.0] * (poly_degree + 1)
 
     for i in range(poly_degree + 1):
         for j in range(poly_degree + 1):
-            for k in range(n_samples):
+            for k in range(num_samples):
                 VTV[i][j] += V[k][i] * V[k][j]
-        for k in range(n_samples):
+        for k in range(num_samples):
             VTy[i] += V[k][i] * unwrapped_lons[k]
 
-    # Solve the linear system using Gaussian elimination with partial pivoting
+    # Solve the linear system using Gaussian elimination
     coeffs = _solve_linear_system(VTV, VTy)
 
     # Evaluate polynomial at target time (t_norm = 0)
     # Since t_norm = (jd_tt - t_center) / t_scale = 0, we just need coeffs[0]
-    # But let's do it properly for clarity
-    t_target_norm = 0.0  # (jd_tt - jd_tt) / t_scale = 0
+    t_target_norm = 0.0
     interp_lon = sum(coeffs[j] * (t_target_norm**j) for j in range(poly_degree + 1))
 
     # Normalize longitude to [0, 360)
@@ -2465,6 +2501,125 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     interp_ecc = sample_eccs[central_idx]
 
     return interp_lon, interp_lat, interp_ecc
+
+
+def _cubic_spline_interpolate(x: list, y: list, x_eval: float) -> float:
+    """
+    Natural cubic spline interpolation.
+
+    Computes the interpolated value at x_eval using natural cubic spline
+    through the given (x, y) data points. Natural spline has zero second
+    derivative at the endpoints.
+
+    The cubic spline ensures:
+    1. The interpolant passes through all data points
+    2. First and second derivatives are continuous at interior points
+    3. Second derivative is zero at endpoints (natural boundary condition)
+
+    Algorithm
+    =========
+
+    For n+1 data points (x_0, y_0), ..., (x_n, y_n), the cubic spline S(x)
+    is defined piecewise on each interval [x_i, x_{i+1}]:
+
+        S_i(x) = a_i + b_i*(x-x_i) + c_i*(x-x_i)^2 + d_i*(x-x_i)^3
+
+    where the coefficients are determined by:
+    1. S_i(x_i) = y_i (interpolation condition)
+    2. S_i(x_{i+1}) = S_{i+1}(x_{i+1}) (continuity)
+    3. S_i'(x_{i+1}) = S_{i+1}'(x_{i+1}) (continuous first derivative)
+    4. S_i''(x_{i+1}) = S_{i+1}''(x_{i+1}) (continuous second derivative)
+    5. S_0''(x_0) = 0 and S_{n-1}''(x_n) = 0 (natural boundary conditions)
+
+    Args:
+        x: List of x-coordinates (must be sorted in ascending order)
+        y: List of y-coordinates (same length as x)
+        x_eval: The x-coordinate at which to evaluate the spline
+
+    Returns:
+        float: The interpolated y-value at x_eval
+
+    References:
+        - Press et al., "Numerical Recipes", Chapter 3.3
+        - Burden & Faires, "Numerical Analysis", Chapter 3.5
+    """
+    n = len(x) - 1  # Number of intervals
+
+    if n < 1:
+        return y[0] if len(y) > 0 else 0.0
+
+    # Compute the differences
+    h = [x[i + 1] - x[i] for i in range(n)]
+
+    # Set up the tridiagonal system for the second derivatives (c values)
+    # For natural spline: c[0] = 0, c[n] = 0
+
+    # Right-hand side of the tridiagonal system
+    alpha = [0.0] * n
+    for i in range(1, n):
+        alpha[i] = (3.0 / h[i]) * (y[i + 1] - y[i]) - (3.0 / h[i - 1]) * (
+            y[i] - y[i - 1]
+        )
+
+    # Solve the tridiagonal system using Thomas algorithm
+    # Diagonal elements: 2*(h[i-1] + h[i]) for i = 1, ..., n-1
+    # Sub/super diagonal: h[i]
+
+    diag = [0.0] * (n + 1)
+    mu = [0.0] * (n + 1)
+    z = [0.0] * (n + 1)
+
+    diag[0] = 1.0
+    mu[0] = 0.0
+    z[0] = 0.0
+
+    for i in range(1, n):
+        diag[i] = 2.0 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1]
+        if abs(diag[i]) < 1e-15:
+            diag[i] = 1e-15  # Prevent division by zero
+        mu[i] = h[i] / diag[i]
+        z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / diag[i]
+
+    diag[n] = 1.0
+    z[n] = 0.0
+
+    # Back substitution to get c values (second derivatives / 2)
+    c = [0.0] * (n + 1)
+    c[n] = 0.0
+
+    for j in range(n - 1, -1, -1):
+        c[j] = z[j] - mu[j] * c[j + 1]
+
+    # Compute b and d coefficients
+    b = [0.0] * n
+    d = [0.0] * n
+
+    for i in range(n):
+        b[i] = (y[i + 1] - y[i]) / h[i] - h[i] * (c[i + 1] + 2.0 * c[i]) / 3.0
+        d[i] = (c[i + 1] - c[i]) / (3.0 * h[i])
+
+    # Find the interval containing x_eval
+    # Clamp to valid range if outside
+    if x_eval <= x[0]:
+        idx = 0
+        dx = x_eval - x[0]
+    elif x_eval >= x[n]:
+        idx = n - 1
+        dx = x_eval - x[n - 1]
+    else:
+        # Binary search for the interval
+        idx = 0
+        for i in range(n):
+            if x[i] <= x_eval < x[i + 1]:
+                idx = i
+                break
+        dx = x_eval - x[idx]
+
+    # Evaluate the spline at x_eval
+    # S_i(x) = y[i] + b[i]*dx + c[i]*dx^2 + d[i]*dx^3
+    result = y[idx] + b[idx] * dx + c[idx] * dx * dx + d[idx] * dx * dx * dx
+
+    return result
 
 
 def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:

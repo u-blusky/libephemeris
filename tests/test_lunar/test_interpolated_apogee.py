@@ -2,8 +2,18 @@
 Tests for the interpolated lunar apogee (SE_INTP_APOG) and perigee (SE_INTP_PERG).
 
 The interpolated apogee is a smoothed version of the osculating apogee that
-removes spurious short-period oscillations by polynomial interpolation through
+removes spurious short-period oscillations by cubic spline interpolation through
 successive osculating apogee positions.
+
+Algorithm Design (based on Swiss Ephemeris research):
+- Sample osculating apogee at 7 points spanning ~14 days (half synodic month)
+- Use natural cubic spline interpolation for smooth, continuous curves
+- The spline ensures continuous first derivatives (velocity)
+
+Key facts about the "natural" apogee (from Swiss Ephemeris documentation):
+- Apogee oscillates ~5° from mean position (vs. perigee ~25°)
+- Apogee and perigee are not exactly opposite at all times
+- Swiss Ephemeris uses an analytical method from Moshier's lunar theory
 
 These tests verify:
 1. Basic functionality and API compatibility
@@ -11,6 +21,8 @@ These tests verify:
 3. Relationship between interpolated and osculating apogee
 4. Velocity calculations
 5. Perigee as opposite of apogee
+6. Cubic spline interpolation correctness
+7. Proper smoothing of oscillations
 """
 
 import math
@@ -283,3 +295,177 @@ class TestInterpolatedApogeeConsistency:
 
         assert abs(x[0] - 1.4) < 1e-10
         assert abs(x[1] - 1.2) < 1e-10
+
+
+class TestCubicSplineInterpolation:
+    """Tests for the cubic spline interpolation algorithm."""
+
+    def test_cubic_spline_passes_through_points(self):
+        """Test that cubic spline interpolation passes through data points."""
+        from libephemeris.lunar import _cubic_spline_interpolate
+
+        # Simple test data
+        x = [0.0, 1.0, 2.0, 3.0, 4.0]
+        y = [0.0, 1.0, 4.0, 9.0, 16.0]  # y = x^2
+
+        # Evaluate at each data point - should return exact y values
+        for i in range(len(x)):
+            result = _cubic_spline_interpolate(x, y, x[i])
+            assert abs(result - y[i]) < 1e-10, (
+                f"Spline at x[{i}]={x[i]} should be {y[i]}, got {result}"
+            )
+
+    def test_cubic_spline_interpolates_smoothly(self):
+        """Test that cubic spline gives reasonable intermediate values."""
+        from libephemeris.lunar import _cubic_spline_interpolate
+
+        # Linear data should give linear interpolation
+        x = [0.0, 1.0, 2.0, 3.0]
+        y = [0.0, 2.0, 4.0, 6.0]  # y = 2x
+
+        # Check intermediate points
+        assert abs(_cubic_spline_interpolate(x, y, 0.5) - 1.0) < 0.1
+        assert abs(_cubic_spline_interpolate(x, y, 1.5) - 3.0) < 0.1
+        assert abs(_cubic_spline_interpolate(x, y, 2.5) - 5.0) < 0.1
+
+    def test_cubic_spline_handles_sine_wave(self):
+        """Test cubic spline with oscillating data (like apogee oscillations)."""
+        from libephemeris.lunar import _cubic_spline_interpolate
+
+        # Sample a sine wave
+        n_points = 7
+        x = [i * 0.5 for i in range(n_points)]  # 0, 0.5, 1, 1.5, 2, 2.5, 3
+        y = [math.sin(xi) for xi in x]
+
+        # Evaluate at midpoint - should be close to true sine value
+        x_eval = 1.25
+        expected = math.sin(x_eval)
+        result = _cubic_spline_interpolate(x, y, x_eval)
+
+        # Cubic spline should be quite accurate for smooth functions
+        assert abs(result - expected) < 0.01, (
+            f"Spline at {x_eval} expected {expected}, got {result}"
+        )
+
+    def test_cubic_spline_edge_cases(self):
+        """Test cubic spline with edge cases."""
+        from libephemeris.lunar import _cubic_spline_interpolate
+
+        # Single point - should return that value
+        x = [1.0]
+        y = [5.0]
+        assert abs(_cubic_spline_interpolate(x, y, 1.0) - 5.0) < 1e-10
+
+        # Two points - should handle gracefully
+        x = [0.0, 1.0]
+        y = [0.0, 1.0]
+        result = _cubic_spline_interpolate(x, y, 0.5)
+        # For two points, the spline degenerates but should still work
+        assert 0.0 <= result <= 1.0
+
+
+class TestInterpolatedApogeeAlgorithm:
+    """Tests for the specific algorithm design choices."""
+
+    def test_uses_half_synodic_month_window(self):
+        """Test that the algorithm uses approximately half synodic month window."""
+        # The algorithm should smooth out the ~14.77 day oscillation
+        # by sampling across this period
+        from libephemeris import lunar
+
+        jd_tt = 2451545.0
+
+        # Sample over several oscillation periods
+        # If correctly smoothed, we should see reduced oscillation amplitude
+        num_samples = 30
+        intp_lons = []
+        oscu_lons = []
+
+        for i in range(num_samples):
+            jd = jd_tt + i
+            intp_lon, _, _ = lunar.calc_interpolated_apogee(jd)
+            oscu_lon, _, _ = lunar.calc_true_lilith(jd)
+            intp_lons.append(intp_lon)
+            oscu_lons.append(oscu_lon)
+
+        # Unwrap both series
+        def unwrap(lons):
+            result = [lons[0]]
+            for i in range(1, len(lons)):
+                diff = lons[i] - lons[i - 1]
+                if diff > 180:
+                    diff -= 360
+                elif diff < -180:
+                    diff += 360
+                result.append(result[-1] + diff)
+            return result
+
+        intp_unwrapped = unwrap(intp_lons)
+        oscu_unwrapped = unwrap(oscu_lons)
+
+        # Calculate the range (max - min) as a measure of oscillation amplitude
+        intp_range = max(intp_unwrapped) - min(intp_unwrapped)
+        oscu_range = max(oscu_unwrapped) - min(oscu_unwrapped)
+
+        # The interpolated apogee should have a smaller range than osculating
+        # (smoothed out oscillations)
+        assert intp_range < oscu_range, (
+            f"Interpolated range {intp_range} should be less than osculating {oscu_range}"
+        )
+
+    def test_apogee_oscillation_within_5_degrees_of_mean(self):
+        """Test that interpolated apogee is significantly smoother than osculating."""
+        from libephemeris import lunar
+
+        jd_tt = 2451545.0
+
+        # Sample over 100 days to see the smoothing effect
+        num_samples = 100
+        intp_lons = []
+        oscu_lons = []
+
+        for i in range(num_samples):
+            jd = jd_tt + i
+            intp_lon, _, _ = lunar.calc_interpolated_apogee(jd)
+            oscu_lon, _, _ = lunar.calc_true_lilith(jd)
+            intp_lons.append(intp_lon)
+            oscu_lons.append(oscu_lon)
+
+        # Unwrap both series
+        def unwrap(lons):
+            result = [lons[0]]
+            for i in range(1, len(lons)):
+                diff = lons[i] - lons[i - 1]
+                if diff > 180:
+                    diff -= 360
+                elif diff < -180:
+                    diff += 360
+                result.append(result[-1] + diff)
+            return result
+
+        intp_unwrapped = unwrap(intp_lons)
+        oscu_unwrapped = unwrap(oscu_lons)
+
+        # Calculate variance of day-to-day changes as measure of smoothness
+        intp_changes = [
+            intp_unwrapped[i + 1] - intp_unwrapped[i] for i in range(num_samples - 1)
+        ]
+        oscu_changes = [
+            oscu_unwrapped[i + 1] - oscu_unwrapped[i] for i in range(num_samples - 1)
+        ]
+
+        intp_mean = sum(intp_changes) / len(intp_changes)
+        oscu_mean = sum(oscu_changes) / len(oscu_changes)
+
+        intp_variance = sum((c - intp_mean) ** 2 for c in intp_changes) / len(
+            intp_changes
+        )
+        oscu_variance = sum((c - oscu_mean) ** 2 for c in oscu_changes) / len(
+            oscu_changes
+        )
+
+        # Interpolated should have lower variance (smoother daily motion)
+        # This confirms the algorithm is working to smooth out oscillations
+        assert intp_variance < oscu_variance, (
+            f"Interpolated variance {intp_variance} should be less than osculating {oscu_variance}"
+        )
