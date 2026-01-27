@@ -53,6 +53,11 @@ _SPK_BODY_MAP: dict[
     int, tuple[str, int]
 ] = {}  # Body mappings {ipl: (spk_file, naif_id)}
 
+# Auto SPK download configuration
+# When enabled, attempts to download SPK from JPL Horizons for minor bodies
+# before falling back to Keplerian propagation
+_AUTO_SPK_DOWNLOAD: Optional[bool] = None  # None = check env var, True/False = explicit
+
 
 def get_loader() -> Loader:
     """
@@ -562,7 +567,7 @@ def close() -> None:
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _LOADER, _PLANETS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
-    global _SPK_KERNELS, _SPK_BODY_MAP
+    global _SPK_KERNELS, _SPK_BODY_MAP, _AUTO_SPK_DOWNLOAD
 
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:
@@ -587,6 +592,7 @@ def close() -> None:
     _TIDAL_ACCELERATION = None
     _DELTA_T_USERDEF = None
     _LAPSE_RATE = None
+    _AUTO_SPK_DOWNLOAD = None
 
     # Close and clear SPK kernels
     for kernel in _SPK_KERNELS.values():
@@ -685,6 +691,79 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
     except Exception:
         # Return empty data on any error
         return ("", 0.0, 0.0, 0)
+
+
+# =============================================================================
+# AUTO SPK DOWNLOAD CONFIGURATION
+# =============================================================================
+
+# Environment variable name for auto SPK download
+_AUTO_SPK_ENV_VAR = "LIBEPHEMERIS_AUTO_SPK"
+
+
+def set_auto_spk_download(enabled: Optional[bool]) -> None:
+    """
+    Enable or disable automatic SPK download for minor bodies.
+
+    When enabled, the library will attempt to download high-precision SPK files
+    from JPL Horizons for minor bodies before falling back to Keplerian propagation.
+    This provides significantly better accuracy (~arcseconds vs ~arcminutes).
+
+    Args:
+        enabled: True to enable automatic SPK download, False to disable,
+                 or None to use the environment variable (LIBEPHEMERIS_AUTO_SPK).
+
+    Note:
+        - Requires the 'astroquery' package to be installed for downloads
+        - Downloads are cached in ~/.libephemeris/spk/ directory
+        - If astroquery is not available and auto-download is enabled,
+          the library will silently fall back to Keplerian propagation
+        - Set to False for offline use or to ensure consistent behavior
+
+    Environment Variable:
+        LIBEPHEMERIS_AUTO_SPK: Set to "1", "true", or "yes" to enable,
+                               "0", "false", or "no" to disable.
+                               Case-insensitive.
+
+    Example:
+        >>> from libephemeris import set_auto_spk_download, get_auto_spk_download
+        >>> set_auto_spk_download(True)  # Enable automatic SPK downloads
+        >>> get_auto_spk_download()
+        True
+        >>> set_auto_spk_download(None)  # Use environment variable
+    """
+    global _AUTO_SPK_DOWNLOAD
+    _AUTO_SPK_DOWNLOAD = enabled
+
+
+def get_auto_spk_download() -> bool:
+    """
+    Get the current auto SPK download setting.
+
+    Returns:
+        bool: True if automatic SPK download is enabled, False otherwise.
+
+    Note:
+        - If set_auto_spk_download() was called with an explicit value, returns that.
+        - Otherwise, checks the LIBEPHEMERIS_AUTO_SPK environment variable.
+        - If the environment variable is not set, returns False (disabled by default).
+
+    Example:
+        >>> from libephemeris import get_auto_spk_download
+        >>> get_auto_spk_download()  # Default is False
+        False
+        >>> import os
+        >>> os.environ['LIBEPHEMERIS_AUTO_SPK'] = '1'
+        >>> get_auto_spk_download()  # Now enabled via env var
+        True
+    """
+    # If explicitly set via function, use that value
+    if _AUTO_SPK_DOWNLOAD is not None:
+        return _AUTO_SPK_DOWNLOAD
+
+    # Otherwise check environment variable
+    env_value = os.environ.get(_AUTO_SPK_ENV_VAR, "").lower().strip()
+    return env_value in ("1", "true", "yes", "on", "enabled")
 
 
 # =============================================================================

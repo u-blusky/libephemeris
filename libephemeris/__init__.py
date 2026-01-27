@@ -62,6 +62,8 @@ from .state import (
     get_library_path as swe_get_library_path,
     get_current_file_data as swe_get_current_file_data,
     close as swe_close,
+    set_auto_spk_download,
+    get_auto_spk_download,
 )
 from .crossing import (
     swe_solcross_ut,
@@ -485,4 +487,7 @@ __all__ = [
     "download_and_register_spk",
     # Automatic SPK download module
     "spk_auto",
+    # Auto SPK download configuration
+    "set_auto_spk_download",
+    "get_auto_spk_download",
 ]

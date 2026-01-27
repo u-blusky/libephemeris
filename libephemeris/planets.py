@@ -187,6 +187,109 @@ def get_planet_name(planet_id: int) -> str:
     return f"Unknown ({planet_id})"
 
 
+def _try_auto_spk_download(t, ipl: int, iflag: int):
+    """
+    Try to automatically download and use SPK for a minor body.
+
+    This is called when auto SPK download is enabled and no SPK is registered
+    for the given body. It attempts to download the SPK from JPL Horizons
+    and then calculate the position using the downloaded data.
+
+    Args:
+        t: Skyfield Time object
+        ipl: Planet/body ID
+        iflag: Calculation flags
+
+    Returns:
+        Position tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+        or None if download fails or body not supported.
+
+    Note:
+        This function is called internally by _calc_body() when auto SPK
+        download is enabled. It handles all errors gracefully and returns
+        None to allow fallback to Keplerian propagation.
+    """
+    from . import spk_auto, spk, minor_bodies
+    from .constants import (
+        SE_CHIRON,
+        SE_PHOLUS,
+        SE_CERES,
+        SE_PALLAS,
+        SE_JUNO,
+        SE_VESTA,
+        SE_ERIS,
+        SE_SEDNA,
+        SE_HAUMEA,
+        SE_MAKEMAKE,
+        SE_IXION,
+        SE_ORCUS,
+        SE_QUAOAR,
+        NAIF_CHIRON,
+        NAIF_PHOLUS,
+        NAIF_CERES,
+        NAIF_PALLAS,
+        NAIF_JUNO,
+        NAIF_VESTA,
+        NAIF_ERIS,
+        NAIF_SEDNA,
+        NAIF_HAUMEA,
+        NAIF_MAKEMAKE,
+        NAIF_IXION,
+        NAIF_ORCUS,
+        NAIF_QUAOAR,
+    )
+
+    # Mapping of body IDs to (Horizons body_id, NAIF ID)
+    # The Horizons body_id is the asteroid number as a string
+    BODY_INFO = {
+        SE_CHIRON: ("2060", NAIF_CHIRON),
+        SE_PHOLUS: ("5145", NAIF_PHOLUS),
+        SE_CERES: ("1", NAIF_CERES),
+        SE_PALLAS: ("2", NAIF_PALLAS),
+        SE_JUNO: ("3", NAIF_JUNO),
+        SE_VESTA: ("4", NAIF_VESTA),
+        SE_ERIS: ("136199", NAIF_ERIS),
+        SE_SEDNA: ("90377", NAIF_SEDNA),
+        SE_HAUMEA: ("136108", NAIF_HAUMEA),
+        SE_MAKEMAKE: ("136472", NAIF_MAKEMAKE),
+        SE_IXION: ("28978", NAIF_IXION),
+        SE_ORCUS: ("90482", NAIF_ORCUS),
+        SE_QUAOAR: ("50000", NAIF_QUAOAR),
+    }
+
+    if ipl not in BODY_INFO:
+        return None
+
+    body_id, naif_id = BODY_INFO[ipl]
+
+    # Check if astroquery is available
+    if not spk_auto._check_astroquery_available():
+        return None
+
+    try:
+        # Calculate a reasonable date range for the SPK
+        # Use 10 years before and after the requested date
+        jd = t.tt
+        jd_start = jd - 3652.5  # ~10 years before
+        jd_end = jd + 3652.5  # ~10 years after
+
+        # Try to get or download SPK
+        spk_path = spk_auto.auto_get_spk(
+            body_id=body_id,
+            jd_start=jd_start,
+            jd_end=jd_end,
+            ipl=ipl,
+            naif_id=naif_id,
+        )
+
+        # Now try to calculate using the newly registered SPK
+        return spk.calc_spk_body_position(t, ipl, iflag)
+
+    except Exception:
+        # If anything fails, return None to fall back to Keplerian
+        return None
+
+
 def swe_calc_ut(
     tjd_ut: float, ipl: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -599,10 +702,21 @@ def _calc_body(
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
         # Try SPK kernel first (high precision)
         from . import spk
+        from .state import get_auto_spk_download
 
         spk_result = spk.calc_spk_body_position(t, ipl, iflag)
         if spk_result is not None:
             return spk_result, iflag
+
+        # Try automatic SPK download if enabled and body not registered
+        if get_auto_spk_download():
+            try:
+                spk_result = _try_auto_spk_download(t, ipl, iflag)
+                if spk_result is not None:
+                    return spk_result, iflag
+            except Exception:
+                # If auto-download fails, silently fall back to Keplerian
+                pass
 
         # Fallback to Keplerian approximation
         jd_tt = t.tt
