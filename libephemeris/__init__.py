@@ -169,6 +169,11 @@ from .spk import (  # SPK kernel support for high-precision minor body calculati
     download_and_register_spk,
 )
 from . import spk_auto  # Automatic SPK download and caching
+from .minor_bodies import (  # Generic asteroid lookup by number
+    calc_asteroid_by_number,
+    fetch_orbital_elements_from_sbdb,
+    clear_asteroid_elements_cache,
+)
 
 
 # =============================================================================

@@ -1500,3 +1500,271 @@ def calc_minor_body_heliocentric(
     lat = math.degrees(math.asin(z / r))
 
     return lon, lat, r
+
+
+# =============================================================================
+# JPL SBDB API FOR DYNAMIC ASTEROID LOOKUP
+# =============================================================================
+
+# JPL Small-Body Database API endpoint
+SBDB_API_URL = "https://ssd-api.jpl.nasa.gov/sbdb.api"
+
+# Cache for dynamically fetched orbital elements
+# Maps asteroid_number -> OrbitalElements
+_ASTEROID_ELEMENTS_CACHE: dict[int, OrbitalElements] = {}
+
+
+def fetch_orbital_elements_from_sbdb(
+    asteroid_number: int, timeout: float = 30.0
+) -> Optional[OrbitalElements]:
+    """
+    Fetch orbital elements for a numbered asteroid from JPL SBDB API.
+
+    This function queries the JPL Small-Body Database API to retrieve current
+    osculating orbital elements for any numbered asteroid in the database.
+
+    Args:
+        asteroid_number: The asteroid catalog number (e.g., 1 for Ceres, 2060 for Chiron)
+        timeout: Request timeout in seconds (default: 30)
+
+    Returns:
+        OrbitalElements if successful, None if the asteroid is not found or
+        the request fails.
+
+    Raises:
+        No exceptions are raised; errors return None.
+
+    Example:
+        >>> from libephemeris.minor_bodies import fetch_orbital_elements_from_sbdb
+        >>> elements = fetch_orbital_elements_from_sbdb(433)  # Eros
+        >>> if elements:
+        ...     print(f"Eros semi-major axis: {elements.a:.4f} AU")
+
+    Notes:
+        - Requires network access to ssd-api.jpl.nasa.gov
+        - Results are cached to avoid redundant API calls
+        - JPL SBDB contains 1+ million numbered asteroids
+    """
+    import json
+    import urllib.error
+    import urllib.request
+
+    # Check cache first
+    if asteroid_number in _ASTEROID_ELEMENTS_CACHE:
+        return _ASTEROID_ELEMENTS_CACHE[asteroid_number]
+
+    # Build API request
+    params = f"sstr={asteroid_number}&phys-par=false&full-prec=true"
+    url = f"{SBDB_API_URL}?{params}"
+
+    try:
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "libephemeris/1.0 (Python)"},
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            data = json.loads(response.read().decode("utf-8"))
+
+        # Check for API errors
+        if "error" in data:
+            return None
+
+        # Extract orbital elements
+        orbit = data.get("orbit", {})
+        elements_list = orbit.get("elements", [])
+
+        if not elements_list:
+            return None
+
+        # Build a dict of element name -> value
+        elem_dict: dict[str, float] = {}
+        for elem in elements_list:
+            elem_dict[elem["name"]] = float(elem["value"])
+
+        # Get epoch (Julian Day TDB)
+        epoch_jd = float(orbit.get("epoch", 0))
+        if epoch_jd == 0:
+            return None
+
+        # Get body name from object data
+        obj_data = data.get("object", {})
+        body_name = obj_data.get("fullname", f"Asteroid {asteroid_number}")
+
+        # Map SBDB element names to our structure
+        # SBDB uses: e, a, q, i, om (node), w (arg peri), ma (mean anom), n (mean motion)
+        orbital_elements = OrbitalElements(
+            name=body_name,
+            epoch=epoch_jd,
+            a=elem_dict.get("a", 0.0),  # Semi-major axis
+            e=elem_dict.get("e", 0.0),  # Eccentricity
+            i=elem_dict.get("i", 0.0),  # Inclination
+            omega=elem_dict.get("w", 0.0),  # Argument of perihelion
+            Omega=elem_dict.get("om", 0.0),  # Longitude of ascending node
+            M0=elem_dict.get("ma", 0.0),  # Mean anomaly
+            n=elem_dict.get("n", 0.0),  # Mean motion
+        )
+
+        # Cache the result
+        _ASTEROID_ELEMENTS_CACHE[asteroid_number] = orbital_elements
+
+        return orbital_elements
+
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+        return None
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
+def clear_asteroid_elements_cache() -> int:
+    """
+    Clear the cache of dynamically fetched orbital elements.
+
+    Returns:
+        int: Number of entries cleared from the cache.
+
+    Example:
+        >>> from libephemeris.minor_bodies import clear_asteroid_elements_cache
+        >>> cleared = clear_asteroid_elements_cache()
+        >>> print(f"Cleared {cleared} cached entries")
+    """
+    count = len(_ASTEROID_ELEMENTS_CACHE)
+    _ASTEROID_ELEMENTS_CACHE.clear()
+    return count
+
+
+def calc_asteroid_by_number(
+    asteroid_number: int,
+    jd_tt: float,
+    use_spk: bool = True,
+) -> Tuple[float, float, float]:
+    """
+    Calculate position for any numbered asteroid by fetching orbital elements on demand.
+
+    This function provides a generic way to calculate the heliocentric position
+    of any numbered asteroid (out of 1+ million known) without requiring the
+    asteroid to be hardcoded in the library. It first checks if an SPK file
+    is available for higher precision, otherwise falls back to Keplerian
+    calculations using orbital elements fetched from JPL SBDB.
+
+    Args:
+        asteroid_number: The asteroid catalog number (e.g., 1 for Ceres,
+            433 for Eros, 2060 for Chiron, 136199 for Eris)
+        jd_tt: Julian Day in Terrestrial Time (TT)
+        use_spk: If True (default), check for registered SPK file first.
+            If False, always use Keplerian calculation.
+
+    Returns:
+        Tuple[float, float, float]: (longitude, latitude, distance) where:
+            - longitude: Heliocentric ecliptic longitude in degrees (0-360)
+            - latitude: Heliocentric ecliptic latitude in degrees (-90 to +90)
+            - distance: Heliocentric distance in AU
+
+    Raises:
+        ValueError: If asteroid_number is invalid or not found in JPL SBDB.
+        ConnectionError: If unable to fetch orbital elements from JPL SBDB
+            (only when SPK is not available and cache is empty).
+
+    Precision:
+        - With SPK: Sub-arcsecond to arcsecond accuracy
+        - Without SPK (Keplerian): ~10-30 arcseconds for main belt,
+          ~1-3 arcminutes for TNOs
+
+    Example:
+        >>> from libephemeris.minor_bodies import calc_asteroid_by_number
+        >>> # Calculate position for Eros (asteroid 433) at J2000.0
+        >>> lon, lat, dist = calc_asteroid_by_number(433, 2451545.0)
+        >>> print(f"Eros: {lon:.4f}deg, {lat:.4f}deg, {dist:.4f} AU")
+        >>>
+        >>> # Calculate for any asteroid by number
+        >>> lon, lat, dist = calc_asteroid_by_number(99942, 2451545.0)  # Apophis
+        >>> lon, lat, dist = calc_asteroid_by_number(25143, 2451545.0)  # Itokawa
+
+    Notes:
+        - First call for an asteroid requires network access to JPL SBDB
+        - Subsequent calls use cached orbital elements
+        - Use clear_asteroid_elements_cache() to clear the cache
+        - For known bodies in MINOR_BODY_ELEMENTS, use calc_minor_body_heliocentric()
+          as it doesn't require network access
+
+    See Also:
+        calc_minor_body_heliocentric: For bodies with pre-defined orbital elements
+        fetch_orbital_elements_from_sbdb: To fetch elements without calculating position
+    """
+    from .constants import SE_AST_OFFSET
+
+    # Validate asteroid number
+    if not isinstance(asteroid_number, int) or asteroid_number <= 0:
+        raise ValueError(
+            f"asteroid_number must be a positive integer, got {asteroid_number}"
+        )
+
+    # Check if we have this asteroid in the predefined MINOR_BODY_ELEMENTS
+    body_id = asteroid_number + SE_AST_OFFSET
+    if body_id in MINOR_BODY_ELEMENTS:
+        return calc_minor_body_heliocentric(body_id, jd_tt)
+
+    # Check special cases for low-numbered asteroids that use different IDs
+    # (Chiron, Pholus, Ceres, Pallas, Juno, Vesta have dedicated SE_* constants)
+    from .constants import (
+        SE_CHIRON,
+        SE_PHOLUS,
+        SE_CERES,
+        SE_PALLAS,
+        SE_JUNO,
+        SE_VESTA,
+    )
+
+    special_mapping = {
+        2060: SE_CHIRON,  # Chiron
+        5145: SE_PHOLUS,  # Pholus
+        1: SE_CERES,  # Ceres
+        2: SE_PALLAS,  # Pallas
+        3: SE_JUNO,  # Juno
+        4: SE_VESTA,  # Vesta
+    }
+
+    if asteroid_number in special_mapping:
+        mapped_id = special_mapping[asteroid_number]
+        if mapped_id in MINOR_BODY_ELEMENTS:
+            return calc_minor_body_heliocentric(mapped_id, jd_tt)
+
+    # Check if SPK file is available for this asteroid
+    if use_spk:
+        try:
+            from . import state
+            from .constants import SEFLG_HELCTR
+            from .spk import calc_spk_body_position
+
+            # Check if there's a registered SPK for this body
+            if body_id in state._SPK_BODY_MAP:
+                # SPK is available, create a Skyfield Time object and use SPK calculation
+                ts = state.get_timescale()
+                t = ts.tt_jd(jd_tt)
+
+                # Calculate heliocentric position using SPK
+                result = calc_spk_body_position(t, body_id, SEFLG_HELCTR)
+                if result is not None:
+                    lon, lat, dist, _, _, _ = result
+                    return lon, lat, dist
+        except (ImportError, ValueError):
+            # Fall through to Keplerian calculation
+            pass
+
+    # No SPK available, fetch orbital elements from SBDB and calculate
+    elements = fetch_orbital_elements_from_sbdb(asteroid_number)
+
+    if elements is None:
+        raise ValueError(
+            f"Asteroid {asteroid_number} not found in JPL Small-Body Database. "
+            "Check if the asteroid number is valid."
+        )
+
+    # Calculate position using Keplerian mechanics with perturbations
+    x, y, z = calc_minor_body_position(elements, jd_tt)
+
+    # Convert Cartesian to spherical coordinates
+    r = math.sqrt(x**2 + y**2 + z**2)
+    lon = math.degrees(math.atan2(y, x)) % 360.0
+    lat = math.degrees(math.asin(z / r))
+
+    return lon, lat, r

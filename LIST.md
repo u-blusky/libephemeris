@@ -180,9 +180,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD BENNU ASTEROID TO CATALOG: Add asteroid 101955 Bennu to MINOR_BODY_ELEMENTS, target of OSIRIS-REx sample return mission, add SE_BENNU = 101955 + SE_AST_OFFSET.
 
-- [ ] ADD RYUGU ASTEROID TO CATALOG: Add asteroid 162173 Ryugu to MINOR_BODY_ELEMENTS, target of Hayabusa2 sample return mission, add SE_RYUGU = 162173 + SE_AST_OFFSET.
+- [x] ADD RYUGU ASTEROID TO CATALOG: Add asteroid 162173 Ryugu to MINOR_BODY_ELEMENTS, target of Hayabusa2 sample return mission, add SE_RYUGU = 162173 + SE_AST_OFFSET.
 
-- [ ] IMPLEMENT GENERIC ASTEROID LOOKUP BY NUMBER: Implement a function calc_asteroid_by_number(asteroid_number, jd_tt) that can calculate position for any numbered asteroid by fetching orbital elements from JPL SBDB API on demand or by checking if an SPK file is available, this allows users to request any of the 1+ million known asteroids without needing each one hardcoded.
+- [x] IMPLEMENT GENERIC ASTEROID LOOKUP BY NUMBER: Implement a function calc_asteroid_by_number(asteroid_number, jd_tt) that can calculate position for any numbered asteroid by fetching orbital elements from JPL SBDB API on demand or by checking if an SPK file is available, this allows users to request any of the 1+ million known asteroids without needing each one hardcoded.
 
 - [ ] ADD ASTEROID NAME LOOKUP: Implement function get_asteroid_number(name) that looks up an asteroid's catalog number by name using a local database or JPL SBDB query, useful for users who know the name but not the number.
 
