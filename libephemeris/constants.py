@@ -94,6 +94,9 @@ SE_DAVIDA: int = 511 + SE_AST_OFFSET  # Seventh largest asteroid, main belt
 SE_EUROPA_AST: int = (
     52 + SE_AST_OFFSET
 )  # 52 Europa (main belt asteroid, not Jupiter's moon)
+SE_SYLVIA: int = (
+    87 + SE_AST_OFFSET
+)  # 87 Sylvia (triple asteroid system with moons Romulus and Remus)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS

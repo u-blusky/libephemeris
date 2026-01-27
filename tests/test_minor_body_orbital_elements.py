@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 23 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 24 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -34,6 +34,7 @@ from libephemeris.constants import (
     SE_INTERAMNIA,
     SE_DAVIDA,
     SE_EUROPA_AST,
+    SE_SYLVIA,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -74,6 +75,7 @@ def all_minor_body_ids():
         SE_INTERAMNIA,
         SE_DAVIDA,
         SE_EUROPA_AST,
+        SE_SYLVIA,
     ]
 
 
@@ -90,9 +92,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 23 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 23, (
-            f"Expected 23 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 24 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 24, (
+            f"Expected 24 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -367,6 +369,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 7.0 < elements.i < 8.0, f"Europa i={elements.i} unexpected"
         # Mean motion consistent with ~5.4 year period
         assert 0.18 < elements.n < 0.19, f"Europa n={elements.n} unexpected"
+
+    def test_sylvia_triple_asteroid(self):
+        """Sylvia: Triple asteroid system with moons Romulus and Remus."""
+        elements = MINOR_BODY_ELEMENTS[SE_SYLVIA]
+        assert elements.name == "Sylvia"
+        # Semi-major axis ~3.48 AU (outer main belt)
+        assert 3.45 < elements.a < 3.55, f"Sylvia a={elements.a} unexpected"
+        # Low eccentricity ~0.09
+        assert 0.08 < elements.e < 0.11, f"Sylvia e={elements.e} unexpected"
+        # Moderate inclination ~10.9 degrees
+        assert 10.5 < elements.i < 11.5, f"Sylvia i={elements.i} unexpected"
+        # Mean motion consistent with ~6.5 year period
+        assert 0.15 < elements.n < 0.16, f"Sylvia n={elements.n} unexpected"
 
 
 @pytest.mark.unit

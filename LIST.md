@@ -152,9 +152,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD DAVIDA ASTEROID TO CATALOG: Add asteroid 511 Davida to MINOR_BODY_ELEMENTS, another large main belt asteroid, add SE_DAVIDA = 511 + SE_AST_OFFSET.
 
-- [ ] ADD EUROPA ASTEROID TO CATALOG: Add asteroid 52 Europa (not to be confused with Jupiter's moon) to MINOR_BODY_ELEMENTS, add SE_EUROPA_AST = 52 + SE_AST_OFFSET.
+- [x] ADD EUROPA ASTEROID TO CATALOG: Add asteroid 52 Europa (not to be confused with Jupiter's moon) to MINOR_BODY_ELEMENTS, add SE_EUROPA_AST = 52 + SE_AST_OFFSET.
 
-- [ ] ADD SYLVIA ASTEROID TO CATALOG: Add asteroid 87 Sylvia to MINOR_BODY_ELEMENTS, Sylvia has two small moons (Romulus and Remus) making it a triple asteroid system, add SE_SYLVIA = 87 + SE_AST_OFFSET.
+- [x] ADD SYLVIA ASTEROID TO CATALOG: Add asteroid 87 Sylvia to MINOR_BODY_ELEMENTS, Sylvia has two small moons (Romulus and Remus) making it a triple asteroid system, add SE_SYLVIA = 87 + SE_AST_OFFSET.
 
 - [ ] ADD PSYCHE ASTEROID TO CATALOG: Add asteroid 16 Psyche to MINOR_BODY_ELEMENTS, Psyche is a metallic M-type asteroid and the target of NASA's Psyche mission launching 2023, add SE_PSYCHE = 16 + SE_AST_OFFSET.
 

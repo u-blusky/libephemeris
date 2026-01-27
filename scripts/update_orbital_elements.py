@@ -85,6 +85,8 @@ BODY_SBDB_IDS: dict[str, str] = {
     "Hygiea": "10",  # 10 Hygiea (fourth largest asteroid, dwarf planet candidate)
     "Interamnia": "704",  # 704 Interamnia (fifth largest asteroid)
     "Davida": "511",  # 511 Davida (seventh largest asteroid)
+    "Europa": "52",  # 52 Europa (main belt asteroid, not Jupiter's moon)
+    "Sylvia": "87",  # 87 Sylvia (triple asteroid system with moons Romulus and Remus)
 }
 
 
