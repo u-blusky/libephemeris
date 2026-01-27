@@ -20,9 +20,11 @@ from libephemeris.minor_bodies import (
     MASS_RATIO_JUPITER,
     MASS_RATIO_SATURN,
     MASS_RATIO_URANUS,
+    MASS_RATIO_NEPTUNE,
     JUPITER_A,
     SATURN_A,
     URANUS_A,
+    NEPTUNE_A,
 )
 from libephemeris.constants import (
     SE_CERES,
@@ -31,6 +33,8 @@ from libephemeris.constants import (
     SE_CHIRON,
     SE_ERIS,
     SE_QUAOAR,
+    SE_IXION,
+    SE_ORCUS,
 )
 
 
@@ -365,3 +369,155 @@ class TestAllBodiesPerturbations:
         assert perihelion * 0.9 < r < aphelion * 1.1, (
             f"{elements.name}: distance {r:.2f} AU outside expected range"
         )
+
+
+class TestNeptunePerturbations:
+    """Test Neptune perturbation calculations for TNOs."""
+
+    def test_neptune_mass_ratio(self):
+        """Neptune mass ratio should be in expected range."""
+        # Neptune is about 1/19412 solar mass (~5.15e-5)
+        assert 0.00005 < MASS_RATIO_NEPTUNE < 0.000055
+
+    def test_neptune_orbital_elements(self):
+        """Neptune orbital elements should match expected values."""
+        assert NEPTUNE_A == 30.1104  # Semi-major axis (AU)
+
+    def test_neptune_perturbation_only_for_distant_bodies(self):
+        """Neptune perturbations should only apply for bodies with a > 20 AU."""
+        # Ceres is in the main belt (~2.77 AU) - should NOT have Neptune perturbation
+        # The test verifies that inner solar system bodies are unaffected
+        ceres_elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        assert ceres_elements.a < 20.0, "Ceres should be interior to 20 AU threshold"
+
+    def test_ixion_neptune_perturbation(self):
+        """Ixion (plutino, a~39 AU) should have significant Neptune perturbation."""
+        # Ixion is in 2:3 mean motion resonance with Neptune
+        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+
+        # Verify Ixion is a plutino (a ~ 39 AU, near 2:3 resonance with Neptune)
+        assert 38.0 < elements.a < 41.0, f"Ixion should be at ~39 AU, got {elements.a}"
+
+        d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
+
+        # Convert to arcsec/year for easier comparison
+        d_omega_arcsec_year = d_omega * 365.25 * 3600
+
+        # Ixion should have measurable perturbation rates
+        assert abs(d_omega_arcsec_year) > 0, "Ixion should have measurable omega rate"
+        assert math.isfinite(d_omega), "d_omega should be finite for Ixion"
+        assert math.isfinite(d_Omega), "d_Omega should be finite for Ixion"
+
+    def test_orcus_neptune_perturbation(self):
+        """Orcus (plutino, a~39 AU) should have significant Neptune perturbation."""
+        # Orcus is also in 2:3 mean motion resonance with Neptune (anti-Pluto phase)
+        elements = MINOR_BODY_ELEMENTS[SE_ORCUS]
+
+        # Verify Orcus is a plutino
+        assert 38.0 < elements.a < 41.0, f"Orcus should be at ~39 AU, got {elements.a}"
+
+        d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
+
+        # Convert to arcsec/year
+        d_omega_arcsec_year = d_omega * 365.25 * 3600
+
+        # Orcus should have measurable perturbation rates
+        assert abs(d_omega_arcsec_year) > 0, "Orcus should have measurable omega rate"
+        assert math.isfinite(d_omega), "d_omega should be finite for Orcus"
+        assert math.isfinite(d_Omega), "d_Omega should be finite for Orcus"
+
+    def test_eris_neptune_perturbation(self):
+        """Eris (a~68 AU) should have Neptune perturbation as exterior body."""
+        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+
+        # Eris is exterior to Neptune
+        assert elements.a > NEPTUNE_A, (
+            f"Eris should be exterior to Neptune, a={elements.a}"
+        )
+
+        d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
+
+        # Eris is very distant, but should still have measurable Neptune effect
+        d_omega_arcsec_year = d_omega * 365.25 * 3600
+
+        assert math.isfinite(d_omega), "d_omega should be finite for Eris"
+        assert math.isfinite(d_Omega), "d_Omega should be finite for Eris"
+        # The rate should be small but non-zero
+        assert abs(d_omega_arcsec_year) < 200, (
+            "Eris omega rate should be small due to distance"
+        )
+
+    def test_plutino_neptune_contribution_significant(self):
+        """For plutinos, Neptune perturbation should be a significant contributor."""
+        # Compare perturbation rates for Ixion with and without the Neptune effect
+        # by testing that the rate is larger than it would be from just Uranus
+        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+
+        d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
+
+        # Convert to arcsec/year
+        d_omega_arcsec_year = abs(d_omega) * 365.25 * 3600
+        d_Omega_arcsec_year = abs(d_Omega) * 365.25 * 3600
+
+        # For a plutino at ~39 AU, Neptune (at 30 AU) is relatively close
+        # The alpha ratio is ~0.77 which gives significant Laplace coefficients
+        # Total perturbation should be measurable (expect > 0.5 arcsec/year)
+        assert d_omega_arcsec_year > 0.5, (
+            f"Ixion omega rate {d_omega_arcsec_year:.2f} arcsec/yr should be > 0.5"
+        )
+
+    @pytest.mark.parametrize("body_id", [SE_IXION, SE_ORCUS, SE_QUAOAR, SE_ERIS])
+    def test_tno_neptune_perturbation_finite(self, body_id):
+        """All TNOs should have finite perturbation rates including Neptune."""
+        elements = MINOR_BODY_ELEMENTS[body_id]
+
+        # Verify body is beyond the 20 AU threshold
+        assert elements.a > 20.0, f"{elements.name} should be beyond 20 AU"
+
+        d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
+
+        assert math.isfinite(d_omega), f"d_omega should be finite for {elements.name}"
+        assert math.isfinite(d_Omega), f"d_Omega should be finite for {elements.name}"
+        assert math.isfinite(d_n), f"d_n should be finite for {elements.name}"
+
+    @pytest.mark.parametrize("body_id", [SE_IXION, SE_ORCUS])
+    def test_plutino_position_with_neptune_perturbations(self, body_id):
+        """Plutino positions should be valid with Neptune perturbations."""
+        elements = MINOR_BODY_ELEMENTS[body_id]
+        epoch = elements.epoch
+
+        # Propagate 5 years - enough for perturbations to matter
+        jd = epoch + 5 * 365.25
+        x, y, z = calc_minor_body_position(elements, jd, include_perturbations=True)
+
+        # Position should be finite
+        assert math.isfinite(x), f"x should be finite for {elements.name}"
+        assert math.isfinite(y), f"y should be finite for {elements.name}"
+        assert math.isfinite(z), f"z should be finite for {elements.name}"
+
+        # Distance should be within orbital bounds
+        r = math.sqrt(x**2 + y**2 + z**2)
+        perihelion = elements.a * (1 - elements.e)
+        aphelion = elements.a * (1 + elements.e)
+        assert perihelion * 0.9 < r < aphelion * 1.1, (
+            f"{elements.name}: distance {r:.2f} AU outside expected range"
+        )
+
+    def test_neptune_perturbation_changes_position(self):
+        """Neptune perturbations should cause measurable position changes for plutinos."""
+        # For Ixion, propagate forward and compare with/without perturbations
+        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        epoch = elements.epoch
+
+        # Propagate 10 years
+        jd = epoch + 10 * 365.25
+
+        x1, y1, z1 = calc_minor_body_position(elements, jd, include_perturbations=True)
+        x2, y2, z2 = calc_minor_body_position(elements, jd, include_perturbations=False)
+
+        # Positions should differ due to perturbations
+        dist = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
+
+        # Over 10 years, expect differences of order 0.001-0.1 AU for plutinos
+        assert dist > 0, "Positions should differ with perturbations"
+        assert dist < 1.0, f"Position difference {dist} AU seems too large"

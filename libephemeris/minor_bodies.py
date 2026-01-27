@@ -7,7 +7,7 @@ This module computes positions for:
 - Trans-Neptunian Objects (TNOs): Eris, Sedna, Haumea, Makemake, Orcus, Quaoar, Ixion
 
 Method: Keplerian orbital elements with first-order secular perturbations from
-Jupiter, Saturn, and Uranus. This provides significantly improved accuracy over pure
+Jupiter, Saturn, Uranus, and Neptune. This provides significantly improved accuracy over pure
 2-body dynamics, especially for propagation over multiple years.
 
 PRECISION:
@@ -17,7 +17,8 @@ PRECISION:
 
 PERTURBATION MODEL:
 - Applies secular perturbations to orbital elements (ω, Ω, mean anomaly)
-- Accounts for gravitational influence of Jupiter (dominant), Saturn, and Uranus
+- Accounts for gravitational influence of Jupiter (dominant), Saturn, Uranus, and Neptune
+- Neptune perturbations are critical for plutinos (2:3 resonance) like Ixion and Orcus
 - Uranus perturbations are significant for Trans-Neptunian Objects (TNOs)
 - Based on classical Laplace-Lagrange secular theory
 - Does NOT include: mean-motion resonances, close encounters, non-gravitational forces
@@ -92,6 +93,18 @@ URANUS_N = 0.01177  # Mean motion (degrees/day)
 
 # Mass ratio of Uranus relative to Sun
 MASS_RATIO_URANUS = 1.0 / 22902  # ~4.366e-5
+
+# Neptune mean elements (critical for TNO accuracy, especially plutinos)
+# Plutinos like Ixion and Orcus are in 2:3 mean motion resonance with Neptune
+NEPTUNE_A = 30.1104  # Semi-major axis (AU)
+NEPTUNE_E = 0.0086  # Mean eccentricity
+NEPTUNE_I = 1.769  # Mean inclination (degrees)
+NEPTUNE_OMEGA = 44.9  # Mean argument of perihelion (degrees)
+NEPTUNE_NODE = 131.7  # Mean longitude of ascending node (degrees)
+NEPTUNE_N = 0.006021  # Mean motion (degrees/day)
+
+# Mass ratio of Neptune relative to Sun
+MASS_RATIO_NEPTUNE = 1.0 / 19412  # ~5.153e-5
 
 
 @dataclass
@@ -178,7 +191,7 @@ def calc_secular_perturbation_rates(
     elements: OrbitalElements,
 ) -> Tuple[float, float, float]:
     """
-    Calculate secular perturbation rates for orbital elements due to Jupiter, Saturn, and Uranus.
+    Calculate secular perturbation rates for orbital elements due to Jupiter, Saturn, Uranus, and Neptune.
 
     Uses first-order Laplace-Lagrange secular perturbation theory to compute
     the time rates of change of the argument of perihelion (ω), longitude of
@@ -190,6 +203,10 @@ def calc_secular_perturbation_rates(
     - Small correction to mean motion due to non-Keplerian effects
 
     Note:
+        Neptune perturbations are critical for TNO accuracy, especially for
+        plutinos like Ixion and Orcus which are in 2:3 mean motion resonance
+        with Neptune. Neptune perturbations are only applied for bodies with
+        semi-major axis > 20 AU to avoid overhead for inner solar system objects.
         Uranus perturbations are particularly significant for Trans-Neptunian Objects
         (TNOs) where its gravitational influence is comparable to or greater than
         Saturn's influence.
@@ -325,6 +342,43 @@ def calc_secular_perturbation_rates(
         d_omega += math.degrees(d_omega_ura)
         d_Omega += math.degrees(d_Omega_ura)
 
+    # Calculate perturbations from Neptune (critical for TNO accuracy)
+    # Only apply for bodies with a > 20 AU to avoid overhead for inner solar system
+    # Neptune is especially important for plutinos like Ixion and Orcus (2:3 resonance)
+    if a > 20.0:
+        if a < NEPTUNE_A:
+            # Body is interior to Neptune (includes plutinos at ~39 AU)
+            alpha = a / NEPTUNE_A
+            b32_1 = _calc_laplace_coefficients(alpha, 1.5, 1)
+            factor = n_rad * MASS_RATIO_NEPTUNE * alpha * b32_1
+
+            d_omega_nep = factor * (1.0 / 4.0) * (2.0 + 1.5 * e * e) / (1.0 - e * e)
+            d_Omega_nep = (
+                -factor * (1.0 / 4.0) * math.cos(i_rad) / math.sqrt(1.0 - e * e)
+            )
+
+            d_omega += math.degrees(d_omega_nep)
+            d_Omega += math.degrees(d_Omega_nep)
+
+        elif a > NEPTUNE_A:
+            # Body is exterior to Neptune (most TNOs: Eris, Sedna, Haumea, etc.)
+            alpha = NEPTUNE_A / a
+            b32_1 = _calc_laplace_coefficients(alpha, 1.5, 1)
+            factor = n_rad * MASS_RATIO_NEPTUNE * alpha * b32_1
+
+            d_omega_nep = (
+                factor * (1.0 / 4.0) * (2.0 + 1.5 * e * e) / (max(0.01, 1.0 - e * e))
+            )
+            d_Omega_nep = (
+                -factor
+                * (1.0 / 4.0)
+                * math.cos(i_rad)
+                / math.sqrt(max(0.01, 1.0 - e * e))
+            )
+
+            d_omega += math.degrees(d_omega_nep)
+            d_Omega += math.degrees(d_Omega_nep)
+
     return d_omega, d_Omega, d_n
 
 
@@ -336,7 +390,8 @@ def apply_secular_perturbations(
 
     Takes the osculating orbital elements at epoch and applies first-order
     secular perturbation corrections to propagate them to the target time.
-    This accounts for the long-term drift in ω and Ω due to Jupiter, Saturn, and Uranus.
+    This accounts for the long-term drift in ω and Ω due to Jupiter, Saturn, Uranus,
+    and Neptune (for TNOs with a > 20 AU).
 
     Args:
         elements: Original orbital elements at epoch
