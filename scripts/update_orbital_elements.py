@@ -77,6 +77,7 @@ BODY_SBDB_IDS: dict[str, str] = {
     "Orcus": "90482",  # 90482 Orcus
     "Quaoar": "50000",  # 50000 Quaoar
     "Nessus": "7066",  # 7066 Nessus (centaur)
+    "Asbolus": "8405",  # 8405 Asbolus (centaur)
 }
 
 

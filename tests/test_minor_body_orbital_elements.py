@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 13 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 15 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -25,6 +25,7 @@ from libephemeris.constants import (
     SE_ORCUS,
     SE_QUAOAR,
     SE_NESSUS,
+    SE_ASBOLUS,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -56,6 +57,7 @@ def all_minor_body_ids():
         SE_ORCUS,
         SE_QUAOAR,
         SE_NESSUS,
+        SE_ASBOLUS,
     ]
 
 
@@ -72,9 +74,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 14 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 14, (
-            f"Expected 14 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 15 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 15, (
+            f"Expected 15 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -236,6 +238,17 @@ class TestSpecificBodiesOrbitalElements:
         assert 0.51 < elements.e < 0.53, f"Nessus e={elements.e} unexpected"
         # Inclination ~15.6 degrees
         assert 15.0 < elements.i < 16.5, f"Nessus i={elements.i} unexpected"
+
+    def test_asbolus_centaur(self):
+        """Asbolus: Centaur with orbit between Saturn and Uranus."""
+        elements = MINOR_BODY_ELEMENTS[SE_ASBOLUS]
+        assert elements.name == "Asbolus"
+        # Semi-major axis ~18 AU (between Saturn ~9.5 AU and Uranus ~19.2 AU)
+        assert 17.5 < elements.a < 18.5, f"Asbolus a={elements.a} unexpected"
+        # Highly eccentric orbit
+        assert 0.61 < elements.e < 0.63, f"Asbolus e={elements.e} unexpected"
+        # Inclination ~17.6 degrees
+        assert 17.0 < elements.i < 18.5, f"Asbolus i={elements.i} unexpected"
 
 
 @pytest.mark.unit
