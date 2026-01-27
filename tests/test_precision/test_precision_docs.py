@@ -478,8 +478,8 @@ class TestDocumentedLimitations:
     """Verify documented limitations are correctly described."""
 
     @pytest.mark.precision
-    def test_fixed_star_velocity_returns_zero(self):
-        """Verify fixed star velocities return 0 as documented."""
+    def test_fixed_star_velocity_is_small(self):
+        """Verify fixed star velocities are small but non-zero due to precession."""
         jd = 2451545.0
 
         # fixstar_ut returns (position, flags, error_string)
@@ -491,10 +491,11 @@ class TestDocumentedLimitations:
         if "not found" in error.lower():
             pytest.skip(f"Star not in catalog: {error}")
 
-        # Documented: velocities return 0
-        assert pos[3] == 0.0, "Fixed star lon velocity should be 0"
-        assert pos[4] == 0.0, "Fixed star lat velocity should be 0"
-        assert pos[5] == 0.0, "Fixed star dist velocity should be 0"
+        # Fixed stars have small non-zero velocities due to precession of equinoxes
+        # (approximately 3.8e-05 degrees/day), consistent with pyswisseph behavior
+        assert abs(pos[3]) < 0.001, "Fixed star lon velocity should be very small"
+        assert abs(pos[4]) < 0.001, "Fixed star lat velocity should be very small"
+        assert abs(pos[5]) < 0.001, "Fixed star dist velocity should be very small"
 
     @pytest.mark.precision
     def test_equal_whole_sign_work_at_polar_latitudes(self):

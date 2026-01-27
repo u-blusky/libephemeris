@@ -200,15 +200,19 @@ class TestMigrationGuideEphemerisContextState:
 class TestMigrationGuideNotImplemented:
     """Test features documented as not implemented in the migration guide."""
 
-    def test_fixed_star_velocities_are_zero(self):
-        """Test that fixed star velocities return 0 as documented."""
+    def test_fixed_star_velocities_are_small(self):
+        """Test that fixed star velocities are small but non-zero due to precession.
+
+        Fixed stars have small velocities (~3.8e-05 deg/day) due to precession
+        of equinoxes, consistent with pyswisseph behavior.
+        """
         jd = 2451545.0
 
         result = swe.fixstar_ut("Aldebaran", jd, SEFLG_SPEED)
         # fixstar_ut returns (pos, flag, starname)
         pos = result[0]
 
-        # Velocities should be 0 (not implemented)
-        assert pos[3] == 0.0, "Fixed star lon velocity should be 0"
-        assert pos[4] == 0.0, "Fixed star lat velocity should be 0"
-        assert pos[5] == 0.0, "Fixed star dist velocity should be 0"
+        # Velocities are very small but non-zero due to precession of equinoxes
+        assert abs(pos[3]) < 0.001, "Fixed star lon velocity should be very small"
+        assert abs(pos[4]) < 0.001, "Fixed star lat velocity should be very small"
+        assert abs(pos[5]) < 0.001, "Fixed star dist velocity should be very small"
