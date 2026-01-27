@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 22 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 23 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -33,6 +33,7 @@ from libephemeris.constants import (
     SE_HYGIEA,
     SE_INTERAMNIA,
     SE_DAVIDA,
+    SE_EUROPA_AST,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -72,6 +73,7 @@ def all_minor_body_ids():
         SE_HYGIEA,
         SE_INTERAMNIA,
         SE_DAVIDA,
+        SE_EUROPA_AST,
     ]
 
 
@@ -88,9 +90,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 21 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 22, (
-            f"Expected 22 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 23 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 23, (
+            f"Expected 23 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -352,6 +354,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 15.5 < elements.i < 16.5, f"Davida i={elements.i} unexpected"
         # Mean motion consistent with ~5.6 year period
         assert 0.17 < elements.n < 0.18, f"Davida n={elements.n} unexpected"
+
+    def test_europa_main_belt_asteroid(self):
+        """Europa: Main belt asteroid (not to be confused with Jupiter's moon)."""
+        elements = MINOR_BODY_ELEMENTS[SE_EUROPA_AST]
+        assert elements.name == "Europa"
+        # Semi-major axis ~3.09 AU (main belt)
+        assert 3.05 < elements.a < 3.15, f"Europa a={elements.a} unexpected"
+        # Low eccentricity ~0.11
+        assert 0.10 < elements.e < 0.13, f"Europa e={elements.e} unexpected"
+        # Low inclination ~7.5 degrees
+        assert 7.0 < elements.i < 8.0, f"Europa i={elements.i} unexpected"
+        # Mean motion consistent with ~5.4 year period
+        assert 0.18 < elements.n < 0.19, f"Europa n={elements.n} unexpected"
 
 
 @pytest.mark.unit
