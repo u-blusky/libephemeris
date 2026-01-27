@@ -605,6 +605,310 @@ def get_cache_info() -> dict[str, Union[int, float, str, list[str]]]:
 
 
 # =============================================================================
+# CACHE MANAGEMENT FUNCTIONS
+# =============================================================================
+
+
+def list_cached_spk(
+    cache_dir: Optional[str] = None,
+) -> list[dict[str, Union[str, float, int, None]]]:
+    """
+    List all cached SPK files with their date ranges and sizes.
+
+    This function scans the cache directory for SPK files and returns detailed
+    information about each file including its size, date range coverage, and
+    last access time.
+
+    Args:
+        cache_dir: Optional custom cache directory path. If None, checks both:
+            - The default cache directory ({library_path}/spk_cache/)
+            - The auto SPK directory (~/.libephemeris/spk/)
+
+    Returns:
+        list: A list of dictionaries, each containing:
+            - filename (str): Name of the SPK file
+            - path (str): Full path to the file
+            - size_bytes (int): File size in bytes
+            - size_mb (float): File size in megabytes
+            - jd_start (float or None): Start Julian Day from SPK coverage (if readable)
+            - jd_end (float or None): End Julian Day from SPK coverage (if readable)
+            - date_start (str or None): Start date in YYYY-MM-DD format (if readable)
+            - date_end (str or None): End date in YYYY-MM-DD format (if readable)
+            - last_accessed (float): Last access time as Unix timestamp
+
+    Example:
+        >>> from libephemeris.spk_auto import list_cached_spk
+        >>> cached_files = list_cached_spk()
+        >>> for f in cached_files:
+        ...     print(f"{f['filename']}: {f['size_mb']:.2f} MB")
+        ...     if f['date_start']:
+        ...         print(f"  Coverage: {f['date_start']} to {f['date_end']}")
+    """
+    from .spk import get_spk_coverage
+
+    result = []
+    dirs_to_check = []
+
+    if cache_dir is not None:
+        dirs_to_check = [os.path.abspath(cache_dir)]
+    else:
+        # Check both default cache directories
+        default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        dirs_to_check = [default_cache, DEFAULT_AUTO_SPK_DIR]
+
+    for dir_path in dirs_to_check:
+        if not os.path.exists(dir_path):
+            continue
+
+        for filename in os.listdir(dir_path):
+            if not filename.endswith(".bsp"):
+                continue
+
+            filepath = os.path.join(dir_path, filename)
+            stat_info = os.stat(filepath)
+
+            file_info: dict[str, Union[str, float, int, None]] = {
+                "filename": filename,
+                "path": filepath,
+                "size_bytes": stat_info.st_size,
+                "size_mb": round(stat_info.st_size / (1024 * 1024), 2),
+                "jd_start": None,
+                "jd_end": None,
+                "date_start": None,
+                "date_end": None,
+                "last_accessed": stat_info.st_atime,
+            }
+
+            # Try to get actual coverage from SPK file
+            try:
+                coverage = get_spk_coverage(filepath)
+                if coverage is not None:
+                    jd_start, jd_end = coverage
+                    file_info["jd_start"] = jd_start
+                    file_info["jd_end"] = jd_end
+                    file_info["date_start"] = _jd_to_iso_date(jd_start)
+                    file_info["date_end"] = _jd_to_iso_date(jd_end)
+            except Exception:
+                # If we can't read coverage, try to extract from filename
+                parts = filename[:-4].split("_")  # Remove .bsp
+                if len(parts) >= 3:
+                    try:
+                        file_jd_start = float(parts[-2])
+                        file_jd_end = float(parts[-1])
+                        file_info["jd_start"] = file_jd_start
+                        file_info["jd_end"] = file_jd_end
+                        file_info["date_start"] = _jd_to_iso_date(file_jd_start)
+                        file_info["date_end"] = _jd_to_iso_date(file_jd_end)
+                    except ValueError:
+                        pass
+
+            result.append(file_info)
+
+    return result
+
+
+def clear_spk_cache(cache_dir: Optional[str] = None) -> int:
+    """
+    Delete all cached SPK files.
+
+    This function removes all .bsp files from the cache directory. It does not
+    delete the directory itself, only the SPK files within it.
+
+    Warning: This operation cannot be undone. All cached SPK files will need
+    to be re-downloaded if needed.
+
+    Args:
+        cache_dir: Optional custom cache directory path. If None, clears both:
+            - The default cache directory ({library_path}/spk_cache/)
+            - The auto SPK directory (~/.libephemeris/spk/)
+
+    Returns:
+        int: Number of files deleted
+
+    Example:
+        >>> from libephemeris.spk_auto import clear_spk_cache, get_cache_size
+        >>> print(f"Cache size before: {get_cache_size():.2f} MB")
+        Cache size before: 15.32 MB
+        >>> deleted = clear_spk_cache()
+        >>> print(f"Deleted {deleted} files")
+        Deleted 5 files
+        >>> print(f"Cache size after: {get_cache_size():.2f} MB")
+        Cache size after: 0.00 MB
+    """
+    deleted_count = 0
+    dirs_to_clear = []
+
+    if cache_dir is not None:
+        dirs_to_clear = [os.path.abspath(cache_dir)]
+    else:
+        # Clear both default cache directories
+        default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        dirs_to_clear = [default_cache, DEFAULT_AUTO_SPK_DIR]
+
+    for dir_path in dirs_to_clear:
+        if not os.path.exists(dir_path):
+            continue
+
+        for filename in os.listdir(dir_path):
+            if not filename.endswith(".bsp"):
+                continue
+
+            filepath = os.path.join(dir_path, filename)
+            try:
+                os.remove(filepath)
+                deleted_count += 1
+            except OSError:
+                # Skip files that can't be deleted (e.g., permission issues)
+                pass
+
+    # Also clear the spk_path from any registered configurations
+    with _AUTO_SPK_LOCK:
+        for config in _AUTO_SPK_REGISTRY.values():
+            if config.spk_path and not os.path.exists(config.spk_path):
+                config.spk_path = None
+
+    return deleted_count
+
+
+def get_cache_size(cache_dir: Optional[str] = None) -> float:
+    """
+    Get the total disk usage of the SPK cache in megabytes.
+
+    This function calculates the combined size of all .bsp files in the
+    cache directory.
+
+    Args:
+        cache_dir: Optional custom cache directory path. If None, calculates
+            the combined size of both:
+            - The default cache directory ({library_path}/spk_cache/)
+            - The auto SPK directory (~/.libephemeris/spk/)
+
+    Returns:
+        float: Total size of cached SPK files in megabytes
+
+    Example:
+        >>> from libephemeris.spk_auto import get_cache_size
+        >>> size = get_cache_size()
+        >>> print(f"Total cache size: {size:.2f} MB")
+        Total cache size: 15.32 MB
+        >>> if size > 100:
+        ...     print("Consider pruning old cache files")
+    """
+    total_size = 0
+    dirs_to_check = []
+
+    if cache_dir is not None:
+        dirs_to_check = [os.path.abspath(cache_dir)]
+    else:
+        # Check both default cache directories
+        default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        dirs_to_check = [default_cache, DEFAULT_AUTO_SPK_DIR]
+
+    for dir_path in dirs_to_check:
+        if not os.path.exists(dir_path):
+            continue
+
+        for filename in os.listdir(dir_path):
+            if not filename.endswith(".bsp"):
+                continue
+
+            filepath = os.path.join(dir_path, filename)
+            try:
+                total_size += os.path.getsize(filepath)
+            except OSError:
+                pass
+
+    return round(total_size / (1024 * 1024), 2)
+
+
+def prune_old_cache(
+    max_age_days: int,
+    cache_dir: Optional[str] = None,
+) -> int:
+    """
+    Remove SPK files that have not been accessed recently.
+
+    This function removes cached SPK files whose last access time exceeds
+    the specified age threshold. This helps manage disk space by removing
+    files that are no longer in active use.
+
+    Args:
+        max_age_days: Maximum age in days since last access. Files not accessed
+            within this period will be deleted. Must be a positive integer.
+        cache_dir: Optional custom cache directory path. If None, prunes both:
+            - The default cache directory ({library_path}/spk_cache/)
+            - The auto SPK directory (~/.libephemeris/spk/)
+
+    Returns:
+        int: Number of files deleted
+
+    Raises:
+        ValueError: If max_age_days is not a positive integer
+
+    Example:
+        >>> from libephemeris.spk_auto import prune_old_cache, list_cached_spk
+        >>> # Remove files not accessed in the last 30 days
+        >>> pruned = prune_old_cache(max_age_days=30)
+        >>> print(f"Removed {pruned} old cache files")
+        Removed 3 old cache files
+        >>> # Check remaining files
+        >>> remaining = list_cached_spk()
+        >>> print(f"Remaining cached files: {len(remaining)}")
+
+    Note:
+        The access time is based on the file's last access timestamp (atime),
+        which may not be updated on all file systems. Some file systems mount
+        with 'noatime' for performance, which would prevent this from working
+        correctly.
+    """
+    import time
+
+    if not isinstance(max_age_days, int) or max_age_days <= 0:
+        raise ValueError("max_age_days must be a positive integer")
+
+    deleted_count = 0
+    current_time = time.time()
+    max_age_seconds = max_age_days * 24 * 60 * 60
+    dirs_to_prune = []
+
+    if cache_dir is not None:
+        dirs_to_prune = [os.path.abspath(cache_dir)]
+    else:
+        # Prune both default cache directories
+        default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        dirs_to_prune = [default_cache, DEFAULT_AUTO_SPK_DIR]
+
+    for dir_path in dirs_to_prune:
+        if not os.path.exists(dir_path):
+            continue
+
+        for filename in os.listdir(dir_path):
+            if not filename.endswith(".bsp"):
+                continue
+
+            filepath = os.path.join(dir_path, filename)
+            try:
+                stat_info = os.stat(filepath)
+                last_access = stat_info.st_atime
+                age_seconds = current_time - last_access
+
+                if age_seconds > max_age_seconds:
+                    os.remove(filepath)
+                    deleted_count += 1
+            except OSError:
+                # Skip files that can't be accessed or deleted
+                pass
+
+    # Also clear the spk_path from any registered configurations for deleted files
+    with _AUTO_SPK_LOCK:
+        for config in _AUTO_SPK_REGISTRY.values():
+            if config.spk_path and not os.path.exists(config.spk_path):
+                config.spk_path = None
+
+    return deleted_count
+
+
+# =============================================================================
 # PRESET CONFIGURATIONS
 # =============================================================================
 

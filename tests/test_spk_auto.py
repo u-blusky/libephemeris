@@ -1763,3 +1763,452 @@ class TestSpkRegistrationIntegration:
 
         assert 0 <= pos[0] < 360
         assert pos[2] > 0
+
+
+# =============================================================================
+# TESTS FOR SPK CACHE MANAGEMENT FUNCTIONS
+# =============================================================================
+
+
+class TestListCachedSpk:
+    """Test list_cached_spk function."""
+
+    def test_returns_empty_list_when_no_cache_dirs(self, tmp_path, monkeypatch):
+        """Returns empty list when no cache directories exist."""
+        # Monkeypatch default directories to non-existent paths
+        monkeypatch.setattr(
+            spk_auto, "DEFAULT_AUTO_SPK_DIR", str(tmp_path / "nonexistent1")
+        )
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.list_cached_spk()
+            assert result == []
+
+    def test_returns_empty_list_for_empty_directory(self, tmp_path):
+        """Returns empty list when cache directory is empty."""
+        result = spk_auto.list_cached_spk(cache_dir=str(tmp_path))
+        assert result == []
+
+    def test_lists_single_spk_file(self, tmp_path):
+        """Lists a single SPK file with basic info."""
+        # Create a dummy SPK file
+        spk_file = tmp_path / "test_body_2458849_2462502.bsp"
+        spk_file.write_bytes(b"x" * (1024 * 100))  # 100 KB
+
+        with patch("libephemeris.spk.get_spk_coverage", return_value=None):
+            result = spk_auto.list_cached_spk(cache_dir=str(tmp_path))
+
+        assert len(result) == 1
+        assert result[0]["filename"] == "test_body_2458849_2462502.bsp"
+        assert result[0]["path"] == str(spk_file)
+        assert result[0]["size_bytes"] == 1024 * 100
+        assert result[0]["size_mb"] > 0
+
+    def test_extracts_date_range_from_filename(self, tmp_path):
+        """Extracts date range from filename when SPK can't be parsed."""
+        spk_file = tmp_path / "2060_2458849_2462502.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        with patch("libephemeris.spk.get_spk_coverage", side_effect=Exception("err")):
+            result = spk_auto.list_cached_spk(cache_dir=str(tmp_path))
+
+        assert len(result) == 1
+        assert result[0]["jd_start"] == 2458849.0
+        assert result[0]["jd_end"] == 2462502.0
+        assert result[0]["date_start"] is not None
+        assert result[0]["date_end"] is not None
+
+    def test_uses_spk_coverage_when_available(self, tmp_path):
+        """Uses actual SPK coverage when file is parseable."""
+        spk_file = tmp_path / "chiron.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        with patch(
+            "libephemeris.spk.get_spk_coverage", return_value=(2450000.0, 2470000.0)
+        ):
+            result = spk_auto.list_cached_spk(cache_dir=str(tmp_path))
+
+        assert len(result) == 1
+        assert result[0]["jd_start"] == 2450000.0
+        assert result[0]["jd_end"] == 2470000.0
+
+    def test_lists_multiple_files(self, tmp_path):
+        """Lists multiple SPK files."""
+        (tmp_path / "body1.bsp").write_bytes(b"x" * 1000)
+        (tmp_path / "body2.bsp").write_bytes(b"y" * 2000)
+        (tmp_path / "body3.bsp").write_bytes(b"z" * 3000)
+        (tmp_path / "not_spk.txt").write_bytes(b"ignored")
+
+        with patch("libephemeris.spk.get_spk_coverage", return_value=None):
+            result = spk_auto.list_cached_spk(cache_dir=str(tmp_path))
+
+        assert len(result) == 3
+        filenames = [r["filename"] for r in result]
+        assert "body1.bsp" in filenames
+        assert "body2.bsp" in filenames
+        assert "body3.bsp" in filenames
+        assert "not_spk.txt" not in filenames
+
+    def test_includes_last_accessed_time(self, tmp_path):
+        """Includes last accessed time for each file."""
+        import time
+
+        spk_file = tmp_path / "test.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        with patch("libephemeris.spk.get_spk_coverage", return_value=None):
+            result = spk_auto.list_cached_spk(cache_dir=str(tmp_path))
+
+        assert len(result) == 1
+        assert "last_accessed" in result[0]
+        assert isinstance(result[0]["last_accessed"], float)
+        # Should be a recent timestamp (within last minute)
+        assert time.time() - result[0]["last_accessed"] < 60
+
+    def test_checks_both_default_directories(self, tmp_path, monkeypatch):
+        """Checks both default cache directories when no cache_dir specified."""
+        default_cache = tmp_path / "spk_cache"
+        auto_spk_dir = tmp_path / "auto_spk"
+        default_cache.mkdir()
+        auto_spk_dir.mkdir()
+
+        (default_cache / "file1.bsp").write_bytes(b"from default")
+        (auto_spk_dir / "file2.bsp").write_bytes(b"from auto")
+
+        monkeypatch.setattr(spk_auto, "DEFAULT_AUTO_SPK_DIR", str(auto_spk_dir))
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            with patch("libephemeris.spk.get_spk_coverage", return_value=None):
+                result = spk_auto.list_cached_spk()
+
+        assert len(result) == 2
+        filenames = [r["filename"] for r in result]
+        assert "file1.bsp" in filenames
+        assert "file2.bsp" in filenames
+
+
+class TestClearSpkCache:
+    """Test clear_spk_cache function."""
+
+    def test_returns_zero_when_no_cache_dirs(self, tmp_path, monkeypatch):
+        """Returns 0 when cache directories don't exist."""
+        monkeypatch.setattr(
+            spk_auto, "DEFAULT_AUTO_SPK_DIR", str(tmp_path / "nonexistent1")
+        )
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.clear_spk_cache()
+            assert result == 0
+
+    def test_returns_zero_for_empty_directory(self, tmp_path):
+        """Returns 0 when cache directory is empty."""
+        result = spk_auto.clear_spk_cache(cache_dir=str(tmp_path))
+        assert result == 0
+
+    def test_deletes_single_file(self, tmp_path):
+        """Deletes a single SPK file."""
+        spk_file = tmp_path / "test.bsp"
+        spk_file.write_bytes(b"dummy")
+        assert spk_file.exists()
+
+        result = spk_auto.clear_spk_cache(cache_dir=str(tmp_path))
+
+        assert result == 1
+        assert not spk_file.exists()
+
+    def test_deletes_multiple_files(self, tmp_path):
+        """Deletes multiple SPK files."""
+        (tmp_path / "file1.bsp").write_bytes(b"x")
+        (tmp_path / "file2.bsp").write_bytes(b"y")
+        (tmp_path / "file3.bsp").write_bytes(b"z")
+
+        result = spk_auto.clear_spk_cache(cache_dir=str(tmp_path))
+
+        assert result == 3
+        assert not (tmp_path / "file1.bsp").exists()
+        assert not (tmp_path / "file2.bsp").exists()
+        assert not (tmp_path / "file3.bsp").exists()
+
+    def test_ignores_non_bsp_files(self, tmp_path):
+        """Does not delete non-.bsp files."""
+        (tmp_path / "spk.bsp").write_bytes(b"delete me")
+        (tmp_path / "keep.txt").write_bytes(b"keep me")
+        (tmp_path / "config.json").write_bytes(b"keep me too")
+
+        result = spk_auto.clear_spk_cache(cache_dir=str(tmp_path))
+
+        assert result == 1
+        assert not (tmp_path / "spk.bsp").exists()
+        assert (tmp_path / "keep.txt").exists()
+        assert (tmp_path / "config.json").exists()
+
+    def test_clears_both_default_directories(self, tmp_path, monkeypatch):
+        """Clears both default cache directories."""
+        default_cache = tmp_path / "spk_cache"
+        auto_spk_dir = tmp_path / "auto_spk"
+        default_cache.mkdir()
+        auto_spk_dir.mkdir()
+
+        (default_cache / "file1.bsp").write_bytes(b"x")
+        (auto_spk_dir / "file2.bsp").write_bytes(b"y")
+
+        monkeypatch.setattr(spk_auto, "DEFAULT_AUTO_SPK_DIR", str(auto_spk_dir))
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.clear_spk_cache()
+
+        assert result == 2
+        assert not (default_cache / "file1.bsp").exists()
+        assert not (auto_spk_dir / "file2.bsp").exists()
+
+    def test_clears_spk_path_from_registry(self, tmp_path, monkeypatch):
+        """Clears spk_path from registered configurations."""
+        spk_file = tmp_path / "test.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        # Create a mock config with spk_path set
+        config = spk_auto.AutoSpkConfig(ipl=SE_CHIRON, body_id="2060")
+        config.spk_path = str(spk_file)
+
+        with patch.object(spk_auto, "_AUTO_SPK_REGISTRY", {SE_CHIRON: config}):
+            spk_auto.clear_spk_cache(cache_dir=str(tmp_path))
+
+            # spk_path should be cleared since file was deleted
+            assert config.spk_path is None
+
+
+class TestGetCacheSize:
+    """Test get_cache_size function."""
+
+    def test_returns_zero_when_no_cache_dirs(self, tmp_path, monkeypatch):
+        """Returns 0 when cache directories don't exist."""
+        monkeypatch.setattr(
+            spk_auto, "DEFAULT_AUTO_SPK_DIR", str(tmp_path / "nonexistent1")
+        )
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.get_cache_size()
+            assert result == 0.0
+
+    def test_returns_zero_for_empty_directory(self, tmp_path):
+        """Returns 0 when cache directory is empty."""
+        result = spk_auto.get_cache_size(cache_dir=str(tmp_path))
+        assert result == 0.0
+
+    def test_calculates_single_file_size(self, tmp_path):
+        """Calculates size of a single SPK file."""
+        # Create a 1 MB file
+        spk_file = tmp_path / "test.bsp"
+        spk_file.write_bytes(b"x" * (1024 * 1024))
+
+        result = spk_auto.get_cache_size(cache_dir=str(tmp_path))
+
+        assert result == 1.0
+
+    def test_sums_multiple_file_sizes(self, tmp_path):
+        """Sums sizes of multiple SPK files."""
+        (tmp_path / "file1.bsp").write_bytes(b"x" * (1024 * 1024))  # 1 MB
+        (tmp_path / "file2.bsp").write_bytes(b"y" * (1024 * 512))  # 0.5 MB
+        (tmp_path / "file3.bsp").write_bytes(b"z" * (1024 * 1024 * 2))  # 2 MB
+
+        result = spk_auto.get_cache_size(cache_dir=str(tmp_path))
+
+        assert result == 3.5
+
+    def test_ignores_non_bsp_files(self, tmp_path):
+        """Does not count non-.bsp files."""
+        (tmp_path / "spk.bsp").write_bytes(b"x" * (1024 * 1024))  # 1 MB
+        (tmp_path / "other.txt").write_bytes(b"y" * (1024 * 1024 * 10))  # 10 MB
+
+        result = spk_auto.get_cache_size(cache_dir=str(tmp_path))
+
+        assert result == 1.0
+
+    def test_sums_both_default_directories(self, tmp_path, monkeypatch):
+        """Sums sizes from both default cache directories."""
+        default_cache = tmp_path / "spk_cache"
+        auto_spk_dir = tmp_path / "auto_spk"
+        default_cache.mkdir()
+        auto_spk_dir.mkdir()
+
+        (default_cache / "file1.bsp").write_bytes(b"x" * (1024 * 1024))  # 1 MB
+        (auto_spk_dir / "file2.bsp").write_bytes(b"y" * (1024 * 1024 * 2))  # 2 MB
+
+        monkeypatch.setattr(spk_auto, "DEFAULT_AUTO_SPK_DIR", str(auto_spk_dir))
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.get_cache_size()
+
+        assert result == 3.0
+
+
+class TestPruneOldCache:
+    """Test prune_old_cache function."""
+
+    def test_raises_for_invalid_max_age(self, tmp_path):
+        """Raises ValueError for invalid max_age_days."""
+        with pytest.raises(ValueError) as exc_info:
+            spk_auto.prune_old_cache(max_age_days=0, cache_dir=str(tmp_path))
+        assert "positive integer" in str(exc_info.value)
+
+        with pytest.raises(ValueError) as exc_info:
+            spk_auto.prune_old_cache(max_age_days=-5, cache_dir=str(tmp_path))
+        assert "positive integer" in str(exc_info.value)
+
+    def test_raises_for_non_integer_max_age(self, tmp_path):
+        """Raises ValueError for non-integer max_age_days."""
+        with pytest.raises(ValueError) as exc_info:
+            spk_auto.prune_old_cache(max_age_days=5.5, cache_dir=str(tmp_path))  # type: ignore
+        assert "positive integer" in str(exc_info.value)
+
+    def test_returns_zero_when_no_cache_dirs(self, tmp_path, monkeypatch):
+        """Returns 0 when cache directories don't exist."""
+        monkeypatch.setattr(
+            spk_auto, "DEFAULT_AUTO_SPK_DIR", str(tmp_path / "nonexistent1")
+        )
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.prune_old_cache(max_age_days=30)
+            assert result == 0
+
+    def test_returns_zero_for_empty_directory(self, tmp_path):
+        """Returns 0 when cache directory is empty."""
+        result = spk_auto.prune_old_cache(max_age_days=30, cache_dir=str(tmp_path))
+        assert result == 0
+
+    def test_keeps_recently_accessed_files(self, tmp_path):
+        """Does not delete recently accessed files."""
+        spk_file = tmp_path / "recent.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        result = spk_auto.prune_old_cache(max_age_days=30, cache_dir=str(tmp_path))
+
+        assert result == 0
+        assert spk_file.exists()
+
+    def test_deletes_old_files(self, tmp_path):
+        """Deletes files older than max_age_days."""
+        import time
+
+        spk_file = tmp_path / "old.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        # Set access time to 60 days ago
+        old_time = time.time() - (60 * 24 * 60 * 60)
+        os.utime(spk_file, (old_time, os.stat(spk_file).st_mtime))
+
+        result = spk_auto.prune_old_cache(max_age_days=30, cache_dir=str(tmp_path))
+
+        assert result == 1
+        assert not spk_file.exists()
+
+    def test_deletes_only_old_files(self, tmp_path):
+        """Deletes only files older than threshold."""
+        import time
+
+        old_file = tmp_path / "old.bsp"
+        new_file = tmp_path / "new.bsp"
+        old_file.write_bytes(b"old")
+        new_file.write_bytes(b"new")
+
+        # Set old file access time to 60 days ago
+        old_time = time.time() - (60 * 24 * 60 * 60)
+        os.utime(old_file, (old_time, os.stat(old_file).st_mtime))
+
+        result = spk_auto.prune_old_cache(max_age_days=30, cache_dir=str(tmp_path))
+
+        assert result == 1
+        assert not old_file.exists()
+        assert new_file.exists()
+
+    def test_ignores_non_bsp_files(self, tmp_path):
+        """Does not prune non-.bsp files."""
+        import time
+
+        bsp_file = tmp_path / "old.bsp"
+        txt_file = tmp_path / "old.txt"
+        bsp_file.write_bytes(b"bsp")
+        txt_file.write_bytes(b"txt")
+
+        # Set both files' access time to 60 days ago
+        old_time = time.time() - (60 * 24 * 60 * 60)
+        os.utime(bsp_file, (old_time, os.stat(bsp_file).st_mtime))
+        os.utime(txt_file, (old_time, os.stat(txt_file).st_mtime))
+
+        result = spk_auto.prune_old_cache(max_age_days=30, cache_dir=str(tmp_path))
+
+        assert result == 1
+        assert not bsp_file.exists()
+        assert txt_file.exists()
+
+    def test_prunes_both_default_directories(self, tmp_path, monkeypatch):
+        """Prunes old files from both default cache directories."""
+        import time
+
+        default_cache = tmp_path / "spk_cache"
+        auto_spk_dir = tmp_path / "auto_spk"
+        default_cache.mkdir()
+        auto_spk_dir.mkdir()
+
+        old_file1 = default_cache / "old1.bsp"
+        old_file2 = auto_spk_dir / "old2.bsp"
+        old_file1.write_bytes(b"x")
+        old_file2.write_bytes(b"y")
+
+        # Set both files' access time to 60 days ago
+        old_time = time.time() - (60 * 24 * 60 * 60)
+        os.utime(old_file1, (old_time, os.stat(old_file1).st_mtime))
+        os.utime(old_file2, (old_time, os.stat(old_file2).st_mtime))
+
+        monkeypatch.setattr(spk_auto, "DEFAULT_AUTO_SPK_DIR", str(auto_spk_dir))
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.prune_old_cache(max_age_days=30)
+
+        assert result == 2
+        assert not old_file1.exists()
+        assert not old_file2.exists()
+
+    def test_clears_spk_path_from_registry(self, tmp_path):
+        """Clears spk_path from registered configurations for deleted files."""
+        import time
+
+        spk_file = tmp_path / "old.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        # Set access time to 60 days ago
+        old_time = time.time() - (60 * 24 * 60 * 60)
+        os.utime(spk_file, (old_time, os.stat(spk_file).st_mtime))
+
+        # Create a mock config with spk_path set
+        config = spk_auto.AutoSpkConfig(ipl=SE_CHIRON, body_id="2060")
+        config.spk_path = str(spk_file)
+
+        with patch.object(spk_auto, "_AUTO_SPK_REGISTRY", {SE_CHIRON: config}):
+            spk_auto.prune_old_cache(max_age_days=30, cache_dir=str(tmp_path))
+
+            # spk_path should be cleared since file was deleted
+            assert config.spk_path is None
+
+
+class TestCacheManagementExports:
+    """Test that cache management functions are properly exported."""
+
+    def test_list_cached_spk_accessible(self):
+        """list_cached_spk is accessible from spk_auto module."""
+        assert hasattr(spk_auto, "list_cached_spk")
+        assert callable(spk_auto.list_cached_spk)
+
+    def test_clear_spk_cache_accessible(self):
+        """clear_spk_cache is accessible from spk_auto module."""
+        assert hasattr(spk_auto, "clear_spk_cache")
+        assert callable(spk_auto.clear_spk_cache)
+
+    def test_get_cache_size_accessible(self):
+        """get_cache_size is accessible from spk_auto module."""
+        assert hasattr(spk_auto, "get_cache_size")
+        assert callable(spk_auto.get_cache_size)
+
+    def test_prune_old_cache_accessible(self):
+        """prune_old_cache is accessible from spk_auto module."""
+        assert hasattr(spk_auto, "prune_old_cache")
+        assert callable(spk_auto.prune_old_cache)
+
+    def test_functions_accessible_via_libephemeris(self):
+        """Cache management functions accessible via libephemeris.spk_auto."""
+        assert hasattr(eph.spk_auto, "list_cached_spk")
+        assert hasattr(eph.spk_auto, "clear_spk_cache")
+        assert hasattr(eph.spk_auto, "get_cache_size")
+        assert hasattr(eph.spk_auto, "prune_old_cache")
