@@ -2626,8 +2626,55 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     """
     Calculate the Interpolated (Natural) Lunar Perigee.
 
-    The interpolated perigee is 180° opposite to the interpolated apogee.
-    See calc_interpolated_apogee() for detailed documentation.
+    The interpolated perigee is a smoothed version of the osculating perigee that
+    removes the spurious short-period oscillations caused by the instantaneous
+    nature of osculating orbital elements. This function performs the interpolation
+    directly on perigee values for consistency, rather than deriving it from the
+    interpolated apogee.
+
+    Physical Background
+    ===================
+
+    The osculating perigee is calculated from instantaneous orbital elements that
+    change rapidly due to solar perturbations. As described in the Swiss Ephemeris
+    documentation (section 2.2.4):
+
+        "The solar perturbation results in gigantic monthly oscillations in the
+        ephemeris of the osculating apsides (the amplitude is 30 degrees). These
+        oscillations have to be considered an artifact of the insufficient model,
+        they do not really show a motion of the apsides."
+
+    The interpolated perigee removes these spurious oscillations to reveal the
+    "natural" perigee position - representing the true apsidal line orientation.
+
+    Key Characteristics of the Natural Perigee
+    ==========================================
+
+    According to Swiss Ephemeris research:
+
+    1. **Perigee oscillates ~25° from mean position** (vs. apogee which oscillates ~5°)
+    2. **Apogee and perigee are not exactly opposite** - they are only roughly
+       opposite when the Sun is in conjunction with one of them or at 90° angle
+    3. **The curves should be continuous** - both position and velocity
+
+    Implementation
+    ==============
+
+    This function samples osculating perigee positions (computed as osculating
+    apogee + 180°) at multiple points and applies polynomial regression to smooth
+    out the short-period oscillations. The interpolation is done directly on the
+    perigee values, not derived from the interpolated apogee.
+
+    **Sampling Strategy:**
+        - Sample osculating perigee positions at 7 points spanning approximately
+          half a synodic month (~14.77 days)
+        - Sample times: t-7d, t-4.67d, t-2.33d, t, t+2.33d, t+4.67d, t+7d
+        - This captures the dominant ~14.77-day (2D) oscillation cycle
+
+    **Polynomial Regression (Least Squares):**
+        - Fit a 2nd-degree polynomial through the sampled points
+        - The low-degree polynomial smooths out high-frequency oscillations
+        - 7 points with degree 2 gives 5 degrees of freedom for smoothing
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT).
@@ -2635,23 +2682,105 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     Returns:
         Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
             - longitude: Ecliptic longitude of interpolated perigee in degrees [0, 360)
-            - latitude: Ecliptic latitude in degrees (negated from apogee)
-            - eccentricity: Orbital eccentricity magnitude
+            - latitude: Ecliptic latitude in degrees (from central sample, negated)
+            - eccentricity: Orbital eccentricity magnitude (from central sample)
 
     References:
         - Swiss Ephemeris documentation, section 2.2.4 "The Interpolated or
           Natural Apogee and Perigee"
+        - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+        - Dieter Koch, "Was ist Lilith und welche Ephemeride ist richtig", Meridian 1/95
+        - Dieter Koch & Bernhard Rindgen, "Lilith und Priapus", Frankfurt/Main, 2000
     """
-    # Calculate interpolated apogee
-    apogee_lon, apogee_lat, ecc = calc_interpolated_apogee(jd_tt)
+    # Sampling parameters
+    # Half synodic month ≈ 14.77 days; use 7 days on each side
+    # 7 sample points at approximately 2.33-day intervals
+    num_samples = 7
+    half_window_days = 7.0  # ~half a synodic half-month
 
-    # Perigee is 180° opposite to apogee
-    perigee_lon = (apogee_lon + 180.0) % 360.0
+    # Generate sample times centered on the target time
+    # Positions: t-7d, t-4.67d, t-2.33d, t, t+2.33d, t+4.67d, t+7d
+    sample_times = []
+    for i in range(num_samples):
+        offset = -half_window_days + (2 * half_window_days * i / (num_samples - 1))
+        sample_times.append(jd_tt + offset)
 
-    # Latitude is negated (opposite direction)
-    perigee_lat = -apogee_lat
+    # Sample the osculating perigee at each time
+    # Perigee is computed as osculating apogee (calc_true_lilith) + 180°
+    sample_lons = []
+    sample_lats = []
+    sample_eccs = []
 
-    return perigee_lon, perigee_lat, ecc
+    for sample_jd in sample_times:
+        apogee_lon, apogee_lat, ecc = calc_true_lilith(sample_jd)
+        # Perigee is 180° from apogee
+        perigee_lon = (apogee_lon + 180.0) % 360.0
+        perigee_lat = -apogee_lat  # Latitude is negated
+        sample_lons.append(perigee_lon)
+        sample_lats.append(perigee_lat)
+        sample_eccs.append(ecc)
+
+    # Unwrap longitudes to handle 0°/360° discontinuity
+    # This ensures the polynomial fit works correctly across the boundary
+    unwrapped_lons = [sample_lons[0]]
+    for i in range(1, len(sample_lons)):
+        diff = sample_lons[i] - sample_lons[i - 1]
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        unwrapped_lons.append(unwrapped_lons[-1] + diff)
+
+    # Use polynomial regression (least squares) for smoothing
+    # A 2nd-degree polynomial (quadratic) will smooth out the ~14.77-day oscillations
+    # while capturing the underlying linear motion of the perigee
+    # Using degree 2 with 7 points gives 5 degrees of freedom for smoothing
+    poly_degree = 2
+
+    # Normalize time to [-1, 1] for numerical stability
+    t_center = jd_tt
+    t_scale = half_window_days
+
+    # Normalized time values
+    t_norm = [(t - t_center) / t_scale for t in sample_times]
+
+    # Build Vandermonde matrix for polynomial fit (least squares)
+    # Each row is [1, t, t²] for quadratic fit
+    V = []
+    for t in t_norm:
+        row = [t**j for j in range(poly_degree + 1)]
+        V.append(row)
+
+    # Solve the normal equations: (V^T V) c = V^T y
+    # Using explicit matrix operations
+    VTV = [[0.0] * (poly_degree + 1) for _ in range(poly_degree + 1)]
+    VTy = [0.0] * (poly_degree + 1)
+
+    for i in range(poly_degree + 1):
+        for j in range(poly_degree + 1):
+            for k in range(num_samples):
+                VTV[i][j] += V[k][i] * V[k][j]
+        for k in range(num_samples):
+            VTy[i] += V[k][i] * unwrapped_lons[k]
+
+    # Solve the linear system using Gaussian elimination
+    coeffs = _solve_linear_system(VTV, VTy)
+
+    # Evaluate polynomial at target time (t_norm = 0)
+    # Since t_norm = (jd_tt - t_center) / t_scale = 0, we just need coeffs[0]
+    t_target_norm = 0.0
+    interp_lon = sum(coeffs[j] * (t_target_norm**j) for j in range(poly_degree + 1))
+
+    # Normalize longitude to [0, 360)
+    interp_lon = interp_lon % 360.0
+
+    # For latitude and eccentricity, use values from the central sample
+    # (the interpolation is primarily for longitude where oscillations are significant)
+    central_idx = num_samples // 2
+    interp_lat = sample_lats[central_idx]
+    interp_ecc = sample_eccs[central_idx]
+
+    return interp_lon, interp_lat, interp_ecc
 
 
 def _solve_linear_system(A: list, b: list) -> list:
