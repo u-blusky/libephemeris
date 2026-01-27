@@ -35,6 +35,7 @@ from libephemeris.constants import (
     SE_DAVIDA,
     SE_EUROPA_AST,
     SE_SYLVIA,
+    SE_PSYCHE,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -76,6 +77,7 @@ def all_minor_body_ids():
         SE_DAVIDA,
         SE_EUROPA_AST,
         SE_SYLVIA,
+        SE_PSYCHE,
     ]
 
 
@@ -92,9 +94,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 24 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 24, (
-            f"Expected 24 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 25 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 25, (
+            f"Expected 25 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -382,6 +384,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 10.5 < elements.i < 11.5, f"Sylvia i={elements.i} unexpected"
         # Mean motion consistent with ~6.5 year period
         assert 0.15 < elements.n < 0.16, f"Sylvia n={elements.n} unexpected"
+
+    def test_psyche_metallic_asteroid(self):
+        """Psyche: Metallic M-type asteroid, target of NASA Psyche mission."""
+        elements = MINOR_BODY_ELEMENTS[SE_PSYCHE]
+        assert elements.name == "Psyche"
+        # Semi-major axis ~2.92 AU (main belt)
+        assert 2.90 < elements.a < 2.95, f"Psyche a={elements.a} unexpected"
+        # Low eccentricity ~0.13
+        assert 0.12 < elements.e < 0.15, f"Psyche e={elements.e} unexpected"
+        # Low inclination ~3.1 degrees
+        assert 2.5 < elements.i < 3.5, f"Psyche i={elements.i} unexpected"
+        # Mean motion consistent with ~5.0 year period
+        assert 0.19 < elements.n < 0.21, f"Psyche n={elements.n} unexpected"
 
 
 @pytest.mark.unit

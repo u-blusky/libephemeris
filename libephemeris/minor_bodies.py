@@ -58,6 +58,7 @@ from .constants import (
     SE_DAVIDA,
     SE_EUROPA_AST,
     SE_SYLVIA,
+    SE_PSYCHE,
 )
 
 
@@ -986,6 +987,17 @@ MINOR_BODY_ELEMENTS = {
         Omega=73.01146029932147,
         M0=94.95962367758351,
         n=0.151526942166858,  # ~6.5 year period
+    ),
+    SE_PSYCHE: OrbitalElements(
+        name="Psyche",
+        epoch=2461000.5,
+        a=2.923314514376521,  # Main belt asteroid (~226 km, metallic M-type, NASA Psyche mission target)
+        e=0.1343462202634327,  # Low eccentricity
+        i=3.097291662719076,  # Low inclination
+        omega=229.7534129677803,
+        Omega=150.0098773790708,
+        M0=40.63883784197816,
+        n=0.1971926664511637,  # ~5.0 year period
     ),
 }
 

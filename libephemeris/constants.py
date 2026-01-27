@@ -97,6 +97,9 @@ SE_EUROPA_AST: int = (
 SE_SYLVIA: int = (
     87 + SE_AST_OFFSET
 )  # 87 Sylvia (triple asteroid system with moons Romulus and Remus)
+SE_PSYCHE: int = (
+    16 + SE_AST_OFFSET
+)  # 16 Psyche (metallic M-type asteroid, NASA Psyche mission target)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
