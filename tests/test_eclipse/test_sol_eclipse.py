@@ -356,9 +356,34 @@ class TestSolEclipseWhenLoc:
 
         assert times[0] > jd_start
 
-    def test_alias_matches_main_function(self):
-        """swe_sol_eclipse_when_loc should be an alias for sol_eclipse_when_loc."""
-        assert swe_sol_eclipse_when_loc is sol_eclipse_when_loc
+    def test_swe_version_provides_pyswisseph_compatible_interface(self):
+        """swe_sol_eclipse_when_loc provides pyswisseph-compatible interface.
+
+        Note: swe_sol_eclipse_when_loc has a different signature than sol_eclipse_when_loc
+        to match pyswisseph conventions (geopos sequence vs individual lat/lon/alt params).
+        They are distinct functions that produce equivalent results.
+        """
+        from libephemeris import SEFLG_SWIEPH
+
+        jd_start = swe_julday(2024, 1, 1, 0)
+        lat, lon, altitude = 35.0, -100.0, 0.0
+
+        # Call sol_eclipse_when_loc (libephemeris-style)
+        times1, attr1, ecl_type1 = sol_eclipse_when_loc(
+            jd_start, lat, lon, altitude=altitude
+        )
+
+        # Call swe_sol_eclipse_when_loc (pyswisseph-style with geopos sequence)
+        geopos = (lon, lat, altitude)  # Note: pyswisseph uses (lon, lat, alt) order
+        times2, attr2, ecl_type2 = swe_sol_eclipse_when_loc(
+            jd_start, SEFLG_SWIEPH, geopos
+        )
+
+        # Both should find the same eclipse (same maximum time within tolerance)
+        assert abs(times1[0] - times2[0]) < 0.01  # Within ~15 minutes
+        # Both should return eclipse visibility flags
+        assert ecl_type1 & SE_ECL_VISIBLE
+        assert ecl_type2 & SE_ECL_VISIBLE
 
     def test_multiple_locations_same_eclipse(self):
         """Same eclipse should show different circumstances at different locations."""
@@ -544,11 +569,25 @@ class TestSolEclipseWhere:
             # Path width should be positive
             assert path_width > 0
 
-    def test_alias_matches_main_function(self):
-        """swe_sol_eclipse_where should be an alias for sol_eclipse_where."""
+    def test_swe_version_provides_pyswisseph_compatible_interface(self):
+        """swe_sol_eclipse_where and sol_eclipse_where produce equivalent results.
+
+        Note: sol_eclipse_where is a wrapper that calls swe_sol_eclipse_where internally.
+        They are distinct functions with the same interface that produce identical results.
+        """
         from libephemeris import sol_eclipse_where, swe_sol_eclipse_where
 
-        assert swe_sol_eclipse_where is sol_eclipse_where
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Call both versions
+        geopos1, attr1, ecl_type1 = sol_eclipse_where(times[0])
+        geopos2, attr2, ecl_type2 = swe_sol_eclipse_where(times[0], SEFLG_SWIEPH)
+
+        # Results should be identical
+        assert geopos1 == geopos2
+        assert attr1 == attr2
+        assert ecl_type1 == ecl_type2
 
     def test_flags_parameter_accepted(self):
         """Should accept flags parameter without error."""
@@ -789,11 +828,28 @@ class TestSolEclipseHow:
 
         assert len(attr) == 20
 
-    def test_alias_matches_main_function(self):
-        """swe_sol_eclipse_how should be an alias for sol_eclipse_how."""
+    def test_swe_version_provides_pyswisseph_compatible_interface(self):
+        """swe_sol_eclipse_how and sol_eclipse_how produce equivalent results.
+
+        Note: sol_eclipse_how is a wrapper that calls swe_sol_eclipse_how internally
+        with a different parameter order (lat, lon vs geopos sequence).
+        They produce identical results for the same location.
+        """
         from libephemeris import sol_eclipse_how, swe_sol_eclipse_how
 
-        assert swe_sol_eclipse_how is sol_eclipse_how
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        lat, lon, altitude = 32.7767, -96.7970, 0.0
+        geopos = (lon, lat, altitude)  # pyswisseph uses (lon, lat, alt) order
+
+        # Call both versions
+        attr1, ecl_type1 = sol_eclipse_how(times[0], lat, lon, altitude=altitude)
+        attr2, ecl_type2 = swe_sol_eclipse_how(times[0], SEFLG_SWIEPH, geopos)
+
+        # Results should be identical
+        assert attr1 == attr2
+        assert ecl_type1 == ecl_type2
 
     def test_known_eclipse_april_2024_dallas(self):
         """Test April 8, 2024 eclipse from Dallas."""
