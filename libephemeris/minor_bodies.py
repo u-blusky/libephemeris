@@ -23,7 +23,7 @@ PERTURBATION MODEL:
 
 For research-grade precision, use full numerical integration (Swiss Ephemeris, JPL Horizons)
 
-Orbital elements source: JPL Small-Body Database (epoch 2025.0, JD 2461000.5)
+Orbital elements source: JPL Small-Body Database (epoch JD 2461000.5 TDB = 2025-Sep-19)
 Algorithm: Keplerian mechanics with Laplace-Lagrange secular perturbations
 """
 
@@ -328,9 +328,9 @@ def apply_secular_perturbations(
 
 
 # =============================================================================
-# ORBITAL ELEMENTS DATABASE (Epoch 2025.0 = JD 2461000.5)
+# ORBITAL ELEMENTS DATABASE (Epoch JD 2461000.5 TDB = 2025-Sep-19)
 # =============================================================================
-# Source: NASA JPL Small-Body Database (sbdb.api), retrieved 2025
+# Source: NASA JPL Small-Body Database (sbdb.api), retrieved 2025-Nov-27
 # Epoch: JD 2461000.5 TDB (2025-Sep-19)
 #
 # Note: Elements are osculating at the given epoch.
@@ -341,145 +341,145 @@ MINOR_BODY_ELEMENTS = {
     SE_CHIRON: OrbitalElements(
         name="Chiron",
         epoch=2461000.5,
-        a=13.6922,  # AU - between Saturn and Uranus
-        e=0.378979,
-        i=6.926,
-        omega=339.254,  # argument of perihelion
-        Omega=209.298,  # longitude of ascending node
-        M0=212.840,
-        n=0.01945,  # ~51 year period
+        a=13.69219896172984,  # AU - between Saturn and Uranus
+        e=0.3789792342846475,
+        i=6.926003536565557,
+        omega=339.2537417045351,  # argument of perihelion
+        Omega=209.2984204899107,  # longitude of ascending node
+        M0=212.8397717853335,
+        n=0.01945334424082164,  # ~51 year period
     ),
     SE_PHOLUS: OrbitalElements(
         name="Pholus",
         epoch=2461000.5,
-        a=20.2834,
-        e=0.574745,  # Highly eccentric
-        i=24.757,
-        omega=354.730,
-        Omega=119.290,
-        M0=134.471,
-        n=0.01079,  # ~91 year period
+        a=20.28340105547402,
+        e=0.574744804002886,  # Highly eccentric
+        i=24.75699076739707,
+        omega=354.7299656288133,
+        Omega=119.2896923424452,
+        M0=134.470501527666,
+        n=0.01078929100989589,  # ~91 year period
     ),
     SE_CERES: OrbitalElements(
         name="Ceres",
         epoch=2461000.5,
-        a=2.7656,
-        e=0.079576,
-        i=10.588,
-        omega=73.300,
-        Omega=80.250,
-        M0=231.540,
-        n=0.21430,  # ~4.6 year period
+        a=2.765615651508659,
+        e=0.07957631994408416,
+        i=10.58788658206854,
+        omega=73.29975464616518,
+        Omega=80.24963090816965,
+        M0=231.5397330043706,
+        n=0.2142971214271186,  # ~4.6 year period
     ),
     SE_PALLAS: OrbitalElements(
         name="Pallas",
         epoch=2461000.5,
-        a=2.7699,
-        e=0.230643,
-        i=34.928,  # High inclination
-        omega=310.933,
-        Omega=172.889,
-        M0=211.530,
-        n=0.21380,  # ~4.6 year period
+        a=2.76992582511479,
+        e=0.2306429787781384,
+        i=34.92832687077855,  # High inclination
+        omega=310.9333840114307,
+        Omega=172.8885963367437,
+        M0=211.5297778033731,
+        n=0.2137971269626138,  # ~4.6 year period
     ),
     SE_JUNO: OrbitalElements(
         name="Juno",
         epoch=2461000.5,
-        a=2.6709,
-        e=0.255826,
-        i=12.986,
-        omega=247.884,
-        Omega=169.820,
-        M0=217.591,
-        n=0.22580,  # ~4.4 year period
+        a=2.670879058906207,
+        e=0.2558257725543152,
+        i=12.98603961477441,
+        omega=247.8836661359693,
+        Omega=169.8198844530219,
+        M0=217.5909617686606,
+        n=0.2257993770223806,  # ~4.4 year period
     ),
     SE_VESTA: OrbitalElements(
         name="Vesta",
         epoch=2461000.5,
-        a=2.3615,
-        e=0.090168,
-        i=7.144,
-        omega=151.537,
-        Omega=103.702,
-        M0=26.810,
-        n=0.27159,  # ~3.6 year period
+        a=2.361541280084789,
+        e=0.09016764504738634,
+        i=7.144060599543863,
+        omega=151.5371488873794,
+        Omega=103.7022980342142,
+        M0=26.80967220901607,
+        n=0.2715881155129186,  # ~3.6 year period
     ),
     SE_ERIS: OrbitalElements(
         name="Eris",
         epoch=2461000.5,
-        a=67.9964,  # Highly distant
-        e=0.436965,
-        i=43.869,  # Extreme inclination
-        omega=150.732,
-        Omega=36.027,
-        M0=211.449,
-        n=0.001758,  # ~561 year period
+        a=67.99636506315233,  # Highly distant
+        e=0.4369647318678042,
+        i=43.86893210857381,  # Extreme inclination
+        omega=150.7324609262193,
+        Omega=36.0271728267921,
+        M0=211.4489901906776,
+        n=0.001757824561999289,  # ~561 year period
     ),
     SE_SEDNA: OrbitalElements(
         name="Sedna",
         epoch=2461000.5,
-        a=549.541,  # Extreme distance (detached object)
-        e=0.861297,  # Very eccentric
-        i=11.926,
-        omega=311.010,
-        Omega=144.479,
-        M0=358.607,
-        n=0.0000765,  # ~12,880 year period
+        a=549.5405279241455,  # Extreme distance (detached object)
+        e=0.8612974378772624,  # Very eccentric
+        i=11.92591697769048,
+        omega=311.0097709574837,
+        Omega=144.4787268123774,
+        M0=358.6072615114487,
+        n=7.650758332945998e-05,  # ~12,880 year period
     ),
     SE_HAUMEA: OrbitalElements(
         name="Haumea",
         epoch=2461000.5,
-        a=43.0055,
-        e=0.195775,
-        i=28.208,
-        omega=240.888,
-        Omega=121.797,
-        M0=222.328,
-        n=0.003495,  # ~282 year period
+        a=43.00549881333706,
+        e=0.1957748188564788,
+        i=28.20840579216805,
+        omega=240.888336259082,
+        Omega=121.7972901946415,
+        M0=222.3276474703985,
+        n=0.003494765903502902,  # ~282 year period
     ),
     SE_MAKEMAKE: OrbitalElements(
         name="Makemake",
         epoch=2461000.5,
-        a=45.5107,
-        e=0.160425,
-        i=29.032,
-        omega=297.075,
-        Omega=79.269,
-        M0=169.320,
-        n=0.003210,  # ~307 year period
+        a=45.51068175675377,
+        e=0.1604249910368623,
+        i=29.03230613859081,
+        omega=297.0754218776326,
+        Omega=79.26892117343222,
+        M0=169.3202841867025,
+        n=0.003210214572603997,  # ~307 year period
     ),
     SE_IXION: OrbitalElements(
         name="Ixion",
         epoch=2461000.5,
-        a=39.3505,  # Plutino (2:3 resonance with Neptune)
-        e=0.244233,
-        i=19.670,
-        omega=300.659,
-        Omega=71.093,
-        M0=294.200,
-        n=0.003993,  # ~247 year period
+        a=39.35053706213409,  # Plutino (2:3 resonance with Neptune)
+        e=0.2442328489971719,
+        i=19.67041190191546,
+        omega=300.6585723831106,
+        Omega=71.09295825377649,
+        M0=294.2004612799266,
+        n=0.003992804789574964,  # ~247 year period
     ),
     SE_ORCUS: OrbitalElements(
         name="Orcus",
         epoch=2461000.5,
-        a=39.3358,  # Plutino (anti-Pluto phase)
-        e=0.221730,
-        i=20.556,
-        omega=73.722,
-        Omega=268.386,
-        M0=188.111,
-        n=0.003995,  # ~247 year period
+        a=39.33577647200568,  # Plutino (anti-Pluto phase)
+        e=0.2217300030420161,
+        i=20.55552551599616,
+        omega=73.72249191891537,
+        Omega=268.3859416278478,
+        M0=188.1111318293787,
+        n=0.003995052426031791,  # ~247 year period
     ),
     SE_QUAOAR: OrbitalElements(
         name="Quaoar",
         epoch=2461000.5,
-        a=43.1477,
-        e=0.035839,  # Nearly circular
-        i=7.991,
-        omega=163.923,
-        Omega=188.963,
-        M0=291.482,
-        n=0.003478,  # ~284 year period
+        a=43.1476797802032,
+        e=0.03583878353429052,  # Nearly circular
+        i=7.991371294217068,
+        omega=163.9231384883233,
+        Omega=188.9632800603184,
+        M0=291.4818844949103,
+        n=0.003477506123841158,  # ~284 year period
     ),
 }
 
