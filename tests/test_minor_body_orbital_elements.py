@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 36 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 37 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -47,6 +47,7 @@ from libephemeris.constants import (
     SE_TOUTATIS,
     SE_ITOKAWA,
     SE_BENNU,
+    SE_RYUGU,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -100,6 +101,7 @@ def all_minor_body_ids():
         SE_TOUTATIS,
         SE_ITOKAWA,
         SE_BENNU,
+        SE_RYUGU,
     ]
 
 
@@ -116,9 +118,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 36 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 36, (
-            f"Expected 36 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 37 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 37, (
+            f"Expected 37 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -562,6 +564,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 6.0 < elements.i < 6.1, f"Bennu i={elements.i} unexpected"
         # Mean motion consistent with ~1.20 year period (437 days)
         assert 0.82 < elements.n < 0.83, f"Bennu n={elements.n} unexpected"
+
+    def test_ryugu_apollo_asteroid(self):
+        """Ryugu: Apollo PHA, target of Hayabusa2 sample return mission."""
+        elements = MINOR_BODY_ELEMENTS[SE_RYUGU]
+        assert elements.name == "Ryugu"
+        # Semi-major axis ~1.19 AU (Apollo asteroid)
+        assert 1.18 < elements.a < 1.20, f"Ryugu a={elements.a} unexpected"
+        # Moderate eccentricity ~0.19 (q=0.96 AU, Q=1.42 AU)
+        assert 0.19 < elements.e < 0.20, f"Ryugu e={elements.e} unexpected"
+        # Low inclination ~5.9 degrees
+        assert 5.8 < elements.i < 5.9, f"Ryugu i={elements.i} unexpected"
+        # Mean motion consistent with ~1.30 year period (475 days)
+        assert 0.75 < elements.n < 0.76, f"Ryugu n={elements.n} unexpected"
 
 
 @pytest.mark.unit

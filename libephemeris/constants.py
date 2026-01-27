@@ -131,6 +131,9 @@ SE_ITOKAWA: int = (
 SE_BENNU: int = (
     101955 + SE_AST_OFFSET
 )  # 101955 Bennu (Apollo PHA, OSIRIS-REx sample return mission target)
+SE_RYUGU: int = (
+    162173 + SE_AST_OFFSET
+)  # 162173 Ryugu (Apollo PHA, Hayabusa2 sample return mission target)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
