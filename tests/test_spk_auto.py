@@ -241,6 +241,147 @@ class TestCacheInfo:
             assert info["total_size_mb"] > 0
 
 
+class TestEnsureCacheDir:
+    """Test ensure_cache_dir function."""
+
+    def test_creates_default_cache_dir(self, tmp_path):
+        """Create default cache directory if it doesn't exist."""
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            expected_dir = tmp_path / spk_auto.DEFAULT_CACHE_DIR
+            assert not expected_dir.exists()
+
+            result = spk_auto.ensure_cache_dir()
+
+            assert expected_dir.exists()
+            assert result == str(expected_dir)
+
+    def test_creates_custom_cache_dir(self, tmp_path):
+        """Create custom cache directory if it doesn't exist."""
+        custom_dir = tmp_path / "my_custom_cache"
+        assert not custom_dir.exists()
+
+        result = spk_auto.ensure_cache_dir(str(custom_dir))
+
+        assert custom_dir.exists()
+        assert result == str(custom_dir)
+
+    def test_returns_existing_dir(self, tmp_path):
+        """Return existing cache directory path."""
+        existing_dir = tmp_path / "existing_cache"
+        existing_dir.mkdir()
+
+        result = spk_auto.ensure_cache_dir(str(existing_dir))
+
+        assert result == str(existing_dir)
+
+    def test_returns_absolute_path(self, tmp_path, monkeypatch):
+        """Always returns absolute path."""
+        monkeypatch.chdir(tmp_path)
+        relative_path = "relative_cache"
+
+        result = spk_auto.ensure_cache_dir(relative_path)
+
+        assert os.path.isabs(result)
+        assert result == os.path.abspath(relative_path)
+
+
+class TestGetCachePath:
+    """Test get_cache_path function."""
+
+    def test_numeric_body_id_int(self, tmp_path):
+        """Get cache path for numeric body ID (int)."""
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.get_cache_path(2060)
+
+            assert result.endswith("2060.bsp")
+            assert spk_auto.DEFAULT_CACHE_DIR in result
+
+    def test_numeric_body_id_str(self, tmp_path):
+        """Get cache path for numeric body ID (string)."""
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.get_cache_path("136199")
+
+            assert result.endswith("136199.bsp")
+
+    def test_named_body_id(self, tmp_path):
+        """Get cache path for named body."""
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.get_cache_path("Chiron")
+
+            assert result.endswith("chiron.bsp")
+
+    def test_body_id_with_spaces(self, tmp_path):
+        """Sanitize body ID with spaces."""
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            result = spk_auto.get_cache_path("2060 Chiron")
+
+            assert " " not in result
+            assert result.endswith(".bsp")
+            assert "2060_chiron" in result
+
+    def test_custom_cache_dir(self, tmp_path):
+        """Get cache path with custom cache directory."""
+        custom_dir = tmp_path / "custom"
+        result = spk_auto.get_cache_path("2060", str(custom_dir))
+
+        assert str(custom_dir) in result
+        assert result.endswith("2060.bsp")
+
+    def test_returns_absolute_path(self, tmp_path):
+        """Always returns absolute path."""
+        result = spk_auto.get_cache_path("2060", str(tmp_path))
+
+        assert os.path.isabs(result)
+
+
+class TestCacheInfoStandalone:
+    """Test cache_info standalone function."""
+
+    def test_empty_cache(self, tmp_path):
+        """Return empty info when cache doesn't exist."""
+        non_existent = tmp_path / "nonexistent"
+        info = spk_auto.cache_info(str(non_existent))
+
+        assert info["cache_dir"] == str(non_existent)
+        assert info["num_files"] == 0
+        assert info["total_size_mb"] == 0.0
+        assert info["files"] == []
+
+    def test_with_files(self, tmp_path):
+        """Return correct info when cache has files."""
+        # Create some dummy SPK files (large enough to register non-zero MB)
+        (tmp_path / "body1.bsp").write_bytes(b"x" * (1024 * 1024))  # 1 MB
+        (tmp_path / "body2.bsp").write_bytes(b"y" * (1024 * 512))  # 0.5 MB
+        (tmp_path / "not_spk.txt").write_bytes(b"ignored")
+
+        info = spk_auto.cache_info(str(tmp_path))
+
+        assert info["cache_dir"] == str(tmp_path)
+        assert info["num_files"] == 2
+        assert "body1.bsp" in info["files"]
+        assert "body2.bsp" in info["files"]
+        assert "not_spk.txt" not in info["files"]
+        assert info["total_size_mb"] >= 1.0  # At least 1 MB
+
+    def test_default_cache_dir(self, tmp_path):
+        """Use default cache directory when none specified."""
+        with patch.object(spk_auto, "get_library_path", return_value=str(tmp_path)):
+            info = spk_auto.cache_info()
+
+            expected_dir = os.path.join(str(tmp_path), spk_auto.DEFAULT_CACHE_DIR)
+            assert info["cache_dir"] == expected_dir
+
+    def test_returns_absolute_path(self, tmp_path, monkeypatch):
+        """Always returns absolute path in cache_dir."""
+        monkeypatch.chdir(tmp_path)
+        relative_path = "relative_cache"
+        os.makedirs(relative_path, exist_ok=True)
+
+        info = spk_auto.cache_info(relative_path)
+
+        assert os.path.isabs(info["cache_dir"])
+
+
 class TestTryAutoDownload:
     """Test the try_auto_download function."""
 

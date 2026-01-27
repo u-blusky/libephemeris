@@ -56,6 +56,137 @@ DEFAULT_END_DATE = "2100-01-01"
 
 
 # =============================================================================
+# CACHE DIRECTORY MANAGEMENT
+# =============================================================================
+
+
+def ensure_cache_dir(cache_dir: Optional[str] = None) -> str:
+    """
+    Ensure the SPK cache directory exists, creating it if necessary.
+
+    This function creates the cache directory if it doesn't exist and returns
+    the absolute path to the cache directory.
+
+    Args:
+        cache_dir: Optional custom cache directory path. If None, uses the
+            default cache directory ({library_path}/spk_cache/).
+
+    Returns:
+        str: Absolute path to the cache directory.
+
+    Example:
+        >>> from libephemeris.spk_auto import ensure_cache_dir
+        >>> cache_path = ensure_cache_dir()
+        >>> print(cache_path)
+        /path/to/libephemeris/spk_cache
+        >>> # Custom cache directory
+        >>> cache_path = ensure_cache_dir("/custom/cache/path")
+    """
+    if cache_dir is not None:
+        cache_path = os.path.abspath(cache_dir)
+    else:
+        cache_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path, exist_ok=True)
+
+    return cache_path
+
+
+def get_cache_path(body_id: Union[int, str], cache_dir: Optional[str] = None) -> str:
+    """
+    Get the path where an SPK file for a body should be stored.
+
+    This function returns the expected cache file path for a given body ID.
+    The path is constructed using the body_id as part of the filename.
+    Note: This does not create the file or directory - use ensure_cache_dir()
+    to create the cache directory if needed.
+
+    Args:
+        body_id: JPL Horizons body identifier. Can be:
+            - Asteroid number (int or str): 2060, "2060", "136199"
+            - Name (str): "Chiron", "Eris"
+        cache_dir: Optional custom cache directory path. If None, uses the
+            default cache directory ({library_path}/spk_cache/).
+
+    Returns:
+        str: Full path where the SPK file would be stored.
+            The filename format is: {sanitized_body_id}.bsp
+
+    Example:
+        >>> from libephemeris.spk_auto import get_cache_path
+        >>> path = get_cache_path("2060")
+        >>> print(path)
+        /path/to/libephemeris/spk_cache/2060.bsp
+        >>> path = get_cache_path("Chiron")
+        >>> print(path)
+        /path/to/libephemeris/spk_cache/chiron.bsp
+    """
+    if cache_dir is not None:
+        dir_path = os.path.abspath(cache_dir)
+    else:
+        dir_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+
+    # Sanitize body_id for filename
+    body_str = str(body_id).lower()
+    safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
+
+    filename = f"{safe_body_id}.bsp"
+    return os.path.join(dir_path, filename)
+
+
+def cache_info(
+    cache_dir: Optional[str] = None,
+) -> dict[str, Union[int, float, str, list[str]]]:
+    """
+    Get information about the SPK cache directory.
+
+    This function returns statistics about cached SPK files including the
+    number of files, total size, and list of cached filenames.
+
+    Args:
+        cache_dir: Optional custom cache directory path. If None, uses the
+            default cache directory ({library_path}/spk_cache/).
+
+    Returns:
+        dict: Cache information with the following keys:
+            - cache_dir (str): Absolute path to the cache directory
+            - num_files (int): Number of cached SPK files (.bsp files)
+            - total_size_mb (float): Total size of all cached files in megabytes
+            - files (list[str]): List of cached SPK filenames
+
+    Example:
+        >>> from libephemeris.spk_auto import cache_info
+        >>> info = cache_info()
+        >>> print(f"Cache at: {info['cache_dir']}")
+        >>> print(f"Files cached: {info['num_files']}")
+        >>> print(f"Total size: {info['total_size_mb']:.2f} MB")
+    """
+    if cache_dir is not None:
+        dir_path = os.path.abspath(cache_dir)
+    else:
+        dir_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+
+    if not os.path.exists(dir_path):
+        return {
+            "cache_dir": dir_path,
+            "num_files": 0,
+            "total_size_mb": 0.0,
+            "files": [],
+        }
+
+    files = [f for f in os.listdir(dir_path) if f.endswith(".bsp")]
+    total_size = sum(os.path.getsize(os.path.join(dir_path, f)) for f in files)
+
+    return {
+        "cache_dir": dir_path,
+        "num_files": len(files),
+        "total_size_mb": round(total_size / (1024 * 1024), 2),
+        "files": files,
+    }
+
+
+# =============================================================================
 # CONFIGURATION CLASS
 # =============================================================================
 
