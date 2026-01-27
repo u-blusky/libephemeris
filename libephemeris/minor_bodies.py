@@ -7,7 +7,7 @@ This module computes positions for:
 - Trans-Neptunian Objects (TNOs): Eris, Sedna, Haumea, Makemake, Orcus, Quaoar, Ixion
 
 Method: Keplerian orbital elements with first-order secular perturbations from
-Jupiter and Saturn. This provides significantly improved accuracy over pure
+Jupiter, Saturn, and Uranus. This provides significantly improved accuracy over pure
 2-body dynamics, especially for propagation over multiple years.
 
 PRECISION:
@@ -17,7 +17,8 @@ PRECISION:
 
 PERTURBATION MODEL:
 - Applies secular perturbations to orbital elements (ω, Ω, mean anomaly)
-- Accounts for gravitational influence of Jupiter (dominant) and Saturn
+- Accounts for gravitational influence of Jupiter (dominant), Saturn, and Uranus
+- Uranus perturbations are significant for Trans-Neptunian Objects (TNOs)
 - Based on classical Laplace-Lagrange secular theory
 - Does NOT include: mean-motion resonances, close encounters, non-gravitational forces
 
@@ -80,6 +81,17 @@ SATURN_I = 2.489  # Mean inclination (degrees)
 SATURN_OMEGA = 339.39  # Mean longitude of perihelion (degrees)
 SATURN_NODE = 113.66  # Mean longitude of ascending node (degrees)
 SATURN_N = 0.03346  # Mean motion (degrees/day)
+
+# Uranus mean elements (significant for TNO calculations)
+URANUS_A = 19.2184  # Semi-major axis (AU)
+URANUS_E = 0.0457  # Mean eccentricity
+URANUS_I = 0.772  # Mean inclination (degrees)
+URANUS_OMEGA = 170.9  # Mean argument of perihelion (degrees)
+URANUS_NODE = 74.0  # Mean longitude of ascending node (degrees)
+URANUS_N = 0.01177  # Mean motion (degrees/day)
+
+# Mass ratio of Uranus relative to Sun
+MASS_RATIO_URANUS = 1.0 / 22902  # ~4.366e-5
 
 
 @dataclass
@@ -166,7 +178,7 @@ def calc_secular_perturbation_rates(
     elements: OrbitalElements,
 ) -> Tuple[float, float, float]:
     """
-    Calculate secular perturbation rates for orbital elements due to Jupiter and Saturn.
+    Calculate secular perturbation rates for orbital elements due to Jupiter, Saturn, and Uranus.
 
     Uses first-order Laplace-Lagrange secular perturbation theory to compute
     the time rates of change of the argument of perihelion (ω), longitude of
@@ -176,6 +188,11 @@ def calc_secular_perturbation_rates(
     - Precession of perihelion (ω advances or regresses)
     - Precession of the ascending node (Ω regresses for prograde orbits)
     - Small correction to mean motion due to non-Keplerian effects
+
+    Note:
+        Uranus perturbations are particularly significant for Trans-Neptunian Objects
+        (TNOs) where its gravitational influence is comparable to or greater than
+        Saturn's influence.
 
     Args:
         elements: Orbital elements of the minor body
@@ -281,6 +298,33 @@ def calc_secular_perturbation_rates(
         d_omega += math.degrees(d_omega_sat)
         d_Omega += math.degrees(d_Omega_sat)
 
+    # Calculate perturbations from Uranus (significant for TNOs)
+    if a < URANUS_A:
+        alpha = a / URANUS_A
+        b32_1 = _calc_laplace_coefficients(alpha, 1.5, 1)
+        factor = n_rad * MASS_RATIO_URANUS * alpha * b32_1
+
+        d_omega_ura = factor * (1.0 / 4.0) * (2.0 + 1.5 * e * e) / (1.0 - e * e)
+        d_Omega_ura = -factor * (1.0 / 4.0) * math.cos(i_rad) / math.sqrt(1.0 - e * e)
+
+        d_omega += math.degrees(d_omega_ura)
+        d_Omega += math.degrees(d_Omega_ura)
+
+    elif a > URANUS_A:
+        alpha = URANUS_A / a
+        b32_1 = _calc_laplace_coefficients(alpha, 1.5, 1)
+        factor = n_rad * MASS_RATIO_URANUS * alpha * b32_1
+
+        d_omega_ura = (
+            factor * (1.0 / 4.0) * (2.0 + 1.5 * e * e) / (max(0.01, 1.0 - e * e))
+        )
+        d_Omega_ura = (
+            -factor * (1.0 / 4.0) * math.cos(i_rad) / math.sqrt(max(0.01, 1.0 - e * e))
+        )
+
+        d_omega += math.degrees(d_omega_ura)
+        d_Omega += math.degrees(d_Omega_ura)
+
     return d_omega, d_Omega, d_n
 
 
@@ -292,7 +336,7 @@ def apply_secular_perturbations(
 
     Takes the osculating orbital elements at epoch and applies first-order
     secular perturbation corrections to propagate them to the target time.
-    This accounts for the long-term drift in ω and Ω due to Jupiter and Saturn.
+    This accounts for the long-term drift in ω and Ω due to Jupiter, Saturn, and Uranus.
 
     Args:
         elements: Original orbital elements at epoch
