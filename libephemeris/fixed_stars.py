@@ -35,11 +35,11 @@ References:
 - Proper motion: Hipparcos/Tycho catalogs
 """
 
-import math
 from dataclasses import dataclass
 from typing import List, Tuple
 
-from skyfield.nutationlib import iau2000a_radians
+from skyfield.api import Star
+from skyfield.framelib import ecliptic_frame
 
 from .constants import (
     SE_REGULUS,
@@ -95,6 +95,7 @@ from .constants import (
     SE_MARKAB,
     SE_SCHEAT,
     SEFLG_SPEED,
+    SEFLG_NOABERR,
 )
 
 
@@ -1398,200 +1399,113 @@ def get_canonical_star_name(star_id: int) -> str | None:
     return None
 
 
-def calc_fixed_star_position(star_id: int, jd_tt: float) -> Tuple[float, float, float]:
+def _calc_star_position_skyfield(
+    star_id: int, jd_tt: float, noaberr: bool = False
+) -> Tuple[float, float, float]:
+    """
+    Calculate ecliptic position using Skyfield Star class with proper aberration.
+
+    This function uses Skyfield's Star class which correctly handles:
+    - Proper motion
+    - Precession
+    - Nutation
+    - Annual aberration (unless noaberr=True)
+
+    Args:
+        star_id: Star identifier (SE_* constant)
+        jd_tt: Julian Day in Terrestrial Time (TT)
+        noaberr: If True, skip aberration correction (astrometric position)
+
+    Returns:
+        Tuple of (longitude, latitude, distance) in degrees and AU
+
+    Raises:
+        ValueError: If star_id not in catalog
+    """
+    if star_id not in FIXED_STARS:
+        raise ValueError(f"could not find star name {star_id}")
+
+    star_data = FIXED_STARS[star_id]
+
+    # Create Skyfield Star object
+    # Note: pm_ra in StarData is already "pm_ra * cos(dec)" (proper motion in RA direction)
+    # Skyfield expects ra_mas_per_year which is the same convention
+    star = Star(
+        ra_hours=star_data.ra_j2000 / 15.0,  # Convert degrees to hours
+        dec_degrees=star_data.dec_j2000,
+        ra_mas_per_year=star_data.pm_ra * 1000.0,  # arcsec/yr to mas/yr
+        dec_mas_per_year=star_data.pm_dec * 1000.0,
+    )
+
+    # Get timescale and ephemeris
+    from .state import get_timescale, get_planets
+
+    ts = get_timescale()
+    eph = get_planets()
+    earth = eph["earth"]
+
+    # Create time object
+    t = ts.tt_jd(jd_tt)
+
+    # Calculate position
+    astrometric = earth.at(t).observe(star)
+
+    if noaberr:
+        pos = astrometric
+    else:
+        pos = astrometric.apparent()
+
+    # Transform to ecliptic coordinates of date
+    ecl = pos.frame_latlon(ecliptic_frame)
+
+    # ecl returns (latitude, longitude, distance) as Skyfield Angle/Distance objects
+    lat = ecl[0].degrees
+    lon = ecl[1].degrees % 360.0
+    # Distance: Use a fixed large value for backward compatibility
+    # Stars are effectively at infinite distance for ephemeris purposes
+    dist = 100000.0
+
+    return lon, lat, dist
+
+
+def calc_fixed_star_position(
+    star_id: int, jd_tt: float, noaberr: bool = False
+) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position of a fixed star at given date.
 
-    Applies proper motion and precession to J2000.0 catalog position.
+    Uses Skyfield Star class for accurate position calculation including:
+    - Proper motion
+    - Precession and nutation
+    - Annual aberration (by default)
 
     Args:
-        star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR)
+        star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
+        noaberr: If True, skip aberration correction (astrometric position)
 
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of date in degrees (0-360)
             - latitude: Ecliptic latitude of date in degrees
-            - distance: Arbitrary large value (100000 AU) - stars are effectively infinite
+            - distance: Arbitrary large value (AU) - stars are effectively infinite
 
     Raises:
         ValueError: If star_id not in catalog
 
-    Algorithm:
-        1. Apply proper motion using rigorous space motion approach (3D vector propagation)
-        2. Precess equatorial coordinates using IAU 2006 formula
-        3. Calculate true obliquity (mean + nutation)
-        4. Transform to ecliptic coordinates
-
     Notes:
-        Proper motion is applied using the rigorous space motion approach from
-        Hipparcos Vol. 1, Section 1.5.5 with second-order Taylor expansion.
-        This method converts the position to a 3D unit vector, applies proper
-        motion as angular velocity in the tangent plane with centripetal
-        acceleration correction, and normalizes to account for spherical geometry.
-
-        The second-order term significantly improves accuracy for high proper
-        motion stars (e.g., Barnard's Star) over century-scale intervals.
-
-        Limitations:
-        - Ignores radial velocity (parallax effect)
-        - Assumes constant proper motion (no acceleration)
-        - No annual parallax (star distance not modeled)
-        Typical error: <0.01 arcsec over ±100 years, <1 arcsec over ±500 years
+        By default, includes annual aberration to match pyswisseph behavior.
+        Use noaberr=True for astrometric (geometric) position.
 
     References:
         IAU 2006 precession (Capitaine et al.)
-        IAU 2000A nutation model (1365 terms) via Skyfield
+        Skyfield library for apparent position calculation
     """
-    if star_id not in FIXED_STARS:
-        raise ValueError(f"could not find star name {star_id}")
-
-    star = FIXED_STARS[star_id]
-
-    # Time from J2000.0
-    t_years = (jd_tt - 2451545.0) / 365.25
-    T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries
-
-    # Apply Proper Motion using rigorous space motion approach
-    # Uses 3D vector propagation to correctly handle spherical geometry.
-    # This avoids errors from the curvature of the celestial sphere that occur
-    # with linear RA/Dec extrapolation over long time periods.
-    #
-    # Algorithm (Hipparcos Vol. 1, Section 1.5.5):
-    #   1. Convert (RA, Dec) to unit position vector P
-    #   2. Compute proper motion as angular velocity in the tangent plane
-    #   3. Propagate position vector: P(t) = P(0) + V * dt, then normalize
-    #   4. Convert back to (RA, Dec)
-
-    # Convert proper motions from arcsec/year to radians/year
-    # pm_ra is μα* = μα × cos(δ), the proper motion in RA direction (not angular)
-    # pm_dec is μδ, the proper motion in Dec direction
-    pm_ra_rad = math.radians(star.pm_ra / 3600.0)  # arcsec -> deg -> rad
-    pm_dec_rad = math.radians(star.pm_dec / 3600.0)
-
-    # Convert J2000 position to radians
-    ra_rad = math.radians(star.ra_j2000)
-    dec_rad = math.radians(star.dec_j2000)
-
-    # Unit position vector at J2000 epoch
-    cos_dec = math.cos(dec_rad)
-    sin_dec = math.sin(dec_rad)
-    cos_ra = math.cos(ra_rad)
-    sin_ra = math.sin(ra_rad)
-
-    px = cos_dec * cos_ra
-    py = cos_dec * sin_ra
-    pz = sin_dec
-
-    # Proper motion velocity vector in the tangent plane (perpendicular to position)
-    # The unit vectors in RA and Dec directions are:
-    #   e_ra = (-sin(ra), cos(ra), 0)  (tangent to RA circles, pointing East)
-    #   e_dec = (-sin(dec)*cos(ra), -sin(dec)*sin(ra), cos(dec))  (pointing North)
-    # Velocity = pm_ra * e_ra + pm_dec * e_dec (in radians/year)
-    vx = -pm_ra_rad * sin_ra - pm_dec_rad * sin_dec * cos_ra
-    vy = pm_ra_rad * cos_ra - pm_dec_rad * sin_dec * sin_ra
-    vz = pm_dec_rad * cos_dec
-
-    # Propagate position using second-order Taylor expansion:
-    # P(t) = P(0) + V*dt + 0.5*A*dt²
-    #
-    # For motion on a unit sphere, the acceleration is the centripetal term:
-    # A = -|V|² * P(0)
-    # This accounts for the curvature of the celestial sphere and significantly
-    # improves accuracy for high proper motion stars (e.g., Barnard's Star)
-    # over century-scale time intervals.
-    v_squared = vx * vx + vy * vy + vz * vz
-    t_squared = t_years * t_years
-
-    # Second-order expansion: P(t) = P(0) + V*dt - 0.5*|V|²*P(0)*dt²
-    px_t = px + vx * t_years - 0.5 * v_squared * px * t_squared
-    py_t = py + vy * t_years - 0.5 * v_squared * py * t_squared
-    pz_t = pz + vz * t_years - 0.5 * v_squared * pz * t_squared
-
-    # Normalize to get unit vector (accounts for curvature)
-    r = math.sqrt(px_t * px_t + py_t * py_t + pz_t * pz_t)
-    px_t /= r
-    py_t /= r
-    pz_t /= r
-
-    # Convert back to RA/Dec
-    dec_pm = math.asin(pz_t)  # Keep in radians for precession
-    ra_pm = math.atan2(py_t, px_t)
-    if ra_pm < 0:
-        ra_pm += 2 * math.pi
-
-    # IAU 2006 precession parameters (arcseconds -> degrees)
-    zeta = (2306.2181 * T + 0.30188 * T**2 + 0.017998 * T**3) / 3600.0
-    z = (2306.2181 * T + 1.09468 * T**2 + 0.018203 * T**3) / 3600.0
-    theta = (2004.3109 * T - 0.42665 * T**2 - 0.041833 * T**3) / 3600.0
-
-    zeta_r = math.radians(zeta)
-    z_r = math.radians(z)
-    theta_r = math.radians(theta)
-    # ra_pm and dec_pm are already in radians from the proper motion calculation
-    ra_r = ra_pm
-    dec_r = dec_pm
-
-    # Convert equatorial to Cartesian (unit sphere)
-    x0 = math.cos(dec_r) * math.cos(ra_r)
-    y0 = math.cos(dec_r) * math.sin(ra_r)
-    z0 = math.sin(dec_r)
-
-    # Apply precession rotation: R_z(-z) · R_y(θ) · R_z(-ζ)
-    # Step 1: R_z(-ζ) rotation around z-axis
-    x1 = x0 * math.cos(-zeta_r) + y0 * math.sin(-zeta_r)
-    y1 = -x0 * math.sin(-zeta_r) + y0 * math.cos(-zeta_r)
-    z1 = z0
-
-    # Step 2: R_y(θ) rotation around y-axis
-    x2 = x1 * math.cos(theta_r) - z1 * math.sin(theta_r)
-    y2 = y1
-    z2 = x1 * math.sin(theta_r) + z1 * math.cos(theta_r)
-
-    # Step 3: R_z(-z) rotation around z-axis
-    x3 = x2 * math.cos(-z_r) + y2 * math.sin(-z_r)
-    y3 = -x2 * math.sin(-z_r) + y2 * math.cos(-z_r)
-    z3 = z2
-
-    # Convert back to spherical (RA/Dec of date)
-    ra_date = math.atan2(y3, x3)
-    dec_date = math.asin(z3)
-
-    # Calculate mean obliquity of date (IAU 2006)
-    eps0 = 23.43929111 - (46.8150 + (0.00059 - 0.001813 * T) * T) * T / 3600.0
-
-    # Use full IAU 2000A nutation model (1365 terms) for sub-milliarcsecond precision
-    # Reference: IERS Conventions 2010, Skyfield iau2000a_radians implementation
-    from .state import get_timescale
-
-    ts = get_timescale()
-    t_obj = ts.tt_jd(jd_tt)
-    dpsi_rad, deps_rad = iau2000a_radians(t_obj)
-
-    # Convert nutation in obliquity from radians to degrees
-    deps_deg = math.degrees(deps_rad)
-    eps_true = eps0 + deps_deg
-    eps_r = math.radians(eps_true)
-
-    # Transform equatorial (RA, Dec) to ecliptic (lon, lat)
-    sin_lat = math.sin(dec_date) * math.cos(eps_r) - math.cos(dec_date) * math.sin(
-        eps_r
-    ) * math.sin(ra_date)
-    lat = math.asin(sin_lat)
-
-    y_lon = math.sin(ra_date) * math.cos(eps_r) + math.tan(dec_date) * math.sin(eps_r)
-    x_lon = math.cos(ra_date)
-    lon = math.degrees(math.atan2(y_lon, x_lon)) % 360.0
-    lat_deg = math.degrees(lat)
-
-    # Distance is arbitrary for fixed stars (effectively infinite)
-    dist = 100000.0  # AU (placeholder)
-
-    return lon, lat_deg, dist
+    return _calc_star_position_skyfield(star_id, jd_tt, noaberr)
 
 
 def calc_fixed_star_velocity(
-    star_id: int, jd_tt: float
+    star_id: int, jd_tt: float, noaberr: bool = False
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Calculate ecliptic position and velocity of a fixed star at given date.
@@ -1601,6 +1515,7 @@ def calc_fixed_star_velocity(
     1. Proper motion of the star itself through space
     2. Precession of the equinoxes (ecliptic coordinate grid rotation)
     3. Nutation (small periodic oscillations)
+    4. Annual aberration (unless noaberr=True)
 
     The dominant contribution is precession at ~50.3 arcseconds/year = 0.0001378
     degrees/day in longitude.
@@ -1608,6 +1523,7 @@ def calc_fixed_star_velocity(
     Args:
         star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
+        noaberr: If True, skip aberration correction (astrometric position)
 
     Returns:
         Tuple[float, float, float, float, float, float]:
@@ -1634,10 +1550,10 @@ def calc_fixed_star_velocity(
         Precession rate: ~50.3 arcsec/year ≈ 0.0001378 deg/day in longitude
     """
     # Calculate position at current time
-    lon1, lat1, dist = calc_fixed_star_position(star_id, jd_tt)
+    lon1, lat1, dist = calc_fixed_star_position(star_id, jd_tt, noaberr)
 
     # Calculate position one day later
-    lon2, lat2, _ = calc_fixed_star_position(star_id, jd_tt + 1.0)
+    lon2, lat2, _ = calc_fixed_star_position(star_id, jd_tt + 1.0, noaberr)
 
     # Compute longitude velocity with 360° wraparound handling
     speed_lon = lon2 - lon1
@@ -1721,10 +1637,13 @@ def swe_fixstar_ut(
     t = ts.ut1_jd(tjd_ut)
 
     try:
+        # Check SEFLG_NOABERR flag for astrometric (no aberration) position
+        noaberr = bool(iflag & SEFLG_NOABERR)
+
         # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, t.tt
+                star_id, t.tt, noaberr
             )
             return (
                 (lon, lat, dist, speed_lon, speed_lat, speed_dist),
@@ -1732,7 +1651,7 @@ def swe_fixstar_ut(
                 canonical_name or "",
             )
         else:
-            lon, lat, dist = calc_fixed_star_position(star_id, t.tt)
+            lon, lat, dist = calc_fixed_star_position(star_id, t.tt, noaberr)
             # Return canonical star name on success (pyswisseph behavior)
             return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, canonical_name or "")
     except Exception as e:
@@ -1774,10 +1693,13 @@ def swe_fixstar(
 
     # Use TT directly - no conversion needed
     try:
+        # Check SEFLG_NOABERR flag for astrometric (no aberration) position
+        noaberr = bool(iflag & SEFLG_NOABERR)
+
         # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, jd
+                star_id, jd, noaberr
             )
             return (
                 (lon, lat, dist, speed_lon, speed_lat, speed_dist),
@@ -1785,7 +1707,7 @@ def swe_fixstar(
                 canonical_name or "",
             )
         else:
-            lon, lat, dist = calc_fixed_star_position(star_id, jd)
+            lon, lat, dist = calc_fixed_star_position(star_id, jd, noaberr)
             # Return canonical star name on success (pyswisseph behavior)
             return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, canonical_name or "")
     except Exception as e:
@@ -1946,10 +1868,13 @@ def swe_fixstar2_ut(
     t = ts.ut1_jd(tjd_ut)
 
     try:
+        # Check SEFLG_NOABERR flag for astrometric (no aberration) position
+        noaberr = bool(iflag & SEFLG_NOABERR)
+
         # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, t.tt
+                entry.id, t.tt, noaberr
             )
             star_name_out = _format_star_name(entry)
             return (
@@ -1959,7 +1884,7 @@ def swe_fixstar2_ut(
                 "",
             )
         else:
-            lon, lat, dist = calc_fixed_star_position(entry.id, t.tt)
+            lon, lat, dist = calc_fixed_star_position(entry.id, t.tt, noaberr)
             star_name_out = _format_star_name(entry)
             return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
     except Exception as e:
@@ -2015,10 +1940,13 @@ def swe_fixstar2(
 
     # Use TT directly - no conversion needed
     try:
+        # Check SEFLG_NOABERR flag for astrometric (no aberration) position
+        noaberr = bool(iflag & SEFLG_NOABERR)
+
         # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, jd
+                entry.id, jd, noaberr
             )
             star_name_out = _format_star_name(entry)
             return (
@@ -2028,7 +1956,7 @@ def swe_fixstar2(
                 "",
             )
         else:
-            lon, lat, dist = calc_fixed_star_position(entry.id, jd)
+            lon, lat, dist = calc_fixed_star_position(entry.id, jd, noaberr)
             star_name_out = _format_star_name(entry)
             return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
     except Exception as e:

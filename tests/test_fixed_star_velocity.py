@@ -129,12 +129,12 @@ class TestFixedStarVelocity:
         if err and "could not find" in err.lower():
             pytest.skip(f"Star {star_name} not found")
 
-        # Longitude velocity should be primarily due to precession
-        # ~50.3 arcsec/year = 0.0000378 deg/day
-        # Plus proper motion and nutation, expect ~0.0001 deg/day magnitude
-        assert 0.00001 < abs(pos[3]) < 0.001, (
-            f"{star_name} unexpected speed_lon: {pos[3]:.6f}"
-        )
+        # Longitude velocity should be primarily due to precession and aberration
+        # ~50.3 arcsec/year = 0.0000378 deg/day for precession
+        # Plus proper motion, nutation, and aberration effects
+        # Aberration can cause near-zero velocities at specific epochs
+        # when its rate of change cancels other effects
+        assert abs(pos[3]) < 0.001, f"{star_name} unexpected speed_lon: {pos[3]:.6f}"
 
         # Latitude velocity should be small
         assert abs(pos[4]) < 0.0001, f"{star_name} unexpected speed_lat: {pos[4]:.6f}"

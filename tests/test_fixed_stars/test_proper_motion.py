@@ -302,16 +302,18 @@ class TestCalcFixedStarPositionIntegration:
         assert 202 < lon < 205, f"Spica ecliptic longitude: {lon}"
 
     def test_position_changes_over_time(self):
-        """Test that star positions change over 100 years."""
+        """Test that star positions change over 50 years."""
         jd_2000 = 2451545.0
-        jd_2100 = 2451545.0 + 100 * 365.25
+        # Use year 2050 which is within ephemeris range (1899-2053)
+        jd_2050 = 2451545.0 + 50 * 365.25
 
         lon_2000, _, _ = calc_fixed_star_position(SE_SPICA_STAR, jd_2000)
-        lon_2100, _, _ = calc_fixed_star_position(SE_SPICA_STAR, jd_2100)
+        lon_2050, _, _ = calc_fixed_star_position(SE_SPICA_STAR, jd_2050)
 
         # Position should have changed due to proper motion + precession
-        diff = abs(lon_2100 - lon_2000)
-        assert diff > 0.1, f"Expected movement over 100 years, got {diff} deg"
+        # Over 50 years, expect at least 0.05 degrees change
+        diff = abs(lon_2050 - lon_2000)
+        assert diff > 0.05, f"Expected movement over 50 years, got {diff} deg"
 
     def test_position_changes_backwards_in_time(self):
         """Test that star positions change going backwards in time."""
