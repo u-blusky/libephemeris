@@ -827,6 +827,83 @@ def _find_covering_spk(
     return None
 
 
+def is_spk_cached(
+    body_id: Union[int, str],
+    jd_start: float,
+    jd_end: float,
+    cache_dir: Optional[str] = None,
+) -> bool:
+    """
+    Check if a cached SPK file exists and covers the requested date range.
+
+    This function searches the cache directory for SPK files matching the given
+    body_id and verifies that the file covers the requested Julian Day range by
+    parsing the SPK file header (not just relying on filename patterns).
+
+    Args:
+        body_id: JPL Horizons body identifier. Can be:
+            - Asteroid number (int): 2060, 136199
+            - Name (str): "Chiron", "Eris"
+            - Combined: "2060 Chiron"
+        jd_start: Start of the date range (Julian Day)
+        jd_end: End of the date range (Julian Day)
+        cache_dir: Directory to search for SPK files.
+            Default: ~/.libephemeris/spk/
+
+    Returns:
+        bool: True if a cached SPK file exists that covers the requested range,
+              False otherwise.
+
+    Example:
+        >>> from libephemeris.spk_auto import is_spk_cached
+        >>> # Check if Chiron SPK is cached for 2020-2030
+        >>> jd_start = 2458849.5  # 2020-01-01
+        >>> jd_end = 2462502.5    # 2030-01-01
+        >>> if is_spk_cached("2060", jd_start, jd_end):
+        ...     print("Chiron SPK is cached")
+        ... else:
+        ...     print("Need to download Chiron SPK")
+    """
+    # Determine cache directory
+    if cache_dir is None:
+        cache_dir = DEFAULT_AUTO_SPK_DIR
+
+    if not os.path.exists(cache_dir):
+        return False
+
+    # Sanitize body_id to match filename pattern
+    body_str = str(body_id).lower()
+    safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
+
+    # Import get_spk_coverage here to avoid circular imports
+    from .spk import get_spk_coverage
+
+    # Look for files matching this body
+    for filename in os.listdir(cache_dir):
+        if not filename.endswith(".bsp"):
+            continue
+
+        # Check if filename matches our body
+        if not filename.startswith(safe_body_id + "_"):
+            continue
+
+        # Found a potential match - parse the actual SPK file to get coverage
+        spk_path = os.path.join(cache_dir, filename)
+
+        try:
+            coverage = get_spk_coverage(spk_path)
+            if coverage is not None:
+                file_jd_start, file_jd_end = coverage
+                # Check if this file covers our requested range
+                if file_jd_start <= jd_start and file_jd_end >= jd_end:
+                    return True
+        except Exception:
+            # If we can't read the file, skip it and try others
+            continue
+
+    return False
+
+
 def auto_get_spk(
     body_id: Union[int, str],
     jd_start: float,

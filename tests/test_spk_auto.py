@@ -805,3 +805,185 @@ class TestAutoGetSpkIntegration:
         path2 = spk_auto.auto_get_spk("2060", jd_start, jd_end, str(tmp_path))
 
         assert path1 == path2
+
+
+# =============================================================================
+# TESTS FOR is_spk_cached FUNCTION
+# =============================================================================
+
+
+class TestIsSpkCached:
+    """Test is_spk_cached function."""
+
+    def test_returns_false_when_cache_dir_not_exists(self, tmp_path):
+        """Returns False if cache directory doesn't exist."""
+        result = spk_auto.is_spk_cached(
+            "2060", 2458849.5, 2462502.5, str(tmp_path / "nonexistent")
+        )
+        assert result is False
+
+    def test_returns_false_when_cache_empty(self, tmp_path):
+        """Returns False if cache directory is empty."""
+        result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+        assert result is False
+
+    def test_returns_false_when_no_matching_body(self, tmp_path):
+        """Returns False if no SPK file matches the body."""
+        # Create a file for different body
+        spk_file = tmp_path / "5145_2450000_2470000.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+        assert result is False
+
+    def test_returns_false_when_file_invalid(self, tmp_path):
+        """Returns False if SPK file cannot be parsed."""
+        # Create a file with matching name but invalid content
+        spk_file = tmp_path / "2060_2450000_2470000.bsp"
+        spk_file.write_bytes(b"not a valid SPK file")
+
+        result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+        assert result is False
+
+    def test_uses_default_cache_dir(self, tmp_path, monkeypatch):
+        """Uses default cache directory when none specified."""
+        # Monkeypatch the default directory
+        test_default = str(tmp_path / "default_cache")
+        monkeypatch.setattr(spk_auto, "DEFAULT_AUTO_SPK_DIR", test_default)
+
+        # Should return False since directory doesn't exist
+        result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5)
+        assert result is False
+
+    def test_sanitizes_body_id_with_spaces(self, tmp_path):
+        """Sanitizes body ID with spaces for filename matching."""
+        # Create a file with sanitized name
+        spk_file = tmp_path / "2060_chiron_2450000_2470000.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        # Should attempt to match (will fail because file is invalid, but shouldn't crash)
+        result = spk_auto.is_spk_cached(
+            "2060 Chiron", 2458849.5, 2462502.5, str(tmp_path)
+        )
+        assert result is False  # False because file content is invalid
+
+    def test_sanitizes_body_id_lowercase(self, tmp_path):
+        """Body ID is lowercased for filename matching."""
+        # The function should match "chiron" regardless of input case
+        spk_file = tmp_path / "chiron_2450000_2470000.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        # Should attempt to match (will fail because file is invalid, but shouldn't crash)
+        result = spk_auto.is_spk_cached("Chiron", 2458849.5, 2462502.5, str(tmp_path))
+        assert result is False
+
+    def test_ignores_non_bsp_files(self, tmp_path):
+        """Ignores non-.bsp files in cache directory."""
+        # Create a file with wrong extension
+        txt_file = tmp_path / "2060_2450000_2470000.txt"
+        txt_file.write_bytes(b"not an SPK file")
+
+        result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+        assert result is False
+
+
+class TestIsSpkCachedWithMockedCoverage:
+    """Test is_spk_cached with mocked get_spk_coverage."""
+
+    def test_returns_true_when_spk_covers_range(self, tmp_path):
+        """Returns True when SPK file covers the requested range."""
+        # Create a dummy SPK file
+        spk_file = tmp_path / "2060_2450000_2470000.bsp"
+        spk_file.write_bytes(b"dummy SPK")
+
+        # Mock get_spk_coverage in the spk module (where it's imported from)
+        with patch("libephemeris.spk.get_spk_coverage") as mock_coverage:
+            mock_coverage.return_value = (2450000.0, 2470000.0)
+
+            result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+            assert result is True
+            mock_coverage.assert_called()
+
+    def test_returns_false_when_spk_range_too_narrow(self, tmp_path):
+        """Returns False when SPK file doesn't cover the full range."""
+        # Create a dummy SPK file
+        spk_file = tmp_path / "2060_2459000_2460000.bsp"
+        spk_file.write_bytes(b"dummy SPK")
+
+        # Mock get_spk_coverage to return narrower range
+        with patch("libephemeris.spk.get_spk_coverage") as mock_coverage:
+            mock_coverage.return_value = (2459000.0, 2460000.0)
+
+            result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+            assert result is False
+
+    def test_returns_false_when_coverage_returns_none(self, tmp_path):
+        """Returns False when get_spk_coverage returns None."""
+        # Create a dummy SPK file
+        spk_file = tmp_path / "2060_2450000_2470000.bsp"
+        spk_file.write_bytes(b"dummy SPK")
+
+        # Mock get_spk_coverage to return None
+        with patch("libephemeris.spk.get_spk_coverage") as mock_coverage:
+            mock_coverage.return_value = None
+
+            result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+            assert result is False
+
+    def test_tries_multiple_files(self, tmp_path):
+        """Tries multiple SPK files until one covers the range."""
+        # Create multiple SPK files
+        spk_file1 = tmp_path / "2060_2459000_2460000.bsp"
+        spk_file1.write_bytes(b"narrow range")
+        spk_file2 = tmp_path / "2060_2450000_2470000.bsp"
+        spk_file2.write_bytes(b"wide range")
+
+        call_count = 0
+        files_checked = []
+
+        def mock_coverage_side_effect(path):
+            nonlocal call_count
+            call_count += 1
+            files_checked.append(path)
+            if "2459000" in path:
+                return (2459000.0, 2460000.0)  # Too narrow
+            elif "2450000" in path:
+                return (2450000.0, 2470000.0)  # Covers range
+            return None
+
+        with patch(
+            "libephemeris.spk.get_spk_coverage",
+            side_effect=mock_coverage_side_effect,
+        ):
+            result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+            assert result is True
+            # Should have checked at least one file
+            assert call_count >= 1
+
+    def test_handles_coverage_exception(self, tmp_path):
+        """Handles exceptions from get_spk_coverage gracefully."""
+        # Create a dummy SPK file
+        spk_file = tmp_path / "2060_2450000_2470000.bsp"
+        spk_file.write_bytes(b"dummy SPK")
+
+        # Mock get_spk_coverage to raise exception
+        with patch("libephemeris.spk.get_spk_coverage") as mock_coverage:
+            mock_coverage.side_effect = Exception("Failed to parse SPK")
+
+            # Should not raise, just return False
+            result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
+            assert result is False
+
+
+class TestIsSpkCachedModuleExport:
+    """Test that is_spk_cached is properly exported."""
+
+    def test_is_spk_cached_accessible(self):
+        """is_spk_cached is accessible from spk_auto module."""
+        assert hasattr(spk_auto, "is_spk_cached")
+        assert callable(spk_auto.is_spk_cached)
+
+    def test_is_spk_cached_via_libephemeris(self):
+        """is_spk_cached is accessible via libephemeris.spk_auto."""
+        assert hasattr(eph.spk_auto, "is_spk_cached")
+        assert callable(eph.spk_auto.is_spk_cached)
