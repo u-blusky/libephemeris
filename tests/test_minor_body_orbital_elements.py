@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 16 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 17 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -27,6 +27,7 @@ from libephemeris.constants import (
     SE_NESSUS,
     SE_ASBOLUS,
     SE_CHARIKLO,
+    SE_GONGGONG,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -60,6 +61,7 @@ def all_minor_body_ids():
         SE_NESSUS,
         SE_ASBOLUS,
         SE_CHARIKLO,
+        SE_GONGGONG,
     ]
 
 
@@ -76,9 +78,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 16 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 16, (
-            f"Expected 16 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 17 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 17, (
+            f"Expected 17 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -262,6 +264,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 0.16 < elements.e < 0.18, f"Chariklo e={elements.e} unexpected"
         # Inclination ~23.4 degrees
         assert 23.0 < elements.i < 24.0, f"Chariklo i={elements.i} unexpected"
+
+    def test_gonggong_tno(self):
+        """Gonggong: TNO dwarf planet candidate (formerly 2007 OR10)."""
+        elements = MINOR_BODY_ELEMENTS[SE_GONGGONG]
+        assert elements.name == "Gonggong"
+        # Semi-major axis ~67 AU (distant TNO)
+        assert 66.0 < elements.a < 68.0, f"Gonggong a={elements.a} unexpected"
+        # Moderately eccentric orbit
+        assert 0.50 < elements.e < 0.51, f"Gonggong e={elements.e} unexpected"
+        # High inclination ~30.9 degrees
+        assert 30.5 < elements.i < 31.5, f"Gonggong i={elements.i} unexpected"
+        # Slow mean motion (long orbital period ~547 years)
+        assert elements.n < 0.002, f"Gonggong n={elements.n} too fast"
 
 
 @pytest.mark.unit
