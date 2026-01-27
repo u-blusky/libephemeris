@@ -1,13 +1,18 @@
 """
-Tests for Earth's gravitational parameter (GM) in lunar calculations.
+Tests for gravitational parameters (GM) in lunar calculations.
 
-The GM value used in orbital calculations must match the IAU 2015 Resolution B3
-TDB-compatible value used by the DE440 ephemeris for consistency.
+The GM values used in orbital calculations must match the IAU 2015 Resolution B3
+TDB-compatible values used by the DE440 ephemeris for consistency.
+
+For the lunar apogee calculation, we need the combined Earth-Moon gravitational
+parameter because the eccentricity vector formula uses μ = G(M_Earth + M_Moon)
+for the two-body problem.
 
 Reference:
     IAU 2015 Resolution B3: Recommended Nominal Values for Selected Solar and
     Planetary Quantities
     GM_Earth (TDB) = 398600.435436 km^3/s^2
+    Earth/Moon mass ratio = 81.3005691
 """
 
 import re
@@ -19,6 +24,16 @@ from pathlib import Path
 # This is the value used by DE440/DE441 ephemeris files
 GM_EARTH_IAU2015_KM3_S2 = 398600.435436
 
+# Earth/Moon mass ratio (IAU 2015 Resolution B3)
+EARTH_MOON_MASS_RATIO_IAU2015 = 81.3005691
+
+# Derived: GM_Moon from Earth/Moon mass ratio
+GM_MOON_IAU2015_KM3_S2 = GM_EARTH_IAU2015_KM3_S2 / EARTH_MOON_MASS_RATIO_IAU2015
+
+# Combined Earth-Moon gravitational parameter for two-body problem
+# μ = G(M_Earth + M_Moon) = GM_Earth + GM_Moon
+GM_EARTH_MOON_IAU2015_KM3_S2 = GM_EARTH_IAU2015_KM3_S2 + GM_MOON_IAU2015_KM3_S2
+
 # Conversion factors
 AU_KM = 149597870.7  # km per AU (IAU 2012 definition)
 SECONDS_PER_DAY = 86400.0
@@ -27,26 +42,64 @@ SECONDS_PER_DAY = 86400.0
 class TestGMEarthConstant:
     """Tests for the GM_Earth constant value used in lunar.py."""
 
-    def test_gm_value_in_source_code(self):
+    def test_gm_earth_value_in_source_code(self):
         """Verify that lunar.py uses the IAU 2015 GM_Earth value."""
         lunar_py = Path(__file__).parent.parent.parent / "libephemeris" / "lunar.py"
         content = lunar_py.read_text()
 
-        # Find the mu calculation line
-        # Pattern: mu = 398600.xxx... / (149597870.7**3) * (86400**2)
-        pattern = r"mu\s*=\s*(\d+\.?\d*)\s*/\s*\(149597870\.7\*\*3\)"
+        # Find the gm_earth constant definition
+        pattern = r"gm_earth\s*=\s*(\d+\.?\d*)\s*#\s*km"
         match = re.search(pattern, content)
 
-        assert match is not None, (
-            "Could not find GM_Earth constant (mu = ...) in lunar.py"
-        )
+        assert match is not None, "Could not find gm_earth constant in lunar.py"
 
         gm_value = float(match.group(1))
 
         # Verify it matches IAU 2015 value within a small tolerance
         assert abs(gm_value - GM_EARTH_IAU2015_KM3_S2) < 0.001, (
-            f"GM_Earth value {gm_value} does not match IAU 2015 value "
+            f"gm_earth value {gm_value} does not match IAU 2015 value "
             f"{GM_EARTH_IAU2015_KM3_S2} km^3/s^2"
+        )
+
+    def test_earth_moon_mass_ratio_in_source_code(self):
+        """Verify that lunar.py uses the IAU 2015 Earth/Moon mass ratio."""
+        lunar_py = Path(__file__).parent.parent.parent / "libephemeris" / "lunar.py"
+        content = lunar_py.read_text()
+
+        # Find the mass ratio constant
+        pattern = r"earth_moon_mass_ratio\s*=\s*(\d+\.?\d*)"
+        match = re.search(pattern, content)
+
+        assert match is not None, (
+            "Could not find earth_moon_mass_ratio constant in lunar.py"
+        )
+
+        ratio_value = float(match.group(1))
+
+        # Verify it matches IAU 2015 value within tolerance
+        assert abs(ratio_value - EARTH_MOON_MASS_RATIO_IAU2015) < 0.0001, (
+            f"earth_moon_mass_ratio {ratio_value} does not match IAU 2015 value "
+            f"{EARTH_MOON_MASS_RATIO_IAU2015}"
+        )
+
+    def test_uses_combined_earth_moon_mu(self):
+        """Verify that calc_true_lilith uses combined Earth-Moon gravitational parameter."""
+        lunar_py = Path(__file__).parent.parent.parent / "libephemeris" / "lunar.py"
+        content = lunar_py.read_text()
+
+        # Check that gm_earth_moon is calculated and used for mu
+        assert "gm_earth_moon" in content, (
+            "lunar.py should calculate gm_earth_moon (combined Earth-Moon GM)"
+        )
+        assert "gm_moon" in content, (
+            "lunar.py should calculate gm_moon from Earth/Moon mass ratio"
+        )
+        # Verify mu uses the combined value, not just GM_Earth
+        pattern = r"mu\s*=\s*gm_earth_moon"
+        match = re.search(pattern, content)
+        assert match is not None, (
+            "mu should be set from gm_earth_moon (combined Earth-Moon GM), "
+            "not just GM_Earth"
         )
 
     def test_gm_value_documented_in_docstring(self):
@@ -108,14 +161,16 @@ class TestGMImpactOnOrbitalCalculations:
         Test that circular orbital velocity formula works with the GM value.
 
         v = sqrt(GM/r) where v is velocity, GM is gravitational parameter, r is radius
+
+        For two-body problem, use combined Earth-Moon GM.
         """
         # Mean Moon distance in km
         moon_distance_km = 384400.0
 
-        # Calculate circular orbital velocity
-        v_km_s = math.sqrt(GM_EARTH_IAU2015_KM3_S2 / moon_distance_km)
+        # Calculate circular orbital velocity using combined Earth-Moon GM
+        v_km_s = math.sqrt(GM_EARTH_MOON_IAU2015_KM3_S2 / moon_distance_km)
 
-        # Moon's actual mean orbital velocity is about 1.022 km/s
+        # Moon's actual mean orbital velocity is about 1.022-1.024 km/s
         assert 1.0 < v_km_s < 1.1, (
             f"Calculated velocity {v_km_s} km/s is outside expected range"
         )
@@ -125,12 +180,16 @@ class TestGMImpactOnOrbitalCalculations:
         Test that orbital period formula works with the GM value.
 
         T = 2*pi*sqrt(a^3/GM) where T is period, a is semi-major axis
+
+        For two-body problem, use combined Earth-Moon GM.
         """
         # Moon's mean semi-major axis in km
         moon_sma_km = 384748.0
 
-        # Calculate orbital period in seconds
-        T_seconds = 2 * math.pi * math.sqrt(moon_sma_km**3 / GM_EARTH_IAU2015_KM3_S2)
+        # Calculate orbital period in seconds using combined Earth-Moon GM
+        T_seconds = (
+            2 * math.pi * math.sqrt(moon_sma_km**3 / GM_EARTH_MOON_IAU2015_KM3_S2)
+        )
 
         # Convert to days
         T_days = T_seconds / SECONDS_PER_DAY
@@ -138,4 +197,75 @@ class TestGMImpactOnOrbitalCalculations:
         # Moon's sidereal orbital period is about 27.32 days
         assert 27.0 < T_days < 28.0, (
             f"Calculated period {T_days} days is outside expected range"
+        )
+
+
+class TestEarthMoonCombinedGM:
+    """Tests for the combined Earth-Moon gravitational parameter."""
+
+    def test_combined_gm_is_larger_than_earth_only(self):
+        """Verify that combined GM is larger than Earth-only GM."""
+        assert GM_EARTH_MOON_IAU2015_KM3_S2 > GM_EARTH_IAU2015_KM3_S2, (
+            "Combined Earth-Moon GM should be larger than Earth-only GM"
+        )
+
+    def test_moon_contribution_is_about_1_percent(self):
+        """Verify the Moon's contribution to the combined GM is ~1.2%."""
+        moon_fraction = GM_MOON_IAU2015_KM3_S2 / GM_EARTH_IAU2015_KM3_S2
+
+        # Moon is about 1/81.3 of Earth's mass, so ~1.23% contribution
+        assert 0.012 < moon_fraction < 0.013, (
+            f"Moon's GM fraction {moon_fraction} is outside expected range (0.012-0.013)"
+        )
+
+    def test_combined_gm_value_matches_expected(self):
+        """Verify the combined GM matches the expected value."""
+        # Expected combined GM from IAU 2015 values
+        # GM_Earth = 398600.435436 km³/s²
+        # GM_Moon = 398600.435436 / 81.3005691 = 4902.80008 km³/s²
+        # Total = 403503.2355 km³/s²
+        expected_combined = 403503.2355
+
+        assert abs(GM_EARTH_MOON_IAU2015_KM3_S2 - expected_combined) < 0.1, (
+            f"Combined GM {GM_EARTH_MOON_IAU2015_KM3_S2} does not match expected "
+            f"value {expected_combined} km^3/s^2"
+        )
+
+    def test_using_earth_only_gm_gives_incorrect_period(self):
+        """
+        Demonstrate that using Earth-only GM gives incorrect orbital period.
+
+        This test shows why we need the combined Earth-Moon GM for the
+        eccentricity vector calculation.
+        """
+        # Moon's mean semi-major axis in km
+        moon_sma_km = 384748.0
+
+        # Calculate period with Earth-only GM (incorrect)
+        T_earth_only = 2 * math.pi * math.sqrt(moon_sma_km**3 / GM_EARTH_IAU2015_KM3_S2)
+        T_earth_only_days = T_earth_only / SECONDS_PER_DAY
+
+        # Calculate period with combined GM (correct)
+        T_combined = (
+            2 * math.pi * math.sqrt(moon_sma_km**3 / GM_EARTH_MOON_IAU2015_KM3_S2)
+        )
+        T_combined_days = T_combined / SECONDS_PER_DAY
+
+        # The difference is about 0.2 days (significant!)
+        difference_days = T_earth_only_days - T_combined_days
+
+        # Using Earth-only GM gives a period that's too long by ~0.16 days
+        assert 0.1 < difference_days < 0.3, (
+            f"Period difference {difference_days} days is outside expected range"
+        )
+
+    def test_combined_gm_conversion_to_au_day(self):
+        """Test the conversion of combined GM from km^3/s^2 to AU^3/day^2."""
+        # Convert from km^3/s^2 to AU^3/day^2
+        gm_au3_day2 = GM_EARTH_MOON_IAU2015_KM3_S2 / (AU_KM**3) * (SECONDS_PER_DAY**2)
+
+        # Expected value approximately 8.997e-10 AU^3/day^2 (slightly larger than Earth-only)
+        assert gm_au3_day2 > 0, "GM in AU^3/day^2 must be positive"
+        assert 8.9e-10 < gm_au3_day2 < 9.2e-10, (
+            f"Combined GM conversion result {gm_au3_day2} is outside expected range"
         )

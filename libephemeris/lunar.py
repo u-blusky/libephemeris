@@ -1631,9 +1631,28 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
         r[0] * v[1] - r[1] * v[0],
     ]
 
-    # GM_Earth in AU³/day² (converted from km³/s²)
-    # IAU 2015 Resolution B3, TDB-compatible value
-    mu = 398600.435436 / (149597870.7**3) * (86400**2)
+    # Gravitational parameter for Earth-Moon system in AU³/day²
+    #
+    # For two-body orbital calculations (eccentricity vector, vis-viva equation),
+    # the effective gravitational parameter is μ = G(M_Earth + M_Moon), not just
+    # GM_Earth alone. This is because the relative motion of two bodies under
+    # mutual gravitation follows: d²r/dt² = -μ * r / |r|³
+    # where μ = G(M₁ + M₂).
+    #
+    # IAU 2015 Resolution B3 values (TDB-compatible):
+    #   GM_Earth = 398600.435436 km³/s²
+    #   Earth/Moon mass ratio = 81.3005691
+    #   GM_Moon = GM_Earth / 81.3005691 = 4902.800076 km³/s²
+    #   μ_total = GM_Earth + GM_Moon = 403503.235512 km³/s²
+    #
+    # References:
+    # - IAU 2015 Resolution B3: Nominal values for solar and planetary quantities
+    # - Vallado, D. "Fundamentals of Astrodynamics and Applications"
+    gm_earth = 398600.435436  # km³/s²
+    earth_moon_mass_ratio = 81.3005691  # IAU 2015
+    gm_moon = gm_earth / earth_moon_mass_ratio  # ~4902.800 km³/s²
+    gm_earth_moon = gm_earth + gm_moon  # ~403503.235 km³/s²
+    mu = gm_earth_moon / (149597870.7**3) * (86400**2)  # Convert to AU³/day²
 
     # Eccentricity vector e = (v × h)/μ - r/|r| (points toward perigee)
     e_vec = [
