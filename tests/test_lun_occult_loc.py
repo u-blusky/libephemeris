@@ -56,8 +56,8 @@ class TestLunOccultWhenLoc:
         assert len(times) == 10
         assert all(isinstance(t, float) for t in times)
 
-        # Attributes should be 11-element tuple
-        assert len(attr) == 11
+        # Attributes should be 20-element tuple (pyswisseph compatible)
+        assert len(attr) == 20
         assert all(isinstance(a, float) for a in attr)
 
         # Occultation type should be int
@@ -119,7 +119,10 @@ class TestLunOccultWhenLoc:
         assert ocl_type & visibility_flags
 
     def test_moon_attributes_returned(self):
-        """Test that Moon attributes are returned."""
+        """Test that occultation attributes are returned.
+
+        Uses pyswisseph compatible format.
+        """
         jd_start = julday(2017, 1, 1, 0)
         lat, lon = 45.0, 10.0
 
@@ -128,14 +131,14 @@ class TestLunOccultWhenLoc:
         # Fraction covered should be between 0 and 1
         assert 0.0 <= attr[0] <= 1.0
 
-        # Moon azimuth should be between 0 and 360
-        assert 0.0 <= attr[3] < 360.0
+        # Target azimuth should be between 0 and 360
+        assert 0.0 <= attr[4] < 360.0
 
-        # Moon altitude should be between -90 and 90
-        assert -90.0 <= attr[4] <= 90.0
+        # Target altitude should be between -90 and 90
+        assert -90.0 <= attr[5] <= 90.0
 
-        # Moon diameter should be reasonable (around 0.5 degrees)
-        assert 0.4 < attr[5] < 0.6
+        # Angular separation (elongation) should be small for an occultation
+        assert 0.0 <= attr[7] < 1.0
 
     def test_raises_error_for_no_target(self):
         """Test that function raises error if no target specified."""

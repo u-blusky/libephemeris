@@ -3903,18 +3903,16 @@ def lun_occult_when_loc(
                 [7]: Time of moonrise (if Moon rises during occultation, else 0)
                 [8]: Time of moonset (if Moon sets during occultation, else 0)
                 [9]: Reserved (0)
-            - attr: Tuple of 11 floats with occultation attributes:
-                [0]: Fraction of target covered at maximum (0-1)
-                [1]: Reserved (0)
-                [2]: Reserved (0)
-                [3]: Azimuth of Moon at maximum occultation (degrees)
-                [4]: Altitude of Moon at maximum occultation (degrees)
-                [5]: Apparent diameter of Moon (degrees)
-                [6]: Apparent diameter of target (degrees)
-                [7]: Angular separation at maximum (degrees)
-                [8]: Reserved (0)
-                [9]: Reserved (0)
-                [10]: Reserved (0)
+            - attr: Tuple of 20 floats with occultation attributes (pyswisseph compatible):
+                [0]: Fraction of target diameter covered by Moon (magnitude)
+                [1]: Ratio of lunar diameter to target diameter
+                [2]: Fraction of target disc covered by Moon (obscuration)
+                [3]: Diameter of core shadow in km (0 for stars)
+                [4]: Azimuth of target at maximum occultation (degrees)
+                [5]: True altitude of target above horizon at maximum (degrees)
+                [6]: Apparent altitude of target above horizon at maximum (degrees)
+                [7]: Angular separation (elongation) at maximum (degrees)
+                [8-19]: Reserved (0)
             - retflag: Occultation type flags bitmask (SE_ECL_* constants)
                 SE_ECL_TOTAL: Total occultation (body fully behind Moon)
                 SE_ECL_PARTIAL: Partial occultation (body partially behind Moon)
@@ -4239,19 +4237,31 @@ def lun_occult_when_loc(
             0.0,  # [9] Reserved
         )
 
-        # Prepare attributes tuple (11 elements)
+        # Prepare attributes tuple (20 elements, pyswisseph compatible)
+        # Calculate ratio of diameters
+        diameter_ratio = moon_diameter / target_diameter if target_diameter > 0 else 0.0
+
         attr = (
-            fraction_covered,  # [0] Fraction of target covered
-            0.0,  # [1] Reserved
-            0.0,  # [2] Reserved
-            moon_az,  # [3] Azimuth of Moon at maximum
-            moon_alt,  # [4] Altitude of Moon at maximum
-            moon_diameter,  # [5] Apparent diameter of Moon
-            target_diameter,  # [6] Apparent diameter of target
-            min_separation,  # [7] Angular separation at maximum
+            fraction_covered,  # [0] Fraction of target diameter covered (magnitude)
+            diameter_ratio,  # [1] Ratio of lunar diameter to target diameter
+            fraction_covered,  # [2] Fraction of disc covered (obscuration, same as magnitude for point sources)
+            0.0,  # [3] Diameter of core shadow in km (0 for stars)
+            target_az,  # [4] Azimuth of target at maximum
+            target_alt,  # [5] True altitude of target above horizon
+            target_alt,  # [6] Apparent altitude (same as true for simplicity)
+            min_separation,  # [7] Angular separation (elongation) at maximum
             0.0,  # [8] Reserved
             0.0,  # [9] Reserved
             0.0,  # [10] Reserved
+            0.0,  # [11] Reserved
+            0.0,  # [12] Reserved
+            0.0,  # [13] Reserved
+            0.0,  # [14] Reserved
+            0.0,  # [15] Reserved
+            0.0,  # [16] Reserved
+            0.0,  # [17] Reserved
+            0.0,  # [18] Reserved
+            0.0,  # [19] Reserved
         )
 
         return times, attr, ecl_type
