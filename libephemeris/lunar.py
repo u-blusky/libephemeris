@@ -2006,3 +2006,354 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     longitude = lon_date % 360.0
 
     return longitude, lat, e_mag
+
+
+def calc_true_lilith_orbital_elements(jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate True Lilith using the classical orbital elements method.
+
+    This is an alternative method that computes osculating orbital elements
+    (semi-major axis, eccentricity, inclination, longitude of ascending node,
+    and argument of perigee) from state vectors, then derives the apogee
+    longitude as Ω + ω + 180° where Ω is the longitude of ascending node
+    and ω is the argument of perigee.
+
+    Algorithm
+    =========
+
+    **Step 1: Obtain Moon State Vectors**
+        - Query JPL DE ephemeris via Skyfield
+        - Get geocentric position r and velocity v
+        - Reference frame: ICRS (equatorial)
+
+    **Step 2: Compute Angular Momentum and Node Vector**
+        - h = r × v (angular momentum, perpendicular to orbital plane)
+        - n = k × h (node vector, where k = [0, 0, 1] is the z-axis)
+        - The ascending node lies along n
+
+    **Step 3: Compute Eccentricity Vector**
+        - e = (v × h)/μ - r/|r| (points toward perigee)
+
+    **Step 4: Compute Orbital Elements**
+        - Ω = atan2(n_y, n_x) (longitude of ascending node in equatorial)
+        - ω = arccos((n · e) / (|n| |e|)) (argument of perigee)
+        - i = arccos(h_z / |h|) (inclination)
+
+    **Step 5: Compute Apogee Longitude**
+        - Apogee longitude in ecliptic = Ω_ecl + ω + 180° (mod 360)
+
+    **Step 6: Apply Precession and Nutation**
+        - Transform from J2000 ecliptic to ecliptic of date
+
+    Comparison with Eccentricity Vector Method
+    ==========================================
+
+    - **Eccentricity Vector Method** (calc_true_lilith): Directly computes
+      the apogee direction from -e_vec, then applies perturbation corrections.
+
+    - **Orbital Elements Method** (this function): Computes Ω and ω separately,
+      then combines them. This approach is closer to how Swiss Ephemeris
+      computes the osculating apogee.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
+
+    Returns:
+        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+            - longitude: Ecliptic longitude of apogee in degrees [0, 360)
+            - latitude: Ecliptic latitude in degrees (small, typically < 5°)
+            - eccentricity: Orbital eccentricity magnitude (~0.055)
+
+    References:
+        - Vallado, D. "Fundamentals of Astrodynamics and Applications"
+        - Bate, Mueller, White "Fundamentals of Astrodynamics"
+        - Swiss Ephemeris documentation on osculating apogee
+    """
+    try:
+        import erfa
+
+        _HAS_ERFA = True
+    except ImportError:
+        _HAS_ERFA = False
+
+    planets = get_planets()
+    ts = get_timescale()
+    t = ts.tt_jd(jd_tt)
+
+    earth = planets["earth"]
+    moon = planets["moon"]
+
+    # Get geocentric Moon state vectors in ICRS (equatorial)
+    moon_obs = (moon - earth).at(t)
+    r = moon_obs.position.au
+    v = moon_obs.velocity.au_per_d
+
+    # Calculate magnitudes
+    r_mag = math.sqrt(r[0] ** 2 + r[1] ** 2 + r[2] ** 2)
+
+    # Specific angular momentum h = r × v
+    h_vec = [
+        r[1] * v[2] - r[2] * v[1],
+        r[2] * v[0] - r[0] * v[2],
+        r[0] * v[1] - r[1] * v[0],
+    ]
+    h_mag = math.sqrt(h_vec[0] ** 2 + h_vec[1] ** 2 + h_vec[2] ** 2)
+
+    # Gravitational parameter for Earth-Moon system in AU³/day²
+    # μ = G(M_Earth + M_Moon) for two-body problem
+    gm_earth = 398600.435436  # km³/s² (IAU 2015)
+    earth_moon_mass_ratio = 81.3005691  # IAU 2015
+    gm_moon = gm_earth / earth_moon_mass_ratio  # ~4902.800 km³/s²
+    gm_earth_moon = gm_earth + gm_moon  # ~403503.235 km³/s²
+    mu = gm_earth_moon / (149597870.7**3) * (86400**2)  # Convert to AU³/day²
+
+    # ========================================================================
+    # COMPUTE CLASSICAL ORBITAL ELEMENTS
+    # ========================================================================
+
+    # Node vector n = k × h, where k = [0, 0, 1] (z-axis unit vector)
+    # n points toward the ascending node
+    n_vec = [
+        -h_vec[1],  # k × h = [0*h[2] - 1*h[1], 1*h[0] - 0*h[2], 0*h[1] - 0*h[0]]
+        h_vec[0],  # = [-h[1], h[0], 0]
+        0.0,
+    ]
+    n_mag = math.sqrt(n_vec[0] ** 2 + n_vec[1] ** 2)
+
+    # Eccentricity vector e = (v × h)/μ - r/|r| (points toward perigee)
+    e_vec = [
+        (v[1] * h_vec[2] - v[2] * h_vec[1]) / mu - r[0] / r_mag,
+        (v[2] * h_vec[0] - v[0] * h_vec[2]) / mu - r[1] / r_mag,
+        (v[0] * h_vec[1] - v[1] * h_vec[0]) / mu - r[2] / r_mag,
+    ]
+    e_mag = math.sqrt(e_vec[0] ** 2 + e_vec[1] ** 2 + e_vec[2] ** 2)
+
+    # Inclination: i = arccos(h_z / |h|)
+    # This is the inclination to the equatorial plane
+    inc_eq = math.acos(max(-1.0, min(1.0, h_vec[2] / h_mag)))
+
+    # Longitude of ascending node in equatorial coordinates: Ω = atan2(n_y, n_x)
+    if n_mag > 1e-10:
+        omega_eq = math.atan2(n_vec[1], n_vec[0])  # In radians
+    else:
+        omega_eq = 0.0  # Degenerate case (equatorial orbit)
+
+    # Argument of perigee: ω = arccos((n · e) / (|n| |e|))
+    # Sign determined by e_z: if e_z > 0, ω is in [0, π], else [π, 2π]
+    if n_mag > 1e-10 and e_mag > 1e-10:
+        n_dot_e = n_vec[0] * e_vec[0] + n_vec[1] * e_vec[1] + n_vec[2] * e_vec[2]
+        cos_omega = max(-1.0, min(1.0, n_dot_e / (n_mag * e_mag)))
+        omega_perigee = math.acos(cos_omega)
+
+        # Determine the quadrant: if e_z < 0, ω is in [π, 2π]
+        if e_vec[2] < 0:
+            omega_perigee = 2.0 * math.pi - omega_perigee
+    else:
+        omega_perigee = 0.0
+
+    # ========================================================================
+    # TRANSFORM TO ECLIPTIC COORDINATES
+    # ========================================================================
+
+    # Use J2000 obliquity for transformation
+    J2000_OBLIQUITY_RAD = 0.4090928042223415  # 84381.406 arcsec in radians
+
+    if _HAS_ERFA:
+        eps_j2000 = erfa.obl06(2451545.0, 0.0)
+    else:
+        eps_j2000 = J2000_OBLIQUITY_RAD
+
+    cos_eps = math.cos(eps_j2000)
+    sin_eps = math.sin(eps_j2000)
+
+    # Transform angular momentum vector from equatorial to ecliptic
+    # This gives the orbital pole in ecliptic coordinates
+    h_ecl = [
+        h_vec[0],
+        h_vec[1] * cos_eps + h_vec[2] * sin_eps,
+        -h_vec[1] * sin_eps + h_vec[2] * cos_eps,
+    ]
+    h_ecl_mag = math.sqrt(h_ecl[0] ** 2 + h_ecl[1] ** 2 + h_ecl[2] ** 2)
+
+    # Inclination to ecliptic
+    inc_ecl = math.acos(max(-1.0, min(1.0, h_ecl[2] / h_ecl_mag)))
+
+    # Node vector in ecliptic: n_ecl = k_ecl × h_ecl
+    # where k_ecl = [0, 0, 1] is the ecliptic pole
+    n_ecl = [
+        -h_ecl[1],
+        h_ecl[0],
+        0.0,
+    ]
+    n_ecl_mag = math.sqrt(n_ecl[0] ** 2 + n_ecl[1] ** 2)
+
+    # Longitude of ascending node in ecliptic coordinates
+    if n_ecl_mag > 1e-10:
+        omega_ecl = math.atan2(n_ecl[1], n_ecl[0])  # In radians
+    else:
+        omega_ecl = 0.0
+
+    # Transform eccentricity vector to ecliptic
+    e_ecl = [
+        e_vec[0],
+        e_vec[1] * cos_eps + e_vec[2] * sin_eps,
+        -e_vec[1] * sin_eps + e_vec[2] * cos_eps,
+    ]
+
+    # Argument of perigee in ecliptic: angle from ascending node to perigee
+    if n_ecl_mag > 1e-10 and e_mag > 1e-10:
+        n_dot_e_ecl = n_ecl[0] * e_ecl[0] + n_ecl[1] * e_ecl[1] + n_ecl[2] * e_ecl[2]
+        cos_omega_ecl = max(-1.0, min(1.0, n_dot_e_ecl / (n_ecl_mag * e_mag)))
+        omega_perigee_ecl = math.acos(cos_omega_ecl)
+
+        # Determine quadrant: if e_ecl[2] < 0, ω is in [π, 2π]
+        if e_ecl[2] < 0:
+            omega_perigee_ecl = 2.0 * math.pi - omega_perigee_ecl
+    else:
+        omega_perigee_ecl = 0.0
+
+    # ========================================================================
+    # COMPUTE APOGEE LONGITUDE
+    # ========================================================================
+
+    # Longitude of perigee (ϖ) = Ω + ω (in the ecliptic)
+    lon_perigee_j2000 = math.degrees(omega_ecl + omega_perigee_ecl)
+
+    # Apogee is 180° from perigee
+    lon_apogee_j2000 = (lon_perigee_j2000 + 180.0) % 360.0
+
+    # ========================================================================
+    # COMPUTE LATITUDE (from eccentricity vector direction)
+    # ========================================================================
+
+    # The apogee vector is opposite to the eccentricity vector
+    apogee_ecl = [-e for e in e_ecl]
+    apogee_ecl_mag = math.sqrt(
+        apogee_ecl[0] ** 2 + apogee_ecl[1] ** 2 + apogee_ecl[2] ** 2
+    )
+
+    if apogee_ecl_mag > 1e-10:
+        lat = math.degrees(
+            math.asin(max(-1.0, min(1.0, apogee_ecl[2] / apogee_ecl_mag)))
+        )
+    else:
+        lat = 0.0
+
+    # ========================================================================
+    # APPLY PRECESSION FROM J2000 TO ECLIPTIC OF DATE
+    # ========================================================================
+
+    if _HAS_ERFA:
+        result = erfa.p06e(jd_tt, 0.0)
+        psi_a = result[1]  # Luni-solar precession
+        lon_date = lon_apogee_j2000 + math.degrees(psi_a)
+    else:
+        # Fallback: Lieske precession formula
+        T = (jd_tt - 2451545.0) / 36525.0
+        psi_a = (5029.0966 * T + 1.1120 * T**2 - 0.000006 * T**3) / 3600.0
+        lon_date = lon_apogee_j2000 + psi_a
+
+    # Apply nutation correction for true ecliptic of date
+    dpsi_rad, deps_rad = iau2000a_radians(t)
+    lon_date += math.degrees(dpsi_rad)
+
+    # ========================================================================
+    # APPLY PERTURBATION CORRECTIONS (same as eccentricity vector method)
+    # ========================================================================
+
+    D, M, M_prime, F = _calc_lunar_fundamental_arguments(jd_tt)
+
+    # Evection correction (period ~31.8 days, amplitude ~1.274°)
+    evection_arg = 2.0 * D - M_prime
+    evection_correction = 1.2739 * math.sin(evection_arg)
+    lon_date += evection_correction
+
+    # Evection-related secondary terms from Meeus Table 47.B
+    evection_secondary_1 = -0.2136 * math.sin(M_prime - 2.0 * D)
+    lon_date += evection_secondary_1
+
+    evection_secondary_2 = 0.1058 * math.sin(M_prime + 2.0 * D)
+    lon_date += evection_secondary_2
+
+    evection_secondary_3 = -0.2037 * math.sin(2.0 * M_prime)
+    lon_date += evection_secondary_3
+
+    evection_secondary_4 = 0.1027 * math.sin(2.0 * M_prime - 2.0 * D)
+    lon_date += evection_secondary_4
+
+    # Variation correction (period ~14.77 days, amplitude ~0.658°)
+    variation_arg = 2.0 * D
+    variation_correction = 0.6583 * math.sin(variation_arg)
+    lon_date += variation_correction
+
+    # Annual equation correction (period ~1 year, amplitude ~0.186°)
+    annual_equation_correction = 0.1856 * math.sin(M)
+    lon_date += annual_equation_correction
+
+    # Parallactic inequality correction (period ~1 synodic month, amplitude ~0.125°)
+    parallactic_inequality_correction = 0.125 * math.sin(D)
+    lon_date += parallactic_inequality_correction
+
+    # Reduction to ecliptic correction (period ~4.5 years, amplitude ~0.116°)
+    LUNAR_INCLINATION = math.radians(5.145)
+    tan_half_incl_sq = math.tan(LUNAR_INCLINATION / 2.0) ** 2
+    omega_perigee_arg = F - M_prime
+    reduction_to_ecliptic = -math.degrees(
+        tan_half_incl_sq * math.sin(2.0 * omega_perigee_arg)
+    )
+    lon_date += reduction_to_ecliptic
+
+    # Normalize to [0, 360)
+    longitude = lon_date % 360.0
+
+    return longitude, lat, e_mag
+
+
+def compare_true_lilith_methods(
+    jd_tt: float,
+) -> dict:
+    """
+    Compare the two True Lilith calculation methods.
+
+    This function computes True Lilith using both the eccentricity vector
+    method and the orbital elements method, returning detailed results for
+    comparison and analysis.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
+
+    Returns:
+        dict: Dictionary containing:
+            - 'eccentricity_vector': (lon, lat, e_mag) from calc_true_lilith
+            - 'orbital_elements': (lon, lat, e_mag) from calc_true_lilith_orbital_elements
+            - 'lon_diff': Difference in longitude (degrees)
+            - 'lat_diff': Difference in latitude (degrees)
+            - 'e_diff': Difference in eccentricity
+
+    Example:
+        >>> result = compare_true_lilith_methods(2451545.0)  # J2000.0
+        >>> print(f"Longitude difference: {result['lon_diff']:.4f}°")
+    """
+    # Compute using eccentricity vector method
+    ev_lon, ev_lat, ev_e = calc_true_lilith(jd_tt)
+
+    # Compute using orbital elements method
+    oe_lon, oe_lat, oe_e = calc_true_lilith_orbital_elements(jd_tt)
+
+    # Calculate differences
+    lon_diff = ev_lon - oe_lon
+    if lon_diff > 180:
+        lon_diff -= 360
+    if lon_diff < -180:
+        lon_diff += 360
+
+    lat_diff = ev_lat - oe_lat
+    e_diff = ev_e - oe_e
+
+    return {
+        "eccentricity_vector": (ev_lon, ev_lat, ev_e),
+        "orbital_elements": (oe_lon, oe_lat, oe_e),
+        "lon_diff": lon_diff,
+        "lat_diff": lat_diff,
+        "e_diff": e_diff,
+    }
