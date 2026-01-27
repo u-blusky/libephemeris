@@ -131,9 +131,9 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
     through zenith perpendicular to meridian) intersects the ecliptic in the western sky.
     Often used in astrology for fateful encounters or significant relationships.
 
-    Mathematical precision improvement: Uses limiting formula for near-equator latitudes
-    instead of epsilon approximation. At equator (lat=0), Vertex = East Point + 180°,
-    where East Point is the ecliptic longitude at ARMC + 90° converted from RA to ecliptic.
+    At the equator (lat=0), the Vertex is mathematically undefined because the Prime
+    Vertical coincides with the horizon plane. Following Swiss Ephemeris convention,
+    we return 180.0 as a fallback value in this case.
 
     Args:
         armc_deg: Right Ascension of Midheaven (sidereal time) in degrees
@@ -142,24 +142,16 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
         mc: Midheaven longitude in degrees (for hemisphere verification)
 
     Returns:
-        Vertex longitude in degrees (western hemisphere)
+        Vertex longitude in degrees (western hemisphere), or 0.0 at equator
 
-    Precision: Exact at equator (no epsilon approximation), ~0.001° elsewhere
+    Precision: ~0.001° for non-equatorial latitudes
     """
     eps_rad = math.radians(eps)
 
-    # Use limiting case formula for very small latitudes (exact at equator)
-    # At equator: Vertex is the point 90° West of ARMC in RA, converted to ecliptic
+    # At equator (lat=0), Vertex is mathematically undefined (Prime Vertical
+    # coincides with the horizon plane). Swiss Ephemeris returns 0.0 as fallback.
     if abs(lat) < 1e-10:  # Effectively zero latitude (~0.00036 arcsec)
-        # East Point: ARMC + 90° in RA
-        vertex_ra = (armc_deg + 90.0) % 360.0
-        # Convert RA to ecliptic longitude: tan(lon) = sin(RA) / (cos(RA) * cos(eps))
-        y = math.sin(math.radians(vertex_ra))
-        x = math.cos(math.radians(vertex_ra)) * math.cos(eps_rad)
-        vtx = math.degrees(math.atan2(y, x)) % 360.0
-        # Vertex is opposite to East Point (in Western hemisphere)
-        vtx = (vtx + 180.0) % 360.0
-        return vtx
+        return 0.0
 
     # Standard formula for non-zero latitudes
     # Vertex is where Prime Vertical intersects ecliptic in West
@@ -492,12 +484,17 @@ def swe_houses(
     # Formula from Swiss Ephemeris swehouse.c lines 2039-2044:
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
-    coasc2_armc = (armc_deg + 90.0) % 360.0
-    if lat >= 0:
-        coasc2_lat = 90.0 - lat
+    # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
+    # Swiss Ephemeris returns 0.0 as fallback in this case.
+    if abs(lat) < 1e-10:
+        co_asc = 0.0
     else:
-        coasc2_lat = -90.0 - lat
-    co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
+        coasc2_armc = (armc_deg + 90.0) % 360.0
+        if lat >= 0:
+            coasc2_lat = 90.0 - lat
+        else:
+            coasc2_lat = -90.0 - lat
+        co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
 
     # Polar Ascendant M. Munkasey (polasc)
     # Formula from Swiss Ephemeris swehouse.c line 2047:
@@ -566,6 +563,21 @@ def swe_houses(
         cusps = _houses_horizontal(armc_active, lat, eps, asc, mc)
     elif hsys_char == "Y":  # APC Houses
         cusps = _houses_apc(armc_active, lat, eps, asc, mc)
+        # APC at polar latitudes needs cusps and MC flipped if MC is below horizon
+        # (Swiss Ephemeris behavior - different from R/C/T which flip armc_active)
+        mc_dec_rad = math.atan(
+            math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
+        )
+        lat_rad = math.radians(lat)
+        sin_alt = math.sin(lat_rad) * math.sin(mc_dec_rad) + math.cos(
+            lat_rad
+        ) * math.cos(mc_dec_rad)
+        if sin_alt < 0:
+            # Flip MC in ascmc
+            ascmc[1] = (ascmc[1] + 180.0) % 360.0
+            # Flip all cusps by 180°
+            for i in range(1, 13):
+                cusps[i] = (cusps[i] + 180.0) % 360.0
     elif hsys_char == "F":  # Carter (Poli-Equatorial)
         cusps = _houses_carter(armc_active, lat, eps, asc, mc)
     elif hsys_char == "U":  # Krusinski
@@ -749,12 +761,17 @@ def swe_houses_armc(
     # Co-Ascendant M. Munkasey (coasc2)
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
-    coasc2_armc = (armc_deg + 90.0) % 360.0
-    if lat >= 0:
-        coasc2_lat = 90.0 - lat
+    # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
+    # Swiss Ephemeris returns 0.0 as fallback in this case.
+    if abs(lat) < 1e-10:
+        co_asc = 0.0
     else:
-        coasc2_lat = -90.0 - lat
-    co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
+        coasc2_armc = (armc_deg + 90.0) % 360.0
+        if lat >= 0:
+            coasc2_lat = 90.0 - lat
+        else:
+            coasc2_lat = -90.0 - lat
+        co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
 
     # Polar Ascendant M. Munkasey (polasc)
     # polasc = Asc(ARMC - 90°, latitude)
@@ -818,6 +835,21 @@ def swe_houses_armc(
         cusps = _houses_horizontal(armc_active, lat, eps, asc, mc)
     elif hsys_char == "Y":  # APC Houses
         cusps = _houses_apc(armc_active, lat, eps, asc, mc)
+        # APC at polar latitudes needs MC flipped in ascmc if MC is below horizon
+        # (Swiss Ephemeris behavior - different from R/C/T which flip armc_active)
+        mc_dec_rad = math.atan(
+            math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
+        )
+        lat_rad = math.radians(lat)
+        sin_alt = math.sin(lat_rad) * math.sin(mc_dec_rad) + math.cos(
+            lat_rad
+        ) * math.cos(mc_dec_rad)
+        if sin_alt < 0:
+            # Flip MC in ascmc
+            ascmc[1] = (ascmc[1] + 180.0) % 360.0
+            # Flip all cusps by 180°
+            for i in range(1, 13):
+                cusps[i] = (cusps[i] + 180.0) % 360.0
     elif hsys_char == "F":  # Carter (Poli-Equatorial)
         cusps = _houses_carter(armc_active, lat, eps, asc, mc)
     elif hsys_char == "U":  # Krusinski

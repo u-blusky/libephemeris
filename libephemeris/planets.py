@@ -541,13 +541,15 @@ def _calc_body_pctr(
             dp1 += 360.0 / dt
 
     # Apply sidereal offset if requested (ecliptic only)
+    # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
+    # matching Swiss Ephemeris behavior. get_ayanamsa_ut() returns mean ayanamsha.
     if is_sidereal and not is_equatorial:
-        ayanamsa = swe_get_ayanamsa_ut(t.ut1)
+        ayanamsa = _get_true_ayanamsa(t.ut1)
         p1 = (p1 - ayanamsa) % 360.0
 
         # Correct velocity for ayanamsha rate if speed was calculated
         if iflag & SEFLG_SPEED:
-            ayanamsa_next = swe_get_ayanamsa_ut(t.ut1 + dt)
+            ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt)
             da = (ayanamsa_next - ayanamsa) / dt
             dp1 -= da
 
@@ -1067,13 +1069,15 @@ def _calc_body(
             dp1 += 360.0 / dt
 
     # 5. Sidereal Mode
+    # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
+    # matching Swiss Ephemeris behavior. get_ayanamsa_ut() returns mean ayanamsha.
     if is_sidereal and not is_equatorial:
-        ayanamsa = swe_get_ayanamsa_ut(t.ut1)
+        ayanamsa = _get_true_ayanamsa(t.ut1)
         p1 = (p1 - ayanamsa) % 360.0
 
         # Correct velocity for ayanamsha rate if speed was calculated
         if iflag & SEFLG_SPEED:
-            ayanamsa_next = swe_get_ayanamsa_ut(t.ut1 + dt)
+            ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt)
             da = (ayanamsa_next - ayanamsa) / dt
             dp1 -= da
 
@@ -1761,17 +1765,40 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
     # Calculate Mean Ayanamsa
     # Ayanamsa = Ayanamsa0 + Rate * T
+    # Note: get_ayanamsa_ut() returns MEAN ayanamsha (without nutation).
+    # For sidereal planet positions, use _get_true_ayanamsa() which includes nutation.
     ayanamsa = aya_j2000 + (precession * T) / 3600.0
 
-    # Add Nutation (True Ayanamsa)
-    # Using Skyfield's IAU 2000B nutation model (77 terms, arcsec precision)
-    # This converts mean ayanamsa to true (apparent) ayanamsa
+    return ayanamsa % 360.0
+
+
+def _get_true_ayanamsa(tjd_ut: float) -> float:
+    """
+    Get TRUE ayanamsha (mean + nutation) for sidereal planet position calculations.
+
+    Swiss Ephemeris uses the true ayanamsha (including nutation) when calculating
+    sidereal planet positions with FLG_SIDEREAL, even though get_ayanamsa_ut()
+    returns the mean ayanamsha.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+
+    Returns:
+        True ayanamsha in degrees (mean ayanamsha + nutation in longitude)
+    """
+    sid_mode = get_sid_mode()
+    assert isinstance(sid_mode, int)
+
+    # Get mean ayanamsha
+    mean_ayanamsa = _calc_ayanamsa(tjd_ut, sid_mode)
+
+    # Add nutation in longitude
     ts = get_timescale()
     t_obj = ts.ut1_jd(tjd_ut)
-    dpsi, deps = iau2000b_radians(t_obj)  # Nutation in longitude and obliquity
-    ayanamsa += math.degrees(dpsi)  # Apply nutation correction
+    dpsi_rad, _ = iau2000b_radians(t_obj)
+    nutation_deg = math.degrees(dpsi_rad)
 
-    return ayanamsa % 360.0
+    return (mean_ayanamsa + nutation_deg) % 360.0
 
 
 def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
