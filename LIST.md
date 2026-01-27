@@ -172,9 +172,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD LILITH ASTEROID TO CATALOG: Add asteroid 1181 Lilith (the asteroid, not to be confused with lunar apogee Lilith points) to MINOR_BODY_ELEMENTS, add SE_LILITH_AST = 1181 + SE_AST_OFFSET.
 
-- [ ] ADD HIDALGO ASTEROID TO CATALOG: Add asteroid 944 Hidalgo to MINOR_BODY_ELEMENTS, Hidalgo has a comet-like orbit and is used in astrological research, add SE_HIDALGO = 944 + SE_AST_OFFSET.
+- [x] ADD HIDALGO ASTEROID TO CATALOG: Add asteroid 944 Hidalgo to MINOR_BODY_ELEMENTS, Hidalgo has a comet-like orbit and is used in astrological research, add SE_HIDALGO = 944 + SE_AST_OFFSET.
 
-- [ ] ADD TOUTATIS ASTEROID TO CATALOG: Add asteroid 4179 Toutatis to MINOR_BODY_ELEMENTS, a potentially hazardous asteroid studied by radar and spacecraft, add SE_TOUTATIS = 4179 + SE_AST_OFFSET.
+- [x] ADD TOUTATIS ASTEROID TO CATALOG: Add asteroid 4179 Toutatis to MINOR_BODY_ELEMENTS, a potentially hazardous asteroid studied by radar and spacecraft, add SE_TOUTATIS = 4179 + SE_AST_OFFSET.
 
 - [ ] ADD ITOKAWA ASTEROID TO CATALOG: Add asteroid 25143 Itokawa to MINOR_BODY_ELEMENTS, target of the Hayabusa sample return mission, add SE_ITOKAWA = 25143 + SE_AST_OFFSET.
 

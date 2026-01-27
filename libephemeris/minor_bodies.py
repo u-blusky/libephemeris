@@ -5,7 +5,7 @@ This module computes positions for:
 - Main belt asteroids: Ceres, Pallas, Juno, Vesta, Hygiea, Interamnia, Davida, Europa, Sylvia, Psyche, Sappho, Pandora, Lilith
 - Centaurs: Chiron, Pholus, Nessus, Asbolus, Chariklo, Hidalgo
 - Trans-Neptunian Objects (TNOs): Eris, Sedna, Haumea, Makemake, Orcus, Quaoar, Ixion, Gonggong, Varuna
-- Near-Earth asteroids: Apophis, Eros, Amor, Icarus, Toro
+- Near-Earth asteroids: Apophis, Eros, Amor, Icarus, Toro, Toutatis
 
 Method: Keplerian orbital elements with first-order secular perturbations from
 Jupiter, Saturn, Uranus, and Neptune. This provides significantly improved accuracy over pure
@@ -67,6 +67,7 @@ from .constants import (
     SE_PANDORA_AST,
     SE_LILITH_AST,
     SE_HIDALGO,
+    SE_TOUTATIS,
 )
 
 
@@ -1094,6 +1095,17 @@ MINOR_BODY_ELEMENTS = {
         Omega=21.36316817210909,
         M0=185.3374947174508,
         n=0.07188938874958553,  # ~13.7 year period (5008 days)
+    ),
+    SE_TOUTATIS: OrbitalElements(
+        name="Toutatis",
+        epoch=2461000.5,
+        a=2.543029853370523,  # Apollo PHA, radar and spacecraft target (~5.4 km)
+        e=0.6247403332202829,  # High eccentricity (q=0.95 AU, Q=4.13 AU)
+        i=0.4480782679581268,  # Very low inclination
+        omega=277.8613313176078,
+        Omega=125.3653430437421,
+        M0=76.89343773316328,
+        n=0.2430395129094619,  # ~4.05 year period (1481 days), tumbling rotation
     ),
 }
 

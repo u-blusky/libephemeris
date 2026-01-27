@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 33 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 34 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -44,6 +44,7 @@ from libephemeris.constants import (
     SE_PANDORA_AST,
     SE_LILITH_AST,
     SE_HIDALGO,
+    SE_TOUTATIS,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -94,6 +95,7 @@ def all_minor_body_ids():
         SE_PANDORA_AST,
         SE_LILITH_AST,
         SE_HIDALGO,
+        SE_TOUTATIS,
     ]
 
 
@@ -110,9 +112,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 33 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 33, (
-            f"Expected 33 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 34 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 34, (
+            f"Expected 34 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -517,6 +519,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 42.0 < elements.i < 43.0, f"Hidalgo i={elements.i} unexpected"
         # Mean motion consistent with ~13.7 year period (5008 days)
         assert 0.071 < elements.n < 0.073, f"Hidalgo n={elements.n} unexpected"
+
+    def test_toutatis_apollo_asteroid(self):
+        """Toutatis: Apollo PHA, radar and spacecraft target, tumbling rotation."""
+        elements = MINOR_BODY_ELEMENTS[SE_TOUTATIS]
+        assert elements.name == "Toutatis"
+        # Semi-major axis ~2.54 AU (Apollo asteroid)
+        assert 2.53 < elements.a < 2.56, f"Toutatis a={elements.a} unexpected"
+        # High eccentricity ~0.62 (q=0.95 AU, Q=4.13 AU)
+        assert 0.62 < elements.e < 0.63, f"Toutatis e={elements.e} unexpected"
+        # Very low inclination ~0.45 degrees
+        assert 0.4 < elements.i < 0.5, f"Toutatis i={elements.i} unexpected"
+        # Mean motion consistent with ~4.05 year period (1481 days)
+        assert 0.24 < elements.n < 0.25, f"Toutatis n={elements.n} unexpected"
 
 
 @pytest.mark.unit

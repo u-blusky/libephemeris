@@ -122,6 +122,9 @@ SE_LILITH_AST: int = (
 SE_HIDALGO: int = (
     944 + SE_AST_OFFSET
 )  # 944 Hidalgo (Centaur-class asteroid with comet-like orbit, astrological research)
+SE_TOUTATIS: int = (
+    4179 + SE_AST_OFFSET
+)  # 4179 Toutatis (Apollo PHA, radar and spacecraft target, tumbling rotation)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
