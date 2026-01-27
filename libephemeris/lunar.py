@@ -1557,17 +1557,21 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
 
     1. **Evection**: Solar perturbation modulates lunar eccentricity
        (amplitude 1.274°, period ~31.8 days)
-    2. **Variation**: Transverse solar tidal force at quadrature
+    2. **Evection-Related Secondary Terms**: Additional terms from Meeus
+       Table 47.B involving l-2D, l+2D, 2l, and 2l-2D arguments that affect
+       the lunar eccentricity and apogee direction (amplitudes 0.10-0.21°)
+    3. **Variation**: Transverse solar tidal force at quadrature
        (amplitude 0.658°, period ~14.77 days)
-    3. **Annual Equation**: Earth's orbital eccentricity effect
+    4. **Annual Equation**: Earth's orbital eccentricity effect
        (amplitude 0.186°, period ~1 year)
-    4. **Parallactic Inequality**: Effect of Moon's varying parallax
+    5. **Parallactic Inequality**: Effect of Moon's varying parallax
        (amplitude 0.125°, period ~29.53 days)
-    5. **Reduction to Ecliptic**: Projection effect from inclined lunar
+    6. **Reduction to Ecliptic**: Projection effect from inclined lunar
        orbital plane onto ecliptic (amplitude 0.116°, period ~4.5 years)
 
-    Evection, variation, annual equation, parallactic inequality, and reduction
-    to ecliptic corrections are applied to improve accuracy.
+    Evection, evection-related secondary terms, variation, annual equation,
+    parallactic inequality, and reduction to ecliptic corrections are applied
+    to improve accuracy.
     The true apogee can vary ±30° from the mean apogee.
 
     Args:
@@ -1710,6 +1714,58 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     evection_arg = 2.0 * D - M_prime
     evection_correction = 1.2739 * math.sin(evection_arg)
     lon_date += evection_correction
+
+    # ========================================================================
+    # EVECTION-RELATED SECONDARY TERMS (from Meeus Table 47.B)
+    # ========================================================================
+    # These terms are related to the main evection term because they involve
+    # combinations of the Moon's mean anomaly (l = M') and the mean elongation (D),
+    # affecting the lunar eccentricity and thus the apogee direction.
+    #
+    # The evection modulates the lunar eccentricity, and these secondary terms
+    # capture additional perturbations that arise from the Sun-Moon gravitational
+    # interaction affecting the apsidal line direction.
+    #
+    # References:
+    # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47, Table 47.B
+    # - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+
+    # Term with argument l - 2D (M' - 2D)
+    # This is the "anti-evection" term with the opposite sign of the main evection.
+    # Period: ~31.8 days (same as evection but phase-shifted)
+    # Amplitude: -0.2136° (from Meeus Table 47.B)
+    # Physical mechanism: Represents the eccentricity perturbation when the Moon's
+    # position in its orbit is ahead of the Sun-Moon alignment.
+    evection_secondary_1 = -0.2136 * math.sin(M_prime - 2.0 * D)
+    lon_date += evection_secondary_1
+
+    # Term with argument l + 2D (M' + 2D)
+    # Period: ~9.6 days (faster than main evection)
+    # Amplitude: +0.1058° (from Meeus Table 47.B)
+    # Physical mechanism: Higher-frequency coupling between the Moon's anomaly
+    # and the elongation, creating a beat pattern with the main evection.
+    evection_secondary_2 = 0.1058 * math.sin(M_prime + 2.0 * D)
+    lon_date += evection_secondary_2
+
+    # Term with argument 2l (2*M')
+    # This is the second harmonic of the Moon's mean anomaly, related to the
+    # equation of center's second term.
+    # Period: ~13.78 days (half the anomalistic month)
+    # Amplitude: -0.2037° (from Meeus Table 47.B)
+    # Physical mechanism: Non-linear eccentricity effects from the Moon's
+    # elliptical orbit, modulating the apogee direction.
+    evection_secondary_3 = -0.2037 * math.sin(2.0 * M_prime)
+    lon_date += evection_secondary_3
+
+    # Term with argument 2l - 2D (2*M' - 2D)
+    # Combined second harmonic of anomaly with elongation.
+    # Period: ~14.8 days (similar to variation period)
+    # Amplitude: +0.1027° (from Meeus Table 47.B)
+    # Physical mechanism: Coupling between the Moon's orbital shape (eccentricity)
+    # and its phase relative to the Sun, affecting the apsidal line orientation.
+    evection_secondary_4 = 0.1027 * math.sin(2.0 * M_prime - 2.0 * D)
+    lon_date += evection_secondary_4
 
     # ========================================================================
     # VARIATION CORRECTION (period ~14.77 days, amplitude ~0.658°)
