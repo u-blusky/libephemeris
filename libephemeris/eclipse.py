@@ -3467,45 +3467,51 @@ def swe_lun_eclipse_how(
 
 
 def lun_occult_when_glob(
-    jd_start: float,
-    planet: int,
-    star_name: str = "",
+    tjdut: float,
+    body: "int | str",
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], int]:
+    ecltype: int = 0,
+    backwards: bool = False,
+) -> Tuple[int, Tuple[float, ...]]:
     """
-    Find the next lunar occultation of a planet or fixed star.
+    Find the next lunar occultation of a planet or fixed star globally (UT).
 
     A lunar occultation occurs when the Moon passes in front of (occults)
     a planet or star as seen from Earth. This function searches forward
-    in time to find the next such event globally (somewhere on Earth).
+    (or backward) in time to find the next such event globally (somewhere on Earth).
+
+    This function matches the pyswisseph swe_lun_occult_when_glob() API.
 
     Args:
-        jd_start: Julian Day (UT) to start search from
-        planet: Planet ID to check for occultation (SE_MERCURY, SE_VENUS, etc.)
-            Set to 0 if searching for a fixed star occultation.
-        star_name: Name of fixed star to check (e.g. "Regulus", "Spica").
-            Only used if planet is 0.
+        tjdut: Julian Day (UT) to start search from
+        body: Planet identifier (int) or star name (str)
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        ecltype: Bit flags for eclipse type wanted:
+            - SE_ECL_TOTAL, SE_ECL_PARTIAL, SE_ECL_ANNULAR
+            - 0 for any type
+        backwards: If True, search backward in time
 
     Returns:
         Tuple containing:
-            - times: Tuple of 8 floats with occultation phase times (JD UT):
-                [0]: Time of maximum occultation (minimum separation)
-                [1]: Time of first contact (occultation begins)
-                [2]: Time of second contact (full occultation begins, or 0)
-                [3]: Time of third contact (full occultation ends, or 0)
-                [4]: Time of fourth contact (occultation ends)
-                [5]: Reserved (0)
-                [6]: Reserved (0)
-                [7]: Reserved (0)
-            - retflag: Occultation type flags bitmask (SE_ECL_* constants)
-                SE_ECL_TOTAL: Total occultation (body fully behind Moon)
-                SE_ECL_PARTIAL: Partial occultation (body partially behind Moon)
-                SE_ECL_ANNULAR: Body larger than Moon (very rare, only Sun)
+            - retflags: Returned bit flags (int):
+                - 0 if no occultation found
+                - SE_ECL_TOTAL or SE_ECL_ANNULAR or SE_ECL_PARTIAL
+                - SE_ECL_CENTRAL, SE_ECL_NONCENTRAL
+            - tret: Tuple of 10 floats with occultation phase times (JD UT):
+                [0]: Time of maximum occultation
+                [1]: Time when occultation takes place at local apparent noon
+                [2]: Time of occultation begin
+                [3]: Time of occultation end
+                [4]: Time of totality begin
+                [5]: Time of totality end
+                [6]: Time of center line begin
+                [7]: Time of center line end
+                [8]: Time when annular-total occultation becomes total
+                [9]: Time when annular-total occultation becomes annular again
 
     Raises:
         RuntimeError: If no occultation found within search limit
-        ValueError: If neither planet nor star_name is specified
+        ValueError: If body is invalid
 
     Algorithm:
         1. Calculate Moon's position and the target body's position
@@ -3523,17 +3529,24 @@ def lun_occult_when_glob(
         >>> # Find next occultation of Regulus by the Moon
         >>> from libephemeris import julday
         >>> jd = julday(2024, 1, 1, 0)
-        >>> times, ocl_type = lun_occult_when_glob(jd, 0, "Regulus")
-        >>> print(f"Occultation at JD {times[0]:.5f}")
+        >>> retflags, tret = lun_occult_when_glob(jd, "Regulus")
+        >>> print(f"Occultation at JD {tret[0]:.5f}")
 
         >>> # Find next occultation of Venus by the Moon
-        >>> times, ocl_type = lun_occult_when_glob(jd, SE_VENUS, "")
-        >>> print(f"Venus occultation at JD {times[0]:.5f}")
+        >>> retflags, tret = lun_occult_when_glob(jd, SE_VENUS)
+        >>> print(f"Venus occultation at JD {tret[0]:.5f}")
 
     References:
         - Swiss Ephemeris: swe_lun_occult_when_glob()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
+    # Determine if body is planet ID or star name
+    if isinstance(body, str):
+        planet = 0
+        star_name = body
+    else:
+        planet = body
+        star_name = ""
     from .state import get_planets, get_timescale
     from .fixed_stars import swe_fixstar_ut
     from .constants import (
@@ -3552,6 +3565,8 @@ def lun_occult_when_glob(
         raise ValueError(
             "Either planet ID or star_name must be specified for occultation search"
         )
+
+    jd_start = tjdut
 
     MAX_SEARCH_YEARS = 20
     MAX_ITERATIONS = int(MAX_SEARCH_YEARS * 365)  # Check roughly daily
@@ -3796,18 +3811,31 @@ def lun_occult_when_glob(
                     # Partial occultation
                     ecl_type = SE_ECL_PARTIAL
 
-                times = (
-                    jd_max,  # [0] Maximum
-                    jd_first,  # [1] First contact
-                    jd_second,  # [2] Second contact (total begins)
-                    jd_third,  # [3] Third contact (total ends)
-                    jd_fourth,  # [4] Fourth contact
-                    0.0,  # [5] Reserved
-                    0.0,  # [6] Reserved
-                    0.0,  # [7] Reserved
+                # Build tret tuple with pyswisseph indices (10 elements):
+                # [0]: time of maximum occultation
+                # [1]: time when occultation takes place at local apparent noon
+                # [2]: time of occultation begin
+                # [3]: time of occultation end
+                # [4]: time of totality begin
+                # [5]: time of totality end
+                # [6]: time of center line begin
+                # [7]: time of center line end
+                # [8]: time when annular-total becomes total
+                # [9]: time when annular-total becomes annular again
+                tret = (
+                    jd_max,  # [0] Time of maximum occultation
+                    0.0,  # [1] Time at local apparent noon (not implemented)
+                    jd_first,  # [2] Time of occultation begin
+                    jd_fourth,  # [3] Time of occultation end
+                    jd_second,  # [4] Time of totality begin
+                    jd_third,  # [5] Time of totality end
+                    0.0,  # [6] Time of center line begin
+                    0.0,  # [7] Time of center line end
+                    0.0,  # [8] Annular-total becomes total
+                    0.0,  # [9] Annular-total becomes annular
                 )
 
-                return times, ecl_type
+                return ecl_type, tret
 
         # Check if we're getting close to an occultation
         if sep < 3.0:  # Within 3 degrees
@@ -4051,9 +4079,9 @@ def lun_occult_when_loc(
     for _ in range(MAX_OCCULTATIONS):
         # Find next global occultation
         try:
-            global_times, global_type = lun_occult_when_glob(
-                jd, planet, star_name, flags
-            )
+            # Determine body argument for new signature
+            body: "int | str" = star_name if planet == 0 else planet
+            global_type, global_times = lun_occult_when_glob(jd, body, flags)
         except RuntimeError:
             raise RuntimeError(
                 f"No lunar occultation of {'star ' + star_name if planet == 0 else 'planet ' + str(planet)} "
@@ -4061,11 +4089,14 @@ def lun_occult_when_loc(
                 f"within {MAX_SEARCH_YEARS} years of JD {jd_start}"
             )
 
+        # Extract times using pyswisseph indices:
+        # [0]: time of maximum, [2]: occultation begin, [3]: occultation end
+        # [4]: totality begin, [5]: totality end
         jd_max = global_times[0]
-        jd_first = global_times[1]
-        jd_second = global_times[2]
-        jd_third = global_times[3]
-        jd_fourth = global_times[4]
+        jd_first = global_times[2]  # occultation begin
+        jd_second = global_times[4]  # totality begin
+        jd_third = global_times[5]  # totality end
+        jd_fourth = global_times[3]  # occultation end
 
         # Check if occultation is visible from this location
         # Sample at key phases: first contact, maximum, fourth contact

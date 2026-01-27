@@ -36,88 +36,98 @@ class TestLunOccultWhenGlob:
         # Start from Jan 1, 2017 - there's a known occultation on June 28, 2017
         jd_start = julday(2017, 1, 1, 0)
 
-        times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+        # pyswisseph signature: lun_occult_when_glob(tjdut, body, flags, ecltype, backwards)
+        # Returns: (retflags, tret)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
 
         # Should find an occultation
-        assert ocl_type != 0
-        assert times[0] > jd_start  # Maximum should be after start
-        assert times[0] > 0  # Should have valid maximum time
+        assert retflags != 0
+        assert tret[0] > jd_start  # Maximum should be after start
+        assert tret[0] > 0  # Should have valid maximum time
 
         # Verify it's around June 2017
-        year, month, day, hour = revjul(times[0])
+        year, month, day, hour = revjul(tret[0])
         assert year == 2017
         assert month == 6
 
     def test_returns_correct_tuple_structure(self):
-        """Test that return values have correct structure."""
+        """Test that return values have correct structure per pyswisseph spec."""
         jd_start = julday(2017, 1, 1, 0)
 
-        times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
 
-        # Should return 8-element tuple
-        assert len(times) == 8
+        # Should return 10-element tuple per pyswisseph specification
+        assert len(tret) == 10
         # All elements should be floats
-        assert all(isinstance(t, float) for t in times)
+        assert all(isinstance(t, float) for t in tret)
         # Occultation type should be int
-        assert isinstance(ocl_type, int)
+        assert isinstance(retflags, int)
 
     def test_contact_times_ordering(self):
-        """Test that contact times are in correct chronological order."""
+        """Test that contact times are in correct chronological order.
+
+        pyswisseph tret indices:
+        [0]: time of maximum occultation
+        [2]: time of occultation begin
+        [3]: time of occultation end
+        [4]: time of totality begin
+        [5]: time of totality end
+        """
         jd_start = julday(2017, 1, 1, 0)
 
-        times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
 
-        jd_max = times[0]
-        jd_first = times[1]
-        jd_second = times[2]
-        jd_third = times[3]
-        jd_fourth = times[4]
+        jd_max = tret[0]
+        jd_begin = tret[2]
+        jd_end = tret[3]
+        jd_total_begin = tret[4]
+        jd_total_end = tret[5]
 
-        # First contact should be before maximum
-        if jd_first > 0:
-            assert jd_first < jd_max
+        # Occultation begin should be before maximum
+        if jd_begin > 0:
+            assert jd_begin < jd_max
 
-        # Fourth contact should be after maximum
-        if jd_fourth > 0:
-            assert jd_fourth > jd_max
+        # Occultation end should be after maximum
+        if jd_end > 0:
+            assert jd_end > jd_max
 
-        # If we have second/third contacts (total occultation)
-        if jd_second > 0 and jd_third > 0:
-            assert jd_first <= jd_second <= jd_max
-            assert jd_max <= jd_third <= jd_fourth
+        # If we have totality (total occultation)
+        if jd_total_begin > 0 and jd_total_end > 0:
+            assert jd_begin <= jd_total_begin <= jd_max
+            assert jd_max <= jd_total_end <= jd_end
 
     def test_occultation_type_flags(self):
         """Test that occultation type flags are set."""
         jd_start = julday(2017, 1, 1, 0)
 
-        times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
 
         # Should be either total or partial
-        assert (ocl_type & SE_ECL_TOTAL) or (ocl_type & SE_ECL_PARTIAL)
+        assert (retflags & SE_ECL_TOTAL) or (retflags & SE_ECL_PARTIAL)
 
     def test_raises_error_for_no_target(self):
         """Test that function raises error if no target specified."""
         jd_start = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            lun_occult_when_glob(jd_start, 0, "")
+            lun_occult_when_glob(jd_start, "")
 
     def test_raises_error_for_unknown_star(self):
         """Test that function raises error for unknown star name."""
         jd_start = julday(2017, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            lun_occult_when_glob(jd_start, 0, "UnknownStar123")
+            lun_occult_when_glob(jd_start, "UnknownStar123")
 
     def test_swe_alias(self):
         """Test that swe_lun_occult_when_glob is an alias."""
         jd_start = julday(2017, 1, 1, 0)
 
-        times1, ocl_type1 = lun_occult_when_glob(jd_start, 0, "Regulus")
-        times2, ocl_type2 = swe_lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags1, tret1 = lun_occult_when_glob(jd_start, "Regulus")
+        retflags2, tret2 = swe_lun_occult_when_glob(jd_start, "Regulus")
 
-        assert times1 == times2
-        assert ocl_type1 == ocl_type2
+        assert tret1 == tret2
+        assert retflags1 == retflags2
 
     def test_occultation_duration_reasonable(self):
         """Test that occultation duration is reasonable.
@@ -127,13 +137,13 @@ class TestLunOccultWhenGlob:
         """
         jd_start = julday(2017, 1, 1, 0)
 
-        times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
 
-        jd_first = times[1]
-        jd_fourth = times[4]
+        jd_begin = tret[2]
+        jd_end = tret[3]
 
-        if jd_first > 0 and jd_fourth > 0:
-            duration_hours = (jd_fourth - jd_first) * 24
+        if jd_begin > 0 and jd_end > 0:
+            duration_hours = (jd_end - jd_begin) * 24
             # Duration should be between 0.01 hours (~30 seconds) and 2 hours
             assert 0.001 < duration_hours < 2.0
 
@@ -149,10 +159,10 @@ class TestLunOccultEdgeCases:
         # Search from June 1, 2017
         jd_start = julday(2017, 6, 1, 0)
 
-        times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
 
         # Verify it's on June 28
-        year, month, day, hour = revjul(times[0])
+        year, month, day, hour = revjul(tret[0])
         assert year == 2017
         assert month == 6
         assert 27 <= day <= 28  # Allow for timezone differences
@@ -165,9 +175,9 @@ class TestLunOccultEdgeCases:
         # The function should either find an occultation or raise RuntimeError
         # after exhausting the search limit
         try:
-            times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+            retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
             # If found, verify it's after start date
-            assert times[0] > jd_start
+            assert tret[0] > jd_start
         except RuntimeError as e:
             # Expected if no occultation in 20 years
             assert "No lunar occultation" in str(e)
@@ -177,7 +187,7 @@ class TestLunOccultEdgeCases:
         jd_start = julday(2020, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            lun_occult_when_glob(jd_start, 999, "")  # Invalid planet ID
+            lun_occult_when_glob(jd_start, 999)  # Invalid planet ID
 
 
 class TestLunOccultResolveStarId:
@@ -197,15 +207,72 @@ class TestLunOccultResolveStarId:
         jd_start = julday(2017, 1, 1, 0)
 
         # This should not raise "ValueError: too many values to unpack"
-        times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
-        assert times[0] > jd_start
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
+        assert tret[0] > jd_start
 
     def test_invalid_star_raises_value_error_with_message(self):
         """Test that invalid stars raise ValueError with descriptive message."""
         jd_start = julday(2017, 1, 1, 0)
 
         with pytest.raises(ValueError) as exc_info:
-            lun_occult_when_glob(jd_start, 0, "InvalidStarXYZ123")
+            lun_occult_when_glob(jd_start, "InvalidStarXYZ123")
 
         # Error message should mention the star name
         assert "invalidstarxyz123" in str(exc_info.value).lower()
+
+
+class TestLunOccultPyswissephCompatibility:
+    """Tests verifying pyswisseph API compatibility."""
+
+    def test_signature_matches_pyswisseph(self):
+        """Test that the function signature matches pyswisseph.
+
+        pyswisseph signature:
+        lun_occult_when_glob(tjdut, body, flags=FLG_SWIEPH, ecltype=0, backwards=False)
+
+        body can be int (planet) or str (star name)
+        Returns: (retflags, tret) where tret is 10-element tuple
+        """
+        jd_start = julday(2017, 1, 1, 0)
+
+        # Test with string body (star name)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
+        assert isinstance(retflags, int)
+        assert len(tret) == 10
+
+    def test_tret_indices_match_pyswisseph_documentation(self):
+        """Test that tret array indices match pyswisseph documentation.
+
+        pyswisseph tret indices:
+        [0]: time of maximum occultation
+        [1]: time when occultation takes place at local apparent noon
+        [2]: time of occultation begin
+        [3]: time of occultation end
+        [4]: time of totality begin
+        [5]: time of totality end
+        [6]: time of center line begin
+        [7]: time of center line end
+        [8]: time when annular-total becomes total
+        [9]: time when annular-total becomes annular again
+        """
+        jd_start = julday(2017, 1, 1, 0)
+
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus")
+
+        # Maximum occultation should be valid
+        assert tret[0] > 0
+
+        # Begin should be before max
+        if tret[2] > 0:
+            assert tret[2] < tret[0]
+
+        # End should be after max
+        if tret[3] > 0:
+            assert tret[3] > tret[0]
+
+        # For total occultations, check totality times
+        if retflags & SE_ECL_TOTAL:
+            if tret[4] > 0:
+                assert tret[2] <= tret[4] <= tret[0]  # begin <= totality_begin <= max
+            if tret[5] > 0:
+                assert tret[0] <= tret[5] <= tret[3]  # max <= totality_end <= end
