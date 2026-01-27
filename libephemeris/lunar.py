@@ -2309,6 +2309,205 @@ def calc_true_lilith_orbital_elements(jd_tt: float) -> Tuple[float, float, float
     return longitude, lat, e_mag
 
 
+def _get_ephemeris_range() -> Tuple[float, float]:
+    """
+    Get the valid Julian Date range for the current ephemeris.
+
+    Returns:
+        Tuple[float, float]: (min_jd, max_jd) Julian Date range in TT.
+
+    Note:
+        For de421.bsp (default), the range is approximately 1899-07-29 to 2053-10-09.
+        For other ephemeris files, the range varies:
+        - de422.bsp: -3000 to 3000
+        - de430.bsp: 1550 to 2650
+        - de431.bsp: -13200 to 17191
+    """
+    planets = get_planets()
+    ts = get_timescale()
+
+    # Access the ephemeris segment to get its time range
+    # The planets object is a SpiceKernel with segments
+    try:
+        # Get the Moon-Earth barycenter segment which is typically present
+        for segment in planets.segments:
+            # Look for Moon segment (target 301) or Earth-Moon barycenter (3)
+            if hasattr(segment, "start_jd") and hasattr(segment, "end_jd"):
+                # Return the range from the first segment we find
+                # Skyfield uses TDB which is close enough to TT for this purpose
+                return (segment.start_jd, segment.end_jd)
+
+        # Fallback: try to get range from the SPK file metadata
+        # Default de421.bsp range
+        return (2415020.0, 2471184.0)  # ~1900 to ~2053
+    except Exception:
+        # Safe fallback for de421.bsp
+        return (2415020.0, 2471184.0)
+
+
+def _sample_osculating_apogee_with_fallback(
+    jd_tt: float,
+    half_window_days: float,
+    num_samples: int,
+) -> Tuple[list, list, list, list, int]:
+    """
+    Sample osculating apogee positions with fallback for ephemeris boundaries.
+
+    This function handles edge cases where the sampling window extends beyond
+    the ephemeris range by:
+    1. First trying symmetric sampling around the target date
+    2. If that fails, shifting the window to stay within the ephemeris range
+    3. If asymmetric sampling still fails, reducing the number of samples
+    4. As a last resort, returning just the central sample
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT) - the target date.
+        half_window_days: Half of the total sampling window in days.
+        num_samples: Number of samples to take.
+
+    Returns:
+        Tuple containing:
+            - sample_times: List of Julian dates for successful samples
+            - sample_lons: List of longitudes in degrees
+            - sample_lats: List of latitudes in degrees
+            - sample_eccs: List of eccentricities
+            - target_idx: Index of the sample closest to jd_tt
+    """
+    # Get ephemeris range
+    min_jd, max_jd = _get_ephemeris_range()
+
+    # Check if symmetric window is within range
+    if jd_tt - half_window_days >= min_jd and jd_tt + half_window_days <= max_jd:
+        # Standard symmetric sampling
+        sample_times = []
+        for i in range(num_samples):
+            offset = -half_window_days + (2 * half_window_days * i / (num_samples - 1))
+            sample_times.append(jd_tt + offset)
+        target_idx = num_samples // 2
+    else:
+        # Need to adjust window for boundary
+        if jd_tt - half_window_days < min_jd:
+            # Near start of ephemeris - shift window forward
+            window_start = max(min_jd, jd_tt - half_window_days)
+            window_end = min(max_jd, window_start + 2 * half_window_days)
+            # Ensure we don't exceed the end
+            if window_end > max_jd:
+                window_end = max_jd
+                window_start = max(min_jd, window_end - 2 * half_window_days)
+        else:
+            # Near end of ephemeris - shift window backward
+            window_end = min(max_jd, jd_tt + half_window_days)
+            window_start = max(min_jd, window_end - 2 * half_window_days)
+            # Ensure we don't go before the start
+            if window_start < min_jd:
+                window_start = min_jd
+                window_end = min(max_jd, window_start + 2 * half_window_days)
+
+        # Calculate actual window size
+        actual_window = window_end - window_start
+
+        # If window is very small, reduce samples proportionally
+        if actual_window < half_window_days:
+            # Very constrained window - use fewer samples
+            num_samples = max(
+                3, int(num_samples * actual_window / (2 * half_window_days))
+            )
+
+        # Generate sample times within the adjusted window
+        sample_times = []
+        if num_samples > 1:
+            for i in range(num_samples):
+                t = window_start + (actual_window * i / (num_samples - 1))
+                sample_times.append(t)
+        else:
+            sample_times = [jd_tt]
+
+        # Find which sample is closest to the target date
+        target_idx = 0
+        min_dist = abs(sample_times[0] - jd_tt)
+        for i in range(1, len(sample_times)):
+            dist = abs(sample_times[i] - jd_tt)
+            if dist < min_dist:
+                min_dist = dist
+                target_idx = i
+
+    # Sample the osculating apogee at each time, with fallback for failures
+    sample_lons = []
+    sample_lats = []
+    sample_eccs = []
+    valid_times = []
+
+    for sample_jd in sample_times:
+        try:
+            lon, lat, ecc = calc_true_lilith(sample_jd)
+            sample_lons.append(lon)
+            sample_lats.append(lat)
+            sample_eccs.append(ecc)
+            valid_times.append(sample_jd)
+        except Exception:
+            # Skip samples that fail (outside ephemeris range)
+            continue
+
+    # If we lost samples, recalculate target_idx
+    if len(valid_times) < len(sample_times):
+        # Find which valid sample is closest to the target date
+        if valid_times:
+            target_idx = 0
+            min_dist = abs(valid_times[0] - jd_tt)
+            for i in range(1, len(valid_times)):
+                dist = abs(valid_times[i] - jd_tt)
+                if dist < min_dist:
+                    min_dist = dist
+                    target_idx = i
+        else:
+            # No valid samples - try just the target date
+            try:
+                lon, lat, ecc = calc_true_lilith(jd_tt)
+                return [jd_tt], [lon], [lat], [ecc], 0
+            except Exception:
+                # Even target date fails - re-raise the original error
+                raise
+
+    # Need at least 2 samples for linear regression
+    if len(valid_times) < 2:
+        # Fall back to osculating apogee for the target date
+        lon, lat, ecc = calc_true_lilith(jd_tt)
+        return [jd_tt], [lon], [lat], [ecc], 0
+
+    return valid_times, sample_lons, sample_lats, sample_eccs, target_idx
+
+
+def _unwrap_longitudes(longitudes: list) -> list:
+    """
+    Unwrap a sequence of longitudes to handle 0°/360° discontinuity.
+
+    This ensures polynomial fitting works correctly when the apogee crosses
+    the 0°/360° boundary. The unwrapped values may exceed [0, 360) but
+    maintain continuous change between consecutive values.
+
+    Args:
+        longitudes: List of longitude values in degrees [0, 360).
+
+    Returns:
+        List of unwrapped longitude values (may be outside [0, 360)).
+    """
+    if not longitudes:
+        return []
+
+    unwrapped = [longitudes[0]]
+    for i in range(1, len(longitudes)):
+        diff = longitudes[i] - longitudes[i - 1]
+        # Detect wraparound: if diff > 180, we crossed from ~360 to ~0
+        # if diff < -180, we crossed from ~0 to ~360
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        unwrapped.append(unwrapped[-1] + diff)
+
+    return unwrapped
+
+
 def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     """
     Calculate the Interpolated (Natural) Lunar Apogee.
@@ -2458,34 +2657,21 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     num_samples = 9
     half_window_days = 28.0  # 56-day total window (2 synodic months)
 
-    # Generate sample times centered on the target time
-    # Positions: t-7d, t-4.67d, t-2.33d, t, t+2.33d, t+4.67d, t+7d
-    sample_times = []
-    for i in range(num_samples):
-        offset = -half_window_days + (2 * half_window_days * i / (num_samples - 1))
-        sample_times.append(jd_tt + offset)
+    # Sample osculating apogee with fallback for ephemeris boundary handling
+    # This handles edge cases where the sampling window extends beyond the
+    # ephemeris range by adjusting the window or reducing samples as needed.
+    sample_times, sample_lons, sample_lats, sample_eccs, target_idx = (
+        _sample_osculating_apogee_with_fallback(jd_tt, half_window_days, num_samples)
+    )
+    num_samples = len(sample_times)
 
-    # Sample the osculating apogee at each time
-    sample_lons = []
-    sample_lats = []
-    sample_eccs = []
-
-    for sample_jd in sample_times:
-        lon, lat, ecc = calc_true_lilith(sample_jd)
-        sample_lons.append(lon)
-        sample_lats.append(lat)
-        sample_eccs.append(ecc)
+    # If only one sample available (fallback to osculating), return it directly
+    if num_samples == 1:
+        return sample_lons[0], sample_lats[0], sample_eccs[0]
 
     # Unwrap longitudes to handle 0°/360° discontinuity
     # This ensures the polynomial fit works correctly across the boundary
-    unwrapped_lons = [sample_lons[0]]
-    for i in range(1, len(sample_lons)):
-        diff = sample_lons[i] - sample_lons[i - 1]
-        if diff > 180:
-            diff -= 360
-        elif diff < -180:
-            diff += 360
-        unwrapped_lons.append(unwrapped_lons[-1] + diff)
+    unwrapped_lons = _unwrap_longitudes(sample_lons)
 
     # Use polynomial regression (least squares) for smoothing
     # Linear fit (degree 1) provides maximum smoothing effect because:
@@ -2494,12 +2680,33 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     # - Testing showed linear fit has lowest variance (0.56 vs 1.5+ for quadratic)
     poly_degree = 1
 
+    # For very few samples, we might need to fall back to just averaging
+    if num_samples <= poly_degree + 1:
+        # Not enough samples for polynomial fit, use weighted average
+        # with higher weight for samples closer to target date
+        total_weight = 0.0
+        weighted_lon = 0.0
+        for i, t in enumerate(sample_times):
+            # Use inverse distance weighting
+            dist = abs(t - jd_tt)
+            weight = 1.0 / (dist + 0.1)  # Add small value to avoid division by zero
+            weighted_lon += unwrapped_lons[i] * weight
+            total_weight += weight
+        interp_lon = (weighted_lon / total_weight) % 360.0
+        interp_lat = sample_lats[target_idx]
+        interp_ecc = sample_eccs[target_idx]
+        return interp_lon, interp_lat, interp_ecc
+
     # Normalize time to [-1, 1] for numerical stability
-    t_center = jd_tt
-    t_scale = half_window_days
+    # Use the actual sample range for normalization
+    t_min = min(sample_times)
+    t_max = max(sample_times)
+    t_center = (t_min + t_max) / 2.0
+    t_scale = (t_max - t_min) / 2.0 if t_max > t_min else 1.0
 
     # Normalized time values
     t_norm = [(t - t_center) / t_scale for t in sample_times]
+    t_target_norm = (jd_tt - t_center) / t_scale
 
     # Build Vandermonde matrix for polynomial fit (least squares)
     # Each row is [1, t, t²] for quadratic fit
@@ -2523,19 +2730,16 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     # Solve the linear system using Gaussian elimination
     coeffs = _solve_linear_system(VTV, VTy)
 
-    # Evaluate polynomial at target time (t_norm = 0)
-    # Since t_norm = (jd_tt - t_center) / t_scale = 0, we just need coeffs[0]
-    t_target_norm = 0.0
+    # Evaluate polynomial at target time
     interp_lon = sum(coeffs[j] * (t_target_norm**j) for j in range(poly_degree + 1))
 
     # Normalize longitude to [0, 360)
     interp_lon = interp_lon % 360.0
 
-    # For latitude and eccentricity, use values from the central sample
+    # For latitude and eccentricity, use values from the sample closest to target
     # (the interpolation is primarily for longitude where oscillations are significant)
-    central_idx = num_samples // 2
-    interp_lat = sample_lats[central_idx]
-    interp_ecc = sample_eccs[central_idx]
+    interp_lat = sample_lats[target_idx]
+    interp_ecc = sample_eccs[target_idx]
 
     return interp_lon, interp_lat, interp_ecc
 
@@ -2659,6 +2863,147 @@ def _cubic_spline_interpolate(x: list, y: list, x_eval: float) -> float:
     return result
 
 
+def _sample_osculating_perigee_with_fallback(
+    jd_tt: float,
+    half_window_days: float,
+    num_samples: int,
+) -> Tuple[list, list, list, list, int]:
+    """
+    Sample osculating perigee positions with fallback for ephemeris boundaries.
+
+    This function handles edge cases where the sampling window extends beyond
+    the ephemeris range by:
+    1. First trying symmetric sampling around the target date
+    2. If that fails, shifting the window to stay within the ephemeris range
+    3. If asymmetric sampling still fails, reducing the number of samples
+    4. As a last resort, returning just the central sample
+
+    The perigee is computed as the osculating apogee + 180°.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT) - the target date.
+        half_window_days: Half of the total sampling window in days.
+        num_samples: Number of samples to take.
+
+    Returns:
+        Tuple containing:
+            - sample_times: List of Julian dates for successful samples
+            - sample_lons: List of perigee longitudes in degrees
+            - sample_lats: List of perigee latitudes in degrees
+            - sample_eccs: List of eccentricities
+            - target_idx: Index of the sample closest to jd_tt
+    """
+    # Get ephemeris range
+    min_jd, max_jd = _get_ephemeris_range()
+
+    # Check if symmetric window is within range
+    if jd_tt - half_window_days >= min_jd and jd_tt + half_window_days <= max_jd:
+        # Standard symmetric sampling
+        sample_times = []
+        for i in range(num_samples):
+            offset = -half_window_days + (2 * half_window_days * i / (num_samples - 1))
+            sample_times.append(jd_tt + offset)
+        target_idx = num_samples // 2
+    else:
+        # Need to adjust window for boundary
+        if jd_tt - half_window_days < min_jd:
+            # Near start of ephemeris - shift window forward
+            window_start = max(min_jd, jd_tt - half_window_days)
+            window_end = min(max_jd, window_start + 2 * half_window_days)
+            # Ensure we don't exceed the end
+            if window_end > max_jd:
+                window_end = max_jd
+                window_start = max(min_jd, window_end - 2 * half_window_days)
+        else:
+            # Near end of ephemeris - shift window backward
+            window_end = min(max_jd, jd_tt + half_window_days)
+            window_start = max(min_jd, window_end - 2 * half_window_days)
+            # Ensure we don't go before the start
+            if window_start < min_jd:
+                window_start = min_jd
+                window_end = min(max_jd, window_start + 2 * half_window_days)
+
+        # Calculate actual window size
+        actual_window = window_end - window_start
+
+        # If window is very small, reduce samples proportionally
+        if actual_window < half_window_days:
+            # Very constrained window - use fewer samples
+            num_samples = max(
+                3, int(num_samples * actual_window / (2 * half_window_days))
+            )
+
+        # Generate sample times within the adjusted window
+        sample_times = []
+        if num_samples > 1:
+            for i in range(num_samples):
+                t = window_start + (actual_window * i / (num_samples - 1))
+                sample_times.append(t)
+        else:
+            sample_times = [jd_tt]
+
+        # Find which sample is closest to the target date
+        target_idx = 0
+        min_dist = abs(sample_times[0] - jd_tt)
+        for i in range(1, len(sample_times)):
+            dist = abs(sample_times[i] - jd_tt)
+            if dist < min_dist:
+                min_dist = dist
+                target_idx = i
+
+    # Sample the osculating perigee at each time, with fallback for failures
+    sample_lons = []
+    sample_lats = []
+    sample_eccs = []
+    valid_times = []
+
+    for sample_jd in sample_times:
+        try:
+            apogee_lon, apogee_lat, ecc = calc_true_lilith(sample_jd)
+            # Perigee is 180° from apogee
+            perigee_lon = (apogee_lon + 180.0) % 360.0
+            perigee_lat = -apogee_lat  # Latitude is negated
+            sample_lons.append(perigee_lon)
+            sample_lats.append(perigee_lat)
+            sample_eccs.append(ecc)
+            valid_times.append(sample_jd)
+        except Exception:
+            # Skip samples that fail (outside ephemeris range)
+            continue
+
+    # If we lost samples, recalculate target_idx
+    if len(valid_times) < len(sample_times):
+        # Find which valid sample is closest to the target date
+        if valid_times:
+            target_idx = 0
+            min_dist = abs(valid_times[0] - jd_tt)
+            for i in range(1, len(valid_times)):
+                dist = abs(valid_times[i] - jd_tt)
+                if dist < min_dist:
+                    min_dist = dist
+                    target_idx = i
+        else:
+            # No valid samples - try just the target date
+            try:
+                apogee_lon, apogee_lat, ecc = calc_true_lilith(jd_tt)
+                perigee_lon = (apogee_lon + 180.0) % 360.0
+                perigee_lat = -apogee_lat
+                return [jd_tt], [perigee_lon], [perigee_lat], [ecc], 0
+            except Exception:
+                # Even target date fails - re-raise the original error
+                raise
+
+    # Need at least 2 samples for linear regression
+    if len(valid_times) < 2:
+        # Fall back to osculating perigee for the target date
+        apogee_lon, apogee_lat, ecc = calc_true_lilith(jd_tt)
+        perigee_lon = (apogee_lon + 180.0) % 360.0
+        perigee_lat = -apogee_lat
+        return [jd_tt], [perigee_lon], [perigee_lat], [ecc], 0
+
+    return valid_times, sample_lons, sample_lats, sample_eccs, target_idx
+
+
 def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     """
     Calculate the Interpolated (Natural) Lunar Perigee.
@@ -2733,38 +3078,21 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     num_samples = 9
     half_window_days = 28.0  # 56-day total window (2 synodic months)
 
-    # Generate sample times centered on the target time
-    # Positions: t-7d, t-4.67d, t-2.33d, t, t+2.33d, t+4.67d, t+7d
-    sample_times = []
-    for i in range(num_samples):
-        offset = -half_window_days + (2 * half_window_days * i / (num_samples - 1))
-        sample_times.append(jd_tt + offset)
+    # Sample osculating perigee with fallback for ephemeris boundary handling
+    # This handles edge cases where the sampling window extends beyond the
+    # ephemeris range by adjusting the window or reducing samples as needed.
+    sample_times, sample_lons, sample_lats, sample_eccs, target_idx = (
+        _sample_osculating_perigee_with_fallback(jd_tt, half_window_days, num_samples)
+    )
+    num_samples = len(sample_times)
 
-    # Sample the osculating perigee at each time
-    # Perigee is computed as osculating apogee (calc_true_lilith) + 180°
-    sample_lons = []
-    sample_lats = []
-    sample_eccs = []
-
-    for sample_jd in sample_times:
-        apogee_lon, apogee_lat, ecc = calc_true_lilith(sample_jd)
-        # Perigee is 180° from apogee
-        perigee_lon = (apogee_lon + 180.0) % 360.0
-        perigee_lat = -apogee_lat  # Latitude is negated
-        sample_lons.append(perigee_lon)
-        sample_lats.append(perigee_lat)
-        sample_eccs.append(ecc)
+    # If only one sample available (fallback to osculating), return it directly
+    if num_samples == 1:
+        return sample_lons[0], sample_lats[0], sample_eccs[0]
 
     # Unwrap longitudes to handle 0°/360° discontinuity
     # This ensures the polynomial fit works correctly across the boundary
-    unwrapped_lons = [sample_lons[0]]
-    for i in range(1, len(sample_lons)):
-        diff = sample_lons[i] - sample_lons[i - 1]
-        if diff > 180:
-            diff -= 360
-        elif diff < -180:
-            diff += 360
-        unwrapped_lons.append(unwrapped_lons[-1] + diff)
+    unwrapped_lons = _unwrap_longitudes(sample_lons)
 
     # Use polynomial regression (least squares) for smoothing
     # Linear fit (degree 1) provides maximum smoothing effect because:
@@ -2772,12 +3100,33 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     # - Higher degree polynomials follow the oscillations too closely
     poly_degree = 1
 
+    # For very few samples, we might need to fall back to just averaging
+    if num_samples <= poly_degree + 1:
+        # Not enough samples for polynomial fit, use weighted average
+        # with higher weight for samples closer to target date
+        total_weight = 0.0
+        weighted_lon = 0.0
+        for i, t in enumerate(sample_times):
+            # Use inverse distance weighting
+            dist = abs(t - jd_tt)
+            weight = 1.0 / (dist + 0.1)  # Add small value to avoid division by zero
+            weighted_lon += unwrapped_lons[i] * weight
+            total_weight += weight
+        interp_lon = (weighted_lon / total_weight) % 360.0
+        interp_lat = sample_lats[target_idx]
+        interp_ecc = sample_eccs[target_idx]
+        return interp_lon, interp_lat, interp_ecc
+
     # Normalize time to [-1, 1] for numerical stability
-    t_center = jd_tt
-    t_scale = half_window_days
+    # Use the actual sample range for normalization
+    t_min = min(sample_times)
+    t_max = max(sample_times)
+    t_center = (t_min + t_max) / 2.0
+    t_scale = (t_max - t_min) / 2.0 if t_max > t_min else 1.0
 
     # Normalized time values
     t_norm = [(t - t_center) / t_scale for t in sample_times]
+    t_target_norm = (jd_tt - t_center) / t_scale
 
     # Build Vandermonde matrix for polynomial fit (least squares)
     # Each row is [1, t, t²] for quadratic fit
@@ -2801,19 +3150,16 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     # Solve the linear system using Gaussian elimination
     coeffs = _solve_linear_system(VTV, VTy)
 
-    # Evaluate polynomial at target time (t_norm = 0)
-    # Since t_norm = (jd_tt - t_center) / t_scale = 0, we just need coeffs[0]
-    t_target_norm = 0.0
+    # Evaluate polynomial at target time
     interp_lon = sum(coeffs[j] * (t_target_norm**j) for j in range(poly_degree + 1))
 
     # Normalize longitude to [0, 360)
     interp_lon = interp_lon % 360.0
 
-    # For latitude and eccentricity, use values from the central sample
+    # For latitude and eccentricity, use values from the sample closest to target
     # (the interpolation is primarily for longitude where oscillations are significant)
-    central_idx = num_samples // 2
-    interp_lat = sample_lats[central_idx]
-    interp_ecc = sample_eccs[central_idx]
+    interp_lat = sample_lats[target_idx]
+    interp_ecc = sample_eccs[target_idx]
 
     return interp_lon, interp_lat, interp_ecc
 
