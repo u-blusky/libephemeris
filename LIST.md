@@ -146,9 +146,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD APOPHIS NEAR EARTH ASTEROID TO CATALOG: Add asteroid 99942 Apophis to MINOR_BODY_ELEMENTS with very current orbital elements as this asteroid's orbit is being actively refined due to close Earth approaches in 2029 and 2036, add SE_APOPHIS = 99942 + SE_AST_OFFSET to constants.py, note that Apophis orbital elements change measurably with each update.
 
-- [ ] ADD HYGIEA ASTEROID TO CATALOG: Add asteroid 10 Hygiea to MINOR_BODY_ELEMENTS, Hygiea is the fourth largest asteroid in the main belt and a dwarf planet candidate, add SE_HYGIEA = 10 + SE_AST_OFFSET to constants.py.
+- [x] ADD HYGIEA ASTEROID TO CATALOG: Add asteroid 10 Hygiea to MINOR_BODY_ELEMENTS, Hygiea is the fourth largest asteroid in the main belt and a dwarf planet candidate, add SE_HYGIEA = 10 + SE_AST_OFFSET to constants.py.
 
-- [ ] ADD INTERAMNIA ASTEROID TO CATALOG: Add asteroid 704 Interamnia to MINOR_BODY_ELEMENTS, one of the largest main belt asteroids, add SE_INTERAMNIA = 704 + SE_AST_OFFSET.
+- [x] ADD INTERAMNIA ASTEROID TO CATALOG: Add asteroid 704 Interamnia to MINOR_BODY_ELEMENTS, one of the largest main belt asteroids, add SE_INTERAMNIA = 704 + SE_AST_OFFSET.
 
 - [ ] ADD DAVIDA ASTEROID TO CATALOG: Add asteroid 511 Davida to MINOR_BODY_ELEMENTS, another large main belt asteroid, add SE_DAVIDA = 511 + SE_AST_OFFSET.
 

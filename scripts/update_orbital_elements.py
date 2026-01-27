@@ -83,6 +83,7 @@ BODY_SBDB_IDS: dict[str, str] = {
     "Gonggong": "225088",  # 225088 Gonggong (TNO, dwarf planet candidate)
     "Apophis": "99942",  # 99942 Apophis (Near-Earth asteroid)
     "Hygiea": "10",  # 10 Hygiea (fourth largest asteroid, dwarf planet candidate)
+    "Interamnia": "704",  # 704 Interamnia (fifth largest asteroid)
 }
 
 

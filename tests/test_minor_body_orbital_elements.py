@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 20 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 21 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -31,6 +31,7 @@ from libephemeris.constants import (
     SE_VARUNA,
     SE_APOPHIS,
     SE_HYGIEA,
+    SE_INTERAMNIA,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -68,6 +69,7 @@ def all_minor_body_ids():
         SE_VARUNA,
         SE_APOPHIS,
         SE_HYGIEA,
+        SE_INTERAMNIA,
     ]
 
 
@@ -84,9 +86,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 20 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 20, (
-            f"Expected 20 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 21 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 21, (
+            f"Expected 21 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -322,6 +324,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 3.5 < elements.i < 4.5, f"Hygiea i={elements.i} unexpected"
         # Mean motion consistent with ~5.6 year period
         assert 0.17 < elements.n < 0.18, f"Hygiea n={elements.n} unexpected"
+
+    def test_interamnia_main_belt_asteroid(self):
+        """Interamnia: Fifth largest main belt asteroid."""
+        elements = MINOR_BODY_ELEMENTS[SE_INTERAMNIA]
+        assert elements.name == "Interamnia"
+        # Semi-major axis ~3.06 AU (main belt)
+        assert 3.00 < elements.a < 3.10, f"Interamnia a={elements.a} unexpected"
+        # Moderate eccentricity ~0.15
+        assert 0.14 < elements.e < 0.17, f"Interamnia e={elements.e} unexpected"
+        # Moderate inclination ~17.3 degrees
+        assert 16.5 < elements.i < 18.0, f"Interamnia i={elements.i} unexpected"
+        # Mean motion consistent with ~5.3 year period
+        assert 0.18 < elements.n < 0.19, f"Interamnia n={elements.n} unexpected"
 
 
 @pytest.mark.unit
