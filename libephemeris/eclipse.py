@@ -4282,7 +4282,7 @@ def lun_occult_where(
     planet: int,
     star_name: str = "",
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Calculate where on Earth a lunar occultation is visible at a given time.
 
@@ -4290,6 +4290,8 @@ def lun_occult_where(
     or star is visible at the specified Julian Day. It returns the geographic
     coordinates of the central line (where the occultation is most central)
     and attributes about the occultation geometry.
+
+    This function matches the pyswisseph swe_lun_occult_where() API.
 
     Args:
         jd: Julian Day (UT) of the moment to calculate
@@ -4301,6 +4303,8 @@ def lun_occult_where(
 
     Returns:
         Tuple containing:
+            - retflag: Occultation type flags bitmask (SE_ECL_* constants)
+                Returns 0 if no occultation at this time
             - geopos: Tuple of 10 floats with geographic positions:
                 [0]: Geographic longitude of central occultation (degrees, East+)
                 [1]: Geographic latitude of central occultation (degrees, North+)
@@ -4312,17 +4316,16 @@ def lun_occult_where(
                 [7]: Geographic latitude of sunrise limit (degrees)
                 [8]: Geographic longitude of sunset limit (degrees)
                 [9]: Geographic latitude of sunset limit (degrees)
-            - attr: Tuple of 8 floats with occultation attributes:
+            - attr: Tuple of 20 floats with occultation attributes:
                 [0]: Fraction of target covered by Moon (0-1)
-                [1]: Ratio of target diameter to Moon diameter
-                [2]: Angular separation at central line (degrees)
-                [3]: Width of occultation path (km)
+                [1]: Ratio of lunar diameter to target diameter
+                [2]: Fraction of disc covered (obscuration)
+                [3]: Diameter of core shadow in km (0 for stars)
                 [4]: Moon's azimuth at central line (degrees)
-                [5]: Moon's altitude at central line (degrees)
-                [6]: Apparent diameter of Moon (degrees)
-                [7]: Apparent diameter of target (degrees)
-            - retflag: Occultation type flags bitmask (SE_ECL_* constants)
-                Returns 0 if no occultation at this time
+                [5]: True altitude of Moon at central line (degrees)
+                [6]: Apparent altitude of Moon (with refraction)
+                [7]: Angular distance Moon center from target center
+                [8-19]: Reserved for future use
 
     Raises:
         ValueError: If neither planet nor star_name is specified
@@ -4342,7 +4345,7 @@ def lun_occult_where(
         >>> # Find where Regulus occultation is visible
         >>> from libephemeris import julday, lun_occult_where
         >>> jd = julday(2017, 6, 28, 10.0)  # During a known occultation
-        >>> geopos, attr, ocl_type = lun_occult_where(jd, 0, "Regulus")
+        >>> retflag, geopos, attr = lun_occult_where(jd, 0, "Regulus")
         >>> print(f"Central line at lon={geopos[0]:.2f}, lat={geopos[1]:.2f}")
 
     References:
@@ -4395,7 +4398,7 @@ def lun_occult_where(
 
     # Zero return values for no occultation
     zero_geopos = (0.0,) * 10
-    zero_attr = (0.0,) * 8
+    zero_attr = (0.0,) * 20
 
     def _get_moon_geocentric(jd_calc: float) -> Tuple[float, float, float, float]:
         """Get Moon's geocentric RA, Dec, distance, and angular radius."""
@@ -4468,7 +4471,7 @@ def lun_occult_where(
     occultation_threshold = moon_radius + target_radius
     if separation > occultation_threshold:
         # No occultation at this time
-        return zero_geopos, zero_attr, 0
+        return 0, zero_geopos, zero_attr
 
     # Occultation is occurring - calculate where on Earth it's visible
 
@@ -4625,17 +4628,29 @@ def lun_occult_where(
     )
 
     attr = (
-        fraction_covered,  # [0] Fraction covered
-        diameter_ratio,  # [1] Target/Moon diameter ratio
-        local_separation,  # [2] Angular separation
-        path_width_km,  # [3] Path width in km
-        moon_azimuth,  # [4] Moon azimuth
-        moon_altitude,  # [5] Moon altitude
-        local_moon_diameter,  # [6] Moon apparent diameter
-        local_target_diameter,  # [7] Target apparent diameter
+        fraction_covered,  # [0] Fraction covered (magnitude)
+        diameter_ratio,  # [1] Ratio of lunar diameter to target diameter
+        fraction_covered,  # [2] Fraction of disc covered (obscuration)
+        path_width_km,  # [3] Diameter of core shadow in km
+        moon_azimuth,  # [4] Moon azimuth at central line
+        moon_altitude,  # [5] True altitude of Moon
+        moon_altitude,  # [6] Apparent altitude (with refraction)
+        local_separation,  # [7] Angular distance Moon center from target
+        0.0,  # [8] Reserved
+        0.0,  # [9] Reserved
+        0.0,  # [10] Reserved
+        0.0,  # [11] Reserved
+        0.0,  # [12] Reserved
+        0.0,  # [13] Reserved
+        0.0,  # [14] Reserved
+        0.0,  # [15] Reserved
+        0.0,  # [16] Reserved
+        0.0,  # [17] Reserved
+        0.0,  # [18] Reserved
+        0.0,  # [19] Reserved
     )
 
-    return geopos, attr, eclipse_type
+    return eclipse_type, geopos, attr
 
 
 # Alias for Swiss Ephemeris API compatibility

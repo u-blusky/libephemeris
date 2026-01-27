@@ -27,18 +27,18 @@ class TestLunOccultWhere:
         """Test that return values have correct structure."""
         # First find a known occultation time
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Now get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         # geopos should be 10-element tuple
         assert len(geopos) == 10
         assert all(isinstance(g, float) for g in geopos)
 
-        # attr should be 8-element tuple
-        assert len(attr) == 8
+        # attr should be 20-element tuple (pyswisseph compatible)
+        assert len(attr) == 20
         assert all(isinstance(a, float) for a in attr)
 
         # Occultation type should be int
@@ -48,11 +48,11 @@ class TestLunOccultWhere:
         """Test that function finds valid location during a known occultation."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         # Should find an occultation
         assert ocl_type != 0
@@ -68,7 +68,7 @@ class TestLunOccultWhere:
         # Use a random time when Moon is not near Regulus
         jd = julday(2024, 1, 1, 12)  # Random date
 
-        geopos, attr, ocl_type = lun_occult_where(jd, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd, 0, "Regulus")
 
         # Should return 0 for no occultation
         assert ocl_type == 0
@@ -80,11 +80,11 @@ class TestLunOccultWhere:
         """Test that occultation type flags are set correctly."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         # Should be either total or partial
         assert (ocl_type & SE_ECL_TOTAL) or (ocl_type & SE_ECL_PARTIAL)
@@ -93,11 +93,11 @@ class TestLunOccultWhere:
         """Test that geographic limits are reasonable."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         if ocl_type != 0:
             # Central line
@@ -124,11 +124,11 @@ class TestLunOccultWhere:
         """Test that occultation attributes are reasonable."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         if ocl_type != 0:
             # Fraction covered should be between 0 and 1
@@ -137,8 +137,8 @@ class TestLunOccultWhere:
             # Diameter ratio should be positive (and small for stars)
             assert attr[1] >= 0.0
 
-            # Angular separation should be non-negative
-            assert attr[2] >= 0.0
+            # Obscuration (attr[2]) should be between 0 and 1
+            assert 0.0 <= attr[2] <= 1.0
 
             # Path width should be reasonable (0 to 1000 km)
             assert 0.0 <= attr[3] <= 1000.0
@@ -148,9 +148,6 @@ class TestLunOccultWhere:
 
             # Moon altitude should be -90 to 90
             assert -90.0 <= attr[5] <= 90.0
-
-            # Moon diameter should be reasonable (around 0.5 degrees)
-            assert 0.4 < attr[6] < 0.6
 
     def test_raises_error_for_no_target(self):
         """Test that function raises error if no target specified."""
@@ -170,11 +167,11 @@ class TestLunOccultWhere:
         """Test that swe_lun_occult_where is an alias."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
-        geopos1, attr1, ocl_type1 = lun_occult_where(jd_max, 0, "Regulus")
-        geopos2, attr2, ocl_type2 = swe_lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type1, geopos1, attr1 = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type2, geopos2, attr2 = swe_lun_occult_where(jd_max, 0, "Regulus")
 
         assert geopos1 == geopos2
         assert attr1 == attr2
@@ -188,11 +185,11 @@ class TestLunOccultWhere:
         """
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         if ocl_type != 0:
             central_lat = geopos[1]
@@ -208,11 +205,11 @@ class TestLunOccultWhereEdgeCases:
         """Test occultation location changes during an event."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get location at maximum
-        geopos_max, _, ocl_type_max = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type_max, geopos_max, _ = lun_occult_where(jd_max, 0, "Regulus")
 
         if ocl_type_max != 0:
             # The longitude should change as the Earth rotates
@@ -227,11 +224,11 @@ class TestLunOccultWhereEdgeCases:
         """
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         if ocl_type != 0:
             # For a star, it should be total when visible
@@ -242,11 +239,11 @@ class TestLunOccultWhereEdgeCases:
         """Test that fraction covered is 1.0 for total occultation."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         if ocl_type & SE_ECL_TOTAL:
             # Fraction covered should be 1.0 for total occultation
@@ -260,11 +257,11 @@ class TestLunOccultWhereIntegration:
         """Test that lun_occult_where is consistent with lun_occult_when_glob."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, glob_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+        glob_type, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Get where it's visible
-        geopos, attr, ocl_type = lun_occult_where(jd_max, 0, "Regulus")
+        ocl_type, geopos, attr = lun_occult_where(jd_max, 0, "Regulus")
 
         # Both should indicate an occultation
         assert glob_type != 0
@@ -280,7 +277,7 @@ class TestLunOccultWhereIntegration:
         """Test that calling the function multiple times gives same result."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        times, _ = lun_occult_when_glob(jd_start, 0, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
         jd_max = times[0]
 
         # Call multiple times
