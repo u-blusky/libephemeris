@@ -14,7 +14,7 @@ class TestGeocentricPositions:
 
     def test_sun_position_j2000(self, standard_jd, compare_with_swisseph):
         """Test Sun position at J2000.0."""
-        passed, diffs = compare_with_swisseph(standard_jd, SE_SUN, SEFLG_SWIEPH)
+        passed, diffs, _ = compare_with_swisseph(standard_jd, SE_SUN, SEFLG_SWIEPH)
         assert passed, f"Sun position diff: {diffs}"
 
     def test_all_planets_geocentric(
@@ -22,7 +22,9 @@ class TestGeocentricPositions:
     ):
         """Test all major planets in geocentric mode."""
         for planet_id, planet_name in all_planets:
-            passed, diffs = compare_with_swisseph(standard_jd, planet_id, SEFLG_SWIEPH)
+            passed, diffs, _ = compare_with_swisseph(
+                standard_jd, planet_id, SEFLG_SWIEPH
+            )
             assert passed, f"{planet_name} position diff: {diffs}"
 
     def test_moon_high_precision(self, standard_jd):
