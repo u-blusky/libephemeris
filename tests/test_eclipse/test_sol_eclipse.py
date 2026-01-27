@@ -614,7 +614,7 @@ class TestSolEclipseHow:
         dallas_lat, dallas_lon = 32.7767, -96.7970
         attr, ecl_type = sol_eclipse_how(times[0], dallas_lat, dallas_lon)
 
-        assert len(attr) == 11
+        assert len(attr) == 20
 
     def test_eclipse_visible_during_eclipse(self):
         """During an eclipse, should return positive magnitude."""
@@ -773,7 +773,7 @@ class TestSolEclipseHow:
         # Should not raise
         attr, ecl_type = sol_eclipse_how(times[0], 32.7767, -96.7970, altitude=1000.0)
 
-        assert len(attr) == 11
+        assert len(attr) == 20
 
     def test_flags_parameter_accepted(self):
         """Should accept flags parameter."""
@@ -787,7 +787,7 @@ class TestSolEclipseHow:
             times[0], 32.7767, -96.7970, flags=SEFLG_SWIEPH
         )
 
-        assert len(attr) == 11
+        assert len(attr) == 20
 
     def test_alias_matches_main_function(self):
         """swe_sol_eclipse_how should be an alias for sol_eclipse_how."""

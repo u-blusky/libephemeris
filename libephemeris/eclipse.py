@@ -2069,8 +2069,29 @@ def swe_sol_eclipse_how(
         sun_app = observer_at.at(t).observe(sun).apparent()
         moon_app = observer_at.at(t).observe(moon).apparent()
     except Exception:
-        # If calculation fails, return zeros
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
+        # If calculation fails, return zeros (20 elements per pyswisseph spec)
+        return (
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ), 0
 
     # Get Sun altitude and azimuth
     sun_alt, sun_az, _ = sun_app.altaz()
@@ -2091,9 +2112,30 @@ def swe_sol_eclipse_how(
     else:
         apparent_alt = sun_altitude
 
-    # If Sun is below horizon, no visible eclipse
+    # If Sun is below horizon, no visible eclipse (20 elements per pyswisseph spec)
     if sun_altitude < -1.0:  # Allow for refraction near horizon
-        return (0.0, 0.0, 0.0, 0.0, sun_azimuth, sun_altitude, apparent_alt, 0.0), 0
+        return (
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            sun_azimuth,
+            sun_altitude,
+            apparent_alt,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ), 0
 
     # Calculate angular separation between Sun and Moon
     separation = sun_app.separation_from(moon_app).degrees
@@ -2115,16 +2157,28 @@ def swe_sol_eclipse_how(
     # Check if there's any eclipse (disks overlapping)
     sum_radii = sun_angular_radius + moon_angular_radius
     if separation >= sum_radii:
-        # No eclipse - Sun and Moon too far apart
+        # No eclipse - Sun and Moon too far apart (20 elements per pyswisseph spec)
         return (
-            0.0,  # magnitude
-            ratio,  # ratio
-            0.0,  # obscuration
-            0.0,  # shadow width
-            sun_azimuth,  # azimuth
-            sun_altitude,  # true altitude
-            apparent_alt,  # apparent altitude
-            separation,  # separation
+            0.0,  # [0] magnitude
+            ratio,  # [1] ratio
+            0.0,  # [2] obscuration
+            0.0,  # [3] shadow width
+            sun_azimuth,  # [4] azimuth
+            sun_altitude,  # [5] true altitude
+            apparent_alt,  # [6] apparent altitude
+            separation,  # [7] separation
+            0.0,  # [8] magnitude acc. to NASA
+            0.0,  # [9] saros series number
+            0.0,  # [10] saros series member number
+            0.0,  # [11] reserved
+            0.0,  # [12] reserved
+            0.0,  # [13] reserved
+            0.0,  # [14] reserved
+            0.0,  # [15] reserved
+            0.0,  # [16] reserved
+            0.0,  # [17] reserved
+            0.0,  # [18] reserved
+            0.0,  # [19] reserved
         ), 0
 
     # Calculate eclipse magnitude
@@ -2222,7 +2276,7 @@ def swe_sol_eclipse_how(
         # Partial eclipse
         eclipse_type |= SE_ECL_PARTIAL
 
-    # Prepare attributes tuple (8 elements matching pyswisseph format)
+    # Prepare attributes tuple (20 elements matching pyswisseph format)
     attr = (
         magnitude,  # [0] Fraction of solar diameter covered
         ratio,  # [1] Ratio of lunar to solar diameter
@@ -2232,6 +2286,18 @@ def swe_sol_eclipse_how(
         sun_altitude,  # [5] True altitude of sun
         apparent_alt,  # [6] Apparent altitude with refraction
         separation,  # [7] Angular distance Moon-Sun centers
+        0.0,  # [8] magnitude acc. to NASA
+        0.0,  # [9] saros series number
+        0.0,  # [10] saros series member number
+        0.0,  # [11] reserved
+        0.0,  # [12] reserved
+        0.0,  # [13] reserved
+        0.0,  # [14] reserved
+        0.0,  # [15] reserved
+        0.0,  # [16] reserved
+        0.0,  # [17] reserved
+        0.0,  # [18] reserved
+        0.0,  # [19] reserved
     )
 
     return attr, eclipse_type

@@ -182,7 +182,7 @@ class TestSweSolEclipseHowSignature:
         attr, retflag = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, dallas_geopos)
 
         # attr should be at least 8-element tuple
-        assert len(attr) >= 8
+        assert len(attr) == 20
         assert all(isinstance(a, float) for a in attr)
 
         # retflag should be int
@@ -218,7 +218,7 @@ class TestSweSolEclipseHowSignature:
 
         # Legacy signature: (jd, lat, lon, altitude, flags)
         attr, retflag = sol_eclipse_how(tjd_ut, 32.7767, -96.797, 0, SEFLG_SWIEPH)
-        assert len(attr) >= 8
+        assert len(attr) == 20
 
 
 class TestSweSolEclipseHowDallasApril2024:
