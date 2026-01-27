@@ -225,8 +225,13 @@ class AutoSpkConfig:
 
     def get_cache_dir(self) -> str:
         """Get the cache directory, creating if necessary."""
+        from . import state
+
+        cache_path: str
         if self.cache_dir:
             cache_path = self.cache_dir
+        elif state.get_spk_cache_dir() is not None:
+            cache_path = state.get_spk_cache_dir()  # type: ignore
         else:
             cache_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
 
@@ -366,6 +371,13 @@ def enable_auto_spk(
             "astroquery is required for automatic SPK downloads. "
             "Install it with: pip install astroquery"
         )
+
+    # Import state to get configuration settings
+    from . import state
+
+    # Use parameter if provided, otherwise fall back to global config
+    if cache_dir is None:
+        cache_dir = state.get_spk_cache_dir()
 
     config = AutoSpkConfig(
         ipl=ipl,
@@ -1234,7 +1246,8 @@ def auto_get_spk(
         jd_start: Start of the date range (Julian Day)
         jd_end: End of the date range (Julian Day)
         cache_dir: Directory for storing/finding SPK files.
-            Default: ~/.libephemeris/spk/
+            Default: Uses set_spk_cache_dir() value if set, otherwise
+            ~/.libephemeris/spk/
         ipl: Optional libephemeris body ID (e.g., SE_CHIRON). If provided,
             the SPK body is automatically registered after download.
         naif_id: Optional NAIF ID for SPK lookup. If not provided but ipl is,
@@ -1248,6 +1261,10 @@ def auto_get_spk(
         ImportError: If astroquery is not installed
         ValueError: If body not found, download fails, or naif_id cannot be
             deduced when ipl is provided
+
+    Note:
+        The date range may be extended by the value set via set_spk_date_padding()
+        to provide a buffer around the requested range.
 
     Example:
         >>> from libephemeris.spk_auto import auto_get_spk
@@ -1273,9 +1290,20 @@ def auto_get_spk(
             f"jd_end ({jd_end}) must be greater than jd_start ({jd_start})"
         )
 
-    # Determine cache directory
+    # Import state to get configuration settings
+    from . import state
+
+    # Determine cache directory (parameter > global config > default)
+    if cache_dir is None:
+        cache_dir = state.get_spk_cache_dir()
     if cache_dir is None:
         cache_dir = DEFAULT_AUTO_SPK_DIR
+
+    # Apply date padding from global configuration
+    date_padding = state.get_spk_date_padding()
+    if date_padding > 0:
+        jd_start = jd_start - date_padding
+        jd_end = jd_end + date_padding
 
     # Create cache directory if it doesn't exist
     if not os.path.exists(cache_dir):

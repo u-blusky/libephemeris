@@ -58,6 +58,15 @@ _SPK_BODY_MAP: dict[
 # before falling back to Keplerian propagation
 _AUTO_SPK_DOWNLOAD: Optional[bool] = None  # None = check env var, True/False = explicit
 
+# SPK cache directory override
+# When set, SPK files are cached in this directory instead of the default
+_SPK_CACHE_DIR: Optional[str] = None
+
+# SPK date padding in days
+# Extra time buffer added to date ranges when downloading SPK files
+# e.g., if requesting 2020-2030, with padding=365 will download 2019-2031
+_SPK_DATE_PADDING: int = 0
+
 
 def get_loader() -> Loader:
     """
@@ -568,6 +577,7 @@ def close() -> None:
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
     global _SPK_KERNELS, _SPK_BODY_MAP, _AUTO_SPK_DOWNLOAD
+    global _SPK_CACHE_DIR, _SPK_DATE_PADDING
 
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:
@@ -593,6 +603,8 @@ def close() -> None:
     _DELTA_T_USERDEF = None
     _LAPSE_RATE = None
     _AUTO_SPK_DOWNLOAD = None
+    _SPK_CACHE_DIR = None
+    _SPK_DATE_PADDING = 0
 
     # Close and clear SPK kernels
     for kernel in _SPK_KERNELS.values():
@@ -764,6 +776,112 @@ def get_auto_spk_download() -> bool:
     # Otherwise check environment variable
     env_value = os.environ.get(_AUTO_SPK_ENV_VAR, "").lower().strip()
     return env_value in ("1", "true", "yes", "on", "enabled")
+
+
+def set_spk_cache_dir(path: Optional[str]) -> None:
+    """
+    Set the directory for caching SPK files.
+
+    When set, SPK files will be stored in this directory instead of the
+    default cache location (~/.libephemeris/spk/).
+
+    Args:
+        path: Directory path for SPK cache, or None to use the default.
+              The directory will be created if it doesn't exist.
+
+    Note:
+        - This affects where auto_get_spk() and enable_auto_spk() store files
+        - Already-registered SPK bodies are not affected
+        - Set to None to revert to the default cache location
+
+    Example:
+        >>> from libephemeris import set_spk_cache_dir, get_spk_cache_dir
+        >>> set_spk_cache_dir("/data/ephemeris/spk_cache")
+        >>> get_spk_cache_dir()
+        '/data/ephemeris/spk_cache'
+        >>> set_spk_cache_dir(None)  # Revert to default
+        >>> get_spk_cache_dir() is None
+        True
+    """
+    global _SPK_CACHE_DIR
+    _SPK_CACHE_DIR = path
+
+
+def get_spk_cache_dir() -> Optional[str]:
+    """
+    Get the current SPK cache directory override.
+
+    Returns:
+        Optional[str]: The custom cache directory path if set,
+                      or None if using the default location.
+
+    Note:
+        When this returns None, SPK files are cached in the default
+        location (~/.libephemeris/spk/).
+
+    Example:
+        >>> from libephemeris import get_spk_cache_dir, set_spk_cache_dir
+        >>> get_spk_cache_dir()  # Default is None (uses default location)
+        None
+        >>> set_spk_cache_dir("/custom/cache")
+        >>> get_spk_cache_dir()
+        '/custom/cache'
+    """
+    return _SPK_CACHE_DIR
+
+
+def set_spk_date_padding(days: int) -> None:
+    """
+    Set the date padding for SPK downloads.
+
+    When downloading SPK files, this number of days is added before and
+    after the requested date range. This provides a buffer to ensure
+    coverage even when calculations occur near the edges of the range.
+
+    Args:
+        days: Number of days to add as padding on each side.
+              Must be non-negative (0 means no padding).
+
+    Note:
+        - A padding of 365 days means downloading 1 year extra on each side
+        - This is useful when you need to calculate positions for dates
+          slightly outside your main date range
+        - Default is 0 (no padding)
+
+    Example:
+        >>> from libephemeris import set_spk_date_padding, get_spk_date_padding
+        >>> set_spk_date_padding(365)  # Add 1 year buffer on each side
+        >>> get_spk_date_padding()
+        365
+        >>> set_spk_date_padding(0)  # No padding
+    """
+    global _SPK_DATE_PADDING
+    if days < 0:
+        raise ValueError("spk_date_padding must be non-negative")
+    _SPK_DATE_PADDING = days
+
+
+def get_spk_date_padding() -> int:
+    """
+    Get the current SPK date padding in days.
+
+    Returns:
+        int: Number of days added as padding on each side when downloading
+             SPK files. Default is 0.
+
+    Note:
+        This value is used by auto_get_spk() to expand the requested
+        date range when downloading new SPK files.
+
+    Example:
+        >>> from libephemeris import get_spk_date_padding, set_spk_date_padding
+        >>> get_spk_date_padding()  # Default
+        0
+        >>> set_spk_date_padding(30)
+        >>> get_spk_date_padding()
+        30
+    """
+    return _SPK_DATE_PADDING
 
 
 # =============================================================================

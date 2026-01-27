@@ -64,6 +64,10 @@ from .state import (
     close as swe_close,
     set_auto_spk_download,
     get_auto_spk_download,
+    set_spk_cache_dir,
+    get_spk_cache_dir,
+    set_spk_date_padding,
+    get_spk_date_padding,
 )
 from .crossing import (
     swe_solcross_ut,
@@ -490,6 +494,12 @@ __all__ = [
     # Auto SPK download configuration
     "set_auto_spk_download",
     "get_auto_spk_download",
+    # SPK cache directory configuration
+    "set_spk_cache_dir",
+    "get_spk_cache_dir",
+    # SPK date padding configuration
+    "set_spk_date_padding",
+    "get_spk_date_padding",
     # SPK body name mapping
     "SPK_BODY_NAME_MAP",
     "get_horizons_id",
