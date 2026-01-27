@@ -116,6 +116,9 @@ SE_SAPPHO: int = (
 SE_PANDORA_AST: int = (
     55 + SE_AST_OFFSET
 )  # 55 Pandora (main belt asteroid, distinct from Saturn moon Pandora)
+SE_LILITH_AST: int = (
+    1181 + SE_AST_OFFSET
+)  # 1181 Lilith (main belt asteroid, not to be confused with lunar apogee Lilith)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS

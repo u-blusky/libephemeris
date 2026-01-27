@@ -166,11 +166,11 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD TORO ASTEROID TO CATALOG: Add asteroid 1685 Toro to MINOR_BODY_ELEMENTS, add SE_TORO = 1685 + SE_AST_OFFSET.
 
-- [ ] ADD SAPPHO ASTEROID TO CATALOG: Add asteroid 80 Sappho to MINOR_BODY_ELEMENTS, used in some astrological traditions to represent artistic expression and same-sex love, add SE_SAPPHO = 80 + SE_AST_OFFSET.
+- [x] ADD SAPPHO ASTEROID TO CATALOG: Add asteroid 80 Sappho to MINOR_BODY_ELEMENTS, used in some astrological traditions to represent artistic expression and same-sex love, add SE_SAPPHO = 80 + SE_AST_OFFSET.
 
-- [ ] ADD PANDORA ASTEROID TO CATALOG: Add asteroid 55 Pandora to MINOR_BODY_ELEMENTS, add SE_PANDORA_AST = 55 + SE_AST_OFFSET (distinct from Saturn moon Pandora).
+- [x] ADD PANDORA ASTEROID TO CATALOG: Add asteroid 55 Pandora to MINOR_BODY_ELEMENTS, add SE_PANDORA_AST = 55 + SE_AST_OFFSET (distinct from Saturn moon Pandora).
 
-- [ ] ADD LILITH ASTEROID TO CATALOG: Add asteroid 1181 Lilith (the asteroid, not to be confused with lunar apogee Lilith points) to MINOR_BODY_ELEMENTS, add SE_LILITH_AST = 1181 + SE_AST_OFFSET.
+- [x] ADD LILITH ASTEROID TO CATALOG: Add asteroid 1181 Lilith (the asteroid, not to be confused with lunar apogee Lilith points) to MINOR_BODY_ELEMENTS, add SE_LILITH_AST = 1181 + SE_AST_OFFSET.
 
 - [ ] ADD HIDALGO ASTEROID TO CATALOG: Add asteroid 944 Hidalgo to MINOR_BODY_ELEMENTS, Hidalgo has a comet-like orbit and is used in astrological research, add SE_HIDALGO = 944 + SE_AST_OFFSET.
 
