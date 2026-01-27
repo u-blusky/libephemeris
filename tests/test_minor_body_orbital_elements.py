@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 15 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 16 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -26,6 +26,7 @@ from libephemeris.constants import (
     SE_QUAOAR,
     SE_NESSUS,
     SE_ASBOLUS,
+    SE_CHARIKLO,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -58,6 +59,7 @@ def all_minor_body_ids():
         SE_QUAOAR,
         SE_NESSUS,
         SE_ASBOLUS,
+        SE_CHARIKLO,
     ]
 
 
@@ -74,9 +76,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 15 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 15, (
-            f"Expected 15 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 16 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 16, (
+            f"Expected 16 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -249,6 +251,17 @@ class TestSpecificBodiesOrbitalElements:
         assert 0.61 < elements.e < 0.63, f"Asbolus e={elements.e} unexpected"
         # Inclination ~17.6 degrees
         assert 17.0 < elements.i < 18.5, f"Asbolus i={elements.i} unexpected"
+
+    def test_chariklo_centaur(self):
+        """Chariklo: Largest known centaur with ring system discovered in 2014."""
+        elements = MINOR_BODY_ELEMENTS[SE_CHARIKLO]
+        assert elements.name == "Chariklo"
+        # Semi-major axis ~15.7 AU (between Saturn ~9.5 AU and Uranus ~19.2 AU)
+        assert 15.5 < elements.a < 16.0, f"Chariklo a={elements.a} unexpected"
+        # Moderate eccentricity
+        assert 0.16 < elements.e < 0.18, f"Chariklo e={elements.e} unexpected"
+        # Inclination ~23.4 degrees
+        assert 23.0 < elements.i < 24.0, f"Chariklo i={elements.i} unexpected"
 
 
 @pytest.mark.unit

@@ -3,7 +3,7 @@ Minor body calculations for asteroids and Trans-Neptunian Objects (TNOs).
 
 This module computes positions for:
 - Main belt asteroids: Ceres, Pallas, Juno, Vesta
-- Centaurs: Chiron, Pholus, Nessus, Asbolus
+- Centaurs: Chiron, Pholus, Nessus, Asbolus, Chariklo
 - Trans-Neptunian Objects (TNOs): Eris, Sedna, Haumea, Makemake, Orcus, Quaoar, Ixion
 
 Method: Keplerian orbital elements with first-order secular perturbations from
@@ -48,6 +48,7 @@ from .constants import (
     SE_QUAOAR,
     SE_NESSUS,
     SE_ASBOLUS,
+    SE_CHARIKLO,
 )
 
 
@@ -872,6 +873,17 @@ MINOR_BODY_ELEMENTS = {
         Omega=6.020562307154061,
         M0=109.6324751756823,
         n=0.01283805024514489,  # ~77 year period
+    ),
+    SE_CHARIKLO: OrbitalElements(
+        name="Chariklo",
+        epoch=2461000.5,
+        a=15.73995155535189,  # Centaur orbit, largest known centaur (~250 km)
+        e=0.1702459901276738,  # Moderate eccentricity
+        i=23.43032407033149,
+        omega=241.2242283234723,
+        Omega=300.4752379513423,
+        M0=126.9607903541095,
+        n=0.01578334271898484,  # ~62 year period, has ring system discovered 2014
     ),
 }
 

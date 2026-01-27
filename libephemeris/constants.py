@@ -71,6 +71,7 @@ SE_ORCUS: int = 90482 + SE_AST_OFFSET  # Plutino, "anti-Pluto"
 SE_QUAOAR: int = 50000 + SE_AST_OFFSET  # Classical KBO
 SE_NESSUS: int = 7066 + SE_AST_OFFSET  # Centaur, astrologically important
 SE_ASBOLUS: int = 8405 + SE_AST_OFFSET  # Centaur, astrologically significant
+SE_CHARIKLO: int = 10199 + SE_AST_OFFSET  # Centaur, largest known, has ring system
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
@@ -97,6 +98,7 @@ NAIF_ORCUS: int = 2090482  # 90482 Orcus
 NAIF_QUAOAR: int = 2050000  # 50000 Quaoar
 NAIF_NESSUS: int = 2007066  # 7066 Nessus (Centaur)
 NAIF_ASBOLUS: int = 2008405  # 8405 Asbolus (Centaur)
+NAIF_CHARIKLO: int = 2010199  # 10199 Chariklo (Centaur, largest, has rings)
 
 # =============================================================================
 # SPK BODY NAME MAPPING
@@ -124,6 +126,7 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
     SE_VARUNA: ("20000", 2020000),  # 20000 Varuna (classical KBO)
     SE_NESSUS: ("7066", NAIF_NESSUS),  # 7066 Nessus (centaur)
     SE_ASBOLUS: ("8405", NAIF_ASBOLUS),  # 8405 Asbolus (centaur)
+    SE_CHARIKLO: ("10199", NAIF_CHARIKLO),  # 10199 Chariklo (centaur, largest, rings)
 }
 
 
