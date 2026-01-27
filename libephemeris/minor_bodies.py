@@ -31,7 +31,7 @@ Algorithm: Keplerian mechanics with Laplace-Lagrange secular perturbations
 
 import math
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, Optional, NamedTuple
 from .constants import (
     SE_CHIRON,
     SE_PHOLUS,
@@ -107,6 +107,88 @@ NEPTUNE_N = 0.006021  # Mean motion (degrees/day)
 MASS_RATIO_NEPTUNE = 1.0 / 19412  # ~5.153e-5
 
 
+# =============================================================================
+# MEAN MOTION RESONANCE CONSTANTS
+# =============================================================================
+# Mean motion resonances with Neptune occur when an outer body's orbital period
+# is a simple integer ratio of Neptune's period. These resonances protect
+# bodies from close encounters but also mean that secular perturbation theory
+# breaks down and gives incorrect results.
+#
+# Common Neptune resonances (body:Neptune orbital period ratio):
+# - 2:3 (Plutinos): ~39.4 AU - most populated resonance (Pluto, Ixion, Orcus)
+# - 1:2 (Twotinos): ~47.8 AU
+# - 2:5: ~55.4 AU
+# - 1:3: ~62.5 AU
+# - 3:5: ~36.4 AU
+# - 4:7: ~43.7 AU
+# - 3:4: ~36.5 AU
+#
+# References:
+#   Malhotra, R. (1995) "The origin of Pluto's peculiar orbit"
+#   Murray & Dermott "Solar System Dynamics" Ch. 8
+
+# Neptune's mean motion in degrees/day (for resonance calculations)
+NEPTUNE_MEAN_MOTION = 0.006021  # degrees/day (~164.8 year period)
+
+
+class ResonanceInfo(NamedTuple):
+    """
+    Information about a mean motion resonance.
+
+    Attributes:
+        p: Integer numerator (body's period multiplier)
+        q: Integer denominator (Neptune's period multiplier)
+        name: Common name for the resonance (e.g., "plutino", "twotino")
+        a_resonant: Expected semi-major axis for this resonance (AU)
+        tolerance: Fractional tolerance for detecting resonance
+    """
+
+    p: int
+    q: int
+    name: str
+    a_resonant: float
+    tolerance: float
+
+
+# Calculate resonant semi-major axis using Kepler's 3rd law:
+# For a p:q resonance, body makes p orbits while Neptune makes q orbits
+# T_body / T_Neptune = q / p  (body's period is longer if q > p)
+# (a_body / a_Neptune)^(3/2) = q / p
+# a_body = a_Neptune * (q / p)^(2/3)
+
+
+def _calc_resonant_a(p: int, q: int) -> float:
+    """Calculate the resonant semi-major axis for a p:q resonance with Neptune.
+
+    In a p:q resonance, the body completes p orbits while Neptune completes q orbits.
+    For exterior resonances (most common), q > p, so the body's orbit is larger.
+    """
+    return NEPTUNE_A * (q / p) ** (2.0 / 3.0)
+
+
+# Known Neptune mean motion resonances
+# Format: (p, q, name, a_resonant, tolerance)
+# Tolerance is fractional (e.g., 0.02 means ±2% of a_resonant)
+NEPTUNE_RESONANCES: list[ResonanceInfo] = [
+    # Interior resonances (a < Neptune)
+    ResonanceInfo(3, 4, "3:4 resonance", _calc_resonant_a(3, 4), 0.02),
+    ResonanceInfo(3, 5, "3:5 resonance", _calc_resonant_a(3, 5), 0.02),
+    # Plutinos (most famous resonance, includes Pluto)
+    ResonanceInfo(2, 3, "plutino", _calc_resonant_a(2, 3), 0.02),
+    # Other exterior resonances
+    ResonanceInfo(4, 7, "4:7 resonance", _calc_resonant_a(4, 7), 0.02),
+    # Twotinos (1:2 resonance)
+    ResonanceInfo(1, 2, "twotino", _calc_resonant_a(1, 2), 0.02),
+    # More distant resonances
+    ResonanceInfo(2, 5, "2:5 resonance", _calc_resonant_a(2, 5), 0.02),
+    ResonanceInfo(1, 3, "1:3 resonance", _calc_resonant_a(1, 3), 0.02),
+]
+
+# Default tolerance for resonance detection (fractional difference in mean motion)
+DEFAULT_RESONANCE_TOLERANCE = 0.02  # 2%
+
+
 @dataclass
 class OrbitalElements:
     """
@@ -137,6 +219,182 @@ class OrbitalElements:
     Omega: float
     M0: float
     n: float
+
+
+# =============================================================================
+# MEAN MOTION RESONANCE DETECTION FUNCTIONS
+# =============================================================================
+
+
+@dataclass
+class ResonanceResult:
+    """
+    Result of resonance detection for a body.
+
+    Attributes:
+        is_resonant: Whether the body is in or near a mean motion resonance
+        resonance: The detected resonance (ResonanceInfo), or None if not resonant
+        deviation: Fractional deviation from exact resonance (0.0 = exact)
+        warning_message: Message about secular perturbation accuracy, or None
+    """
+
+    is_resonant: bool
+    resonance: Optional[ResonanceInfo]
+    deviation: float
+    warning_message: Optional[str]
+
+
+def detect_mean_motion_resonance(
+    elements: "OrbitalElements",
+    tolerance: float = DEFAULT_RESONANCE_TOLERANCE,
+) -> ResonanceResult:
+    """
+    Detect if a body is in mean motion resonance with Neptune.
+
+    Checks if the body's mean motion is close to a resonant ratio with Neptune's
+    mean motion. Bodies in mean motion resonance have their secular perturbations
+    significantly modified by resonant effects that are not captured by
+    first-order Laplace-Lagrange secular theory.
+
+    Args:
+        elements: Orbital elements of the body to check
+        tolerance: Fractional tolerance for detecting resonance (default 2%)
+
+    Returns:
+        ResonanceResult: Contains detection result, resonance info, and warning
+
+    Algorithm:
+        For each known Neptune resonance p:q, checks if:
+        |n_body / n_Neptune - p/q| < tolerance * (p/q)
+
+        where n is mean motion. In a p:q resonance, the body completes p orbits
+        while Neptune completes q, so n_body/n_Neptune = p/q.
+        This is equivalent to checking if the semi-major axis is within
+        tolerance of the resonant value.
+
+    Example:
+        >>> from libephemeris.minor_bodies import detect_mean_motion_resonance
+        >>> result = detect_mean_motion_resonance(MINOR_BODY_ELEMENTS[SE_IXION])
+        >>> result.is_resonant
+        True
+        >>> result.resonance.name
+        'plutino'
+
+    Note:
+        Bodies in resonance may have secular perturbation calculations that
+        are less accurate than for non-resonant bodies. The warning_message
+        field provides guidance in such cases.
+
+    References:
+        Murray & Dermott "Solar System Dynamics" Ch. 8
+        Malhotra (1995) "The origin of Pluto's peculiar orbit"
+    """
+    a = elements.a
+    n = elements.n
+
+    # Only check bodies that could potentially be in Neptune resonance
+    # (must be in outer solar system, say a > 20 AU)
+    if a < 20.0:
+        return ResonanceResult(
+            is_resonant=False, resonance=None, deviation=0.0, warning_message=None
+        )
+
+    # Calculate body's mean motion ratio relative to Neptune
+    # For a p:q resonance, body makes p orbits while Neptune makes q
+    # So n_body / n_Neptune = p / q
+    n_ratio = n / NEPTUNE_MEAN_MOTION
+
+    best_match: Optional[ResonanceInfo] = None
+    best_deviation = float("inf")
+
+    for resonance in NEPTUNE_RESONANCES:
+        # Expected ratio for this resonance: p/q
+        expected_ratio = resonance.p / resonance.q
+
+        # Calculate fractional deviation
+        deviation = abs(n_ratio - expected_ratio) / expected_ratio
+
+        if deviation < tolerance and deviation < best_deviation:
+            best_match = resonance
+            best_deviation = deviation
+
+    if best_match is not None:
+        warning = (
+            f"Body '{elements.name}' is near the {best_match.p}:{best_match.q} "
+            f"mean motion resonance with Neptune ({best_match.name}). "
+            f"Secular perturbation theory may be inaccurate for resonant bodies. "
+            f"Deviation from exact resonance: {best_deviation * 100:.2f}%"
+        )
+        return ResonanceResult(
+            is_resonant=True,
+            resonance=best_match,
+            deviation=best_deviation,
+            warning_message=warning,
+        )
+
+    return ResonanceResult(
+        is_resonant=False, resonance=None, deviation=0.0, warning_message=None
+    )
+
+
+def is_body_resonant(
+    body_id: int, tolerance: float = DEFAULT_RESONANCE_TOLERANCE
+) -> bool:
+    """
+    Check if a minor body is in mean motion resonance with Neptune.
+
+    This is a convenience function that looks up the body's orbital elements
+    and checks for resonance.
+
+    Args:
+        body_id: Minor body identifier (SE_IXION, SE_ORCUS, etc.)
+        tolerance: Fractional tolerance for detecting resonance (default 2%)
+
+    Returns:
+        bool: True if the body is in or near a Neptune resonance
+
+    Raises:
+        ValueError: If body_id is not in the orbital elements database
+
+    Example:
+        >>> from libephemeris.minor_bodies import is_body_resonant
+        >>> from libephemeris.constants import SE_IXION, SE_CERES
+        >>> is_body_resonant(SE_IXION)
+        True
+        >>> is_body_resonant(SE_CERES)
+        False
+    """
+    if body_id not in MINOR_BODY_ELEMENTS:
+        raise ValueError(f"Unknown body ID: {body_id}")
+
+    elements = MINOR_BODY_ELEMENTS[body_id]
+    result = detect_mean_motion_resonance(elements, tolerance)
+    return result.is_resonant
+
+
+def get_resonance_info(body_id: int) -> Optional[ResonanceResult]:
+    """
+    Get detailed resonance information for a minor body.
+
+    Args:
+        body_id: Minor body identifier (SE_IXION, SE_ORCUS, etc.)
+
+    Returns:
+        ResonanceResult: Detailed resonance detection result, or None if body unknown
+
+    Example:
+        >>> from libephemeris.minor_bodies import get_resonance_info
+        >>> from libephemeris.constants import SE_ORCUS
+        >>> info = get_resonance_info(SE_ORCUS)
+        >>> if info and info.is_resonant:
+        ...     print(f"{info.resonance.name}: deviation {info.deviation:.2%}")
+        plutino: deviation 0.15%
+    """
+    if body_id not in MINOR_BODY_ELEMENTS:
+        return None
+
+    elements = MINOR_BODY_ELEMENTS[body_id]
+    return detect_mean_motion_resonance(elements)
 
 
 # =============================================================================
@@ -393,6 +651,13 @@ def apply_secular_perturbations(
     This accounts for the long-term drift in ω and Ω due to Jupiter, Saturn, Uranus,
     and Neptune (for TNOs with a > 20 AU).
 
+    WARNING: For bodies in mean motion resonance with Neptune (e.g., plutinos
+    like Ixion and Orcus in 2:3 resonance, twotinos in 1:2 resonance), the
+    secular perturbation theory used here may give inaccurate results. Resonant
+    bodies experience additional perturbations that are not captured by
+    first-order Laplace-Lagrange theory. Use detect_mean_motion_resonance()
+    or is_body_resonant() to check if a body is in resonance.
+
     Args:
         elements: Original orbital elements at epoch
         jd_tt: Target Julian Day in Terrestrial Time
@@ -404,6 +669,10 @@ def apply_secular_perturbations(
             - Omega_pert: Perturbed longitude of ascending node (degrees)
             - M_pert: Perturbed mean anomaly at target time (degrees)
             - n_pert: Perturbed mean motion (degrees/day)
+
+    See Also:
+        detect_mean_motion_resonance: Check if a body is in Neptune resonance
+        is_body_resonant: Quick check if a body ID is resonant
     """
     dt = jd_tt - elements.epoch  # Time since epoch in days
 
