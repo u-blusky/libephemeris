@@ -1560,8 +1560,9 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     2. **Variation**: Transverse solar tidal force at quadrature
        (amplitude 0.658°, period ~14.77 days)
     3. **Annual Equation**: Earth's orbital eccentricity effect
+       (amplitude 0.186°, period ~1 year)
 
-    Both evection and variation corrections are applied to improve accuracy.
+    Evection, variation, and annual equation corrections are applied to improve accuracy.
     The true apogee can vary ±30° from the mean apogee.
 
     Args:
@@ -1728,6 +1729,29 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     variation_arg = 2.0 * D
     variation_correction = 0.6583 * math.sin(variation_arg)
     lon_date += variation_correction
+
+    # ========================================================================
+    # ANNUAL EQUATION CORRECTION (period ~1 year, amplitude ~0.186°)
+    # ========================================================================
+    # The Annual Equation is a perturbation of the lunar motion caused by the
+    # variation in the Earth-Sun distance due to Earth's orbital eccentricity.
+    # When Earth is closer to the Sun (perihelion), the solar gravitational
+    # perturbation on the Moon is stronger, affecting both the Moon's longitude
+    # and the position of the lunar apogee.
+    #
+    # This effect modulates the lunar apogee position with an annual period,
+    # tied to the Sun's mean anomaly (the angle from perihelion in Earth's orbit).
+    #
+    # Annual equation argument: M (Sun's mean anomaly)
+    # Period: ~365.25 days (anomalistic year)
+    # Amplitude: 0.1856° for the apogee position
+    #
+    # References:
+    # - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+    # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
+    annual_equation_correction = 0.1856 * math.sin(M)
+    lon_date += annual_equation_correction
 
     # Normalize to [0, 360)
     longitude = lon_date % 360.0
