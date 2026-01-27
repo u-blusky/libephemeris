@@ -1401,3 +1401,365 @@ class TestDownloadSpkFromHorizonsIntegration:
 
         # The error message should indicate the body was not found
         assert "DEFINITELY_NOT_A_REAL_BODY_XYZ123" in str(exc_info.value)
+
+
+# =============================================================================
+# TESTS FOR SPK REGISTRATION AFTER DOWNLOAD
+# =============================================================================
+
+
+class TestRegisterSpkAfterDownload:
+    """Test the _register_spk_after_download helper function."""
+
+    def setup_method(self):
+        """Clear SPK state before each test."""
+        from libephemeris import state
+
+        state._SPK_BODY_MAP.clear()
+        state._SPK_KERNELS.clear()
+
+    def teardown_method(self):
+        """Clear SPK state after each test."""
+        from libephemeris import state
+
+        state._SPK_BODY_MAP.clear()
+        state._SPK_KERNELS.clear()
+
+    def test_raises_when_naif_id_cannot_be_deduced(self, tmp_path):
+        """Raises ValueError when NAIF ID cannot be deduced from body name."""
+        # Create a dummy SPK file
+        spk_file = tmp_path / "test.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        with pytest.raises(ValueError) as exc_info:
+            spk_auto._register_spk_after_download(
+                str(spk_file),
+                "UnknownBodyWithNoNumber",
+                SE_CHIRON,
+                naif_id=None,
+            )
+
+        assert "Cannot deduce NAIF ID" in str(exc_info.value)
+        assert "UnknownBodyWithNoNumber" in str(exc_info.value)
+
+
+class TestAutoGetSpkWithRegistration:
+    """Test auto_get_spk with automatic SPK registration."""
+
+    def setup_method(self):
+        """Clear SPK and registry state before each test."""
+        spk_auto.disable_all()
+        from libephemeris import state
+
+        state._SPK_BODY_MAP.clear()
+        state._SPK_KERNELS.clear()
+
+    def teardown_method(self):
+        """Clear SPK and registry state after each test."""
+        spk_auto.disable_all()
+        from libephemeris import state
+
+        state._SPK_BODY_MAP.clear()
+        state._SPK_KERNELS.clear()
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    @patch.object(spk_auto, "_download_spk_astroquery")
+    def test_registers_spk_when_ipl_provided(self, mock_download, mock_check, tmp_path):
+        """auto_get_spk registers SPK body when ipl is provided."""
+        from libephemeris import state
+
+        # Mock download to create a file
+        def create_file(**kwargs):
+            with open(kwargs["output_path"], "wb") as f:
+                f.write(b"dummy spk content")
+
+        mock_download.side_effect = create_file
+
+        # Call with ipl parameter
+        with patch.object(spk_auto, "_register_spk_after_download") as mock_register:
+            spk_auto.auto_get_spk(
+                "2060",
+                2458849.5,
+                2462502.5,
+                str(tmp_path),
+                ipl=SE_CHIRON,
+            )
+
+            # Verify registration was called
+            mock_register.assert_called_once()
+            call_args = mock_register.call_args
+            assert call_args[0][2] == SE_CHIRON  # ipl argument
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    @patch.object(spk_auto, "_download_spk_astroquery")
+    def test_does_not_register_when_ipl_not_provided(
+        self, mock_download, mock_check, tmp_path
+    ):
+        """auto_get_spk does not register SPK body when ipl is not provided."""
+
+        # Mock download to create a file
+        def create_file(**kwargs):
+            with open(kwargs["output_path"], "wb") as f:
+                f.write(b"dummy spk content")
+
+        mock_download.side_effect = create_file
+
+        with patch.object(spk_auto, "_register_spk_after_download") as mock_register:
+            spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
+
+            # Verify registration was NOT called
+            mock_register.assert_not_called()
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_registers_cached_spk_when_ipl_provided(self, mock_check, tmp_path):
+        """auto_get_spk registers cached SPK when ipl is provided."""
+        # Create a cached SPK file
+        spk_file = tmp_path / "2060_2458849_2462502.bsp"
+        spk_file.write_bytes(b"cached SPK data")
+
+        with patch.object(spk_auto, "_register_spk_after_download") as mock_register:
+            result = spk_auto.auto_get_spk(
+                "2060",
+                2458849.5,
+                2462502.5,
+                str(tmp_path),
+                ipl=SE_CHIRON,
+            )
+
+            # Should return cached file
+            assert result == str(spk_file)
+
+            # Should still register
+            mock_register.assert_called_once()
+            call_args = mock_register.call_args
+            assert call_args[0][0] == str(spk_file)  # spk_path
+            assert call_args[0][2] == SE_CHIRON  # ipl
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    @patch.object(spk_auto, "_download_spk_astroquery")
+    def test_passes_naif_id_to_registration(self, mock_download, mock_check, tmp_path):
+        """auto_get_spk passes naif_id to registration."""
+
+        # Mock download to create a file
+        def create_file(**kwargs):
+            with open(kwargs["output_path"], "wb") as f:
+                f.write(b"dummy spk content")
+
+        mock_download.side_effect = create_file
+
+        with patch.object(spk_auto, "_register_spk_after_download") as mock_register:
+            spk_auto.auto_get_spk(
+                "2060",
+                2458849.5,
+                2462502.5,
+                str(tmp_path),
+                ipl=SE_CHIRON,
+                naif_id=NAIF_CHIRON,
+            )
+
+            # Verify naif_id was passed
+            mock_register.assert_called_once()
+            call_args = mock_register.call_args
+            assert call_args[0][3] == NAIF_CHIRON  # naif_id
+
+
+class TestDownloadSpkFromHorizonsWithRegistration:
+    """Test download_spk_from_horizons with automatic SPK registration."""
+
+    def setup_method(self):
+        """Clear SPK state before each test."""
+        from libephemeris import state
+
+        state._SPK_BODY_MAP.clear()
+        state._SPK_KERNELS.clear()
+
+    def teardown_method(self):
+        """Clear SPK state after each test."""
+        from libephemeris import state
+
+        state._SPK_BODY_MAP.clear()
+        state._SPK_KERNELS.clear()
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_registers_spk_when_ipl_provided(self, mock_check, tmp_path):
+        """download_spk_from_horizons registers SPK body when ipl is provided."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with patch.object(
+                spk_auto, "_register_spk_after_download"
+            ) as mock_register:
+                spk_auto.download_spk_from_horizons(
+                    "2060",
+                    2458849.5,
+                    2462502.5,
+                    output_path,
+                    ipl=SE_CHIRON,
+                )
+
+                # Verify registration was called
+                mock_register.assert_called_once()
+                call_args = mock_register.call_args
+                assert call_args[0][0] == output_path  # spk_path
+                assert call_args[0][1] == "2060"  # body_id
+                assert call_args[0][2] == SE_CHIRON  # ipl
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_does_not_register_when_ipl_not_provided(self, mock_check, tmp_path):
+        """download_spk_from_horizons does not register when ipl is not provided."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with patch.object(
+                spk_auto, "_register_spk_after_download"
+            ) as mock_register:
+                spk_auto.download_spk_from_horizons(
+                    "2060",
+                    2458849.5,
+                    2462502.5,
+                    output_path,
+                )
+
+                # Verify registration was NOT called
+                mock_register.assert_not_called()
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_passes_naif_id_to_registration(self, mock_check, tmp_path):
+        """download_spk_from_horizons passes naif_id to registration."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with patch.object(
+                spk_auto, "_register_spk_after_download"
+            ) as mock_register:
+                spk_auto.download_spk_from_horizons(
+                    "2060",
+                    2458849.5,
+                    2462502.5,
+                    output_path,
+                    ipl=SE_CHIRON,
+                    naif_id=NAIF_CHIRON,
+                )
+
+                # Verify naif_id was passed
+                mock_register.assert_called_once()
+                call_args = mock_register.call_args
+                assert call_args[0][3] == NAIF_CHIRON  # naif_id
+
+
+# Network-dependent tests for registration
+@pytest.mark.skipif(
+    os.environ.get("LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD") != "1",
+    reason="Set LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD=1 to run network tests",
+)
+class TestSpkRegistrationIntegration:
+    """Integration tests for SPK registration that require network access."""
+
+    def setup_method(self):
+        """Clear state before each test."""
+        spk_auto.disable_all()
+        from libephemeris import state
+
+        state._SPK_BODY_MAP.clear()
+        state._SPK_KERNELS.clear()
+
+    def teardown_method(self):
+        """Clear state after each test."""
+        spk_auto.disable_all()
+        from libephemeris import state
+
+        state._SPK_BODY_MAP.clear()
+        state._SPK_KERNELS.clear()
+
+    def test_auto_get_spk_with_registration(self, tmp_path):
+        """auto_get_spk downloads and registers SPK for use with calc_ut."""
+        jd_start = 2459215.5  # 2021-01-01
+        jd_end = 2460676.5  # 2025-01-01
+
+        # Download and register
+        spk_path = spk_auto.auto_get_spk(
+            "2060",
+            jd_start,
+            jd_end,
+            str(tmp_path),
+            ipl=SE_CHIRON,
+        )
+
+        # Verify file exists
+        assert os.path.exists(spk_path)
+
+        # Verify registration
+        info = eph.get_spk_body_info(SE_CHIRON)
+        assert info is not None
+        assert info[0] == spk_path
+
+        # Calculate position using SPK
+        jd = 2459580.5  # 2022-01-01
+        pos, _ = eph.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+
+        assert 0 <= pos[0] < 360  # Valid longitude
+        assert pos[2] > 0  # Positive distance
+
+    def test_download_spk_from_horizons_with_registration(self, tmp_path):
+        """download_spk_from_horizons downloads and registers SPK."""
+        jd_start = 2459215.5  # 2021-01-01
+        jd_end = 2460676.5  # 2025-01-01
+        output_path = str(tmp_path / "chiron_registered.bsp")
+
+        # Download and register
+        result = spk_auto.download_spk_from_horizons(
+            "2060",
+            jd_start,
+            jd_end,
+            output_path,
+            ipl=SE_CHIRON,
+        )
+
+        # Verify file exists
+        assert os.path.exists(result)
+        assert result == output_path
+
+        # Verify registration
+        info = eph.get_spk_body_info(SE_CHIRON)
+        assert info is not None
+        assert info[0] == output_path
+
+        # Calculate position using SPK
+        jd = 2459580.5  # 2022-01-01
+        pos, _ = eph.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+
+        assert 0 <= pos[0] < 360
+        assert pos[2] > 0

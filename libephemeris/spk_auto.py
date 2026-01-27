@@ -909,6 +909,8 @@ def auto_get_spk(
     jd_start: float,
     jd_end: float,
     cache_dir: Optional[str] = None,
+    ipl: Optional[int] = None,
+    naif_id: Optional[int] = None,
 ) -> str:
     """
     Automatically get SPK file for a body and date range, downloading if needed.
@@ -916,6 +918,9 @@ def auto_get_spk(
     This function checks if an SPK file for the requested body and date range
     exists in the local cache directory. If not, it automatically downloads
     the file from JPL Horizons using the Horizons class.
+
+    If ``ipl`` is provided, the SPK body is automatically registered with
+    libephemeris after download, making it immediately usable by ``calc_ut()``.
 
     Args:
         body_id: JPL Horizons body identifier. Can be:
@@ -926,22 +931,30 @@ def auto_get_spk(
         jd_end: End of the date range (Julian Day)
         cache_dir: Directory for storing/finding SPK files.
             Default: ~/.libephemeris/spk/
+        ipl: Optional libephemeris body ID (e.g., SE_CHIRON). If provided,
+            the SPK body is automatically registered after download.
+        naif_id: Optional NAIF ID for SPK lookup. If not provided but ipl is,
+            the NAIF ID is deduced from body_id using the convention:
+            naif_id = asteroid_number + 2000000
 
     Returns:
         str: Path to the SPK file (either existing cached or newly downloaded)
 
     Raises:
         ImportError: If astroquery is not installed
-        ValueError: If body not found or download fails
+        ValueError: If body not found, download fails, or naif_id cannot be
+            deduced when ipl is provided
 
     Example:
         >>> from libephemeris.spk_auto import auto_get_spk
-        >>> # Get SPK for Chiron covering 2020-2030
+        >>> from libephemeris.constants import SE_CHIRON
+        >>> # Get SPK for Chiron covering 2020-2030 and register it
         >>> jd_start = 2458849.5  # 2020-01-01
         >>> jd_end = 2462502.5    # 2030-01-01
-        >>> spk_path = auto_get_spk("2060", jd_start, jd_end)
+        >>> spk_path = auto_get_spk("2060", jd_start, jd_end, ipl=SE_CHIRON)
         >>> print(spk_path)
         /home/user/.libephemeris/spk/2060_2458849_2462502.bsp
+        >>> # Now calc_ut(jd, SE_CHIRON, ...) uses SPK data automatically
     """
     # Check if astroquery is available
     if not _check_astroquery_available():
@@ -967,6 +980,9 @@ def auto_get_spk(
     # Check if we already have a cached SPK that covers this range
     existing_spk = _find_covering_spk(body_id, jd_start, jd_end, cache_dir)
     if existing_spk is not None:
+        # Even if cached, register if ipl is provided
+        if ipl is not None:
+            _register_spk_after_download(existing_spk, body_id, ipl, naif_id)
         return existing_spk
 
     # Need to download - convert Julian Days to date strings
@@ -981,11 +997,17 @@ def auto_get_spk(
     with _AUTO_SPK_LOCK:
         # Double-check after acquiring lock (another thread may have downloaded)
         if os.path.exists(output_path):
+            # Register if ipl is provided
+            if ipl is not None:
+                _register_spk_after_download(output_path, body_id, ipl, naif_id)
             return output_path
 
         # Check again for covering SPK (may have been downloaded with different range)
         existing_spk = _find_covering_spk(body_id, jd_start, jd_end, cache_dir)
         if existing_spk is not None:
+            # Register if ipl is provided
+            if ipl is not None:
+                _register_spk_after_download(existing_spk, body_id, ipl, naif_id)
             return existing_spk
 
         # Download SPK file
@@ -996,7 +1018,48 @@ def auto_get_spk(
             output_path=output_path,
         )
 
+    # Register the SPK body if ipl is provided
+    if ipl is not None:
+        _register_spk_after_download(output_path, body_id, ipl, naif_id)
+
     return output_path
+
+
+def _register_spk_after_download(
+    spk_path: str,
+    body_id: Union[int, str],
+    ipl: int,
+    naif_id: Optional[int] = None,
+) -> None:
+    """
+    Register an SPK body after download.
+
+    Internal helper function that registers the SPK body with libephemeris
+    so it can be used by calc_ut().
+
+    Args:
+        spk_path: Path to the downloaded SPK file
+        body_id: JPL Horizons body identifier (used for NAIF ID deduction)
+        ipl: libephemeris body ID (e.g., SE_CHIRON)
+        naif_id: Optional NAIF ID. If not provided, deduced from body_id.
+
+    Raises:
+        ValueError: If naif_id cannot be deduced and is not provided
+    """
+    from . import spk
+
+    # Deduce NAIF ID if not provided
+    if naif_id is None:
+        naif_id = spk._deduce_naif_id(str(body_id))
+        if naif_id is None:
+            raise ValueError(
+                f"Cannot deduce NAIF ID for '{body_id}'. "
+                f"Please provide naif_id explicitly. "
+                f"For numbered asteroids: naif_id = asteroid_number + 2000000"
+            )
+
+    # Register the SPK body
+    spk.register_spk_body(ipl, spk_path, naif_id)
 
 
 # =============================================================================
@@ -1010,6 +1073,8 @@ def download_spk_from_horizons(
     jd_end: float,
     output_path: str,
     location: str = "@0",
+    ipl: Optional[int] = None,
+    naif_id: Optional[int] = None,
 ) -> str:
     """
     Download an SPK file from JPL Horizons for a specified body and date range.
@@ -1017,6 +1082,9 @@ def download_spk_from_horizons(
     This function uses astroquery.jplhorizons to download an SPK (SPICE kernel)
     file for the specified body and Julian Day range. The file can then be used
     for high-precision ephemeris calculations.
+
+    If ``ipl`` is provided, the SPK body is automatically registered with
+    libephemeris after download, making it immediately usable by ``calc_ut()``.
 
     Args:
         body_id: JPL Horizons body identifier. Can be:
@@ -1027,6 +1095,11 @@ def download_spk_from_horizons(
         jd_end: End of the date range (Julian Day)
         output_path: Full path where the SPK file should be saved (including filename)
         location: Observer location code for Horizons (default: "@0" = solar system barycenter)
+        ipl: Optional libephemeris body ID (e.g., SE_CHIRON). If provided,
+            the SPK body is automatically registered after download.
+        naif_id: Optional NAIF ID for SPK lookup. If not provided but ipl is,
+            the NAIF ID is deduced from body_id using the convention:
+            naif_id = asteroid_number + 2000000
 
     Returns:
         str: Path to the downloaded SPK file (same as output_path)
@@ -1034,12 +1107,14 @@ def download_spk_from_horizons(
     Raises:
         ImportError: If astroquery is not installed
         ValueError: If body is not found on Horizons, date range is invalid,
-            or the date range is too large for Horizons to process
+            the date range is too large for Horizons to process, or naif_id
+            cannot be deduced when ipl is provided
         ConnectionError: If network request fails
 
     Example:
         >>> from libephemeris.spk_auto import download_spk_from_horizons
-        >>> # Download Chiron SPK for 2020-2030
+        >>> from libephemeris.constants import SE_CHIRON
+        >>> # Download Chiron SPK for 2020-2030 and register it
         >>> jd_start = 2458849.5  # 2020-01-01
         >>> jd_end = 2462502.5    # 2030-01-01
         >>> path = download_spk_from_horizons(
@@ -1047,9 +1122,11 @@ def download_spk_from_horizons(
         ...     jd_start=jd_start,
         ...     jd_end=jd_end,
         ...     output_path="/path/to/chiron.bsp",
+        ...     ipl=SE_CHIRON,  # Automatically registers the SPK
         ... )
         >>> print(path)
         /path/to/chiron.bsp
+        >>> # Now calc_ut(jd, SE_CHIRON, ...) uses SPK data automatically
 
     Notes:
         - Horizons has limits on the date range for SPK generation. For most
@@ -1141,5 +1218,9 @@ def download_spk_from_horizons(
         raise ValueError(
             f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"
         ) from e
+
+    # Register the SPK body if ipl is provided
+    if ipl is not None:
+        _register_spk_after_download(output_path, body_id, ipl, naif_id)
 
     return output_path
