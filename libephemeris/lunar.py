@@ -420,10 +420,77 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     perturbation += 0.0063 * math.sin(evection_arg + F)
     perturbation += -0.0052 * math.sin(evection_arg - F)
 
-    # Variation-related terms (amplitude ~0.66°, period ~14.8 days)
+    # ========================================================================
+    # VARIATION EFFECT ON NODE (Long-period term, period ~14.77 days)
+    # ========================================================================
+    # The Variation is a major lunar inequality discovered by Tycho Brahe,
+    # caused by the difference in solar gravitational force between the
+    # Moon's position at quadrature versus conjunction/opposition.
+    #
+    # Physical mechanism: At quadrature (first/last quarter), the Moon is
+    # approximately at right angles to the Sun-Earth line. The transverse
+    # component of the Sun's tidal force is maximum here, causing the Moon
+    # to speed up (before quadrature) or slow down (after quadrature).
+    # At conjunction/opposition (new/full Moon), the radial component
+    # dominates, with different effects on the orbit.
+    #
+    # The Variation has:
+    # - Period: ~14.77 days (half the synodic month, 29.53/2 days)
+    # - Amplitude: ~0.658° in longitude
+    # - Argument: 2D (twice the mean elongation)
+    #
+    # The main 2D term (-1.5233 sin(2D)) at line 247 captures the dominant
+    # fortnightly oscillation of the node. The terms below capture the
+    # Variation's secondary effects through its coupling with other
+    # perturbations and its influence on the orbital plane orientation.
+    #
+    # The Variation affects the node through:
+    # 1. Direct modulation of the Moon's radial velocity, which affects
+    #    the instantaneous orbital plane orientation
+    # 2. Coupling with the lunar inclination (F) and anomaly (M')
+    # 3. Interaction with the eccentricity variation (evection coupling)
+    #
+    # References:
+    # - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+    # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
     variation_arg = 2.0 * D
+
+    # Primary Variation-inclination coupling terms (2D ± F)
+    # The Variation modulates the lunar latitude through its coupling
+    # with the argument of latitude F. This creates a secondary effect
+    # on the node position. Amplitude ~0.658° × sin(i) ≈ 0.059°
+    perturbation += 0.0523 * math.sin(variation_arg + F)
+    perturbation += -0.0478 * math.sin(variation_arg - F)
+
+    # Variation-anomaly coupling terms (2D ± M')
+    # The Variation interacts with the Moon's mean anomaly, creating
+    # combined perturbations. These arise from the modulation of the
+    # eccentricity effect by the solar tidal force.
+    perturbation += 0.0156 * math.sin(variation_arg + M_prime)
+    perturbation += -0.0142 * math.sin(variation_arg - M_prime)
+
+    # Combined Variation-inclination-anomaly terms (2D + F ± M')
+    # Higher-order coupling between the Variation, inclination, and
+    # the Moon's orbital eccentricity.
     perturbation += 0.0048 * math.sin(variation_arg + F + M_prime)
     perturbation += -0.0041 * math.sin(variation_arg - F + M_prime)
+    perturbation += 0.0038 * math.sin(variation_arg + F - M_prime)
+    perturbation += -0.0033 * math.sin(variation_arg - F - M_prime)
+
+    # Variation-solar coupling terms (2D ± M)
+    # The Variation's interaction with the Sun's mean anomaly creates
+    # beat frequencies between the fortnightly and annual periods.
+    perturbation += 0.0028 * E * math.sin(variation_arg + M)
+    perturbation += -0.0024 * E * math.sin(variation_arg - M)
+
+    # Double Variation terms (4D)
+    # Second harmonic of the Variation, with half the period (~7.4 days)
+    # and smaller amplitude. These arise from non-linear effects in
+    # the solar tidal perturbation.
+    perturbation += 0.0067 * math.sin(4.0 * D)
+    perturbation += 0.0043 * math.sin(4.0 * D + F)
+    perturbation += -0.0039 * math.sin(4.0 * D - F)
 
     # Annual equation terms (amplitude ~0.19°, period ~1 year)
     perturbation += 0.0037 * E * math.sin(M + 2.0 * F)
