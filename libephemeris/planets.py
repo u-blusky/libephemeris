@@ -496,10 +496,34 @@ def _calc_body(
         jd_tt = t.tt
         if ipl == SE_MEAN_NODE:
             lon = lunar.calc_mean_lunar_node(jd_tt)
-            return (lon, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+            # Calculate velocity via numerical differentiation if requested
+            dlon = 0.0
+            if iflag & SEFLG_SPEED:
+                dt = 1.0 / 86400.0  # 1 second in days
+                lon_next = lunar.calc_mean_lunar_node(jd_tt + dt)
+                dlon = (lon_next - lon) / dt
+                # Handle longitude wrap-around
+                if dlon > 18000:
+                    dlon -= 360.0 / dt
+                elif dlon < -18000:
+                    dlon += 360.0 / dt
+            return (lon, 0.0, 0.0, dlon, 0.0, 0.0), iflag
         else:  # SE_TRUE_NODE
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
-            return (lon, lat, dist, 0.0, 0.0, 0.0), iflag
+            # Calculate velocity via numerical differentiation if requested
+            dlon, dlat, ddist = 0.0, 0.0, 0.0
+            if iflag & SEFLG_SPEED:
+                dt = 1.0 / 86400.0  # 1 second in days
+                lon_next, lat_next, dist_next = lunar.calc_true_lunar_node(jd_tt + dt)
+                dlon = (lon_next - lon) / dt
+                dlat = (lat_next - lat) / dt
+                ddist = (dist_next - dist) / dt
+                # Handle longitude wrap-around
+                if dlon > 18000:
+                    dlon -= 360.0 / dt
+                elif dlon < -18000:
+                    dlon += 360.0 / dt
+            return (lon, lat, dist, dlon, dlat, ddist), iflag
 
     # South nodes are 180° from north nodes
     if ipl in [-SE_MEAN_NODE, -SE_TRUE_NODE]:
