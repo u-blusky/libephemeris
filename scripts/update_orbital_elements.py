@@ -76,6 +76,7 @@ BODY_SBDB_IDS: dict[str, str] = {
     "Ixion": "28978",  # 28978 Ixion
     "Orcus": "90482",  # 90482 Orcus
     "Quaoar": "50000",  # 50000 Quaoar
+    "Varuna": "20000",  # 20000 Varuna (classical KBO)
     "Nessus": "7066",  # 7066 Nessus (centaur)
     "Asbolus": "8405",  # 8405 Asbolus (centaur)
     "Chariklo": "10199",  # 10199 Chariklo (centaur)

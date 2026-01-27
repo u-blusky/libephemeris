@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 17 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 18 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -28,6 +28,7 @@ from libephemeris.constants import (
     SE_ASBOLUS,
     SE_CHARIKLO,
     SE_GONGGONG,
+    SE_VARUNA,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -62,6 +63,7 @@ def all_minor_body_ids():
         SE_ASBOLUS,
         SE_CHARIKLO,
         SE_GONGGONG,
+        SE_VARUNA,
     ]
 
 
@@ -78,9 +80,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 17 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 17, (
-            f"Expected 17 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 18 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 18, (
+            f"Expected 18 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -277,6 +279,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 30.5 < elements.i < 31.5, f"Gonggong i={elements.i} unexpected"
         # Slow mean motion (long orbital period ~547 years)
         assert elements.n < 0.002, f"Gonggong n={elements.n} too fast"
+
+    def test_varuna_classical_kbo(self):
+        """Varuna: Large classical Kuiper belt object (~670 km diameter)."""
+        elements = MINOR_BODY_ELEMENTS[SE_VARUNA]
+        assert elements.name == "Varuna"
+        # Semi-major axis ~43.2 AU (classical KBO region)
+        assert 42.5 < elements.a < 44.0, f"Varuna a={elements.a} unexpected"
+        # Nearly circular orbit (low eccentricity)
+        assert elements.e < 0.06, f"Varuna e={elements.e} too high for classical KBO"
+        # Moderate inclination ~17.1 degrees
+        assert 16.5 < elements.i < 18.0, f"Varuna i={elements.i} unexpected"
+        # Mean motion consistent with ~284 year period
+        assert 0.003 < elements.n < 0.004, f"Varuna n={elements.n} unexpected"
 
 
 @pytest.mark.unit
