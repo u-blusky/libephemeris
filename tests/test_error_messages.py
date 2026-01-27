@@ -97,7 +97,7 @@ class TestIllegalPlanetMessages:
         from libephemeris.fixed_stars import _resolve_star_id, _resolve_star2
 
         # Test _resolve_star_id
-        star_id, error = _resolve_star_id("NonExistentStar")
+        star_id, error, _ = _resolve_star_id("NonExistentStar")
         assert star_id == -1
         assert "could not find star name" in error.lower()
 
