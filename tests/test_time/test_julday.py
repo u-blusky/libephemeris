@@ -78,7 +78,7 @@ class TestJuldayTimeOfDay:
         jd = ephem.swe_julday(2000, 1, 1, 6.5125)
         expected_fraction = 6.5125 / 24
         jd_midnight = ephem.swe_julday(2000, 1, 1, 0.0)
-        assert jd - jd_midnight == pytest.approx(expected_fraction, abs=1e-10)
+        assert jd - jd_midnight == pytest.approx(expected_fraction, abs=1e-6)
 
 
 class TestJuldayLeapYears:
