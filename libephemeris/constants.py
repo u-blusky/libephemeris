@@ -95,6 +95,94 @@ NAIF_ORCUS: int = 2090482  # 90482 Orcus
 NAIF_QUAOAR: int = 2050000  # 50000 Quaoar
 
 # =============================================================================
+# SPK BODY NAME MAPPING
+# =============================================================================
+# Mapping from libephemeris body IDs (SE_*) to JPL Horizons target designations.
+# This is used for automatic SPK downloads. The tuple contains:
+#   (horizons_id: str, naif_id: int)
+# where horizons_id is the identifier used in JPL Horizons queries (typically
+# the asteroid catalog number), and naif_id is the NAIF SPICE ID.
+
+SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
+    SE_CHIRON: ("2060", NAIF_CHIRON),  # 2060 Chiron (centaur)
+    SE_PHOLUS: ("5145", NAIF_PHOLUS),  # 5145 Pholus (centaur)
+    SE_CERES: ("1", NAIF_CERES),  # 1 Ceres (dwarf planet)
+    SE_PALLAS: ("2", NAIF_PALLAS),  # 2 Pallas (main belt asteroid)
+    SE_JUNO: ("3", NAIF_JUNO),  # 3 Juno (main belt asteroid)
+    SE_VESTA: ("4", NAIF_VESTA),  # 4 Vesta (main belt asteroid)
+    SE_ERIS: ("136199", NAIF_ERIS),  # 136199 Eris (dwarf planet)
+    SE_SEDNA: ("90377", NAIF_SEDNA),  # 90377 Sedna (detached TNO)
+    SE_HAUMEA: ("136108", NAIF_HAUMEA),  # 136108 Haumea (dwarf planet)
+    SE_MAKEMAKE: ("136472", NAIF_MAKEMAKE),  # 136472 Makemake (dwarf planet)
+    SE_IXION: ("28978", NAIF_IXION),  # 28978 Ixion (plutino)
+    SE_ORCUS: ("90482", NAIF_ORCUS),  # 90482 Orcus (plutino)
+    SE_QUAOAR: ("50000", NAIF_QUAOAR),  # 50000 Quaoar (classical KBO)
+    SE_VARUNA: ("20000", 2020000),  # 20000 Varuna (classical KBO)
+}
+
+
+def get_horizons_id(ipl: int) -> "str | None":
+    """
+    Get the JPL Horizons target identifier for a libephemeris body ID.
+
+    Args:
+        ipl: libephemeris body ID (e.g., SE_CHIRON, SE_ERIS)
+
+    Returns:
+        The Horizons target identifier as a string (e.g., "2060" for Chiron),
+        or None if the body is not in the mapping.
+
+    Example:
+        >>> from libephemeris.constants import get_horizons_id, SE_CHIRON
+        >>> get_horizons_id(SE_CHIRON)
+        '2060'
+    """
+    if ipl in SPK_BODY_NAME_MAP:
+        return SPK_BODY_NAME_MAP[ipl][0]
+    return None
+
+
+def get_naif_id_from_ipl(ipl: int) -> "int | None":
+    """
+    Get the NAIF SPICE ID for a libephemeris body ID.
+
+    Args:
+        ipl: libephemeris body ID (e.g., SE_CHIRON, SE_ERIS)
+
+    Returns:
+        The NAIF ID (e.g., 2002060 for Chiron), or None if the body
+        is not in the mapping.
+
+    Example:
+        >>> from libephemeris.constants import get_naif_id_from_ipl, SE_CHIRON
+        >>> get_naif_id_from_ipl(SE_CHIRON)
+        2002060
+    """
+    if ipl in SPK_BODY_NAME_MAP:
+        return SPK_BODY_NAME_MAP[ipl][1]
+    return None
+
+
+def get_spk_body_info_from_map(ipl: int) -> "tuple[str, int] | None":
+    """
+    Get both Horizons ID and NAIF ID for a libephemeris body.
+
+    Args:
+        ipl: libephemeris body ID (e.g., SE_CHIRON, SE_ERIS)
+
+    Returns:
+        A tuple of (horizons_id, naif_id), or None if the body
+        is not in the mapping.
+
+    Example:
+        >>> from libephemeris.constants import get_spk_body_info_from_map, SE_ERIS
+        >>> get_spk_body_info_from_map(SE_ERIS)
+        ('136199', 2136199)
+    """
+    return SPK_BODY_NAME_MAP.get(ipl)
+
+
+# =============================================================================
 # VIRTUAL POINTS AND CALCULATED POSITIONS
 # =============================================================================
 
@@ -102,6 +190,56 @@ NAIF_QUAOAR: int = 2050000  # 50000 Quaoar
 SE_FIXSTAR_OFFSET: int = 1000000
 SE_REGULUS: int = SE_FIXSTAR_OFFSET + 1  # Alpha Leonis
 SE_SPICA_STAR: int = SE_FIXSTAR_OFFSET + 2  # Alpha Virginis
+SE_ALGOL: int = SE_FIXSTAR_OFFSET + 3  # Beta Persei
+SE_SIRIUS: int = SE_FIXSTAR_OFFSET + 4  # Alpha Canis Majoris
+SE_ALDEBARAN: int = SE_FIXSTAR_OFFSET + 5  # Alpha Tauri
+SE_ANTARES: int = SE_FIXSTAR_OFFSET + 6  # Alpha Scorpii
+SE_VEGA: int = SE_FIXSTAR_OFFSET + 7  # Alpha Lyrae
+SE_POLARIS: int = SE_FIXSTAR_OFFSET + 8  # Alpha Ursae Minoris
+SE_FOMALHAUT: int = SE_FIXSTAR_OFFSET + 9  # Alpha Piscis Austrini
+SE_BETELGEUSE: int = SE_FIXSTAR_OFFSET + 10  # Alpha Orionis
+SE_RIGEL: int = SE_FIXSTAR_OFFSET + 11  # Beta Orionis
+SE_PROCYON: int = SE_FIXSTAR_OFFSET + 12  # Alpha Canis Minoris
+SE_CAPELLA: int = SE_FIXSTAR_OFFSET + 13  # Alpha Aurigae
+SE_ARCTURUS: int = SE_FIXSTAR_OFFSET + 14  # Alpha Bootis
+SE_DENEB: int = SE_FIXSTAR_OFFSET + 15  # Alpha Cygni
+SE_POLLUX: int = SE_FIXSTAR_OFFSET + 16  # Beta Geminorum
+SE_CASTOR: int = SE_FIXSTAR_OFFSET + 17  # Alpha Geminorum
+SE_ALTAIR: int = SE_FIXSTAR_OFFSET + 18  # Alpha Aquilae
+SE_ACHERNAR: int = SE_FIXSTAR_OFFSET + 19  # Alpha Eridani
+SE_CANOPUS: int = SE_FIXSTAR_OFFSET + 20  # Alpha Carinae
+SE_ACRUX: int = SE_FIXSTAR_OFFSET + 21  # Alpha Crucis
+SE_MIMOSA: int = SE_FIXSTAR_OFFSET + 22  # Beta Crucis
+SE_GACRUX: int = SE_FIXSTAR_OFFSET + 23  # Gamma Crucis
+SE_HADAR: int = SE_FIXSTAR_OFFSET + 24  # Beta Centauri
+SE_RIGIL_KENT: int = SE_FIXSTAR_OFFSET + 25  # Alpha Centauri
+SE_SHAULA: int = SE_FIXSTAR_OFFSET + 26  # Lambda Scorpii
+SE_BELLATRIX: int = SE_FIXSTAR_OFFSET + 27  # Gamma Orionis
+SE_ELNATH: int = SE_FIXSTAR_OFFSET + 28  # Beta Tauri
+SE_MIRA: int = SE_FIXSTAR_OFFSET + 29  # Omicron Ceti
+SE_ALNILAM: int = SE_FIXSTAR_OFFSET + 30  # Epsilon Orionis
+SE_ALNITAK: int = SE_FIXSTAR_OFFSET + 31  # Zeta Orionis
+SE_MINTAKA: int = SE_FIXSTAR_OFFSET + 32  # Delta Orionis
+SE_SAIPH: int = SE_FIXSTAR_OFFSET + 33  # Kappa Orionis
+SE_DIPHDA: int = SE_FIXSTAR_OFFSET + 34  # Beta Ceti
+SE_ALPHARD: int = SE_FIXSTAR_OFFSET + 35  # Alpha Hydrae
+SE_RASALHAGUE: int = SE_FIXSTAR_OFFSET + 36  # Alpha Ophiuchi
+SE_ETAMIN: int = SE_FIXSTAR_OFFSET + 37  # Gamma Draconis
+SE_KOCHAB: int = SE_FIXSTAR_OFFSET + 38  # Beta Ursae Minoris
+SE_ALKAID: int = SE_FIXSTAR_OFFSET + 39  # Eta Ursae Majoris
+SE_DUBHE: int = SE_FIXSTAR_OFFSET + 40  # Alpha Ursae Majoris
+SE_MERAK: int = SE_FIXSTAR_OFFSET + 41  # Beta Ursae Majoris
+SE_ALIOTH: int = SE_FIXSTAR_OFFSET + 42  # Epsilon Ursae Majoris
+SE_MIZAR: int = SE_FIXSTAR_OFFSET + 43  # Zeta Ursae Majoris
+SE_ALCOR: int = SE_FIXSTAR_OFFSET + 44  # 80 Ursae Majoris
+SE_VINDEMIATRIX: int = SE_FIXSTAR_OFFSET + 45  # Epsilon Virginis
+SE_ZUBENELGENUBI: int = SE_FIXSTAR_OFFSET + 46  # Alpha Librae
+SE_ZUBENESCHAMALI: int = SE_FIXSTAR_OFFSET + 47  # Beta Librae
+SE_UNUKALHAI: int = SE_FIXSTAR_OFFSET + 48  # Alpha Serpentis
+SE_ALGIEBA: int = SE_FIXSTAR_OFFSET + 49  # Gamma Leonis
+SE_DENEBOLA: int = SE_FIXSTAR_OFFSET + 50  # Beta Leonis
+SE_MARKAB: int = SE_FIXSTAR_OFFSET + 51  # Alpha Pegasi
+SE_SCHEAT: int = SE_FIXSTAR_OFFSET + 52  # Beta Pegasi
 
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000

@@ -490,4 +490,9 @@ __all__ = [
     # Auto SPK download configuration
     "set_auto_spk_download",
     "get_auto_spk_download",
+    # SPK body name mapping
+    "SPK_BODY_NAME_MAP",
+    "get_horizons_id",
+    "get_naif_id_from_ipl",
+    "get_spk_body_info_from_map",
 ]
