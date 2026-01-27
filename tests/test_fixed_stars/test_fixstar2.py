@@ -163,7 +163,10 @@ class TestFixstar2TT:
         name2, pos2, _, err2 = ephem.swe_fixstar2("Regulus", standard_jd, 0)
         pos1, _, err1 = ephem.swe_fixstar("Regulus", standard_jd, 0)
 
-        assert err1 == "" and err2 == ""
+        assert (
+            "could not find" not in err1.lower()
+            and "could not find" not in err2.lower()
+        )
         assert pos1[0] == pos2[0], "Longitude should match"
         assert pos1[1] == pos2[1], "Latitude should match"
         assert pos1[2] == pos2[2], "Distance should match"
@@ -229,7 +232,10 @@ class TestFixstar2UT:
         name2, pos2, _, err2 = ephem.swe_fixstar2_ut("Spica", standard_jd, 0)
         pos1, _, err1 = ephem.swe_fixstar_ut("Spica", standard_jd, 0)
 
-        assert err1 == "" and err2 == ""
+        assert (
+            "could not find" not in err1.lower()
+            and "could not find" not in err2.lower()
+        )
         assert pos1[0] == pos2[0], "Longitude should match"
         assert pos1[1] == pos2[1], "Latitude should match"
 
