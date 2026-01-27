@@ -3419,23 +3419,17 @@ def lun_occult_when_glob(
         """Get target body's geocentric RA, Dec, and angular radius."""
         if planet == 0:
             # Fixed star
-            pos, retflag, err = swe_fixstar_ut(star_name, jd, flags)
-            if err:
-                raise ValueError(f"could not find star name {star_name.lower()}: {err}")
-            # For fixed stars, we need to convert ecliptic to equatorial
-            # swe_fixstar_ut returns ecliptic coordinates, but we need RA/Dec
-            # Use the planets module to get proper equatorial coords
-            t = ts.ut1_jd(jd)
-
             # Get star data and calculate equatorial position
             from .fixed_stars import FIXED_STARS
             from .fixed_stars import _resolve_star_id
 
-            star_id, _ = _resolve_star_id(star_name)
-            if star_id < 0:
-                raise ValueError(f"could not find star name {star_name.lower()}")
+            star_id, err, _ = _resolve_star_id(star_name)
+            if err is not None:
+                raise ValueError(err)
 
             star = FIXED_STARS[star_id]
+
+            t = ts.ut1_jd(jd)
 
             # Time from J2000.0
             t_years = (jd - 2451545.0) / 365.25
@@ -3821,9 +3815,9 @@ def lun_occult_when_loc(
 
         if planet == 0:
             # Fixed star - calculate alt/az from RA/Dec
-            star_id, _ = _resolve_star_id(star_name)
-            if star_id < 0:
-                raise ValueError(f"could not find star name {star_name.lower()}")
+            star_id, err, _ = _resolve_star_id(star_name)
+            if err is not None:
+                raise ValueError(err)
 
             star = FIXED_STARS[star_id]
 
@@ -3948,7 +3942,9 @@ def lun_occult_when_loc(
 
             if planet == 0:
                 # Fixed star
-                star_id, _ = _resolve_star_id(star_name)
+                star_id, err, _ = _resolve_star_id(star_name)
+                if err is not None:
+                    raise ValueError(err)
                 star = FIXED_STARS[star_id]
                 t_years = (jd_check - 2451545.0) / 365.25
                 ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
@@ -4200,9 +4196,9 @@ def lun_occult_where(
         """Get target body's geocentric RA, Dec, and angular radius."""
         if planet == 0:
             # Fixed star
-            star_id, _ = _resolve_star_id(star_name)
-            if star_id < 0:
-                raise ValueError(f"could not find star name {star_name.lower()}")
+            star_id, err, _ = _resolve_star_id(star_name)
+            if err is not None:
+                raise ValueError(err)
 
             star = FIXED_STARS[star_id]
 
@@ -4330,7 +4326,9 @@ def lun_occult_where(
 
         if planet == 0:
             # Fixed star
-            star_id, _ = _resolve_star_id(star_name)
+            star_id, err, _ = _resolve_star_id(star_name)
+            if err is not None:
+                raise ValueError(err)
             star = FIXED_STARS[star_id]
             t_years = (jd - 2451545.0) / 365.25
             ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0

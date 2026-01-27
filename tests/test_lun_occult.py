@@ -178,3 +178,34 @@ class TestLunOccultEdgeCases:
 
         with pytest.raises(ValueError):
             lun_occult_when_glob(jd_start, 999, "")  # Invalid planet ID
+
+
+class TestLunOccultResolveStarId:
+    """Regression tests for _resolve_star_id tuple unpacking fix.
+
+    These tests verify that _resolve_star_id returning 3 values
+    (star_id, error_message, canonical_name) is correctly handled
+    throughout the eclipse module.
+    """
+
+    def test_valid_star_does_not_raise_unpack_error(self):
+        """Test that valid star names don't cause unpacking errors.
+
+        Regression test for ValueError: too many values to unpack (expected 2).
+        The _resolve_star_id function returns 3 values, not 2.
+        """
+        jd_start = julday(2017, 1, 1, 0)
+
+        # This should not raise "ValueError: too many values to unpack"
+        times, ocl_type = lun_occult_when_glob(jd_start, 0, "Regulus")
+        assert times[0] > jd_start
+
+    def test_invalid_star_raises_value_error_with_message(self):
+        """Test that invalid stars raise ValueError with descriptive message."""
+        jd_start = julday(2017, 1, 1, 0)
+
+        with pytest.raises(ValueError) as exc_info:
+            lun_occult_when_glob(jd_start, 0, "InvalidStarXYZ123")
+
+        # Error message should mention the star name
+        assert "invalidstarxyz123" in str(exc_info.value).lower()
