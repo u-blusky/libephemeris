@@ -12,6 +12,7 @@ This document provides detailed information about the precision and limitations 
 | Moon position | ±5 arcsec | Relaxed due to lunar theory differences |
 | Jupiter, Saturn positions | ±5 arcsec | Outer planets |
 | Uranus, Neptune, Pluto | ±5 arcsec | Keplerian model limitations apply to Pluto |
+| True Lunar Node | ~0.07° (~260 arcsec) | Osculating orbital elements method |
 | House cusps | ±0.001° (~3.6 arcsec) | All 19 house systems |
 | Ayanamsha (standard) | ±0.01° | Fagan-Bradley, Lahiri, etc. |
 | Ayanamsha (star-based) | ±0.06° | True Citra, Galactic Center, etc. |
@@ -238,12 +239,14 @@ LibEphemeris uses different calculation models for some lunar points, resulting 
 
 | Point | Max Difference vs pyswisseph | Notes |
 |-------|------------------------------|-------|
-| Mean Node | <0.01° | High precision |
-| True Node | ~1-2° | Different oscillation model |
+| Mean Node | < 0.01° | High precision |
+| True Node | ~0.07° (~260 arcsec) | Osculating orbital elements method |
 | Mean Lilith | ~0.1° | Minor formula differences |
-| True Lilith | ~5-7° | Different orbital model |
+| True Lilith | ~5-15° | Different orbital model (see below) |
 
-**Note on True Node/Lilith**: The "True" (osculating) versions use simplified analytical formulas rather than full numerical integration. The differences are due to different perturbation terms included in the models. For most astrological purposes, Mean Node is preferred and has excellent precision.
+**Note on True Node**: The True Node calculation uses osculating orbital elements derived from the Moon's instantaneous position and velocity, with IAU 2006 precession correction. Mean error is ~0.02° (86 arcsec), max error ~0.07° (260 arcsec). For most astrological purposes, this precision is sufficient.
+
+**Note on True Lilith**: The True Lilith (osculating apogee) calculation uses the eccentricity vector method derived from JPL DE ephemeris state vectors. This differs fundamentally from Swiss Ephemeris which uses an integrated analytical lunar theory. The difference arises because the "osculating apogee" concept is model-dependent when solar perturbations are significant. Typical error is 5-15°, with occasional differences up to 25°. For applications requiring closer Swiss Ephemeris compatibility, use Mean Lilith instead.
 
 ### Asteroids
 

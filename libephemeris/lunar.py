@@ -1526,39 +1526,75 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     """
     Calculate True Lilith (osculating lunar apogee).
 
-    Computes the apogee of the instantaneous ellipse fitted to Moon's orbit,
-    using orbital elements derived from position/velocity state vectors.
+    Computes the osculating lunar apogee using the eccentricity vector method.
+    The eccentricity vector, derived from the Moon's instantaneous position
+    and velocity from JPL DE ephemeris, points toward perigee. The apogee
+    direction is 180° from perigee.
 
-    Algorithm:
-        1. Get Moon geocentric state vectors (r, v)
-        2. Compute eccentricity vector e = (v × h)/μ - r/|r|
-        3. Eccentricity vector points to perigee
-        4. Apogee = -e (opposite direction)
-        5. Convert to ecliptic longitude/latitude
+    Algorithm
+    =========
+
+    **Step 1: Obtain Moon State Vectors**
+        - Query JPL DE ephemeris via Skyfield
+        - Get geocentric position r and velocity v
+        - Reference frame: ICRS (equatorial)
+
+    **Step 2: Compute Eccentricity Vector**
+        - h = r × v (angular momentum)
+        - e = (v × h)/μ - r/|r| (points toward perigee)
+        - Apogee direction = -e (opposite to perigee)
+
+    **Step 3: Transform to Ecliptic**
+        - Rotate from ICRS equatorial to ecliptic coordinates
+        - Apply precession and nutation for true ecliptic of date
+
+    Physical Background
+    ==================
+
+    The osculating lunar apogee is the apogee direction of the instantaneous
+    Keplerian orbit that passes through the Moon's current position with its
+    current velocity. This differs from the mean apogee due to:
+
+    1. **Evection**: Solar perturbation modulates lunar eccentricity
+    2. **Variation**: Transverse solar tidal force at quadrature
+    3. **Annual Equation**: Earth's orbital eccentricity effect
+
+    The true apogee can vary ±30° from the mean apogee.
 
     Args:
-        jd_tt: Julian Day in Terrestrial Time (TT)
+        jd_tt: Julian Day in Terrestrial Time (TT).
 
     Returns:
-        Tuple[float, float, float]: (longitude, latitude, distance_scaled) where:
-            - longitude: Ecliptic longitude in degrees (0-360)
-            - latitude: Ecliptic latitude in degrees (typically < 5°)
-            - distance_scaled: Relative scale (eccentricity magnitude)
+        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+            - longitude: Ecliptic longitude of apogee in degrees [0, 360)
+            - latitude: Ecliptic latitude in degrees (small, typically < 5°)
+            - eccentricity: Orbital eccentricity magnitude (~0.055)
 
-    Precision:
-        Agreement with Swiss Ephemeris: < 0.01° for modern dates
-        May differ by 0.1° for complex perturbations
+    Precision
+    =========
 
-    Note:
-        True Lilith can vary ±10° from mean Lilith in days/weeks.
-        The osculating apogee is sensitive to momentary perturbations.
+    **Compared to Swiss Ephemeris:**
+        - Typical difference: 5-15°
+        - Maximum difference: ~25° at some epochs
 
-        μ (GM_Earth) = 398600.435436 km³/s² (IAU 2015 Resolution B3,
-        TDB-compatible, from DE440) converted to AU³/day²
+    The difference arises from different approaches:
+    - LibEphemeris: Osculating elements from JPL DE state vectors
+    - Swiss Ephemeris: Analytical lunar theory with integrated orbit
+
+    For applications requiring close Swiss Ephemeris compatibility,
+    consider using Mean Lilith (calc_mean_lilith) instead.
 
     References:
-        Eccentricity vector method: Vallado "Fundamentals of Astrodynamics"
+        - Vallado, D. "Fundamentals of Astrodynamics and Applications"
+        - Swiss Ephemeris documentation
     """
+    try:
+        import erfa
+
+        _HAS_ERFA = True
+    except ImportError:
+        _HAS_ERFA = False
+
     planets = get_planets()
     ts = get_timescale()
     t = ts.tt_jd(jd_tt)
@@ -1567,17 +1603,12 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     moon = planets["moon"]
 
     # Get geocentric Moon state vectors
-    moon_pos = moon.at(t).position.au
-    earth_pos = earth.at(t).position.au
-    r = moon_pos - earth_pos
-
-    moon_vel = moon.at(t).velocity.au_per_d
-    earth_vel = earth.at(t).velocity.au_per_d
-    v = moon_vel - earth_vel
+    moon_obs = (moon - earth).at(t)
+    r = moon_obs.position.au
+    v = moon_obs.velocity.au_per_d
 
     # Calculate magnitudes
-    r_mag = math.sqrt(sum(x**2 for x in r))
-    v_mag = math.sqrt(sum(x**2 for x in v))
+    r_mag = math.sqrt(r[0] ** 2 + r[1] ** 2 + r[2] ** 2)
 
     # Specific angular momentum h = r × v
     h_vec = [
@@ -1585,13 +1616,9 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
         r[2] * v[0] - r[0] * v[2],
         r[0] * v[1] - r[1] * v[0],
     ]
-    h_mag = math.sqrt(sum(x**2 for x in h_vec))
 
-    # FIXME: Precision - Using standard gravitational parameter for Earth
-    # This assumes 2-body problem (Earth-Moon). For highest precision,
-    # account for Sun's perturbations via 3-body dynamics.
     # GM_Earth in AU³/day² (converted from km³/s²)
-    # IAU 2015 Resolution B3, TDB-compatible value from DE440 ephemeris
+    # IAU 2015 Resolution B3, TDB-compatible value
     mu = 398600.435436 / (149597870.7**3) * (86400**2)
 
     # Eccentricity vector e = (v × h)/μ - r/|r| (points toward perigee)
@@ -1601,24 +1628,57 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
         (v[0] * h_vec[1] - v[1] * h_vec[0]) / mu - r[2] / r_mag,
     ]
 
+    e_mag = math.sqrt(e_vec[0] ** 2 + e_vec[1] ** 2 + e_vec[2] ** 2)
+
     # Apogee is opposite to perigee (180° from eccentricity vector)
     apogee_vec = [-e for e in e_vec]
 
-    # Dynamic mean obliquity (IAU 2006) - varies with time due to precession
-    eps = _mean_obliquity_radians(jd_tt)
+    # Use J2000 obliquity for transformation to J2000 ecliptic
+    J2000_OBLIQUITY_RAD = 0.4090928042223415  # 84381.406 arcsec in radians
 
-    # Rotate from ICRS (equatorial) to ecliptic coordinates
+    if _HAS_ERFA:
+        eps_j2000 = erfa.obl06(2451545.0, 0.0)
+    else:
+        eps_j2000 = J2000_OBLIQUITY_RAD
+
+    cos_eps = math.cos(eps_j2000)
+    sin_eps = math.sin(eps_j2000)
+
+    # Rotate from ICRS (equatorial) to J2000 ecliptic coordinates
     apogee_ecl = [
         apogee_vec[0],
-        apogee_vec[1] * math.cos(eps) + apogee_vec[2] * math.sin(eps),
-        -apogee_vec[1] * math.sin(eps) + apogee_vec[2] * math.cos(eps),
+        apogee_vec[1] * cos_eps + apogee_vec[2] * sin_eps,
+        -apogee_vec[1] * sin_eps + apogee_vec[2] * cos_eps,
     ]
 
-    # Convert to spherical coordinates
-    lon = math.degrees(math.atan2(apogee_ecl[1], apogee_ecl[0])) % 360.0
+    # Convert to spherical coordinates (J2000 ecliptic)
+    lon_j2000 = math.degrees(math.atan2(apogee_ecl[1], apogee_ecl[0])) % 360.0
     lat = math.degrees(
-        math.asin(apogee_ecl[2] / math.sqrt(sum(x**2 for x in apogee_ecl)))
+        math.asin(
+            apogee_ecl[2]
+            / math.sqrt(apogee_ecl[0] ** 2 + apogee_ecl[1] ** 2 + apogee_ecl[2] ** 2)
+        )
     )
-    dist = math.sqrt(sum(x**2 for x in apogee_ecl))
 
-    return lon, lat, dist
+    # Apply precession from J2000 to ecliptic of date
+    T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000
+
+    if _HAS_ERFA:
+        result = erfa.p06e(jd_tt, 0.0)
+        psi_a = result[1]  # Luni-solar precession
+
+        # Apply precession correction
+        lon_date = lon_j2000 + math.degrees(psi_a)
+    else:
+        # Fallback: Lieske precession formula
+        psi_a = (5029.0966 * T + 1.1120 * T**2 - 0.000006 * T**3) / 3600.0
+        lon_date = lon_j2000 + psi_a
+
+    # Apply nutation correction for true ecliptic of date
+    dpsi_rad, deps_rad = iau2000a_radians(t)
+    lon_date += math.degrees(dpsi_rad)
+
+    # Normalize to [0, 360)
+    longitude = lon_date % 360.0
+
+    return longitude, lat, e_mag
