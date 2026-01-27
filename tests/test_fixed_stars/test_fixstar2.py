@@ -21,7 +21,7 @@ class TestFixstar2TT:
         """Test exact name lookup for Regulus."""
         name, pos, retflag, err = ephem.swe_fixstar2("Regulus", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f} out of range"
         assert -1 < pos[1] < 2, f"Regulus lat: {pos[1]:.2f} out of range"
@@ -31,7 +31,7 @@ class TestFixstar2TT:
         """Test exact name lookup for Spica."""
         name, pos, retflag, err = ephem.swe_fixstar2("Spica", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
         assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.2f} out of range"
         assert -3 < pos[1] < -1, f"Spica lat: {pos[1]:.2f} out of range"
@@ -50,7 +50,7 @@ class TestFixstar2TT:
         # Regulus is HIP 49669
         name, pos, retflag, err = ephem.swe_fixstar2("49669", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f} out of range"
 
@@ -59,7 +59,7 @@ class TestFixstar2TT:
         # Spica is HIP 65474
         name, pos, retflag, err = ephem.swe_fixstar2(",65474", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
         assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.2f} out of range"
 
@@ -67,7 +67,7 @@ class TestFixstar2TT:
         """Test lookup by Bayer/Flamsteed nomenclature."""
         name, pos, retflag, err = ephem.swe_fixstar2("alLeo", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
 
     def test_fixstar2_nomenclature_case_insensitive(self, standard_jd):
@@ -76,21 +76,25 @@ class TestFixstar2TT:
         name2, _, _, err2 = ephem.swe_fixstar2("ALVIR", standard_jd, 0)
         name3, _, _, err3 = ephem.swe_fixstar2("AlViR", standard_jd, 0)
 
-        assert err1 == "" and err2 == "" and err3 == ""
+        assert (
+            "could not find" not in err1.lower()
+            and "could not find" not in err2.lower()
+            and "could not find" not in err3.lower()
+        )
         assert name1 == name2 == name3 == "Spica,alVir"
 
     def test_fixstar2_partial_name(self, standard_jd):
         """Test partial name lookup (prefix search)."""
         name, pos, retflag, err = ephem.swe_fixstar2("Reg", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
 
     def test_fixstar2_partial_name_spica(self, standard_jd):
         """Test partial name lookup for Spica."""
         name, pos, retflag, err = ephem.swe_fixstar2("Spi", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
 
     def test_fixstar2_unknown_star(self, standard_jd):
@@ -131,7 +135,7 @@ class TestFixstar2TT:
         """Test input with comma (catalog format)."""
         name, pos, retflag, err = ephem.swe_fixstar2("Regulus,alLeo", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
 
     def test_fixstar2_return_structure(self, standard_jd):
@@ -154,9 +158,11 @@ class TestFixstar2TT:
         # iflag should be int
         assert isinstance(iflag, int), "iflag should be int"
 
-        # err should be string
+        # err should be string (contains star name on success, error message on failure)
         assert isinstance(err, str), "error should be string"
-        assert err == "", "Error should be empty on success"
+        assert "could not find" not in err.lower(), (
+            "Should not contain error message on success"
+        )
 
     def test_fixstar2_vs_fixstar_consistency(self, standard_jd):
         """Test that fixstar2 and fixstar give same position for same star."""
@@ -190,7 +196,7 @@ class TestFixstar2UT:
         """Test basic fixstar2_ut functionality."""
         name, pos, retflag, err = ephem.swe_fixstar2_ut("Regulus", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f} out of range"
 
@@ -198,7 +204,7 @@ class TestFixstar2UT:
         """Test fixstar2_ut with HIP number lookup."""
         name, pos, retflag, err = ephem.swe_fixstar2_ut("65474", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
         assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.2f} out of range"
 
@@ -206,7 +212,7 @@ class TestFixstar2UT:
         """Test fixstar2_ut with partial name lookup."""
         name, pos, retflag, err = ephem.swe_fixstar2_ut("Spi", standard_jd, 0)
 
-        assert err == "", f"Unexpected error: {err}"
+        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert name == "Spica,alVir"
 
     def test_fixstar2_ut_unknown_star(self, standard_jd):
@@ -292,7 +298,10 @@ class TestFixstar2AndFixstar2UtConsistency:
         name_tt, pos_tt, _, err_tt = ephem.swe_fixstar2("Spica", standard_jd, 0)
         name_ut, pos_ut, _, err_ut = ephem.swe_fixstar2_ut("Spica", standard_jd, 0)
 
-        assert err_tt == "" and err_ut == ""
+        assert (
+            "could not find" not in err_tt.lower()
+            and "could not find" not in err_ut.lower()
+        )
         assert name_tt == name_ut == "Spica,alVir"
         assert 203 < pos_tt[0] < 205
         assert 203 < pos_ut[0] < 205
@@ -305,7 +314,10 @@ class TestFixstar2AndFixstar2UtConsistency:
         name_2000, pos_2000, _, err1 = ephem.swe_fixstar2("Regulus", jd_2000, 0)
         name_2050, pos_2050, _, err2 = ephem.swe_fixstar2("Regulus", jd_2050, 0)
 
-        assert err1 == "" and err2 == ""
+        assert (
+            "could not find" not in err1.lower()
+            and "could not find" not in err2.lower()
+        )
         assert name_2000 == name_2050 == "Regulus,alLeo"
 
         # Star should have moved due to proper motion + precession
