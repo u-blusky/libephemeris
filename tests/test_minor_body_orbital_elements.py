@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 27 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 28 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -38,6 +38,7 @@ from libephemeris.constants import (
     SE_PSYCHE,
     SE_EROS,
     SE_AMOR,
+    SE_ICARUS,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -82,6 +83,7 @@ def all_minor_body_ids():
         SE_PSYCHE,
         SE_EROS,
         SE_AMOR,
+        SE_ICARUS,
     ]
 
 
@@ -98,9 +100,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 27 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 27, (
-            f"Expected 27 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 28 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 28, (
+            f"Expected 28 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -427,6 +429,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 11.5 < elements.i < 12.5, f"Amor i={elements.i} unexpected"
         # Mean motion consistent with ~2.66 year period (972 days)
         assert 0.36 < elements.n < 0.38, f"Amor n={elements.n} unexpected"
+
+    def test_icarus_apollo_asteroid(self):
+        """Icarus: Apollo asteroid with highly eccentric orbit reaching inside Mercury."""
+        elements = MINOR_BODY_ELEMENTS[SE_ICARUS]
+        assert elements.name == "Icarus"
+        # Semi-major axis ~1.08 AU (Apollo-class NEA)
+        assert 1.07 < elements.a < 1.09, f"Icarus a={elements.a} unexpected"
+        # Very high eccentricity ~0.83 (perihelion at ~0.19 AU, inside Mercury's orbit)
+        assert 0.82 < elements.e < 0.84, f"Icarus e={elements.e} unexpected"
+        # Moderate inclination ~22.8 degrees
+        assert 22.0 < elements.i < 24.0, f"Icarus i={elements.i} unexpected"
+        # Mean motion consistent with ~1.12 year period (409 days)
+        assert 0.87 < elements.n < 0.89, f"Icarus n={elements.n} unexpected"
 
 
 @pytest.mark.unit

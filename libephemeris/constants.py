@@ -106,6 +106,9 @@ SE_EROS: int = (
 SE_AMOR: int = (
     1221 + SE_AST_OFFSET
 )  # 1221 Amor (prototype of the Amor near-Earth asteroid class)
+SE_ICARUS: int = (
+    1566 + SE_AST_OFFSET
+)  # 1566 Icarus (Apollo asteroid, highly eccentric orbit reaches inside Mercury)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS

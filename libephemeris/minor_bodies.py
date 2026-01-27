@@ -5,7 +5,7 @@ This module computes positions for:
 - Main belt asteroids: Ceres, Pallas, Juno, Vesta, Hygiea, Interamnia, Davida, Europa, Sylvia, Psyche
 - Centaurs: Chiron, Pholus, Nessus, Asbolus, Chariklo
 - Trans-Neptunian Objects (TNOs): Eris, Sedna, Haumea, Makemake, Orcus, Quaoar, Ixion, Gonggong, Varuna
-- Near-Earth asteroids: Apophis, Eros
+- Near-Earth asteroids: Apophis, Eros, Amor, Icarus
 
 Method: Keplerian orbital elements with first-order secular perturbations from
 Jupiter, Saturn, Uranus, and Neptune. This provides significantly improved accuracy over pure
@@ -61,6 +61,7 @@ from .constants import (
     SE_PSYCHE,
     SE_EROS,
     SE_AMOR,
+    SE_ICARUS,
 )
 
 
@@ -1022,6 +1023,17 @@ MINOR_BODY_ELEMENTS = {
         Omega=171.2371875175307,
         M0=59.87048521279021,
         n=0.3705181485730381,  # ~2.66 year period (972 days)
+    ),
+    SE_ICARUS: OrbitalElements(
+        name="Icarus",
+        epoch=2461000.5,
+        a=1.078037837567316,  # Apollo asteroid (~1.4 km, perihelion inside Mercury's orbit)
+        e=0.8270056908369543,  # Very high eccentricity (q=0.19 AU, Q=1.97 AU)
+        i=22.8032205675089,  # Moderate inclination
+        omega=31.43821652068713,
+        Omega=87.95241724594092,
+        M0=153.0789301425594,
+        n=0.8805480660198883,  # ~1.12 year period (409 days)
     ),
 }
 
