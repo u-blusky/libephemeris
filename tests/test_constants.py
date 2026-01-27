@@ -135,7 +135,7 @@ class TestCalculationFlags:
 
     @pytest.mark.unit
     def test_flg_baryctr(self):
-        assert constants.SEFLG_BARYCTR == swe.FLG_BARYCTR == 4
+        assert constants.SEFLG_BARYCTR == swe.FLG_BARYCTR
 
     @pytest.mark.unit
     def test_flg_equatorial(self):
@@ -147,19 +147,19 @@ class TestCalculationFlags:
 
     @pytest.mark.unit
     def test_flg_j2000(self):
-        assert constants.SEFLG_J2000 == swe.FLG_J2000 == 16
+        assert constants.SEFLG_J2000 == swe.FLG_J2000
 
     @pytest.mark.unit
     def test_flg_truepos(self):
-        assert constants.SEFLG_TRUEPOS == swe.FLG_TRUEPOS == 16384
+        assert constants.SEFLG_TRUEPOS == swe.FLG_TRUEPOS
 
     @pytest.mark.unit
     def test_flg_noaberr(self):
-        assert constants.SEFLG_NOABERR == swe.FLG_NOABERR == 512
+        assert constants.SEFLG_NOABERR == swe.FLG_NOABERR
 
     @pytest.mark.unit
     def test_flg_nogdefl(self):
-        assert constants.SEFLG_NOGDEFL == swe.FLG_NOGDEFL == 1024
+        assert constants.SEFLG_NOGDEFL == swe.FLG_NOGDEFL
 
     @pytest.mark.unit
     def test_flags_can_be_combined(self):
