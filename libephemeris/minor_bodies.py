@@ -5,6 +5,7 @@ This module computes positions for:
 - Main belt asteroids: Ceres, Pallas, Juno, Vesta
 - Centaurs: Chiron, Pholus, Nessus, Asbolus, Chariklo
 - Trans-Neptunian Objects (TNOs): Eris, Sedna, Haumea, Makemake, Orcus, Quaoar, Ixion, Gonggong, Varuna
+- Near-Earth asteroids: Apophis
 
 Method: Keplerian orbital elements with first-order secular perturbations from
 Jupiter, Saturn, Uranus, and Neptune. This provides significantly improved accuracy over pure
@@ -51,6 +52,7 @@ from .constants import (
     SE_CHARIKLO,
     SE_GONGGONG,
     SE_VARUNA,
+    SE_APOPHIS,
 )
 
 
@@ -908,6 +910,21 @@ MINOR_BODY_ELEMENTS = {
         Omega=97.21030234100793,
         M0=115.0289798413239,
         n=0.003473815549791981,  # ~284 year period
+    ),
+    # Near-Earth Asteroids (NEAs)
+    # NOTE: Apophis orbital elements change measurably with each refinement due to
+    # close Earth approaches in 2029 and 2036. These elements are from JPL SBDB
+    # solution 220 (2024-06-25). For critical applications, use SPK files.
+    SE_APOPHIS: OrbitalElements(
+        name="Apophis",
+        epoch=2461000.5,
+        a=0.9223803173917017,  # Aten-class NEA (~0.34 km diameter)
+        e=0.1911663355386932,  # Moderate eccentricity
+        i=3.340958441017069,  # Low inclination
+        omega=126.6728325163065,
+        Omega=203.8996515621043,
+        M0=312.8054663584516,
+        n=1.11259994308075,  # ~0.89 year period, close approach 2029-04-13
     ),
 }
 

@@ -81,6 +81,7 @@ BODY_SBDB_IDS: dict[str, str] = {
     "Asbolus": "8405",  # 8405 Asbolus (centaur)
     "Chariklo": "10199",  # 10199 Chariklo (centaur)
     "Gonggong": "225088",  # 225088 Gonggong (TNO, dwarf planet candidate)
+    "Apophis": "99942",  # 99942 Apophis (Near-Earth asteroid)
 }
 
 

@@ -87,6 +87,7 @@ SE_CHARIKLO: int = 10199 + SE_AST_OFFSET  # Centaur, largest known, has ring sys
 SE_GONGGONG: int = (
     225088 + SE_AST_OFFSET
 )  # TNO, dwarf planet candidate (formerly 2007 OR10)
+SE_APOPHIS: int = 99942 + SE_AST_OFFSET  # Near-Earth asteroid, close approach 2029
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
@@ -115,6 +116,7 @@ NAIF_NESSUS: int = 2007066  # 7066 Nessus (Centaur)
 NAIF_ASBOLUS: int = 2008405  # 8405 Asbolus (Centaur)
 NAIF_CHARIKLO: int = 2010199  # 10199 Chariklo (Centaur, largest, has rings)
 NAIF_GONGGONG: int = 2225088  # 225088 Gonggong (TNO, dwarf planet candidate)
+NAIF_APOPHIS: int = 2099942  # 99942 Apophis (Near-Earth asteroid)
 
 # =============================================================================
 # SPK BODY NAME MAPPING
@@ -147,6 +149,7 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
         "225088",
         NAIF_GONGGONG,
     ),  # 225088 Gonggong (TNO, dwarf planet candidate)
+    SE_APOPHIS: ("99942", NAIF_APOPHIS),  # 99942 Apophis (Near-Earth asteroid)
 }
 
 

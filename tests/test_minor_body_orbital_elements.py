@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 18 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 19 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -29,6 +29,7 @@ from libephemeris.constants import (
     SE_CHARIKLO,
     SE_GONGGONG,
     SE_VARUNA,
+    SE_APOPHIS,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -64,6 +65,7 @@ def all_minor_body_ids():
         SE_CHARIKLO,
         SE_GONGGONG,
         SE_VARUNA,
+        SE_APOPHIS,
     ]
 
 
@@ -80,9 +82,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 18 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 18, (
-            f"Expected 18 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 19 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 19, (
+            f"Expected 19 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -292,6 +294,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 16.5 < elements.i < 18.0, f"Varuna i={elements.i} unexpected"
         # Mean motion consistent with ~284 year period
         assert 0.003 < elements.n < 0.004, f"Varuna n={elements.n} unexpected"
+
+    def test_apophis_near_earth_asteroid(self):
+        """Apophis: Near-Earth asteroid with close approach in 2029."""
+        elements = MINOR_BODY_ELEMENTS[SE_APOPHIS]
+        assert elements.name == "Apophis"
+        # Semi-major axis ~0.92 AU (Aten-class NEA, crosses Earth's orbit)
+        assert 0.91 < elements.a < 0.93, f"Apophis a={elements.a} unexpected"
+        # Moderate eccentricity
+        assert 0.18 < elements.e < 0.20, f"Apophis e={elements.e} unexpected"
+        # Low inclination ~3.3 degrees
+        assert 3.0 < elements.i < 4.0, f"Apophis i={elements.i} unexpected"
+        # Fast mean motion (short orbital period ~0.89 years = 324 days)
+        assert 1.10 < elements.n < 1.15, f"Apophis n={elements.n} unexpected"
 
 
 @pytest.mark.unit
