@@ -1556,9 +1556,12 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     current velocity. This differs from the mean apogee due to:
 
     1. **Evection**: Solar perturbation modulates lunar eccentricity
+       (amplitude 1.274°, period ~31.8 days)
     2. **Variation**: Transverse solar tidal force at quadrature
+       (amplitude 0.658°, period ~14.77 days)
     3. **Annual Equation**: Earth's orbital eccentricity effect
 
+    Both evection and variation corrections are applied to improve accuracy.
     The true apogee can vary ±30° from the mean apogee.
 
     Args:
@@ -1701,6 +1704,30 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     evection_arg = 2.0 * D - M_prime
     evection_correction = 1.2739 * math.sin(evection_arg)
     lon_date += evection_correction
+
+    # ========================================================================
+    # VARIATION CORRECTION (period ~14.77 days, amplitude ~0.658°)
+    # ========================================================================
+    # The Variation is a major lunar perturbation discovered by Tycho Brahe,
+    # caused by the transverse component of the solar tidal force. It affects
+    # the Moon's longitude with maximum effect at quadrature (first/third quarter).
+    #
+    # The same solar perturbation that causes the variation in the Moon's
+    # longitude also affects the lunar apogee position. When the Moon is at
+    # quadrature (elongation 90° or 270°), the differential solar gravity
+    # creates a transverse force that shifts the apsidal line.
+    #
+    # Variation argument: 2D (twice the mean elongation)
+    # Period: synodic month / 2 ≈ 14.77 days
+    # Amplitude: 0.6583° (same as lunar longitude variation)
+    #
+    # References:
+    # - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+    # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
+    variation_arg = 2.0 * D
+    variation_correction = 0.6583 * math.sin(variation_arg)
+    lon_date += variation_correction
 
     # Normalize to [0, 360)
     longitude = lon_date % 360.0
