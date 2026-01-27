@@ -66,7 +66,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] VALIDATE TRUE LILITH VELOCITY: When SEFLG_SPEED is set, verify that True Lilith velocity is calculated correctly, the osculating apogee can move rapidly so velocity is important.
 
-- [ ] COMPARE TRUE LILITH CALCULATION METHODS: Research and document the exact method Swiss Ephemeris uses for the osculating apogee, it may use a different approach than the eccentricity vector method, document findings and adjust implementation accordingly.
+- [x] COMPARE TRUE LILITH CALCULATION METHODS: Research and document the exact method Swiss Ephemeris uses for the osculating apogee, it may use a different approach than the eccentricity vector method, document findings and adjust implementation accordingly. COMPLETED: Swiss Ephemeris uses the same fundamental approach (computing osculating orbital elements from Moon's position and speed vectors). The 5-15 degree differences arise from different ephemeris sources, perturbation treatment, and the inherent ambiguity of the osculating apogee concept. Full documentation in docs/TRUE_LILITH_METHODS.md.
 
 ---
 
