@@ -1578,11 +1578,18 @@ def swe_sol_eclipse_where(
 
     Returns:
         Tuple containing:
-            - geopos: Tuple of 3 floats with geographic position:
-                [0]: Geographic longitude (degrees, East positive)
-                [1]: Geographic latitude (degrees, North positive)
-                [2]: Always 0 (reserved for altitude)
-            - attr: Tuple of 8+ floats with eclipse attributes:
+            - geopos: Tuple of 10 floats with geographic position per pyswisseph:
+                [0]: Geographic longitude of central line (degrees, East positive)
+                [1]: Geographic latitude of central line (degrees, North positive)
+                [2]: Longitude of northern limit of umbra
+                [3]: Latitude of northern limit of umbra
+                [4]: Longitude of southern limit of umbra
+                [5]: Latitude of southern limit of umbra
+                [6]: Longitude of northern limit of penumbra
+                [7]: Latitude of northern limit of penumbra
+                [8]: Longitude of southern limit of penumbra
+                [9]: Latitude of southern limit of penumbra
+            - attr: Tuple of 20 floats with eclipse attributes per pyswisseph:
                 [0]: Fraction of solar diameter covered by Moon (magnitude)
                 [1]: Ratio of lunar diameter to solar diameter
                 [2]: Fraction of Sun's area obscured (obscuration)
@@ -1591,6 +1598,7 @@ def swe_sol_eclipse_where(
                 [5]: True altitude of Sun at central line (degrees)
                 [6]: Apparent altitude with refraction (degrees)
                 [7]: Angular distance Moon center from Sun center (degrees)
+                [8-19]: Reserved for future use
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
                 Returns 0 if no central eclipse at this time
 
@@ -1803,12 +1811,62 @@ def swe_sol_eclipse_where(
         path_width_km = max(0.0, min(1000.0, path_width_km))
 
     except Exception:
-        # If calculation fails, return zeros
-        return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
+        # If calculation fails, return zeros (10-element geopos, 20-element attr)
+        return (
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            (
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ),
+            0,
+        )
 
     # Determine eclipse type flags
     if magnitude <= 0:
-        return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
+        return (
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            (
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ),
+            0,
+        )
 
     eclipse_type = 0
     if is_central and separation <= abs(local_moon_radius - local_sun_radius):
@@ -1823,10 +1881,43 @@ def swe_sol_eclipse_where(
         eclipse_type |= SE_ECL_PARTIAL
 
     # Prepare return tuples (pyswisseph format)
-    # geopos: [longitude, latitude, 0]
-    geopos = (central_lon, central_lat, 0.0)
+    # geopos: 10 floats per pyswisseph documentation
+    # [0] longitude central line
+    # [1] latitude central line
+    # [2] lon northern limit umbra
+    # [3] lat northern limit umbra
+    # [4] lon southern limit umbra
+    # [5] lat southern limit umbra
+    # [6] lon northern limit penumbra
+    # [7] lat northern limit penumbra
+    # [8] lon southern limit penumbra
+    # [9] lat southern limit penumbra
+    # Note: umbra/penumbra limit calculations require complex shadow geometry
+    # For now we provide the central line and zeros for limits (consistent with
+    # pyswisseph behavior when limits cannot be calculated)
+    geopos = (
+        central_lon,  # [0] longitude central line
+        central_lat,  # [1] latitude central line
+        0.0,  # [2] lon northern limit umbra
+        0.0,  # [3] lat northern limit umbra
+        0.0,  # [4] lon southern limit umbra
+        0.0,  # [5] lat southern limit umbra
+        0.0,  # [6] lon northern limit penumbra
+        0.0,  # [7] lat northern limit penumbra
+        0.0,  # [8] lon southern limit penumbra
+        0.0,  # [9] lat southern limit penumbra
+    )
 
-    # attr: [magnitude, ratio, obscuration, path_width, azimuth, true_alt, app_alt, separation]
+    # attr: 20 floats per pyswisseph documentation
+    # [0] Fraction of solar diameter covered by Moon (magnitude)
+    # [1] Ratio of lunar diameter to solar diameter
+    # [2] Fraction of solar disc area obscured (obscuration)
+    # [3] Width of totality/annularity path (km)
+    # [4] Sun's azimuth at central line (degrees)
+    # [5] True altitude of Sun at central line (degrees)
+    # [6] Apparent altitude with refraction (degrees)
+    # [7] Angular distance Moon center from Sun center (degrees)
+    # [8-19] Reserved for future use (zeros)
     attr = (
         magnitude,  # [0] Fraction of solar diameter covered
         local_ratio,  # [1] Moon/Sun diameter ratio
@@ -1836,6 +1927,18 @@ def swe_sol_eclipse_where(
         sun_altitude,  # [5] True altitude of sun
         apparent_alt,  # [6] Apparent altitude with refraction
         separation,  # [7] Angular distance Moon-Sun centers
+        0.0,  # [8] Reserved
+        0.0,  # [9] Reserved
+        0.0,  # [10] Reserved
+        0.0,  # [11] Reserved
+        0.0,  # [12] Reserved
+        0.0,  # [13] Reserved
+        0.0,  # [14] Reserved
+        0.0,  # [15] Reserved
+        0.0,  # [16] Reserved
+        0.0,  # [17] Reserved
+        0.0,  # [18] Reserved
+        0.0,  # [19] Reserved
     )
 
     return geopos, attr, eclipse_type

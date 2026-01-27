@@ -42,13 +42,12 @@ class TestSweSolEclipseWhereSignature:
 
         geopos, attr, retflag = swe_sol_eclipse_where(tjd_ut, SEFLG_SWIEPH)
 
-        # geopos should be 3-element tuple [lon, lat, 0]
-        assert len(geopos) == 3
+        # geopos should be 10-element tuple per pyswisseph documentation
+        assert len(geopos) == 10
         assert all(isinstance(g, float) for g in geopos)
-        assert geopos[2] == 0.0  # Third element should be 0
 
-        # attr should be at least 8-element tuple
-        assert len(attr) >= 8
+        # attr should be 20-element tuple per pyswisseph documentation
+        assert len(attr) == 20
         assert all(isinstance(a, float) for a in attr)
 
         # retflag should be int
@@ -60,9 +59,9 @@ class TestSweSolEclipseWhereSignature:
 
         geopos, attr, retflag = sol_eclipse_where(tjd_ut, SEFLG_SWIEPH)
 
-        # Should return same structure
-        assert len(geopos) == 3
-        assert len(attr) >= 8
+        # Should return same structure (10-element geopos, 20-element attr)
+        assert len(geopos) == 10
+        assert len(attr) == 20
 
 
 class TestSweSolEclipseWhereApril2024:

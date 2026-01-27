@@ -410,7 +410,7 @@ class TestSolEclipseWhere:
     """Tests for sol_eclipse_where function."""
 
     def test_returns_correct_tuple_sizes(self):
-        """Should return geopos tuple of 2 and attr tuple of 8 elements."""
+        """Should return geopos tuple of 10 and attr tuple of 20 elements per pyswisseph."""
         from libephemeris import sol_eclipse_where
 
         # First find an eclipse to get a valid time
@@ -419,8 +419,8 @@ class TestSolEclipseWhere:
 
         geopos, attr, ecl_type = sol_eclipse_where(times[0])
 
-        assert len(geopos) == 2
-        assert len(attr) == 8
+        assert len(geopos) == 10
+        assert len(attr) == 20
 
     def test_central_eclipse_returns_valid_position(self):
         """For central eclipse, should return valid geographic coordinates."""
@@ -434,7 +434,7 @@ class TestSolEclipseWhere:
 
         # If eclipse is central, we should get valid coordinates
         if ecl_type & SE_ECL_CENTRAL:
-            lon, lat = geopos
+            lon, lat = geopos[0], geopos[1]
             # Longitude should be -180 to 180
             assert -180 <= lon <= 180
             # Latitude should be -90 to 90
@@ -517,7 +517,7 @@ class TestSolEclipseWhere:
 
         # Should be a total eclipse
         if ecl_type & SE_ECL_TOTAL:
-            lon, lat = geopos
+            lon, lat = geopos[0], geopos[1]
             # The path crossed Mexico, US, and Eastern Canada
             # Central line was roughly around:
             # - Mexico: around 100W, 20-25N
