@@ -1632,6 +1632,197 @@ def clear_asteroid_elements_cache() -> int:
     return count
 
 
+# Cache for name-to-number lookups (asteroid_name_lower -> asteroid_number)
+_ASTEROID_NAME_CACHE: dict[str, int] = {}
+
+
+def _build_local_name_cache() -> None:
+    """
+    Build a lookup cache from asteroid names to their catalog numbers.
+
+    Populates the cache using bodies in MINOR_BODY_ELEMENTS and known mappings
+    for asteroids with dedicated SE_* constants (Chiron, Pholus, Ceres, etc.).
+    """
+    if _ASTEROID_NAME_CACHE:
+        return  # Already built
+
+    # Known mappings for bodies with dedicated SE_* constants
+    known_mappings = {
+        "chiron": 2060,
+        "pholus": 5145,
+        "ceres": 1,
+        "pallas": 2,
+        "juno": 3,
+        "vesta": 4,
+        "eris": 136199,
+        "sedna": 90377,
+        "haumea": 136108,
+        "makemake": 136472,
+        "ixion": 28978,
+        "orcus": 90482,
+        "quaoar": 50000,
+        "nessus": 7066,
+        "asbolus": 8405,
+        "chariklo": 10199,
+        "gonggong": 225088,
+        "varuna": 20000,
+        "apophis": 99942,
+        "hygiea": 10,
+        "interamnia": 704,
+        "davida": 511,
+        "europa": 52,  # Main belt asteroid, not Jupiter's moon
+        "sylvia": 87,
+        "psyche": 16,
+        "eros": 433,
+        "amor": 1221,
+        "icarus": 1566,
+        "toro": 1685,
+        "sappho": 80,
+        "pandora": 55,  # Main belt asteroid, not Saturn's moon
+        "lilith": 1181,  # Main belt asteroid, not lunar apogee Lilith
+        "hidalgo": 944,
+        "toutatis": 4179,
+        "itokawa": 25143,
+        "bennu": 101955,
+        "ryugu": 162173,
+    }
+
+    _ASTEROID_NAME_CACHE.update(known_mappings)
+
+
+def get_asteroid_number(name: str, timeout: float = 30.0) -> Optional[int]:
+    """
+    Look up an asteroid's catalog number by name.
+
+    This function is useful for users who know an asteroid's name but not its
+    catalog number. It first checks a local database of well-known asteroids,
+    then queries the JPL Small-Body Database (SBDB) API if not found locally.
+
+    Args:
+        name: The asteroid name to look up (case-insensitive).
+            Examples: "Ceres", "Eros", "Apophis", "Bennu", "Vesta"
+        timeout: Request timeout in seconds for SBDB API queries (default: 30)
+
+    Returns:
+        int: The asteroid catalog number if found, or None if not found.
+
+    Example:
+        >>> from libephemeris.minor_bodies import get_asteroid_number
+        >>> get_asteroid_number("Ceres")
+        1
+        >>> get_asteroid_number("Chiron")
+        2060
+        >>> get_asteroid_number("Apophis")
+        99942
+        >>> get_asteroid_number("Eros")
+        433
+
+    Notes:
+        - Local lookup is instant and doesn't require network access
+        - SBDB API query requires network access to ssd-api.jpl.nasa.gov
+        - Results from SBDB queries are cached for subsequent lookups
+        - The search is case-insensitive ("ceres", "Ceres", "CERES" all work)
+        - For ambiguous names (e.g., "Pandora" can be an asteroid or Saturn's
+          moon), this returns the asteroid catalog number
+
+    See Also:
+        calc_asteroid_by_number: Calculate position using the returned number
+        fetch_orbital_elements_from_sbdb: Get orbital elements by number
+    """
+    import json
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    # Normalize name for lookup
+    name_lower = name.strip().lower()
+
+    if not name_lower:
+        return None
+
+    # Build local cache if not done
+    _build_local_name_cache()
+
+    # Check local cache first
+    if name_lower in _ASTEROID_NAME_CACHE:
+        return _ASTEROID_NAME_CACHE[name_lower]
+
+    # Query JPL SBDB API by name
+    # The API accepts names in the sstr parameter
+    params = f"sstr={urllib.parse.quote(name)}&phys-par=false"
+    url = f"{SBDB_API_URL}?{params}"
+
+    try:
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "libephemeris/1.0 (Python)"},
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            data = json.loads(response.read().decode("utf-8"))
+
+        # Check for API errors
+        if "error" in data:
+            return None
+
+        # Extract object data
+        obj_data = data.get("object", {})
+
+        # Get the SPK-ID (asteroid number) from object data
+        # SBDB returns "spkid" for numbered objects or we can use "des" (designation)
+        spkid = obj_data.get("spkid")
+        if spkid:
+            try:
+                # SPK-ID format for asteroids: 2XXXXXX (2000000 + number)
+                spkid_int = int(spkid)
+                if spkid_int >= 2000000:
+                    asteroid_number = spkid_int - 2000000
+                else:
+                    # Some objects have direct SPK-IDs
+                    asteroid_number = spkid_int
+            except (ValueError, TypeError):
+                return None
+        else:
+            # Try to parse from designation
+            des = obj_data.get("des", "")
+            if des and des.isdigit():
+                asteroid_number = int(des)
+            else:
+                # Try fullname parsing - e.g., "1 Ceres" -> 1
+                fullname = obj_data.get("fullname", "")
+                parts = fullname.split()
+                if parts and parts[0].isdigit():
+                    asteroid_number = int(parts[0])
+                else:
+                    return None
+
+        # Cache the result for future lookups
+        _ASTEROID_NAME_CACHE[name_lower] = asteroid_number
+
+        return asteroid_number
+
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+        return None
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
+def clear_asteroid_name_cache() -> int:
+    """
+    Clear the cache of name-to-number lookups.
+
+    Returns:
+        int: Number of entries cleared from the cache.
+
+    Example:
+        >>> from libephemeris.minor_bodies import clear_asteroid_name_cache
+        >>> cleared = clear_asteroid_name_cache()
+        >>> print(f"Cleared {cleared} cached entries")
+    """
+    count = len(_ASTEROID_NAME_CACHE)
+    _ASTEROID_NAME_CACHE.clear()
+    return count
+
+
 def calc_asteroid_by_number(
     asteroid_number: int,
     jd_tt: float,

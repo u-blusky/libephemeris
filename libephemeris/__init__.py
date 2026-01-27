@@ -173,6 +173,8 @@ from .minor_bodies import (  # Generic asteroid lookup by number
     calc_asteroid_by_number,
     fetch_orbital_elements_from_sbdb,
     clear_asteroid_elements_cache,
+    get_asteroid_number,
+    clear_asteroid_name_cache,
 )
 
 
@@ -510,4 +512,10 @@ __all__ = [
     "get_horizons_id",
     "get_naif_id_from_ipl",
     "get_spk_body_info_from_map",
+    # Asteroid name lookup
+    "get_asteroid_number",
+    "clear_asteroid_name_cache",
+    "calc_asteroid_by_number",
+    "fetch_orbital_elements_from_sbdb",
+    "clear_asteroid_elements_cache",
 ]
