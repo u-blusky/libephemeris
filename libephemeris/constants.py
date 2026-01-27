@@ -88,6 +88,7 @@ SE_GONGGONG: int = (
     225088 + SE_AST_OFFSET
 )  # TNO, dwarf planet candidate (formerly 2007 OR10)
 SE_APOPHIS: int = 99942 + SE_AST_OFFSET  # Near-Earth asteroid, close approach 2029
+SE_HYGIEA: int = 10 + SE_AST_OFFSET  # Fourth largest asteroid, dwarf planet candidate
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
@@ -117,6 +118,9 @@ NAIF_ASBOLUS: int = 2008405  # 8405 Asbolus (Centaur)
 NAIF_CHARIKLO: int = 2010199  # 10199 Chariklo (Centaur, largest, has rings)
 NAIF_GONGGONG: int = 2225088  # 225088 Gonggong (TNO, dwarf planet candidate)
 NAIF_APOPHIS: int = 2099942  # 99942 Apophis (Near-Earth asteroid)
+NAIF_HYGIEA: int = (
+    2000010  # 10 Hygiea (fourth largest asteroid, dwarf planet candidate)
+)
 
 # =============================================================================
 # SPK BODY NAME MAPPING
@@ -150,6 +154,7 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
         NAIF_GONGGONG,
     ),  # 225088 Gonggong (TNO, dwarf planet candidate)
     SE_APOPHIS: ("99942", NAIF_APOPHIS),  # 99942 Apophis (Near-Earth asteroid)
+    SE_HYGIEA: ("10", NAIF_HYGIEA),  # 10 Hygiea (fourth largest asteroid)
 }
 
 
