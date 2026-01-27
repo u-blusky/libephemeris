@@ -100,6 +100,9 @@ SE_SYLVIA: int = (
 SE_PSYCHE: int = (
     16 + SE_AST_OFFSET
 )  # 16 Psyche (metallic M-type asteroid, NASA Psyche mission target)
+SE_EROS: int = (
+    433 + SE_AST_OFFSET
+)  # 433 Eros (near-Earth asteroid, NEAR Shoemaker mission target)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
@@ -132,6 +135,7 @@ NAIF_APOPHIS: int = 2099942  # 99942 Apophis (Near-Earth asteroid)
 NAIF_HYGIEA: int = (
     2000010  # 10 Hygiea (fourth largest asteroid, dwarf planet candidate)
 )
+NAIF_EROS: int = 2000433  # 433 Eros (near-Earth asteroid, NEAR Shoemaker mission)
 
 # =============================================================================
 # SPK BODY NAME MAPPING
@@ -166,6 +170,7 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
     ),  # 225088 Gonggong (TNO, dwarf planet candidate)
     SE_APOPHIS: ("99942", NAIF_APOPHIS),  # 99942 Apophis (Near-Earth asteroid)
     SE_HYGIEA: ("10", NAIF_HYGIEA),  # 10 Hygiea (fourth largest asteroid)
+    SE_EROS: ("433", NAIF_EROS),  # 433 Eros (near-Earth asteroid, NEAR Shoemaker)
 }
 
 

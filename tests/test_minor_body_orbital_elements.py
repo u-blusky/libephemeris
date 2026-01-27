@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 24 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 26 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -36,6 +36,7 @@ from libephemeris.constants import (
     SE_EUROPA_AST,
     SE_SYLVIA,
     SE_PSYCHE,
+    SE_EROS,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -78,6 +79,7 @@ def all_minor_body_ids():
         SE_EUROPA_AST,
         SE_SYLVIA,
         SE_PSYCHE,
+        SE_EROS,
     ]
 
 
@@ -94,9 +96,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 25 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 25, (
-            f"Expected 25 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 26 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 26, (
+            f"Expected 26 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -397,6 +399,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 2.5 < elements.i < 3.5, f"Psyche i={elements.i} unexpected"
         # Mean motion consistent with ~5.0 year period
         assert 0.19 < elements.n < 0.21, f"Psyche n={elements.n} unexpected"
+
+    def test_eros_near_earth_asteroid(self):
+        """Eros: Near-Earth asteroid, target of NEAR Shoemaker mission."""
+        elements = MINOR_BODY_ELEMENTS[SE_EROS]
+        assert elements.name == "Eros"
+        # Semi-major axis ~1.46 AU (Amor-class NEA, crosses Mars's orbit)
+        assert 1.45 < elements.a < 1.47, f"Eros a={elements.a} unexpected"
+        # Moderate eccentricity ~0.22
+        assert 0.21 < elements.e < 0.24, f"Eros e={elements.e} unexpected"
+        # Moderate inclination ~10.8 degrees
+        assert 10.5 < elements.i < 11.5, f"Eros i={elements.i} unexpected"
+        # Mean motion consistent with ~1.76 year period (643 days)
+        assert 0.55 < elements.n < 0.57, f"Eros n={elements.n} unexpected"
 
 
 @pytest.mark.unit

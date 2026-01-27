@@ -156,9 +156,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD SYLVIA ASTEROID TO CATALOG: Add asteroid 87 Sylvia to MINOR_BODY_ELEMENTS, Sylvia has two small moons (Romulus and Remus) making it a triple asteroid system, add SE_SYLVIA = 87 + SE_AST_OFFSET.
 
-- [ ] ADD PSYCHE ASTEROID TO CATALOG: Add asteroid 16 Psyche to MINOR_BODY_ELEMENTS, Psyche is a metallic M-type asteroid and the target of NASA's Psyche mission launching 2023, add SE_PSYCHE = 16 + SE_AST_OFFSET.
+- [x] ADD PSYCHE ASTEROID TO CATALOG: Add asteroid 16 Psyche to MINOR_BODY_ELEMENTS, Psyche is a metallic M-type asteroid and the target of NASA's Psyche mission launching 2023, add SE_PSYCHE = 16 + SE_AST_OFFSET.
 
-- [ ] ADD EROS ASTEROID TO CATALOG: Add asteroid 433 Eros to MINOR_BODY_ELEMENTS, Eros is a near-Earth asteroid visited by the NEAR Shoemaker spacecraft and of astrological interest representing passion, add SE_EROS = 433 + SE_AST_OFFSET.
+- [x] ADD EROS ASTEROID TO CATALOG: Add asteroid 433 Eros to MINOR_BODY_ELEMENTS, Eros is a near-Earth asteroid visited by the NEAR Shoemaker spacecraft and of astrological interest representing passion, add SE_EROS = 433 + SE_AST_OFFSET.
 
 - [ ] ADD AMOR ASTEROID TO CATALOG: Add asteroid 1221 Amor to MINOR_BODY_ELEMENTS, the prototype of the Amor near-Earth asteroid class, add SE_AMOR = 1221 + SE_AST_OFFSET.
 
