@@ -1563,9 +1563,11 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
        (amplitude 0.186°, period ~1 year)
     4. **Parallactic Inequality**: Effect of Moon's varying parallax
        (amplitude 0.125°, period ~29.53 days)
+    5. **Reduction to Ecliptic**: Projection effect from inclined lunar
+       orbital plane onto ecliptic (amplitude 0.116°, period ~4.5 years)
 
-    Evection, variation, annual equation, and parallactic inequality corrections
-    are applied to improve accuracy.
+    Evection, variation, annual equation, parallactic inequality, and reduction
+    to ecliptic corrections are applied to improve accuracy.
     The true apogee can vary ±30° from the mean apogee.
 
     Args:
@@ -1778,6 +1780,60 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
     parallactic_inequality_correction = 0.125 * math.sin(D)
     lon_date += parallactic_inequality_correction
+
+    # ========================================================================
+    # REDUCTION TO ECLIPTIC CORRECTION (period ~4.5 years, amplitude ~0.116°)
+    # ========================================================================
+    # The Reduction to Ecliptic is a geometric correction that accounts for
+    # the projection of the lunar apogee position from the inclined lunar
+    # orbital plane onto the ecliptic plane.
+    #
+    # Physical mechanism: The Moon's orbit is inclined approximately 5.145°
+    # to the ecliptic plane. The apsidal line (perigee-apogee line) lies in
+    # the lunar orbital plane, not in the ecliptic. When we project the apogee
+    # direction onto the ecliptic, the longitude is affected by this inclination.
+    #
+    # The reduction to ecliptic depends on where the apogee is relative to
+    # the lunar orbital nodes. When the apogee is at a node (crossing the
+    # ecliptic), there is no correction. When the apogee is 45° from a node
+    # (maximum latitude from ecliptic), the correction is maximum.
+    #
+    # Formula: Δλ = -tan²(i/2) × sin(2ω)
+    # where:
+    #   i = 5.145° (lunar orbital inclination to ecliptic)
+    #   ω = argument of perigee = F - M' (from lunar orbital elements)
+    #
+    # The argument of perigee ω is the angle from the ascending node to
+    # the perigee, measured in the orbital plane. Since:
+    #   F = L' - Ω (argument of latitude = mean longitude - node longitude)
+    #   M' = L' - ϖ' (mean anomaly = mean longitude - perigee longitude)
+    # we have: ω = ϖ' - Ω = F - M'
+    #
+    # Period: ~4.5 years (half the nodal regression period of ~18.6 years)
+    #   Rate of 2ω = 2(F - M') ≈ 2 × (1342.23° - 477.20°)/century
+    #                          ≈ 1730°/century ≈ 79.7°/year
+    #   Period = 360° / 79.7° ≈ 4.5 years
+    #
+    # Amplitude: tan²(i/2) × (180/π) = tan²(2.5725°) × 57.2958°
+    #            ≈ 0.00202 × 57.2958° ≈ 0.116° (about 7 arcminutes)
+    #
+    # References:
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+    # - Smart, W.M. "Textbook on Spherical Astronomy" (1977), Chapter 7
+    # - Roy, A.E. "Orbital Motion" (4th ed., 2005), Section 10.5
+    LUNAR_INCLINATION = math.radians(5.145)  # Lunar orbital inclination
+    tan_half_incl_sq = math.tan(LUNAR_INCLINATION / 2.0) ** 2  # ≈ 0.00202
+
+    # Argument of perigee: ω = F - M' (in radians, already computed)
+    omega_perigee = F - M_prime
+
+    # Reduction to ecliptic correction (in degrees)
+    # Negative sign because projection to ecliptic reduces longitude
+    # when apogee is north of ecliptic (positive argument) and vice versa
+    reduction_to_ecliptic = -math.degrees(
+        tan_half_incl_sq * math.sin(2.0 * omega_perigee)
+    )
+    lon_date += reduction_to_ecliptic
 
     # Normalize to [0, 360)
     longitude = lon_date % 360.0
