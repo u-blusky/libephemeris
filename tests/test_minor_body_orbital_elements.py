@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 28 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 29 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -39,6 +39,7 @@ from libephemeris.constants import (
     SE_EROS,
     SE_AMOR,
     SE_ICARUS,
+    SE_TORO,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -84,6 +85,7 @@ def all_minor_body_ids():
         SE_EROS,
         SE_AMOR,
         SE_ICARUS,
+        SE_TORO,
     ]
 
 
@@ -100,9 +102,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 28 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 28, (
-            f"Expected 28 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 29 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 29, (
+            f"Expected 29 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -442,6 +444,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 22.0 < elements.i < 24.0, f"Icarus i={elements.i} unexpected"
         # Mean motion consistent with ~1.12 year period (409 days)
         assert 0.87 < elements.n < 0.89, f"Icarus n={elements.n} unexpected"
+
+    def test_toro_apollo_asteroid(self):
+        """Toro: Apollo asteroid, near-Earth asteroid."""
+        elements = MINOR_BODY_ELEMENTS[SE_TORO]
+        assert elements.name == "Toro"
+        # Semi-major axis ~1.37 AU (Apollo-class NEA)
+        assert 1.36 < elements.a < 1.38, f"Toro a={elements.a} unexpected"
+        # Moderate eccentricity ~0.44 (perihelion at ~0.77 AU, aphelion at ~1.96 AU)
+        assert 0.43 < elements.e < 0.45, f"Toro e={elements.e} unexpected"
+        # Low inclination ~9.4 degrees
+        assert 9.0 < elements.i < 10.0, f"Toro i={elements.i} unexpected"
+        # Mean motion consistent with ~1.6 year period (584 days)
+        assert 0.61 < elements.n < 0.63, f"Toro n={elements.n} unexpected"
 
 
 @pytest.mark.unit

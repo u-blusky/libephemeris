@@ -109,6 +109,7 @@ SE_AMOR: int = (
 SE_ICARUS: int = (
     1566 + SE_AST_OFFSET
 )  # 1566 Icarus (Apollo asteroid, highly eccentric orbit reaches inside Mercury)
+SE_TORO: int = 1685 + SE_AST_OFFSET  # 1685 Toro (Apollo asteroid, near-Earth asteroid)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS

@@ -160,11 +160,11 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD EROS ASTEROID TO CATALOG: Add asteroid 433 Eros to MINOR_BODY_ELEMENTS, Eros is a near-Earth asteroid visited by the NEAR Shoemaker spacecraft and of astrological interest representing passion, add SE_EROS = 433 + SE_AST_OFFSET.
 
-- [ ] ADD AMOR ASTEROID TO CATALOG: Add asteroid 1221 Amor to MINOR_BODY_ELEMENTS, the prototype of the Amor near-Earth asteroid class, add SE_AMOR = 1221 + SE_AST_OFFSET.
+- [x] ADD AMOR ASTEROID TO CATALOG: Add asteroid 1221 Amor to MINOR_BODY_ELEMENTS, the prototype of the Amor near-Earth asteroid class, add SE_AMOR = 1221 + SE_AST_OFFSET.
 
-- [ ] ADD ICARUS ASTEROID TO CATALOG: Add asteroid 1566 Icarus to MINOR_BODY_ELEMENTS, an Apollo asteroid with very eccentric orbit that comes closer to the Sun than Mercury, add SE_ICARUS = 1566 + SE_AST_OFFSET.
+- [x] ADD ICARUS ASTEROID TO CATALOG: Add asteroid 1566 Icarus to MINOR_BODY_ELEMENTS, an Apollo asteroid with very eccentric orbit that comes closer to the Sun than Mercury, add SE_ICARUS = 1566 + SE_AST_OFFSET.
 
-- [ ] ADD TORO ASTEROID TO CATALOG: Add asteroid 1685 Toro to MINOR_BODY_ELEMENTS, add SE_TORO = 1685 + SE_AST_OFFSET.
+- [x] ADD TORO ASTEROID TO CATALOG: Add asteroid 1685 Toro to MINOR_BODY_ELEMENTS, add SE_TORO = 1685 + SE_AST_OFFSET.
 
 - [ ] ADD SAPPHO ASTEROID TO CATALOG: Add asteroid 80 Sappho to MINOR_BODY_ELEMENTS, used in some astrological traditions to represent artistic expression and same-sex love, add SE_SAPPHO = 80 + SE_AST_OFFSET.
 
