@@ -64,7 +64,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] VALIDATE TRUE LILITH LATITUDE: The True Lilith also has an ecliptic latitude component (unlike Mean Lilith which is always on the ecliptic), verify that the latitude calculation in calc_true_lilith (line 592-594) is correct by comparing against pyswisseph.
 
-- [ ] VALIDATE TRUE LILITH VELOCITY: When SEFLG_SPEED is set, verify that True Lilith velocity is calculated correctly, the osculating apogee can move rapidly so velocity is important.
+- [x] VALIDATE TRUE LILITH VELOCITY: When SEFLG_SPEED is set, verify that True Lilith velocity is calculated correctly, the osculating apogee can move rapidly so velocity is important.
 
 - [ ] COMPARE TRUE LILITH CALCULATION METHODS: Research and document the exact method Swiss Ephemeris uses for the osculating apogee, it may use a different approach than the eccentricity vector method, document findings and adjust implementation accordingly.
 
