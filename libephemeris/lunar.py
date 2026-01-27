@@ -2309,6 +2309,245 @@ def calc_true_lilith_orbital_elements(jd_tt: float) -> Tuple[float, float, float
     return longitude, lat, e_mag
 
 
+def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate the Interpolated (Natural) Lunar Apogee.
+
+    The interpolated apogee is a smoothed version of the osculating apogee that
+    removes the spurious short-period oscillations caused by the instantaneous
+    nature of osculating orbital elements. This is done by sampling the osculating
+    apogee at multiple points across the Moon's orbital period and fitting a
+    polynomial through these samples to extract the underlying "natural" motion.
+
+    Physical Background
+    ==================
+
+    The osculating apogee (True Lilith) is calculated from instantaneous orbital
+    elements that change rapidly due to solar perturbations. These rapid changes
+    create oscillations with periods shorter than the Moon's orbital period
+    (~27.3 days) that are computational artifacts rather than physically meaningful
+    motions of the actual apogee point.
+
+    The interpolated apogee removes these spurious oscillations by:
+    1. Sampling the osculating apogee at multiple points over ~1 lunar orbit
+    2. Fitting a polynomial through these samples
+    3. Evaluating the polynomial at the target time to get a smoothed position
+
+    This gives the "natural" apogee - the position that represents the true
+    apsidal line orientation averaged over the orbital perturbation cycle.
+
+    Algorithm
+    =========
+
+    **Step 1: Define Sampling Window**
+        - Use 15 sample points spanning approximately 1 lunar orbital period
+        - Half-window of ~13.5 days on each side of target time
+        - This captures one complete cycle of short-period perturbations
+
+    **Step 2: Sample Osculating Apogee Positions**
+        - Calculate the osculating apogee at each sample point
+        - Unwrap longitude to handle 0°/360° discontinuities
+
+    **Step 3: Polynomial Fit**
+        - Fit a 4th-degree polynomial to the sampled positions
+        - This smooths out oscillations with periods < half the window size
+
+    **Step 4: Evaluate at Target Time**
+        - Evaluate the polynomial at the target Julian Day
+        - This gives the interpolated (smoothed) apogee longitude
+
+    Comparison with Swiss Ephemeris
+    ===============================
+
+    Swiss Ephemeris uses a similar approach but with a more sophisticated
+    B-spline or Chebyshev polynomial method. The differences are:
+    - Polynomial degree and sampling strategy may differ
+    - Swiss Ephemeris may use pre-computed coefficient tables
+
+    Expected agreement: ~0.5-2° compared to Swiss Ephemeris SE_INTP_APOG
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
+
+    Returns:
+        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+            - longitude: Ecliptic longitude of interpolated apogee in degrees [0, 360)
+            - latitude: Ecliptic latitude in degrees (from central sample)
+            - eccentricity: Orbital eccentricity magnitude (from central sample)
+
+    References:
+        - Swiss Ephemeris documentation, section 2.2.4 "The Interpolated or
+          Natural Apogee and Perigee"
+        - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+    """
+    # Sampling parameters
+    # Use approximately one lunar orbital period (27.32 days) as the window
+    # 15 samples provide good polynomial fit while remaining computationally efficient
+    num_samples = 15
+    half_window_days = 13.5  # ~half a lunar orbital period
+
+    # Generate sample times centered on the target time
+    sample_times = []
+    for i in range(num_samples):
+        # Evenly space samples across the window
+        offset = -half_window_days + (2 * half_window_days * i / (num_samples - 1))
+        sample_times.append(jd_tt + offset)
+
+    # Sample the osculating apogee at each time
+    sample_lons = []
+    sample_lats = []
+    sample_eccs = []
+
+    for sample_jd in sample_times:
+        lon, lat, ecc = calc_true_lilith(sample_jd)
+        sample_lons.append(lon)
+        sample_lats.append(lat)
+        sample_eccs.append(ecc)
+
+    # Unwrap longitudes to handle 0°/360° discontinuity
+    # This ensures the polynomial fit works correctly across the boundary
+    unwrapped_lons = [sample_lons[0]]
+    for i in range(1, len(sample_lons)):
+        diff = sample_lons[i] - sample_lons[i - 1]
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        unwrapped_lons.append(unwrapped_lons[-1] + diff)
+
+    # Fit a 4th-degree polynomial to the unwrapped longitudes
+    # Using least-squares polynomial fit (Vandermonde matrix approach)
+    # Normalize time to [-1, 1] for numerical stability
+    t_center = jd_tt
+    t_scale = half_window_days
+
+    # Build Vandermonde matrix for polynomial fit
+    poly_degree = 4
+    n_samples = len(sample_times)
+
+    # Normalized time values
+    t_norm = [(t - t_center) / t_scale for t in sample_times]
+
+    # Build the Vandermonde matrix (each row is [1, t, t², t³, t⁴])
+    V = []
+    for t in t_norm:
+        row = [t**j for j in range(poly_degree + 1)]
+        V.append(row)
+
+    # Solve the normal equations: (V^T V) c = V^T y
+    # Using explicit matrix operations for simplicity
+    VTV = [[0.0] * (poly_degree + 1) for _ in range(poly_degree + 1)]
+    VTy = [0.0] * (poly_degree + 1)
+
+    for i in range(poly_degree + 1):
+        for j in range(poly_degree + 1):
+            for k in range(n_samples):
+                VTV[i][j] += V[k][i] * V[k][j]
+        for k in range(n_samples):
+            VTy[i] += V[k][i] * unwrapped_lons[k]
+
+    # Solve the linear system using Gaussian elimination with partial pivoting
+    coeffs = _solve_linear_system(VTV, VTy)
+
+    # Evaluate polynomial at target time (t_norm = 0)
+    # Since t_norm = (jd_tt - t_center) / t_scale = 0, we just need coeffs[0]
+    # But let's do it properly for clarity
+    t_target_norm = 0.0  # (jd_tt - jd_tt) / t_scale = 0
+    interp_lon = sum(coeffs[j] * (t_target_norm**j) for j in range(poly_degree + 1))
+
+    # Normalize longitude to [0, 360)
+    interp_lon = interp_lon % 360.0
+
+    # For latitude and eccentricity, use values from the central sample
+    # (the interpolation is primarily for longitude where oscillations are significant)
+    central_idx = num_samples // 2
+    interp_lat = sample_lats[central_idx]
+    interp_ecc = sample_eccs[central_idx]
+
+    return interp_lon, interp_lat, interp_ecc
+
+
+def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate the Interpolated (Natural) Lunar Perigee.
+
+    The interpolated perigee is 180° opposite to the interpolated apogee.
+    See calc_interpolated_apogee() for detailed documentation.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
+
+    Returns:
+        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+            - longitude: Ecliptic longitude of interpolated perigee in degrees [0, 360)
+            - latitude: Ecliptic latitude in degrees (negated from apogee)
+            - eccentricity: Orbital eccentricity magnitude
+
+    References:
+        - Swiss Ephemeris documentation, section 2.2.4 "The Interpolated or
+          Natural Apogee and Perigee"
+    """
+    # Calculate interpolated apogee
+    apogee_lon, apogee_lat, ecc = calc_interpolated_apogee(jd_tt)
+
+    # Perigee is 180° opposite to apogee
+    perigee_lon = (apogee_lon + 180.0) % 360.0
+
+    # Latitude is negated (opposite direction)
+    perigee_lat = -apogee_lat
+
+    return perigee_lon, perigee_lat, ecc
+
+
+def _solve_linear_system(A: list, b: list) -> list:
+    """
+    Solve a linear system Ax = b using Gaussian elimination with partial pivoting.
+
+    Args:
+        A: Coefficient matrix (list of lists)
+        b: Right-hand side vector (list)
+
+    Returns:
+        Solution vector x (list)
+    """
+    n = len(b)
+
+    # Create augmented matrix
+    aug = [row[:] + [b[i]] for i, row in enumerate(A)]
+
+    # Forward elimination with partial pivoting
+    for col in range(n):
+        # Find pivot
+        max_row = col
+        for row in range(col + 1, n):
+            if abs(aug[row][col]) > abs(aug[max_row][col]):
+                max_row = row
+
+        # Swap rows
+        aug[col], aug[max_row] = aug[max_row], aug[col]
+
+        # Check for singular matrix
+        if abs(aug[col][col]) < 1e-12:
+            # Matrix is singular or nearly singular, return zeros
+            return [0.0] * n
+
+        # Eliminate column
+        for row in range(col + 1, n):
+            factor = aug[row][col] / aug[col][col]
+            for j in range(col, n + 1):
+                aug[row][j] -= factor * aug[col][j]
+
+    # Back substitution
+    x = [0.0] * n
+    for row in range(n - 1, -1, -1):
+        x[row] = aug[row][n]
+        for col in range(row + 1, n):
+            x[row] -= aug[row][col] * x[col]
+        x[row] /= aug[row][row]
+
+    return x
+
+
 def compare_true_lilith_methods(
     jd_tt: float,
 ) -> dict:

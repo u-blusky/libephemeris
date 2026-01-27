@@ -61,6 +61,8 @@ from .constants import (
     SE_TRUE_NODE,
     SE_MEAN_APOG,
     SE_OSCU_APOG,
+    SE_INTP_APOG,
+    SE_INTP_PERG,
     SEFLG_SPEED,
     SEFLG_HELCTR,
     SEFLG_TOPOCTR,
@@ -127,6 +129,8 @@ _PLANET_NAMES = {
     SE_TRUE_NODE: "True Node",
     SE_MEAN_APOG: "Mean Apogee",
     SE_OSCU_APOG: "Osculating Apogee",
+    SE_INTP_APOG: "Interpolated Apogee",
+    SE_INTP_PERG: "Interpolated Perigee",
     SE_EARTH: "Earth",
 }
 
@@ -561,6 +565,35 @@ def _calc_body(
                 elif dlon < -18000:
                     dlon += 360.0 / dt
             return (lon, lat, dist, dlon, dlat, ddist), iflag
+
+    # Handle Interpolated Apogee/Perigee
+    if ipl in [SE_INTP_APOG, SE_INTP_PERG]:
+        jd_tt = t.tt
+        if ipl == SE_INTP_APOG:
+            lon, lat, dist = lunar.calc_interpolated_apogee(jd_tt)
+        else:  # SE_INTP_PERG
+            lon, lat, dist = lunar.calc_interpolated_perigee(jd_tt)
+        # Calculate velocity via numerical differentiation if requested
+        dlon, dlat, ddist = 0.0, 0.0, 0.0
+        if iflag & SEFLG_SPEED:
+            dt = 1.0 / 86400.0  # 1 second in days
+            if ipl == SE_INTP_APOG:
+                lon_next, lat_next, dist_next = lunar.calc_interpolated_apogee(
+                    jd_tt + dt
+                )
+            else:
+                lon_next, lat_next, dist_next = lunar.calc_interpolated_perigee(
+                    jd_tt + dt
+                )
+            dlon = (lon_next - lon) / dt
+            dlat = (lat_next - lat) / dt
+            ddist = (dist_next - dist) / dt
+            # Handle longitude wrap-around
+            if dlon > 18000:
+                dlon -= 360.0 / dt
+            elif dlon < -18000:
+                dlon += 360.0 / dt
+        return (lon, lat, dist, dlon, dlat, ddist), iflag
 
     # Handle minor bodies (asteroids and TNOs)
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
