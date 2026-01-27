@@ -987,3 +987,417 @@ class TestIsSpkCachedModuleExport:
         """is_spk_cached is accessible via libephemeris.spk_auto."""
         assert hasattr(eph.spk_auto, "is_spk_cached")
         assert callable(eph.spk_auto.is_spk_cached)
+
+
+# =============================================================================
+# TESTS FOR download_spk_from_horizons FUNCTION
+# =============================================================================
+
+
+class TestDownloadSpkFromHorizonsValidation:
+    """Test download_spk_from_horizons input validation."""
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=False)
+    def test_raises_import_error_without_astroquery(self, mock_check, tmp_path):
+        """Raises ImportError when astroquery is not available."""
+        output_path = str(tmp_path / "test.bsp")
+        with pytest.raises(ImportError) as exc_info:
+            spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2462502.5, output_path
+            )
+
+        assert "astroquery" in str(exc_info.value)
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_raises_value_error_for_invalid_range(self, mock_check, tmp_path):
+        """Raises ValueError when jd_end <= jd_start."""
+        output_path = str(tmp_path / "test.bsp")
+
+        # jd_end < jd_start
+        with pytest.raises(ValueError) as exc_info:
+            spk_auto.download_spk_from_horizons(
+                "2060", 2462502.5, 2458849.5, output_path
+            )
+        assert "must be greater than" in str(exc_info.value)
+
+        # jd_end == jd_start
+        with pytest.raises(ValueError) as exc_info:
+            spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2458849.5, output_path
+            )
+        assert "must be greater than" in str(exc_info.value)
+
+
+class TestDownloadSpkFromHorizonsDirectoryCreation:
+    """Test download_spk_from_horizons output directory handling."""
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_creates_output_directory(self, mock_check, tmp_path):
+        """Creates output directory if it doesn't exist."""
+        nested_dir = tmp_path / "nested" / "directory" / "path"
+        output_path = str(nested_dir / "test.bsp")
+        assert not nested_dir.exists()
+
+        # Create mock module structure for astroquery
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+        mock_astroquery = MagicMock(jplhorizons=mock_jplhorizons)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": mock_astroquery,
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2462502.5, output_path
+            )
+
+        # Directory should have been created
+        assert nested_dir.exists()
+
+
+class TestDownloadSpkFromHorizonsErrorHandling:
+    """Test download_spk_from_horizons error handling."""
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_handles_body_not_found(self, mock_check, tmp_path):
+        """Raises ValueError with clear message when body is not found."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_obj.download_spk.side_effect = Exception("unknown target")
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with pytest.raises(ValueError) as exc_info:
+                spk_auto.download_spk_from_horizons(
+                    "INVALID_BODY_12345", 2458849.5, 2462502.5, output_path
+                )
+
+            assert "not found" in str(exc_info.value)
+            assert "INVALID_BODY_12345" in str(exc_info.value)
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_handles_no_matches_found(self, mock_check, tmp_path):
+        """Raises ValueError when no matches found for body."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_obj.download_spk.side_effect = Exception("No matches found")
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with pytest.raises(ValueError) as exc_info:
+                spk_auto.download_spk_from_horizons(
+                    "NONEXISTENT", 2458849.5, 2462502.5, output_path
+                )
+
+            assert "not found" in str(exc_info.value)
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_handles_date_range_too_large(self, mock_check, tmp_path):
+        """Raises ValueError when date range is too large for Horizons."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_obj.download_spk.side_effect = Exception(
+            "time span exceeds limits"
+        )
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with pytest.raises(ValueError) as exc_info:
+                spk_auto.download_spk_from_horizons(
+                    "2060", 2400000.0, 2500000.0, output_path
+                )
+
+            assert "too large" in str(exc_info.value).lower()
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_handles_network_timeout(self, mock_check, tmp_path):
+        """Raises ConnectionError on network timeout."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_obj.download_spk.side_effect = Exception("connection timeout")
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with pytest.raises(ConnectionError) as exc_info:
+                spk_auto.download_spk_from_horizons(
+                    "2060", 2458849.5, 2462502.5, output_path
+                )
+
+            assert "Network error" in str(exc_info.value)
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_handles_http_error(self, mock_check, tmp_path):
+        """Raises ConnectionError on HTTP errors."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_obj.download_spk.side_effect = Exception("HTTP Error 500")
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with pytest.raises(ConnectionError) as exc_info:
+                spk_auto.download_spk_from_horizons(
+                    "2060", 2458849.5, 2462502.5, output_path
+                )
+
+            assert "Network error" in str(exc_info.value)
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_handles_generic_error(self, mock_check, tmp_path):
+        """Raises ValueError with context for unknown errors."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_obj.download_spk.side_effect = Exception("Some unexpected error")
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            with pytest.raises(ValueError) as exc_info:
+                spk_auto.download_spk_from_horizons(
+                    "2060", 2458849.5, 2462502.5, output_path
+                )
+
+            assert "Failed to download SPK" in str(exc_info.value)
+            assert "2060" in str(exc_info.value)
+
+
+class TestDownloadSpkFromHorizonsSuccess:
+    """Test download_spk_from_horizons successful downloads."""
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_returns_output_path(self, mock_check, tmp_path):
+        """Returns the output path on successful download."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            result = spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2462502.5, output_path
+            )
+
+        assert result == output_path
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_calls_horizons_with_correct_params(self, mock_check, tmp_path):
+        """Calls Horizons with correct parameters."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2462502.5, output_path
+            )
+
+        # Check Horizons was called with correct parameters
+        mock_horizons_class.assert_called_once()
+        call_kwargs = mock_horizons_class.call_args[1]
+        assert call_kwargs["id"] == "2060"
+        assert call_kwargs["location"] == "@0"
+        assert call_kwargs["epochs"]["start"] == "2020-01-01"
+        assert call_kwargs["epochs"]["stop"] == "2030-01-01"
+
+        # Check download_spk was called with output path
+        mock_horizons_obj.download_spk.assert_called_once_with(output_path)
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_custom_location(self, mock_check, tmp_path):
+        """Uses custom location parameter."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2462502.5, output_path, location="@sun"
+            )
+
+        call_kwargs = mock_horizons_class.call_args[1]
+        assert call_kwargs["location"] == "@sun"
+
+    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
+    def test_accepts_integer_body_id(self, mock_check, tmp_path):
+        """Accepts integer body IDs."""
+        output_path = str(tmp_path / "test.bsp")
+
+        mock_horizons_class = MagicMock()
+        mock_horizons_obj = MagicMock()
+        mock_horizons_class.return_value = mock_horizons_obj
+        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
+                "astroquery.jplhorizons": mock_jplhorizons,
+            },
+        ):
+            result = spk_auto.download_spk_from_horizons(
+                2060, 2458849.5, 2462502.5, output_path
+            )
+
+        assert result == output_path
+        call_kwargs = mock_horizons_class.call_args[1]
+        assert call_kwargs["id"] == "2060"  # Should be converted to string
+
+
+class TestDownloadSpkFromHorizonsModuleExport:
+    """Test that download_spk_from_horizons is properly exported."""
+
+    def test_accessible_from_spk_auto(self):
+        """download_spk_from_horizons is accessible from spk_auto module."""
+        assert hasattr(spk_auto, "download_spk_from_horizons")
+        assert callable(spk_auto.download_spk_from_horizons)
+
+    def test_accessible_via_libephemeris(self):
+        """download_spk_from_horizons is accessible via libephemeris.spk_auto."""
+        assert hasattr(eph.spk_auto, "download_spk_from_horizons")
+        assert callable(eph.spk_auto.download_spk_from_horizons)
+
+
+# Network-dependent tests for download_spk_from_horizons
+@pytest.mark.skipif(
+    os.environ.get("LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD") != "1",
+    reason="Set LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD=1 to run network tests",
+)
+class TestDownloadSpkFromHorizonsIntegration:
+    """Integration tests for download_spk_from_horizons that require network access."""
+
+    def test_download_chiron_spk(self, tmp_path):
+        """Download Chiron SPK via download_spk_from_horizons."""
+        jd_start = 2459215.5  # 2021-01-01
+        jd_end = 2460676.5  # 2025-01-01
+        output_path = str(tmp_path / "chiron_horizons.bsp")
+
+        result = spk_auto.download_spk_from_horizons(
+            "2060", jd_start, jd_end, output_path
+        )
+
+        assert result == output_path
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+    def test_download_ceres_spk(self, tmp_path):
+        """Download Ceres SPK via download_spk_from_horizons."""
+        jd_start = 2459215.5  # 2021-01-01
+        jd_end = 2460676.5  # 2025-01-01
+        output_path = str(tmp_path / "ceres_horizons.bsp")
+
+        result = spk_auto.download_spk_from_horizons("1", jd_start, jd_end, output_path)
+
+        assert result == output_path
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+    def test_download_with_body_name(self, tmp_path):
+        """Download SPK using body name instead of number."""
+        jd_start = 2459215.5  # 2021-01-01
+        jd_end = 2460676.5  # 2025-01-01
+        output_path = str(tmp_path / "chiron_by_name.bsp")
+
+        result = spk_auto.download_spk_from_horizons(
+            "Chiron", jd_start, jd_end, output_path
+        )
+
+        assert result == output_path
+        assert os.path.exists(result)
+
+    def test_invalid_body_raises_value_error(self, tmp_path):
+        """Invalid body ID raises ValueError."""
+        output_path = str(tmp_path / "invalid.bsp")
+
+        with pytest.raises(ValueError) as exc_info:
+            spk_auto.download_spk_from_horizons(
+                "DEFINITELY_NOT_A_REAL_BODY_XYZ123",
+                2459215.5,
+                2460676.5,
+                output_path,
+            )
+
+        # The error message should indicate the body was not found
+        assert "DEFINITELY_NOT_A_REAL_BODY_XYZ123" in str(exc_info.value)

@@ -997,3 +997,149 @@ def auto_get_spk(
         )
 
     return output_path
+
+
+# =============================================================================
+# JPL HORIZONS SPK DOWNLOAD (PUBLIC API)
+# =============================================================================
+
+
+def download_spk_from_horizons(
+    body_id: Union[int, str],
+    jd_start: float,
+    jd_end: float,
+    output_path: str,
+    location: str = "@0",
+) -> str:
+    """
+    Download an SPK file from JPL Horizons for a specified body and date range.
+
+    This function uses astroquery.jplhorizons to download an SPK (SPICE kernel)
+    file for the specified body and Julian Day range. The file can then be used
+    for high-precision ephemeris calculations.
+
+    Args:
+        body_id: JPL Horizons body identifier. Can be:
+            - Asteroid number (int or str): 2060, "2060", "136199"
+            - Name (str): "Chiron", "Eris"
+            - Designation (str): "2003 UB313"
+        jd_start: Start of the date range (Julian Day)
+        jd_end: End of the date range (Julian Day)
+        output_path: Full path where the SPK file should be saved (including filename)
+        location: Observer location code for Horizons (default: "@0" = solar system barycenter)
+
+    Returns:
+        str: Path to the downloaded SPK file (same as output_path)
+
+    Raises:
+        ImportError: If astroquery is not installed
+        ValueError: If body is not found on Horizons, date range is invalid,
+            or the date range is too large for Horizons to process
+        ConnectionError: If network request fails
+
+    Example:
+        >>> from libephemeris.spk_auto import download_spk_from_horizons
+        >>> # Download Chiron SPK for 2020-2030
+        >>> jd_start = 2458849.5  # 2020-01-01
+        >>> jd_end = 2462502.5    # 2030-01-01
+        >>> path = download_spk_from_horizons(
+        ...     body_id="2060",
+        ...     jd_start=jd_start,
+        ...     jd_end=jd_end,
+        ...     output_path="/path/to/chiron.bsp",
+        ... )
+        >>> print(path)
+        /path/to/chiron.bsp
+
+    Notes:
+        - Horizons has limits on the date range for SPK generation. For most
+          bodies, a 100-year range is typically acceptable.
+        - For numbered asteroids, use the asteroid number (e.g., "2060" for Chiron).
+        - For major planets, use the body name (e.g., "Mars", "Jupiter").
+    """
+    # Check if astroquery is available
+    if not _check_astroquery_available():
+        raise ImportError(
+            "astroquery is required for downloading SPK files from Horizons. "
+            "Install it with: pip install astroquery"
+        )
+
+    # Validate inputs
+    if jd_end <= jd_start:
+        raise ValueError(
+            f"jd_end ({jd_end}) must be greater than jd_start ({jd_start})"
+        )
+
+    # Convert Julian Days to ISO date strings
+    start_date = _jd_to_iso_date(jd_start)
+    end_date = _jd_to_iso_date(jd_end)
+
+    # Ensure output directory exists
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    # Import astroquery here to handle import errors gracefully
+    try:
+        from astroquery.jplhorizons import Horizons
+    except ImportError as e:
+        raise ImportError(
+            "astroquery is required for downloading SPK files from Horizons. "
+            "Install it with: pip install astroquery"
+        ) from e
+
+    # Create Horizons query object
+    body_id_str = str(body_id)
+    try:
+        obj = Horizons(
+            id=body_id_str,
+            location=location,
+            epochs={"start": start_date, "stop": end_date},
+        )
+    except Exception as e:
+        raise ValueError(f"Failed to create Horizons query for '{body_id}': {e}") from e
+
+    # Download SPK file with error handling
+    try:
+        obj.download_spk(output_path)
+    except Exception as e:
+        error_msg = str(e).lower()
+
+        # Handle body not found
+        if "unknown target" in error_msg or "no matches found" in error_msg:
+            raise ValueError(
+                f"Body '{body_id}' not found on JPL Horizons. "
+                "Check the body identifier and try again."
+            ) from e
+
+        # Handle date range too large
+        if (
+            "time span" in error_msg
+            or "too large" in error_msg
+            or "exceeds" in error_msg
+        ):
+            raise ValueError(
+                f"Date range too large for JPL Horizons. "
+                f"Requested range: JD {jd_start} to {jd_end} "
+                f"({start_date} to {end_date}). "
+                "Try a smaller date range."
+            ) from e
+
+        # Handle network failures
+        if (
+            "connection" in error_msg
+            or "timeout" in error_msg
+            or "network" in error_msg
+            or "urlopen" in error_msg
+            or "http" in error_msg
+        ):
+            raise ConnectionError(
+                f"Network error downloading SPK from Horizons: {e}"
+            ) from e
+
+        # Re-raise with more context for other errors
+        raise ValueError(
+            f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"
+        ) from e
+
+    return output_path
