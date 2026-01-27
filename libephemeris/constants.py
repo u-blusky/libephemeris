@@ -128,6 +128,9 @@ SE_TOUTATIS: int = (
 SE_ITOKAWA: int = (
     25143 + SE_AST_OFFSET
 )  # 25143 Itokawa (Apollo PHA, Hayabusa sample return mission target)
+SE_BENNU: int = (
+    101955 + SE_AST_OFFSET
+)  # 101955 Bennu (Apollo PHA, OSIRIS-REx sample return mission target)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS

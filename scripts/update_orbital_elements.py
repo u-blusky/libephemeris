@@ -90,6 +90,15 @@ BODY_SBDB_IDS: dict[str, str] = {
     "Psyche": "16",  # 16 Psyche (metallic M-type asteroid, NASA Psyche mission target)
     "Eros": "433",  # 433 Eros (near-Earth asteroid, NEAR Shoemaker mission target)
     "Amor": "1221",  # 1221 Amor (prototype of the Amor near-Earth asteroid class)
+    "Icarus": "1566",  # 1566 Icarus (Apollo asteroid, highly eccentric orbit)
+    "Toro": "1685",  # 1685 Toro (Apollo asteroid, near-Earth asteroid)
+    "Sappho": "80",  # 80 Sappho (main belt asteroid)
+    "Pandora": "55",  # 55 Pandora (main belt asteroid, not Saturn moon)
+    "Lilith": "1181",  # 1181 Lilith (main belt asteroid)
+    "Hidalgo": "944",  # 944 Hidalgo (Centaur-class asteroid)
+    "Toutatis": "4179",  # 4179 Toutatis (Apollo PHA)
+    "Itokawa": "25143",  # 25143 Itokawa (Hayabusa sample return mission target)
+    "Bennu": "101955",  # 101955 Bennu (OSIRIS-REx sample return mission target)
 }
 
 

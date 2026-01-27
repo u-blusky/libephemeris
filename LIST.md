@@ -178,7 +178,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD ITOKAWA ASTEROID TO CATALOG: Add asteroid 25143 Itokawa to MINOR_BODY_ELEMENTS, target of the Hayabusa sample return mission, add SE_ITOKAWA = 25143 + SE_AST_OFFSET.
 
-- [ ] ADD BENNU ASTEROID TO CATALOG: Add asteroid 101955 Bennu to MINOR_BODY_ELEMENTS, target of OSIRIS-REx sample return mission, add SE_BENNU = 101955 + SE_AST_OFFSET.
+- [x] ADD BENNU ASTEROID TO CATALOG: Add asteroid 101955 Bennu to MINOR_BODY_ELEMENTS, target of OSIRIS-REx sample return mission, add SE_BENNU = 101955 + SE_AST_OFFSET.
 
 - [ ] ADD RYUGU ASTEROID TO CATALOG: Add asteroid 162173 Ryugu to MINOR_BODY_ELEMENTS, target of Hayabusa2 sample return mission, add SE_RYUGU = 162173 + SE_AST_OFFSET.
 

@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 35 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 36 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -46,6 +46,7 @@ from libephemeris.constants import (
     SE_HIDALGO,
     SE_TOUTATIS,
     SE_ITOKAWA,
+    SE_BENNU,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -98,6 +99,7 @@ def all_minor_body_ids():
         SE_HIDALGO,
         SE_TOUTATIS,
         SE_ITOKAWA,
+        SE_BENNU,
     ]
 
 
@@ -114,9 +116,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 35 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 35, (
-            f"Expected 35 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 36 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 36, (
+            f"Expected 36 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -547,6 +549,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 1.5 < elements.i < 1.7, f"Itokawa i={elements.i} unexpected"
         # Mean motion consistent with ~1.52 year period (557 days)
         assert 0.64 < elements.n < 0.66, f"Itokawa n={elements.n} unexpected"
+
+    def test_bennu_apollo_asteroid(self):
+        """Bennu: Apollo PHA, target of OSIRIS-REx sample return mission."""
+        elements = MINOR_BODY_ELEMENTS[SE_BENNU]
+        assert elements.name == "Bennu"
+        # Semi-major axis ~1.13 AU (Apollo asteroid)
+        assert 1.12 < elements.a < 1.14, f"Bennu a={elements.a} unexpected"
+        # Moderate eccentricity ~0.20 (q=0.90 AU, Q=1.36 AU)
+        assert 0.20 < elements.e < 0.21, f"Bennu e={elements.e} unexpected"
+        # Low inclination ~6.0 degrees
+        assert 6.0 < elements.i < 6.1, f"Bennu i={elements.i} unexpected"
+        # Mean motion consistent with ~1.20 year period (437 days)
+        assert 0.82 < elements.n < 0.83, f"Bennu n={elements.n} unexpected"
 
 
 @pytest.mark.unit
