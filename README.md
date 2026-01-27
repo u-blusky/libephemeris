@@ -50,7 +50,7 @@ LibEphemeris is born from the need for a **truly open, maintainable, and scienti
 -   **Velocities**: Full 6-component state vectors (position + velocity).
 -   **House systems (19)**: Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Polich/Page (Topocentric), Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural Gradient, and more.
 -   **Sidereal zodiac (43 ayanamshas)**: Fagan/Bradley, Lahiri, Raman, Krishnamurti, star-based and historical variants.
--   **Extended points**: Lunar nodes, Lilith (mean and true), major asteroids (Chiron, Pholus, Ceres, Pallas, Juno, Vesta), TNOs (Orcus, Haumea, Quaoar, Makemake, Gonggong, Eris, Sedna), major fixed stars and Arabic parts.
+-   **Extended points**: Lunar nodes, Lilith (mean and true), interpolated apogee/perigee, major asteroids (Chiron, Pholus, Ceres, Pallas, Juno, Vesta), centaurs (Nessus, Asbolus, Chariklo), TNOs (Orcus, Ixion, Haumea, Quaoar, Makemake, Gonggong, Eris, Sedna), major fixed stars and Arabic parts.
 -   **High-precision minor bodies via SPK**: Download SPK kernels from JPL Horizons for arcsecond-level precision on asteroids and TNOs.
 -   **Event finding**: Sun/Moon longitude crossings (e.g. ingress), with additional events planned (eclipses, etc.).
 -   **Thread safety**: Optional thread-safe `EphemerisContext` API for concurrent calculations.
@@ -328,6 +328,24 @@ pos, _ = eph.calc_ut(2460000.0, eph.SE_ERIS, 0)
 | `list_spk_bodies()` | List all registered SPK bodies |
 | `get_spk_body_info(ipl)` | Get SPK info for a body |
 | `get_spk_coverage(spk_path)` | Get date range covered by SPK |
+| `set_auto_spk_download(enable)` | Enable/disable automatic SPK download |
+| `set_spk_cache_dir(path)` | Set SPK cache directory |
+| `set_spk_date_padding(days)` | Set date range padding for auto-downloads |
+
+### Automatic SPK Download (Experimental)
+
+LibEphemeris can automatically download and cache SPK kernels on demand:
+
+```python
+import libephemeris as eph
+
+# Enable automatic SPK download
+eph.set_auto_spk_download(True)
+eph.set_spk_cache_dir("./spk_cache")  # Optional: custom cache location
+
+# First calculation triggers automatic download
+pos, _ = eph.calc_ut(2460000.0, eph.SE_CHIRON, 0)  # Downloads SPK if needed
+```
 
 ### NAIF ID constants
 
@@ -341,8 +359,12 @@ NAIF_PALLAS = 2000002           # Pallas (2)
 NAIF_JUNO = 2000003             # Juno (3)
 NAIF_VESTA = 2000004            # Vesta (4)
 NAIF_PHOLUS = 2005145           # Pholus (5145)
+NAIF_NESSUS = 2007066           # Nessus (7066)
+NAIF_ASBOLUS = 2008405          # Asbolus (8405)
+NAIF_CHARIKLO = 2010199         # Chariklo (10199)
 NAIF_ERIS = 2136199             # Eris (136199)
 NAIF_SEDNA = 2090377            # Sedna (90377)
+NAIF_GONGGONG = 2225088         # Gonggong (225088)
 ```
 
 For any numbered asteroid, the NAIF ID is `asteroid_number + 2000000`.

@@ -16,6 +16,8 @@ Features
 - **43 Ayanamshas**: Full sidereal zodiac support
 - **Eclipses**: Solar and lunar eclipse calculations
 - **Fixed Stars**: Regulus, Spica, and more with proper motion
+- **Minor Bodies**: Asteroids, centaurs, and TNOs with SPK kernel support
+- **High-Precision SPK**: Download SPK kernels from JPL Horizons for arcsecond-level precision
 
 Quick Start
 -----------
@@ -51,9 +53,18 @@ Contents
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Getting Started:
+
+   migration-guide
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Technical Documentation:
 
    api_reference
+   PRECISION
+   INTERPOLATED_APOGEE
+   TRUE_LILITH_METHODS
 
 
 Indices and Tables

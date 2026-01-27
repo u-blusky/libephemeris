@@ -1693,3 +1693,312 @@ Rise/Set Flags
    :value: 8
 
    Lower transit (anti-culmination)
+
+
+SPK Kernel Functions
+--------------------
+
+These functions provide high-precision calculations for minor bodies using
+SPK (SPICE kernel) files downloaded from NASA JPL Horizons.
+
+download_spk
+~~~~~~~~~~~~
+
+.. function:: download_spk(body, start, end, path=None)
+
+   Download an SPK kernel file from JPL Horizons for a minor body.
+
+   :param body: Body identifier (asteroid number or name, e.g., "2060", "Chiron")
+   :type body: str
+   :param start: Start date for SPK coverage (e.g., "2000-01-01")
+   :type start: str
+   :param end: End date for SPK coverage (e.g., "2100-01-01")
+   :type end: str
+   :param path: Directory to save the SPK file (default: current directory)
+   :type path: str, optional
+   :returns: Path to the downloaded SPK file
+   :rtype: str
+
+   **Example:**
+
+   >>> path = download_spk("2060", "2000-01-01", "2100-01-01", "./spk")
+
+
+register_spk_body
+~~~~~~~~~~~~~~~~~
+
+.. function:: register_spk_body(ipl, spk_file, naif_id)
+
+   Register an SPK file for a minor body.
+
+   After registration, ``calc_ut()`` will use the SPK kernel for this body
+   instead of Keplerian approximations.
+
+   :param ipl: LibEphemeris body ID (e.g., SE_CHIRON)
+   :type ipl: int
+   :param spk_file: Path to the SPK file
+   :type spk_file: str
+   :param naif_id: NAIF SPICE ID for the body
+   :type naif_id: int
+
+
+unregister_spk_body
+~~~~~~~~~~~~~~~~~~~
+
+.. function:: unregister_spk_body(ipl)
+
+   Remove SPK registration for a body, reverting to Keplerian calculations.
+
+   :param ipl: LibEphemeris body ID
+   :type ipl: int
+
+
+download_and_register_spk
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: download_and_register_spk(body, ipl, start, end, path=None)
+
+   Download an SPK kernel and register it in one step.
+
+   :param body: Body identifier for JPL Horizons
+   :type body: str
+   :param ipl: LibEphemeris body ID
+   :type ipl: int
+   :param start: Start date for SPK coverage
+   :type start: str
+   :param end: End date for SPK coverage
+   :type end: str
+   :param path: Directory for SPK file (optional)
+   :type path: str, optional
+   :returns: Path to the downloaded SPK file
+   :rtype: str
+
+
+list_spk_bodies
+~~~~~~~~~~~~~~~
+
+.. function:: list_spk_bodies()
+
+   List all bodies with registered SPK kernels.
+
+   :returns: List of registered body IDs
+   :rtype: list[int]
+
+
+get_spk_body_info
+~~~~~~~~~~~~~~~~~
+
+.. function:: get_spk_body_info(ipl)
+
+   Get information about an SPK registration.
+
+   :param ipl: LibEphemeris body ID
+   :type ipl: int
+   :returns: Dictionary with 'spk_file' and 'naif_id', or None if not registered
+   :rtype: dict or None
+
+
+get_spk_coverage
+~~~~~~~~~~~~~~~~
+
+.. function:: get_spk_coverage(spk_path)
+
+   Get the date range covered by an SPK file.
+
+   :param spk_path: Path to SPK file
+   :type spk_path: str
+   :returns: Tuple of (start_jd, end_jd) Julian Day numbers
+   :rtype: tuple[float, float]
+
+
+SPK Auto-Download Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: set_auto_spk_download(enable)
+
+   Enable or disable automatic SPK download for minor bodies.
+
+   When enabled, calculations for supported minor bodies will automatically
+   download and cache SPK kernels from JPL Horizons.
+
+   :param enable: True to enable, False to disable
+   :type enable: bool
+
+
+.. function:: get_auto_spk_download()
+
+   Check if automatic SPK download is enabled.
+
+   :returns: Current auto-download setting
+   :rtype: bool
+
+
+.. function:: set_spk_cache_dir(path)
+
+   Set the directory for caching downloaded SPK files.
+
+   :param path: Directory path for SPK cache
+   :type path: str
+
+
+.. function:: get_spk_cache_dir()
+
+   Get the current SPK cache directory.
+
+   :returns: Path to SPK cache directory
+   :rtype: str
+
+
+.. function:: set_spk_date_padding(days)
+
+   Set the date padding for auto-downloaded SPK files.
+
+   When auto-downloading, the SPK will cover the requested date plus/minus
+   this padding on each side.
+
+   :param days: Number of days to pad the date range
+   :type days: int
+
+
+.. function:: get_spk_date_padding()
+
+   Get the current SPK date padding setting.
+
+   :returns: Padding in days
+   :rtype: int
+
+
+Minor Body IDs
+~~~~~~~~~~~~~~
+
+Centaurs
+^^^^^^^^
+
+.. data:: SE_CHIRON
+   :value: 15
+
+   Chiron (2060)
+
+.. data:: SE_PHOLUS
+   :value: 16
+
+   Pholus (5145)
+
+.. data:: SE_NESSUS
+
+   Nessus (7066) - Centaur
+
+.. data:: SE_ASBOLUS
+
+   Asbolus (8405) - Centaur
+
+.. data:: SE_CHARIKLO
+
+   Chariklo (10199) - Largest known centaur, has ring system
+
+
+Trans-Neptunian Objects (TNOs)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. data:: SE_ORCUS
+
+   Orcus (90482) - Plutino
+
+.. data:: SE_IXION
+
+   Ixion (28978) - Plutino
+
+.. data:: SE_HAUMEA
+
+   Haumea (136108) - Dwarf planet
+
+.. data:: SE_QUAOAR
+
+   Quaoar (50000) - Classical Kuiper belt object
+
+.. data:: SE_MAKEMAKE
+
+   Makemake (136472) - Dwarf planet
+
+.. data:: SE_GONGGONG
+
+   Gonggong (225088) - TNO, dwarf planet candidate
+
+.. data:: SE_ERIS
+
+   Eris (136199) - Largest known dwarf planet
+
+.. data:: SE_SEDNA
+
+   Sedna (90377) - Detached TNO
+
+
+NAIF ID Constants
+~~~~~~~~~~~~~~~~~
+
+NAIF IDs are used for SPK kernel registration. For numbered asteroids,
+the NAIF ID is ``asteroid_number + 2000000``.
+
+.. data:: NAIF_ASTEROID_OFFSET
+   :value: 2000000
+
+   Add asteroid number to get NAIF ID
+
+.. data:: NAIF_CHIRON
+   :value: 2002060
+
+.. data:: NAIF_PHOLUS
+   :value: 2005145
+
+.. data:: NAIF_NESSUS
+   :value: 2007066
+
+.. data:: NAIF_ASBOLUS
+   :value: 2008405
+
+.. data:: NAIF_CHARIKLO
+   :value: 2010199
+
+.. data:: NAIF_CERES
+   :value: 2000001
+
+.. data:: NAIF_PALLAS
+   :value: 2000002
+
+.. data:: NAIF_JUNO
+   :value: 2000003
+
+.. data:: NAIF_VESTA
+   :value: 2000004
+
+.. data:: NAIF_ERIS
+   :value: 2136199
+
+.. data:: NAIF_SEDNA
+   :value: 2090377
+
+.. data:: NAIF_GONGGONG
+   :value: 2225088
+
+
+Minor Body Resonance Detection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: detect_mean_motion_resonance(elements, tolerance=0.02)
+
+   Detect if a minor body is in a mean motion resonance with Neptune.
+
+   :param elements: Orbital elements of the body
+   :type elements: OrbitalElements
+   :param tolerance: Fractional tolerance for resonance detection (default 0.02 = 2%)
+   :type tolerance: float
+   :returns: ResonanceResult with resonance info, or None if not in resonance
+   :rtype: ResonanceResult or None
+
+   **Example:**
+
+   >>> from libephemeris.minor_bodies import detect_mean_motion_resonance, MINOR_BODY_ELEMENTS
+   >>> from libephemeris.constants import SE_IXION
+   >>> result = detect_mean_motion_resonance(MINOR_BODY_ELEMENTS[SE_IXION])
+   >>> if result:
+   ...     print(f"{result.resonance.name}: {result.resonance.p}:{result.resonance.q}")

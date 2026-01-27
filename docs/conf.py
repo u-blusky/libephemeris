@@ -11,10 +11,10 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 project = "libephemeris"
-copyright = "2024, Giacomo Battaglia"
+copyright = "2024-2026, Giacomo Battaglia"
 author = "Giacomo Battaglia"
-release = "0.1.8"
-version = "0.1.8"
+release = "0.2.0"
+version = "0.2.0"
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -23,6 +23,7 @@ extensions = [
     "sphinx.ext.napoleon",  # Support for Google/NumPy style docstrings
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "myst_parser",  # Support for Markdown files
 ]
 
 # Napoleon settings for Google/NumPy style docstrings
@@ -65,8 +66,19 @@ templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # Source file suffixes
-source_suffix = ".rst"
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
 master_doc = "index"
+
+# MyST parser settings
+myst_enable_extensions = [
+    "colon_fence",  # ::: directive syntax
+    "deflist",  # Definition lists
+    "tasklist",  # Task lists with checkboxes
+]
+myst_heading_anchors = 3  # Add anchors to headings up to level 3
 
 # -- Options for HTML output -------------------------------------------------
 html_theme = "sphinx_rtd_theme"

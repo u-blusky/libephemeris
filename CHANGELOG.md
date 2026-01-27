@@ -7,7 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.8] - 2025-01-26
+### Added
+
+#### Minor Bodies
+- New centaurs: Nessus (7066), Asbolus (8405), Chariklo (10199)
+- New TNO: Gonggong (225088)
+- Uranus perturbations for improved TNO accuracy
+- Neptune perturbations for TNO accuracy (critical for plutinos)
+- Mean motion resonance detection for Neptune resonances (`detect_mean_motion_resonance`)
+- Updated orbital elements with full precision from JPL SBDB
+- TNO validation against pyswisseph over 2000-2050 date range
+
+#### SPK Auto-Download and Caching
+- New `spk_auto` module for automatic SPK download and caching
+- `set_auto_spk_download()` / `get_auto_spk_download()` for enabling automatic SPK fallback
+- `set_spk_cache_dir()` / `get_spk_cache_dir()` for configuring SPK cache location
+- `set_spk_date_padding()` / `get_spk_date_padding()` for date range padding configuration
+- Automatic SPK registration after download
+- SPK cache management functions (`is_spk_cached`, `ensure_cache_dir`, `get_cache_path`)
+
+#### Lunar Calculations
+- Interpolated lunar apogee (SE_INTP_APOG) with comprehensive algorithm
+- Interpolated lunar perigee (SE_INTP_PERG)
+- Velocity calculation for interpolated apogee/perigee
+- Optimized interpolation window (9 samples, 56 days, linear fit)
+- True Lilith velocity calculation (SEFLG_SPEED support)
+- True Node velocity calculation
+- Comprehensive perturbation terms for True Node (Venus, Mars, Saturn, evection, variation, annual equation, parallactic)
+- ELP2000-82B True Node perturbation term table
+- IAU 2000A nutation correction for True Node
+- Second-order perturbation terms for True Node
+- Solar gravitational perturbation on eccentricity vector for True Lilith
+
+#### Scripts
+- `scripts/download_spk.py` for pre-downloading SPK files
+- `scripts/update_orbital_elements.py` for updating orbital elements from JPL SBDB
+
+#### Constants
+- `SPK_BODY_NAME_MAP` for body ID to JPL Horizons mapping
+- NAIF ID constants for new bodies (NAIF_NESSUS, NAIF_ASBOLUS, NAIF_CHARIKLO, NAIF_GONGGONG)
+- SE_NESSUS, SE_ASBOLUS, SE_CHARIKLO, SE_GONGGONG body IDs
+
+### Documentation
+
+- Comprehensive documentation for interpolated apogee (`docs/INTERPOLATED_APOGEE.md`)
+- True Lilith calculation method comparison (`docs/TRUE_LILITH_METHODS.md`)
+- Updated precision documentation with TNO validation results
+
+### Tests
+
+- TNO validation tests against pyswisseph over 2000-2050
+- Resonance detection tests
+- Secular perturbation tests for minor bodies
+- Interpolated apogee/perigee precision tests
+- True Lilith latitude validation tests
+- True Node velocity tests
+- Download SPK script tests
+- Orbital elements update script tests
+
+## [0.2.0] - 2026-01-26
 
 ### Added
 
@@ -181,6 +239,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.1.8...HEAD
-[0.1.8]: https://github.com/g-battaglia/libephemeris/compare/v0.1.0...v0.1.8
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/g-battaglia/libephemeris/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/g-battaglia/libephemeris/releases/tag/v0.1.0
