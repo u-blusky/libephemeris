@@ -78,8 +78,8 @@ class TestDeltaT:
     def test_deltat_exists(self):
         """Test Delta T function returns reasonable value."""
         jd = 2451545.0
-        dt_py = ephem.swe_deltat(jd)
-        # Delta T is returned in SECONDS and should be around 60-70 seconds at J2000
+        dt_py = ephem.swe_deltat(jd) * 86400  # Convert from days to seconds
+        # Delta T should be around 60-70 seconds at J2000
         assert 60 < dt_py < 70
 
     def test_deltat_historical(self):
