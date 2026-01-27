@@ -546,7 +546,38 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     # Period ~182.6 days (half anomalistic year).
     perturbation += 0.0024 * E2 * math.sin(2.0 * M)
 
-    # Parallactic inequality
+    # ========================================================================
+    # PARALLACTIC EQUATION (Parallactic Inequality)
+    # ========================================================================
+    # The parallactic equation is caused by the Sun being at a finite distance
+    # rather than infinitely far away. The Sun's gravitational perturbation on
+    # the Moon varies depending on whether the Moon is on the sunward or
+    # anti-sunward side of Earth.
+    #
+    # Physical mechanism: When the Moon is between Earth and Sun (new moon,
+    # D ~ 0), it is closer to the Sun and experiences stronger solar gravity.
+    # When the Moon is on the far side of Earth (full moon, D ~ 180°), it is
+    # farther from the Sun and experiences weaker solar gravity.
+    #
+    # The parallactic equation has:
+    # - Period: ~29.53 days (synodic month)
+    # - Amplitude: ~0.035 degrees (approximately 2 arcminutes)
+    # - Argument: D (mean elongation of Moon from Sun)
+    #
+    # The amplitude depends on the solar parallax (ratio of Earth's radius
+    # to Earth-Sun distance), approximately 8.794 arcseconds, scaled by
+    # the lunar distance and orbital mechanics factors.
+    #
+    # References:
+    # - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+    # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
+
+    # Primary parallactic equation term
+    # Amplitude ~0.035° from ELP2000 theory
+    perturbation += 0.0350 * math.sin(D)
+
+    # Secondary parallactic terms (cross-coupling with F and M')
     perturbation += 0.0026 * math.sin(2.0 * D - M_prime + 2.0 * F)
     perturbation += -0.0022 * math.sin(2.0 * D + M_prime - 2.0 * F)
 
