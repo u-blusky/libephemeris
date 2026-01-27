@@ -313,6 +313,10 @@ def swe_houses(
         >>> asc, mc = ascmc[0], ascmc[1]
         >>> house_1_start = cusps[0]  # First house cusp
     """
+    # Validate latitude range (must be in [-90, 90])
+    if lat > 90.0 or lat < -90.0:
+        raise ValueError(f"swe_houses: latitude {lat} is out of valid range [-90, 90]")
+
     # 1. Calculate Sidereal Time (ARMC)
     # ARMC = GMST + lon
     ts = get_timescale()
@@ -616,6 +620,12 @@ def swe_houses_armc(
         >>> cusps, ascmc = swe_houses_armc(armc, 41.9, eps, ord('P'))
         >>> asc, mc = ascmc[0], ascmc[1]
     """
+    # Validate latitude range (must be in [-90, 90])
+    if lat > 90.0 or lat < -90.0:
+        raise ValueError(
+            f"swe_houses_armc: latitude {lat} is out of valid range [-90, 90]"
+        )
+
     # Normalize ARMC to 0-360
     armc_deg = armc % 360.0
 

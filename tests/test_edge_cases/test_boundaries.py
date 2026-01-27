@@ -71,24 +71,19 @@ class TestInvalidInputs:
 
     @pytest.mark.edge_case
     def test_latitude_over_90(self):
-        """Latitude > 90 should be handled."""
+        """Latitude > 90 should raise ValueError with clear message."""
         jd = 2451545.0
 
-        try:
-            cusps, ascmc = ephem.swe_houses(jd, 91.0, 0.0, ord("P"))
-            # If no exception, should clamp or handle gracefully
-        except ValueError:
-            pass  # Expected
+        with pytest.raises(ValueError, match="latitude 91.0 is out of valid range"):
+            ephem.swe_houses(jd, 91.0, 0.0, ord("P"))
 
     @pytest.mark.edge_case
     def test_latitude_under_minus_90(self):
-        """Latitude < -90 should be handled."""
+        """Latitude < -90 should raise ValueError with clear message."""
         jd = 2451545.0
 
-        try:
-            cusps, ascmc = ephem.swe_houses(jd, -91.0, 0.0, ord("P"))
-        except ValueError:
-            pass  # Expected
+        with pytest.raises(ValueError, match="latitude -91.0 is out of valid range"):
+            ephem.swe_houses(jd, -91.0, 0.0, ord("P"))
 
 
 class TestLongitudeWrapping:
