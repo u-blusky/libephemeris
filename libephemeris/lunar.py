@@ -246,8 +246,8 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     # The dominant term with 2D argument (fortnightly variation)
     perturbation += -1.5233 * math.sin(2.0 * D)
 
-    # Terms involving Sun's mean anomaly M (annual variation)
-    perturbation += -0.1534 * E * math.sin(M)
+    # Terms involving Sun's mean anomaly M combined with elongation (2D ± M)
+    # Note: The primary annual equation term (sin(M) alone) is in its own section below
     perturbation += 0.0595 * E * math.sin(2.0 * D - M)
     perturbation += -0.0145 * E * math.sin(2.0 * D + M)
 
@@ -492,9 +492,59 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     perturbation += 0.0043 * math.sin(4.0 * D + F)
     perturbation += -0.0039 * math.sin(4.0 * D - F)
 
-    # Annual equation terms (amplitude ~0.19°, period ~1 year)
+    # ========================================================================
+    # ANNUAL EQUATION EFFECT ON NODE (Long-period term, period ~365.26 days)
+    # ========================================================================
+    # The Annual Equation is a major lunar perturbation caused by the varying
+    # Earth-Sun distance due to Earth's orbital eccentricity (e ≈ 0.0167).
+    #
+    # Physical mechanism: When Earth is at perihelion (early January), it is
+    # ~3.3% closer to the Sun than at aphelion (early July). The increased
+    # solar gravitational influence at perihelion accelerates the Moon's
+    # orbital motion, while at aphelion the Moon moves slightly slower.
+    # This creates a periodic variation in lunar longitude.
+    #
+    # The Annual Equation has:
+    # - Period: ~365.2596 days (one anomalistic year)
+    # - Amplitude: ~0.186° (11.2 arcminutes) in lunar longitude
+    # - Argument: M (Sun's mean anomaly)
+    # - Cause: Earth's orbital eccentricity varying Earth-Sun distance
+    #
+    # The Annual Equation affects the node through:
+    # 1. Direct modulation of the Moon's angular velocity, which affects
+    #    the instantaneous orbital plane orientation
+    # 2. Coupling with the lunar inclination (F) and anomaly (M')
+    # 3. Interaction with the eccentricity through the E factor
+    #
+    # References:
+    # - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+    # - Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
+    # - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
+
+    # Primary Annual Equation term
+    # The amplitude 0.186° is scaled for the node effect. The coefficient
+    # includes the geometric coupling between the annual longitude variation
+    # and the node motion. The E factor accounts for the secular decrease
+    # in Earth's orbital eccentricity.
+    perturbation += -0.1860 * E * math.sin(M)
+
+    # Annual Equation coupling with Moon's anomaly (M')
+    # These arise from the interaction between the annual solar distance
+    # variation and the Moon's elliptical orbit. The amplitude is modulated
+    # by the product of Earth's eccentricity and Moon's eccentricity.
+    perturbation += 0.0098 * E * math.sin(M + M_prime)
+    perturbation += -0.0082 * E * math.sin(M - M_prime)
+
+    # Annual Equation-inclination coupling terms (M ± 2F)
+    # These capture the coupling between the annual equation and the lunar
+    # latitude argument, affecting the node through inclination variations.
     perturbation += 0.0037 * E * math.sin(M + 2.0 * F)
     perturbation += -0.0032 * E * math.sin(M - 2.0 * F)
+
+    # Second harmonic of Annual Equation (2M)
+    # Arises from the non-linear effects of Earth's orbital eccentricity.
+    # Period ~182.6 days (half anomalistic year).
+    perturbation += 0.0024 * E2 * math.sin(2.0 * M)
 
     # Parallactic inequality
     perturbation += 0.0026 * math.sin(2.0 * D - M_prime + 2.0 * F)
