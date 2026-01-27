@@ -20,6 +20,7 @@ import math
 import warnings
 from typing import Tuple
 from .state import get_timescale, get_planets
+from skyfield.nutationlib import iau2000a_radians
 
 # Validity range constants for Meeus polynomial approximations
 # The polynomials are optimized for dates near J2000.0 (year 2000)
@@ -918,10 +919,11 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
         3. Transform h to J2000 ecliptic coordinates
         4. Compute ascending node longitude from angular momentum
         5. Apply precession from J2000 ecliptic to ecliptic of date
-        6. Apply nutation for apparent position (optional)
+        6. Apply nutation (IAU 2000A model) for true ecliptic of date
 
     The coordinate transformation uses:
         - IAU 2006 precession model
+        - IAU 2000A nutation model (1365 terms) for sub-arcsecond precision
         - Frame bias and precession via pyerfa when available
         - Proper rotation from equatorial (ICRS) to ecliptic frame
 
@@ -930,13 +932,15 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
 
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
-            - longitude: Ecliptic longitude in degrees (0-360)
+            - longitude: Ecliptic longitude in degrees (0-360), in true
+                        ecliptic of date (includes nutation)
             - latitude: Always 0.0 (node is on ecliptic by definition)
             - distance: Semi-major axis proxy (normalized)
 
     Precision:
-        With correct precession: <0.01° compared to Swiss Ephemeris
-        for dates 1900-2100
+        With correct precession and nutation: <0.01° compared to Swiss Ephemeris
+        for dates 1900-2100. The IAU 2000A nutation model provides
+        sub-milliarcsecond precision in the nutation correction.
 
     Note:
         The true node varies rapidly (oscillates ~±1.5° from mean) due to
@@ -947,6 +951,7 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
         - Swiss Ephemeris documentation, section 2.2.2 "The True Node"
         - Vallado "Fundamentals of Astrodynamics" (2013) for orbital mechanics
         - Capitaine et al. (2003) for IAU 2006 precession
+        - IERS Conventions 2010 for IAU 2000A nutation model
     """
     try:
         import erfa
@@ -1026,6 +1031,16 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
         psi_a = (5029.0966 * T + 1.1120 * T**2 - 0.000006 * T**3) / 3600.0
 
         node_lon_date = node_lon_j2000 + psi_a
+
+    # Apply nutation correction to get true ecliptic of date
+    # IAU 2000A model provides 1365 terms for sub-milliarcsecond precision
+    # Reference: IERS Conventions 2010, Skyfield iau2000a_radians implementation
+    dpsi_rad, deps_rad = iau2000a_radians(t)
+
+    # Nutation in longitude (dpsi) shifts the ecliptic reference point
+    # This gives us the position in the true ecliptic of date (instantaneous)
+    # rather than the mean ecliptic of date
+    node_lon_date += math.degrees(dpsi_rad)
 
     # Normalize to [0, 360)
     node_lon = node_lon_date % 360.0
