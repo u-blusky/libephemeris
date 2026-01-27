@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 32 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 33 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -43,6 +43,7 @@ from libephemeris.constants import (
     SE_SAPPHO,
     SE_PANDORA_AST,
     SE_LILITH_AST,
+    SE_HIDALGO,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -92,6 +93,7 @@ def all_minor_body_ids():
         SE_SAPPHO,
         SE_PANDORA_AST,
         SE_LILITH_AST,
+        SE_HIDALGO,
     ]
 
 
@@ -108,9 +110,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 32 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 32, (
-            f"Expected 32 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 33 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 33, (
+            f"Expected 33 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -502,6 +504,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 5.5 < elements.i < 5.7, f"Lilith i={elements.i} unexpected"
         # Mean motion consistent with ~4.35 year period (1589 days)
         assert 0.22 < elements.n < 0.23, f"Lilith n={elements.n} unexpected"
+
+    def test_hidalgo_centaur_asteroid(self):
+        """Hidalgo: Centaur-class asteroid with comet-like orbit, used in astrological research."""
+        elements = MINOR_BODY_ELEMENTS[SE_HIDALGO]
+        assert elements.name == "Hidalgo"
+        # Semi-major axis ~5.73 AU (between Mars and Jupiter, Centaur-class)
+        assert 5.70 < elements.a < 5.76, f"Hidalgo a={elements.a} unexpected"
+        # Very high eccentricity ~0.66 (comet-like orbit)
+        assert 0.66 < elements.e < 0.67, f"Hidalgo e={elements.e} unexpected"
+        # Very high inclination ~42.5 degrees
+        assert 42.0 < elements.i < 43.0, f"Hidalgo i={elements.i} unexpected"
+        # Mean motion consistent with ~13.7 year period (5008 days)
+        assert 0.071 < elements.n < 0.073, f"Hidalgo n={elements.n} unexpected"
 
 
 @pytest.mark.unit

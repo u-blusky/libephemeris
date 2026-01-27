@@ -119,6 +119,9 @@ SE_PANDORA_AST: int = (
 SE_LILITH_AST: int = (
     1181 + SE_AST_OFFSET
 )  # 1181 Lilith (main belt asteroid, not to be confused with lunar apogee Lilith)
+SE_HIDALGO: int = (
+    944 + SE_AST_OFFSET
+)  # 944 Hidalgo (Centaur-class asteroid with comet-like orbit, astrological research)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
