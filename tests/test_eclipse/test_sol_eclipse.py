@@ -705,21 +705,13 @@ class TestSolEclipseHow:
             obscuration = attr[2]
             assert 0 <= obscuration <= 1
 
-            # Sun altitude should be -90 to 90
-            altitude = attr[4]
-            assert -90 <= altitude <= 90
-
             # Azimuth should be 0 to 360
-            azimuth = attr[3]
+            azimuth = attr[4]
             assert 0 <= azimuth <= 360
 
-            # Moon/Sun apparent diameters should be positive and reasonable
-            moon_diam = attr[5]
-            sun_diam = attr[6]
-            if moon_diam > 0:
-                assert 0.4 < moon_diam < 0.7  # degrees (roughly)
-            if sun_diam > 0:
-                assert 0.4 < sun_diam < 0.7  # degrees
+            # Sun altitude should be -90 to 90
+            altitude = attr[5]
+            assert -90 <= altitude <= 90
 
     def test_sun_below_horizon_returns_zero_magnitude(self):
         """When Sun is below horizon, should return 0 magnitude or no visibility."""
@@ -737,7 +729,7 @@ class TestSolEclipseHow:
         attr, ecl_type = sol_eclipse_how(times[0], east_asia_lat, east_asia_lon)
 
         # Either no visibility flag or zero magnitude
-        sun_alt = attr[4]
+        sun_alt = attr[5]
         if sun_alt < -1.0:
             # Sun below horizon, should have no visible eclipse
             assert attr[0] == 0.0 or not (ecl_type & SE_ECL_VISIBLE)
