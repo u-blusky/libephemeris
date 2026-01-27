@@ -3,7 +3,7 @@ Unit tests for minor body orbital elements data.
 
 Tests verify:
 - Orbital elements are at the correct epoch (JD 2461000.5 TDB = 2025-Sep-19)
-- All 29 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
+- All 30 bodies in MINOR_BODY_ELEMENTS have valid orbital parameters
 - Elements are consistent with expected physical ranges
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
@@ -40,6 +40,7 @@ from libephemeris.constants import (
     SE_AMOR,
     SE_ICARUS,
     SE_TORO,
+    SE_SAPPHO,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -86,6 +87,7 @@ def all_minor_body_ids():
         SE_AMOR,
         SE_ICARUS,
         SE_TORO,
+        SE_SAPPHO,
     ]
 
 
@@ -102,9 +104,9 @@ class TestOrbitalElementsEpoch:
             )
 
     def test_expected_number_of_bodies(self):
-        """Verify we have 29 minor bodies."""
-        assert len(MINOR_BODY_ELEMENTS) == 29, (
-            f"Expected 29 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
+        """Verify we have 30 minor bodies."""
+        assert len(MINOR_BODY_ELEMENTS) == 30, (
+            f"Expected 30 minor bodies, got {len(MINOR_BODY_ELEMENTS)}"
         )
 
 
@@ -457,6 +459,19 @@ class TestSpecificBodiesOrbitalElements:
         assert 9.0 < elements.i < 10.0, f"Toro i={elements.i} unexpected"
         # Mean motion consistent with ~1.6 year period (584 days)
         assert 0.61 < elements.n < 0.63, f"Toro n={elements.n} unexpected"
+
+    def test_sappho_main_belt_asteroid(self):
+        """Sappho: Main belt asteroid, artistic expression and same-sex love."""
+        elements = MINOR_BODY_ELEMENTS[SE_SAPPHO]
+        assert elements.name == "Sappho"
+        # Semi-major axis ~2.30 AU (main belt asteroid)
+        assert 2.29 < elements.a < 2.31, f"Sappho a={elements.a} unexpected"
+        # Moderate eccentricity ~0.20
+        assert 0.19 < elements.e < 0.21, f"Sappho e={elements.e} unexpected"
+        # Low inclination ~8.7 degrees
+        assert 8.5 < elements.i < 8.9, f"Sappho i={elements.i} unexpected"
+        # Mean motion consistent with ~3.5 year period (1271 days)
+        assert 0.28 < elements.n < 0.29, f"Sappho n={elements.n} unexpected"
 
 
 @pytest.mark.unit

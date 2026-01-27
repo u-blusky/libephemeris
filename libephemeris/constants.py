@@ -110,6 +110,9 @@ SE_ICARUS: int = (
     1566 + SE_AST_OFFSET
 )  # 1566 Icarus (Apollo asteroid, highly eccentric orbit reaches inside Mercury)
 SE_TORO: int = 1685 + SE_AST_OFFSET  # 1685 Toro (Apollo asteroid, near-Earth asteroid)
+SE_SAPPHO: int = (
+    80 + SE_AST_OFFSET
+)  # 80 Sappho (main belt asteroid, artistic expression and same-sex love)
 
 # =============================================================================
 # NAIF IDS FOR SPK KERNELS
