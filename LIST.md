@@ -96,51 +96,51 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## MEDIUM PRIORITY: Minor Bodies - Core Infrastructure
 
-- [ ] CREATE SPK_AUTO.PY MODULE FOR AUTOMATIC DOWNLOADS: Create a new module libephemeris/spk_auto.py that provides automatic SPK download and caching functionality for minor bodies, this module should work with the astroquery.jplhorizons library (pip install astroquery) to download SPK files from JPL Horizons on demand.
+- [x] CREATE SPK_AUTO.PY MODULE FOR AUTOMATIC DOWNLOADS: Create a new module libephemeris/spk_auto.py that provides automatic SPK download and caching functionality for minor bodies, this module should work with the astroquery.jplhorizons library (pip install astroquery) to download SPK files from JPL Horizons on demand.
 
-- [ ] IMPLEMENT AUTO_GET_SPK FUNCTION: In spk_auto.py implement the main function auto_get_spk(body_id, jd_start, jd_end) that checks if an SPK file for the requested body and date range exists in a local cache directory (default ~/.libephemeris/spk/), and if not automatically downloads it from JPL Horizons using the Horizons class with ephemerides() method requesting SPK binary output.
+- [x] IMPLEMENT AUTO_GET_SPK FUNCTION: In spk_auto.py implement the main function auto_get_spk(body_id, jd_start, jd_end) that checks if an SPK file for the requested body and date range exists in a local cache directory (default ~/.libephemeris/spk/), and if not automatically downloads it from JPL Horizons using the Horizons class with ephemerides() method requesting SPK binary output.
 
-- [ ] IMPLEMENT SPK CACHE DIRECTORY MANAGEMENT: Create functions to manage the SPK cache directory including ensure_cache_dir() to create the cache directory if it doesn't exist, get_cache_path(body_id) to return the path where a body's SPK should be stored, and cache_info() to return information about cached files.
+- [x] IMPLEMENT SPK CACHE DIRECTORY MANAGEMENT: Create functions to manage the SPK cache directory including ensure_cache_dir() to create the cache directory if it doesn't exist, get_cache_path(body_id) to return the path where a body's SPK should be stored, and cache_info() to return information about cached files.
 
-- [ ] IMPLEMENT SPK CACHE LOOKUP: Implement function is_spk_cached(body_id, jd_start, jd_end) that checks if a cached SPK file exists and covers the requested date range, this requires parsing the SPK file header or maintaining a separate index.
+- [x] IMPLEMENT SPK CACHE LOOKUP: Implement function is_spk_cached(body_id, jd_start, jd_end) that checks if a cached SPK file exists and covers the requested date range, this requires parsing the SPK file header or maintaining a separate index.
 
-- [ ] IMPLEMENT JPL HORIZONS SPK DOWNLOAD: Implement function download_spk_from_horizons(body_id, jd_start, jd_end, output_path) that uses astroquery.jplhorizons to download an SPK file for the specified body and date range, handle errors like body not found, date range too large, or network failures gracefully.
+- [x] IMPLEMENT JPL HORIZONS SPK DOWNLOAD: Implement function download_spk_from_horizons(body_id, jd_start, jd_end, output_path) that uses astroquery.jplhorizons to download an SPK file for the specified body and date range, handle errors like body not found, date range too large, or network failures gracefully.
 
-- [ ] IMPLEMENT SPK REGISTRATION AFTER DOWNLOAD: After downloading an SPK file, automatically register it with the existing spk.py infrastructure so it can be used by calc_ut, this should call the appropriate registration function from spk.py.
+- [x] IMPLEMENT SPK REGISTRATION AFTER DOWNLOAD: After downloading an SPK file, automatically register it with the existing spk.py infrastructure so it can be used by calc_ut, this should call the appropriate registration function from spk.py.
 
-- [ ] IMPLEMENT AUTOMATIC SPK FALLBACK IN PLANETS.PY: Modify planets.py to automatically try SPK lookup before falling back to Keplerian propagation for bodies in MINOR_BODY_ELEMENTS, add a configuration option (environment variable or function call) to enable/disable automatic SPK download.
+- [x] IMPLEMENT AUTOMATIC SPK FALLBACK IN PLANETS.PY: Modify planets.py to automatically try SPK lookup before falling back to Keplerian propagation for bodies in MINOR_BODY_ELEMENTS, add a configuration option (environment variable or function call) to enable/disable automatic SPK download.
 
-- [ ] IMPLEMENT SPK CACHE MANAGEMENT FUNCTIONS: Implement helper functions list_cached_spk() to show all cached files with their date ranges and sizes, clear_spk_cache() to delete all cached files, get_cache_size() to report total disk usage, and prune_old_cache(max_age_days) to remove files not accessed recently.
+- [x] IMPLEMENT SPK CACHE MANAGEMENT FUNCTIONS: Implement helper functions list_cached_spk() to show all cached files with their date ranges and sizes, clear_spk_cache() to delete all cached files, get_cache_size() to report total disk usage, and prune_old_cache(max_age_days) to remove files not accessed recently.
 
-- [ ] IMPLEMENT SPK BODY NAME MAPPING: Create a mapping from libephemeris body IDs (SE_CHIRON, SE_ERIS, etc.) to JPL Horizons target designations (2060, 136199, etc.) for use in SPK downloads.
+- [x] IMPLEMENT SPK BODY NAME MAPPING: Create a mapping from libephemeris body IDs (SE_CHIRON, SE_ERIS, etc.) to JPL Horizons target designations (2060, 136199, etc.) for use in SPK downloads.
 
-- [ ] ADD CONFIGURATION FOR SPK BEHAVIOR: Add configuration options for SPK behavior including auto_download_spk (bool) to enable/disable automatic downloads, spk_cache_dir (path) to override default cache location, and spk_date_padding (days) to add extra time buffer when downloading.
+- [x] ADD CONFIGURATION FOR SPK BEHAVIOR: Add configuration options for SPK behavior including auto_download_spk (bool) to enable/disable automatic downloads, spk_cache_dir (path) to override default cache location, and spk_date_padding (days) to add extra time buffer when downloading.
 
-- [ ] CREATE SPK DOWNLOAD SCRIPT: Create a command-line script scripts/download_spk.py that can be used to pre-download SPK files for common bodies, useful for users who want to populate the cache ahead of time rather than downloading on demand.
+- [x] CREATE SPK DOWNLOAD SCRIPT: Create a command-line script scripts/download_spk.py that can be used to pre-download SPK files for common bodies, useful for users who want to populate the cache ahead of time rather than downloading on demand.
 
-- [ ] UPDATE MINOR BODY ORBITAL ELEMENTS TO LATEST EPOCH: Currently the file minor_bodies.py defines orbital elements at epoch 2025.0 (JD 2461000.5) as stated in line 334 and the docstring notes that accuracy degrades 10-50 arcsec per year from epoch, so your task is to update all orbital elements in the MINOR_BODY_ELEMENTS dictionary (lines 340-483) to the most recent epoch available from JPL Small Body Database (sbdb.jpl.nasa.gov).
+- [x] UPDATE MINOR BODY ORBITAL ELEMENTS TO LATEST EPOCH: Currently the file minor_bodies.py defines orbital elements at epoch 2025.0 (JD 2461000.5) as stated in line 334 and the docstring notes that accuracy degrades 10-50 arcsec per year from epoch, so your task is to update all orbital elements in the MINOR_BODY_ELEMENTS dictionary (lines 340-483) to the most recent epoch available from JPL Small Body Database (sbdb.jpl.nasa.gov).
 
-- [ ] CREATE ORBITAL ELEMENTS UPDATE SCRIPT: Create a maintenance script scripts/update_orbital_elements.py that fetches current orbital elements from JPL SBDB API for all bodies in MINOR_BODY_ELEMENTS, compares with current values, and either updates minor_bodies.py directly or generates a report of needed changes, include instructions to run this quarterly.
+- [x] CREATE ORBITAL ELEMENTS UPDATE SCRIPT: Create a maintenance script scripts/update_orbital_elements.py that fetches current orbital elements from JPL SBDB API for all bodies in MINOR_BODY_ELEMENTS, compares with current values, and either updates minor_bodies.py directly or generates a report of needed changes, include instructions to run this quarterly.
 
-- [ ] ADD URANUS PERTURBATIONS FOR TNO ACCURACY: Currently the file minor_bodies.py in the function calc_secular_perturbation_rates (lines 165-284) only includes perturbations from Jupiter and Saturn, but for Trans-Neptunian Objects the gravitational influence of Uranus is significant, add Uranus orbital elements (a=19.2184 AU, e=0.0457, i=0.772°, Omega=74.0°, omega=170.9°, n=0.01177°/day) and mass ratio (1/22902) to the perturbation calculation.
+- [x] ADD URANUS PERTURBATIONS FOR TNO ACCURACY: Currently the file minor_bodies.py in the function calc_secular_perturbation_rates (lines 165-284) only includes perturbations from Jupiter and Saturn, but for Trans-Neptunian Objects the gravitational influence of Uranus is significant, add Uranus orbital elements (a=19.2184 AU, e=0.0457, i=0.772°, Omega=74.0°, omega=170.9°, n=0.01177°/day) and mass ratio (1/22902) to the perturbation calculation.
 
-- [ ] ADD NEPTUNE PERTURBATIONS FOR TNO ACCURACY: Add Neptune as a perturbation source with orbital elements (a=30.1104 AU, e=0.0086, i=1.769°, Omega=131.7°, omega=44.9°, n=0.006021°/day) and mass ratio (1/19412) for bodies with semi-major axis greater than 20 AU, this is especially important for plutinos like Ixion and Orcus which are in 2:3 mean motion resonance with Neptune.
+- [x] ADD NEPTUNE PERTURBATIONS FOR TNO ACCURACY: Add Neptune as a perturbation source with orbital elements (a=30.1104 AU, e=0.0086, i=1.769°, Omega=131.7°, omega=44.9°, n=0.006021°/day) and mass ratio (1/19412) for bodies with semi-major axis greater than 20 AU, this is especially important for plutinos like Ixion and Orcus which are in 2:3 mean motion resonance with Neptune.
 
-- [ ] IMPLEMENT MEAN MOTION RESONANCE DETECTION: For bodies in mean motion resonance with Neptune (plutinos 2:3, twotinos 1:2, etc.), the secular perturbation theory breaks down and can give incorrect results, implement detection of resonant orbits by checking if the mean motion is close to a resonant ratio, and flag these bodies or implement special handling.
+- [x] IMPLEMENT MEAN MOTION RESONANCE DETECTION: For bodies in mean motion resonance with Neptune (plutinos 2:3, twotinos 1:2, etc.), the secular perturbation theory breaks down and can give incorrect results, implement detection of resonant orbits by checking if the mean motion is close to a resonant ratio, and flag these bodies or implement special handling.
 
-- [ ] VALIDATE MINOR BODY IMPROVEMENTS: After adding Uranus and Neptune perturbations, validate by comparing Eris, Makemake, Ixion, and Orcus positions against pyswisseph over a 50-year span (2000-2050), document the improvement in precision.
+- [x] VALIDATE MINOR BODY IMPROVEMENTS: After adding Uranus and Neptune perturbations, validate by comparing Eris, Makemake, Ixion, and Orcus positions against pyswisseph over a 50-year span (2000-2050), document the improvement in precision.
 
 ---
 
 ## MEDIUM PRIORITY: Minor Bodies - Adding New Bodies
 
-- [ ] ADD NESSUS CENTAUR TO CATALOG: Add asteroid 7066 Nessus to MINOR_BODY_ELEMENTS with orbital elements from JPL SBDB (a≈24.6 AU, e≈0.52, i≈15.6°, get current epoch values), Nessus is astrologically important as a centaur associated with psychological patterns and abuse cycles, add SE_NESSUS = 7066 + SE_AST_OFFSET to constants.py, add NAIF_NESSUS = 2007066 to constants.py for SPK support.
+- [x] ADD NESSUS CENTAUR TO CATALOG: Add asteroid 7066 Nessus to MINOR_BODY_ELEMENTS with orbital elements from JPL SBDB (a≈24.6 AU, e≈0.52, i≈15.6°, get current epoch values), Nessus is astrologically important as a centaur associated with psychological patterns and abuse cycles, add SE_NESSUS = 7066 + SE_AST_OFFSET to constants.py, add NAIF_NESSUS = 2007066 to constants.py for SPK support.
 
-- [ ] ADD ASBOLUS CENTAUR TO CATALOG: Add asteroid 8405 Asbolus to MINOR_BODY_ELEMENTS with current orbital elements from JPL SBDB, Asbolus is another significant centaur in astrological practice, add SE_ASBOLUS = 8405 + SE_AST_OFFSET and NAIF_ASBOLUS = 2008405 to constants.py.
+- [x] ADD ASBOLUS CENTAUR TO CATALOG: Add asteroid 8405 Asbolus to MINOR_BODY_ELEMENTS with current orbital elements from JPL SBDB, Asbolus is another significant centaur in astrological practice, add SE_ASBOLUS = 8405 + SE_AST_OFFSET and NAIF_ASBOLUS = 2008405 to constants.py.
 
-- [ ] ADD CHARIKLO CENTAUR TO CATALOG: Add asteroid 10199 Chariklo to MINOR_BODY_ELEMENTS, Chariklo is the largest known centaur (diameter ~250 km) and has a ring system discovered in 2014, add SE_CHARIKLO = 10199 + SE_AST_OFFSET to constants.py.
+- [x] ADD CHARIKLO CENTAUR TO CATALOG: Add asteroid 10199 Chariklo to MINOR_BODY_ELEMENTS, Chariklo is the largest known centaur (diameter ~250 km) and has a ring system discovered in 2014, add SE_CHARIKLO = 10199 + SE_AST_OFFSET to constants.py.
 
-- [ ] ADD GONGGONG TNO TO CATALOG: Add dwarf planet candidate 225088 Gonggong (formerly 2007 OR10) to MINOR_BODY_ELEMENTS with orbital elements from JPL SBDB (a≈67 AU, e≈0.50, i≈30.7°), this is one of the largest TNOs, add SE_GONGGONG = 225088 + SE_AST_OFFSET to constants.py.
+- [x] ADD GONGGONG TNO TO CATALOG: Add dwarf planet candidate 225088 Gonggong (formerly 2007 OR10) to MINOR_BODY_ELEMENTS with orbital elements from JPL SBDB (a≈67 AU, e≈0.50, i≈30.7°), this is one of the largest TNOs, add SE_GONGGONG = 225088 + SE_AST_OFFSET to constants.py.
 
 - [ ] ADD VARUNA TNO TO CATALOG: Add asteroid 20000 Varuna to MINOR_BODY_ELEMENTS, Varuna is a large classical Kuiper belt object with diameter ~670 km, the constant SE_VARUNA is already defined in constants.py line 58 but verify orbital elements are in MINOR_BODY_ELEMENTS.
 
