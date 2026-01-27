@@ -31,6 +31,18 @@ SE_URANUS: int = 7
 SE_NEPTUNE: int = 8
 SE_PLUTO: int = 9
 
+# Planet aliases without SE_ prefix for pyswisseph compatibility
+SUN: int = SE_SUN
+MOON: int = SE_MOON
+MERCURY: int = SE_MERCURY
+VENUS: int = SE_VENUS
+MARS: int = SE_MARS
+JUPITER: int = SE_JUPITER
+SATURN: int = SE_SATURN
+URANUS: int = SE_URANUS
+NEPTUNE: int = SE_NEPTUNE
+PLUTO: int = SE_PLUTO
+
 # Lunar nodes and apsides
 SE_MEAN_NODE: int = 10  # Mean lunar node (Dragon's Head)
 SE_TRUE_NODE: int = 11  # True (osculating) lunar node
