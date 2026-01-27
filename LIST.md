@@ -86,11 +86,11 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT VELOCITY FOR INTERPOLATED APOGEE: The interpolated apogee should also return velocity when SEFLG_SPEED is set, implement velocity calculation by analytically differentiating the interpolation polynomial or by numerical differentiation using positions at t-dt and t+dt. COMPLETED: Implemented via numerical differentiation in planets.py:576-596 using forward difference with dt=1 second. Velocity is calculated for longitude, latitude, and distance when SEFLG_SPEED flag is set. Tests exist in tests/test_lunar/test_interpolated_apogee.py (TestInterpolatedApogeeVelocity) and tests/test_lunar/test_interpolated_perigee.py (TestInterpolatedPerigeeVelocity).
 
-- [ ] HANDLE EDGE CASES FOR INTERPOLATED APOGEE: Handle edge cases in the interpolated apogee calculation including wrapping around 360/0 degrees (the apogee might cross this boundary during the interpolation window), handle dates at the boundaries of the ephemeris range where future samples cannot be computed.
+- [x] HANDLE EDGE CASES FOR INTERPOLATED APOGEE: Handle edge cases in the interpolated apogee calculation including wrapping around 360/0 degrees (the apogee might cross this boundary during the interpolation window), handle dates at the boundaries of the ephemeris range where future samples cannot be computed.
 
-- [ ] VALIDATE INTERPOLATED APOGEE AGAINST PYSWISSEPH: Create tests comparing calc_interpolated_apogee and calc_interpolated_perigee against pyswisseph swe.calc_ut(jd, swe.INTP_APOG, flags) and swe.calc_ut(jd, swe.INTP_PERG, flags) on at least 100 test dates spanning different lunar phases, target error less than 0.1 degrees.
+- [x] VALIDATE INTERPOLATED APOGEE AGAINST PYSWISSEPH: Create tests comparing calc_interpolated_apogee and calc_interpolated_perigee against pyswisseph swe.calc_ut(jd, swe.INTP_APOG, flags) and swe.calc_ut(jd, swe.INTP_PERG, flags) on at least 100 test dates spanning different lunar phases, target error less than 0.1 degrees.
 
-- [ ] DOCUMENT INTERPOLATED APOGEE IMPLEMENTATION: Add comprehensive documentation explaining the interpolated apogee/perigee, how it differs from the osculating (true) apogee, and when to use each variant.
+- [x] DOCUMENT INTERPOLATED APOGEE IMPLEMENTATION: Add comprehensive documentation explaining the interpolated apogee/perigee, how it differs from the osculating (true) apogee, and when to use each variant. COMPLETED: Comprehensive documentation added in docs/INTERPOLATED_APOGEE.md covering the problem with osculating apsides, the interpolated solution, implementation details, when to use each variant, API usage examples, and precision limitations. Documentation tests added in tests/test_lunar/test_interpolated_apogee_documentation.py. PRECISION.md updated to include interpolated apogee/perigee entries.
 
 ---
 

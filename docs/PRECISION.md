@@ -243,10 +243,14 @@ LibEphemeris uses different calculation models for some lunar points, resulting 
 | True Node | ~0.07° (~260 arcsec) | Osculating orbital elements method |
 | Mean Lilith | ~0.1° | Minor formula differences |
 | True Lilith | ~5-15° | Different orbital model (see below) |
+| Interpolated Apogee | ~8-10° | Smoothed osculating apogee (see below) |
+| Interpolated Perigee | ~10-15° | Smoothed osculating perigee (see below) |
 
 **Note on True Node**: The True Node calculation uses osculating orbital elements derived from the Moon's instantaneous position and velocity, with IAU 2006 precession correction. Mean error is ~0.02° (86 arcsec), max error ~0.07° (260 arcsec). For most astrological purposes, this precision is sufficient.
 
 **Note on True Lilith**: The True Lilith (osculating apogee) calculation uses the eccentricity vector method derived from JPL DE ephemeris state vectors. This differs fundamentally from Swiss Ephemeris which uses an integrated analytical lunar theory. The difference arises because the "osculating apogee" concept is model-dependent when solar perturbations are significant. Typical error is 5-15°, with occasional differences up to 25°. For applications requiring closer Swiss Ephemeris compatibility, use Mean Lilith instead.
+
+**Note on Interpolated Apogee/Perigee**: The interpolated apogee (SE_INTP_APOG) and perigee (SE_INTP_PERG) smooth out the spurious 30-degree oscillations in the osculating apsides using polynomial regression over a 56-day window. While Swiss Ephemeris uses an analytical method derived from Moshier's lunar theory, libephemeris uses least-squares fitting to achieve smoothing. The interpolated apogee oscillates ~5° from the mean (vs. 30° for osculating), making it significantly smoother. However, differences of 8-10° from Swiss Ephemeris persist due to the different underlying osculating calculations. See [INTERPOLATED_APOGEE.md](INTERPOLATED_APOGEE.md) for comprehensive documentation.
 
 ### Asteroids
 
