@@ -5505,8 +5505,107 @@ def lun_occult_when_loc(
     )
 
 
-# Alias for Swiss Ephemeris API compatibility
-swe_lun_occult_when_loc = lun_occult_when_loc
+def swe_lun_occult_when_loc(
+    tjdut: float,
+    body: "int | str",
+    geopos: "Sequence[float]",
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
+    """
+    Find the next lunar occultation visible from a specific location.
+
+    This function matches the pyswisseph swe_lun_occult_when_loc() API exactly.
+
+    A lunar occultation occurs when the Moon passes in front of (occults)
+    a planet or star as seen from Earth. This function searches forward
+    (or backward) in time to find the next occultation visible from a specific
+    geographic location, where both the Moon and the target are above the horizon.
+
+    Args:
+        tjdut: Julian Day (UT) to start search from
+        body: Planet identifier (int) or star name (str)
+            For planets: SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN, etc.
+            For stars: e.g., "Regulus", "Spica", "Aldebaran"
+        geopos: Sequence of [longitude_degrees, latitude_degrees, altitude_meters]
+                NOTE: longitude comes first (this matches pyswisseph convention)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        backwards: If True, search backward in time instead of forward
+
+    Returns:
+        Tuple containing:
+            - retflags: Occultation type flags bitmask (int):
+                SE_ECL_TOTAL: Total occultation (body fully behind Moon)
+                SE_ECL_PARTIAL: Partial occultation (body partially behind Moon)
+                SE_ECL_VISIBLE: Occultation visible from location
+                SE_ECL_MAX_VISIBLE: Maximum visible from location
+                SE_ECL_1ST_VISIBLE: First contact visible
+                SE_ECL_4TH_VISIBLE: Fourth contact visible
+            - tret: Tuple of 10 floats with occultation phase times (JD UT):
+                [0]: Time of maximum occultation (minimum separation)
+                [1]: Time of first contact (occultation begins)
+                [2]: Time of second contact (full occultation begins, or 0)
+                [3]: Time of third contact (full occultation ends, or 0)
+                [4]: Time of fourth contact (occultation ends)
+                [5]: Reserved (0)
+                [6]: Reserved (0)
+                [7]: Time of moonrise (if Moon rises during occultation, else 0)
+                [8]: Time of moonset (if Moon sets during occultation, else 0)
+                [9]: Reserved (0)
+            - attr: Tuple of 20 floats with occultation attributes:
+                [0]: Fraction of target diameter covered by Moon (magnitude)
+                [1]: Ratio of lunar diameter to target diameter
+                [2]: Fraction of target disc covered by Moon (obscuration)
+                [3]: Diameter of core shadow in km (0 for stars)
+                [4]: Azimuth of target at maximum occultation (degrees)
+                [5]: True altitude of target above horizon at maximum (degrees)
+                [6]: Apparent altitude of target above horizon at maximum (degrees)
+                [7]: Angular separation (elongation) at maximum (degrees)
+                [8-19]: Reserved (0)
+
+    Raises:
+        RuntimeError: If no occultation visible from location within search limit
+        ValueError: If body is invalid or geopos has wrong length
+
+    Example:
+        >>> # Find next occultation of Regulus visible from Rome
+        >>> from libephemeris import julday, swe_lun_occult_when_loc, SEFLG_SWIEPH
+        >>> jd = julday(2017, 1, 1, 0)
+        >>> rome_geopos = [12.4964, 41.9028, 0]  # lon, lat, alt
+        >>> retflags, tret, attr = swe_lun_occult_when_loc(jd, "Regulus", rome_geopos)
+        >>> print(f"Occultation maximum at JD {tret[0]:.5f}")
+        >>> print(f"Moon altitude: {attr[5]:.1f}°")
+
+    References:
+        - Swiss Ephemeris: swe_lun_occult_when_loc()
+        - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
+    """
+    from typing import Sequence
+
+    # Validate geopos
+    if len(geopos) < 3:
+        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+
+    # Extract geographic position (pyswisseph uses lon, lat, alt order)
+    lon = geopos[0]
+    lat = geopos[1]
+    altitude = geopos[2]
+
+    # Determine if body is planet ID or star name
+    if isinstance(body, str):
+        planet = 0
+        star_name = body
+    else:
+        planet = body
+        star_name = ""
+
+    # Call the internal implementation
+    times, attr, ecl_type = lun_occult_when_loc(
+        tjdut, planet, star_name, lat, lon, altitude, flags
+    )
+
+    # Return in pyswisseph order: (retflags, tret, attr)
+    return ecl_type, times, attr
 
 
 def lun_occult_where(
