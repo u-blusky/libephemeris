@@ -129,6 +129,7 @@ from .eclipse import (
     interpolate_besselian_elements,
     calc_eclipse_first_contact_c1,
     calc_eclipse_second_contact_c2,
+    calc_eclipse_third_contact_c3,
 )
 from .utils import (
     degnorm,
