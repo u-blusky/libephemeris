@@ -236,6 +236,67 @@ class HypotheticalElements:
     n: float
 
 
+# =============================================================================
+# CUPIDO KEPLERIAN ORBITAL ELEMENTS (Hamburg School, Swiss Ephemeris seorbel.txt)
+# =============================================================================
+# Cupido is the first Hamburg School Uranian planet.
+# Elements from Swiss Ephemeris documentation:
+#   - Semi-major axis: 40.99837 AU
+#   - Eccentricity: 0.00 (nearly circular orbit)
+#   - Orbital period: ~262.5 years (derived from a^(3/2) = period in years)
+#   - Mean longitude at J1900.0: 237.4667 degrees
+#
+# These elements provide a Keplerian-based calculation as an alternative to the
+# secular polynomial formulas used in calc_uranian_longitude().
+
+
+@dataclass
+class CupidoKeplerianElements:
+    """
+    Keplerian orbital elements for Cupido from Swiss Ephemeris seorbel.txt.
+
+    Attributes:
+        name: Name of the body
+        epoch: Reference epoch (Julian Day TT)
+        a: Semi-major axis (AU)
+        e: Eccentricity
+        i: Inclination (degrees)
+        omega: Argument of perihelion (degrees)
+        Omega: Longitude of ascending node (degrees)
+        L0: Mean longitude at epoch (degrees)
+        n: Mean motion (degrees per day)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    omega: float
+    Omega: float
+    L0: float
+    n: float
+
+
+# Cupido Keplerian elements from Swiss Ephemeris seorbel.txt
+# Epoch: J1900.0 (JD 2415020.0)
+# Mean longitude at J1900.0: 237.4667 degrees
+# Mean motion: derived from a = 40.99837 AU using Kepler's 3rd law
+# n = 360 / (a^1.5 * 365.25) degrees/day
+CUPIDO_KEPLERIAN_ELEMENTS = CupidoKeplerianElements(
+    name="Cupido",
+    epoch=2415020.0,  # J1900.0
+    a=40.99837,  # Semi-major axis in AU
+    e=0.00,  # Nearly circular orbit
+    i=0.0,  # Assumed on ecliptic
+    omega=0.0,  # Irrelevant for e=0
+    Omega=0.0,  # Assumed zero ascending node
+    L0=237.4667,  # Mean longitude at J1900.0 (degrees)
+    # n = 360 / (a^1.5 * 365.25) = 360 / (262.49 * 365.25) = 0.003757 deg/day
+    n=0.003757,
+)
+
+
 # Other hypothetical body elements
 # Transpluto (Isis) elements from Swiss Ephemeris
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
@@ -460,6 +521,64 @@ def calc_uranian_position(
         dlon += 360.0 / dt
 
     # Latitude and distance are constant
+    dlat = 0.0
+    ddist = 0.0
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def calc_cupido(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the position of Cupido using Keplerian propagation.
+
+    Cupido is the first Hamburg School Uranian planet. This function uses
+    simple Keplerian propagation with orbital elements from Swiss Ephemeris
+    seorbel.txt documentation:
+        - Semi-major axis: 40.99837 AU
+        - Eccentricity: 0.00 (nearly circular orbit)
+        - Orbital period: ~262.5 years
+
+    For a circular orbit (e=0), the calculation simplifies to:
+        longitude = L0 + n * (jd_tt - epoch)
+
+    where L0 is the mean longitude at epoch and n is the mean motion.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees (always 0 for Cupido)
+            - distance: Distance from Sun in AU (40.99837 AU, constant)
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day (always 0)
+            - ddist: Daily distance change in AU/day (always 0 for e=0)
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_cupido
+        >>> pos = calc_cupido(2451545.0)  # J2000.0
+        >>> print(f"Cupido at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
+    """
+    elements = CUPIDO_KEPLERIAN_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # For a circular orbit (e = 0), mean longitude = true longitude
+    # Simply propagate the mean longitude
+    longitude = (elements.L0 + elements.n * dt) % 360.0
+
+    # Cupido is assumed to be on the ecliptic (zero inclination)
+    latitude = 0.0
+
+    # Distance is constant for circular orbit (equal to semi-major axis)
+    distance = elements.a
+
+    # Daily motion is simply the mean motion for circular orbit
+    dlon = elements.n
+
+    # No latitude or distance change for circular orbit on ecliptic
     dlat = 0.0
     ddist = 0.0
 

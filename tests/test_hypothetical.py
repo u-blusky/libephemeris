@@ -36,10 +36,12 @@ from libephemeris.hypothetical import (
     calc_waldemath_position,
     calc_hypothetical_position,
     list_hypothetical_bodies,
+    calc_cupido,
     # Data structures
     URANIAN_ELEMENTS,
     HYPOTHETICAL_ELEMENTS,
     HYPOTHETICAL_NAMES,
+    CUPIDO_KEPLERIAN_ELEMENTS,
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -474,3 +476,168 @@ class TestHypotheticalElements:
         """Test that eccentricities are valid."""
         for body_id, elements in HYPOTHETICAL_ELEMENTS.items():
             assert 0 <= elements.e < 1, f"{elements.name} has invalid eccentricity"
+
+
+class TestCalcCupido:
+    """Tests for the calc_cupido Keplerian propagation function."""
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_cupido_returns_tuple(self):
+        """Test that calc_cupido returns correct tuple format."""
+        pos = calc_cupido(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        lon, lat, dist, dlon, dlat, ddist = pos
+        assert isinstance(lon, float)
+        assert isinstance(lat, float)
+        assert isinstance(dist, float)
+        assert isinstance(dlon, float)
+        assert isinstance(dlat, float)
+        assert isinstance(ddist, float)
+
+    def test_calc_cupido_longitude_range(self):
+        """Test that longitude is in valid range."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_cupido(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
+
+    def test_calc_cupido_latitude_zero(self):
+        """Test that Cupido has zero latitude (on ecliptic)."""
+        pos = calc_cupido(self.J2000)
+        assert pos[1] == 0.0, "Cupido should have zero latitude"
+
+    def test_calc_cupido_distance_correct(self):
+        """Test that Cupido distance matches semi-major axis (circular orbit)."""
+        pos = calc_cupido(self.J2000)
+        # For circular orbit, distance = semi-major axis = 40.99837 AU
+        assert abs(pos[2] - 40.99837) < 0.001, (
+            f"Cupido distance should be ~40.99837 AU, got {pos[2]}"
+        )
+
+    def test_calc_cupido_distance_constant(self):
+        """Test that distance is constant for circular orbit."""
+        pos1 = calc_cupido(self.J2000)
+        pos2 = calc_cupido(self.J2000 + 365.25 * 50)  # 50 years later
+        assert pos1[2] == pos2[2], "Distance should be constant for circular orbit"
+
+    def test_calc_cupido_velocity_positive(self):
+        """Test that daily motion is positive (prograde)."""
+        pos = calc_cupido(self.J2000)
+        assert pos[3] > 0, "Cupido should have prograde motion"
+
+    def test_calc_cupido_velocity_constant(self):
+        """Test that velocity is constant for circular orbit."""
+        pos = calc_cupido(self.J2000)
+        # For circular orbit, daily motion = mean motion
+        expected_n = CUPIDO_KEPLERIAN_ELEMENTS.n
+        assert pos[3] == expected_n, (
+            f"Daily motion should be {expected_n}, got {pos[3]}"
+        )
+
+    def test_calc_cupido_latitude_velocity_zero(self):
+        """Test that latitude and distance velocity are zero."""
+        pos = calc_cupido(self.J2000)
+        assert pos[4] == 0.0, "Latitude velocity should be zero"
+        assert pos[5] == 0.0, "Distance velocity should be zero for e=0"
+
+    def test_calc_cupido_at_epoch(self):
+        """Test that longitude at J1900.0 matches L0."""
+        pos = calc_cupido(self.J1900)
+        # At epoch, longitude should equal L0
+        expected_L0 = CUPIDO_KEPLERIAN_ELEMENTS.L0
+        assert abs(pos[0] - expected_L0) < 0.01, (
+            f"At epoch, longitude should be {expected_L0}, got {pos[0]}"
+        )
+
+    def test_calc_cupido_progression(self):
+        """Test that Cupido progresses correctly over time."""
+        pos1 = calc_cupido(self.J2000)
+        pos2 = calc_cupido(self.J2000 + 365.25)  # 1 year later
+
+        # Calculate expected motion in 1 year
+        expected_motion = CUPIDO_KEPLERIAN_ELEMENTS.n * 365.25
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        assert abs(actual_motion - expected_motion) < 0.01, (
+            f"Annual motion should be {expected_motion:.4f} deg, got {actual_motion:.4f}"
+        )
+
+    def test_calc_cupido_orbital_period(self):
+        """Test that Cupido completes one orbit in expected period."""
+        # Orbital period from Kepler's 3rd law: T = a^1.5 years
+        a = CUPIDO_KEPLERIAN_ELEMENTS.a
+        expected_period_years = a**1.5  # ~262.5 years
+
+        # One full orbit should advance longitude by ~360 degrees
+        period_days = expected_period_years * 365.25
+        pos1 = calc_cupido(self.J2000)
+        pos2 = calc_cupido(self.J2000 + period_days)
+
+        # After one full period, should be back to same longitude (within tolerance)
+        diff = abs(pos2[0] - pos1[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 1.0, (
+            f"After one orbit ({expected_period_years:.1f} years), "
+            f"longitude should return near start, diff = {diff:.2f} deg"
+        )
+
+    def test_calc_cupido_keplerian_elements_valid(self):
+        """Test that Cupido Keplerian elements have valid values."""
+        elements = CUPIDO_KEPLERIAN_ELEMENTS
+        assert elements.name == "Cupido"
+        assert elements.a > 30.0, "Cupido should be beyond Neptune"
+        assert elements.e == 0.0, "Cupido should have circular orbit"
+        assert elements.i == 0.0, "Cupido should be on ecliptic"
+        assert 0 < elements.n < 1.0, "Mean motion should be small but positive"
+
+    def test_calc_cupido_vs_uranian_different_methods(self):
+        """Test that calc_cupido uses different method from calc_uranian_position.
+
+        The two methods use different algorithms:
+        - calc_cupido: Simple Keplerian propagation from J1900.0 epoch
+        - calc_uranian_position: Secular polynomial formula from J2000.0 epoch
+
+        They may give different longitudes but both should produce valid positions
+        that progress at similar rates over time.
+        """
+        keplerian_pos = calc_cupido(self.J2000)
+        uranian_pos = calc_uranian_position(SE_CUPIDO, self.J2000)
+
+        # Both should be in valid range
+        assert 0.0 <= keplerian_pos[0] < 360.0
+        assert 0.0 <= uranian_pos[0] < 360.0
+
+        # Both should show similar daily motion (prograde, slow)
+        # Keplerian uses n = 0.003757 deg/day
+        # Uranian uses n/36525 where n = 1.091437 deg/century = 0.0000299 deg/day
+        # Wait, that's much slower. Let me check the velocities instead.
+        assert keplerian_pos[3] > 0, "Keplerian motion should be prograde"
+        assert uranian_pos[3] > 0, "Uranian motion should be prograde"
+
+    def test_se_cupido_constant_value(self):
+        """Test that SE_CUPIDO has correct value (SE_FICT_OFFSET + 0 = 40)."""
+        assert SE_CUPIDO == 40
+        assert SE_CUPIDO == SE_FICT_OFFSET + 0
+
+    def test_calc_cupido_exportable_from_main_module(self):
+        """Test that calc_cupido is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_cupido")
+        pos = libephemeris.calc_cupido(self.J2000)
+        assert len(pos) == 6

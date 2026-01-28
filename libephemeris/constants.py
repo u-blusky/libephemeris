@@ -71,6 +71,13 @@ SE_VARUNA: int = SE_AST_OFFSET + 20000  # TNO Varuna
 SE_FICT_OFFSET: int = 40  # Offset for fictitious bodies
 SE_NFICT_ELEM: int = 15  # Number of fictitious elements
 SE_COMET_OFFSET: int = 1000  # Offset for comet IDs
+
+# Hamburg School Uranian planets (fictitious bodies)
+SE_CUPIDO: int = SE_FICT_OFFSET + 0  # 40 - First Uranian planet (Cupido)
+
+# Pyswisseph-compatible alias for Cupido
+CUPIDO: int = SE_CUPIDO
+
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
 # Trans-Neptunian Objects (TNOs) - Catalog number + offset
