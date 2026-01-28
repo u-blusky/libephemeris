@@ -130,6 +130,7 @@ from .eclipse import (
     calc_eclipse_first_contact_c1,
     calc_eclipse_second_contact_c2,
     calc_eclipse_third_contact_c3,
+    calc_eclipse_fourth_contact_c4,
 )
 from .utils import (
     degnorm,

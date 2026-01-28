@@ -8955,3 +8955,93 @@ def calc_eclipse_third_contact_c3(
     )
 
     return t_third_contact
+
+
+def calc_eclipse_fourth_contact_c4(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of fourth external contact (C4) for a solar eclipse.
+
+    Fourth contact (C4) is the moment when the Moon's disk completely separates
+    from the Sun's disk externally, marking the end of a solar eclipse. At this
+    instant, the penumbral shadow cone last touches Earth's surface.
+
+    This function uses Besselian elements to precisely calculate C4. The
+    condition for C4 is when gamma (the distance of the shadow axis from
+    Earth's center) equals 1 + l1 (Earth radius plus penumbral cone radius),
+    occurring after eclipse maximum.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from sol_eclipse_when_glob()
+                or sol_eclipse_when_loc(). The function searches forward from
+                this time to find C4.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of fourth contact C4. Returns 0.0 if C4 cannot be
+        determined (which would indicate the input time is not near a valid
+        solar eclipse).
+
+    Algorithm:
+        1. Calculate l1 (penumbral radius) at eclipse maximum
+        2. Compute target gamma = 1 + l1 (condition for penumbra leaving Earth)
+        3. Use binary search to find when gamma equals this target after maximum
+        4. The search proceeds from jd_max to (jd_max + search_range)
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the gamma value converges to within 1e-8 Earth radii,
+        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+
+    Example:
+        >>> from libephemeris import julday, sol_eclipse_when_glob, calc_eclipse_fourth_contact_c4
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the April 8, 2024 total solar eclipse
+        >>> jd_start = julday(2024, 1, 1, 0.0)
+        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate fourth contact
+        >>> jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
+        >>> print(f"Fourth contact C4: JD {jd_c4:.6f}")
+
+    Note:
+        - C4 is also known as "fourth contact" or "partial phase ends"
+        - C4 marks the end of the eclipse when the penumbra completely leaves Earth
+        - For local eclipse circumstances (at a specific observer location),
+          use sol_eclipse_when_loc() which returns contact times in its result
+        - The returned time is for the global eclipse (when penumbra last
+          leaves Earth anywhere), not for a specific observer location
+        - The total duration of the eclipse is (C4 - C1)
+
+    See Also:
+        - calc_eclipse_first_contact_c1: Calculate first contact (eclipse begins)
+        - calc_eclipse_second_contact_c2: Calculate second contact (totality begins)
+        - calc_eclipse_third_contact_c3: Calculate third contact (totality ends)
+        - sol_eclipse_when_glob: Find next solar eclipse and all phase times
+        - sol_eclipse_when_loc: Get local eclipse circumstances including contacts
+        - calc_besselian_l1: Calculate penumbral shadow radius
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Get l1 (penumbral radius) at maximum eclipse
+    l1 = _calc_penumbra_limit(jd_max)
+
+    # For global eclipse, fourth contact occurs when gamma = 1 + l1
+    # (penumbral shadow leaves Earth's limb from inside)
+    penumbral_limit = 1.0 + l1  # Earth radius + penumbra radius
+
+    # Calculate fourth contact (penumbra completely leaves Earth)
+    # Search forward from maximum with a range of ~3.6 hours
+    # (penumbral contact typically occurs 1.5-3 hours after maximum)
+    t_fourth_contact = _find_contact_time_besselian(
+        jd_max, penumbral_limit, search_before=False, search_range=0.15
+    )
+
+    return t_fourth_contact
