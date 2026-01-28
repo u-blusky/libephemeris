@@ -80,6 +80,7 @@ SE_KRONOS: int = SE_FICT_OFFSET + 3  # 43 - Fourth Uranian planet (Kronos)
 SE_APOLLON: int = SE_FICT_OFFSET + 4  # 44 - Fifth Uranian planet (Apollon)
 SE_ADMETOS: int = SE_FICT_OFFSET + 5  # 45 - Sixth Uranian planet (Admetos)
 SE_VULKANUS: int = SE_FICT_OFFSET + 6  # 46 - Seventh Uranian planet (Vulkanus)
+SE_POSEIDON: int = SE_FICT_OFFSET + 7  # 47 - Eighth Uranian planet (Poseidon)
 
 # Pyswisseph-compatible aliases for Uranian planets
 CUPIDO: int = SE_CUPIDO
@@ -89,6 +90,7 @@ KRONOS: int = SE_KRONOS
 APOLLON: int = SE_APOLLON
 ADMETOS: int = SE_ADMETOS
 VULKANUS: int = SE_VULKANUS
+POSEIDON: int = SE_POSEIDON
 
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 

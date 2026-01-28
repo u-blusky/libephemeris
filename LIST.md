@@ -196,17 +196,17 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT HADES URANIAN PLANET: Implement the second Uranian planet Hades with its orbital elements from seorbel.txt, add SE_HADES = 41 to constants.py, implement calc_hades(jd_tt) in hypothetical.py.
 
-- [ ] IMPLEMENT ZEUS URANIAN PLANET: Implement the third Uranian planet Zeus, add SE_ZEUS = 42 to constants.py, implement calc_zeus(jd_tt) in hypothetical.py.
+- [x] IMPLEMENT ZEUS URANIAN PLANET: Implement the third Uranian planet Zeus, add SE_ZEUS = 42 to constants.py, implement calc_zeus(jd_tt) in hypothetical.py.
 
-- [ ] IMPLEMENT KRONOS URANIAN PLANET: Implement the fourth Uranian planet Kronos, add SE_KRONOS = 43 to constants.py, implement calc_kronos(jd_tt) in hypothetical.py.
+- [x] IMPLEMENT KRONOS URANIAN PLANET: Implement the fourth Uranian planet Kronos, add SE_KRONOS = 43 to constants.py, implement calc_kronos(jd_tt) in hypothetical.py.
 
-- [ ] IMPLEMENT APOLLON URANIAN PLANET: Implement the fifth Uranian planet Apollon, add SE_APOLLON = 44 to constants.py, implement calc_apollon(jd_tt) in hypothetical.py.
+- [x] IMPLEMENT APOLLON URANIAN PLANET: Implement the fifth Uranian planet Apollon, add SE_APOLLON = 44 to constants.py, implement calc_apollon(jd_tt) in hypothetical.py.
 
-- [ ] IMPLEMENT ADMETOS URANIAN PLANET: Implement the sixth Uranian planet Admetos, add SE_ADMETOS = 45 to constants.py, implement calc_admetos(jd_tt) in hypothetical.py.
+- [x] IMPLEMENT ADMETOS URANIAN PLANET: Implement the sixth Uranian planet Admetos, add SE_ADMETOS = 45 to constants.py, implement calc_admetos(jd_tt) in hypothetical.py.
 
-- [ ] IMPLEMENT VULKANUS URANIAN PLANET: Implement the seventh Uranian planet Vulkanus, add SE_VULKANUS = 46 to constants.py, implement calc_vulkanus(jd_tt) in hypothetical.py.
+- [x] IMPLEMENT VULKANUS URANIAN PLANET: Implement the seventh Uranian planet Vulkanus, add SE_VULKANUS = 46 to constants.py, implement calc_vulkanus(jd_tt) in hypothetical.py.
 
-- [ ] IMPLEMENT POSEIDON URANIAN PLANET: Implement the eighth Uranian planet Poseidon, add SE_POSEIDON = 47 to constants.py, implement calc_poseidon(jd_tt) in hypothetical.py.
+- [x] IMPLEMENT POSEIDON URANIAN PLANET: Implement the eighth Uranian planet Poseidon, add SE_POSEIDON = 47 to constants.py, implement calc_poseidon(jd_tt) in hypothetical.py.
 
 - [ ] IMPLEMENT GENERIC URANIAN PLANET CALCULATOR: Create a generic function calc_uranian_planet(body_id, jd_tt) that handles all Uranian planets by looking up their orbital elements from a data structure and performing the Keplerian propagation.
 

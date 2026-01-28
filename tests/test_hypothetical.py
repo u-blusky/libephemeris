@@ -43,6 +43,7 @@ from libephemeris.hypothetical import (
     calc_apollon,
     calc_admetos,
     calc_vulkanus,
+    calc_poseidon,
     # Data structures
     URANIAN_ELEMENTS,
     HYPOTHETICAL_ELEMENTS,
@@ -54,6 +55,7 @@ from libephemeris.hypothetical import (
     APOLLON_KEPLERIAN_ELEMENTS,
     ADMETOS_KEPLERIAN_ELEMENTS,
     VULKANUS_KEPLERIAN_ELEMENTS,
+    POSEIDON_KEPLERIAN_ELEMENTS,
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -1760,4 +1762,188 @@ class TestCalcVulkanus:
         # Vulkanus has larger semi-major axis
         assert vulkanus_pos[2] > admetos_pos[2], (
             "Vulkanus should be farther from Sun than Admetos"
+        )
+
+
+class TestCalcPoseidon:
+    """Tests for the calc_poseidon Keplerian propagation function."""
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_poseidon_returns_tuple(self):
+        """Test that calc_poseidon returns correct tuple format."""
+        pos = calc_poseidon(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        lon, lat, dist, dlon, dlat, ddist = pos
+        assert isinstance(lon, float)
+        assert isinstance(lat, float)
+        assert isinstance(dist, float)
+        assert isinstance(dlon, float)
+        assert isinstance(dlat, float)
+        assert isinstance(ddist, float)
+
+    def test_calc_poseidon_longitude_range(self):
+        """Test that longitude is in valid range."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_poseidon(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
+
+    def test_calc_poseidon_latitude_zero(self):
+        """Test that Poseidon has zero latitude (on ecliptic)."""
+        pos = calc_poseidon(self.J2000)
+        assert pos[1] == 0.0, "Poseidon should have zero latitude"
+
+    def test_calc_poseidon_distance_correct(self):
+        """Test that Poseidon distance matches semi-major axis (circular orbit)."""
+        pos = calc_poseidon(self.J2000)
+        # For circular orbit, distance = semi-major axis = 83.666307 AU
+        assert abs(pos[2] - 83.666307) < 0.001, (
+            f"Poseidon distance should be ~83.666307 AU, got {pos[2]}"
+        )
+
+    def test_calc_poseidon_distance_constant(self):
+        """Test that distance is constant for circular orbit."""
+        pos1 = calc_poseidon(self.J2000)
+        pos2 = calc_poseidon(self.J2000 + 365.25 * 50)  # 50 years later
+        assert pos1[2] == pos2[2], "Distance should be constant for circular orbit"
+
+    def test_calc_poseidon_velocity_positive(self):
+        """Test that daily motion is positive (prograde)."""
+        pos = calc_poseidon(self.J2000)
+        assert pos[3] > 0, "Poseidon should have prograde motion"
+
+    def test_calc_poseidon_velocity_constant(self):
+        """Test that velocity is constant for circular orbit."""
+        pos = calc_poseidon(self.J2000)
+        # For circular orbit, daily motion = mean motion
+        expected_n = POSEIDON_KEPLERIAN_ELEMENTS.n
+        assert pos[3] == expected_n, (
+            f"Daily motion should be {expected_n}, got {pos[3]}"
+        )
+
+    def test_calc_poseidon_latitude_velocity_zero(self):
+        """Test that latitude and distance velocity are zero."""
+        pos = calc_poseidon(self.J2000)
+        assert pos[4] == 0.0, "Latitude velocity should be zero"
+        assert pos[5] == 0.0, "Distance velocity should be zero for e=0"
+
+    def test_calc_poseidon_at_epoch(self):
+        """Test that longitude at J1900.0 matches L0."""
+        pos = calc_poseidon(self.J1900)
+        # At epoch, longitude should equal L0
+        expected_L0 = POSEIDON_KEPLERIAN_ELEMENTS.L0
+        assert abs(pos[0] - expected_L0) < 0.01, (
+            f"At epoch, longitude should be {expected_L0}, got {pos[0]}"
+        )
+
+    def test_calc_poseidon_progression(self):
+        """Test that Poseidon progresses correctly over time."""
+        pos1 = calc_poseidon(self.J2000)
+        pos2 = calc_poseidon(self.J2000 + 365.25)  # 1 year later
+
+        # Calculate expected motion in 1 year
+        expected_motion = POSEIDON_KEPLERIAN_ELEMENTS.n * 365.25
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        assert abs(actual_motion - expected_motion) < 0.01, (
+            f"Annual motion should be {expected_motion:.4f} deg, got {actual_motion:.4f}"
+        )
+
+    def test_calc_poseidon_orbital_period(self):
+        """Test that Poseidon completes one orbit in expected period."""
+        # Orbital period from Kepler's 3rd law: T = a^1.5 years
+        a = POSEIDON_KEPLERIAN_ELEMENTS.a
+        expected_period_years = a**1.5  # ~765.4 years
+
+        # One full orbit should advance longitude by ~360 degrees
+        period_days = expected_period_years * 365.25
+        pos1 = calc_poseidon(self.J2000)
+        pos2 = calc_poseidon(self.J2000 + period_days)
+
+        # After one full period, should be back to same longitude (within tolerance)
+        diff = abs(pos2[0] - pos1[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 1.0, (
+            f"After one orbit ({expected_period_years:.1f} years), "
+            f"longitude should return near start, diff = {diff:.2f} deg"
+        )
+
+    def test_calc_poseidon_keplerian_elements_valid(self):
+        """Test that Poseidon Keplerian elements have valid values."""
+        elements = POSEIDON_KEPLERIAN_ELEMENTS
+        assert elements.name == "Poseidon"
+        assert elements.a > 77.0, "Poseidon should be beyond Vulkanus"
+        assert elements.e == 0.0, "Poseidon should have circular orbit"
+        assert elements.i == 0.0, "Poseidon should be on ecliptic"
+        assert 0 < elements.n < 1.0, "Mean motion should be small but positive"
+
+    def test_calc_poseidon_vs_uranian_different_methods(self):
+        """Test that calc_poseidon uses different method from calc_uranian_position.
+
+        The two methods use different algorithms:
+        - calc_poseidon: Simple Keplerian propagation from J1900.0 epoch
+        - calc_uranian_position: Secular polynomial formula from J2000.0 epoch
+
+        They may give different longitudes but both should produce valid positions
+        that progress at similar rates over time.
+        """
+        keplerian_pos = calc_poseidon(self.J2000)
+        uranian_pos = calc_uranian_position(SE_POSEIDON, self.J2000)
+
+        # Both should be in valid range
+        assert 0.0 <= keplerian_pos[0] < 360.0
+        assert 0.0 <= uranian_pos[0] < 360.0
+
+        # Keplerian should show prograde motion
+        assert keplerian_pos[3] > 0, "Keplerian motion should be prograde"
+        # Uranian velocity may be very small or briefly negative due to oscillation
+        # Check that it's reasonable (within 1 deg/day for these slow bodies)
+        assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
+
+    def test_se_poseidon_constant_value(self):
+        """Test that SE_POSEIDON has correct value (SE_FICT_OFFSET + 7 = 47)."""
+        assert SE_POSEIDON == 47
+        assert SE_POSEIDON == SE_FICT_OFFSET + 7
+
+    def test_calc_poseidon_exportable_from_main_module(self):
+        """Test that calc_poseidon is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_poseidon")
+        pos = libephemeris.calc_poseidon(self.J2000)
+        assert len(pos) == 6
+
+    def test_poseidon_slower_than_vulkanus(self):
+        """Test that Poseidon moves slower than Vulkanus (larger semi-major axis)."""
+        vulkanus_pos = calc_vulkanus(self.J2000)
+        poseidon_pos = calc_poseidon(self.J2000)
+
+        # Poseidon has larger semi-major axis, so slower motion
+        assert poseidon_pos[3] < vulkanus_pos[3], (
+            "Poseidon should move slower than Vulkanus"
+        )
+
+    def test_poseidon_farther_than_vulkanus(self):
+        """Test that Poseidon is farther from Sun than Vulkanus."""
+        vulkanus_pos = calc_vulkanus(self.J2000)
+        poseidon_pos = calc_poseidon(self.J2000)
+
+        # Poseidon has larger semi-major axis
+        assert poseidon_pos[2] > vulkanus_pos[2], (
+            "Poseidon should be farther from Sun than Vulkanus"
         )
