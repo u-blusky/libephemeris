@@ -8,7 +8,7 @@ import statistics
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
-from libephemeris.lunar import calc_true_lunar_node
+from libephemeris.lunar import calc_true_lunar_node, calc_true_lilith
 import sys
 
 sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
@@ -20,6 +20,14 @@ TRUE_NODE_MAX_ERROR_THRESHOLD = 0.15  # degrees (consistent with existing tests)
 TRUE_NODE_MEAN_ERROR_THRESHOLD = 0.08  # degrees (relaxed for 1900-2100 range)
 TRUE_NODE_STD_ERROR_THRESHOLD = 0.05  # degrees
 TRUE_NODE_TARGET_ERROR = 0.01  # degrees (36 arcseconds) - aspirational
+
+# Threshold constants for True Lilith (Osculating Apogee) precision comparison
+# These are relaxed thresholds - the implementation differs from Swiss Ephemeris
+TRUE_LILITH_MAX_ERROR_THRESHOLD = 7.0  # degrees (current known range 5-7)
+TRUE_LILITH_MEAN_ERROR_THRESHOLD = 5.0  # degrees
+TRUE_LILITH_STD_ERROR_THRESHOLD = 2.0  # degrees
+TRUE_LILITH_TARGET_ERROR = 0.5  # degrees - goal after corrections
+TRUE_LILITH_NUM_DATES = 500  # Number of random dates to test
 
 
 def compare_lunar_nodes(jd, name, date_str):
@@ -269,6 +277,190 @@ def compare_true_node_precision():
     return stats
 
 
+def compare_true_lilith_precision():
+    """
+    Compare True Lilith (Osculating Apogee) precision against pyswisseph using 500+ random dates.
+
+    This function validates calc_true_lilith against pyswisseph swe.calc_ut(jd, swe.OSCU_APOG, flags)
+    spanning 1900-2100, calculating maximum/mean/standard deviation of differences
+    and tracking progress toward the target error of less than 0.5 degrees.
+
+    Returns:
+        TestStatistics object with results
+    """
+    print(f"\n{'=' * 80}")
+    print(
+        f"TRUE LILITH (OSCULATING APOGEE) PRECISION COMPARISON ({TRUE_LILITH_NUM_DATES} random dates, 1900-2100)"
+    )
+    print(f"{'=' * 80}")
+
+    stats = TestStatistics()
+    dates = generate_random_jd(1900, 2100, count=TRUE_LILITH_NUM_DATES, seed=42)
+    lon_errors = []
+    lat_errors = []
+    discrepancies = []  # Store (diff, jd, swe_lon, lib_lon, swe_lat, lib_lat, date_info)
+    skipped = 0
+
+    for year, month, day, hour, jd in dates:
+        try:
+            # Calculate with pyswisseph (OSCU_APOG = osculating apogee = True Lilith)
+            swe_result = swe.calc_ut(jd, swe.OSCU_APOG, 0)
+            swe_lon = swe_result[0][0]
+            swe_lat = swe_result[0][1]
+            swe_dist = swe_result[0][2]
+
+            # Calculate with libephemeris
+            lib_lon, lib_lat, lib_e = calc_true_lilith(jd)
+
+            # Calculate angular difference for longitude
+            diff = angular_diff(swe_lon, lib_lon)
+            lon_errors.append(diff)
+
+            # Track latitude difference
+            lat_diff = abs(swe_lat - lib_lat)
+            lat_errors.append(lat_diff)
+
+            # Store for discrepancy report
+            discrepancies.append(
+                (
+                    diff,
+                    jd,
+                    swe_lon,
+                    lib_lon,
+                    swe_lat,
+                    lib_lat,
+                    f"{year:04d}-{month:02d}-{day:02d} {hour:.2f}h",
+                )
+            )
+
+            # Check if within threshold
+            passed = diff < TRUE_LILITH_MAX_ERROR_THRESHOLD
+            stats.add_result(passed, diff)
+
+        except Exception as e:
+            # Skip dates outside ephemeris range
+            if "ephemeris" in str(e).lower() or "outside" in str(e).lower():
+                skipped += 1
+            else:
+                stats.add_result(False, 0.0, error=True)
+
+    if not lon_errors:
+        print("ERROR: No valid dates were tested")
+        return stats
+
+    # Calculate statistics
+    max_error = max(lon_errors)
+    mean_error = statistics.mean(lon_errors)
+    std_error = statistics.stdev(lon_errors) if len(lon_errors) > 1 else 0.0
+    median_error = statistics.median(lon_errors)
+    min_error = min(lon_errors)
+
+    # Latitude statistics
+    max_lat_error = max(lat_errors) if lat_errors else 0.0
+    mean_lat_error = statistics.mean(lat_errors) if lat_errors else 0.0
+
+    # Sort discrepancies by error (descending)
+    discrepancies.sort(key=lambda x: x[0], reverse=True)
+
+    # Count dates meeting target precision
+    dates_under_target = sum(1 for e in lon_errors if e < TRUE_LILITH_TARGET_ERROR)
+    pct_under_target = 100 * dates_under_target / len(lon_errors)
+
+    # Count dates at various precision levels
+    under_1_deg = sum(1 for e in lon_errors if e < 1.0)
+    under_2_deg = sum(1 for e in lon_errors if e < 2.0)
+    under_3_deg = sum(1 for e in lon_errors if e < 3.0)
+    under_5_deg = sum(1 for e in lon_errors if e < 5.0)
+
+    # Print comprehensive report
+    print("\n--- Longitude Statistics ---")
+    print(f"Dates tested: {len(lon_errors)}")
+    print(f"Dates skipped: {skipped}")
+    print("Date range: 1900-2100")
+    print(f"Maximum difference: {max_error:.4f} ({max_error * 3600:.1f} arcsec)")
+    print(f"Mean difference:    {mean_error:.4f} ({mean_error * 3600:.1f} arcsec)")
+    print(f"Median difference:  {median_error:.4f} ({median_error * 3600:.1f} arcsec)")
+    print(f"Std deviation:      {std_error:.4f} ({std_error * 3600:.1f} arcsec)")
+    print(f"Minimum difference: {min_error:.4f} ({min_error * 3600:.1f} arcsec)")
+
+    print("\n--- Latitude Statistics ---")
+    print(
+        f"Maximum lat diff:   {max_lat_error:.4f} ({max_lat_error * 3600:.1f} arcsec)"
+    )
+    print(
+        f"Mean lat diff:      {mean_lat_error:.4f} ({mean_lat_error * 3600:.1f} arcsec)"
+    )
+
+    print("\n--- Target Precision Analysis ---")
+    print(f"Target: < {TRUE_LILITH_TARGET_ERROR}")
+    print(
+        f"Dates meeting target: {dates_under_target}/{len(lon_errors)} ({pct_under_target:.1f}%)"
+    )
+    if max_error >= TRUE_LILITH_TARGET_ERROR:
+        print(f"NOTE: Target precision NOT yet achieved. Max error: {max_error:.4f}")
+        print("      Corrections needed to reduce error to < 0.5")
+
+    # Distribution analysis
+    print("\n--- Error Distribution ---")
+    print(f"< 0.5:   {dates_under_target:4d} ({pct_under_target:.1f}%)")
+    print(f"< 1.0:   {under_1_deg:4d} ({100 * under_1_deg / len(lon_errors):.1f}%)")
+    print(f"< 2.0:   {under_2_deg:4d} ({100 * under_2_deg / len(lon_errors):.1f}%)")
+    print(f"< 3.0:   {under_3_deg:4d} ({100 * under_3_deg / len(lon_errors):.1f}%)")
+    print(f"< 5.0:   {under_5_deg:4d} ({100 * under_5_deg / len(lon_errors):.1f}%)")
+
+    # Report top 10 largest discrepancies
+    print("\n--- Top 10 Largest Discrepancies ---")
+    print(
+        f"{'Date':<22} {'JD':<14} {'SWE Lon':<12} {'LIB Lon':<12} {'Diff':<10} {'SWE Lat':<10} {'LIB Lat':<10}"
+    )
+    print("-" * 90)
+    for diff, jd, swe_lon, lib_lon, swe_lat, lib_lat, date_info in discrepancies[:10]:
+        print(
+            f"{date_info:<22} {jd:<14.4f} {swe_lon:<12.4f} {lib_lon:<12.4f} "
+            f"{diff:<10.4f} {swe_lat:<10.4f} {lib_lat:<10.4f}"
+        )
+
+    # Progress tracking section
+    print(f"\n{'=' * 80}")
+    print("CORRECTION PROGRESS TRACKING")
+    print(f"{'=' * 80}")
+    print("Corrections implemented in calc_true_lilith:")
+    print("  [x] Evection correction (1.274 amplitude)")
+    print("  [x] Solar gravitational perturbation on eccentricity vector")
+    print("  [x] Evection-related secondary terms")
+    print("  [x] Variation correction (0.658 amplitude)")
+    print("  [x] Annual equation (0.186 amplitude)")
+    print("  [x] Parallactic inequality (0.125 amplitude)")
+    print("  [x] Reduction to ecliptic (0.116 amplitude)")
+    print("  [ ] Additional perturbation terms (if needed)")
+    print("")
+    print(f"Progress toward < {TRUE_LILITH_TARGET_ERROR} target:")
+    progress_bar_len = 40
+    progress_pct = (
+        min(100, (TRUE_LILITH_TARGET_ERROR / max_error) * 100) if max_error > 0 else 100
+    )
+    filled = int(progress_bar_len * progress_pct / 100)
+    bar = "#" * filled + "-" * (progress_bar_len - filled)
+    print(f"  [{bar}] {progress_pct:.1f}%")
+    print(
+        f"  Current max error: {max_error:.4f} -> Target: < {TRUE_LILITH_TARGET_ERROR}"
+    )
+
+    # Print pass/fail status
+    max_passed = max_error < TRUE_LILITH_MAX_ERROR_THRESHOLD
+    mean_passed = mean_error < TRUE_LILITH_MEAN_ERROR_THRESHOLD
+    std_passed = std_error < TRUE_LILITH_STD_ERROR_THRESHOLD
+
+    print("\n--- Threshold Checks ---")
+    print(f"Max error < {TRUE_LILITH_MAX_ERROR_THRESHOLD}: {format_status(max_passed)}")
+    print(
+        f"Mean error < {TRUE_LILITH_MEAN_ERROR_THRESHOLD}: {format_status(mean_passed)}"
+    )
+    print(f"Std error < {TRUE_LILITH_STD_ERROR_THRESHOLD}: {format_status(std_passed)}")
+
+    return stats
+
+
 def main():
     print_header("LUNAR CALCULATIONS COMPARISON: LibEphemeris vs SwissEphemeris")
 
@@ -306,6 +498,17 @@ def main():
     stats.errors += precision_stats.errors
     stats.max_diff = max(stats.max_diff, precision_stats.max_diff)
     stats.diff_sum += precision_stats.diff_sum
+
+    # Run True Lilith precision comparison (500+ random dates)
+    lilith_precision_stats = compare_true_lilith_precision()
+
+    # Merge Lilith precision stats into main stats
+    stats.total += lilith_precision_stats.total
+    stats.passed += lilith_precision_stats.passed
+    stats.failed += lilith_precision_stats.failed
+    stats.errors += lilith_precision_stats.errors
+    stats.max_diff = max(stats.max_diff, lilith_precision_stats.max_diff)
+    stats.diff_sum += lilith_precision_stats.diff_sum
 
     # Summary
     stats.print_summary("LUNAR CALCULATIONS SUMMARY")
