@@ -433,6 +433,12 @@ SE_TAYGETA: int = SE_FIXSTAR_OFFSET + 62  # 19 Tauri - Pleiades member
 SE_ATLAS: int = SE_FIXSTAR_OFFSET + 63  # 27 Tauri - Pleiades member
 SE_PLEIONE: int = SE_FIXSTAR_OFFSET + 64  # 28 Tauri - Pleiades member
 
+# Hyades cluster stars (visible members in Taurus)
+SE_PRIMA_HYADUM: int = SE_FIXSTAR_OFFSET + 65  # Gamma Tauri - Hyades member
+SE_SECUNDA_HYADUM: int = SE_FIXSTAR_OFFSET + 66  # Delta^1 Tauri - Hyades member
+SE_THETA_TAURI: int = SE_FIXSTAR_OFFSET + 67  # Theta^2 Tauri - Hyades member
+SE_AIN: int = SE_FIXSTAR_OFFSET + 68  # Epsilon Tauri - Hyades member
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree

@@ -111,6 +111,10 @@ from .constants import (
     SE_TAYGETA,
     SE_ATLAS,
     SE_PLEIONE,
+    SE_PRIMA_HYADUM,
+    SE_SECUNDA_HYADUM,
+    SE_THETA_TAURI,
+    SE_AIN,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -1000,6 +1004,61 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=5.09,
     ),
+    # ======== HYADES CLUSTER STARS ========
+    # The Hyades is an open star cluster in Taurus, one of the nearest to Earth
+    # These are the brightest named members visible to the naked eye
+    StarCatalogEntry(
+        id=SE_PRIMA_HYADUM,
+        name="Prima Hyadum",
+        nomenclature="gaTau",
+        hip_number=20205,
+        data=StarData(
+            ra_j2000=64.948349,  # 04h 19m 47.6s (Gamma Tauri)
+            dec_j2000=15.627643,  # +15° 37' 40"
+            pm_ra=0.11529,  # 115.29 mas/yr
+            pm_dec=-0.02327,  # -23.27 mas/yr
+        ),
+        magnitude=3.65,
+    ),
+    StarCatalogEntry(
+        id=SE_SECUNDA_HYADUM,
+        name="Secunda Hyadum",
+        nomenclature="de1Tau",
+        hip_number=20455,
+        data=StarData(
+            ra_j2000=65.733719,  # 04h 22m 56.1s (Delta^1 Tauri)
+            dec_j2000=17.542514,  # +17° 32' 33"
+            pm_ra=0.10775,  # 107.75 mas/yr
+            pm_dec=-0.02884,  # -28.84 mas/yr
+        ),
+        magnitude=3.77,
+    ),
+    StarCatalogEntry(
+        id=SE_THETA_TAURI,
+        name="Theta Tauri",
+        nomenclature="th2Tau",
+        hip_number=20894,
+        data=StarData(
+            ra_j2000=67.165586,  # 04h 28m 39.7s (Theta^2 Tauri)
+            dec_j2000=15.870882,  # +15° 52' 15"
+            pm_ra=0.11021,  # 110.21 mas/yr
+            pm_dec=-0.02609,  # -26.09 mas/yr
+        ),
+        magnitude=3.40,
+    ),
+    StarCatalogEntry(
+        id=SE_AIN,
+        name="Ain",
+        nomenclature="epTau",
+        hip_number=20889,
+        data=StarData(
+            ra_j2000=67.154163,  # 04h 28m 37.0s (Epsilon Tauri)
+            dec_j2000=19.180560,  # +19° 10' 50"
+            pm_ra=0.10619,  # 106.19 mas/yr
+            pm_dec=-0.03784,  # -37.84 mas/yr
+        ),
+        magnitude=3.53,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -1543,6 +1602,40 @@ STAR_ALIASES: dict[str, int] = {
     # ======== PLEIONE (28 Tauri - Pleiades) ========
     "28 TAURI": SE_PLEIONE,
     "28 TAU": SE_PLEIONE,
+    # ======== PRIMA HYADUM (Gamma Tauri - Hyades) ========
+    "GAMMA TAURI": SE_PRIMA_HYADUM,
+    "GAMMA TAU": SE_PRIMA_HYADUM,
+    "54 TAU": SE_PRIMA_HYADUM,
+    "γ TAU": SE_PRIMA_HYADUM,
+    "GATAU": SE_PRIMA_HYADUM,
+    "HYADUM I": SE_PRIMA_HYADUM,
+    "FIRST HYAD": SE_PRIMA_HYADUM,
+    # ======== SECUNDA HYADUM (Delta^1 Tauri - Hyades) ========
+    "DELTA TAURI": SE_SECUNDA_HYADUM,
+    "DELTA TAU": SE_SECUNDA_HYADUM,
+    "DELTA1 TAURI": SE_SECUNDA_HYADUM,
+    "DELTA1 TAU": SE_SECUNDA_HYADUM,
+    "61 TAU": SE_SECUNDA_HYADUM,
+    "δ TAU": SE_SECUNDA_HYADUM,
+    "DETAU": SE_SECUNDA_HYADUM,
+    "HYADUM II": SE_SECUNDA_HYADUM,
+    "SECOND HYAD": SE_SECUNDA_HYADUM,
+    # ======== THETA TAURI (Theta^2 Tauri - Hyades) ========
+    "THETA2 TAURI": SE_THETA_TAURI,
+    "THETA2 TAU": SE_THETA_TAURI,
+    "78 TAU": SE_THETA_TAURI,
+    "θ TAU": SE_THETA_TAURI,
+    "THTAU": SE_THETA_TAURI,
+    "THETA^2 TAURI": SE_THETA_TAURI,
+    "THETA^2 TAU": SE_THETA_TAURI,
+    # ======== AIN (Epsilon Tauri - Hyades) ========
+    "EPSILON TAURI": SE_AIN,
+    "EPSILON TAU": SE_AIN,
+    "74 TAU": SE_AIN,
+    "ε TAU": SE_AIN,
+    "EPTAU": SE_AIN,
+    "OCULUS BOREALIS": SE_AIN,
+    "BULL'S EYE": SE_AIN,
 }
 
 
