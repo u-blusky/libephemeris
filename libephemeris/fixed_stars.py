@@ -94,6 +94,10 @@ from .constants import (
     SE_DENEBOLA,
     SE_MARKAB,
     SE_SCHEAT,
+    SE_ALCYONE,
+    SE_ALGORAB,
+    SE_ALPHECCA,
+    SE_DENEB_ALGEDI,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -823,6 +827,59 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=2.42,
     ),
+    # ======== BEHENIAN FIXED STARS (additional) ========
+    StarCatalogEntry(
+        id=SE_ALCYONE,
+        name="Alcyone",
+        nomenclature="etTau",
+        hip_number=17702,
+        data=StarData(
+            ra_j2000=56.871152,  # 03h 47m 29.1s (Eta Tauri, brightest Pleiad)
+            dec_j2000=24.105136,  # +24° 06' 18"
+            pm_ra=0.01934,  # 19.34 mas/yr
+            pm_dec=-0.04377,  # -43.77 mas/yr
+        ),
+        magnitude=2.87,
+    ),
+    StarCatalogEntry(
+        id=SE_ALGORAB,
+        name="Algorab",
+        nomenclature="deCrv",
+        hip_number=60965,
+        data=StarData(
+            ra_j2000=187.466063,  # 12h 29m 51.9s (Delta Corvi)
+            dec_j2000=-16.515431,  # -16° 30' 56"
+            pm_ra=-0.21007,  # -210.07 mas/yr
+            pm_dec=-0.13895,  # -138.95 mas/yr
+        ),
+        magnitude=2.95,
+    ),
+    StarCatalogEntry(
+        id=SE_ALPHECCA,
+        name="Alphecca",
+        nomenclature="alCrB",
+        hip_number=76267,
+        data=StarData(
+            ra_j2000=233.671953,  # 15h 34m 41.3s (Alpha Coronae Borealis)
+            dec_j2000=26.714693,  # +26° 42' 53"
+            pm_ra=0.12094,  # 120.94 mas/yr
+            pm_dec=-0.08960,  # -89.60 mas/yr
+        ),
+        magnitude=2.23,
+    ),
+    StarCatalogEntry(
+        id=SE_DENEB_ALGEDI,
+        name="Deneb Algedi",
+        nomenclature="deCap",
+        hip_number=107556,
+        data=StarData(
+            ra_j2000=326.760184,  # 21h 47m 02.4s (Delta Capricorni)
+            dec_j2000=-16.127287,  # -16° 07' 38"
+            pm_ra=0.26263,  # 262.63 mas/yr
+            pm_dec=-0.02968,  # -29.68 mas/yr
+        ),
+        magnitude=2.81,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -1293,6 +1350,44 @@ STAR_ALIASES: dict[str, int] = {
     "β PEG": SE_SCHEAT,
     "BEPEG": SE_SCHEAT,
     "SAQ AL-FARAS": SE_SCHEAT,
+    # ======== ALCYONE (Eta Tauri - Pleiades) - BEHENIAN ========
+    "PLEIADES": SE_ALCYONE,
+    "ETA TAURI": SE_ALCYONE,
+    "ETA TAU": SE_ALCYONE,
+    "25 TAU": SE_ALCYONE,
+    "η TAU": SE_ALCYONE,
+    "ETTAU": SE_ALCYONE,
+    "SEVEN SISTERS": SE_ALCYONE,
+    "KIMAH": SE_ALCYONE,
+    "AL-THURAYYA": SE_ALCYONE,
+    # ======== ALGORAB (Delta Corvi) - BEHENIAN ========
+    "CROW'S WING": SE_ALGORAB,
+    "DELTA CORVI": SE_ALGORAB,
+    "DELTA CRV": SE_ALGORAB,
+    "7 CRV": SE_ALGORAB,
+    "δ CRV": SE_ALGORAB,
+    "DECRV": SE_ALGORAB,
+    "AL-GHIRAB": SE_ALGORAB,
+    "GIENAH CORVI": SE_ALGORAB,
+    # ======== ALPHECCA (Alpha Coronae Borealis) - BEHENIAN ========
+    "GEMMA": SE_ALPHECCA,
+    "ALPHA CORONAE BOREALIS": SE_ALPHECCA,
+    "ALPHA CRB": SE_ALPHECCA,
+    "5 CRB": SE_ALPHECCA,
+    "α CRB": SE_ALPHECCA,
+    "ALCRB": SE_ALPHECCA,
+    "GNOSIA STELLA": SE_ALPHECCA,
+    "MUNIR AL-FAKKAH": SE_ALPHECCA,
+    "ASHTAROTH": SE_ALPHECCA,
+    # ======== DENEB ALGEDI (Delta Capricorni) - BEHENIAN ========
+    "TAIL OF THE GOAT": SE_DENEB_ALGEDI,
+    "DELTA CAPRICORNI": SE_DENEB_ALGEDI,
+    "DELTA CAP": SE_DENEB_ALGEDI,
+    "49 CAP": SE_DENEB_ALGEDI,
+    "δ CAP": SE_DENEB_ALGEDI,
+    "DECAP": SE_DENEB_ALGEDI,
+    "SCHEDDI": SE_DENEB_ALGEDI,
+    "DHANAB AL-JADY": SE_DENEB_ALGEDI,
 }
 
 

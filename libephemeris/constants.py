@@ -418,6 +418,10 @@ SE_ALGIEBA: int = SE_FIXSTAR_OFFSET + 49  # Gamma Leonis
 SE_DENEBOLA: int = SE_FIXSTAR_OFFSET + 50  # Beta Leonis
 SE_MARKAB: int = SE_FIXSTAR_OFFSET + 51  # Alpha Pegasi
 SE_SCHEAT: int = SE_FIXSTAR_OFFSET + 52  # Beta Pegasi
+SE_ALCYONE: int = SE_FIXSTAR_OFFSET + 53  # Eta Tauri (Pleiades) - Behenian star
+SE_ALGORAB: int = SE_FIXSTAR_OFFSET + 54  # Delta Corvi - Behenian star
+SE_ALPHECCA: int = SE_FIXSTAR_OFFSET + 55  # Alpha Coronae Borealis - Behenian star
+SE_DENEB_ALGEDI: int = SE_FIXSTAR_OFFSET + 56  # Delta Capricorni - Behenian star
 
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
