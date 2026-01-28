@@ -250,9 +250,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT BESSELIAN ELEMENT D CALCULATION: Implement calculation of d, the declination of the Moon's shadow axis relative to the fundamental plane.
 
-- [ ] IMPLEMENT BESSELIAN ELEMENT L1 CALCULATION: Implement calculation of l1, the radius of the penumbral shadow cone where it intersects the fundamental plane.
+- [x] IMPLEMENT BESSELIAN ELEMENT L1 CALCULATION: Implement calculation of l1, the radius of the penumbral shadow cone where it intersects the fundamental plane.
 
-- [ ] IMPLEMENT BESSELIAN ELEMENT L2 CALCULATION: Implement calculation of l2, the radius of the umbral (or antumbral for annular eclipses) shadow cone where it intersects the fundamental plane.
+- [x] IMPLEMENT BESSELIAN ELEMENT L2 CALCULATION: Implement calculation of l2, the radius of the umbral (or antumbral for annular eclipses) shadow cone where it intersects the fundamental plane.
 
 - [ ] IMPLEMENT BESSELIAN ELEMENT MU CALCULATION: Implement calculation of mu, the Greenwich hour angle of the shadow axis.
 
