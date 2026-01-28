@@ -82,6 +82,8 @@ from .crossing import (
 )
 from .eclipse import (
     BesselianElements,
+    sol_eclipse_max_time,
+    swe_sol_eclipse_max_time,
     sol_eclipse_when_glob,
     swe_sol_eclipse_when_glob,
     sol_eclipse_when_loc,
@@ -466,6 +468,8 @@ __all__ = [
     "swe_helio_cross",
     "helio_cross",
     # Eclipses
+    "sol_eclipse_max_time",
+    "swe_sol_eclipse_max_time",
     "sol_eclipse_when_glob",
     "swe_sol_eclipse_when_glob",
     "sol_eclipse_when_loc",

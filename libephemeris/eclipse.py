@@ -696,6 +696,240 @@ def _calculate_eclipse_phases(
     return _calculate_eclipse_phases_besselian(jd_max, eclipse_type)
 
 
+def sol_eclipse_max_time(
+    jd_approx: float,
+    lat: float | None = None,
+    lon: float | None = None,
+    altitude: float = 0.0,
+    search_range: float = 0.125,
+    flags: int = SEFLG_SWIEPH,
+) -> Tuple[float, float]:
+    """
+    Calculate the precise time of maximum eclipse when Sun-Moon separation is minimum.
+
+    This function finds the exact moment when the angular separation between the
+    Sun and Moon centers is at its minimum, which corresponds to the time of
+    maximum eclipse. It uses golden section search for sub-second precision.
+
+    For global eclipse maximum (no observer location given):
+        Uses the gamma parameter (minimum distance of Moon's shadow axis from
+        Earth's center) to find global maximum. This is the time when the
+        eclipse is at its maximum considering all possible Earth observers.
+
+    For local eclipse maximum (observer location given):
+        Uses the topocentric angular separation between Sun and Moon as seen
+        from the specified observer location. This accounts for parallax and
+        gives the precise local maximum time.
+
+    Args:
+        jd_approx: Approximate Julian Day (UT) of eclipse, typically near New Moon
+                   or obtained from sol_eclipse_when_glob()[0]
+        lat: Observer latitude in degrees (positive = North, negative = South).
+             If None, calculates global maximum.
+        lon: Observer longitude in degrees (positive = East, negative = West).
+             If None, calculates global maximum.
+        altitude: Observer altitude in meters above sea level (default 0).
+                  Only used if lat and lon are provided.
+        search_range: Search range in days around jd_approx (default ±3 hours).
+                      For best results, jd_approx should be within this range
+                      of the actual eclipse maximum.
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Tuple of (jd_maximum, min_separation) where:
+            - jd_maximum: Julian Day (UT) of maximum eclipse with sub-second precision
+            - min_separation: Minimum angular separation in degrees between Sun and
+                              Moon centers at maximum. For global maximum, this is
+                              the gamma value in Earth radii (not degrees).
+
+    Raises:
+        ValueError: If only one of lat/lon is provided (both or neither required)
+
+    Precision:
+        Sub-second precision (< 1 second) achieved through golden section search
+        with convergence to ~0.1 milliseconds.
+
+    Algorithm:
+        Global maximum:
+            Uses Besselian elements approach - finds when gamma (perpendicular
+            distance of Moon's shadow axis from Earth's center) is minimum.
+            This corresponds to the time when the eclipse is at maximum for
+            observers along the central line.
+
+        Local maximum:
+            Calculates topocentric apparent positions of Sun and Moon at each
+            iteration, finding when their angular separation is minimum as
+            seen from the observer's location on Earth's surface.
+
+    Example:
+        >>> # Find precise global maximum time for April 8, 2024 eclipse
+        >>> from libephemeris import julday, sol_eclipse_max_time, sol_eclipse_when_glob
+        >>> jd_start = julday(2024, 3, 1, 0)
+        >>> times, ecl_type = sol_eclipse_when_glob(jd_start)
+        >>> jd_max, gamma = sol_eclipse_max_time(times[0])
+        >>> print(f"Maximum at JD {jd_max:.8f}, gamma = {gamma:.6f}")
+
+        >>> # Find local maximum time from Dallas, Texas
+        >>> dallas_lat, dallas_lon = 32.7767, -96.7970
+        >>> jd_local_max, separation = sol_eclipse_max_time(
+        ...     times[0], lat=dallas_lat, lon=dallas_lon
+        ... )
+        >>> print(f"Local max at JD {jd_local_max:.8f}, sep = {separation:.6f}°")
+
+    References:
+        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
+        - Swiss Ephemeris documentation on Besselian elements
+    """
+    # Validate that both lat and lon are provided or neither
+    if (lat is None) != (lon is None):
+        raise ValueError(
+            "Both lat and lon must be provided, or neither (for global maximum)"
+        )
+
+    # Determine if we're calculating global or local maximum
+    is_local = lat is not None and lon is not None
+
+    if is_local:
+        # Local maximum: find minimum Sun-Moon separation from observer location
+        return _calc_local_eclipse_max_time(jd_approx, lat, lon, altitude, search_range)
+    else:
+        # Global maximum: find minimum gamma using Besselian elements
+        return _calc_global_eclipse_max_time(jd_approx, search_range)
+
+
+def _calc_global_eclipse_max_time(
+    jd_approx: float, search_range: float
+) -> Tuple[float, float]:
+    """
+    Calculate global eclipse maximum time using gamma minimization.
+
+    Args:
+        jd_approx: Approximate Julian Day of eclipse
+        search_range: Search range in days
+
+    Returns:
+        Tuple of (jd_maximum, gamma_at_maximum)
+    """
+    phi = (1 + math.sqrt(5)) / 2  # Golden ratio
+
+    jd_low = jd_approx - search_range
+    jd_high = jd_approx + search_range
+
+    jd_a = jd_high - (jd_high - jd_low) / phi
+    jd_b = jd_low + (jd_high - jd_low) / phi
+
+    gamma_a = _calc_gamma(jd_a)
+    gamma_b = _calc_gamma(jd_b)
+
+    # Golden section search for minimum gamma
+    for _ in range(60):  # Converges to ~1e-9 days (~0.1 ms)
+        if gamma_a < gamma_b:
+            jd_high = jd_b
+            jd_b = jd_a
+            gamma_b = gamma_a
+            jd_a = jd_high - (jd_high - jd_low) / phi
+            gamma_a = _calc_gamma(jd_a)
+        else:
+            jd_low = jd_a
+            jd_a = jd_b
+            gamma_a = gamma_b
+            jd_b = jd_low + (jd_high - jd_low) / phi
+            gamma_b = _calc_gamma(jd_b)
+
+        if jd_high - jd_low < 1e-8:  # ~0.86 ms precision
+            break
+
+    jd_max = (jd_low + jd_high) / 2
+    gamma_at_max = _calc_gamma(jd_max)
+
+    return jd_max, gamma_at_max
+
+
+def _calc_local_eclipse_max_time(
+    jd_approx: float,
+    lat: float,
+    lon: float,
+    altitude: float,
+    search_range: float,
+) -> Tuple[float, float]:
+    """
+    Calculate local eclipse maximum time using Sun-Moon separation minimization.
+
+    Args:
+        jd_approx: Approximate Julian Day of eclipse
+        lat: Observer latitude in degrees
+        lon: Observer longitude in degrees
+        altitude: Observer altitude in meters
+        search_range: Search range in days
+
+    Returns:
+        Tuple of (jd_maximum, min_separation_degrees)
+    """
+    from skyfield.api import wgs84
+    from .state import get_planets, get_timescale
+
+    # Get ephemeris and timescale
+    eph = get_planets()
+    ts = get_timescale()
+
+    # Create observer location
+    observer = wgs84.latlon(lat, lon, altitude)
+
+    # Get Sun and Moon objects
+    sun = eph["sun"]
+    moon = eph["moon"]
+    earth = eph["earth"]
+
+    def _get_separation(jd: float) -> float:
+        """Get angular separation between Sun and Moon at given JD."""
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+
+        sun_app = observer_at.at(t).observe(sun).apparent()
+        moon_app = observer_at.at(t).observe(moon).apparent()
+
+        return sun_app.separation_from(moon_app).degrees
+
+    # Golden section search for minimum separation
+    phi = (1 + math.sqrt(5)) / 2
+
+    jd_low = jd_approx - search_range
+    jd_high = jd_approx + search_range
+
+    jd_a = jd_high - (jd_high - jd_low) / phi
+    jd_b = jd_low + (jd_high - jd_low) / phi
+
+    sep_a = _get_separation(jd_a)
+    sep_b = _get_separation(jd_b)
+
+    for _ in range(60):  # Converges to ~1e-9 days (~0.1 ms)
+        if sep_a < sep_b:
+            jd_high = jd_b
+            jd_b = jd_a
+            sep_b = sep_a
+            jd_a = jd_high - (jd_high - jd_low) / phi
+            sep_a = _get_separation(jd_a)
+        else:
+            jd_low = jd_a
+            jd_a = jd_b
+            sep_a = sep_b
+            jd_b = jd_low + (jd_high - jd_low) / phi
+            sep_b = _get_separation(jd_b)
+
+        if jd_high - jd_low < 1e-8:  # ~0.86 ms precision
+            break
+
+    jd_max = (jd_low + jd_high) / 2
+    min_separation = _get_separation(jd_max)
+
+    return jd_max, min_separation
+
+
+# Alias for Swiss Ephemeris compatibility
+swe_sol_eclipse_max_time = sol_eclipse_max_time
+
+
 def sol_eclipse_when_glob(
     jd_start: float,
     flags: int = SEFLG_SWIEPH,

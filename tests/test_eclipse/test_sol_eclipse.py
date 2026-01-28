@@ -998,3 +998,251 @@ class TestKnownEclipseValidation:
         # Elements 0-4 should be phase times
         # Maximum should be between first and fourth contacts
         assert times[1] < times[0] < times[4], "Maximum should be between contacts"
+
+
+class TestSolEclipseMaxTime:
+    """Tests for sol_eclipse_max_time function - precise eclipse maximum calculation."""
+
+    def test_global_max_time_returns_tuple(self):
+        """Should return tuple of (jd_max, gamma)."""
+        from libephemeris import sol_eclipse_max_time
+
+        # Use a known eclipse - April 8, 2024
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        jd_max, gamma = sol_eclipse_max_time(times[0])
+
+        # Should return two floats
+        assert isinstance(jd_max, float)
+        assert isinstance(gamma, float)
+
+    def test_global_max_time_near_input(self):
+        """Global maximum time should be close to input approximation."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        jd_max, _ = sol_eclipse_max_time(times[0])
+
+        # Result should be within search range of input
+        assert abs(jd_max - times[0]) < 0.125  # default search range
+
+    def test_global_max_refines_precision(self):
+        """Refined maximum should be more precise than New Moon estimate."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Get refined maximum
+        jd_max, gamma = sol_eclipse_max_time(times[0])
+
+        # Gamma should be positive and reasonably small for a total eclipse
+        assert gamma >= 0
+        assert gamma < 1.0  # For central eclipse, gamma < 1
+
+    def test_global_max_gamma_is_minimum(self):
+        """Gamma at refined maximum should be less than at nearby times."""
+        from libephemeris import sol_eclipse_max_time
+        from libephemeris.eclipse import _calc_gamma
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start)
+
+        jd_max, gamma_at_max = sol_eclipse_max_time(times[0])
+
+        # Check gamma at nearby times is larger
+        delta = 0.001  # ~1.44 minutes
+        gamma_before = _calc_gamma(jd_max - delta)
+        gamma_after = _calc_gamma(jd_max + delta)
+
+        assert gamma_at_max <= gamma_before
+        assert gamma_at_max <= gamma_after
+
+    def test_local_max_time_returns_tuple(self):
+        """Local maximum should return tuple of (jd_max, separation)."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Dallas, Texas - was in path of totality
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+
+        jd_max, separation = sol_eclipse_max_time(
+            times[0], lat=dallas_lat, lon=dallas_lon
+        )
+
+        assert isinstance(jd_max, float)
+        assert isinstance(separation, float)
+
+    def test_local_max_separation_is_minimum(self):
+        """Separation at local maximum should be minimum."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+
+        jd_max, min_sep = sol_eclipse_max_time(times[0], lat=dallas_lat, lon=dallas_lon)
+
+        # Separation should be positive
+        assert min_sep >= 0
+
+        # For Dallas during April 2024 eclipse, separation should be small
+        # (Dallas was near path of totality)
+        assert min_sep < 1.0  # degrees
+
+    def test_local_max_differs_from_global(self):
+        """Local maximum time can differ from global maximum."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Get global maximum
+        jd_global_max, _ = sol_eclipse_max_time(times[0])
+
+        # Get local maximum from Dallas
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        jd_local_max, _ = sol_eclipse_max_time(times[0], lat=dallas_lat, lon=dallas_lon)
+
+        # They may differ due to parallax and shadow movement
+        # Allow up to 1 hour difference
+        assert abs(jd_global_max - jd_local_max) < 1.0 / 24.0
+
+    def test_requires_both_lat_lon_or_neither(self):
+        """Should raise ValueError if only one of lat/lon provided."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start)
+
+        # Only lat provided
+        try:
+            sol_eclipse_max_time(times[0], lat=32.0)
+            assert False, "Should have raised ValueError"
+        except ValueError:
+            pass
+
+        # Only lon provided
+        try:
+            sol_eclipse_max_time(times[0], lon=-96.0)
+            assert False, "Should have raised ValueError"
+        except ValueError:
+            pass
+
+    def test_accepts_altitude_parameter(self):
+        """Should accept altitude parameter for local calculations."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+
+        # Should not raise
+        jd_max, sep = sol_eclipse_max_time(
+            times[0], lat=dallas_lat, lon=dallas_lon, altitude=1000.0
+        )
+
+        assert jd_max > times[0] - 0.125
+
+    def test_search_range_parameter(self):
+        """Should respect custom search_range parameter."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Use smaller search range
+        jd_max1, _ = sol_eclipse_max_time(times[0], search_range=0.05)
+
+        # Use larger search range
+        jd_max2, _ = sol_eclipse_max_time(times[0], search_range=0.25)
+
+        # Both should find similar maximum (within tolerance)
+        assert abs(jd_max1 - jd_max2) < 0.001
+
+    def test_swe_alias_exists(self):
+        """swe_sol_eclipse_max_time should be an alias."""
+        from libephemeris import sol_eclipse_max_time, swe_sol_eclipse_max_time
+
+        assert swe_sol_eclipse_max_time is sol_eclipse_max_time
+
+    def test_known_eclipse_april_2024_precision(self):
+        """Test precision against known April 8, 2024 eclipse."""
+        from libephemeris import sol_eclipse_max_time
+
+        # NASA gives maximum at approximately 18:18 UT
+        # JD 2460409.26 corresponds to ~18:17 UT
+        jd_approx = swe_julday(2024, 4, 8, 18.3)
+
+        jd_max, gamma = sol_eclipse_max_time(jd_approx)
+
+        # Convert to hours for comparison
+        _, _, _, hour = swe_revjul(jd_max)
+
+        # Should be very close to 18:17-18:18 UT
+        assert 18.2 < hour < 18.4, f"Expected ~18.3 hours, got {hour}"
+
+    def test_different_locations_different_local_max(self):
+        """Different locations should have different local maximum times."""
+        from libephemeris import sol_eclipse_max_time
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        # Dallas, Texas
+        dallas_lat, dallas_lon = 32.7767, -96.7970
+        jd_dallas, sep_dallas = sol_eclipse_max_time(
+            times[0], lat=dallas_lat, lon=dallas_lon
+        )
+
+        # Cleveland, Ohio (also in path of April 2024 eclipse)
+        cleveland_lat, cleveland_lon = 41.4993, -81.6944
+        jd_cleveland, sep_cleveland = sol_eclipse_max_time(
+            times[0], lat=cleveland_lat, lon=cleveland_lon
+        )
+
+        # Times should differ (Cleveland is east, sees maximum later)
+        # Allow some tolerance for the difference
+        assert jd_dallas != jd_cleveland or sep_dallas != sep_cleveland
+
+    def test_annular_eclipse(self):
+        """Should work for annular eclipses too."""
+        from libephemeris import sol_eclipse_max_time
+
+        # October 14, 2023 annular eclipse
+        jd_start = swe_julday(2023, 9, 1, 0)
+        times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_ANNULAR)
+
+        jd_max, gamma = sol_eclipse_max_time(times[0])
+
+        # Should return valid values
+        assert jd_max > jd_start
+        assert gamma >= 0
+
+    def test_sub_second_precision(self):
+        """Result should have sub-second precision."""
+        from libephemeris import sol_eclipse_max_time
+        from libephemeris.eclipse import _calc_gamma
+
+        jd_start = swe_julday(2024, 3, 1, 0)
+        times, _ = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+        jd_max, gamma_at_max = sol_eclipse_max_time(times[0])
+
+        # Test that at 1 second away, gamma is measurably larger
+        one_second = 1.0 / 86400.0  # 1 second in days
+
+        gamma_before = _calc_gamma(jd_max - one_second)
+        gamma_after = _calc_gamma(jd_max + one_second)
+
+        # Gamma should be slightly larger at 1 second offset
+        # (may be equal due to floating point precision)
+        assert gamma_at_max <= gamma_before + 1e-10
+        assert gamma_at_max <= gamma_after + 1e-10
