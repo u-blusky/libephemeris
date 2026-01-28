@@ -102,6 +102,11 @@ TRANSPLUTO: int = SE_TRANSPLUTO  # Pyswisseph-compatible alias
 SE_VULCAN: int = SE_FICT_OFFSET + 15  # 55 - Intramercurial hypothetical planet
 VULCAN: int = SE_VULCAN  # Pyswisseph-compatible alias
 
+# Waldemath - Dr. Waldemath's hypothetical second moon of Earth (section 2.7.7 of Swiss Ephemeris docs / seorbel.txt #18)
+# Note: This is different from Mean Lilith and True Lilith which are lunar apogee points
+SE_WALDEMATH: int = SE_FICT_OFFSET + 18  # 58 - Waldemath's hypothetical Dark Moon
+WALDEMATH: int = SE_WALDEMATH  # Pyswisseph-compatible alias
+
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
 # Trans-Neptunian Objects (TNOs) - Catalog number + offset

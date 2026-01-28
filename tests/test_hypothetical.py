@@ -36,6 +36,7 @@ from libephemeris.hypothetical import (
     calc_transpluto_position,
     calc_white_moon_position,
     calc_waldemath_position,
+    calc_waldemath,  # Waldemath Moon (hypothetical second moon of Earth)
     calc_hypothetical_position,
     list_hypothetical_bodies,
     calc_cupido,
@@ -62,6 +63,7 @@ from libephemeris.hypothetical import (
     POSEIDON_KEPLERIAN_ELEMENTS,
     TRANSPLUTO_KEPLERIAN_ELEMENTS,
     VULCAN_ELEMENTS,
+    WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -372,7 +374,7 @@ class TestWhiteMoonCalculations:
 
 
 class TestWaldemathCalculations:
-    """Tests for Waldemath Black Moon calculations."""
+    """Tests for Waldemath Moon (hypothetical second moon of Earth) calculations."""
 
     J2000 = 2451545.0
 
@@ -382,16 +384,104 @@ class TestWaldemathCalculations:
         assert isinstance(pos, tuple)
         assert len(pos) == 6
 
-    def test_calc_waldemath_small_distance(self):
-        """Test that Waldemath is at small distance (second focus of lunar orbit)."""
+    def test_calc_waldemath_distance_correct(self):
+        """Test that Waldemath is at correct distance (orbital elements from seorbel.txt)."""
         pos = calc_waldemath_position(self.J2000)
-        # Second focus is ~42,200 km ~ 0.00028 AU
-        assert pos[2] < 0.01, "Waldemath should be at very small distance"
+        # Waldemath has semi-major axis 0.0029833 AU (from seorbel.txt #18)
+        # For circular orbit, distance = semi-major axis
+        assert abs(pos[2] - 0.0029833) < 0.0001, (
+            f"Waldemath distance should be ~0.0029833 AU, got {pos[2]}"
+        )
 
     def test_calc_waldemath_longitude_range(self):
         """Test that Waldemath longitude is in valid range."""
         pos = calc_waldemath_position(self.J2000)
         assert 0.0 <= pos[0] < 360.0
+
+    def test_calc_waldemath_at_epoch(self):
+        """Test that Waldemath longitude at J2000.0 matches L0."""
+        pos = calc_waldemath_position(self.J2000)
+        # At J2000.0, longitude should equal L0 = 248.8833 degrees
+        expected_L0 = 248.8833
+        assert abs(pos[0] - expected_L0) < 0.01, (
+            f"At J2000.0, longitude should be {expected_L0}, got {pos[0]}"
+        )
+
+    def test_calc_waldemath_latitude_zero(self):
+        """Test that Waldemath has zero latitude (on ecliptic)."""
+        pos = calc_waldemath_position(self.J2000)
+        assert pos[1] == 0.0, "Waldemath should have zero latitude"
+
+    def test_calc_waldemath_velocity_positive(self):
+        """Test that Waldemath has positive (prograde) motion."""
+        pos = calc_waldemath_position(self.J2000)
+        # Mean motion should be ~3.025 deg/day
+        assert pos[3] > 0, "Waldemath should have prograde motion"
+        assert abs(pos[3] - 3.024873) < 0.01, (
+            f"Waldemath daily motion should be ~3.024873 deg/day, got {pos[3]}"
+        )
+
+    def test_calc_waldemath_distance_constant(self):
+        """Test that distance is constant for circular orbit."""
+        pos1 = calc_waldemath_position(self.J2000)
+        pos2 = calc_waldemath_position(self.J2000 + 365.25)  # 1 year later
+        assert pos1[2] == pos2[2], "Distance should be constant for circular orbit"
+
+    def test_calc_waldemath_progression(self):
+        """Test that Waldemath progresses correctly over time."""
+        pos1 = calc_waldemath_position(self.J2000)
+        pos2 = calc_waldemath_position(self.J2000 + 10)  # 10 days later
+
+        # Calculate expected motion in 10 days
+        expected_motion = 3.024873 * 10  # ~30.25 degrees
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        assert abs(actual_motion - expected_motion) < 0.1, (
+            f"10-day motion should be ~{expected_motion:.2f} deg, got {actual_motion:.2f}"
+        )
+
+    def test_calc_waldemath_orbital_period(self):
+        """Test that Waldemath completes one orbit in approximately 119 days."""
+        # Orbital period from n = 360 / period -> period = 360 / 3.024873 ≈ 119 days
+        period_days = 360.0 / 3.024873  # ~119 days
+
+        pos1 = calc_waldemath_position(self.J2000)
+        pos2 = calc_waldemath_position(self.J2000 + period_days)
+
+        # After one full period, should be back to same longitude (within tolerance)
+        diff = abs(pos2[0] - pos1[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 1.0, (
+            f"After one orbit (~{period_days:.1f} days), "
+            f"longitude should return near start, diff = {diff:.2f} deg"
+        )
+
+    def test_calc_waldemath_exportable_from_main_module(self):
+        """Test that calc_waldemath is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_waldemath")
+        pos = libephemeris.calc_waldemath(self.J2000)
+        assert len(pos) == 6
+
+    def test_waldemath_elements_valid(self):
+        """Test that Waldemath orbital elements have valid values."""
+        elements = WALDEMATH_ELEMENTS
+        assert elements.name == "Waldemath"
+        assert elements.epoch == 2451545.0  # J2000.0
+        assert abs(elements.a - 0.0029833) < 0.0001  # Semi-major axis
+        assert elements.e == 0.0  # Circular orbit
+        assert elements.i == 0.0  # On ecliptic
+        assert abs(elements.L0 - 248.8833) < 0.01  # Mean longitude at epoch
+        assert 3.0 < elements.n < 3.1  # Mean motion ~3.025 deg/day
 
 
 class TestMainCalculationFunction:

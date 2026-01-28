@@ -27,9 +27,10 @@ Transpluto (Persephone/Isis):
 
 Other Fictitious Bodies:
     - Vulcan: Hypothetical intra-Mercurial planet (now known not to exist)
-    - White Moon (Selena): Second Moon of Earth (symbolic point)
+    - White Moon (Selena): Symbolic point opposite to Black Moon Lilith
     - Proserpina: Another proposed trans-Plutonian planet
-    - Waldemath Black Moon: Second focus of lunar orbit
+    - Waldemath Moon: Dr. Waldemath's hypothetical second moon of Earth (seorbel.txt #18)
+      Note: This is different from Mean Lilith and True Lilith which are lunar apogee points
 
 References:
     - Swiss Ephemeris documentation: "Hypothetical Bodies"
@@ -961,6 +962,94 @@ VULCAN_ELEMENTS = VulcanElements(
     omega_rate=1670.056,  # Rate of change of omega in degrees/century
     Omega0=47.787931,  # Ascending node at epoch in degrees
     Omega_rate=-1670.056,  # Rate of change of Omega in degrees/century (note: negative)
+)
+
+
+# =============================================================================
+# WALDEMATH BLACK MOON ORBITAL ELEMENTS (seorbel.txt #18)
+# =============================================================================
+# Waldemath Moon is a hypothetical second moon of Earth proposed by Dr. Georg
+# Waldemath in 1898. This is distinct from Mean Lilith and True Lilith which
+# are lunar apogee points.
+#
+# From Swiss Ephemeris seorbel.txt (section 2.7.7):
+# J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo # 18
+#
+# Elements order:
+#   1. epoch (J2000)
+#   2. equinox (JDATE - equinox of date)
+#   3. mean longitude at epoch: 248.8833 degrees
+#   4. semi-major axis: 0.0029833 AU (~446,200 km, ~1.16x Moon distance)
+#   5. eccentricity: 0.0 (circular orbit)
+#   6. argument of perihelion: 0.0
+#   7. ascending node: 0.0
+#   8. inclination: 0.0
+#   9. name: Waldemath, geo (geocentric body)
+#
+# The orbital period is approximately 119 days based on the semi-major axis.
+# Mean motion derived: n = 360 / 119 = ~3.025 degrees/day
+
+
+@dataclass
+class WaldemathElements:
+    """
+    Orbital elements for the Waldemath hypothetical second moon of Earth.
+
+    Dr. Georg Waldemath claimed to have observed a second moon of Earth in 1898.
+    This hypothetical body is sometimes called the "Dark Moon" or "Waldemath Moon".
+    It is geocentric (orbits Earth, not the Sun).
+
+    Note: This is different from:
+    - Mean Lilith (mean lunar apogee)
+    - True Lilith (osculating lunar apogee)
+    - Black Moon Lilith (second focus of lunar orbit)
+
+    Attributes:
+        name: Name of the body
+        epoch: Reference epoch (Julian Day TT) - J2000.0
+        a: Semi-major axis (AU) - geocentric distance from Earth
+        e: Eccentricity (0 for circular orbit)
+        i: Inclination (degrees)
+        omega: Argument of perihelion (degrees)
+        Omega: Longitude of ascending node (degrees)
+        L0: Mean longitude at epoch (degrees)
+        n: Mean motion (degrees per day)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    omega: float
+    Omega: float
+    L0: float
+    n: float
+
+
+# Waldemath Moon orbital elements from Swiss Ephemeris seorbel.txt #18
+# Epoch: J2000.0 (JD 2451545.0)
+# From seorbel.txt line:
+# J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo # 18
+#
+# Mean motion calculation:
+# For a geocentric orbit, period = 2*pi*sqrt(a³/mu) where mu = GM_Earth
+# a = 0.0029833 AU = 446,200 km
+# GM_Earth = 398600.4 km³/s²
+# Period ≈ 119 days
+# n = 360 / 119 ≈ 3.025 deg/day
+WALDEMATH_ELEMENTS = WaldemathElements(
+    name="Waldemath",
+    epoch=2451545.0,  # J2000.0
+    a=0.0029833,  # Semi-major axis in AU (geocentric distance)
+    e=0.0,  # Circular orbit
+    i=0.0,  # On ecliptic plane
+    omega=0.0,  # Irrelevant for e=0
+    Omega=0.0,  # Assumed zero ascending node
+    L0=248.8833,  # Mean longitude at J2000.0 (degrees)
+    # Mean motion derived from orbital period of ~119 days
+    # n = 360 / 119 ≈ 3.025 deg/day
+    n=3.024873,  # degrees per day
 )
 
 
@@ -2152,6 +2241,69 @@ def _calc_vulcan_raw(jd_tt: float) -> Tuple[float, float, float]:
     return (longitude, latitude, distance)
 
 
+def calc_waldemath(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the geocentric position of the Waldemath hypothetical second moon.
+
+    Dr. Georg Waldemath's hypothetical second moon of Earth, documented in Swiss
+    Ephemeris section 2.7.7 (seorbel.txt #18). This is a different body from:
+    - Mean Lilith (SE_MEAN_APOG) - the mean lunar apogee
+    - True Lilith (SE_OSCU_APOG) - the osculating lunar apogee
+    - The second focus of the lunar orbit
+
+    Waldemath claimed to have observed this body in 1898, describing it as a dark
+    moon with an orbital period of approximately 119 days.
+
+    Orbital elements from seorbel.txt:
+        - Epoch: J2000.0 (JD 2451545.0)
+        - Semi-major axis: 0.0029833 AU (~446,200 km, ~1.16x Moon distance)
+        - Eccentricity: 0.0 (circular orbit)
+        - Inclination: 0.0 degrees (on ecliptic)
+        - Mean longitude at epoch: 248.8833 degrees
+        - Orbital period: ~119 days
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Geocentric ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees (0 for circular ecliptic orbit)
+            - distance: Distance from Earth in AU
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day (0)
+            - ddist: Daily distance change in AU/day (0 for circular orbit)
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_waldemath
+        >>> pos = calc_waldemath(2451545.0)  # J2000.0
+        >>> print(f"Waldemath at {pos[0]:.4f} deg, distance {pos[2]:.6f} AU")
+    """
+    elements = WALDEMATH_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # For a circular orbit (e = 0), mean longitude = true longitude
+    # Simply propagate the mean longitude
+    longitude = (elements.L0 + elements.n * dt) % 360.0
+
+    # Waldemath is assumed to be on the ecliptic (zero inclination)
+    latitude = 0.0
+
+    # Distance is constant for circular orbit (equal to semi-major axis)
+    distance = elements.a
+
+    # Daily motion is simply the mean motion for circular orbit
+    dlon = elements.n
+
+    # No latitude or distance change for circular orbit on ecliptic
+    dlat = 0.0
+    ddist = 0.0
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
 def calc_transpluto_position(
     jd_tt: float,
 ) -> Tuple[float, float, float, float, float, float]:
@@ -2395,53 +2547,39 @@ def calc_waldemath_position(
     jd_tt: float,
 ) -> Tuple[float, float, float, float, float, float]:
     """
-    Calculate the position of the Waldemath Black Moon.
+    Calculate the position of the Waldemath Moon (hypothetical second moon of Earth).
 
-    The Waldemath Black Moon is the second focus of the lunar orbit ellipse.
-    Its position is calculated as twice the Earth-Moon distance in the
-    direction opposite to the Moon.
+    Dr. Georg Waldemath's hypothetical second moon of Earth, documented in Swiss
+    Ephemeris section 2.7.7 (seorbel.txt #18). This is a different body from:
+    - Mean Lilith (SE_MEAN_APOG) - the mean lunar apogee
+    - True Lilith (SE_OSCU_APOG) - the osculating lunar apogee
+    - The second focus of the lunar orbit
+
+    Waldemath claimed to have observed this body in 1898, describing it as a dark
+    moon with an orbital period of approximately 119 days.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
 
     Returns:
         Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Geocentric ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees
+            - distance: Distance from Earth in AU
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
 
     Note:
-        This is a geometric point (second focus of ellipse), not a physical body.
+        This is a hypothetical body. Waldemath's observations were never confirmed
+        and no such second moon has been found to exist.
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_waldemath_position
+        >>> pos = calc_waldemath_position(2451545.0)  # J2000.0
+        >>> print(f"Waldemath at {pos[0]:.4f} deg")
     """
-    # Import lunar module
-    from . import lunar
-
-    # Get mean apogee (Lilith) position - this approximates the apse line direction
-    lilith_lon = lunar.calc_mean_lilith(jd_tt)
-
-    # Waldemath is in the same direction as Lilith (apogee direction)
-    # but represents the second focus of the ellipse
-    longitude = lilith_lon
-
-    # For an ellipse with semi-major axis a and eccentricity e,
-    # the distance from center to focus is c = a * e
-    # The lunar orbit has a ~ 384,400 km, e ~ 0.0549
-    # Distance from Earth to second focus ~ 2 * c ~ 42,200 km
-    # In AU: 42,200 km / 149,597,870.7 km/AU ~ 0.00028 AU
-    distance = 0.00028  # AU (geometric, not meaningful for astrology)
-
-    latitude = 0.0
-
-    # Calculate velocity
-    dt = 1.0 / 86400.0
-    lilith_next = lunar.calc_mean_lilith(jd_tt + dt)
-    dlon = (lilith_next - lilith_lon) / dt
-    if dlon > 180.0 / dt:
-        dlon -= 360.0 / dt
-    elif dlon < -180.0 / dt:
-        dlon += 360.0 / dt
-
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    return calc_waldemath(jd_tt)
 
 
 def calc_hypothetical_position(

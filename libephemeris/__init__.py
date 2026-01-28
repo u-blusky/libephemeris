@@ -187,11 +187,13 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_poseidon,
     calc_transpluto,  # Transpluto (Isis) - hypothetical trans-Plutonian planet
     calc_vulcan,  # Vulcan - hypothetical intramercurial planet
+    calc_waldemath,  # Waldemath Moon - hypothetical second moon of Earth (seorbel.txt #18)
     calc_uranian_planet,
     calc_hypothetical_position,
     URANIAN_KEPLERIAN_ELEMENTS,
     TRANSPLUTO_KEPLERIAN_ELEMENTS,
     VULCAN_ELEMENTS,  # Vulcan orbital elements from seorbel.txt
+    WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements from seorbel.txt #18
     SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
     SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
     SE_ZEUS as SE_ZEUS_HYPO,  # Alias to avoid conflict with constants.py
@@ -203,6 +205,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     SE_ISIS as SE_ISIS_HYPO,  # Alias to avoid conflict with constants.py
     SE_TRANSPLUTO as SE_TRANSPLUTO_HYPO,  # Alias to avoid conflict with constants.py
     SE_VULCAN as SE_VULCAN_HYPO,  # Alias to avoid conflict with constants.py
+    SE_WALDEMATH as SE_WALDEMATH_HYPO,  # Alias to avoid conflict with constants.py
 )
 
 
@@ -557,9 +560,11 @@ __all__ = [
     "calc_poseidon",
     "calc_transpluto",  # Transpluto (Isis) - hypothetical trans-Plutonian planet
     "calc_vulcan",  # Vulcan - hypothetical intramercurial planet
+    "calc_waldemath",  # Waldemath Moon - hypothetical second moon of Earth
     "calc_uranian_planet",
     "calc_hypothetical_position",
     "URANIAN_KEPLERIAN_ELEMENTS",
     "TRANSPLUTO_KEPLERIAN_ELEMENTS",
     "VULCAN_ELEMENTS",
+    "WALDEMATH_ELEMENTS",  # Waldemath Moon orbital elements
 ]
