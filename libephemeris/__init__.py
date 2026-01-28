@@ -81,6 +81,7 @@ from .crossing import (
     swe_helio_cross,
 )
 from .eclipse import (
+    BesselianElements,
     sol_eclipse_when_glob,
     swe_sol_eclipse_when_glob,
     sol_eclipse_when_loc,

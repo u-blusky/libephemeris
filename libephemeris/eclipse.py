@@ -6645,6 +6645,91 @@ swe_vis_limit_mag = vis_limit_mag
 EARTH_RADIUS_KM = 6378.137
 
 
+from dataclasses import dataclass
+
+
+@dataclass
+class BesselianElements:
+    """
+    Besselian elements for a solar eclipse at a given reference time.
+
+    Besselian elements are the fundamental quantities used to calculate
+    the circumstances of a solar eclipse for any location on Earth.
+    They describe the geometry of the Moon's shadow relative to Earth
+    in a standardized coordinate system called the fundamental plane.
+
+    The fundamental plane passes through Earth's center and is perpendicular
+    to the Moon-Sun line (shadow axis). The coordinate system has:
+    - x-axis: pointing east (increasing right ascension)
+    - y-axis: pointing north
+    - z-axis: along shadow axis toward the Moon
+
+    Attributes:
+        t0: Reference time (Julian Day, UT) for these elements.
+            Elements are exact at this time; derivatives allow interpolation.
+        x: Shadow axis x-coordinate on fundamental plane (Earth radii).
+            Positive = shadow axis is east of Earth's center.
+        y: Shadow axis y-coordinate on fundamental plane (Earth radii).
+            Positive = shadow axis is north of Earth's equator.
+        d: Declination of the shadow axis (degrees).
+            The angle between the shadow axis and the equatorial plane.
+        l1: Radius of the penumbral shadow cone on fundamental plane (Earth radii).
+            Observers within this radius see at least a partial eclipse.
+        l2: Radius of the umbral/antumbral shadow cone (Earth radii).
+            Positive for annular eclipses (antumbra), negative for total (umbra).
+        mu: Greenwich hour angle of the shadow axis (degrees).
+            The angle measured westward from Greenwich meridian to the
+            sub-solar point on the fundamental plane.
+        dx_dt: Rate of change of x (Earth radii per hour).
+        dy_dt: Rate of change of y (Earth radii per hour).
+        dd_dt: Rate of change of d (degrees per hour).
+        dl1_dt: Rate of change of l1 (Earth radii per hour).
+        dl2_dt: Rate of change of l2 (Earth radii per hour).
+        dmu_dt: Rate of change of mu (degrees per hour).
+
+    Example:
+        >>> from libephemeris import julday, BesselianElements
+        >>> # Create elements manually for illustration
+        >>> elements = BesselianElements(
+        ...     t0=julday(2024, 4, 8, 18.0),
+        ...     x=0.3145, y=0.2731, d=7.5821,
+        ...     l1=0.5436, l2=-0.0047, mu=89.1234,
+        ...     dx_dt=0.5123, dy_dt=0.1456, dd_dt=0.0012,
+        ...     dl1_dt=-0.0001, dl2_dt=-0.0001, dmu_dt=15.0041
+        ... )
+        >>> print(f"Shadow at x={elements.x:.4f}, y={elements.y:.4f}")
+
+    Note:
+        All angular rates (dd_dt, dmu_dt) are in degrees per hour.
+        All linear rates (dx_dt, dy_dt, dl1_dt, dl2_dt) are in Earth radii per hour.
+        Elements can be interpolated to nearby times t using:
+            x(t) ≈ x + dx_dt * (t - t0) * 24  (where t is in days)
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+        - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
+    """
+
+    t0: float  # Reference time (Julian Day, UT)
+
+    # Besselian elements
+    x: float  # Shadow x-coordinate (Earth radii)
+    y: float  # Shadow y-coordinate (Earth radii)
+    d: float  # Declination of shadow axis (degrees)
+    l1: float  # Penumbral cone radius (Earth radii)
+    l2: float  # Umbral cone radius (Earth radii)
+    mu: float  # Greenwich hour angle (degrees)
+
+    # Time derivatives (rates of change per hour)
+    dx_dt: float  # Rate of change of x (Earth radii/hour)
+    dy_dt: float  # Rate of change of y (Earth radii/hour)
+    dd_dt: float  # Rate of change of d (degrees/hour)
+    dl1_dt: float  # Rate of change of l1 (Earth radii/hour)
+    dl2_dt: float  # Rate of change of l2 (Earth radii/hour)
+    dmu_dt: float  # Rate of change of mu (degrees/hour)
+
+
 def calc_besselian_x(jd: float, flags: int = SEFLG_SWIEPH) -> float:
     """
     Calculate the Besselian x coordinate for a solar eclipse.
