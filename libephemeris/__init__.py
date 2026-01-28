@@ -130,12 +130,6 @@ from .eclipse import (
     swe_rise_trans,
     rise_trans_true_hor,
     swe_rise_trans_true_hor,
-    heliacal_ut,
-    swe_heliacal_ut,
-    heliacal_pheno_ut,
-    swe_heliacal_pheno_ut,
-    vis_limit_mag,
-    swe_vis_limit_mag,
     calc_besselian_x,
     calc_besselian_y,
     calc_besselian_d,
@@ -181,6 +175,14 @@ from .eclipse import (
     # Inex series calculation
     get_inex_number,
     INEX_CYCLE_DAYS,
+)
+from .heliacal import (
+    heliacal_ut,
+    swe_heliacal_ut,
+    heliacal_pheno_ut,
+    swe_heliacal_pheno_ut,
+    vis_limit_mag,
+    swe_vis_limit_mag,
 )
 from .utils import (
     degnorm,
@@ -609,6 +611,8 @@ __all__ = [
     "swe_heliacal_ut",
     "heliacal_pheno_ut",
     "swe_heliacal_pheno_ut",
+    "vis_limit_mag",
+    "swe_vis_limit_mag",
     # Utilities
     "degnorm",
     "radnorm",
