@@ -81,7 +81,7 @@ build-backend = "setuptools.build_meta"
 packages = ["libephemeris"]
 
 [tool.setuptools.package-data]
-libephemeris = ["py.typed"]
+libephemeris = ["py.typed", "seorbel.txt"]
 
 [tool.poe.tasks]
 format = "ruff format ."

@@ -1608,6 +1608,78 @@ def parse_seorbel(filepath: Union[str, Path]) -> List[SeorbelElements]:
     return elements
 
 
+def get_bundled_seorbel_path() -> Path:
+    """
+    Get the path to the bundled seorbel.txt file included with libephemeris.
+
+    The seorbel.txt file contains orbital elements for hypothetical bodies
+    from the Swiss Ephemeris. This file is bundled with the libephemeris
+    package for convenience.
+
+    Returns:
+        Path to the bundled seorbel.txt file.
+
+    Raises:
+        FileNotFoundError: If the bundled file is not found (should not happen
+            in a properly installed package).
+
+    Example:
+        >>> from libephemeris.hypothetical import get_bundled_seorbel_path, parse_seorbel
+        >>> seorbel_path = get_bundled_seorbel_path()
+        >>> elements = parse_seorbel(seorbel_path)
+        >>> print(f"Loaded {len(elements)} hypothetical bodies")
+    """
+    # Get the directory containing this module
+    module_dir = Path(__file__).parent
+    seorbel_path = module_dir / "seorbel.txt"
+
+    if not seorbel_path.exists():
+        raise FileNotFoundError(
+            f"Bundled seorbel.txt not found at {seorbel_path}. "
+            "This may indicate a packaging issue with libephemeris."
+        )
+
+    return seorbel_path
+
+
+def load_bundled_seorbel() -> List[SeorbelElements]:
+    """
+    Load and parse the bundled seorbel.txt file included with libephemeris.
+
+    This is a convenience function that combines get_bundled_seorbel_path()
+    and parse_seorbel() to quickly load all hypothetical body elements from
+    the Swiss Ephemeris seorbel.txt file bundled with the package.
+
+    Returns:
+        List of SeorbelElements objects for all hypothetical bodies defined
+        in the bundled seorbel.txt file.
+
+    Raises:
+        FileNotFoundError: If the bundled file is not found.
+
+    Example:
+        >>> from libephemeris.hypothetical import load_bundled_seorbel, get_seorbel_body_by_name
+        >>> elements = load_bundled_seorbel()
+        >>> cupido = get_seorbel_body_by_name(elements, "Cupido")
+        >>> print(f"Cupido semi-axis: {cupido.semi_axis} AU")
+        Cupido semi-axis: 40.99837 AU
+
+        >>> # Calculate position of a custom body from the file
+        >>> from libephemeris.hypothetical import calc_seorbel_position
+        >>> nibiru = get_seorbel_body_by_name(elements, "Nibiru")
+        >>> if nibiru:
+        ...     pos = calc_seorbel_position(nibiru, 2451545.0)
+        ...     print(f"Nibiru longitude: {pos[0]:.4f} deg")
+
+    See Also:
+        - parse_seorbel: Parse a custom seorbel.txt file
+        - get_bundled_seorbel_path: Get the path to the bundled file
+        - get_seorbel_body_by_name: Find a body by name
+        - calc_seorbel_position: Calculate position from elements
+    """
+    return parse_seorbel(get_bundled_seorbel_path())
+
+
 def _parse_seorbel_line(line: str, line_num: int) -> Optional[SeorbelElements]:
     """
     Parse a single data line from seorbel.txt.

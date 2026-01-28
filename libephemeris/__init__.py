@@ -200,6 +200,8 @@ from .hypothetical import (  # Hamburg School Uranian planets
     PICKERING_PLANET_X_ELEMENTS,  # Pickering's Planet O/X orbital elements
     # seorbel.txt parser for custom hypothetical bodies
     parse_seorbel,
+    get_bundled_seorbel_path,
+    load_bundled_seorbel,
     SeorbelElements,
     TPolynomial,
     get_seorbel_body_by_name,
@@ -585,6 +587,8 @@ __all__ = [
     "PICKERING_PLANET_X_ELEMENTS",  # Pickering's Planet O/X orbital elements
     # seorbel.txt parser for custom hypothetical bodies
     "parse_seorbel",
+    "get_bundled_seorbel_path",
+    "load_bundled_seorbel",
     "SeorbelElements",
     "TPolynomial",
     "get_seorbel_body_by_name",

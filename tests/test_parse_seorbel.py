@@ -17,6 +17,8 @@ from libephemeris.hypothetical import (
     TPolynomial,
     get_seorbel_body_by_name,
     calc_seorbel_position,
+    get_bundled_seorbel_path,
+    load_bundled_seorbel,
     _parse_t_polynomial,
     _parse_epoch_or_equinox,
 )
@@ -586,3 +588,135 @@ J2000, J2000, 0.0, 60.0, 0.0, 0.0, 0.0, 0.0, Planet2
             assert elements[1].line_number == 4  # After another comment
         finally:
             Path(filepath).unlink()
+
+
+class TestBundledSeorbel:
+    """Tests for bundled seorbel.txt functionality."""
+
+    def test_get_bundled_seorbel_path_exists(self):
+        """Test that the bundled seorbel.txt path exists."""
+        path = get_bundled_seorbel_path()
+        assert path.exists(), "Bundled seorbel.txt should exist"
+        assert path.is_file(), "Bundled seorbel.txt should be a file"
+        assert path.name == "seorbel.txt", "File should be named seorbel.txt"
+
+    def test_get_bundled_seorbel_path_in_package(self):
+        """Test that the bundled file is inside the libephemeris package."""
+        path = get_bundled_seorbel_path()
+        # The file should be in the libephemeris package directory
+        assert "libephemeris" in str(path), "Path should contain 'libephemeris'"
+
+    def test_load_bundled_seorbel_returns_list(self):
+        """Test that load_bundled_seorbel returns a list of elements."""
+        elements = load_bundled_seorbel()
+        assert isinstance(elements, list), "Should return a list"
+        assert len(elements) > 0, "Should have at least one element"
+        for elem in elements:
+            assert isinstance(elem, SeorbelElements), (
+                "Each element should be SeorbelElements"
+            )
+
+    def test_load_bundled_seorbel_contains_expected_bodies(self):
+        """Test that load_bundled_seorbel contains expected hypothetical bodies."""
+        elements = load_bundled_seorbel()
+        names = [elem.name for elem in elements]
+
+        # Check for Uranian planets (Hamburg School)
+        expected_bodies = [
+            "Cupido",
+            "Hades",
+            "Zeus",
+            "Kronos",
+            "Apollon",
+            "Admetos",
+            # Note: The file has "Vulcanus" not "Vulkanus"
+            "Poseidon",
+        ]
+
+        for body in expected_bodies:
+            assert any(body.lower() in name.lower() for name in names), (
+                f"Expected body '{body}' not found in bundled seorbel.txt"
+            )
+
+    def test_load_bundled_seorbel_cupido_elements(self):
+        """Test that Cupido has correct orbital elements from bundled file."""
+        elements = load_bundled_seorbel()
+        cupido = get_seorbel_body_by_name(elements, "Cupido")
+
+        assert cupido is not None, "Cupido should be found"
+        assert abs(cupido.semi_axis - 40.99837) < 0.001, "Cupido semi-axis should match"
+        assert abs(cupido.eccentricity.constant - 0.00460) < 0.0001, (
+            "Cupido eccentricity should match"
+        )
+
+    def test_load_bundled_seorbel_transpluto_elements(self):
+        """Test that Transpluto/Isis has correct orbital elements."""
+        elements = load_bundled_seorbel()
+        transpluto = get_seorbel_body_by_name(elements, "Isis-Transpluto")
+
+        assert transpluto is not None, "Transpluto should be found"
+        assert abs(transpluto.semi_axis - 77.775) < 0.001, (
+            "Transpluto semi-axis should match"
+        )
+        assert abs(transpluto.eccentricity.constant - 0.3) < 0.01, (
+            "Transpluto eccentricity should match"
+        )
+
+    def test_load_bundled_seorbel_geocentric_bodies(self):
+        """Test that geocentric bodies are correctly identified."""
+        elements = load_bundled_seorbel()
+
+        # Waldemath is geocentric (orbits Earth, not Sun)
+        waldemath = get_seorbel_body_by_name(elements, "Waldemath")
+        assert waldemath is not None, "Waldemath should be found"
+        assert waldemath.is_geocentric, "Waldemath should be geocentric"
+
+        # White Moon (Selena) is geocentric
+        selena = get_seorbel_body_by_name(elements, "Selena/White Moon")
+        assert selena is not None, "Selena/White Moon should be found"
+        assert selena.is_geocentric, "Selena should be geocentric"
+
+    def test_load_bundled_seorbel_can_calculate_position(self):
+        """Test that we can calculate positions from bundled elements."""
+        elements = load_bundled_seorbel()
+        cupido = get_seorbel_body_by_name(elements, "Cupido")
+
+        assert cupido is not None, "Cupido should be found"
+
+        # Calculate position at J2000.0
+        pos = calc_seorbel_position(cupido, 2451545.0)
+
+        # Basic sanity checks
+        assert 0 <= pos[0] < 360, "Longitude should be in range [0, 360)"
+        assert -90 <= pos[1] <= 90, "Latitude should be in range [-90, 90]"
+        assert pos[2] > 0, "Distance should be positive"
+
+    def test_bundled_seorbel_matches_swisseph_source(self):
+        """Test that bundled seorbel.txt matches the original Swiss Ephemeris source."""
+        bundled_path = get_bundled_seorbel_path()
+        bundled_elements = parse_seorbel(bundled_path)
+
+        # If the original file exists, compare
+        original_path = (
+            Path(__file__).parent.parent / "swisseph" / "ephe" / "seorbel.txt"
+        )
+        if original_path.exists():
+            original_elements = parse_seorbel(original_path)
+
+            # Should have same number of bodies
+            assert len(bundled_elements) == len(original_elements), (
+                "Bundled file should have same number of bodies as original"
+            )
+
+            # Check that first few bodies match
+            for i in range(min(5, len(bundled_elements))):
+                assert bundled_elements[i].name == original_elements[i].name, (
+                    f"Body {i} name should match"
+                )
+                assert (
+                    abs(bundled_elements[i].semi_axis - original_elements[i].semi_axis)
+                    < 0.0001
+                ), f"Body {i} semi-axis should match"
+        else:
+            # Skip comparison if original file doesn't exist
+            pytest.skip("Original swisseph/ephe/seorbel.txt not found for comparison")
