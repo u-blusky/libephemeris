@@ -275,6 +275,34 @@ class TestHouseCuspConstants:
         # Our implementation should have ASC at index 0, MC at index 1
 
 
+class TestHypotheticalBodies:
+    """Test hypothetical body constants."""
+
+    @pytest.mark.unit
+    def test_planet_x_leverrier_constant(self):
+        """Test that SE_PLANET_X_LEVERRIER is correctly defined."""
+        # Should be SE_FICT_OFFSET + 11 = 40 + 11 = 51
+        assert constants.SE_PLANET_X_LEVERRIER == 51
+        assert constants.SE_PLANET_X_LEVERRIER == constants.SE_FICT_OFFSET + 11
+
+    @pytest.mark.unit
+    def test_planet_x_leverrier_alias(self):
+        """Test that PLANET_X_LEVERRIER alias works."""
+        assert constants.PLANET_X_LEVERRIER == constants.SE_PLANET_X_LEVERRIER
+
+    @pytest.mark.unit
+    def test_waldemath_constant(self):
+        """Test that SE_WALDEMATH is correctly defined."""
+        assert constants.SE_WALDEMATH == 58
+        assert constants.SE_WALDEMATH == constants.SE_FICT_OFFSET + 18
+
+    @pytest.mark.unit
+    def test_vulcan_constant(self):
+        """Test that SE_VULCAN is correctly defined."""
+        assert constants.SE_VULCAN == 55
+        assert constants.SE_VULCAN == constants.SE_FICT_OFFSET + 15
+
+
 class TestConstantsCompleteness:
     """Test that we have all constants defined that pyswisseph has."""
 

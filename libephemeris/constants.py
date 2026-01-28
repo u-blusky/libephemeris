@@ -107,6 +107,14 @@ VULCAN: int = SE_VULCAN  # Pyswisseph-compatible alias
 SE_WALDEMATH: int = SE_FICT_OFFSET + 18  # 58 - Waldemath's hypothetical Dark Moon
 WALDEMATH: int = SE_WALDEMATH  # Pyswisseph-compatible alias
 
+# Planet X Leverrier - Leverrier's calculated "Planet X" that led to Neptune's discovery (section 2.7.8 of Swiss Ephemeris docs / seorbel.txt #12)
+# This is the orbital elements Leverrier computed in 1846 to predict the position of Neptune.
+# Historical note: Leverrier called it "Planet X" before Neptune was discovered at that position.
+SE_PLANET_X_LEVERRIER: int = (
+    SE_FICT_OFFSET + 11
+)  # 51 - Leverrier's Planet X (Neptune prediction)
+PLANET_X_LEVERRIER: int = SE_PLANET_X_LEVERRIER  # Pyswisseph-compatible alias
+
 # White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
 # In Swiss Ephemeris, this is calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
 # Note: Some systems use True Lilith + 180° instead; libephemeris supports both via calc_white_moon_position()

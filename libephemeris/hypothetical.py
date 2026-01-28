@@ -66,6 +66,9 @@ SE_TRANSPLUTO: int = SE_ISIS  # Alias
 SE_NIBIRU: int = SE_FICT_OFFSET + 9  # 49 - Sitchin's hypothetical planet
 SE_HARRINGTON: int = SE_FICT_OFFSET + 10  # 50 - Harrington's Planet X
 SE_NEPTUNE_LEVERRIER: int = SE_FICT_OFFSET + 11  # 51 - Leverrier's Neptune position
+SE_PLANET_X_LEVERRIER: int = (
+    SE_NEPTUNE_LEVERRIER  # Alias - Leverrier's calculated "Planet X" (section 2.7.8)
+)
 SE_NEPTUNE_ADAMS: int = SE_FICT_OFFSET + 12  # 52 - Adams' Neptune position
 SE_PLUTO_LOWELL: int = SE_FICT_OFFSET + 13  # 53 - Lowell's Pluto position
 SE_PLUTO_PICKERING: int = SE_FICT_OFFSET + 14  # 54 - Pickering's Pluto position
@@ -88,6 +91,7 @@ POSEIDON: int = SE_POSEIDON
 ISIS: int = SE_ISIS
 TRANSPLUTO: int = SE_TRANSPLUTO
 NIBIRU: int = SE_NIBIRU
+PLANET_X_LEVERRIER: int = SE_PLANET_X_LEVERRIER
 VULCAN: int = SE_VULCAN
 WHITE_MOON: int = SE_WHITE_MOON
 PROSERPINA: int = SE_PROSERPINA
