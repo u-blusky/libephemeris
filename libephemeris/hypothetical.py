@@ -70,6 +70,9 @@ SE_PLANET_X_LEVERRIER: int = (
     SE_NEPTUNE_LEVERRIER  # Alias - Leverrier's calculated "Planet X" (section 2.7.8)
 )
 SE_NEPTUNE_ADAMS: int = SE_FICT_OFFSET + 12  # 52 - Adams' Neptune position
+SE_PLANET_X_ADAMS: int = (
+    SE_NEPTUNE_ADAMS  # Alias - Adams' calculated "Planet X" (independently derived)
+)
 SE_PLUTO_LOWELL: int = SE_FICT_OFFSET + 13  # 53 - Lowell's Pluto position
 SE_PLUTO_PICKERING: int = SE_FICT_OFFSET + 14  # 54 - Pickering's Pluto position
 
@@ -92,6 +95,7 @@ ISIS: int = SE_ISIS
 TRANSPLUTO: int = SE_TRANSPLUTO
 NIBIRU: int = SE_NIBIRU
 PLANET_X_LEVERRIER: int = SE_PLANET_X_LEVERRIER
+PLANET_X_ADAMS: int = SE_PLANET_X_ADAMS
 VULCAN: int = SE_VULCAN
 WHITE_MOON: int = SE_WHITE_MOON
 PROSERPINA: int = SE_PROSERPINA

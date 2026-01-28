@@ -29,6 +29,9 @@ from libephemeris.hypothetical import (
     SE_PLANET_X_LEVERRIER,
     SE_NEPTUNE_LEVERRIER,
     PLANET_X_LEVERRIER,
+    SE_PLANET_X_ADAMS,
+    SE_NEPTUNE_ADAMS,
+    PLANET_X_ADAMS,
     # Functions
     is_hypothetical_body,
     get_hypothetical_name,
@@ -125,6 +128,20 @@ class TestBodyIdentification:
     def test_planet_x_leverrier_is_hypothetical(self):
         """Test that SE_PLANET_X_LEVERRIER is identified as hypothetical."""
         assert is_hypothetical_body(SE_PLANET_X_LEVERRIER)
+
+    def test_planet_x_adams_alias(self):
+        """Test that SE_PLANET_X_ADAMS is an alias for SE_NEPTUNE_ADAMS."""
+        assert SE_PLANET_X_ADAMS == SE_NEPTUNE_ADAMS
+        assert SE_PLANET_X_ADAMS == SE_FICT_OFFSET + 12
+        assert SE_PLANET_X_ADAMS == 52
+
+    def test_planet_x_adams_pyswisseph_alias(self):
+        """Test that PLANET_X_ADAMS alias works."""
+        assert PLANET_X_ADAMS == SE_PLANET_X_ADAMS
+
+    def test_planet_x_adams_is_hypothetical(self):
+        """Test that SE_PLANET_X_ADAMS is identified as hypothetical."""
+        assert is_hypothetical_body(SE_PLANET_X_ADAMS)
 
     def test_fict_offset_correct(self):
         """Test that body IDs use correct offset."""

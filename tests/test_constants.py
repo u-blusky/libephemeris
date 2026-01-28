@@ -291,6 +291,18 @@ class TestHypotheticalBodies:
         assert constants.PLANET_X_LEVERRIER == constants.SE_PLANET_X_LEVERRIER
 
     @pytest.mark.unit
+    def test_planet_x_adams_constant(self):
+        """Test that SE_PLANET_X_ADAMS is correctly defined."""
+        # Should be SE_FICT_OFFSET + 12 = 40 + 12 = 52
+        assert constants.SE_PLANET_X_ADAMS == 52
+        assert constants.SE_PLANET_X_ADAMS == constants.SE_FICT_OFFSET + 12
+
+    @pytest.mark.unit
+    def test_planet_x_adams_alias(self):
+        """Test that PLANET_X_ADAMS alias works."""
+        assert constants.PLANET_X_ADAMS == constants.SE_PLANET_X_ADAMS
+
+    @pytest.mark.unit
     def test_waldemath_constant(self):
         """Test that SE_WALDEMATH is correctly defined."""
         assert constants.SE_WALDEMATH == 58

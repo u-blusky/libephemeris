@@ -115,6 +115,14 @@ SE_PLANET_X_LEVERRIER: int = (
 )  # 51 - Leverrier's Planet X (Neptune prediction)
 PLANET_X_LEVERRIER: int = SE_PLANET_X_LEVERRIER  # Pyswisseph-compatible alias
 
+# Planet X Adams - Adams' calculated "Planet X" (independently derived, similar to Leverrier's)
+# John Couch Adams independently predicted Neptune's position around the same time as Leverrier.
+# This uses Adams' orbital elements from seorbel.txt #13 (SE_FICT_OFFSET + 12 = 52).
+SE_PLANET_X_ADAMS: int = (
+    SE_FICT_OFFSET + 12
+)  # 52 - Adams' Planet X (Neptune prediction)
+PLANET_X_ADAMS: int = SE_PLANET_X_ADAMS  # Pyswisseph-compatible alias
+
 # White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
 # In Swiss Ephemeris, this is calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
 # Note: Some systems use True Lilith + 180° instead; libephemeris supports both via calc_white_moon_position()
