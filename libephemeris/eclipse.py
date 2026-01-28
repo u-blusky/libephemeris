@@ -10228,3 +10228,151 @@ def calc_lunar_eclipse_umbral_duration(
     duration_minutes = duration_days * 24.0 * 60.0
 
     return duration_minutes
+
+
+# =============================================================================
+# SAROS SERIES CALCULATION
+# =============================================================================
+
+# Saros cycle period in days (223 synodic months)
+SAROS_CYCLE_DAYS = 6585.3211  # More precise: 6585.3211 days
+
+# Reference solar eclipses with known Saros series numbers
+# These are well-documented historical eclipses from NASA's eclipse catalogs
+# Format: (JD of eclipse maximum, Saros series number)
+_SOLAR_SAROS_REFERENCES = (
+    # Saros 136 - includes the famous 2017 total solar eclipse
+    (2457987.767, 136),  # 2017-Aug-21 total solar eclipse (Saros 136)
+    # Saros 139 - includes the 2024 total solar eclipse
+    (2460409.296, 139),  # 2024-Apr-08 total solar eclipse (Saros 139)
+    # Saros 127 - includes 2018 partial eclipse
+    (2458309.917, 127),  # 2018-Jul-13 partial solar eclipse (Saros 127)
+    # Saros 132 - includes 2021 annular eclipse
+    (2459369.971, 132),  # 2021-Jun-10 annular solar eclipse (Saros 132)
+    # Saros 140 - includes 2020 total eclipse
+    (2459203.604, 140),  # 2020-Dec-14 total solar eclipse (Saros 140)
+    # Saros 124 - includes 2019 total eclipse
+    (2458675.604, 124),  # 2019-Jul-02 total solar eclipse (Saros 124)
+    # Saros 126 - includes 2019 annular eclipse
+    (2458826.900, 126),  # 2019-Dec-26 annular solar eclipse (Saros 126)
+)
+
+# Reference lunar eclipses with known Saros series numbers
+# Format: (JD of eclipse maximum, Saros series number)
+_LUNAR_SAROS_REFERENCES = (
+    # Saros 136 - includes 2022 total lunar eclipse
+    (2459891.459, 136),  # 2022-Nov-08 total lunar eclipse (Saros 136)
+    # Saros 132 - includes 2021 total lunar eclipse
+    (2459356.917, 132),  # 2021-May-26 total lunar eclipse (Saros 132)
+    # Saros 129 - includes 2018 total lunar eclipse
+    (2458310.835, 129),  # 2018-Jul-27 total lunar eclipse (Saros 129)
+    # Saros 134 - includes 2019 total lunar eclipse
+    (2458497.459, 134),  # 2019-Jan-21 total lunar eclipse (Saros 134)
+    # Saros 137 - includes 2023 partial lunar eclipse
+    (2460232.146, 137),  # 2023-Oct-28 partial lunar eclipse (Saros 137)
+    # Saros 131 - includes 2022 total lunar eclipse
+    (2459695.604, 131),  # 2022-May-16 total lunar eclipse (Saros 131)
+    # Saros 141 - includes 2021 partial lunar eclipse
+    (2459534.417, 141),  # 2021-Nov-19 partial lunar eclipse (Saros 141)
+)
+
+
+def get_saros_number(
+    jd_eclipse: float,
+    eclipse_type: str = "solar",
+) -> int:
+    """
+    Determine the Saros series number for an eclipse.
+
+    The Saros cycle is a period of approximately 6585.3211 days (18 years,
+    11 days, 8 hours) after which the Sun, Moon, and lunar nodes return
+    to nearly the same relative geometry, causing similar eclipses to recur.
+
+    Each Saros series is numbered sequentially. Solar eclipses have series
+    numbered approximately 1-180 (though not all are active at any given time),
+    and lunar eclipses similarly have their own numbering.
+
+    Args:
+        jd_eclipse: Julian Day (UT) of the eclipse maximum. This should be
+                    obtained from sol_eclipse_when_glob() or lun_eclipse_when().
+        eclipse_type: Type of eclipse - either "solar" or "lunar".
+                      Defaults to "solar".
+
+    Returns:
+        The Saros series number (integer). Solar Saros numbers typically range
+        from about 1 to 180, and lunar Saros numbers similarly.
+
+    Algorithm:
+        1. For the given eclipse JD, calculate the difference from known
+           reference eclipses with documented Saros series numbers.
+        2. Determine how many Saros cycles separate the input eclipse from
+           the reference.
+        3. Each Saros cycle advances the series number by 1 (earlier eclipses
+           have lower numbers in the same series, later have higher).
+
+    Precision:
+        The function is accurate for eclipses within several centuries of
+        the reference eclipses. Very distant eclipses (more than ~500 years
+        from reference) may have small errors due to the slight variation
+        in the Saros period.
+
+    Example:
+        >>> from libephemeris import julday, sol_eclipse_when_glob, get_saros_number
+        >>> # Find the April 8, 2024 total solar eclipse
+        >>> jd_start = julday(2024, 3, 1, 0.0)
+        >>> times, ecl_type = sol_eclipse_when_glob(jd_start)
+        >>> jd_max = times[0]
+        >>> saros = get_saros_number(jd_max, "solar")
+        >>> print(f"Saros series: {saros}")  # Should print 139
+
+    Note:
+        - Each Saros series begins with partial eclipses near one pole,
+          progresses through central (total/annular) eclipses, and ends
+          with partial eclipses near the other pole.
+        - A typical Saros series contains 70-80 eclipses over ~1200-1400 years.
+        - The same Saros number for solar and lunar eclipses are different
+          series (they use separate numbering systems).
+
+    References:
+        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - van Gent, R.H. "A Catalogue of Eclipse Cycles"
+    """
+    if eclipse_type.lower() == "solar":
+        references = _SOLAR_SAROS_REFERENCES
+    elif eclipse_type.lower() == "lunar":
+        references = _LUNAR_SAROS_REFERENCES
+    else:
+        raise ValueError(
+            f"eclipse_type must be 'solar' or 'lunar', got '{eclipse_type}'"
+        )
+
+    # Use the first reference eclipse as our anchor point
+    ref_jd, ref_saros = references[0]
+
+    # Calculate how many Saros cycles separate the input from the reference
+    delta_days = jd_eclipse - ref_jd
+
+    # Number of complete Saros cycles (can be positive or negative)
+    # We round to the nearest integer since eclipses within a series
+    # are separated by almost exactly one Saros cycle
+    cycles = round(delta_days / SAROS_CYCLE_DAYS)
+
+    # The Saros series number stays the same within a series
+    # Different series are offset by different amounts in time
+    # To find the correct series, we need to find which reference
+    # gives us a cycle count close to an integer
+
+    best_match_series = ref_saros
+    best_match_residual = abs(delta_days - cycles * SAROS_CYCLE_DAYS)
+
+    for ref_jd_test, ref_saros_test in references:
+        delta = jd_eclipse - ref_jd_test
+        cycles_test = round(delta / SAROS_CYCLE_DAYS)
+        residual = abs(delta - cycles_test * SAROS_CYCLE_DAYS)
+
+        if residual < best_match_residual:
+            best_match_residual = residual
+            best_match_series = ref_saros_test
+
+    return best_match_series

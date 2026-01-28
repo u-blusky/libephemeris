@@ -141,6 +141,9 @@ from .eclipse import (
     calc_solar_eclipse_duration,
     calc_lunar_eclipse_total_duration,
     calc_lunar_eclipse_umbral_duration,
+    # Saros series calculation
+    get_saros_number,
+    SAROS_CYCLE_DAYS,
 )
 from .utils import (
     degnorm,
@@ -533,6 +536,9 @@ __all__ = [
     "calc_solar_eclipse_duration",
     "calc_lunar_eclipse_total_duration",
     "calc_lunar_eclipse_umbral_duration",
+    # Saros series calculation
+    "get_saros_number",
+    "SAROS_CYCLE_DAYS",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",
