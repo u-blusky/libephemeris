@@ -533,10 +533,10 @@ def _calculate_eclipse_phases_besselian(
         if gamma_max < umbral_limit:
             # Central phase possible
             t_second_contact = _find_contact_time_besselian(
-                jd_max, umbral_limit, search_before=True, search_range=0.05
+                jd_max, umbral_limit, search_before=True, search_range=0.10
             )
             t_third_contact = _find_contact_time_besselian(
-                jd_max, umbral_limit, search_before=False, search_range=0.05
+                jd_max, umbral_limit, search_before=False, search_range=0.10
             )
 
     # Sunrise/sunset on central line (not implemented - would require path calculation)
@@ -8516,3 +8516,105 @@ def calc_eclipse_first_contact_c1(
     )
 
     return t_first_contact
+
+
+def calc_eclipse_second_contact_c2(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of second contact (C2) for a solar eclipse.
+
+    Second contact (C2) is the moment when totality or annularity begins -
+    when the Moon is fully inside (total eclipse) or outside (annular eclipse)
+    the Sun's disk. At this instant, the umbral (total) or antumbral (annular)
+    shadow first touches Earth's surface.
+
+    This function uses Besselian elements to precisely calculate C2. The
+    condition for C2 is when gamma (the distance of the shadow axis from
+    Earth's center) equals 1 - |l2| (Earth radius minus umbral/antumbral cone
+    radius), occurring before eclipse maximum.
+
+    Note: C2 only exists for central eclipses (total or annular). For partial
+    eclipses, this function returns 0.0.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from sol_eclipse_when_glob()
+                or sol_eclipse_when_loc(). The function searches backward from
+                this time to find C2.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of second contact C2. Returns 0.0 if:
+        - The eclipse is not a central eclipse (total or annular)
+        - C2 cannot be determined (gamma at maximum exceeds umbral limit)
+        - The input time is not near a valid solar eclipse
+
+    Algorithm:
+        1. Calculate l2 (umbral/antumbral radius) at eclipse maximum
+        2. Compute target gamma = 1 - |l2| (condition for umbra touching Earth)
+        3. Check if gamma at maximum is less than umbral limit (central phase possible)
+        4. Use binary search to find when gamma equals this target before maximum
+        5. The search proceeds from (jd_max - search_range) to jd_max
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the gamma value converges to within 1e-8 Earth radii,
+        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+
+    Example:
+        >>> from libephemeris import julday, sol_eclipse_when_glob, calc_eclipse_second_contact_c2
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the April 8, 2024 total solar eclipse
+        >>> jd_start = julday(2024, 1, 1, 0.0)
+        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate second contact
+        >>> jd_c2 = calc_eclipse_second_contact_c2(jd_max)
+        >>> print(f"Second contact C2: JD {jd_c2:.6f}")
+
+    Note:
+        - C2 is also known as "totality begins" or "annularity begins"
+        - For partial eclipses, C2 does not exist (returns 0.0)
+        - The duration of totality/annularity is (C3 - C2)
+        - For local eclipse circumstances (at a specific observer location),
+          use sol_eclipse_when_loc() which returns contact times in its result
+        - The returned time is for the global eclipse (when umbra/antumbra first
+          touches Earth anywhere), not for a specific observer location
+
+    See Also:
+        - calc_eclipse_first_contact_c1: Calculate first contact (eclipse begins)
+        - sol_eclipse_when_glob: Find next solar eclipse and all phase times
+        - sol_eclipse_when_loc: Get local eclipse circumstances including contacts
+        - calc_besselian_l2: Calculate umbral/antumbral shadow radius
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Get l2 (umbral/antumbral radius) at maximum eclipse
+    l2 = _calc_umbra_limit(jd_max)
+
+    # Get gamma at maximum to check if central phase is possible
+    gamma_max = _calc_gamma(jd_max)
+
+    # For central eclipse, second contact occurs when gamma = 1 - |l2|
+    # (umbral/antumbral shadow touches Earth's limb from outside)
+    umbral_limit = 1.0 - abs(l2)  # Earth radius minus umbra/antumbra radius
+
+    # Check if central phase is possible (gamma at max must be less than umbral limit)
+    if gamma_max >= umbral_limit:
+        # No central phase - eclipse is partial only
+        return 0.0
+
+    # Calculate second contact (umbra/antumbra first touches Earth)
+    # Search backward from maximum with a range of ~2.4 hours
+    # (umbral contact typically occurs 0.5-1.5 hours before maximum)
+    t_second_contact = _find_contact_time_besselian(
+        jd_max, umbral_limit, search_before=True, search_range=0.10
+    )
+
+    return t_second_contact
