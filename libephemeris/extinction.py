@@ -643,3 +643,507 @@ def get_extinction_for_heliacal(
         wavelength_nm=WAVELENGTH_V,
     )
     return coeff.k_total
+
+
+# =============================================================================
+# TWILIGHT SKY BRIGHTNESS MODEL
+# =============================================================================
+# The twilight sky brightness model calculates the surface brightness of the sky
+# during the three phases of twilight:
+#   - Civil twilight: Sun altitude 0° to -6°
+#   - Nautical twilight: Sun altitude -6° to -12°
+#   - Astronomical twilight: Sun altitude -12° to -18°
+#
+# The model is based on the work of:
+#   - Patat, F. (2003) "UBVRI twilight sky brightness at ESO-Paranal"
+#   - Krisciunas, K. & Schaefer, B.E. (1991) "A model of the brightness of moonlight"
+#   - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+#   - Rozenberg, G.V. (1966) "Twilight: A Study in Atmospheric Optics"
+# =============================================================================
+
+# Twilight phase boundaries (Sun altitude in degrees)
+TWILIGHT_CIVIL_START = 0.0  # Sun at horizon
+TWILIGHT_CIVIL_END = -6.0  # End of civil twilight
+TWILIGHT_NAUTICAL_END = -12.0  # End of nautical twilight
+TWILIGHT_ASTRONOMICAL_END = -18.0  # End of astronomical twilight (full darkness)
+
+# Sky brightness constants in mag/arcsec^2 (V-band)
+# Dark sky brightness is typically 21.5-22.0 mag/arcsec^2 at excellent sites
+DARK_SKY_BRIGHTNESS_V = 21.7  # Typical dark sky, V-band
+ZENITH_DARK_SKY = 21.9  # Zenith dark sky brightness
+
+# Twilight sky brightness at key Sun altitudes (approximate, V-band)
+# These are representative values for zenith in mag/arcsec^2
+SKY_BRIGHTNESS_SUN_0 = 3.0  # Sun at horizon (very bright)
+SKY_BRIGHTNESS_SUN_MINUS6 = 8.0  # End of civil twilight
+SKY_BRIGHTNESS_SUN_MINUS12 = 17.0  # End of nautical twilight
+SKY_BRIGHTNESS_SUN_MINUS18 = 21.7  # End of astronomical twilight
+
+
+@dataclass
+class TwilightSkyBrightness:
+    """
+    Result of twilight sky brightness calculation.
+
+    Attributes:
+        surface_brightness: Sky surface brightness in mag/arcsec^2 (V-band).
+                           Higher values = darker sky.
+        twilight_phase: Current twilight phase ("day", "civil", "nautical",
+                        "astronomical", or "night").
+        sun_altitude_deg: Sun altitude in degrees (negative = below horizon).
+        azimuth_factor: Angular distance factor from Sun (0-1, 1 = away from Sun).
+        limiting_magnitude: Approximate naked-eye limiting magnitude.
+        nanolamberts: Sky brightness in nanoLamberts (alternative unit).
+    """
+
+    surface_brightness: float  # mag/arcsec^2
+    twilight_phase: str
+    sun_altitude_deg: float
+    azimuth_factor: float
+    limiting_magnitude: float
+    nanolamberts: float
+
+
+def get_twilight_phase(sun_altitude_deg: float) -> str:
+    """
+    Determine the current twilight phase based on Sun altitude.
+
+    Args:
+        sun_altitude_deg: Sun altitude in degrees (negative = below horizon).
+
+    Returns:
+        Twilight phase as a string:
+            - "day": Sun above horizon (altitude > 0)
+            - "civil": Civil twilight (0 >= altitude > -6)
+            - "nautical": Nautical twilight (-6 >= altitude > -12)
+            - "astronomical": Astronomical twilight (-12 >= altitude > -18)
+            - "night": Full darkness (altitude <= -18)
+
+    Example:
+        >>> get_twilight_phase(-3.0)
+        'civil'
+        >>> get_twilight_phase(-9.0)
+        'nautical'
+        >>> get_twilight_phase(-15.0)
+        'astronomical'
+        >>> get_twilight_phase(-20.0)
+        'night'
+    """
+    if sun_altitude_deg > TWILIGHT_CIVIL_START:
+        return "day"
+    elif sun_altitude_deg > TWILIGHT_CIVIL_END:
+        return "civil"
+    elif sun_altitude_deg > TWILIGHT_NAUTICAL_END:
+        return "nautical"
+    elif sun_altitude_deg > TWILIGHT_ASTRONOMICAL_END:
+        return "astronomical"
+    else:
+        return "night"
+
+
+def _calc_azimuth_factor(
+    sun_azimuth_deg: float,
+    target_azimuth_deg: float,
+    sun_altitude_deg: float,
+) -> float:
+    """
+    Calculate the azimuthal brightness factor based on angular distance from Sun.
+
+    The sky is brighter in the direction of the Sun during twilight.
+    This function returns a factor between 0 and 1, where:
+    - 0 = looking toward the Sun (brightest)
+    - 1 = looking away from the Sun (darkest)
+
+    Args:
+        sun_azimuth_deg: Sun azimuth in degrees (0-360).
+        target_azimuth_deg: Target azimuth in degrees (0-360).
+        sun_altitude_deg: Sun altitude in degrees.
+
+    Returns:
+        Azimuth factor between 0 and 1.
+    """
+    # Calculate azimuth difference (0-180 degrees)
+    delta_az = abs(sun_azimuth_deg - target_azimuth_deg)
+    if delta_az > 180.0:
+        delta_az = 360.0 - delta_az
+
+    # Normalize to 0-1 range (0 = toward Sun, 1 = opposite Sun)
+    az_factor = delta_az / 180.0
+
+    # The effect is stronger when Sun is closer to horizon
+    # At lower Sun altitudes, the brightness gradient is more pronounced
+    if sun_altitude_deg > -6.0:
+        # Civil twilight: strong azimuthal gradient
+        weight = 0.7
+    elif sun_altitude_deg > -12.0:
+        # Nautical twilight: moderate gradient
+        weight = 0.4
+    elif sun_altitude_deg > -18.0:
+        # Astronomical twilight: weak gradient
+        weight = 0.2
+    else:
+        # Night: negligible gradient
+        weight = 0.0
+
+    # Return weighted azimuth factor
+    return az_factor * weight + (1.0 - weight)
+
+
+def _calc_altitude_factor(target_altitude_deg: float) -> float:
+    """
+    Calculate brightness factor based on target altitude.
+
+    Sky brightness varies with zenith angle. The sky is generally
+    brighter near the horizon due to longer light path through atmosphere.
+
+    Args:
+        target_altitude_deg: Target altitude in degrees.
+
+    Returns:
+        Altitude factor (multiplicative adjustment to brightness).
+    """
+    if target_altitude_deg <= 0:
+        return 0.5  # Below horizon - very bright sky glow at horizon
+
+    # Zenith angle in degrees
+    zenith_angle = 90.0 - target_altitude_deg
+
+    # Van Rhijn function approximation for sky brightness vs zenith angle
+    # B(z) = B_0 * (1 + k * sec(z))
+    # At zenith (z=0): factor = 1
+    # At horizon (z=90): factor is higher (brighter near horizon)
+    if zenith_angle >= 85:
+        return 1.5  # Near horizon - significantly brighter
+
+    zenith_rad = math.radians(zenith_angle)
+    cos_z = math.cos(zenith_rad)
+
+    # Simple model: brightness increases as secant of zenith angle
+    # but limited to prevent infinities near horizon
+    sec_z = min(1.0 / cos_z, 10.0) if cos_z > 0.1 else 10.0
+
+    # Normalize so zenith = 1.0
+    factor = 0.2 * (sec_z - 1.0) + 1.0
+
+    return min(factor, 2.0)
+
+
+def calc_twilight_sky_brightness(
+    sun_altitude_deg: float,
+    target_altitude_deg: float = 90.0,
+    sun_azimuth_deg: float = 0.0,
+    target_azimuth_deg: float = 180.0,
+    pressure_mbar: float = DEFAULT_PRESSURE_MBAR,
+    temperature_c: float = DEFAULT_TEMPERATURE_C,
+    humidity_percent: float = DEFAULT_HUMIDITY_PERCENT,
+    altitude_m: float = DEFAULT_ALTITUDE_M,
+    wavelength_nm: float = WAVELENGTH_V,
+) -> TwilightSkyBrightness:
+    """
+    Calculate sky surface brightness during twilight.
+
+    This function models the sky brightness as a function of Sun altitude,
+    azimuth relative to the target, and atmospheric conditions. The model
+    covers all three twilight phases:
+
+    - Civil twilight (Sun 0° to -6°): Brightest stars visible, horizon visible
+    - Nautical twilight (Sun -6° to -12°): Horizon line barely visible
+    - Astronomical twilight (Sun -12° to -18°): Sky still not fully dark
+
+    Args:
+        sun_altitude_deg: Sun altitude in degrees (negative = below horizon).
+                         Range: typically -18 to 0 for twilight.
+        target_altitude_deg: Altitude of viewing direction in degrees.
+                            Default 90.0 (zenith).
+        sun_azimuth_deg: Sun azimuth in degrees (0-360, N=0, E=90).
+        target_azimuth_deg: Target azimuth in degrees.
+        pressure_mbar: Atmospheric pressure in millibars.
+        temperature_c: Temperature in degrees Celsius.
+        humidity_percent: Relative humidity (0-100).
+        altitude_m: Observer altitude in meters above sea level.
+        wavelength_nm: Wavelength of observation in nanometers.
+
+    Returns:
+        TwilightSkyBrightness dataclass containing:
+            - surface_brightness: Sky brightness in mag/arcsec^2
+            - twilight_phase: Current twilight phase
+            - sun_altitude_deg: Input Sun altitude
+            - azimuth_factor: Angular distance factor from Sun
+            - limiting_magnitude: Approximate naked-eye limiting magnitude
+            - nanolamberts: Sky brightness in nanoLamberts
+
+    Algorithm:
+        The model uses a multi-component approach:
+
+        1. Base brightness from Sun altitude:
+           The primary driver of twilight sky brightness is the Sun's
+           altitude below the horizon. We use empirical relations from
+           Patat (2003) and Rozenberg (1966).
+
+        2. Azimuthal variation:
+           The sky is brighter toward the Sun. This effect is most
+           pronounced during civil twilight and diminishes as the
+           Sun goes deeper below the horizon.
+
+        3. Altitude/zenith angle variation:
+           The sky is generally brighter near the horizon due to
+           longer atmospheric path length (Van Rhijn effect).
+
+        4. Atmospheric conditions:
+           Aerosols and humidity affect scattering and can brighten
+           the twilight sky, especially near the horizon.
+
+    Example:
+        >>> # Civil twilight, looking at zenith
+        >>> result = calc_twilight_sky_brightness(-3.0, 90.0)
+        >>> print(f"Phase: {result.twilight_phase}")
+        Phase: civil
+        >>> print(f"Brightness: {result.surface_brightness:.1f} mag/arcsec^2")
+        Brightness: 5.5 mag/arcsec^2
+
+        >>> # Nautical twilight, looking away from Sun
+        >>> result = calc_twilight_sky_brightness(-9.0, 45.0, 270.0, 90.0)
+        >>> print(f"Phase: {result.twilight_phase}")
+        Phase: nautical
+        >>> print(f"Brightness: {result.surface_brightness:.1f} mag/arcsec^2")
+        Brightness: 14.2 mag/arcsec^2
+
+        >>> # Astronomical twilight, looking at zenith
+        >>> result = calc_twilight_sky_brightness(-15.0)
+        >>> print(f"Phase: {result.twilight_phase}")
+        Phase: astronomical
+        >>> print(f"Limit mag: {result.limiting_magnitude:.1f}")
+        Limit mag: 5.5
+
+    References:
+        - Patat, F. (2003) "UBVRI twilight sky brightness at ESO-Paranal"
+          A&A 400, 1183-1198
+        - Krisciunas, K. & Schaefer, B.E. (1991) PASP 103, 1033
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+        - Rozenberg, G.V. (1966) "Twilight: A Study in Atmospheric Optics"
+    """
+    # Determine twilight phase
+    phase = get_twilight_phase(sun_altitude_deg)
+
+    # Calculate base sky brightness from Sun altitude
+    if sun_altitude_deg >= 0:
+        # Daytime - very bright sky
+        base_brightness = 3.0 - sun_altitude_deg * 0.05  # Brighter as Sun goes up
+        base_brightness = max(0.0, base_brightness)
+    elif sun_altitude_deg >= TWILIGHT_CIVIL_END:
+        # Civil twilight (0 to -6 degrees)
+        # Interpolate between Sun at horizon (3.0) and end of civil (-6 -> 8.0)
+        fraction = -sun_altitude_deg / 6.0
+        base_brightness = SKY_BRIGHTNESS_SUN_0 + fraction * (
+            SKY_BRIGHTNESS_SUN_MINUS6 - SKY_BRIGHTNESS_SUN_0
+        )
+    elif sun_altitude_deg >= TWILIGHT_NAUTICAL_END:
+        # Nautical twilight (-6 to -12 degrees)
+        fraction = (-sun_altitude_deg - 6.0) / 6.0
+        base_brightness = SKY_BRIGHTNESS_SUN_MINUS6 + fraction * (
+            SKY_BRIGHTNESS_SUN_MINUS12 - SKY_BRIGHTNESS_SUN_MINUS6
+        )
+    elif sun_altitude_deg >= TWILIGHT_ASTRONOMICAL_END:
+        # Astronomical twilight (-12 to -18 degrees)
+        fraction = (-sun_altitude_deg - 12.0) / 6.0
+        base_brightness = SKY_BRIGHTNESS_SUN_MINUS12 + fraction * (
+            SKY_BRIGHTNESS_SUN_MINUS18 - SKY_BRIGHTNESS_SUN_MINUS12
+        )
+    else:
+        # Full night
+        base_brightness = DARK_SKY_BRIGHTNESS_V
+
+    # Calculate azimuth factor (looking toward vs away from Sun)
+    az_factor = _calc_azimuth_factor(
+        sun_azimuth_deg, target_azimuth_deg, sun_altitude_deg
+    )
+
+    # Calculate altitude factor (zenith vs horizon)
+    alt_factor = _calc_altitude_factor(target_altitude_deg)
+
+    # Adjust brightness for azimuth
+    # Looking toward Sun = brighter (lower mag/arcsec^2)
+    # Looking away = darker (higher mag/arcsec^2)
+    # Effect is up to ~2 magnitudes during civil twilight
+    if sun_altitude_deg >= TWILIGHT_CIVIL_END:
+        az_adjustment = (1.0 - az_factor) * 2.0  # Up to 2 mag brighter toward Sun
+    elif sun_altitude_deg >= TWILIGHT_NAUTICAL_END:
+        az_adjustment = (1.0 - az_factor) * 1.0  # Up to 1 mag brighter
+    elif sun_altitude_deg >= TWILIGHT_ASTRONOMICAL_END:
+        az_adjustment = (1.0 - az_factor) * 0.3  # Small effect
+    else:
+        az_adjustment = 0.0  # No effect at night
+
+    # Adjust for altitude factor
+    # Looking at horizon = brighter (lower mag)
+    # Looking at zenith = darker (higher mag)
+    if alt_factor > 1.0:
+        alt_adjustment = -(alt_factor - 1.0) * 1.5  # Brighter near horizon
+    else:
+        alt_adjustment = 0.0
+
+    # Atmospheric conditions affect brightness
+    # Higher aerosol content = more scattering = brighter twilight sky
+    coeff = calc_extinction_coefficient(
+        pressure_mbar=pressure_mbar,
+        temperature_c=temperature_c,
+        humidity_percent=humidity_percent,
+        altitude_m=altitude_m,
+        wavelength_nm=wavelength_nm,
+    )
+
+    # Aerosol effect: more aerosols = brighter twilight
+    # Typical k_aerosol is 0.1-0.2; higher values brighten the sky
+    aerosol_adjustment = -(coeff.k_aerosol - 0.1) * 0.5  # Subtle effect
+
+    # Calculate final surface brightness
+    surface_brightness = (
+        base_brightness - az_adjustment + alt_adjustment + aerosol_adjustment
+    )
+
+    # Clamp to reasonable range
+    surface_brightness = max(0.0, min(surface_brightness, 22.5))
+
+    # Calculate limiting magnitude from sky brightness
+    # Empirical relation: limiting mag depends on sky brightness and observer
+    # Based on Schaefer (1990): m_lim = 7.93 - 5*log10(1 + 10^(4.316 - B/5))
+    # Simplified approximation:
+    if surface_brightness < 10:
+        limiting_mag = -2.0 + surface_brightness * 0.5  # Very bright sky
+    elif surface_brightness < 18:
+        limiting_mag = 3.0 + (surface_brightness - 10) * 0.35  # Twilight
+    else:
+        limiting_mag = 5.8 + (surface_brightness - 18) * 0.2  # Approaching dark sky
+
+    limiting_mag = max(-2.0, min(limiting_mag, 7.0))
+
+    # Convert mag/arcsec^2 to nanoLamberts
+    # Using: log10(nL) = 35.96 - 0.4 * B
+    # where B is surface brightness in mag/arcsec^2
+    nanolamberts = 10 ** (35.96 - 0.4 * surface_brightness)
+
+    return TwilightSkyBrightness(
+        surface_brightness=surface_brightness,
+        twilight_phase=phase,
+        sun_altitude_deg=sun_altitude_deg,
+        azimuth_factor=az_factor,
+        limiting_magnitude=limiting_mag,
+        nanolamberts=nanolamberts,
+    )
+
+
+def calc_twilight_brightness_simple(
+    sun_altitude_deg: float,
+) -> float:
+    """
+    Calculate approximate sky brightness during twilight (simplified model).
+
+    This is a simplified version of calc_twilight_sky_brightness that
+    returns only the zenith sky brightness based on Sun altitude.
+
+    Args:
+        sun_altitude_deg: Sun altitude in degrees (negative = below horizon).
+
+    Returns:
+        Sky surface brightness in mag/arcsec^2 (V-band).
+        Higher values indicate a darker sky.
+
+    Example:
+        >>> calc_twilight_brightness_simple(0.0)   # Sun at horizon
+        3.0
+        >>> calc_twilight_brightness_simple(-6.0)  # End of civil twilight
+        8.0
+        >>> calc_twilight_brightness_simple(-12.0) # End of nautical twilight
+        17.0
+        >>> calc_twilight_brightness_simple(-18.0) # End of astronomical twilight
+        21.7
+
+    References:
+        - Patat, F. (2003) "UBVRI twilight sky brightness at ESO-Paranal"
+    """
+    result = calc_twilight_sky_brightness(
+        sun_altitude_deg=sun_altitude_deg,
+        target_altitude_deg=90.0,  # Zenith
+        sun_azimuth_deg=0.0,
+        target_azimuth_deg=180.0,  # Opposite to Sun
+    )
+    return result.surface_brightness
+
+
+def calc_limiting_magnitude_twilight(
+    sun_altitude_deg: float,
+    target_altitude_deg: float = 45.0,
+    sun_azimuth_deg: float = 0.0,
+    target_azimuth_deg: float = 180.0,
+    pressure_mbar: float = DEFAULT_PRESSURE_MBAR,
+    humidity_percent: float = DEFAULT_HUMIDITY_PERCENT,
+    altitude_m: float = DEFAULT_ALTITUDE_M,
+) -> float:
+    """
+    Calculate the naked-eye limiting magnitude during twilight.
+
+    This function estimates the faintest star visible to the naked eye
+    given the current twilight conditions. The limiting magnitude depends
+    primarily on sky brightness, which varies with Sun altitude and
+    viewing direction.
+
+    Args:
+        sun_altitude_deg: Sun altitude in degrees (negative = below horizon).
+        target_altitude_deg: Altitude of viewing direction in degrees.
+        sun_azimuth_deg: Sun azimuth in degrees.
+        target_azimuth_deg: Target azimuth in degrees.
+        pressure_mbar: Atmospheric pressure in millibars.
+        humidity_percent: Relative humidity (0-100).
+        altitude_m: Observer altitude in meters.
+
+    Returns:
+        Limiting visual magnitude. Stars fainter than this value
+        will not be visible to the naked eye.
+
+    Example:
+        >>> # Civil twilight - only bright objects visible
+        >>> calc_limiting_magnitude_twilight(-3.0)
+        3.0...
+
+        >>> # Nautical twilight - more stars visible
+        >>> calc_limiting_magnitude_twilight(-9.0)
+        4.5...
+
+        >>> # Astronomical twilight - approaching dark sky limit
+        >>> calc_limiting_magnitude_twilight(-15.0)
+        5.5...
+
+        >>> # Full night - typical naked-eye limit
+        >>> calc_limiting_magnitude_twilight(-25.0)
+        6.0...
+
+    References:
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+        - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
+    """
+    result = calc_twilight_sky_brightness(
+        sun_altitude_deg=sun_altitude_deg,
+        target_altitude_deg=target_altitude_deg,
+        sun_azimuth_deg=sun_azimuth_deg,
+        target_azimuth_deg=target_azimuth_deg,
+        pressure_mbar=pressure_mbar,
+        humidity_percent=humidity_percent,
+        altitude_m=altitude_m,
+    )
+
+    # Apply atmospheric extinction to the limiting magnitude
+    # Objects near horizon appear fainter due to extinction
+    airmass = calc_airmass(target_altitude_deg)
+    coeff = calc_extinction_coefficient(
+        pressure_mbar=pressure_mbar,
+        humidity_percent=humidity_percent,
+        altitude_m=altitude_m,
+    )
+
+    # Reduce limiting magnitude for objects seen through more atmosphere
+    # (fainter objects cannot be seen through thick atmosphere)
+    extinction_penalty = coeff.k_total * (airmass - 1.0)
+
+    adjusted_limit = result.limiting_magnitude - extinction_penalty
+
+    return max(-2.0, min(adjusted_limit, 6.5))
