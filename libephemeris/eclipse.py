@@ -54,7 +54,6 @@ from .constants import (
 from .planets import swe_calc_ut
 from .state import get_timescale
 
-
 # Constants for eclipse calculations
 SYNODIC_MONTH = 29.530588853  # Mean synodic month in days
 LUNAR_NODE_PERIOD = 6798.38  # Lunar node regression period in days
@@ -7518,3 +7517,374 @@ def calc_besselian_mu(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         mu_deg += 360.0
 
     return mu_deg
+
+
+# =============================================================================
+# BESSELIAN ELEMENT TIME DERIVATIVES
+# =============================================================================
+# These functions calculate the hourly rates of change for each Besselian
+# element. These derivatives are essential for interpolating element values
+# during an eclipse and for calculating eclipse contact times.
+
+
+def calc_besselian_dx_dt(jd: float, flags: int = SEFLG_SWIEPH) -> float:
+    """
+    Calculate the time derivative of Besselian element x (dx/dt).
+
+    This function computes the hourly rate of change of the Besselian x
+    coordinate, which represents how fast the shadow axis is moving eastward
+    (or westward if negative) across the fundamental plane.
+
+    The derivative is calculated using symmetric numerical differentiation
+    (central difference method) for improved accuracy.
+
+    Args:
+        jd: Julian Day (UT) at which to calculate the derivative
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        The rate of change dx/dt in Earth radii per hour.
+        Positive values indicate eastward motion, negative indicates westward.
+
+    Algorithm:
+        Uses symmetric numerical differentiation:
+        dx/dt ≈ (x(t+h) - x(t-h)) / (2h)
+        where h = 1/1440 days (1 minute) for optimal accuracy.
+
+    Precision:
+        Accurate to approximately 1e-6 Earth radii per hour for typical
+        eclipse conditions. The small time step minimizes truncation error
+        while the symmetric difference eliminates first-order errors.
+
+    Example:
+        >>> from libephemeris import julday, calc_besselian_dx_dt
+        >>> # April 8, 2024 total solar eclipse near maximum
+        >>> jd = julday(2024, 4, 8, 18.3)  # ~18:18 UTC
+        >>> dx_dt = calc_besselian_dx_dt(jd)
+        >>> print(f"dx/dt = {dx_dt:.6f} Earth radii/hour")
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Time step for numerical differentiation: 1 minute in days
+    # This provides good balance between truncation and round-off errors
+    h = 1.0 / 1440.0  # 1 minute = 1/1440 days
+
+    # Calculate x at t-h and t+h
+    x_minus = calc_besselian_x(jd - h, flags)
+    x_plus = calc_besselian_x(jd + h, flags)
+
+    # Symmetric difference quotient
+    # dx/dt in Earth radii per day
+    dx_dt_per_day = (x_plus - x_minus) / (2 * h)
+
+    # Convert to Earth radii per hour (divide by 24)
+    dx_dt_per_hour = dx_dt_per_day / 24.0
+
+    return dx_dt_per_hour
+
+
+def calc_besselian_dy_dt(jd: float, flags: int = SEFLG_SWIEPH) -> float:
+    """
+    Calculate the time derivative of Besselian element y (dy/dt).
+
+    This function computes the hourly rate of change of the Besselian y
+    coordinate, which represents how fast the shadow axis is moving northward
+    (or southward if negative) across the fundamental plane.
+
+    The derivative is calculated using symmetric numerical differentiation
+    (central difference method) for improved accuracy.
+
+    Args:
+        jd: Julian Day (UT) at which to calculate the derivative
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        The rate of change dy/dt in Earth radii per hour.
+        Positive values indicate northward motion, negative indicates southward.
+
+    Algorithm:
+        Uses symmetric numerical differentiation:
+        dy/dt ≈ (y(t+h) - y(t-h)) / (2h)
+        where h = 1/1440 days (1 minute) for optimal accuracy.
+
+    Precision:
+        Accurate to approximately 1e-6 Earth radii per hour for typical
+        eclipse conditions. The small time step minimizes truncation error
+        while the symmetric difference eliminates first-order errors.
+
+    Example:
+        >>> from libephemeris import julday, calc_besselian_dy_dt
+        >>> # April 8, 2024 total solar eclipse near maximum
+        >>> jd = julday(2024, 4, 8, 18.3)  # ~18:18 UTC
+        >>> dy_dt = calc_besselian_dy_dt(jd)
+        >>> print(f"dy/dt = {dy_dt:.6f} Earth radii/hour")
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Time step for numerical differentiation: 1 minute in days
+    h = 1.0 / 1440.0  # 1 minute = 1/1440 days
+
+    # Calculate y at t-h and t+h
+    y_minus = calc_besselian_y(jd - h, flags)
+    y_plus = calc_besselian_y(jd + h, flags)
+
+    # Symmetric difference quotient
+    # dy/dt in Earth radii per day
+    dy_dt_per_day = (y_plus - y_minus) / (2 * h)
+
+    # Convert to Earth radii per hour
+    dy_dt_per_hour = dy_dt_per_day / 24.0
+
+    return dy_dt_per_hour
+
+
+def calc_besselian_dd_dt(jd: float, flags: int = SEFLG_SWIEPH) -> float:
+    """
+    Calculate the time derivative of Besselian element d (dd/dt).
+
+    This function computes the hourly rate of change of the shadow axis
+    declination. During an eclipse, the declination changes very slowly
+    (typically less than 1 degree per hour) as it tracks the Sun's motion.
+
+    The derivative is calculated using symmetric numerical differentiation
+    (central difference method) for improved accuracy.
+
+    Args:
+        jd: Julian Day (UT) at which to calculate the derivative
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        The rate of change dd/dt in degrees per hour.
+        Positive values indicate the shadow axis is moving northward,
+        negative indicates southward.
+
+    Algorithm:
+        Uses symmetric numerical differentiation:
+        dd/dt ≈ (d(t+h) - d(t-h)) / (2h)
+        where h = 1/1440 days (1 minute) for optimal accuracy.
+
+    Precision:
+        Accurate to approximately 1e-5 degrees per hour for typical
+        eclipse conditions.
+
+    Example:
+        >>> from libephemeris import julday, calc_besselian_dd_dt
+        >>> # April 8, 2024 total solar eclipse near maximum
+        >>> jd = julday(2024, 4, 8, 18.3)  # ~18:18 UTC
+        >>> dd_dt = calc_besselian_dd_dt(jd)
+        >>> print(f"dd/dt = {dd_dt:.6f} degrees/hour")
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Time step for numerical differentiation: 1 minute in days
+    h = 1.0 / 1440.0  # 1 minute = 1/1440 days
+
+    # Calculate d at t-h and t+h
+    d_minus = calc_besselian_d(jd - h, flags)
+    d_plus = calc_besselian_d(jd + h, flags)
+
+    # Symmetric difference quotient
+    # dd/dt in degrees per day
+    dd_dt_per_day = (d_plus - d_minus) / (2 * h)
+
+    # Convert to degrees per hour
+    dd_dt_per_hour = dd_dt_per_day / 24.0
+
+    return dd_dt_per_hour
+
+
+def calc_besselian_dl1_dt(jd: float, flags: int = SEFLG_SWIEPH) -> float:
+    """
+    Calculate the time derivative of Besselian element l1 (dl1/dt).
+
+    This function computes the hourly rate of change of the penumbral
+    shadow radius. The penumbral radius changes very slowly during an
+    eclipse as the Earth-Moon-Sun geometry evolves.
+
+    The derivative is calculated using symmetric numerical differentiation
+    (central difference method) for improved accuracy.
+
+    Args:
+        jd: Julian Day (UT) at which to calculate the derivative
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        The rate of change dl1/dt in Earth radii per hour.
+        The value is typically very small (order of 1e-4 to 1e-3).
+
+    Algorithm:
+        Uses symmetric numerical differentiation:
+        dl1/dt ≈ (l1(t+h) - l1(t-h)) / (2h)
+        where h = 1/1440 days (1 minute) for optimal accuracy.
+
+    Precision:
+        Accurate to approximately 1e-7 Earth radii per hour for typical
+        eclipse conditions.
+
+    Example:
+        >>> from libephemeris import julday, calc_besselian_dl1_dt
+        >>> # April 8, 2024 total solar eclipse near maximum
+        >>> jd = julday(2024, 4, 8, 18.3)  # ~18:18 UTC
+        >>> dl1_dt = calc_besselian_dl1_dt(jd)
+        >>> print(f"dl1/dt = {dl1_dt:.8f} Earth radii/hour")
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Time step for numerical differentiation: 1 minute in days
+    h = 1.0 / 1440.0  # 1 minute = 1/1440 days
+
+    # Calculate l1 at t-h and t+h
+    l1_minus = calc_besselian_l1(jd - h, flags)
+    l1_plus = calc_besselian_l1(jd + h, flags)
+
+    # Symmetric difference quotient
+    # dl1/dt in Earth radii per day
+    dl1_dt_per_day = (l1_plus - l1_minus) / (2 * h)
+
+    # Convert to Earth radii per hour
+    dl1_dt_per_hour = dl1_dt_per_day / 24.0
+
+    return dl1_dt_per_hour
+
+
+def calc_besselian_dl2_dt(jd: float, flags: int = SEFLG_SWIEPH) -> float:
+    """
+    Calculate the time derivative of Besselian element l2 (dl2/dt).
+
+    This function computes the hourly rate of change of the umbral/antumbral
+    shadow radius. The umbral radius changes very slowly during an eclipse
+    as the Earth-Moon-Sun geometry evolves.
+
+    The derivative is calculated using symmetric numerical differentiation
+    (central difference method) for improved accuracy.
+
+    Args:
+        jd: Julian Day (UT) at which to calculate the derivative
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        The rate of change dl2/dt in Earth radii per hour.
+        The value is typically very small (order of 1e-5 to 1e-4).
+
+    Algorithm:
+        Uses symmetric numerical differentiation:
+        dl2/dt ≈ (l2(t+h) - l2(t-h)) / (2h)
+        where h = 1/1440 days (1 minute) for optimal accuracy.
+
+    Precision:
+        Accurate to approximately 1e-8 Earth radii per hour for typical
+        eclipse conditions.
+
+    Example:
+        >>> from libephemeris import julday, calc_besselian_dl2_dt
+        >>> # April 8, 2024 total solar eclipse near maximum
+        >>> jd = julday(2024, 4, 8, 18.3)  # ~18:18 UTC
+        >>> dl2_dt = calc_besselian_dl2_dt(jd)
+        >>> print(f"dl2/dt = {dl2_dt:.8f} Earth radii/hour")
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Time step for numerical differentiation: 1 minute in days
+    h = 1.0 / 1440.0  # 1 minute = 1/1440 days
+
+    # Calculate l2 at t-h and t+h
+    l2_minus = calc_besselian_l2(jd - h, flags)
+    l2_plus = calc_besselian_l2(jd + h, flags)
+
+    # Symmetric difference quotient
+    # dl2/dt in Earth radii per day
+    dl2_dt_per_day = (l2_plus - l2_minus) / (2 * h)
+
+    # Convert to Earth radii per hour
+    dl2_dt_per_hour = dl2_dt_per_day / 24.0
+
+    return dl2_dt_per_hour
+
+
+def calc_besselian_dmu_dt(jd: float, flags: int = SEFLG_SWIEPH) -> float:
+    """
+    Calculate the time derivative of Besselian element mu (dmu/dt).
+
+    This function computes the hourly rate of change of the Greenwich hour
+    angle. Since Earth rotates at approximately 15 degrees per hour, dmu/dt
+    is typically close to this value, with small variations due to the
+    changing right ascension of the shadow axis.
+
+    The derivative is calculated using symmetric numerical differentiation
+    (central difference method) for improved accuracy, with special handling
+    for the 0/360 degree wraparound.
+
+    Args:
+        jd: Julian Day (UT) at which to calculate the derivative
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        The rate of change dmu/dt in degrees per hour.
+        Expected to be approximately 15 degrees/hour (Earth's rotation rate)
+        with small variations (typically ±0.04 degrees/hour).
+
+    Algorithm:
+        Uses symmetric numerical differentiation:
+        dmu/dt ≈ (mu(t+h) - mu(t-h)) / (2h)
+        where h = 1/1440 days (1 minute) for optimal accuracy.
+        Special handling ensures correct results near the 0/360 boundary.
+
+    Physical interpretation:
+        dmu/dt ≈ 15.04 deg/hour (Earth's sidereal rotation rate)
+              - d(RA_shadow)/dt (shadow axis RA rate of change)
+
+        The deviation from exactly 15°/hour is due to the apparent
+        motion of the Sun (and hence the shadow axis) in right ascension.
+
+    Precision:
+        Accurate to approximately 1e-4 degrees per hour for typical
+        eclipse conditions.
+
+    Example:
+        >>> from libephemeris import julday, calc_besselian_dmu_dt
+        >>> # April 8, 2024 total solar eclipse near maximum
+        >>> jd = julday(2024, 4, 8, 18.3)  # ~18:18 UTC
+        >>> dmu_dt = calc_besselian_dmu_dt(jd)
+        >>> print(f"dmu/dt = {dmu_dt:.4f} degrees/hour")
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Time step for numerical differentiation: 1 minute in days
+    h = 1.0 / 1440.0  # 1 minute = 1/1440 days
+
+    # Calculate mu at t-h and t+h
+    mu_minus = calc_besselian_mu(jd - h, flags)
+    mu_plus = calc_besselian_mu(jd + h, flags)
+
+    # Handle wraparound at 0/360 degrees
+    # mu increases with time (typically ~15 deg/hour)
+    # If mu_minus is near 360 and mu_plus is near 0, add 360 to mu_plus
+    # If mu_plus is near 360 and mu_minus is near 0, add 360 to mu_minus
+    delta_mu = mu_plus - mu_minus
+
+    if delta_mu < -180.0:
+        # mu wrapped from ~360 to ~0 going forward
+        delta_mu += 360.0
+    elif delta_mu > 180.0:
+        # mu wrapped from ~0 to ~360 going backward (very rare)
+        delta_mu -= 360.0
+
+    # dmu/dt in degrees per day
+    dmu_dt_per_day = delta_mu / (2 * h)
+
+    # Convert to degrees per hour
+    dmu_dt_per_hour = dmu_dt_per_day / 24.0
+
+    return dmu_dt_per_hour

@@ -117,6 +117,12 @@ from .eclipse import (
     calc_besselian_l1,
     calc_besselian_l2,
     calc_besselian_mu,
+    calc_besselian_dx_dt,
+    calc_besselian_dy_dt,
+    calc_besselian_dd_dt,
+    calc_besselian_dl1_dt,
+    calc_besselian_dl2_dt,
+    calc_besselian_dmu_dt,
 )
 from .utils import (
     degnorm,
@@ -228,7 +234,6 @@ from .hypothetical import (  # Hamburg School Uranian planets
     SE_PROSERPINA as SE_PROSERPINA_HYPO,  # Alias to avoid conflict with constants.py
     SE_PLANET_X_PICKERING as SE_PLANET_X_PICKERING_HYPO,  # Alias to avoid conflict with constants.py
 )
-
 
 # =============================================================================
 # PYSWISSEPH-COMPATIBLE FUNCTION ALIASES (without swe_ prefix)
@@ -484,6 +489,13 @@ __all__ = [
     "calc_besselian_l1",
     "calc_besselian_l2",
     "calc_besselian_mu",
+    # Besselian element time derivatives
+    "calc_besselian_dx_dt",
+    "calc_besselian_dy_dt",
+    "calc_besselian_dd_dt",
+    "calc_besselian_dl1_dt",
+    "calc_besselian_dl2_dt",
+    "calc_besselian_dmu_dt",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",

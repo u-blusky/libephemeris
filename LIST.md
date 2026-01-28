@@ -254,9 +254,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT BESSELIAN ELEMENT L2 CALCULATION: Implement calculation of l2, the radius of the umbral (or antumbral for annular eclipses) shadow cone where it intersects the fundamental plane.
 
-- [ ] IMPLEMENT BESSELIAN ELEMENT MU CALCULATION: Implement calculation of mu, the Greenwich hour angle of the shadow axis.
+- [x] IMPLEMENT BESSELIAN ELEMENT MU CALCULATION: Implement calculation of mu, the Greenwich hour angle of the shadow axis.
 
-- [ ] IMPLEMENT BESSELIAN ELEMENT TIME DERIVATIVES: Calculate the hourly changes in all Besselian elements (dx/dt, dy/dt, dd/dt, dl1/dt, dl2/dt, dmu/dt) for interpolation during the eclipse.
+- [x] IMPLEMENT BESSELIAN ELEMENT TIME DERIVATIVES: Calculate the hourly changes in all Besselian elements (dx/dt, dy/dt, dd/dt, dl1/dt, dl2/dt, dmu/dt) for interpolation during the eclipse.
 
 - [ ] CREATE BESSELIAN ELEMENTS DATA STRUCTURE: Create a dataclass or named tuple BesselianElements to hold all elements and their derivatives for a given reference time.
 
