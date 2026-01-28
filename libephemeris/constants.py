@@ -92,6 +92,12 @@ ADMETOS: int = SE_ADMETOS
 VULKANUS: int = SE_VULKANUS
 POSEIDON: int = SE_POSEIDON
 
+# Transpluto (Isis) - hypothetical trans-Plutonian planet (section 2.7.2 of Swiss Ephemeris docs)
+SE_ISIS: int = SE_FICT_OFFSET + 8  # 48 - Transpluto/Isis
+SE_TRANSPLUTO: int = SE_ISIS  # Alias for SE_ISIS
+ISIS: int = SE_ISIS  # Pyswisseph-compatible alias
+TRANSPLUTO: int = SE_TRANSPLUTO  # Pyswisseph-compatible alias
+
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
 # Trans-Neptunian Objects (TNOs) - Catalog number + offset

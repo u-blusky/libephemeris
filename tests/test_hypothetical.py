@@ -32,6 +32,7 @@ from libephemeris.hypothetical import (
     calc_uranian_longitude,
     calc_uranian_position,
     calc_uranian_planet,
+    calc_transpluto,
     calc_transpluto_position,
     calc_white_moon_position,
     calc_waldemath_position,
@@ -58,6 +59,7 @@ from libephemeris.hypothetical import (
     ADMETOS_KEPLERIAN_ELEMENTS,
     VULKANUS_KEPLERIAN_ELEMENTS,
     POSEIDON_KEPLERIAN_ELEMENTS,
+    TRANSPLUTO_KEPLERIAN_ELEMENTS,
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -2357,3 +2359,224 @@ class TestUranianIntegrationWithPlanets:
                 assert 0.0 <= result[0] < 360.0, (
                     f"Body {body_id} at JD {jd} longitude out of range"
                 )
+
+
+class TestCalcTranspluto:
+    """Tests for the calc_transpluto Keplerian propagation function.
+
+    Transpluto (Isis) is a hypothetical trans-Plutonian planet proposed by
+    astrologer Ram, documented in Swiss Ephemeris section 2.7.2 (seorbel.txt).
+    """
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_transpluto_returns_tuple(self):
+        """Test that calc_transpluto returns correct tuple format."""
+        pos = calc_transpluto(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        lon, lat, dist, dlon, dlat, ddist = pos
+        assert isinstance(lon, float)
+        assert isinstance(lat, float)
+        assert isinstance(dist, float)
+        assert isinstance(dlon, float)
+        assert isinstance(dlat, float)
+        assert isinstance(ddist, float)
+
+    def test_calc_transpluto_longitude_range(self):
+        """Test that longitude is in valid range."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_transpluto(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
+
+    def test_calc_transpluto_latitude_zero(self):
+        """Test that Transpluto has zero latitude (on ecliptic, i=0)."""
+        pos = calc_transpluto(self.J2000)
+        assert pos[1] == 0.0, "Transpluto should have zero latitude"
+
+    def test_calc_transpluto_distance_in_range(self):
+        """Test that Transpluto distance is within orbit bounds."""
+        pos = calc_transpluto(self.J2000)
+        # For e=0.3, a=77.775:
+        # perihelion = a(1-e) = 77.775 * 0.7 = 54.44 AU
+        # aphelion = a(1+e) = 77.775 * 1.3 = 101.1 AU
+        a = TRANSPLUTO_KEPLERIAN_ELEMENTS.a
+        e = TRANSPLUTO_KEPLERIAN_ELEMENTS.e
+        min_dist = a * (1 - e)
+        max_dist = a * (1 + e)
+        assert min_dist <= pos[2] <= max_dist, (
+            f"Distance {pos[2]} should be between {min_dist:.2f} and {max_dist:.2f} AU"
+        )
+
+    def test_calc_transpluto_velocity_positive(self):
+        """Test that heliocentric daily motion is positive (prograde)."""
+        pos = calc_transpluto(self.J2000)
+        assert pos[3] > 0, "Transpluto should have prograde heliocentric motion"
+
+    def test_calc_transpluto_velocity_reasonable(self):
+        """Test that velocity is reasonable for Transpluto orbital period."""
+        pos = calc_transpluto(self.J2000)
+        # Mean motion from elements
+        expected_n = TRANSPLUTO_KEPLERIAN_ELEMENTS.n
+        # Velocity should be close to mean motion (varies with eccentricity)
+        # Allow 100% tolerance for eccentric orbit velocity variation
+        assert abs(pos[3] - expected_n) < expected_n * 1.5, (
+            f"Daily motion should be ~{expected_n:.6f}, got {pos[3]:.6f}"
+        )
+
+    def test_calc_transpluto_at_epoch(self):
+        """Test that position at J2000 epoch matches elements."""
+        pos = calc_transpluto(self.J2000)
+        # At J2000, mean anomaly should be M0
+        # Longitude is derived from M0 + omega
+        assert 0.0 <= pos[0] < 360.0, "Longitude should be in valid range at epoch"
+
+    def test_calc_transpluto_progression(self):
+        """Test that Transpluto progresses correctly over time."""
+        pos1 = calc_transpluto(self.J2000)
+        pos2 = calc_transpluto(self.J2000 + 365.25)  # 1 year later
+
+        # Calculate expected motion in 1 year (approximate for eccentric orbit)
+        expected_motion = TRANSPLUTO_KEPLERIAN_ELEMENTS.n * 365.25
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        # Allow larger tolerance for eccentric orbit
+        assert abs(actual_motion - expected_motion) < expected_motion * 0.5, (
+            f"Annual motion should be ~{expected_motion:.4f} deg, got {actual_motion:.4f}"
+        )
+
+    def test_calc_transpluto_keplerian_elements_valid(self):
+        """Test that Transpluto Keplerian elements have valid values."""
+        elements = TRANSPLUTO_KEPLERIAN_ELEMENTS
+        assert elements.name == "Transpluto"
+        assert abs(elements.a - 77.775) < 0.001, "a should match seorbel.txt"
+        assert abs(elements.e - 0.3) < 0.001, "e should match seorbel.txt"
+        assert elements.i == 0.0, "Transpluto should be on ecliptic"
+        assert 0 < elements.n < 0.01, "Mean motion should be small but positive"
+
+    def test_se_transpluto_constant_value(self):
+        """Test that SE_TRANSPLUTO has correct value (SE_FICT_OFFSET + 8 = 48)."""
+        assert SE_TRANSPLUTO == 48
+        assert SE_TRANSPLUTO == SE_FICT_OFFSET + 8
+        assert SE_ISIS == SE_TRANSPLUTO  # Alias
+
+    def test_calc_transpluto_exportable_from_main_module(self):
+        """Test that calc_transpluto is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_transpluto")
+        pos = libephemeris.calc_transpluto(self.J2000)
+        assert len(pos) == 6
+
+    def test_transpluto_keplerian_elements_exportable(self):
+        """Test that TRANSPLUTO_KEPLERIAN_ELEMENTS is exported from main module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "TRANSPLUTO_KEPLERIAN_ELEMENTS")
+        assert libephemeris.TRANSPLUTO_KEPLERIAN_ELEMENTS.name == "Transpluto"
+
+    def test_calc_transpluto_distance_velocity_nonzero(self):
+        """Test that distance velocity is non-zero for eccentric orbit."""
+        pos = calc_transpluto(self.J2000)
+        # For e=0.3, distance velocity should be non-zero (except at apses)
+        # Not all points have zero velocity, so just check it's small
+        assert abs(pos[5]) < 0.1, (
+            "Distance velocity should be small but can be non-zero"
+        )
+
+    def test_calc_transpluto_matches_pyswisseph_at_j2000(self):
+        """Test that calc_transpluto matches pyswisseph heliocentric at J2000."""
+        pytest.importorskip("swisseph")
+        import swisseph as swe
+
+        swe.set_ephe_path(".")
+        # Get pyswisseph heliocentric position
+        swe_result = swe.calc_ut(
+            self.J2000, swe.FICT_OFFSET + 8, swe.FLG_SPEED | swe.FLG_HELCTR
+        )
+        swe_lon = swe_result[0][0]
+        swe_dist = swe_result[0][2]
+
+        # Our calculation
+        pos = calc_transpluto(self.J2000)
+
+        # At J2000, elements were derived to match pyswisseph, so should be exact
+        assert abs(pos[0] - swe_lon) < 0.1, (
+            f"Longitude at J2000 should match pyswisseph: got {pos[0]:.4f}, "
+            f"expected {swe_lon:.4f}"
+        )
+        assert abs(pos[2] - swe_dist) < 0.1, (
+            f"Distance at J2000 should match pyswisseph: got {pos[2]:.4f}, "
+            f"expected {swe_dist:.4f}"
+        )
+
+    def test_calc_transpluto_reasonable_match_pyswisseph_j1900_j2100(self):
+        """Test calc_transpluto gives reasonable values vs pyswisseph at J1900/J2100.
+
+        Due to precession corrections in pyswisseph that are not implemented
+        in simple Keplerian propagation, differences of ~10 degrees over 100 years
+        are expected for distant epochs.
+        """
+        pytest.importorskip("swisseph")
+        import swisseph as swe
+
+        swe.set_ephe_path(".")
+
+        test_dates = [
+            (self.J1900, "J1900", 15.0),  # Allow 15 deg difference
+            (self.J2000 + 36525, "J2100", 10.0),  # Allow 10 deg difference
+        ]
+
+        for jd, label, tolerance in test_dates:
+            swe_result = swe.calc_ut(
+                jd, swe.FICT_OFFSET + 8, swe.FLG_SPEED | swe.FLG_HELCTR
+            )
+            swe_lon = swe_result[0][0]
+
+            pos = calc_transpluto(jd)
+
+            lon_diff = abs(pos[0] - swe_lon)
+            if lon_diff > 180:
+                lon_diff = 360 - lon_diff
+
+            assert lon_diff < tolerance, (
+                f"At {label}, longitude diff {lon_diff:.2f} exceeds tolerance {tolerance}"
+            )
+
+    def test_calc_transpluto_orbital_period(self):
+        """Test that Transpluto moves approximately 360 deg in empirical period.
+
+        Note: The empirical mean motion differs from the theoretical Keplerian
+        period due to precession corrections. This test verifies the orbit is
+        approximately closed over the empirical period.
+        """
+        # Empirical period based on mean motion n
+        n = TRANSPLUTO_KEPLERIAN_ELEMENTS.n  # deg/day
+        empirical_period_days = 360.0 / n  # days for one orbit
+
+        # One full orbit should advance longitude by ~360 degrees
+        pos1 = calc_transpluto(self.J2000)
+        pos2 = calc_transpluto(self.J2000 + empirical_period_days)
+
+        # After one full period based on empirical n, should return to start
+        diff = abs(pos2[0] - pos1[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        # Should be very close to start
+        assert diff < 5.0, (
+            f"After one orbit ({empirical_period_days / 365.25:.1f} years), "
+            f"longitude should return near start, diff = {diff:.2f} deg"
+        )

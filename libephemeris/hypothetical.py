@@ -650,6 +650,67 @@ POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
 
 
 # =============================================================================
+# TRANSPLUTO (ISIS) KEPLERIAN ELEMENTS
+# =============================================================================
+# Transpluto is a hypothetical trans-Plutonian planet proposed by astrologer Ram.
+# Elements from Swiss Ephemeris seorbel.txt (section 2.7.2 of Swiss Ephemeris docs)
+# Reference: "Die Sterne" 3/1952, p. 70ff (Strubell)
+
+
+@dataclass
+class TransplutoKeplerianElements:
+    """
+    Keplerian orbital elements for Transpluto (Isis) from Swiss Ephemeris seorbel.txt.
+
+    Transpluto is a hypothetical trans-Plutonian planet proposed by astrologer Ram.
+    Unlike the Hamburg School Uranian planets which have nearly circular orbits,
+    Transpluto has significant eccentricity (e=0.3).
+
+    Attributes:
+        name: Name of the body
+        epoch: Reference epoch (Julian Day TT) - 1772.76
+        a: Semi-major axis (AU) - 77.775
+        e: Eccentricity - 0.3
+        i: Inclination (degrees) - 0.0
+        omega: Argument of perihelion (degrees) - 0.7
+        Omega: Longitude of ascending node (degrees) - 0.0
+        M0: Mean anomaly at epoch (degrees) - 0.0
+        n: Mean motion (degrees per day)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    omega: float
+    Omega: float
+    M0: float
+    n: float
+
+
+# Transpluto Keplerian elements from Swiss Ephemeris seorbel.txt
+# From seorbel.txt line: 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto
+# Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
+#
+# Note: Swiss Ephemeris applies precession from J1945 equinox to the date of observation.
+# For simpler Keplerian propagation, we use J2000 epoch with elements derived from
+# pyswisseph calculations to minimize differences.
+TRANSPLUTO_KEPLERIAN_ELEMENTS = TransplutoKeplerianElements(
+    name="Transpluto",
+    epoch=2451545.0,  # J2000.0 (reference epoch for derived elements)
+    a=77.775,  # Semi-major axis in AU (from seorbel.txt)
+    e=0.3,  # Eccentricity (from seorbel.txt)
+    i=0.0,  # On ecliptic (from seorbel.txt)
+    omega=1.464316,  # Arg of perihelion derived from pyswisseph at J2000
+    Omega=0.0,  # Ascending node (from seorbel.txt)
+    M0=119.262909,  # Mean anomaly at J2000 derived from pyswisseph
+    # Mean motion derived from pyswisseph J1900-J2000 arc for best match
+    n=0.0011968259,
+)
+
+
+# =============================================================================
 # UNIFIED URANIAN KEPLERIAN ELEMENTS
 # =============================================================================
 # This dataclass and dictionary provide a unified structure for all Uranian
@@ -785,18 +846,21 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
 
 
 # Other hypothetical body elements
-# Transpluto (Isis) elements from Swiss Ephemeris
+# Transpluto (Isis) elements from Swiss Ephemeris seorbel.txt
+# Reference: "Die Sterne" 3/1952, p. 70ff (Strubell)
+# Original seorbel.txt: 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto
+# Elements below are derived at J2000 epoch to match pyswisseph output.
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     SE_ISIS: HypotheticalElements(
         name="Transpluto/Isis",
-        epoch=2451545.0,  # J2000.0
-        a=77.775,  # AU - very distant orbit
-        e=0.2,  # Moderate eccentricity
-        i=0.0,  # Assumed zero inclination
-        omega=228.3,  # Argument of perihelion at J2000
-        Omega=0.0,  # Assumed zero ascending node
-        M0=350.8,  # Mean anomaly at J2000
-        n=0.000470,  # Very slow motion (~2100 year period)
+        epoch=2451545.0,  # J2000.0 - reference epoch
+        a=77.775,  # AU - semi-major axis from seorbel.txt
+        e=0.3,  # Eccentricity from seorbel.txt
+        i=0.0,  # Inclination from seorbel.txt
+        omega=1.464316,  # Argument of perihelion derived from pyswisseph at J2000
+        Omega=0.0,  # Ascending node from seorbel.txt
+        M0=119.262909,  # Mean anomaly at J2000 derived from pyswisseph
+        n=0.0011968259,  # Mean motion derived from pyswisseph J1900-J2000 arc
     ),
     SE_VULCAN: HypotheticalElements(
         name="Vulcan",
@@ -1561,6 +1625,153 @@ def calc_poseidon(jd_tt: float) -> Tuple[float, float, float, float, float, floa
     ddist = 0.0
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def calc_transpluto(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the heliocentric position of Transpluto (Isis) using Keplerian propagation.
+
+    Transpluto is a hypothetical trans-Plutonian planet proposed by astrologer Ram,
+    documented in Swiss Ephemeris section 2.7.2 (seorbel.txt). Unlike the Hamburg
+    School Uranian planets which have nearly circular orbits, Transpluto has
+    significant eccentricity (e=0.3).
+
+    Orbital elements from seorbel.txt:
+        - Epoch: 2368547.66 (1772.76)
+        - Semi-major axis: 77.775 AU
+        - Eccentricity: 0.3
+        - Inclination: 0 degrees
+        - Argument of perihelion: 0.7 degrees
+        - Ascending node: 0 degrees
+        - Mean anomaly at epoch: 0 degrees (at perihelion)
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Heliocentric ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees (0 for Transpluto)
+            - distance: Distance from Sun in AU
+            - dlon: Daily heliocentric longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day (0)
+            - ddist: Daily distance change in AU/day
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_transpluto
+        >>> pos = calc_transpluto(2451545.0)  # J2000.0
+        >>> print(f"Transpluto at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
+    """
+    elements = TRANSPLUTO_KEPLERIAN_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    # For zero inclination and ascending node, this simplifies considerably
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    # Position in orbital plane
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    # Rotate to ecliptic frame
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    # Convert to spherical coordinates
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    # Calculate velocity via numerical differentiation
+    dt_step = 1.0  # 1 day step for daily velocity
+    pos_next = _calc_transpluto_raw(jd_tt + dt_step)
+
+    dlon = pos_next[0] - longitude
+    # Handle wrap-around
+    if dlon > 180.0:
+        dlon -= 360.0
+    elif dlon < -180.0:
+        dlon += 360.0
+
+    dlat = pos_next[1] - latitude
+    ddist = pos_next[2] - distance
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def _calc_transpluto_raw(jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate raw Transpluto position without velocity (helper for differentiation).
+    """
+    elements = TRANSPLUTO_KEPLERIAN_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    return (longitude, latitude, distance)
 
 
 def calc_uranian_planet(

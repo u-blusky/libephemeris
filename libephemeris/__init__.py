@@ -185,9 +185,11 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_admetos,
     calc_vulkanus,
     calc_poseidon,
+    calc_transpluto,  # Transpluto (Isis) - hypothetical trans-Plutonian planet
     calc_uranian_planet,
     calc_hypothetical_position,
     URANIAN_KEPLERIAN_ELEMENTS,
+    TRANSPLUTO_KEPLERIAN_ELEMENTS,
     SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
     SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
     SE_ZEUS as SE_ZEUS_HYPO,  # Alias to avoid conflict with constants.py
@@ -196,6 +198,8 @@ from .hypothetical import (  # Hamburg School Uranian planets
     SE_ADMETOS as SE_ADMETOS_HYPO,  # Alias to avoid conflict with constants.py
     SE_VULKANUS as SE_VULKANUS_HYPO,  # Alias to avoid conflict with constants.py
     SE_POSEIDON as SE_POSEIDON_HYPO,  # Alias to avoid conflict with constants.py
+    SE_ISIS as SE_ISIS_HYPO,  # Alias to avoid conflict with constants.py
+    SE_TRANSPLUTO as SE_TRANSPLUTO_HYPO,  # Alias to avoid conflict with constants.py
 )
 
 
@@ -548,7 +552,9 @@ __all__ = [
     "calc_admetos",
     "calc_vulkanus",
     "calc_poseidon",
+    "calc_transpluto",  # Transpluto (Isis) - hypothetical trans-Plutonian planet
     "calc_uranian_planet",
     "calc_hypothetical_position",
     "URANIAN_KEPLERIAN_ELEMENTS",
+    "TRANSPLUTO_KEPLERIAN_ELEMENTS",
 ]
