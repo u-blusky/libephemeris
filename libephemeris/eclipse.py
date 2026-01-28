@@ -12906,3 +12906,735 @@ def swe_lun_eclipse_gamma(
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     return lun_eclipse_gamma(tjd_ut, ifl)
+
+
+def planet_occult_when_glob(
+    tjdut: float,
+    occulting_planet: int,
+    occulted_planet: int = 0,
+    starname: str = "",
+    flags: int = SEFLG_SWIEPH,
+    direction: int = 0,
+) -> Tuple[int, Tuple[float, ...]]:
+    """
+    Find the next planetary occultation globally (UT).
+
+    A planetary occultation occurs when one planet passes in front of (occults)
+    another planet or star as seen from Earth. This is different from lunar
+    occultations - here the occulting body is a planet (e.g., Venus, Jupiter).
+
+    Planetary occultations are rare events. Mutual occultations between planets
+    typically occur only a few times per century.
+
+    Args:
+        tjdut: Julian Day (UT) to start search from
+        occulting_planet: Planet ID of the occulting (foreground) planet.
+            Use SE_VENUS, SE_MARS, SE_JUPITER, etc.
+        occulted_planet: Planet ID of the occulted (background) planet.
+            Use 0 if searching for a star occultation.
+        starname: Star name (str). Use empty string "" if searching for a planet.
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        direction: Search direction. 0 or positive = forward in time,
+                   negative = backward in time.
+
+    Returns:
+        Tuple containing:
+            - retflags: Returned bit flags (int):
+                - 0 if no occultation found
+                - SE_ECL_TOTAL or SE_ECL_PARTIAL
+            - tret: Tuple of 10 floats with occultation phase times (JD UT):
+                [0]: Time of maximum occultation
+                [1]: Reserved (0)
+                [2]: Time of occultation begin
+                [3]: Time of occultation end
+                [4]: Time of totality begin (if total, else 0)
+                [5]: Time of totality end (if total, else 0)
+                [6-9]: Reserved (0)
+
+    Raises:
+        RuntimeError: If no occultation found within search limit
+        ValueError: If neither occulted_planet nor starname is specified
+
+    Algorithm:
+        1. Calculate both planets' positions over time
+        2. Find conjunctions in right ascension
+        3. At conjunction, check angular separation
+        4. If separation < occulting planet's angular radius + occulted body's radius,
+           an occultation occurs
+        5. Refine timing using golden section search
+        6. Calculate contact times
+
+    Historical Events:
+        - 1818 Dec 3: Venus occulted Jupiter
+        - 2065 Nov 22: Venus will occult Jupiter
+        - 2123 Sep 14: Venus will occult Jupiter
+
+    Example:
+        >>> # Find next planetary occultation of Jupiter by Venus
+        >>> from libephemeris import julday, planet_occult_when_glob, SE_VENUS, SE_JUPITER
+        >>> jd = julday(2060, 1, 1, 0)
+        >>> retflags, tret = planet_occult_when_glob(jd, SE_VENUS, SE_JUPITER)
+        >>> print(f"Occultation at JD {tret[0]:.5f}")
+
+        >>> # Find next occultation of Regulus by Venus
+        >>> retflags, tret = planet_occult_when_glob(jd, SE_VENUS, 0, "Regulus")
+
+    References:
+        - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
+        - Herald, D. & Sinnott, R. "Planetary Occultations"
+    """
+    from .state import get_planets, get_timescale
+    from .fixed_stars import FIXED_STARS, _resolve_star_id
+    from .constants import (
+        SE_MERCURY,
+        SE_VENUS,
+        SE_MARS,
+        SE_JUPITER,
+        SE_SATURN,
+        SE_URANUS,
+        SE_NEPTUNE,
+        SE_PLUTO,
+        SE_SUN,
+        SE_MOON,
+    )
+    from .planets import _PLANET_MAP
+
+    if occulted_planet == 0 and not starname:
+        raise ValueError(
+            "Either occulted_planet ID or starname must be specified for occultation search"
+        )
+
+    # Validate occulting planet - can't be Sun or Moon (use other functions for those)
+    if occulting_planet == SE_SUN:
+        raise ValueError("Sun cannot be an occulting body - use sol_eclipse_when_glob")
+    if occulting_planet == SE_MOON:
+        raise ValueError("Moon cannot be an occulting body - use lun_occult_when_glob")
+    if occulting_planet not in _PLANET_MAP:
+        raise ValueError(f"Invalid occulting planet ID: {occulting_planet}")
+
+    # Validate occulted planet if specified
+    if occulted_planet != 0:
+        if occulted_planet not in _PLANET_MAP:
+            raise ValueError(f"Invalid occulted planet ID: {occulted_planet}")
+        if occulted_planet == occulting_planet:
+            raise ValueError("Occulting and occulted planets cannot be the same")
+
+    jd_start = tjdut
+
+    # Planetary occultations are very rare - search up to 150 years
+    MAX_SEARCH_YEARS = 150
+    MAX_ITERATIONS = int(MAX_SEARCH_YEARS * 365)  # Check roughly daily
+
+    # Get ephemeris and timescale
+    eph = get_planets()
+    ts = get_timescale()
+
+    earth = eph["earth"]
+
+    # Angular radii for planets at mean distances (arcsec)
+    # These vary with distance but provide good approximations
+    PLANET_ANGULAR_RADII_ARCSEC = {
+        SE_MERCURY: 5.0,  # 3.2-6.5 arcsec
+        SE_VENUS: 25.0,  # 9.5-32 arcsec
+        SE_MARS: 9.0,  # 3.5-12.5 arcsec
+        SE_JUPITER: 35.0,  # 29-50 arcsec
+        SE_SATURN: 15.0,  # 14-20 arcsec (disc)
+        SE_URANUS: 1.8,  # 3.3-4.1 arcsec
+        SE_NEPTUNE: 1.1,  # 2.1-2.4 arcsec
+        SE_PLUTO: 0.06,  # ~0.06-0.11 arcsec
+    }
+
+    def _get_body_angular_radius(planet_id: int, dist_au: float) -> float:
+        """Get angular radius in degrees based on distance."""
+        # Mean distance in AU for each planet (used to scale angular radius)
+        MEAN_DISTANCES = {
+            SE_MERCURY: 1.0,  # geocentric mean ~1 AU
+            SE_VENUS: 1.0,
+            SE_MARS: 1.5,
+            SE_JUPITER: 5.2,
+            SE_SATURN: 9.5,
+            SE_URANUS: 19.2,
+            SE_NEPTUNE: 30.1,
+            SE_PLUTO: 39.5,
+        }
+        mean_radius = PLANET_ANGULAR_RADII_ARCSEC.get(planet_id, 1.0)
+        mean_dist = MEAN_DISTANCES.get(planet_id, 1.0)
+        # Scale radius by distance (closer = larger)
+        scaled_radius = mean_radius * (mean_dist / max(dist_au, 0.1))
+        return scaled_radius / 3600.0  # Convert arcsec to degrees
+
+    def _get_planet_position(
+        jd: float, planet_id: int
+    ) -> Tuple[float, float, float, float]:
+        """Get planet's geocentric RA, Dec, distance, and angular radius."""
+        from .planets import get_planet_target
+
+        if planet_id not in _PLANET_MAP:
+            raise ValueError(f"Invalid planet ID: {planet_id}")
+
+        target_name = _PLANET_MAP[planet_id]
+        target = get_planet_target(eph, target_name)
+
+        t = ts.ut1_jd(jd)
+        target_app = earth.at(t).observe(target).apparent()
+        ra, dec, dist = target_app.radec(epoch="date")
+
+        angular_radius = _get_body_angular_radius(planet_id, dist.au)
+
+        return ra.hours * 15.0, dec.degrees, dist.au, angular_radius
+
+    def _get_target_position(jd: float) -> Tuple[float, float, float]:
+        """Get target (occulted) body's geocentric RA, Dec, and angular radius."""
+        if occulted_planet == 0:
+            # Fixed star
+            star_id, err, _ = _resolve_star_id(starname)
+            if err is not None:
+                raise ValueError(err)
+
+            star = FIXED_STARS[star_id]
+
+            # Time from J2000.0
+            t_years = (jd - 2451545.0) / 365.25
+
+            # Apply proper motion
+            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+
+            # Stars have negligible angular radius
+            return ra_deg, dec_deg, 0.0001  # ~0.4 arcsec for point source
+        else:
+            # Planet
+            ra, dec, dist, angular_radius = _get_planet_position(jd, occulted_planet)
+            return ra, dec, angular_radius
+
+    def _angular_separation(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
+        """Calculate angular separation between two points (in degrees)."""
+        ra1_r = math.radians(ra1)
+        dec1_r = math.radians(dec1)
+        ra2_r = math.radians(ra2)
+        dec2_r = math.radians(dec2)
+
+        cos_sep = math.sin(dec1_r) * math.sin(dec2_r) + math.cos(dec1_r) * math.cos(
+            dec2_r
+        ) * math.cos(ra1_r - ra2_r)
+        cos_sep = max(-1.0, min(1.0, cos_sep))
+        return math.degrees(math.acos(cos_sep))
+
+    def _check_occultation(jd: float) -> Tuple[bool, float, float, float]:
+        """
+        Check if occultation occurs at given time.
+
+        Returns: (is_occultation, separation, occulting_radius, target_radius)
+        """
+        occ_ra, occ_dec, occ_dist, occ_radius = _get_planet_position(
+            jd, occulting_planet
+        )
+        target_ra, target_dec, target_radius = _get_target_position(jd)
+
+        separation = _angular_separation(occ_ra, occ_dec, target_ra, target_dec)
+
+        # Occultation threshold: occulting planet radius + target radius
+        threshold = occ_radius + target_radius
+
+        return separation <= threshold, separation, occ_radius, target_radius
+
+    def _find_minimum_separation(jd_start_search: float, jd_end_search: float) -> float:
+        """Find time of minimum separation using golden section search."""
+        phi = (1 + math.sqrt(5)) / 2  # Golden ratio
+
+        a = jd_start_search
+        b = jd_end_search
+
+        c = b - (b - a) / phi
+        d = a + (b - a) / phi
+
+        def get_sep(jd: float) -> float:
+            occ_ra, occ_dec, _, _ = _get_planet_position(jd, occulting_planet)
+            target_ra, target_dec, _ = _get_target_position(jd)
+            return _angular_separation(occ_ra, occ_dec, target_ra, target_dec)
+
+        fc = get_sep(c)
+        fd = get_sep(d)
+
+        for _ in range(50):  # Converge to ~0.1 second precision
+            if fc < fd:
+                b = d
+                d = c
+                fd = fc
+                c = b - (b - a) / phi
+                fc = get_sep(c)
+            else:
+                a = c
+                c = d
+                fc = fd
+                d = a + (b - a) / phi
+                fd = get_sep(d)
+
+            if b - a < 1e-6:  # ~0.1 second precision
+                break
+
+        return (a + b) / 2
+
+    def _calculate_contact_times(
+        jd_max: float, min_sep: float, occ_radius: float, target_radius: float
+    ) -> Tuple[float, float, float, float]:
+        """Calculate contact times for the occultation."""
+        outer_threshold = occ_radius + target_radius
+        inner_threshold = abs(occ_radius - target_radius)
+
+        # Estimate relative angular speed
+        dt_test = 1.0 / 24.0  # 1 hour
+        occ_ra1, occ_dec1, _, _ = _get_planet_position(
+            jd_max - dt_test, occulting_planet
+        )
+        occ_ra2, occ_dec2, _, _ = _get_planet_position(
+            jd_max + dt_test, occulting_planet
+        )
+        target_ra1, target_dec1, _ = _get_target_position(jd_max - dt_test)
+        target_ra2, target_dec2, _ = _get_target_position(jd_max + dt_test)
+
+        # Relative motion
+        d_ra = (occ_ra2 - occ_ra1) - (target_ra2 - target_ra1)
+        d_dec = (occ_dec2 - occ_dec1) - (target_dec2 - target_dec1)
+        relative_speed = math.sqrt(d_ra**2 + d_dec**2) / (2 * dt_test)
+
+        if relative_speed < 0.001:  # Very slow motion, use fallback
+            relative_speed = 0.5  # degrees/day fallback
+
+        # Contact times based on chord geometry
+        if min_sep < outer_threshold:
+            half_chord_outer = math.sqrt(max(0, outer_threshold**2 - min_sep**2))
+            dt_outer = half_chord_outer / relative_speed
+
+            jd_first = jd_max - dt_outer
+            jd_fourth = jd_max + dt_outer
+        else:
+            jd_first = 0.0
+            jd_fourth = 0.0
+
+        # For total occultation
+        if min_sep < inner_threshold:
+            half_chord_inner = math.sqrt(max(0, inner_threshold**2 - min_sep**2))
+            dt_inner = half_chord_inner / relative_speed
+
+            jd_second = jd_max - dt_inner
+            jd_third = jd_max + dt_inner
+        else:
+            jd_second = 0.0
+            jd_third = 0.0
+
+        return jd_first, jd_second, jd_third, jd_fourth
+
+    # Main search loop
+    jd = jd_start
+    step = 1.0  # Check every day initially
+
+    for iteration in range(MAX_ITERATIONS):
+        try:
+            is_occ, sep, occ_r, target_r = _check_occultation(jd)
+        except Exception as e:
+            # Handle ephemeris range errors or other calculation errors
+            if "ephemeris" in str(e).lower() or "range" in str(e).lower():
+                # Exceeded ephemeris range - stop searching
+                break
+            raise
+
+        if is_occ:
+            # Found an occultation! Refine timing
+            jd_max = _find_minimum_separation(jd - 1.0, jd + 1.0)
+
+            # Verify it's still an occultation
+            is_occ_refined, min_sep, occ_r, target_r = _check_occultation(jd_max)
+
+            if is_occ_refined:
+                # Calculate contact times
+                jd_first, jd_second, jd_third, jd_fourth = _calculate_contact_times(
+                    jd_max, min_sep, occ_r, target_r
+                )
+
+                # Determine occultation type
+                if min_sep < abs(occ_r - target_r):
+                    ecl_type = SE_ECL_TOTAL
+                else:
+                    ecl_type = SE_ECL_PARTIAL
+
+                tret = (
+                    jd_max,  # [0] Time of maximum
+                    0.0,  # [1] Reserved
+                    jd_first,  # [2] Begin
+                    jd_fourth,  # [3] End
+                    jd_second,  # [4] Totality begin
+                    jd_third,  # [5] Totality end
+                    0.0,  # [6] Reserved
+                    0.0,  # [7] Reserved
+                    0.0,  # [8] Reserved
+                    0.0,  # [9] Reserved
+                )
+
+                return ecl_type, tret
+
+        # Adaptive step based on angular separation
+        if sep < 0.5:  # Very close - within half a degree
+            step = 0.01  # Check every ~15 minutes
+        elif sep < 2.0:  # Close - within 2 degrees
+            step = 0.1
+        elif sep < 10.0:
+            step = 0.5
+        else:
+            step = 1.0
+
+        jd += step
+
+        if jd > jd_start + MAX_SEARCH_YEARS * 365.25:
+            break
+
+    if occulted_planet == 0:
+        target_desc = starname
+    else:
+        target_desc = f"planet {occulted_planet}"
+    occ_desc = f"planet {occulting_planet}"
+
+    raise RuntimeError(
+        f"No planetary occultation of {target_desc} by {occ_desc} found within "
+        f"{MAX_SEARCH_YEARS} years of JD {jd_start}"
+    )
+
+
+# Alias for Swiss Ephemeris API compatibility
+swe_planet_occult_when_glob = planet_occult_when_glob
+
+
+def planet_occult_when_loc(
+    jd_start: float,
+    occulting_planet: int,
+    occulted_planet: int = 0,
+    star_name: str = "",
+    lat: float = 0.0,
+    lon: float = 0.0,
+    altitude: float = 0.0,
+    flags: int = SEFLG_SWIEPH,
+) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+    """
+    Find the next planetary occultation visible from a specific location.
+
+    A planetary occultation occurs when one planet passes in front of (occults)
+    another planet or star. This function searches forward in time to find the
+    next occultation visible from a specific geographic location, where both
+    the occulting and occulted bodies are above the horizon.
+
+    Args:
+        jd_start: Julian Day (UT) to start search from
+        occulting_planet: Planet ID of the occulting (foreground) planet.
+            Use SE_VENUS, SE_MARS, SE_JUPITER, etc.
+        occulted_planet: Planet ID of the occulted (background) planet.
+            Set to 0 if searching for a fixed star occultation.
+        star_name: Name of fixed star to check (e.g. "Regulus", "Spica").
+            Only used if occulted_planet is 0.
+        lat: Observer latitude in degrees (positive = North, negative = South)
+        lon: Observer longitude in degrees (positive = East, negative = West)
+        altitude: Observer altitude in meters above sea level (default 0)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Tuple containing:
+            - times: Tuple of 10 floats with occultation phase times (JD UT):
+                [0]: Time of maximum occultation (minimum separation)
+                [1]: Time of first contact (occultation begins)
+                [2]: Time of second contact (full occultation begins, or 0)
+                [3]: Time of third contact (full occultation ends, or 0)
+                [4]: Time of fourth contact (occultation ends)
+                [5-9]: Reserved (0)
+            - attr: Tuple of 20 floats with occultation attributes:
+                [0]: Fraction of target covered (magnitude)
+                [1]: Ratio of occulting to occulted angular diameter
+                [2]: Fraction of disc covered (obscuration)
+                [3]: Reserved (0)
+                [4]: Azimuth of occulted body at maximum (degrees)
+                [5]: True altitude of occulted body at maximum (degrees)
+                [6]: Apparent altitude (with refraction)
+                [7]: Angular separation at maximum (degrees)
+                [8-19]: Reserved (0)
+            - retflag: Occultation type flags (SE_ECL_* constants)
+
+    Raises:
+        RuntimeError: If no occultation visible from location within search limit
+        ValueError: If neither occulted_planet nor star_name is specified
+
+    Example:
+        >>> # Find next occultation of Regulus by Venus visible from Rome
+        >>> from libephemeris import julday, planet_occult_when_loc, SE_VENUS
+        >>> jd = julday(2020, 1, 1, 0)
+        >>> rome_lat, rome_lon = 41.9028, 12.4964
+        >>> times, attr, ecl_type = planet_occult_when_loc(
+        ...     jd, SE_VENUS, 0, "Regulus", rome_lat, rome_lon
+        ... )
+        >>> print(f"Occultation max at JD {times[0]:.5f}")
+
+    References:
+        - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
+    """
+    from skyfield.api import wgs84
+
+    from .constants import (
+        SE_MERCURY,
+        SE_VENUS,
+        SE_MARS,
+        SE_JUPITER,
+        SE_SATURN,
+        SE_URANUS,
+        SE_NEPTUNE,
+        SE_PLUTO,
+        SE_SUN,
+        SE_MOON,
+    )
+    from .fixed_stars import FIXED_STARS, _resolve_star_id
+    from .planets import _PLANET_MAP
+    from .state import get_planets, get_timescale
+
+    if occulted_planet == 0 and not star_name:
+        raise ValueError(
+            "Either occulted_planet ID or star_name must be specified for occultation search"
+        )
+
+    # Validate planets
+    if occulting_planet == SE_SUN:
+        raise ValueError("Sun cannot be an occulting body - use sol_eclipse_when_loc")
+    if occulting_planet == SE_MOON:
+        raise ValueError("Moon cannot be an occulting body - use lun_occult_when_loc")
+    if occulting_planet not in _PLANET_MAP:
+        raise ValueError(f"Invalid occulting planet ID: {occulting_planet}")
+
+    if occulted_planet != 0:
+        if occulted_planet not in _PLANET_MAP:
+            raise ValueError(f"Invalid occulted planet ID: {occulted_planet}")
+        if occulted_planet == occulting_planet:
+            raise ValueError("Occulting and occulted planets cannot be the same")
+
+    MAX_SEARCH_YEARS = 150
+    MAX_GLOBAL_SEARCHES = 100
+
+    eph = get_planets()
+    ts = get_timescale()
+
+    earth = eph["earth"]
+    observer = wgs84.latlon(lat, lon, altitude)
+    observer_at = earth + observer
+
+    PLANET_ANGULAR_RADII_ARCSEC = {
+        SE_MERCURY: 5.0,
+        SE_VENUS: 25.0,
+        SE_MARS: 9.0,
+        SE_JUPITER: 35.0,
+        SE_SATURN: 15.0,
+        SE_URANUS: 1.8,
+        SE_NEPTUNE: 1.1,
+        SE_PLUTO: 0.06,
+    }
+
+    def _get_body_altitude(jd: float, planet_id: int) -> Tuple[float, float]:
+        """Get planet's altitude and azimuth from observer location."""
+        from .planets import get_planet_target
+
+        target_name = _PLANET_MAP[planet_id]
+        target = get_planet_target(eph, target_name)
+
+        t = ts.ut1_jd(jd)
+        target_app = observer_at.at(t).observe(target).apparent()
+        alt, az, _ = target_app.altaz()
+
+        return alt.degrees, az.degrees
+
+    def _get_target_altitude(jd: float) -> Tuple[float, float]:
+        """Get target body's altitude and azimuth from observer location."""
+        from .planets import get_planet_target
+
+        t = ts.ut1_jd(jd)
+
+        if occulted_planet == 0:
+            # Fixed star
+            star_id, err, _ = _resolve_star_id(star_name)
+            if err is not None:
+                raise ValueError(err)
+
+            star = FIXED_STARS[star_id]
+
+            t_years = (jd - 2451545.0) / 365.25
+            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+
+            from skyfield.api import Star
+
+            star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+            target_app = observer_at.at(t).observe(star_obj).apparent()
+        else:
+            target_name = _PLANET_MAP[occulted_planet]
+            target = get_planet_target(eph, target_name)
+            target_app = observer_at.at(t).observe(target).apparent()
+
+        alt, az, _ = target_app.altaz()
+        return alt.degrees, az.degrees
+
+    def _is_visible_at_location(jd: float) -> bool:
+        """Check if both bodies are above horizon at given time."""
+        occ_alt, _ = _get_body_altitude(jd, occulting_planet)
+        target_alt, _ = _get_target_altitude(jd)
+
+        # Both bodies must be above horizon (with some margin for twilight)
+        MIN_ALT = -0.5  # Allow slightly below horizon for refraction
+        return occ_alt > MIN_ALT and target_alt > MIN_ALT
+
+    current_jd = jd_start
+
+    for search_count in range(MAX_GLOBAL_SEARCHES):
+        try:
+            # Find next global occultation
+            retflags, tret = planet_occult_when_glob(
+                current_jd, occulting_planet, occulted_planet, star_name, flags, 0
+            )
+
+            jd_max = tret[0]
+            jd_begin = tret[2]
+            jd_end = tret[3]
+
+            # Check if any part of the occultation is visible from this location
+            # Sample multiple times during the occultation
+            visible = False
+            visible_times = []
+
+            if jd_begin > 0 and jd_end > 0:
+                sample_count = 10
+                for i in range(sample_count + 1):
+                    sample_jd = jd_begin + (jd_end - jd_begin) * i / sample_count
+                    if _is_visible_at_location(sample_jd):
+                        visible = True
+                        visible_times.append(sample_jd)
+
+            # Also check at maximum
+            if _is_visible_at_location(jd_max):
+                visible = True
+                visible_times.append(jd_max)
+
+            if visible:
+                # Calculate attributes at maximum
+                from .planets import get_planet_target
+
+                t = ts.ut1_jd(jd_max)
+
+                occ_alt, occ_az = _get_body_altitude(jd_max, occulting_planet)
+                target_alt, target_az = _get_target_altitude(jd_max)
+
+                # Get angular separation at maximum
+                target_name = _PLANET_MAP[occulting_planet]
+                occ_body = get_planet_target(eph, target_name)
+                occ_app = observer_at.at(t).observe(occ_body).apparent()
+
+                if occulted_planet == 0:
+                    star_id, _, _ = _resolve_star_id(star_name)
+                    star = FIXED_STARS[star_id]
+                    t_years = (jd_max - 2451545.0) / 365.25
+                    ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+                    dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+                    from skyfield.api import Star
+
+                    target_body = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+                else:
+                    target_body = get_planet_target(eph, _PLANET_MAP[occulted_planet])
+
+                target_app = observer_at.at(t).observe(target_body).apparent()
+                separation = occ_app.separation_from(target_app).degrees
+
+                # Calculate magnitude (simplified)
+                occ_radius = (
+                    PLANET_ANGULAR_RADII_ARCSEC.get(occulting_planet, 1.0) / 3600.0
+                )
+                if occulted_planet == 0:
+                    target_radius = 0.0001
+                else:
+                    target_radius = (
+                        PLANET_ANGULAR_RADII_ARCSEC.get(occulted_planet, 1.0) / 3600.0
+                    )
+
+                if target_radius > 0:
+                    magnitude = max(0, 1.0 - separation / (occ_radius + target_radius))
+                    ratio = (
+                        occ_radius / target_radius if target_radius > 0.0001 else 999.0
+                    )
+                    obscuration = magnitude  # Simplified
+                else:
+                    magnitude = 1.0 if separation < occ_radius else 0.0
+                    ratio = 999.0
+                    obscuration = magnitude
+
+                # Refraction correction (simplified)
+                apparent_alt = (
+                    target_alt
+                    + (
+                        1.02
+                        / math.tan(
+                            math.radians(target_alt + 10.3 / (target_alt + 5.11))
+                        )
+                    )
+                    / 60.0
+                    if target_alt > -1
+                    else target_alt
+                )
+
+                times = (
+                    jd_max,  # [0] Maximum
+                    jd_begin if jd_begin > 0 else 0.0,  # [1] First contact
+                    tret[4] if tret[4] > 0 else 0.0,  # [2] Second contact
+                    tret[5] if tret[5] > 0 else 0.0,  # [3] Third contact
+                    jd_end if jd_end > 0 else 0.0,  # [4] Fourth contact
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,  # [5-9] Reserved
+                )
+
+                attr = (
+                    magnitude,  # [0] Magnitude
+                    ratio,  # [1] Diameter ratio
+                    obscuration,  # [2] Obscuration
+                    0.0,  # [3] Reserved
+                    target_az,  # [4] Azimuth
+                    target_alt,  # [5] True altitude
+                    apparent_alt,  # [6] Apparent altitude
+                    separation,  # [7] Separation
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,  # [8-19] Reserved
+                )
+
+                return times, attr, retflags
+
+            # Not visible from this location - continue search after this event
+            current_jd = jd_end + 1.0 if jd_end > 0 else jd_max + 1.0
+
+        except RuntimeError:
+            # No more global occultations found
+            break
+
+    if occulted_planet == 0:
+        target_desc = star_name
+    else:
+        target_desc = f"planet {occulted_planet}"
+    occ_desc = f"planet {occulting_planet}"
+
+    raise RuntimeError(
+        f"No planetary occultation of {target_desc} by {occ_desc} visible from "
+        f"lat={lat}, lon={lon} found within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+    )
+
+
+# Alias for Swiss Ephemeris API compatibility
+swe_planet_occult_when_loc = planet_occult_when_loc

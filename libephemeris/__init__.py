@@ -121,6 +121,11 @@ from .eclipse import (
     swe_lun_occult_when_loc,
     lun_occult_where,
     swe_lun_occult_where,
+    # Planetary occultations
+    planet_occult_when_glob,
+    swe_planet_occult_when_glob,
+    planet_occult_when_loc,
+    swe_planet_occult_when_loc,
     rise_trans,
     swe_rise_trans,
     rise_trans_true_hor,
