@@ -141,6 +141,9 @@ from .eclipse import (
     calc_solar_eclipse_duration,
     calc_lunar_eclipse_total_duration,
     calc_lunar_eclipse_umbral_duration,
+    # Eclipse path width calculation
+    calc_eclipse_path_width,
+    swe_calc_eclipse_path_width,
     # Saros series calculation
     get_saros_number,
     SAROS_CYCLE_DAYS,
@@ -539,6 +542,9 @@ __all__ = [
     "calc_solar_eclipse_duration",
     "calc_lunar_eclipse_total_duration",
     "calc_lunar_eclipse_umbral_duration",
+    # Eclipse path width calculation
+    "calc_eclipse_path_width",
+    "swe_calc_eclipse_path_width",
     # Saros series calculation
     "get_saros_number",
     "SAROS_CYCLE_DAYS",
