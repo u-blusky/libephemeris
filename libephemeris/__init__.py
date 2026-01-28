@@ -131,6 +131,8 @@ from .eclipse import (
     calc_eclipse_second_contact_c2,
     calc_eclipse_third_contact_c3,
     calc_eclipse_fourth_contact_c4,
+    calc_lunar_eclipse_penumbral_first_contact_p1,
+    calc_lunar_eclipse_penumbral_fourth_contact_p4,
 )
 from .utils import (
     degnorm,
@@ -506,6 +508,14 @@ __all__ = [
     "calc_besselian_dl1_dt",
     "calc_besselian_dl2_dt",
     "calc_besselian_dmu_dt",
+    # Solar eclipse contact points
+    "calc_eclipse_first_contact_c1",
+    "calc_eclipse_second_contact_c2",
+    "calc_eclipse_third_contact_c3",
+    "calc_eclipse_fourth_contact_c4",
+    # Lunar eclipse penumbral contact points
+    "calc_lunar_eclipse_penumbral_first_contact_p1",
+    "calc_lunar_eclipse_penumbral_fourth_contact_p4",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",

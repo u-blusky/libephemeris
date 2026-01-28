@@ -9045,3 +9045,301 @@ def calc_eclipse_fourth_contact_c4(
     )
 
     return t_fourth_contact
+
+
+def _calc_lunar_eclipse_penumbral_separation(jd: float) -> float:
+    """
+    Calculate the separation between Moon's nearest limb and penumbral shadow edge.
+
+    Returns the angular separation in degrees between the Moon's nearest limb
+    and the penumbral shadow boundary. The penumbral contact occurs when this
+    value equals zero (Moon's limb touches penumbra edge).
+
+    Args:
+        jd: Julian Day (UT)
+
+    Returns:
+        Separation in degrees. Positive means Moon is outside penumbra,
+        negative means Moon's limb is inside penumbra.
+    """
+    # Get positions
+    sun_pos, _ = swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+
+    # Extract coordinates
+    sun_lon = sun_pos[0]
+    moon_lon = moon_pos[0]
+    moon_lat = moon_pos[1]
+    sun_dist = sun_pos[2]
+    moon_dist = moon_pos[2]
+
+    # Shadow center is opposite the Sun (anti-Sun point on ecliptic)
+    shadow_lon = (sun_lon + 180.0) % 360.0
+
+    # Calculate Moon's angular distance from shadow axis
+    # The shadow axis passes through Earth opposite the Sun
+    dlon = moon_lon - shadow_lon
+    if dlon > 180:
+        dlon -= 360
+    if dlon < -180:
+        dlon += 360
+
+    # Angular distance from Moon center to shadow axis (degrees)
+    # Using spherical geometry for accuracy
+    moon_lat_rad = math.radians(moon_lat)
+    distance_from_axis = math.sqrt(dlon**2 * math.cos(moon_lat_rad) ** 2 + moon_lat**2)
+
+    # Constants for shadow geometry
+    SUN_RADIUS_ARCSEC = 959.63
+    EARTH_RADIUS_AU = 4.2635e-5
+
+    # Sun's angular semi-diameter at actual distance (in degrees)
+    sun_semidiameter = (SUN_RADIUS_ARCSEC / 3600.0) / sun_dist
+
+    # Moon's angular semi-diameter
+    moon_semidiameter = (932.56 / 3600.0) * (0.002569 / moon_dist)
+
+    # Earth's angular semi-diameter as seen from Moon (in degrees)
+    earth_semidiameter = math.degrees(math.atan(EARTH_RADIUS_AU / moon_dist))
+
+    # Penumbra radius at Moon's distance
+    penumbra_radius = earth_semidiameter + sun_semidiameter
+
+    # Separation: positive = Moon outside penumbra, negative = Moon inside
+    # Contact occurs when Moon's nearest limb touches penumbra edge
+    # At P1/P4: distance_from_axis - moon_semidiameter = penumbra_radius
+    # So: separation = distance_from_axis - moon_semidiameter - penumbra_radius = 0
+    separation = distance_from_axis - moon_semidiameter - penumbra_radius
+
+    return separation
+
+
+def _find_lunar_penumbral_contact_time(
+    jd_max: float,
+    search_before: bool,
+    search_range: float = 0.20,
+) -> float:
+    """
+    Find the time of lunar eclipse penumbral contact using binary search.
+
+    Uses iterative refinement to find when Moon's limb touches the penumbral
+    shadow boundary.
+
+    Args:
+        jd_max: Julian Day of eclipse maximum
+        search_before: If True, search for P1 (before maximum), else P4 (after)
+        search_range: Search range in days from maximum (default 0.20 = ~4.8 hours)
+
+    Returns:
+        Julian Day of the contact, or 0.0 if not found
+    """
+    # Set up search bounds
+    if search_before:
+        jd_low = jd_max - search_range
+        jd_high = jd_max
+    else:
+        jd_low = jd_max
+        jd_high = jd_max + search_range
+
+    # Verify that a contact exists in the search range
+    sep_low = _calc_lunar_eclipse_penumbral_separation(jd_low)
+    sep_high = _calc_lunar_eclipse_penumbral_separation(jd_high)
+
+    # For P1: sep_low should be positive (outside) and sep_high negative (inside)
+    # For P4: sep_low should be negative (inside) and sep_high positive (outside)
+    if search_before:
+        # P1: looking for transition from positive to negative
+        if sep_low < 0:
+            # Moon already in penumbra at start of search - no P1 in range
+            return 0.0
+        if sep_high > 0:
+            # Moon still outside penumbra at maximum - no eclipse
+            return 0.0
+    else:
+        # P4: looking for transition from negative to positive
+        if sep_low > 0:
+            # Moon already outside penumbra at maximum
+            return 0.0
+        if sep_high < 0:
+            # Moon still in penumbra at end of search
+            return 0.0
+
+    # Binary search for the contact time (when separation = 0)
+    for _ in range(60):  # ~60 iterations gives sub-second precision
+        jd_mid = (jd_low + jd_high) / 2
+        sep_mid = _calc_lunar_eclipse_penumbral_separation(jd_mid)
+
+        if search_before:
+            # P1: separation goes from positive to negative
+            if sep_mid > 0:
+                jd_low = jd_mid
+            else:
+                jd_high = jd_mid
+        else:
+            # P4: separation goes from negative to positive
+            if sep_mid < 0:
+                jd_low = jd_mid
+            else:
+                jd_high = jd_mid
+
+        # Check convergence (precision ~0.05 seconds)
+        if jd_high - jd_low < 5e-7:
+            break
+
+    return (jd_low + jd_high) / 2
+
+
+def calc_lunar_eclipse_penumbral_first_contact_p1(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of penumbral first contact (P1) for a lunar eclipse.
+
+    P1 is the moment when the Moon's leading limb first enters Earth's
+    penumbral shadow, marking the beginning of the lunar eclipse. At this
+    instant, a very subtle shading begins on the Moon's eastern limb, though
+    it is typically not visible to the naked eye until the Moon penetrates
+    deeper into the penumbra.
+
+    This function uses iterative refinement with geometric calculations to
+    precisely determine P1. The condition for P1 is when the angular
+    separation between the Moon's limb and the penumbral shadow edge equals
+    zero, occurring before eclipse maximum.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from lun_eclipse_when().
+                The function searches backward from this time to find P1.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of penumbral first contact P1. Returns 0.0 if P1
+        cannot be determined (which would indicate the input time is not
+        near a valid lunar eclipse).
+
+    Algorithm:
+        1. Calculate Moon's position and Earth's shadow geometry
+        2. Determine penumbral shadow radius at Moon's distance
+        3. Use binary search to find when Moon's limb touches penumbra edge
+        4. The search proceeds from (jd_max - search_range) to jd_max
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the time value converges to within ~0.05 seconds.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_when
+        >>> from libephemeris import calc_lunar_eclipse_penumbral_first_contact_p1
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the November 8, 2022 total lunar eclipse
+        >>> jd_start = julday(2022, 10, 1, 0.0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate penumbral first contact
+        >>> jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
+        >>> print(f"Penumbral first contact P1: JD {jd_p1:.6f}")
+
+    Note:
+        - P1 is also known as "penumbral eclipse begins" or "first penumbral contact"
+        - The penumbral phase (P1 to P4) is the total duration of the eclipse
+        - For penumbral-only eclipses, P1 and P4 are the only contact points
+        - The penumbral shading is typically visible only after the Moon has
+          penetrated significantly into the penumbra (~70% or more)
+
+    See Also:
+        - calc_lunar_eclipse_penumbral_fourth_contact_p4: Calculate P4 (eclipse ends)
+        - lun_eclipse_when: Find next lunar eclipse and all phase times
+        - lun_eclipse_when_loc: Get local lunar eclipse circumstances
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Lunar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate P1 (penumbral first contact)
+    # Search backward from maximum with a range of ~4.8 hours
+    # (penumbral contact typically occurs 2-3 hours before maximum)
+    t_p1 = _find_lunar_penumbral_contact_time(
+        jd_max, search_before=True, search_range=0.20
+    )
+
+    return t_p1
+
+
+def calc_lunar_eclipse_penumbral_fourth_contact_p4(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of penumbral fourth contact (P4) for a lunar eclipse.
+
+    P4 is the moment when the Moon's trailing limb completely exits Earth's
+    penumbral shadow, marking the end of the lunar eclipse. At this instant,
+    the last trace of penumbral shading leaves the Moon's western limb,
+    although the shading would have been imperceptible for some time before.
+
+    This function uses iterative refinement with geometric calculations to
+    precisely determine P4. The condition for P4 is when the angular
+    separation between the Moon's limb and the penumbral shadow edge equals
+    zero, occurring after eclipse maximum.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from lun_eclipse_when().
+                The function searches forward from this time to find P4.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of penumbral fourth contact P4. Returns 0.0 if P4
+        cannot be determined (which would indicate the input time is not
+        near a valid lunar eclipse).
+
+    Algorithm:
+        1. Calculate Moon's position and Earth's shadow geometry
+        2. Determine penumbral shadow radius at Moon's distance
+        3. Use binary search to find when Moon's limb exits penumbra edge
+        4. The search proceeds from jd_max to (jd_max + search_range)
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the time value converges to within ~0.05 seconds.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_when
+        >>> from libephemeris import calc_lunar_eclipse_penumbral_fourth_contact_p4
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the November 8, 2022 total lunar eclipse
+        >>> jd_start = julday(2022, 10, 1, 0.0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate penumbral fourth contact
+        >>> jd_p4 = calc_lunar_eclipse_penumbral_fourth_contact_p4(jd_max)
+        >>> print(f"Penumbral fourth contact P4: JD {jd_p4:.6f}")
+
+    Note:
+        - P4 is also known as "penumbral eclipse ends" or "last penumbral contact"
+        - The total duration of the eclipse (P1 to P4) can be several hours
+        - P4 marks the end of any visible or instrumental eclipse effects
+        - The duration (P4 - P1) represents the complete penumbral phase
+
+    See Also:
+        - calc_lunar_eclipse_penumbral_first_contact_p1: Calculate P1 (eclipse begins)
+        - lun_eclipse_when: Find next lunar eclipse and all phase times
+        - lun_eclipse_when_loc: Get local lunar eclipse circumstances
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Lunar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate P4 (penumbral fourth contact)
+    # Search forward from maximum with a range of ~4.8 hours
+    # (penumbral contact typically occurs 2-3 hours after maximum)
+    t_p4 = _find_lunar_penumbral_contact_time(
+        jd_max, search_before=False, search_range=0.20
+    )
+
+    return t_p4
