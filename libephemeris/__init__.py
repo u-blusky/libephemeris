@@ -106,6 +106,9 @@ from .eclipse import (
     swe_lun_eclipse_when_loc,
     lun_eclipse_how,
     swe_lun_eclipse_how,
+    # Lunar eclipse umbral magnitude
+    lun_eclipse_umbral_magnitude,
+    swe_lun_eclipse_umbral_magnitude,
     lun_occult_when_glob,
     swe_lun_occult_when_glob,
     lun_occult_when_loc,
@@ -530,6 +533,9 @@ __all__ = [
     "swe_lun_eclipse_when_loc",
     "lun_eclipse_how",
     "swe_lun_eclipse_how",
+    # Lunar eclipse umbral magnitude
+    "lun_eclipse_umbral_magnitude",
+    "swe_lun_eclipse_umbral_magnitude",
     "lun_occult_when_glob",
     "swe_lun_occult_when_glob",
     "lun_occult_when_loc",

@@ -12368,3 +12368,120 @@ def swe_sol_eclipse_obscuration_at_loc(
     altitude = float(geopos[2])
 
     return sol_eclipse_obscuration_at_loc(tjd_ut, lat, lon, altitude, ifl)
+
+
+def lun_eclipse_umbral_magnitude(
+    jd: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the umbral magnitude for a lunar eclipse at a specific time.
+
+    Umbral magnitude is defined as the fraction of the Moon's diameter that
+    is within Earth's umbral (dark) shadow. This is a simplified convenience
+    function that returns just the umbral magnitude value.
+
+    Unlike solar eclipse magnitude (which depends on observer location), lunar
+    eclipse magnitude is the same for all observers who can see the Moon,
+    since the Moon physically enters Earth's shadow.
+
+    Args:
+        jd: Julian Day (UT) of the time to calculate
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Umbral magnitude as a float:
+            - 0.0 if the Moon is not in the umbral shadow (penumbral-only
+              eclipse or no eclipse)
+            - 0.0 to 1.0 for partial umbral eclipses (fraction of Moon's
+              diameter within umbra)
+            - >= 1.0 for total lunar eclipses (Moon fully within umbra;
+              values > 1.0 indicate how deep the Moon is in the shadow)
+
+    Note:
+        This function does NOT search for eclipses - it calculates the
+        instantaneous umbral magnitude at the given time. To find eclipse
+        events, use lun_eclipse_when() first.
+
+        For penumbral-only eclipses, this function returns 0.0 since the
+        Moon has not entered the umbra. Use lun_eclipse_how() to get the
+        penumbral magnitude in such cases.
+
+    Algorithm:
+        1. Calculate Moon's ecliptic position
+        2. Calculate Earth's umbral shadow cone geometry at Moon's distance
+        3. Determine how much of the Moon's diameter is within the umbra
+
+    Precision:
+        Magnitude accurate to ~0.01 for typical eclipses.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_umbral_magnitude, lun_eclipse_when
+        >>> # First find a lunar eclipse
+        >>> jd_start = julday(2022, 5, 1, 0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start)
+        >>> jd_max = times[0]  # Time of maximum eclipse
+        >>> # Calculate umbral magnitude at maximum
+        >>> umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
+        >>> print(f"Umbral magnitude: {umbral_mag:.4f}")
+
+        >>> # Check magnitude at a random time (no eclipse)
+        >>> jd_no_eclipse = julday(2022, 6, 1, 12.0)
+        >>> mag = lun_eclipse_umbral_magnitude(jd_no_eclipse)
+        >>> print(f"Magnitude: {mag:.4f}")  # Will be 0.0
+
+    References:
+        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
+        - Swiss Ephemeris documentation
+    """
+    # Use the existing calculation function
+    (
+        ecl_type_flags,
+        umbral_mag,
+        penumbral_mag,
+        gamma,
+        penumbra_radius,
+        umbra_radius,
+    ) = _calculate_lunar_eclipse_type_and_magnitude(jd)
+
+    # Return the umbral magnitude, clamped to non-negative
+    return max(0.0, umbral_mag)
+
+
+def swe_lun_eclipse_umbral_magnitude(
+    tjd_ut: float,
+    ifl: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the umbral magnitude for a lunar eclipse at a specific time.
+
+    This function matches the pyswisseph naming convention. It is a convenience
+    function that returns just the umbral magnitude (fraction of Moon's diameter
+    within Earth's umbral shadow).
+
+    Unlike solar eclipses, lunar eclipse magnitude does not depend on observer
+    location - the Moon physically enters Earth's shadow, so the magnitude is
+    the same for all observers who can see the Moon.
+
+    Args:
+        tjd_ut: Julian Day (UT) of the time to calculate
+        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Umbral magnitude as a float:
+            - 0.0 if Moon is not in umbra (penumbral-only or no eclipse)
+            - 0.0 to 1.0 for partial umbral eclipses
+            - >= 1.0 for total lunar eclipses
+
+    Example:
+        >>> from libephemeris import swe_lun_eclipse_umbral_magnitude, SEFLG_SWIEPH
+        >>> # Calculate umbral magnitude during Nov 8, 2022 total lunar eclipse
+        >>> jd = 2459892.0  # During eclipse
+        >>> umbral_mag = swe_lun_eclipse_umbral_magnitude(jd, SEFLG_SWIEPH)
+        >>> print(f"Umbral magnitude: {umbral_mag:.4f}")
+
+    References:
+        - Swiss Ephemeris: swe_lun_eclipse_how()
+        - Meeus "Astronomical Algorithms" Ch. 54
+    """
+    return lun_eclipse_umbral_magnitude(tjd_ut, ifl)
