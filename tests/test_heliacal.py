@@ -280,22 +280,257 @@ class TestHeliacalAtmosphericConditions:
         assert retflag == SE_HELIACAL_RISING
 
 
-class TestHeliacalAlias:
-    """Test swe_heliacal_ut alias."""
+class TestSweHeliacalUt:
+    """Test swe_heliacal_ut Swiss Ephemeris-compatible API."""
 
-    def test_swe_alias_works(self):
-        """Test that swe_heliacal_ut is an alias for heliacal_ut."""
+    def test_swe_heliacal_ut_basic_call(self):
+        """Test basic swe_heliacal_ut call with array parameters."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        # Geographic position: Rome (lon, lat, altitude)
+        geopos = (12.4964, 41.9028, 0.0)
+        # Atmospheric conditions: pressure, temp, humidity, extinction
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        # Observer: age, Snellen ratio, and optical params
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result1 = heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
-        )
-        result2 = swe_heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
         )
 
-        assert result1 == result2
+        # Should return a tuple of 50 floats
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+        # Should find an event within a year
+        if retflag > 0:
+            assert dret[0] > jd_start
+            assert dret[0] < jd_start + 365
+
+    def test_swe_heliacal_ut_with_planet_name_mercury(self):
+        """Test swe_heliacal_ut with Mercury."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Mercury", SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+        # Mercury has ~3 synodic periods per year
+        if retflag > 0:
+            assert dret[0] > jd_start
+            assert dret[0] < jd_start + 120
+
+    def test_swe_heliacal_ut_with_planet_name_mars(self):
+        """Test swe_heliacal_ut with Mars."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Mars", SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_swe_heliacal_ut_with_planet_name_jupiter(self):
+        """Test swe_heliacal_ut with Jupiter."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (-0.1278, 51.5074, 0.0)  # London
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Jupiter", SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_swe_heliacal_ut_with_planet_name_saturn(self):
+        """Test swe_heliacal_ut with Saturn."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Saturn", SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_swe_heliacal_ut_heliacal_setting(self):
+        """Test swe_heliacal_ut for heliacal setting event."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_SETTING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+        if retflag > 0:
+            assert retflag == SE_HELIACAL_SETTING
+
+    def test_swe_heliacal_ut_evening_first(self):
+        """Test swe_heliacal_ut for evening first event."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", SE_EVENING_FIRST
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_swe_heliacal_ut_morning_last(self):
+        """Test swe_heliacal_ut for morning last event."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Mercury", SE_MORNING_LAST
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_swe_heliacal_ut_sun_raises_error(self):
+        """Test that Sun raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        with pytest.raises(ValueError, match="Sun"):
+            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Sun", SE_HELIACAL_RISING)
+
+    def test_swe_heliacal_ut_moon_raises_error(self):
+        """Test that Moon raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        with pytest.raises(ValueError, match="Moon"):
+            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Moon", SE_HELIACAL_RISING)
+
+    def test_swe_heliacal_ut_invalid_event_type(self):
+        """Test that invalid event type raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        with pytest.raises(ValueError, match="Invalid event_type"):
+            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Venus", 99)
+
+    def test_swe_heliacal_ut_invalid_object_name(self):
+        """Test that unknown object name raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        with pytest.raises(ValueError, match="not recognized"):
+            swe_heliacal_ut(
+                jd_start, geopos, datm, dobs, "InvalidPlanet", SE_HELIACAL_RISING
+            )
+
+    def test_swe_heliacal_ut_case_insensitive(self):
+        """Test that planet name matching is case insensitive."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        # Should work with lowercase
+        dret1, _ = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "venus", SE_HELIACAL_RISING
+        )
+        # Should work with uppercase
+        dret2, _ = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "VENUS", SE_HELIACAL_RISING
+        )
+        # Should work with mixed case
+        dret3, _ = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        )
+
+        # All should return same result
+        assert dret1[0] == dret2[0] == dret3[0]
+
+    def test_swe_heliacal_ut_default_atmospheric(self):
+        """Test that zero atmospheric values get defaults."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        # All zeros should get defaults
+        datm = (0, 0, 0, 0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_swe_heliacal_ut_with_altitude(self):
+        """Test swe_heliacal_ut with observer at altitude."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 2000.0)  # 2000m altitude
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_swe_heliacal_ut_southern_hemisphere(self):
+        """Test swe_heliacal_ut in southern hemisphere."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (151.2093, -33.8688, 0.0)  # Sydney
+        datm = (1013.25, 25.0, 60.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_swe_heliacal_ut_with_planet_id_string(self):
+        """Test swe_heliacal_ut with planet ID as string."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        # Venus is planet ID 3
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "3", SE_HELIACAL_RISING
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
 
 
 class TestHeliacalDateValidation:
