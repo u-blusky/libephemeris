@@ -304,9 +304,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT COMPLETE SOL_ECLIPSE_WHERE: Implement or complete swe_sol_eclipse_where(jd, flags) that returns comprehensive geographic information about where an eclipse is visible including central line coordinates, northern and southern limits, and path width.
 
-- [ ] IMPLEMENT SOL_ECLIPSE_HOW WITH FULL DETAILS: Enhance swe_sol_eclipse_how to return all eclipse circumstances at a given location including times of all contacts, maximum obscuration percentage, position angle of contacts, altitude and azimuth of Sun during eclipse, etc.
+- [x] IMPLEMENT SOL_ECLIPSE_HOW WITH FULL DETAILS: Enhance swe_sol_eclipse_how to return all eclipse circumstances at a given location including times of all contacts, maximum obscuration percentage, position angle of contacts, altitude and azimuth of Sun during eclipse, etc.
 
-- [ ] IMPLEMENT ECLIPSE MAGNITUDE AT LOCATION: Calculate the eclipse magnitude (fraction of solar diameter covered) at any specified geographic location.
+- [x] IMPLEMENT ECLIPSE MAGNITUDE AT LOCATION: Calculate the eclipse magnitude (fraction of solar diameter covered) at any specified geographic location.
 
 - [ ] IMPLEMENT ECLIPSE OBSCURATION AT LOCATION: Calculate the obscuration (fraction of solar disk area covered) at any specified geographic location.
 

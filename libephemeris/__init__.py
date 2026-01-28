@@ -94,6 +94,9 @@ from .eclipse import (
     swe_sol_eclipse_how,
     sol_eclipse_how_details,
     swe_sol_eclipse_how_details,
+    # Eclipse magnitude at location
+    sol_eclipse_magnitude_at_loc,
+    swe_sol_eclipse_magnitude_at_loc,
     lun_eclipse_when,
     swe_lun_eclipse_when,
     lun_eclipse_when_loc,
@@ -512,6 +515,9 @@ __all__ = [
     "swe_sol_eclipse_how",
     "sol_eclipse_how_details",
     "swe_sol_eclipse_how_details",
+    # Eclipse magnitude at location
+    "sol_eclipse_magnitude_at_loc",
+    "swe_sol_eclipse_magnitude_at_loc",
     "lun_eclipse_when",
     "swe_lun_eclipse_when",
     "lun_eclipse_when_loc",
