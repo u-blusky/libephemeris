@@ -98,6 +98,10 @@ SE_TRANSPLUTO: int = SE_ISIS  # Alias for SE_ISIS
 ISIS: int = SE_ISIS  # Pyswisseph-compatible alias
 TRANSPLUTO: int = SE_TRANSPLUTO  # Pyswisseph-compatible alias
 
+# Vulcan - hypothetical intramercurial planet (section 2.7.5 of Swiss Ephemeris docs / seorbel.txt #16)
+SE_VULCAN: int = SE_FICT_OFFSET + 15  # 55 - Intramercurial hypothetical planet
+VULCAN: int = SE_VULCAN  # Pyswisseph-compatible alias
+
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
 # Trans-Neptunian Objects (TNOs) - Catalog number + offset

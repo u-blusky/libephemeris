@@ -862,17 +862,6 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
         M0=119.262909,  # Mean anomaly at J2000 derived from pyswisseph
         n=0.0011968259,  # Mean motion derived from pyswisseph J1900-J2000 arc
     ),
-    SE_VULCAN: HypotheticalElements(
-        name="Vulcan",
-        epoch=2451545.0,  # J2000.0
-        a=0.14,  # AU - inside Mercury's orbit
-        e=0.0,  # Assumed circular
-        i=0.0,  # Assumed zero inclination
-        omega=0.0,
-        Omega=0.0,
-        M0=0.0,  # Unknown, set to Sun position
-        n=18.0,  # Very fast motion (~20 day period)
-    ),
     SE_PROSERPINA: HypotheticalElements(
         name="Proserpina",
         epoch=2451545.0,
@@ -885,6 +874,94 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
         n=0.000445,  # ~2200 year period
     ),
 }
+
+
+# =============================================================================
+# VULCAN ORBITAL ELEMENTS (Intramercurial Hypothetical Planet)
+# =============================================================================
+# Vulcan elements from Swiss Ephemeris seorbel.txt (section 2.7.5):
+# J1900,JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019,
+#              322.212069+1670.056*T, 47.787931-1670.056*T, 7.5, Vulcan
+#
+# This is a hypothetical intramercurial planet proposed by various astrologers.
+# Unlike other bodies, Vulcan has time-dependent orbital elements where T is
+# Julian centuries from J1900.0. The equinox is JDATE (equinox of date).
+#
+# Elements order in seorbel.txt:
+#   1. epoch (J1900)
+#   2. equinox (JDATE - equinox of date)
+#   3. mean anomaly: 252.8987988 + 707550.7341 * T degrees
+#   4. semi-major axis: 0.13744 AU
+#   5. eccentricity: 0.019
+#   6. argument of perihelion: 322.212069 + 1670.056 * T degrees
+#   7. ascending node: 47.787931 - 1670.056 * T degrees
+#   8. inclination: 7.5 degrees
+#
+# Note: The mean motion of 707550.7341 deg/century = 19.373 deg/day corresponds
+# to an orbital period of ~18.6 days, consistent with an intramercurial orbit.
+
+
+@dataclass
+class VulcanElements:
+    """
+    Orbital elements for the hypothetical intramercurial planet Vulcan.
+
+    Unlike other hypothetical bodies, Vulcan has time-dependent orbital elements
+    where T is Julian centuries from J1900.0. This follows Swiss Ephemeris
+    seorbel.txt specification (section 2.7.5).
+
+    The elements with T terms are:
+        - Mean anomaly: M0 + n_century * T
+        - Argument of perihelion: omega0 + omega_rate * T
+        - Ascending node: Omega0 + Omega_rate * T
+
+    where T = (jd - epoch) / 36525.0
+
+    Attributes:
+        name: Name of the body
+        epoch: Reference epoch (Julian Day TT) - J1900.0
+        a: Semi-major axis (AU)
+        e: Eccentricity
+        i: Inclination (degrees)
+        M0: Mean anomaly at epoch (degrees)
+        n_century: Mean motion (degrees per Julian century)
+        omega0: Argument of perihelion at epoch (degrees)
+        omega_rate: Rate of change of argument of perihelion (degrees/century)
+        Omega0: Ascending node at epoch (degrees)
+        Omega_rate: Rate of change of ascending node (degrees/century)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    M0: float
+    n_century: float
+    omega0: float
+    omega_rate: float
+    Omega0: float
+    Omega_rate: float
+
+
+# Vulcan orbital elements from Swiss Ephemeris seorbel.txt
+# Epoch: J1900.0 (JD 2415020.0)
+# From seorbel.txt line:
+# J1900,JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019,
+#              322.212069+1670.056*T, 47.787931-1670.056*T, 7.5, Vulcan
+VULCAN_ELEMENTS = VulcanElements(
+    name="Vulcan",
+    epoch=2415020.0,  # J1900.0
+    a=0.13744,  # Semi-major axis in AU (inside Mercury's orbit)
+    e=0.019,  # Small eccentricity (nearly circular)
+    i=7.5,  # Inclination in degrees
+    M0=252.8987988,  # Mean anomaly at epoch in degrees
+    n_century=707550.7341,  # Mean motion in degrees per century
+    omega0=322.212069,  # Argument of perihelion at epoch in degrees
+    omega_rate=1670.056,  # Rate of change of omega in degrees/century
+    Omega0=47.787931,  # Ascending node at epoch in degrees
+    Omega_rate=-1670.056,  # Rate of change of Omega in degrees/century (note: negative)
+)
 
 
 # =============================================================================
@@ -1953,6 +2030,128 @@ def _calc_uranian_planet_raw(body_id: int, jd_tt: float) -> Tuple[float, float, 
     return (longitude, latitude, distance)
 
 
+def calc_vulcan(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the heliocentric position of Vulcan using Swiss Ephemeris elements.
+
+    Vulcan is a hypothetical intramercurial planet documented in Swiss Ephemeris
+    section 2.7.5 (seorbel.txt #16). Various astrologers proposed different orbital
+    elements for Vulcan; this implementation uses the version from Swiss Ephemeris.
+
+    Unlike other hypothetical bodies, Vulcan has time-dependent orbital elements:
+        - Mean anomaly: 252.8987988 + 707550.7341 * T degrees
+        - Argument of perihelion: 322.212069 + 1670.056 * T degrees
+        - Ascending node: 47.787931 - 1670.056 * T degrees
+
+    where T = Julian centuries from J1900.0 (JD 2415020.0)
+
+    Orbital elements from seorbel.txt:
+        - Epoch: J1900.0 (JD 2415020.0)
+        - Equinox: JDATE (equinox of date)
+        - Semi-major axis: 0.13744 AU (inside Mercury's orbit)
+        - Eccentricity: 0.019 (nearly circular)
+        - Inclination: 7.5 degrees
+        - Orbital period: ~18.6 days (derived from mean motion)
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Heliocentric ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees
+            - distance: Distance from Sun in AU
+            - dlon: Daily heliocentric longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_vulcan
+        >>> pos = calc_vulcan(2451545.0)  # J2000.0
+        >>> print(f"Vulcan at {pos[0]:.4f} deg, distance {pos[2]:.4f} AU")
+    """
+    pos = _calc_vulcan_raw(jd_tt)
+    longitude, latitude, distance = pos
+
+    # Calculate velocity via numerical differentiation
+    dt_step = 1.0  # 1 day step for daily velocity
+    pos_next = _calc_vulcan_raw(jd_tt + dt_step)
+
+    dlon = pos_next[0] - longitude
+    # Handle wrap-around (Vulcan moves ~19 deg/day, so this is important)
+    if dlon > 180.0:
+        dlon -= 360.0
+    elif dlon < -180.0:
+        dlon += 360.0
+
+    dlat = pos_next[1] - latitude
+    ddist = pos_next[2] - distance
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def _calc_vulcan_raw(jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate raw Vulcan position without velocity (helper for differentiation).
+
+    Implements the time-dependent orbital elements from Swiss Ephemeris seorbel.txt.
+    """
+    elements = VULCAN_ELEMENTS
+
+    # Time in Julian centuries from epoch (J1900.0)
+    T = (jd_tt - elements.epoch) / 36525.0
+
+    # Compute time-dependent elements
+    # Mean anomaly: M0 + n_century * T
+    M = (elements.M0 + elements.n_century * T) % 360.0
+    M_rad = math.radians(M)
+
+    # Argument of perihelion: omega0 + omega_rate * T
+    omega = elements.omega0 + elements.omega_rate * T
+    omega_rad = math.radians(omega)
+
+    # Ascending node: Omega0 + Omega_rate * T
+    Omega = elements.Omega0 + elements.Omega_rate * T
+    Omega_rad = math.radians(Omega)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + omega_rad
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+
+    # Position in orbital plane
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    # Rotate to ecliptic frame
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    # Convert to spherical coordinates
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    return (longitude, latitude, distance)
+
+
 def calc_transpluto_position(
     jd_tt: float,
 ) -> Tuple[float, float, float, float, float, float]:
@@ -2285,6 +2484,10 @@ def calc_hypothetical_position(
     # Transpluto / Isis
     if ipl == SE_ISIS:
         return calc_transpluto_position(jd_tt)
+
+    # Vulcan (intramercurial hypothetical planet)
+    if ipl == SE_VULCAN:
+        return calc_vulcan(jd_tt)
 
     # White Moon (Selena)
     if ipl == SE_WHITE_MOON:

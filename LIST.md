@@ -218,7 +218,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## MEDIUM PRIORITY: Hypothetical Bodies - Other Fictitious Bodies
 
-- [ ] IMPLEMENT TRANSPLUTO ISIS: Add support for Transpluto also known as Isis which is a hypothetical planet beyond Pluto proposed by astrologer Ram that Swiss Ephemeris supports as documented in section 2.7.2, get orbital elements from seorbel.txt, add SE_TRANSPLUTO = 48 (or appropriate offset) to constants.py, implement calc_transpluto(jd_tt) in hypothetical.py using Keplerian propagation, validate against pyswisseph.
+- [x] IMPLEMENT TRANSPLUTO ISIS: Add support for Transpluto also known as Isis which is a hypothetical planet beyond Pluto proposed by astrologer Ram that Swiss Ephemeris supports as documented in section 2.7.2, get orbital elements from seorbel.txt, add SE_TRANSPLUTO = 48 (or appropriate offset) to constants.py, implement calc_transpluto(jd_tt) in hypothetical.py using Keplerian propagation, validate against pyswisseph.
 
 - [ ] IMPLEMENT VULCAN HYPOTHETICAL PLANET: Add support for the hypothetical intramercurial planet Vulcan as documented in Swiss Ephemeris section 2.7.5, various astrologers have proposed different orbital elements for Vulcan, implement the version Swiss Ephemeris uses from seorbel.txt, add SE_VULCAN to constants.py, implement in hypothetical.py.
 

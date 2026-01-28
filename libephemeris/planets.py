@@ -65,6 +65,7 @@ from .constants import (
     SE_INTP_PERG,
     SE_CUPIDO,
     SE_POSEIDON,
+    SE_ISIS,
     SEFLG_SPEED,
     SEFLG_HELCTR,
     SEFLG_TOPOCTR,
@@ -134,6 +135,7 @@ _PLANET_NAMES = {
     SE_INTP_APOG: "Interpolated Apogee",
     SE_INTP_PERG: "Interpolated Perigee",
     SE_EARTH: "Earth",
+    SE_ISIS: "Transpluto",
 }
 
 
@@ -710,6 +712,15 @@ def _calc_body(
         # Use calc_uranian_planet() which uses Keplerian elements from seorbel.txt
         # to match pyswisseph's Uranian planet calculations
         pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
+        return pos, iflag
+
+    # Handle Transpluto (Isis) - hypothetical trans-Plutonian planet (ID 48)
+    if ipl == SE_ISIS:
+        from . import hypothetical
+
+        jd_tt = t.tt
+        # Use calc_transpluto() which uses Keplerian elements from seorbel.txt
+        pos = hypothetical.calc_transpluto(jd_tt)
         return pos, iflag
 
     # Handle minor bodies (asteroids and TNOs)

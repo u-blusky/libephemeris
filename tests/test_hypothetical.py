@@ -46,6 +46,7 @@ from libephemeris.hypothetical import (
     calc_admetos,
     calc_vulkanus,
     calc_poseidon,
+    calc_vulcan,
     # Data structures
     URANIAN_ELEMENTS,
     URANIAN_KEPLERIAN_ELEMENTS,
@@ -60,6 +61,7 @@ from libephemeris.hypothetical import (
     VULKANUS_KEPLERIAN_ELEMENTS,
     POSEIDON_KEPLERIAN_ELEMENTS,
     TRANSPLUTO_KEPLERIAN_ELEMENTS,
+    VULCAN_ELEMENTS,
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -2580,3 +2582,246 @@ class TestCalcTranspluto:
             f"After one orbit ({empirical_period_days / 365.25:.1f} years), "
             f"longitude should return near start, diff = {diff:.2f} deg"
         )
+
+    def test_transpluto_via_swe_calc_ut(self):
+        """Test that Transpluto can be calculated via swe_calc_ut() API.
+
+        This verifies that SE_ISIS (48) is properly routed to calc_transpluto()
+        through the main swe_calc_ut() function in planets.py.
+        """
+        from libephemeris import swe_calc_ut, SE_ISIS, SEFLG_SPEED, SEFLG_HELCTR
+
+        # Calculate Transpluto position at J2000
+        pos, flag = swe_calc_ut(self.J2000, SE_ISIS, SEFLG_SPEED | SEFLG_HELCTR)
+
+        # Verify position matches direct calc_transpluto call
+        direct_pos = calc_transpluto(self.J2000)
+
+        # Longitude should match exactly
+        assert abs(pos[0] - direct_pos[0]) < 0.0001, (
+            f"swe_calc_ut longitude {pos[0]:.6f} should match "
+            f"calc_transpluto {direct_pos[0]:.6f}"
+        )
+
+        # Distance should match
+        assert abs(pos[2] - direct_pos[2]) < 0.001, (
+            f"swe_calc_ut distance {pos[2]:.6f} should match "
+            f"calc_transpluto {direct_pos[2]:.6f}"
+        )
+
+    def test_transpluto_via_swe_calc_ut_using_alias(self):
+        """Test that SE_TRANSPLUTO alias also works via swe_calc_ut()."""
+        from libephemeris import swe_calc_ut, SE_TRANSPLUTO, SEFLG_SPEED, SEFLG_HELCTR
+
+        # SE_TRANSPLUTO is alias for SE_ISIS (both = 48)
+        pos, flag = swe_calc_ut(self.J2000, SE_TRANSPLUTO, SEFLG_SPEED | SEFLG_HELCTR)
+
+        # Should return valid position
+        assert 0 <= pos[0] < 360, f"Longitude should be valid: {pos[0]}"
+        assert pos[2] > 50, f"Distance should be > 50 AU: {pos[2]}"
+
+
+class TestCalcVulcan:
+    """Tests for the calc_vulcan calculation function.
+
+    Vulcan is a hypothetical intramercurial planet documented in Swiss Ephemeris
+    section 2.7.5 (seorbel.txt #16). Unlike most hypothetical bodies, Vulcan has
+    time-dependent orbital elements where the argument of perihelion and ascending
+    node both change with time.
+    """
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_vulcan_returns_tuple(self):
+        """Test that calc_vulcan returns correct tuple format."""
+        pos = calc_vulcan(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        lon, lat, dist, dlon, dlat, ddist = pos
+        assert isinstance(lon, float)
+        assert isinstance(lat, float)
+        assert isinstance(dist, float)
+        assert isinstance(dlon, float)
+        assert isinstance(dlat, float)
+        assert isinstance(ddist, float)
+
+    def test_calc_vulcan_longitude_range(self):
+        """Test that longitude is in valid range."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_vulcan(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range at JD {jd}"
+
+    def test_calc_vulcan_latitude_reasonable(self):
+        """Test that Vulcan latitude is within inclination range (i=7.5 deg)."""
+        pos = calc_vulcan(self.J2000)
+        # With inclination of 7.5 degrees, latitude should be within that range
+        assert -8.0 <= pos[1] <= 8.0, f"Latitude {pos[1]} unexpectedly large"
+
+    def test_calc_vulcan_distance_intramercurial(self):
+        """Test that Vulcan distance is inside Mercury's orbit (~0.39 AU)."""
+        pos = calc_vulcan(self.J2000)
+        # Vulcan has a = 0.13744 AU, e = 0.019
+        # Distance should be close to semi-major axis
+        expected_a = VULCAN_ELEMENTS.a
+        expected_e = VULCAN_ELEMENTS.e
+        min_dist = expected_a * (1 - expected_e)  # ~0.135 AU
+        max_dist = expected_a * (1 + expected_e)  # ~0.140 AU
+        assert min_dist * 0.9 <= pos[2] <= max_dist * 1.1, (
+            f"Vulcan distance {pos[2]:.4f} AU should be between {min_dist:.4f} and {max_dist:.4f}"
+        )
+        # Must be inside Mercury's orbit
+        assert pos[2] < 0.39, (
+            f"Vulcan distance {pos[2]:.4f} AU should be inside Mercury's orbit"
+        )
+
+    def test_calc_vulcan_fast_motion(self):
+        """Test that Vulcan has very fast daily motion (~19 deg/day)."""
+        pos = calc_vulcan(self.J2000)
+        # Mean motion from elements: 707550.7341 deg/century = 19.37 deg/day
+        expected_n_per_day = VULCAN_ELEMENTS.n_century / 36525.0  # deg/day
+        # Should be approximately 19 deg/day (fast!)
+        assert abs(pos[3]) > 10.0, (
+            f"Vulcan daily motion {pos[3]:.2f} should be > 10 deg/day"
+        )
+        assert abs(pos[3]) < 25.0, (
+            f"Vulcan daily motion {pos[3]:.2f} should be < 25 deg/day"
+        )
+
+    def test_calc_vulcan_velocity_positive(self):
+        """Test that Vulcan has prograde motion."""
+        pos = calc_vulcan(self.J2000)
+        assert pos[3] > 0, "Vulcan should have prograde motion"
+
+    def test_calc_vulcan_elements_valid(self):
+        """Test that Vulcan orbital elements have valid values."""
+        elements = VULCAN_ELEMENTS
+        assert elements.name == "Vulcan"
+        assert abs(elements.a - 0.13744) < 0.0001, "a should match seorbel.txt"
+        assert abs(elements.e - 0.019) < 0.001, "e should match seorbel.txt"
+        assert abs(elements.i - 7.5) < 0.1, "i should match seorbel.txt"
+        assert abs(elements.M0 - 252.8987988) < 0.0001, "M0 should match seorbel.txt"
+        assert abs(elements.n_century - 707550.7341) < 0.001, (
+            "n_century should match seorbel.txt"
+        )
+        assert abs(elements.omega0 - 322.212069) < 0.0001, (
+            "omega0 should match seorbel.txt"
+        )
+        assert abs(elements.omega_rate - 1670.056) < 0.001, (
+            "omega_rate should match seorbel.txt"
+        )
+        assert abs(elements.Omega0 - 47.787931) < 0.0001, (
+            "Omega0 should match seorbel.txt"
+        )
+        assert abs(elements.Omega_rate - (-1670.056)) < 0.001, (
+            "Omega_rate should match seorbel.txt"
+        )
+
+    def test_calc_vulcan_orbital_period(self):
+        """Test that Vulcan has approximately 18.6 day orbital period."""
+        # From mean motion: n = 707550.7341 deg/century
+        # Period = 360 / (n / 36525) days = 360 * 36525 / 707550.7341 = 18.58 days
+        n_per_day = VULCAN_ELEMENTS.n_century / 36525.0
+        period_days = 360.0 / n_per_day
+
+        # Verify period is approximately 18.5-19 days
+        assert 17.0 < period_days < 20.0, (
+            f"Vulcan period should be ~18.6 days, got {period_days:.2f}"
+        )
+
+        # Test that position returns to approximately same longitude after one period
+        pos1 = calc_vulcan(self.J2000)
+        pos2 = calc_vulcan(self.J2000 + period_days)
+
+        # Handle wrap-around
+        diff = abs(pos2[0] - pos1[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        # Allow some tolerance due to velocity variation and time-dependent elements
+        assert diff < 15.0, (
+            f"After one orbit ({period_days:.2f} days), "
+            f"longitude should return near start, diff = {diff:.2f} deg"
+        )
+
+    def test_calc_vulcan_progression(self):
+        """Test that Vulcan progresses correctly over one day."""
+        pos1 = calc_vulcan(self.J2000)
+        pos2 = calc_vulcan(self.J2000 + 1.0)  # 1 day later
+
+        # Calculate expected motion in 1 day
+        expected_motion = VULCAN_ELEMENTS.n_century / 36525.0  # ~19.37 deg/day
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        # Allow 10% tolerance for eccentric orbit velocity variation
+        assert abs(actual_motion - expected_motion) < expected_motion * 0.2, (
+            f"Daily motion should be ~{expected_motion:.2f} deg, got {actual_motion:.2f}"
+        )
+
+    def test_calc_vulcan_time_dependent_elements(self):
+        """Test that time-dependent elements change correctly over time."""
+        # At J1900 (epoch), elements should match base values
+        # At later times, omega and Omega should have changed
+
+        # omega changes at +1670.056 deg/century
+        # Omega changes at -1670.056 deg/century
+        # After 1 century, omega increases by ~1670 deg, Omega decreases by ~1670 deg
+
+        pos1 = calc_vulcan(self.J1900)
+        pos2 = calc_vulcan(self.J1900 + 36525)  # 100 years later
+
+        # Both positions should be valid
+        assert 0.0 <= pos1[0] < 360.0
+        assert 0.0 <= pos2[0] < 360.0
+
+    def test_se_vulcan_constant_value(self):
+        """Test that SE_VULCAN has correct value (SE_FICT_OFFSET + 15 = 55)."""
+        assert SE_VULCAN == 55
+        assert SE_VULCAN == SE_FICT_OFFSET + 15
+
+    def test_calc_vulcan_via_calc_hypothetical_position(self):
+        """Test that calc_hypothetical_position routes Vulcan correctly."""
+        pos1 = calc_hypothetical_position(SE_VULCAN, self.J2000)
+        pos2 = calc_vulcan(self.J2000)
+        assert pos1 == pos2
+
+    def test_vulcan_name_in_hypothetical_names(self):
+        """Test that Vulcan is in HYPOTHETICAL_NAMES dictionary."""
+        assert SE_VULCAN in HYPOTHETICAL_NAMES
+        assert HYPOTHETICAL_NAMES[SE_VULCAN] == "Vulcan"
+
+    def test_vulcan_identified_as_hypothetical(self):
+        """Test that Vulcan is identified as a hypothetical body."""
+        assert is_hypothetical_body(SE_VULCAN)
+
+    def test_vulcan_name_via_get_hypothetical_name(self):
+        """Test that get_hypothetical_name returns correct name for Vulcan."""
+        assert get_hypothetical_name(SE_VULCAN) == "Vulcan"
+
+    def test_vulcan_different_from_vulkanus(self):
+        """Test that Vulcan (intramercurial) is different from Vulkanus (Uranian)."""
+        # Vulcan is SE_FICT_OFFSET + 15 = 55
+        # Vulkanus is SE_FICT_OFFSET + 6 = 46
+        assert SE_VULCAN != SE_VULKANUS
+
+        vulcan_pos = calc_vulcan(self.J2000)
+        vulkanus_pos = calc_vulkanus(self.J2000)
+
+        # Vulcan is very close to Sun, Vulkanus is very far
+        assert vulcan_pos[2] < 1.0, "Vulcan should be < 1 AU from Sun"
+        assert vulkanus_pos[2] > 70.0, "Vulkanus should be > 70 AU from Sun"
+
+        # Vulcan moves much faster than Vulkanus
+        assert vulcan_pos[3] > 15.0, "Vulcan should move > 15 deg/day"
+        assert vulkanus_pos[3] < 0.01, "Vulkanus should move < 0.01 deg/day"

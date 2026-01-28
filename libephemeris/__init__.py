@@ -186,10 +186,12 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_vulkanus,
     calc_poseidon,
     calc_transpluto,  # Transpluto (Isis) - hypothetical trans-Plutonian planet
+    calc_vulcan,  # Vulcan - hypothetical intramercurial planet
     calc_uranian_planet,
     calc_hypothetical_position,
     URANIAN_KEPLERIAN_ELEMENTS,
     TRANSPLUTO_KEPLERIAN_ELEMENTS,
+    VULCAN_ELEMENTS,  # Vulcan orbital elements from seorbel.txt
     SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
     SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
     SE_ZEUS as SE_ZEUS_HYPO,  # Alias to avoid conflict with constants.py
@@ -200,6 +202,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     SE_POSEIDON as SE_POSEIDON_HYPO,  # Alias to avoid conflict with constants.py
     SE_ISIS as SE_ISIS_HYPO,  # Alias to avoid conflict with constants.py
     SE_TRANSPLUTO as SE_TRANSPLUTO_HYPO,  # Alias to avoid conflict with constants.py
+    SE_VULCAN as SE_VULCAN_HYPO,  # Alias to avoid conflict with constants.py
 )
 
 
@@ -553,8 +556,10 @@ __all__ = [
     "calc_vulkanus",
     "calc_poseidon",
     "calc_transpluto",  # Transpluto (Isis) - hypothetical trans-Plutonian planet
+    "calc_vulcan",  # Vulcan - hypothetical intramercurial planet
     "calc_uranian_planet",
     "calc_hypothetical_position",
     "URANIAN_KEPLERIAN_ELEMENTS",
     "TRANSPLUTO_KEPLERIAN_ELEMENTS",
+    "VULCAN_ELEMENTS",
 ]
