@@ -40,8 +40,10 @@ References:
 """
 
 import math
-from dataclasses import dataclass
-from typing import Tuple, Dict, Any
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Tuple, Dict, Any, List, Optional, Union
 from .constants import SE_FICT_OFFSET
 
 
@@ -1252,6 +1254,687 @@ HYPOTHETICAL_NAMES: Dict[int, str] = {
     SE_PROSERPINA: "Proserpina",
     SE_WALDEMATH: "Waldemath",
 }
+
+
+# =============================================================================
+# SEORBEL.TXT PARSER
+# =============================================================================
+# Parser for Swiss Ephemeris seorbel.txt file format.
+# This allows users to add custom hypothetical bodies by providing a
+# seorbel.txt format file.
+
+
+@dataclass
+class TPolynomial:
+    """
+    Represents a polynomial expression in T (Julian centuries from epoch).
+
+    The seorbel.txt format allows orbital elements to be expressed as
+    polynomials in T, e.g., "252.8987988 + 707550.7341 * T".
+
+    Attributes:
+        constant: The constant term (coefficient of T^0)
+        linear: The linear term (coefficient of T^1)
+    """
+
+    constant: float = 0.0
+    linear: float = 0.0
+
+    def evaluate(self, T: float) -> float:
+        """Evaluate the polynomial at the given T value."""
+        return self.constant + self.linear * T
+
+
+@dataclass
+class SeorbelElements:
+    """
+    Orbital elements for a fictitious body parsed from seorbel.txt format.
+
+    The seorbel.txt format from Swiss Ephemeris defines orbital elements
+    for fictitious bodies. Each line contains 9 comma-separated fields:
+        1. epoch: Reference epoch (Julian day or "J1900", "B1950", "J2000")
+        2. equinox: Coordinate equinox (Julian day, "J1900", "B1950", "J2000", or "JDATE")
+        3. mean_anomaly: Mean anomaly at epoch (degrees, may include T-polynomial)
+        4. semi_axis: Semi-major axis (AU)
+        5. eccentricity: Orbital eccentricity (may include T-polynomial)
+        6. arg_perihelion: Argument of perihelion (degrees, may include T-polynomial)
+        7. asc_node: Longitude of ascending node (degrees, may include T-polynomial)
+        8. inclination: Orbital inclination (degrees, may include T-polynomial)
+        9. name: Body name (may include ", geo" suffix for geocentric bodies)
+
+    T-polynomials allow elements to have secular variations, expressed as:
+        "constant + rate * T"
+    where T is Julian centuries from the epoch.
+
+    Attributes:
+        name: Name of the fictitious body
+        epoch_jd: Reference epoch as Julian Day TT
+        equinox_jd: Coordinate equinox as Julian Day TT (None if JDATE)
+        equinox_is_jdate: True if equinox is "JDATE" (equinox of date)
+        mean_anomaly: Mean anomaly polynomial (degrees)
+        semi_axis: Semi-major axis (AU)
+        eccentricity: Eccentricity polynomial
+        arg_perihelion: Argument of perihelion polynomial (degrees)
+        asc_node: Longitude of ascending node polynomial (degrees)
+        inclination: Inclination polynomial (degrees)
+        is_geocentric: True if body is geocentric (orbits Earth, not Sun)
+        line_number: Original line number in the seorbel.txt file
+    """
+
+    name: str
+    epoch_jd: float
+    equinox_jd: Optional[float]
+    equinox_is_jdate: bool
+    mean_anomaly: TPolynomial
+    semi_axis: float
+    eccentricity: TPolynomial
+    arg_perihelion: TPolynomial
+    asc_node: TPolynomial
+    inclination: TPolynomial
+    is_geocentric: bool = False
+    line_number: int = 0
+
+    def get_mean_motion(self) -> float:
+        """
+        Calculate mean motion from semi-major axis using Kepler's 3rd law.
+
+        Returns:
+            Mean motion in degrees per day.
+        """
+        # n = 360 / (a^1.5 * 365.25) for heliocentric orbits
+        # For geocentric orbits, this would need Earth's GM, but we use
+        # an approximate formula.
+        return 360.0 / (self.semi_axis**1.5 * 365.25)
+
+
+# Standard epoch Julian Day values
+_EPOCH_JD = {
+    "J1900": 2415020.0,  # January 0.5, 1900 TDT
+    "B1950": 2433282.42345905,  # Besselian year 1950.0
+    "J2000": 2451545.0,  # January 1.5, 2000 TDT
+}
+
+
+def _parse_epoch_or_equinox(value: str) -> Tuple[Optional[float], bool]:
+    """
+    Parse an epoch or equinox value from seorbel.txt.
+
+    Args:
+        value: The epoch/equinox string (e.g., "J1900", "J2000", "JDATE", or a Julian day)
+
+    Returns:
+        Tuple of (julian_day, is_jdate) where julian_day is None if is_jdate is True.
+
+    Raises:
+        ValueError: If the value cannot be parsed.
+    """
+    value = value.strip().upper()
+
+    if value == "JDATE":
+        return (None, True)
+
+    if value in _EPOCH_JD:
+        return (_EPOCH_JD[value], False)
+
+    # Try to parse as a Julian day number
+    try:
+        jd = float(value)
+        return (jd, False)
+    except ValueError:
+        raise ValueError(f"Cannot parse epoch/equinox value: '{value}'")
+
+
+def _parse_t_polynomial(expr: str) -> TPolynomial:
+    """
+    Parse a T-polynomial expression from seorbel.txt.
+
+    Parses expressions like:
+        - "252.8987988"
+        - "252.8987988 + 707550.7341 * T"
+        - "322.212069+1670.056*T"
+        - "47.787931-1670.056*T"
+        - "47.787931 - 1670.056 * T"
+
+    Args:
+        expr: The expression string
+
+    Returns:
+        TPolynomial with constant and linear coefficients.
+
+    Raises:
+        ValueError: If the expression cannot be parsed.
+    """
+    expr = expr.strip()
+
+    # Check if this is a simple number (no T term)
+    if "T" not in expr.upper():
+        try:
+            return TPolynomial(constant=float(expr), linear=0.0)
+        except ValueError:
+            raise ValueError(f"Cannot parse expression as number: '{expr}'")
+
+    # Normalize the expression: ensure spaces around operators
+    # But preserve signs as part of numbers
+    expr_normalized = expr.replace("*", " * ").replace("+", " + ").replace("-", " - ")
+    # Remove multiple spaces
+    while "  " in expr_normalized:
+        expr_normalized = expr_normalized.replace("  ", " ")
+    expr_normalized = expr_normalized.strip()
+
+    # Pattern to match expressions like "constant + rate * T" or "constant - rate * T"
+    # Also handles "rate * T + constant" and variations with T first
+    pattern = r"""
+        ^
+        \s*
+        (?:
+            # Pattern 1: constant [+/-] rate * T
+            (?P<const1>-?[\d.]+)
+            \s*
+            (?P<op1>[+\-])
+            \s*
+            (?P<rate1>[\d.]+)
+            \s*\*\s*
+            T
+        |
+            # Pattern 2: rate * T [+/-] constant
+            (?P<rate2>-?[\d.]+)
+            \s*\*\s*
+            T
+            \s*
+            (?P<op2>[+\-])
+            \s*
+            (?P<const2>[\d.]+)
+        |
+            # Pattern 3: just constant (no T) - already handled above
+            (?P<const3>-?[\d.]+)
+        )
+        \s*
+        $
+    """
+
+    match = re.match(pattern, expr, re.VERBOSE | re.IGNORECASE)
+
+    if match:
+        groups = match.groupdict()
+
+        if groups.get("const1") is not None:
+            # Pattern 1: constant +/- rate * T
+            constant = float(groups["const1"])
+            rate = float(groups["rate1"])
+            if groups["op1"] == "-":
+                rate = -rate
+            return TPolynomial(constant=constant, linear=rate)
+
+        elif groups.get("rate2") is not None:
+            # Pattern 2: rate * T +/- constant
+            rate = float(groups["rate2"])
+            constant = float(groups["const2"])
+            if groups["op2"] == "-":
+                constant = -constant
+            return TPolynomial(constant=constant, linear=rate)
+
+        elif groups.get("const3") is not None:
+            # Pattern 3: just constant
+            return TPolynomial(constant=float(groups["const3"]), linear=0.0)
+
+    # If the regex didn't match, try a simpler approach
+    # Split on + or - while keeping the operator
+    parts = re.split(r"(\s*[+\-]\s*)", expr)
+
+    constant = 0.0
+    linear = 0.0
+
+    current_sign = 1.0
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        if part in ["+", "+"]:
+            current_sign = 1.0
+        elif part in ["-", "-"]:
+            current_sign = -1.0
+        elif "T" in part.upper():
+            # This is the T term, extract the coefficient
+            t_part = part.upper().replace("T", "").replace("*", "").strip()
+            if t_part == "" or t_part == "+":
+                linear = current_sign * 1.0
+            elif t_part == "-":
+                linear = -1.0
+            else:
+                linear = current_sign * float(t_part)
+        else:
+            # This is the constant term
+            constant = current_sign * float(part)
+
+    return TPolynomial(constant=constant, linear=linear)
+
+
+def parse_seorbel(filepath: Union[str, Path]) -> List[SeorbelElements]:
+    """
+    Parse a Swiss Ephemeris seorbel.txt file to extract orbital elements.
+
+    The seorbel.txt file format defines orbital elements for fictitious/hypothetical
+    bodies. This function parses the file and returns a list of SeorbelElements
+    objects that can be used to compute positions of custom hypothetical bodies.
+
+    File Format:
+        - Lines starting with '#' (after optional whitespace) are comments
+        - Empty or whitespace-only lines are ignored
+        - Each data line has 9 comma-separated fields:
+            1. epoch: Reference epoch (Julian day or "J1900", "B1950", "J2000")
+            2. equinox: Coordinate equinox (Julian day, "J1900", "B1950", "J2000", or "JDATE")
+            3. mean_anomaly: Mean anomaly at epoch (degrees, may include "+ rate * T")
+            4. semi_axis: Semi-major axis (AU)
+            5. eccentricity: Orbital eccentricity (may include T-polynomial)
+            6. arg_perihelion: Argument of perihelion (degrees, may include T-polynomial)
+            7. asc_node: Longitude of ascending node (degrees, may include T-polynomial)
+            8. inclination: Orbital inclination (degrees, may include T-polynomial)
+            9. name: Body name (may include ", geo" suffix for geocentric bodies)
+        - Inline comments can appear after the 9th field, starting with '#'
+
+    T-Polynomials:
+        Some orbital elements can be expressed as polynomials in T, where
+        T is Julian centuries from the epoch. For example:
+            "252.8987988 + 707550.7341 * T"
+        This represents an element that changes linearly with time.
+
+    Geocentric Bodies:
+        If the name field contains ", geo" (case-insensitive), the body is
+        marked as geocentric (orbiting Earth rather than the Sun).
+
+    Args:
+        filepath: Path to the seorbel.txt file
+
+    Returns:
+        List of SeorbelElements objects, one for each valid data line.
+        The list preserves the order of bodies as they appear in the file.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If a line cannot be parsed (with line number in message).
+
+    Example:
+        >>> from libephemeris.hypothetical import parse_seorbel
+        >>> elements = parse_seorbel("seorbel.txt")
+        >>> for elem in elements:
+        ...     print(f"{elem.name}: a={elem.semi_axis} AU, e={elem.eccentricity.constant}")
+        Cupido: a=40.99837 AU, e=0.0046
+        Hades: a=50.66744 AU, e=0.00245
+        ...
+
+    Example with custom file:
+        >>> # Create a custom seorbel file
+        >>> with open("my_planet.txt", "w") as f:
+        ...     f.write("# My custom hypothetical planet\\n")
+        ...     f.write("J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, MyPlanet\\n")
+        >>> elements = parse_seorbel("my_planet.txt")
+        >>> print(elements[0].name)
+        MyPlanet
+
+    See Also:
+        - Swiss Ephemeris documentation on fictitious objects
+        - SeorbelElements dataclass for the structure of parsed elements
+    """
+    filepath = Path(filepath)
+
+    if not filepath.exists():
+        raise FileNotFoundError(f"seorbel.txt file not found: {filepath}")
+
+    elements: List[SeorbelElements] = []
+
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        for line_num, line in enumerate(f, start=1):
+            # Remove trailing whitespace and carriage returns
+            line = line.rstrip()
+
+            # Skip empty lines
+            if not line.strip():
+                continue
+
+            # Skip comment lines (lines starting with # after optional whitespace)
+            if line.strip().startswith("#"):
+                continue
+
+            # Remove inline comments (everything after # that's not part of a field)
+            # We need to be careful because # appears in inline comments after the 9th field
+            # Strategy: split by comma first to get 9 fields, then handle comments
+            try:
+                parsed = _parse_seorbel_line(line, line_num)
+                if parsed:
+                    elements.append(parsed)
+            except ValueError as e:
+                raise ValueError(f"Error parsing line {line_num}: {e}") from e
+
+    return elements
+
+
+def _parse_seorbel_line(line: str, line_num: int) -> Optional[SeorbelElements]:
+    """
+    Parse a single data line from seorbel.txt.
+
+    Args:
+        line: The line to parse
+        line_num: Line number for error messages
+
+    Returns:
+        SeorbelElements object, or None if the line is a comment or empty.
+
+    Raises:
+        ValueError: If the line cannot be parsed.
+    """
+    # Handle the tricky part: the name field might contain commas,
+    # and there might be a comment after the name.
+    # Strategy: split carefully
+
+    # First, try to find and remove trailing comment
+    # Look for # that appears after what looks like the 9th field
+    # The name field is the last, so we count 8 commas
+
+    # Split by comma, but we need at least 9 parts
+    parts = line.split(",")
+
+    if len(parts) < 9:
+        raise ValueError(
+            f"Expected at least 9 comma-separated fields, got {len(parts)}"
+        )
+
+    # Parse the first 8 fields (they should be straightforward)
+    epoch_str = parts[0].strip()
+    equinox_str = parts[1].strip()
+    mean_anomaly_str = parts[2].strip()
+    semi_axis_str = parts[3].strip()
+    eccentricity_str = parts[4].strip()
+    arg_perihelion_str = parts[5].strip()
+    asc_node_str = parts[6].strip()
+    inclination_str = parts[7].strip()
+
+    # The 9th field (name) might contain commas or be followed by a comment
+    # Join remaining parts and handle
+    name_and_rest = ",".join(parts[8:])
+
+    # Remove inline comment if present
+    # Look for # that's likely a comment (not part of the name)
+    # The comment usually starts with " #" after the name
+    if "#" in name_and_rest:
+        # Find the first # that appears to be a comment
+        # (usually preceded by whitespace or end of name)
+        hash_idx = name_and_rest.find("#")
+        name_field = name_and_rest[:hash_idx].strip()
+    else:
+        name_field = name_and_rest.strip()
+
+    # Check for geocentric marker
+    is_geocentric = False
+    name = name_field
+    if ", geo" in name_field.lower():
+        is_geocentric = True
+        # Remove the ", geo" suffix
+        name = re.sub(r",\s*geo\s*$", "", name_field, flags=re.IGNORECASE).strip()
+    elif " geo" in name_field.lower() and name_field.lower().endswith("geo"):
+        # Handle "Waldemath, geo" format
+        is_geocentric = True
+        name = re.sub(r"\s*,?\s*geo\s*$", "", name_field, flags=re.IGNORECASE).strip()
+
+    # Parse epoch and equinox
+    epoch_jd, _ = _parse_epoch_or_equinox(epoch_str)
+    if epoch_jd is None:
+        raise ValueError(f"Epoch cannot be JDATE: '{epoch_str}'")
+
+    equinox_jd, equinox_is_jdate = _parse_epoch_or_equinox(equinox_str)
+
+    # Parse orbital elements (may be T-polynomials)
+    mean_anomaly = _parse_t_polynomial(mean_anomaly_str)
+
+    # Semi-axis is always a simple number
+    try:
+        semi_axis = float(semi_axis_str)
+    except ValueError:
+        raise ValueError(f"Cannot parse semi-major axis: '{semi_axis_str}'")
+
+    eccentricity = _parse_t_polynomial(eccentricity_str)
+    arg_perihelion = _parse_t_polynomial(arg_perihelion_str)
+    asc_node = _parse_t_polynomial(asc_node_str)
+    inclination = _parse_t_polynomial(inclination_str)
+
+    return SeorbelElements(
+        name=name,
+        epoch_jd=epoch_jd,
+        equinox_jd=equinox_jd,
+        equinox_is_jdate=equinox_is_jdate,
+        mean_anomaly=mean_anomaly,
+        semi_axis=semi_axis,
+        eccentricity=eccentricity,
+        arg_perihelion=arg_perihelion,
+        asc_node=asc_node,
+        inclination=inclination,
+        is_geocentric=is_geocentric,
+        line_number=line_num,
+    )
+
+
+def get_seorbel_body_by_name(
+    elements: List[SeorbelElements], name: str
+) -> Optional[SeorbelElements]:
+    """
+    Find a body in a parsed seorbel elements list by name.
+
+    Args:
+        elements: List of SeorbelElements from parse_seorbel()
+        name: Name to search for (case-insensitive)
+
+    Returns:
+        The SeorbelElements object if found, None otherwise.
+
+    Example:
+        >>> elements = parse_seorbel("seorbel.txt")
+        >>> cupido = get_seorbel_body_by_name(elements, "Cupido")
+        >>> if cupido:
+        ...     print(f"Cupido semi-axis: {cupido.semi_axis} AU")
+    """
+    name_lower = name.lower()
+    for elem in elements:
+        if elem.name.lower() == name_lower:
+            return elem
+    return None
+
+
+def calc_seorbel_position(
+    elem: SeorbelElements, jd_tt: float
+) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the position of a body from parsed seorbel.txt elements.
+
+    This function uses the orbital elements from a SeorbelElements object
+    to compute the heliocentric (or geocentric for ", geo" bodies) position
+    using Keplerian propagation.
+
+    For bodies with time-dependent elements (T-polynomials), the elements
+    are evaluated at the given Julian date.
+
+    Args:
+        elem: SeorbelElements object from parse_seorbel()
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees
+            - distance: Distance in AU (from Sun or Earth for geocentric bodies)
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
+
+    Example:
+        >>> elements = parse_seorbel("seorbel.txt")
+        >>> cupido = get_seorbel_body_by_name(elements, "Cupido")
+        >>> if cupido:
+        ...     pos = calc_seorbel_position(cupido, 2451545.0)  # J2000.0
+        ...     print(f"Cupido at {pos[0]:.4f} deg")
+    """
+    # Time in Julian centuries from epoch
+    T = (jd_tt - elem.epoch_jd) / 36525.0
+    # Days from epoch (for Keplerian motion)
+    dt_days = jd_tt - elem.epoch_jd
+
+    # Evaluate time-dependent elements
+    # For mean anomaly, we have two components:
+    # 1. The polynomial value (constant + linear*T where T is in centuries)
+    # 2. Keplerian mean motion from semi-major axis (if not already in polynomial)
+    #
+    # In seorbel.txt, if the mean_anomaly has a large linear T-term, it represents
+    # the total mean motion (deg/century). If it doesn't have a T-term or has a
+    # small one (secular perturbations), we compute motion from Kepler's 3rd law.
+    M_poly = elem.mean_anomaly.evaluate(T)
+
+    # Threshold: typical mean motion for 100 AU body is ~3600 deg/century
+    # Any explicit motion > 10 deg/century likely includes Keplerian motion
+    if abs(elem.mean_anomaly.linear) < 10.0:
+        # Add Keplerian mean motion: n = 360 / (a^1.5 * 365.25) deg/day
+        n_deg_per_day = elem.get_mean_motion()
+        M_deg = M_poly + n_deg_per_day * dt_days
+    else:
+        M_deg = M_poly
+
+    e = elem.eccentricity.evaluate(T)
+    omega_deg = elem.arg_perihelion.evaluate(T)
+    Omega_deg = elem.asc_node.evaluate(T)
+    i_deg = elem.inclination.evaluate(T)
+    a = elem.semi_axis
+
+    # Normalize mean anomaly
+    M_deg = M_deg % 360.0
+    M_rad = math.radians(M_deg)
+
+    # For circular orbits (e=0), mean anomaly = true anomaly
+    # We still need to do proper coordinate conversion for inclined orbits
+    if e < 1e-10:
+        # Circular orbit: E = M, nu = M
+        nu = M_rad
+        r = a  # Distance is constant
+    else:
+        # Solve Kepler's equation for eccentric anomaly
+        E = _solve_kepler_equation(M_rad, e)
+
+        # True anomaly
+        sqrt_term = math.sqrt((1.0 + e) / (1.0 - e))
+        nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+        # Distance
+        r = a * (1.0 - e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    omega_rad = math.radians(omega_deg)
+    u = nu + omega_rad
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(i_deg)
+    Omega_rad = math.radians(Omega_deg)
+
+    # Position in orbital plane
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    # Rotate to ecliptic frame
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    # Convert to spherical coordinates
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    # Calculate velocity via numerical differentiation
+    dt_step = 1.0  # 1 day step for daily velocity
+    pos_next = _calc_seorbel_position_raw(elem, jd_tt + dt_step)
+
+    dlon = pos_next[0] - longitude
+    # Handle wrap-around
+    if dlon > 180.0:
+        dlon -= 360.0
+    elif dlon < -180.0:
+        dlon += 360.0
+
+    dlat = pos_next[1] - latitude
+    ddist = pos_next[2] - distance
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def _calc_seorbel_position_raw(
+    elem: SeorbelElements, jd_tt: float
+) -> Tuple[float, float, float]:
+    """
+    Calculate raw position without velocity (helper for differentiation).
+    """
+    # Time in Julian centuries from epoch
+    T = (jd_tt - elem.epoch_jd) / 36525.0
+    # Days from epoch (for Keplerian motion)
+    dt_days = jd_tt - elem.epoch_jd
+
+    # Evaluate time-dependent elements
+    # Same logic as calc_seorbel_position for mean anomaly
+    M_poly = elem.mean_anomaly.evaluate(T)
+    if abs(elem.mean_anomaly.linear) < 10.0:
+        n_deg_per_day = elem.get_mean_motion()
+        M_deg = M_poly + n_deg_per_day * dt_days
+    else:
+        M_deg = M_poly
+
+    e = elem.eccentricity.evaluate(T)
+    omega_deg = elem.arg_perihelion.evaluate(T)
+    Omega_deg = elem.asc_node.evaluate(T)
+    i_deg = elem.inclination.evaluate(T)
+    a = elem.semi_axis
+
+    # Normalize mean anomaly
+    M_deg = M_deg % 360.0
+    M_rad = math.radians(M_deg)
+
+    # For circular orbits (e=0), mean anomaly = true anomaly
+    if e < 1e-10:
+        nu = M_rad
+        r = a
+    else:
+        # Solve Kepler's equation
+        E = _solve_kepler_equation(M_rad, e)
+
+        # True anomaly
+        sqrt_term = math.sqrt((1.0 + e) / (1.0 - e))
+        nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+        # Distance
+        r = a * (1.0 - e * math.cos(E))
+
+    # Argument of latitude
+    omega_rad = math.radians(omega_deg)
+    u = nu + omega_rad
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(i_deg)
+    Omega_rad = math.radians(Omega_deg)
+
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+
+    return (longitude, latitude, r)
 
 
 # =============================================================================

@@ -198,6 +198,12 @@ from .hypothetical import (  # Hamburg School Uranian planets
     VULCAN_ELEMENTS,  # Vulcan orbital elements from seorbel.txt
     WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements from seorbel.txt #18
     PICKERING_PLANET_X_ELEMENTS,  # Pickering's Planet O/X orbital elements
+    # seorbel.txt parser for custom hypothetical bodies
+    parse_seorbel,
+    SeorbelElements,
+    TPolynomial,
+    get_seorbel_body_by_name,
+    calc_seorbel_position,
     SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
     SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
     SE_ZEUS as SE_ZEUS_HYPO,  # Alias to avoid conflict with constants.py
@@ -577,4 +583,10 @@ __all__ = [
     "VULCAN_ELEMENTS",
     "WALDEMATH_ELEMENTS",  # Waldemath Moon orbital elements
     "PICKERING_PLANET_X_ELEMENTS",  # Pickering's Planet O/X orbital elements
+    # seorbel.txt parser for custom hypothetical bodies
+    "parse_seorbel",
+    "SeorbelElements",
+    "TPolynomial",
+    "get_seorbel_body_by_name",
+    "calc_seorbel_position",
 ]
