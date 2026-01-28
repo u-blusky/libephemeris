@@ -178,8 +178,10 @@ from .minor_bodies import (  # Generic asteroid lookup by number
 )
 from .hypothetical import (  # Hamburg School Uranian planets
     calc_cupido,
+    calc_hades,
     calc_hypothetical_position,
     SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
+    SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
 )
 
 
@@ -525,5 +527,6 @@ __all__ = [
     "clear_asteroid_elements_cache",
     # Hypothetical bodies (Hamburg School Uranian planets)
     "calc_cupido",
+    "calc_hades",
     "calc_hypothetical_position",
 ]

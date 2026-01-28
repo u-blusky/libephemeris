@@ -297,6 +297,56 @@ CUPIDO_KEPLERIAN_ELEMENTS = CupidoKeplerianElements(
 )
 
 
+@dataclass
+class HadesKeplerianElements:
+    """
+    Keplerian orbital elements for Hades from Swiss Ephemeris seorbel.txt.
+
+    Hades is the second Hamburg School Uranian planet. Unlike Cupido, Hades has
+    small but non-zero eccentricity and inclination, requiring full Keplerian
+    propagation.
+
+    Attributes:
+        name: Name of the body
+        epoch: Reference epoch (Julian Day TT)
+        a: Semi-major axis (AU)
+        e: Eccentricity
+        i: Inclination (degrees)
+        omega: Argument of perihelion (degrees)
+        Omega: Longitude of ascending node (degrees)
+        M0: Mean anomaly at epoch (degrees)
+        n: Mean motion (degrees per day)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    omega: float
+    Omega: float
+    M0: float
+    n: float
+
+
+# Hades Keplerian elements from Swiss Ephemeris seorbel.txt
+# Epoch: J1900.0 (JD 2415020.0)
+# From seorbel.txt line: J1900, J1900, 27.6496, 50.66744, 0.00245, 148.1796, 161.3339, 1.0500, Hades
+# Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
+HADES_KEPLERIAN_ELEMENTS = HadesKeplerianElements(
+    name="Hades",
+    epoch=2415020.0,  # J1900.0
+    a=50.66744,  # Semi-major axis in AU
+    e=0.00245,  # Small eccentricity (nearly circular)
+    i=1.0500,  # Inclination in degrees
+    omega=148.1796,  # Argument of perihelion in degrees
+    Omega=161.3339,  # Longitude of ascending node in degrees
+    M0=27.6496,  # Mean anomaly at epoch in degrees
+    # n = 360 / (a^1.5 * 365.25) = 360 / (360.47 * 365.25) = 0.002736 deg/day
+    n=360.0 / (50.66744**1.5 * 365.25),
+)
+
+
 # Other hypothetical body elements
 # Transpluto (Isis) elements from Swiss Ephemeris
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
@@ -583,6 +633,149 @@ def calc_cupido(jd_tt: float) -> Tuple[float, float, float, float, float, float]
     ddist = 0.0
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def calc_hades(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the position of Hades using Keplerian propagation.
+
+    Hades is the second Hamburg School Uranian planet. This function uses
+    Keplerian propagation with orbital elements from Swiss Ephemeris
+    seorbel.txt documentation:
+        - Semi-major axis: 50.66744 AU
+        - Eccentricity: 0.00245 (nearly circular orbit)
+        - Inclination: 1.05 degrees
+        - Orbital period: ~360.5 years
+
+    Unlike Cupido which has a perfectly circular orbit, Hades has small but
+    non-zero eccentricity and inclination, requiring full Keplerian mechanics.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees
+            - distance: Distance from Sun in AU
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_hades
+        >>> pos = calc_hades(2451545.0)  # J2000.0
+        >>> print(f"Hades at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
+    """
+    elements = HADES_KEPLERIAN_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    # Position in orbital plane
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    # Rotate to ecliptic frame
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    # Convert to spherical coordinates
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    # Calculate velocity via numerical differentiation
+    dt_step = 1.0  # 1 day step for daily velocity
+    pos_next = _calc_hades_raw(jd_tt + dt_step)
+
+    dlon = pos_next[0] - longitude
+    # Handle wrap-around
+    if dlon > 180.0:
+        dlon -= 360.0
+    elif dlon < -180.0:
+        dlon += 360.0
+
+    dlat = pos_next[1] - latitude
+    ddist = pos_next[2] - distance
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def _calc_hades_raw(jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate raw Hades position without velocity (helper for differentiation).
+    """
+    elements = HADES_KEPLERIAN_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    return (longitude, latitude, distance)
 
 
 def calc_transpluto_position(

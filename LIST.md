@@ -184,17 +184,17 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT GENERIC ASTEROID LOOKUP BY NUMBER: Implement a function calc_asteroid_by_number(asteroid_number, jd_tt) that can calculate position for any numbered asteroid by fetching orbital elements from JPL SBDB API on demand or by checking if an SPK file is available, this allows users to request any of the 1+ million known asteroids without needing each one hardcoded.
 
-- [ ] ADD ASTEROID NAME LOOKUP: Implement function get_asteroid_number(name) that looks up an asteroid's catalog number by name using a local database or JPL SBDB query, useful for users who know the name but not the number.
+- [x] ADD ASTEROID NAME LOOKUP: Implement function get_asteroid_number(name) that looks up an asteroid's catalog number by name using a local database or JPL SBDB query, useful for users who know the name but not the number.
 
 ---
 
 ## MEDIUM PRIORITY: Hypothetical Bodies - Uranian Planets
 
-- [ ] CREATE HYPOTHETICAL.PY MODULE: Create a new module libephemeris/hypothetical.py to contain calculation functions for all hypothetical bodies including Uranian planets, Transpluto, and other fictitious bodies, this separates hypothetical calculations from real astronomical bodies.
+- [x] CREATE HYPOTHETICAL.PY MODULE: Create a new module libephemeris/hypothetical.py to contain calculation functions for all hypothetical bodies including Uranian planets, Transpluto, and other fictitious bodies, this separates hypothetical calculations from real astronomical bodies.
 
-- [ ] IMPLEMENT CUPIDO URANIAN PLANET: Implement the first Hamburg School Uranian planet Cupido with orbital elements from Swiss Ephemeris seorbel.txt or documentation (a≈40.99837 AU, e≈0.00, nearly circular orbit), add SE_CUPIDO = 40 to constants.py using SE_FICT_OFFSET, implement calc_cupido(jd_tt) in hypothetical.py using simple Keplerian propagation.
+- [x] IMPLEMENT CUPIDO URANIAN PLANET: Implement the first Hamburg School Uranian planet Cupido with orbital elements from Swiss Ephemeris seorbel.txt or documentation (a≈40.99837 AU, e≈0.00, nearly circular orbit), add SE_CUPIDO = 40 to constants.py using SE_FICT_OFFSET, implement calc_cupido(jd_tt) in hypothetical.py using simple Keplerian propagation.
 
-- [ ] IMPLEMENT HADES URANIAN PLANET: Implement the second Uranian planet Hades with its orbital elements from seorbel.txt, add SE_HADES = 41 to constants.py, implement calc_hades(jd_tt) in hypothetical.py.
+- [x] IMPLEMENT HADES URANIAN PLANET: Implement the second Uranian planet Hades with its orbital elements from seorbel.txt, add SE_HADES = 41 to constants.py, implement calc_hades(jd_tt) in hypothetical.py.
 
 - [ ] IMPLEMENT ZEUS URANIAN PLANET: Implement the third Uranian planet Zeus, add SE_ZEUS = 42 to constants.py, implement calc_zeus(jd_tt) in hypothetical.py.
 

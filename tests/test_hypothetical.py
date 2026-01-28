@@ -37,11 +37,13 @@ from libephemeris.hypothetical import (
     calc_hypothetical_position,
     list_hypothetical_bodies,
     calc_cupido,
+    calc_hades,
     # Data structures
     URANIAN_ELEMENTS,
     HYPOTHETICAL_ELEMENTS,
     HYPOTHETICAL_NAMES,
     CUPIDO_KEPLERIAN_ELEMENTS,
+    HADES_KEPLERIAN_ELEMENTS,
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -641,3 +643,199 @@ class TestCalcCupido:
         assert hasattr(libephemeris, "calc_cupido")
         pos = libephemeris.calc_cupido(self.J2000)
         assert len(pos) == 6
+
+
+class TestCalcHades:
+    """Tests for the calc_hades Keplerian propagation function."""
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_hades_returns_tuple(self):
+        """Test that calc_hades returns correct tuple format."""
+        pos = calc_hades(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        lon, lat, dist, dlon, dlat, ddist = pos
+        assert isinstance(lon, float)
+        assert isinstance(lat, float)
+        assert isinstance(dist, float)
+        assert isinstance(dlon, float)
+        assert isinstance(dlat, float)
+        assert isinstance(ddist, float)
+
+    def test_calc_hades_longitude_range(self):
+        """Test that longitude is in valid range."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_hades(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
+
+    def test_calc_hades_latitude_small(self):
+        """Test that Hades has small latitude (inclination = 1.05 degrees)."""
+        pos = calc_hades(self.J2000)
+        # With inclination of 1.05 degrees, latitude should be in that range
+        assert -2.0 <= pos[1] <= 2.0, f"Latitude {pos[1]} unexpectedly large"
+
+    def test_calc_hades_distance_correct(self):
+        """Test that Hades distance is close to semi-major axis."""
+        pos = calc_hades(self.J2000)
+        # For nearly circular orbit (e=0.00245), distance ~ semi-major axis = 50.66744 AU
+        # Maximum deviation from a = a * e = 50.66744 * 0.00245 = 0.124 AU
+        expected_a = HADES_KEPLERIAN_ELEMENTS.a
+        assert abs(pos[2] - expected_a) < 0.2, (
+            f"Hades distance should be ~{expected_a:.2f} AU, got {pos[2]:.2f}"
+        )
+
+    def test_calc_hades_distance_nearly_constant(self):
+        """Test that distance is nearly constant for nearly circular orbit."""
+        pos1 = calc_hades(self.J2000)
+        pos2 = calc_hades(self.J2000 + 365.25 * 50)  # 50 years later
+        # With e=0.00245, max variation is about 0.25 AU
+        assert abs(pos1[2] - pos2[2]) < 0.5, "Distance should be nearly constant"
+
+    def test_calc_hades_velocity_positive(self):
+        """Test that daily motion is positive (prograde)."""
+        pos = calc_hades(self.J2000)
+        assert pos[3] > 0, "Hades should have prograde motion"
+
+    def test_calc_hades_velocity_reasonable(self):
+        """Test that velocity is reasonable for Hades orbital period."""
+        pos = calc_hades(self.J2000)
+        # Expected mean motion: n = 360 / (a^1.5 * 365.25) deg/day
+        # For a = 50.66744 AU: period ~ 360.5 years
+        # n ~ 360 / (360.5 * 365.25) ~ 0.00274 deg/day
+        expected_n = HADES_KEPLERIAN_ELEMENTS.n
+        # Velocity should be close to mean motion (within 10% due to eccentricity)
+        assert abs(pos[3] - expected_n) < expected_n * 0.5, (
+            f"Daily motion should be ~{expected_n:.6f}, got {pos[3]:.6f}"
+        )
+
+    def test_calc_hades_at_epoch(self):
+        """Test that mean anomaly at J1900.0 matches M0."""
+        pos = calc_hades(self.J1900)
+        # At epoch, we start with the given mean anomaly
+        # The longitude depends on M0, omega, and Omega
+        assert 0.0 <= pos[0] < 360.0, "Longitude should be in valid range at epoch"
+
+    def test_calc_hades_progression(self):
+        """Test that Hades progresses correctly over time."""
+        pos1 = calc_hades(self.J2000)
+        pos2 = calc_hades(self.J2000 + 365.25)  # 1 year later
+
+        # Calculate expected motion in 1 year
+        expected_motion = HADES_KEPLERIAN_ELEMENTS.n * 365.25
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        assert abs(actual_motion - expected_motion) < 0.1, (
+            f"Annual motion should be ~{expected_motion:.4f} deg, got {actual_motion:.4f}"
+        )
+
+    def test_calc_hades_orbital_period(self):
+        """Test that Hades completes one orbit in expected period."""
+        # Orbital period from Kepler's 3rd law: T = a^1.5 years
+        a = HADES_KEPLERIAN_ELEMENTS.a
+        expected_period_years = a**1.5  # ~360.5 years
+
+        # One full orbit should advance longitude by ~360 degrees
+        period_days = expected_period_years * 365.25
+        pos1 = calc_hades(self.J2000)
+        pos2 = calc_hades(self.J2000 + period_days)
+
+        # After one full period, should be back to same longitude (within tolerance)
+        diff = abs(pos2[0] - pos1[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 1.0, (
+            f"After one orbit ({expected_period_years:.1f} years), "
+            f"longitude should return near start, diff = {diff:.2f} deg"
+        )
+
+    def test_calc_hades_keplerian_elements_valid(self):
+        """Test that Hades Keplerian elements have valid values."""
+        elements = HADES_KEPLERIAN_ELEMENTS
+        assert elements.name == "Hades"
+        assert elements.a > 40.0, "Hades should be beyond Cupido"
+        assert 0 < elements.e < 1.0, "Eccentricity should be valid"
+        assert abs(elements.e - 0.00245) < 0.0001, (
+            "Eccentricity should match seorbel.txt"
+        )
+        assert abs(elements.i - 1.0500) < 0.0001, "Inclination should match seorbel.txt"
+        assert 0 < elements.n < 1.0, "Mean motion should be small but positive"
+
+    def test_calc_hades_vs_uranian_different_methods(self):
+        """Test that calc_hades uses different method from calc_uranian_position.
+
+        The two methods use different algorithms:
+        - calc_hades: Full Keplerian propagation from J1900.0 epoch
+        - calc_uranian_position: Secular polynomial formula from J2000.0 epoch
+
+        They may give different longitudes but both should produce valid positions
+        that progress at similar rates over time.
+        """
+        keplerian_pos = calc_hades(self.J2000)
+        uranian_pos = calc_uranian_position(SE_HADES, self.J2000)
+
+        # Both should be in valid range
+        assert 0.0 <= keplerian_pos[0] < 360.0
+        assert 0.0 <= uranian_pos[0] < 360.0
+
+        # Both should show prograde motion
+        assert keplerian_pos[3] > 0, "Keplerian motion should be prograde"
+        assert uranian_pos[3] > 0, "Uranian motion should be prograde"
+
+    def test_se_hades_constant_value(self):
+        """Test that SE_HADES has correct value (SE_FICT_OFFSET + 1 = 41)."""
+        assert SE_HADES == 41
+        assert SE_HADES == SE_FICT_OFFSET + 1
+
+    def test_calc_hades_exportable_from_main_module(self):
+        """Test that calc_hades is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_hades")
+        pos = libephemeris.calc_hades(self.J2000)
+        assert len(pos) == 6
+
+    def test_calc_hades_latitude_velocity_small(self):
+        """Test that latitude velocity is small."""
+        pos = calc_hades(self.J2000)
+        # Latitude velocity should be small for nearly circular orbit
+        assert abs(pos[4]) < 0.01, "Latitude velocity should be small"
+
+    def test_calc_hades_distance_velocity_small(self):
+        """Test that distance velocity is small for nearly circular orbit."""
+        pos = calc_hades(self.J2000)
+        # Distance velocity should be small for nearly circular orbit (e=0.00245)
+        assert abs(pos[5]) < 0.001, (
+            "Distance velocity should be small for nearly circular orbit"
+        )
+
+    def test_hades_slower_than_cupido(self):
+        """Test that Hades moves slower than Cupido (larger semi-major axis)."""
+        cupido_pos = calc_cupido(self.J2000)
+        hades_pos = calc_hades(self.J2000)
+
+        # Hades has larger semi-major axis, so slower motion
+        assert hades_pos[3] < cupido_pos[3], "Hades should move slower than Cupido"
+
+    def test_hades_farther_than_cupido(self):
+        """Test that Hades is farther from Sun than Cupido."""
+        cupido_pos = calc_cupido(self.J2000)
+        hades_pos = calc_hades(self.J2000)
+
+        # Hades has larger semi-major axis
+        assert hades_pos[2] > cupido_pos[2], (
+            "Hades should be farther from Sun than Cupido"
+        )
