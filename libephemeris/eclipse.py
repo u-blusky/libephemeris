@@ -12485,3 +12485,121 @@ def swe_lun_eclipse_umbral_magnitude(
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     return lun_eclipse_umbral_magnitude(tjd_ut, ifl)
+
+
+def lun_eclipse_penumbral_magnitude(
+    jd: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the penumbral magnitude for a lunar eclipse at a specific time.
+
+    Penumbral magnitude is defined as the fraction of the Moon's diameter that
+    is within Earth's penumbral (partial) shadow. This is a simplified convenience
+    function that returns just the penumbral magnitude value.
+
+    Unlike solar eclipse magnitude (which depends on observer location), lunar
+    eclipse magnitude is the same for all observers who can see the Moon,
+    since the Moon physically enters Earth's shadow.
+
+    Args:
+        jd: Julian Day (UT) of the time to calculate
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Penumbral magnitude as a float:
+            - 0.0 if the Moon is not in the penumbral shadow (no eclipse)
+            - 0.0 to 1.0 for penumbral-only eclipses or during penumbral
+              phases of umbral eclipses
+            - > 1.0 when the Moon is fully within the penumbra (and possibly
+              also within the umbra); values > 1.0 indicate how deep the Moon
+              is in the penumbral shadow
+
+    Note:
+        This function does NOT search for eclipses - it calculates the
+        instantaneous penumbral magnitude at the given time. To find eclipse
+        events, use lun_eclipse_when() first.
+
+        For all lunar eclipses (penumbral, partial, or total), the penumbral
+        magnitude will be > 0 during the eclipse. For penumbral-only eclipses,
+        use this function to determine the eclipse magnitude.
+
+    Algorithm:
+        1. Calculate Moon's ecliptic position
+        2. Calculate Earth's penumbral shadow cone geometry at Moon's distance
+        3. Determine how much of the Moon's diameter is within the penumbra
+
+    Precision:
+        Magnitude accurate to ~0.01 for typical eclipses.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_penumbral_magnitude, lun_eclipse_when
+        >>> from libephemeris import SE_ECL_PENUMBRAL
+        >>> # First find a penumbral lunar eclipse
+        >>> jd_start = julday(2020, 1, 1, 0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        >>> jd_max = times[0]  # Time of maximum eclipse
+        >>> # Calculate penumbral magnitude at maximum
+        >>> penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
+        >>> print(f"Penumbral magnitude: {penumbral_mag:.4f}")
+
+        >>> # Check magnitude at a random time (no eclipse)
+        >>> jd_no_eclipse = julday(2022, 6, 1, 12.0)
+        >>> mag = lun_eclipse_penumbral_magnitude(jd_no_eclipse)
+        >>> print(f"Magnitude: {mag:.4f}")  # Will be 0.0
+
+    References:
+        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
+        - Swiss Ephemeris documentation
+    """
+    # Use the existing calculation function
+    (
+        ecl_type_flags,
+        umbral_mag,
+        penumbral_mag,
+        gamma,
+        penumbra_radius,
+        umbra_radius,
+    ) = _calculate_lunar_eclipse_type_and_magnitude(jd)
+
+    # Return the penumbral magnitude, clamped to non-negative
+    return max(0.0, penumbral_mag)
+
+
+def swe_lun_eclipse_penumbral_magnitude(
+    tjd_ut: float,
+    ifl: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the penumbral magnitude for a lunar eclipse at a specific time.
+
+    This function matches the pyswisseph naming convention. It is a convenience
+    function that returns just the penumbral magnitude (fraction of Moon's diameter
+    within Earth's penumbral shadow).
+
+    Unlike solar eclipses, lunar eclipse magnitude does not depend on observer
+    location - the Moon physically enters Earth's shadow, so the magnitude is
+    the same for all observers who can see the Moon.
+
+    Args:
+        tjd_ut: Julian Day (UT) of the time to calculate
+        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Penumbral magnitude as a float:
+            - 0.0 if Moon is not in penumbra (no eclipse)
+            - 0.0 to 1.0 for penumbral-only eclipses (partial immersion)
+            - > 1.0 when Moon is fully within the penumbra
+
+    Example:
+        >>> from libephemeris import swe_lun_eclipse_penumbral_magnitude, SEFLG_SWIEPH
+        >>> # Calculate penumbral magnitude during Jan 10, 2020 penumbral lunar eclipse
+        >>> jd = 2458859.0  # During eclipse
+        >>> penumbral_mag = swe_lun_eclipse_penumbral_magnitude(jd, SEFLG_SWIEPH)
+        >>> print(f"Penumbral magnitude: {penumbral_mag:.4f}")
+
+    References:
+        - Swiss Ephemeris: swe_lun_eclipse_how()
+        - Meeus "Astronomical Algorithms" Ch. 54
+    """
+    return lun_eclipse_penumbral_magnitude(tjd_ut, ifl)
