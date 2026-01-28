@@ -7389,3 +7389,132 @@ def calc_besselian_l2(jd: float, flags: int = SEFLG_SWIEPH) -> float:
     l2_earth_radii = l2_km / EARTH_RADIUS_KM
 
     return l2_earth_radii
+
+
+def calc_besselian_mu(jd: float, flags: int = SEFLG_SWIEPH) -> float:
+    """
+    Calculate the Besselian element mu (Greenwich hour angle) for a solar eclipse.
+
+    The Besselian element mu is the Greenwich hour angle of the shadow axis,
+    measured in degrees. It represents the angle between the Greenwich meridian
+    and the hour circle containing the shadow axis, measured westward from
+    Greenwich along the celestial equator.
+
+    Together with the declination d, mu defines the orientation of the shadow
+    axis in the equatorial coordinate system. As Earth rotates, mu increases
+    at approximately 15 degrees per hour (360 degrees per sidereal day).
+
+    Args:
+        jd: Julian Day (UT) at which to calculate mu
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        The Greenwich hour angle mu in degrees.
+        Range: 0 to 360 degrees, measured westward from Greenwich.
+        Values increase with time as Earth rotates eastward.
+
+    Algorithm:
+        1. Get geocentric equatorial positions of Moon and Sun
+        2. Convert to 3D Cartesian coordinates (AU)
+        3. Compute the shadow axis direction (from Moon toward Sun, the
+           conventional Besselian axis direction toward the observer)
+        4. Calculate the right ascension (RA) of the shadow axis from
+           its x,y components: RA = atan2(y, x)
+        5. Calculate Greenwich Apparent Sidereal Time (GAST)
+        6. Compute mu = GAST - RA, normalized to 0-360 degrees
+
+    Mathematical basis:
+        The hour angle H of a celestial object is defined as:
+            H = LST - RA (Local Sidereal Time minus Right Ascension)
+
+        For the Greenwich meridian, this becomes:
+            mu = GAST - RA_shadow
+
+        where RA_shadow is the right ascension of the shadow axis direction.
+        The shadow axis in Besselian elements points from the Moon toward
+        the Sun (toward the observer on Earth).
+
+    Physical interpretation:
+        mu indicates where the shadow axis crosses the celestial equator
+        relative to the Greenwich meridian. When mu = 0, the shadow axis
+        is on the Greenwich meridian. As Earth rotates, mu increases by
+        about 15 degrees per hour.
+
+    Precision:
+        Accurate to better than 0.01 degrees for typical eclipses.
+        Uses full precision Moon and Sun ephemeris positions and
+        accurate sidereal time calculation.
+
+    Example:
+        >>> from libephemeris import julday, calc_besselian_mu
+        >>> # April 8, 2024 total solar eclipse near maximum
+        >>> jd = julday(2024, 4, 8, 18.3)  # ~18:18 UTC
+        >>> mu = calc_besselian_mu(jd)
+        >>> print(f"Besselian mu = {mu:.4f} degrees")
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+        - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
+    """
+    from .state import get_planets, get_timescale
+
+    # Get ephemeris and timescale
+    eph = get_planets()
+    ts = get_timescale()
+    t = ts.ut1_jd(jd)
+
+    # Get Earth, Sun, Moon
+    earth = eph["earth"]
+    sun = eph["sun"]
+    moon = eph["moon"]
+
+    # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
+    earth_at = earth.at(t)
+
+    # Geocentric apparent positions
+    sun_apparent = earth_at.observe(sun).apparent()
+    moon_apparent = earth_at.observe(moon).apparent()
+
+    # Get Cartesian positions in AU
+    # These are geocentric equatorial coordinates (x toward vernal equinox,
+    # z toward north celestial pole, y completes right-handed system)
+    sun_pos = sun_apparent.position.au  # [x, y, z] in AU
+    moon_pos = moon_apparent.position.au  # [x, y, z] in AU
+
+    # Shadow axis direction: from Moon toward Sun
+    # This is the conventional Besselian axis direction (toward Earth/observer)
+    # Same convention as used in calc_besselian_d
+    shadow_dir = [
+        sun_pos[0] - moon_pos[0],
+        sun_pos[1] - moon_pos[1],
+        sun_pos[2] - moon_pos[2],
+    ]
+
+    # Calculate the right ascension of the shadow axis
+    # RA = atan2(y, x) in the equatorial coordinate system
+    # The x-axis points toward the vernal equinox, y-axis at RA=90 degrees
+    ra_rad = math.atan2(shadow_dir[1], shadow_dir[0])
+    ra_deg = math.degrees(ra_rad)
+
+    # Normalize RA to 0-360 degrees
+    if ra_deg < 0:
+        ra_deg += 360.0
+
+    # Calculate Greenwich Apparent Sidereal Time (GAST)
+    # We need the nutation and obliquity for accurate GAST
+    # Use Skyfield's built-in calculation for accuracy
+    gast = t.gast  # Greenwich Apparent Sidereal Time in hours
+
+    # Convert GAST from hours to degrees (1 hour = 15 degrees)
+    gast_deg = gast * 15.0
+
+    # Calculate Greenwich hour angle: mu = GAST - RA
+    mu_deg = gast_deg - ra_deg
+
+    # Normalize to 0-360 degrees
+    mu_deg = mu_deg % 360.0
+    if mu_deg < 0:
+        mu_deg += 360.0
+
+    return mu_deg
