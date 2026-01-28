@@ -8,8 +8,13 @@ Computes ecliptic positions for bright fixed stars with:
 - Equatorial to ecliptic coordinate transformation
 
 Supported stars:
-- Regulus (Alpha Leonis) - Royal Star
+- The four Royal Stars of Persia (watchers of the four directions):
+  - Aldebaran (Alpha Tauri) - Watcher of the East (Tascheter)
+  - Regulus (Alpha Leonis) - Watcher of the North (Venant)
+  - Antares (Alpha Scorpii) - Watcher of the West (Satevis)
+  - Fomalhaut (Alpha Piscis Austrini) - Watcher of the South (Hastorang)
 - Spica (Alpha Virginis) - Used for ayanamsha calculations
+- And many other bright stars...
 
 Notes on precision:
     Proper motion is applied using the rigorous space motion approach from
@@ -893,7 +898,7 @@ _STAR_NAME_TO_ID = {entry.name.upper(): entry.id for entry in STAR_CATALOG}
 # Includes: common names, Bayer designations (full and abbreviated),
 # Flamsteed numbers, Arabic names, Latin names, Greek transliterations
 STAR_ALIASES: dict[str, int] = {
-    # ======== REGULUS (Alpha Leonis) ========
+    # ======== REGULUS (Alpha Leonis) - ROYAL STAR ========
     "COR LEONIS": SE_REGULUS,
     "ALPHA LEONIS": SE_REGULUS,
     "ALPHA LEO": SE_REGULUS,
@@ -904,6 +909,8 @@ STAR_ALIASES: dict[str, int] = {
     "REX": SE_REGULUS,
     "KALB AL-ASAD": SE_REGULUS,
     "ALLEO": SE_REGULUS,
+    "WATCHER OF THE NORTH": SE_REGULUS,
+    "VENANT": SE_REGULUS,
     # ======== SPICA (Alpha Virginis) ========
     "ALPHA VIRGINIS": SE_SPICA_STAR,
     "ALPHA VIR": SE_SPICA_STAR,
@@ -938,7 +945,7 @@ STAR_ALIASES: dict[str, int] = {
     "ALCMA": SE_SIRIUS,
     "AL-SHIRA": SE_SIRIUS,
     "SOTHIS": SE_SIRIUS,
-    # ======== ALDEBARAN (Alpha Tauri) ========
+    # ======== ALDEBARAN (Alpha Tauri) - ROYAL STAR ========
     "EYE OF TAURUS": SE_ALDEBARAN,
     "ALPHA TAURI": SE_ALDEBARAN,
     "ALPHA TAU": SE_ALDEBARAN,
@@ -949,7 +956,9 @@ STAR_ALIASES: dict[str, int] = {
     "AL-DABARAN": SE_ALDEBARAN,
     "FOLLOWER": SE_ALDEBARAN,
     "ROHINI": SE_ALDEBARAN,
-    # ======== ANTARES (Alpha Scorpii) ========
+    "WATCHER OF THE EAST": SE_ALDEBARAN,
+    "TASCHETER": SE_ALDEBARAN,
+    # ======== ANTARES (Alpha Scorpii) - ROYAL STAR ========
     "RIVAL OF MARS": SE_ANTARES,
     "ALPHA SCORPII": SE_ANTARES,
     "ALPHA SCO": SE_ANTARES,
@@ -960,6 +969,8 @@ STAR_ALIASES: dict[str, int] = {
     "CALB AL-AKRAB": SE_ANTARES,
     "HEART OF SCORPION": SE_ANTARES,
     "JYESHTHA": SE_ANTARES,
+    "WATCHER OF THE WEST": SE_ANTARES,
+    "SATEVIS": SE_ANTARES,
     # ======== VEGA (Alpha Lyrae) ========
     "HARP STAR": SE_VEGA,
     "ALPHA LYRAE": SE_VEGA,
@@ -982,7 +993,7 @@ STAR_ALIASES: dict[str, int] = {
     "CYNOSURA": SE_POLARIS,
     "LODESTAR": SE_POLARIS,
     "STELLA POLARIS": SE_POLARIS,
-    # ======== FOMALHAUT (Alpha Piscis Austrini) ========
+    # ======== FOMALHAUT (Alpha Piscis Austrini) - ROYAL STAR ========
     "FISH'S MOUTH": SE_FOMALHAUT,
     "ALPHA PISCIS AUSTRINI": SE_FOMALHAUT,
     "ALPHA PSA": SE_FOMALHAUT,
@@ -993,6 +1004,7 @@ STAR_ALIASES: dict[str, int] = {
     "OS PISCIS MERIDIANI": SE_FOMALHAUT,
     "LONELY STAR": SE_FOMALHAUT,
     "HASTORANG": SE_FOMALHAUT,
+    "WATCHER OF THE SOUTH": SE_FOMALHAUT,
     # ======== BETELGEUSE (Alpha Orionis) ========
     "ARMPIT OF ORION": SE_BETELGEUSE,
     "ALPHA ORIONIS": SE_BETELGEUSE,
