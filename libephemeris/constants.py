@@ -75,10 +75,12 @@ SE_COMET_OFFSET: int = 1000  # Offset for comet IDs
 # Hamburg School Uranian planets (fictitious bodies)
 SE_CUPIDO: int = SE_FICT_OFFSET + 0  # 40 - First Uranian planet (Cupido)
 SE_HADES: int = SE_FICT_OFFSET + 1  # 41 - Second Uranian planet (Hades)
+SE_ZEUS: int = SE_FICT_OFFSET + 2  # 42 - Third Uranian planet (Zeus)
 
 # Pyswisseph-compatible aliases for Uranian planets
 CUPIDO: int = SE_CUPIDO
 HADES: int = SE_HADES
+ZEUS: int = SE_ZEUS
 
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
