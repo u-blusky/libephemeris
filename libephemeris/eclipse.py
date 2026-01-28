@@ -9959,3 +9959,272 @@ def calc_lunar_eclipse_umbral_fourth_contact_u4(
     )
 
     return t_u4
+
+
+def calc_solar_eclipse_duration(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the duration of totality or annularity for a solar eclipse.
+
+    For central solar eclipses (total or annular), this function calculates
+    the duration of the central phase - the time between second contact (C2)
+    and third contact (C3). This represents the length of time the umbral
+    (total) or antumbral (annular) shadow touches Earth's surface.
+
+    For non-central eclipses (partial only), the function returns 0.0 since
+    there is no totality or annularity phase.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from sol_eclipse_when_glob()
+                or sol_eclipse_when_loc(). The function calculates C2 and C3
+                relative to this time.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Duration of totality/annularity in minutes. Returns 0.0 if:
+        - The eclipse is not a central eclipse (total or annular)
+        - C2 or C3 cannot be determined
+        - The input time is not near a valid solar eclipse
+
+    Algorithm:
+        1. Calculate second contact C2 (when central phase begins)
+        2. Calculate third contact C3 (when central phase ends)
+        3. Return (C3 - C2) converted from days to minutes
+
+    Precision:
+        The calculation achieves timing precision better than 1 second,
+        resulting in duration precision of approximately ±0.03 minutes (±2 seconds).
+
+    Example:
+        >>> from libephemeris import julday, sol_eclipse_when_glob
+        >>> from libephemeris import calc_solar_eclipse_duration, SE_ECL_TOTAL
+        >>> # Find the April 8, 2024 total solar eclipse
+        >>> jd_start = julday(2024, 1, 1, 0.0)
+        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate duration of totality
+        >>> duration = calc_solar_eclipse_duration(jd_max)
+        >>> print(f"Duration of totality: {duration:.2f} minutes")
+
+    Note:
+        - This is the global duration (time umbra/antumbra is on Earth anywhere)
+        - Local duration at a specific observer location is typically shorter
+        - For local eclipse duration, use sol_eclipse_when_loc() which provides
+          contact times for the specific location
+        - Total solar eclipses can have central durations up to ~7.5 minutes
+        - Annular eclipses can have central durations up to ~12 minutes
+        - The global duration is always longer than any local duration
+
+    See Also:
+        - calc_eclipse_second_contact_c2: Calculate C2 (central phase begins)
+        - calc_eclipse_third_contact_c3: Calculate C3 (central phase ends)
+        - sol_eclipse_when_glob: Find next solar eclipse and all phase times
+        - sol_eclipse_when_loc: Get local eclipse circumstances including contacts
+        - calc_lunar_eclipse_total_duration: Duration of lunar eclipse totality
+        - calc_lunar_eclipse_umbral_duration: Duration of lunar eclipse umbral phase
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate C2 (second contact - central phase begins)
+    jd_c2 = calc_eclipse_second_contact_c2(jd_max, flags=flags)
+
+    # Check if central phase exists
+    if jd_c2 == 0.0:
+        return 0.0
+
+    # Calculate C3 (third contact - central phase ends)
+    jd_c3 = calc_eclipse_third_contact_c3(jd_max, flags=flags)
+
+    # Check if C3 was found
+    if jd_c3 == 0.0:
+        return 0.0
+
+    # Calculate duration in minutes (C3 - C2) * 24 hours * 60 minutes
+    duration_days = jd_c3 - jd_c2
+    duration_minutes = duration_days * 24.0 * 60.0
+
+    return duration_minutes
+
+
+def calc_lunar_eclipse_total_duration(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the duration of totality for a total lunar eclipse.
+
+    For total lunar eclipses, this function calculates the duration of
+    totality - the time between umbral second contact (U2) and umbral
+    third contact (U3). This represents the length of time the entire
+    Moon is within Earth's umbral shadow.
+
+    For partial or penumbral lunar eclipses, the function returns 0.0
+    since totality does not occur.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from lun_eclipse_when().
+                The function calculates U2 and U3 relative to this time.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Duration of totality in minutes. Returns 0.0 if:
+        - The eclipse is not a total lunar eclipse
+        - U2 or U3 cannot be determined
+        - The input time is not near a valid lunar eclipse
+
+    Algorithm:
+        1. Calculate umbral second contact U2 (when totality begins)
+        2. Calculate umbral third contact U3 (when totality ends)
+        3. Return (U3 - U2) converted from days to minutes
+
+    Precision:
+        The calculation achieves timing precision better than 1 second,
+        resulting in duration precision of approximately ±0.03 minutes (±2 seconds).
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_when
+        >>> from libephemeris import calc_lunar_eclipse_total_duration, SE_ECL_TOTAL
+        >>> # Find the November 8, 2022 total lunar eclipse
+        >>> jd_start = julday(2022, 10, 1, 0.0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate duration of totality
+        >>> duration = calc_lunar_eclipse_total_duration(jd_max)
+        >>> print(f"Duration of totality: {duration:.2f} minutes")
+
+    Note:
+        - U2 marks when the Moon fully enters the umbra (totality begins)
+        - U3 marks when the Moon begins exiting the umbra (totality ends)
+        - During totality, the Moon appears red/copper due to refracted sunlight
+        - Total lunar eclipse durations can range from about 14 to 107 minutes
+        - Unlike solar eclipses, lunar eclipse totality is visible from the
+          entire night side of Earth
+
+    See Also:
+        - calc_lunar_eclipse_umbral_second_contact_u2: Calculate U2 (totality begins)
+        - calc_lunar_eclipse_umbral_third_contact_u3: Calculate U3 (totality ends)
+        - calc_lunar_eclipse_umbral_duration: Duration of umbral/partial phase
+        - lun_eclipse_when: Find next lunar eclipse and all phase times
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Lunar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate U2 (umbral second contact - totality begins)
+    jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max, flags=flags)
+
+    # Check if totality exists
+    if jd_u2 == 0.0:
+        return 0.0
+
+    # Calculate U3 (umbral third contact - totality ends)
+    jd_u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max, flags=flags)
+
+    # Check if U3 was found
+    if jd_u3 == 0.0:
+        return 0.0
+
+    # Calculate duration in minutes (U3 - U2) * 24 hours * 60 minutes
+    duration_days = jd_u3 - jd_u2
+    duration_minutes = duration_days * 24.0 * 60.0
+
+    return duration_minutes
+
+
+def calc_lunar_eclipse_umbral_duration(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the duration of the umbral (partial) phase for a lunar eclipse.
+
+    For lunar eclipses that enter Earth's umbral shadow (total or partial
+    eclipses), this function calculates the duration of the umbral phase -
+    the time between umbral first contact (U1) and umbral fourth contact (U4).
+    This represents the length of time any part of the Moon is within the
+    Earth's umbral shadow.
+
+    For penumbral-only lunar eclipses, the function returns 0.0 since
+    the Moon does not enter the umbral shadow.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from lun_eclipse_when().
+                The function calculates U1 and U4 relative to this time.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Duration of umbral phase in minutes. Returns 0.0 if:
+        - The eclipse is a penumbral-only eclipse
+        - U1 or U4 cannot be determined
+        - The input time is not near a valid lunar eclipse
+
+    Algorithm:
+        1. Calculate umbral first contact U1 (when partial phase begins)
+        2. Calculate umbral fourth contact U4 (when partial phase ends)
+        3. Return (U4 - U1) converted from days to minutes
+
+    Precision:
+        The calculation achieves timing precision better than 1 second,
+        resulting in duration precision of approximately ±0.03 minutes (±2 seconds).
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_when
+        >>> from libephemeris import calc_lunar_eclipse_umbral_duration, SE_ECL_TOTAL
+        >>> # Find the November 8, 2022 total lunar eclipse
+        >>> jd_start = julday(2022, 10, 1, 0.0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate duration of umbral phase
+        >>> duration = calc_lunar_eclipse_umbral_duration(jd_max)
+        >>> print(f"Duration of umbral phase: {duration:.2f} minutes")
+
+    Note:
+        - U1 marks when the Moon first enters the umbra (partial phase begins)
+        - U4 marks when the Moon fully exits the umbra (partial phase ends)
+        - This duration includes totality (if it occurs) plus both partial phases
+        - Umbral phase durations can range from about 24 to 236 minutes
+        - Unlike solar eclipses, lunar eclipse umbral phase is visible from
+          the entire night side of Earth
+
+    See Also:
+        - calc_lunar_eclipse_umbral_first_contact_u1: Calculate U1 (partial begins)
+        - calc_lunar_eclipse_umbral_fourth_contact_u4: Calculate U4 (partial ends)
+        - calc_lunar_eclipse_total_duration: Duration of totality phase only
+        - lun_eclipse_when: Find next lunar eclipse and all phase times
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Lunar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate U1 (umbral first contact - partial phase begins)
+    jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max, flags=flags)
+
+    # Check if umbral phase exists
+    if jd_u1 == 0.0:
+        return 0.0
+
+    # Calculate U4 (umbral fourth contact - partial phase ends)
+    jd_u4 = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max, flags=flags)
+
+    # Check if U4 was found
+    if jd_u4 == 0.0:
+        return 0.0
+
+    # Calculate duration in minutes (U4 - U1) * 24 hours * 60 minutes
+    duration_days = jd_u4 - jd_u1
+    duration_minutes = duration_days * 24.0 * 60.0
+
+    return duration_minutes

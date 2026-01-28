@@ -137,6 +137,10 @@ from .eclipse import (
     calc_lunar_eclipse_umbral_second_contact_u2,
     calc_lunar_eclipse_umbral_third_contact_u3,
     calc_lunar_eclipse_umbral_fourth_contact_u4,
+    # Eclipse duration functions
+    calc_solar_eclipse_duration,
+    calc_lunar_eclipse_total_duration,
+    calc_lunar_eclipse_umbral_duration,
 )
 from .utils import (
     degnorm,
@@ -525,6 +529,10 @@ __all__ = [
     "calc_lunar_eclipse_umbral_second_contact_u2",
     "calc_lunar_eclipse_umbral_third_contact_u3",
     "calc_lunar_eclipse_umbral_fourth_contact_u4",
+    # Eclipse duration functions
+    "calc_solar_eclipse_duration",
+    "calc_lunar_eclipse_total_duration",
+    "calc_lunar_eclipse_umbral_duration",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",
