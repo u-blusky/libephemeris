@@ -77,12 +77,14 @@ SE_CUPIDO: int = SE_FICT_OFFSET + 0  # 40 - First Uranian planet (Cupido)
 SE_HADES: int = SE_FICT_OFFSET + 1  # 41 - Second Uranian planet (Hades)
 SE_ZEUS: int = SE_FICT_OFFSET + 2  # 42 - Third Uranian planet (Zeus)
 SE_KRONOS: int = SE_FICT_OFFSET + 3  # 43 - Fourth Uranian planet (Kronos)
+SE_APOLLON: int = SE_FICT_OFFSET + 4  # 44 - Fifth Uranian planet (Apollon)
 
 # Pyswisseph-compatible aliases for Uranian planets
 CUPIDO: int = SE_CUPIDO
 HADES: int = SE_HADES
 ZEUS: int = SE_ZEUS
 KRONOS: int = SE_KRONOS
+APOLLON: int = SE_APOLLON
 
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 

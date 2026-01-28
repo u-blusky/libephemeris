@@ -40,6 +40,7 @@ from libephemeris.hypothetical import (
     calc_hades,
     calc_zeus,
     calc_kronos,
+    calc_apollon,
     # Data structures
     URANIAN_ELEMENTS,
     HYPOTHETICAL_ELEMENTS,
@@ -48,6 +49,7 @@ from libephemeris.hypothetical import (
     HADES_KEPLERIAN_ELEMENTS,
     ZEUS_KEPLERIAN_ELEMENTS,
     KRONOS_KEPLERIAN_ELEMENTS,
+    APOLLON_KEPLERIAN_ELEMENTS,
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -1204,4 +1206,186 @@ class TestCalcKronos:
         # Kronos has larger semi-major axis
         assert kronos_pos[2] > zeus_pos[2], (
             "Kronos should be farther from Sun than Zeus"
+        )
+
+
+class TestCalcApollon:
+    """Tests for the calc_apollon Keplerian propagation function."""
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_apollon_returns_tuple(self):
+        """Test that calc_apollon returns correct tuple format."""
+        pos = calc_apollon(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        lon, lat, dist, dlon, dlat, ddist = pos
+        assert isinstance(lon, float)
+        assert isinstance(lat, float)
+        assert isinstance(dist, float)
+        assert isinstance(dlon, float)
+        assert isinstance(dlat, float)
+        assert isinstance(ddist, float)
+
+    def test_calc_apollon_longitude_range(self):
+        """Test that longitude is in valid range."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_apollon(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
+
+    def test_calc_apollon_latitude_zero(self):
+        """Test that Apollon has zero latitude (on ecliptic)."""
+        pos = calc_apollon(self.J2000)
+        assert pos[1] == 0.0, "Apollon should have zero latitude"
+
+    def test_calc_apollon_distance_correct(self):
+        """Test that Apollon distance matches semi-major axis (circular orbit)."""
+        pos = calc_apollon(self.J2000)
+        # For circular orbit, distance = semi-major axis = 70.361180 AU
+        assert abs(pos[2] - 70.361180) < 0.001, (
+            f"Apollon distance should be ~70.361180 AU, got {pos[2]}"
+        )
+
+    def test_calc_apollon_distance_constant(self):
+        """Test that distance is constant for circular orbit."""
+        pos1 = calc_apollon(self.J2000)
+        pos2 = calc_apollon(self.J2000 + 365.25 * 50)  # 50 years later
+        assert pos1[2] == pos2[2], "Distance should be constant for circular orbit"
+
+    def test_calc_apollon_velocity_positive(self):
+        """Test that daily motion is positive (prograde)."""
+        pos = calc_apollon(self.J2000)
+        assert pos[3] > 0, "Apollon should have prograde motion"
+
+    def test_calc_apollon_velocity_constant(self):
+        """Test that velocity is constant for circular orbit."""
+        pos = calc_apollon(self.J2000)
+        # For circular orbit, daily motion = mean motion
+        expected_n = APOLLON_KEPLERIAN_ELEMENTS.n
+        assert pos[3] == expected_n, (
+            f"Daily motion should be {expected_n}, got {pos[3]}"
+        )
+
+    def test_calc_apollon_latitude_velocity_zero(self):
+        """Test that latitude and distance velocity are zero."""
+        pos = calc_apollon(self.J2000)
+        assert pos[4] == 0.0, "Latitude velocity should be zero"
+        assert pos[5] == 0.0, "Distance velocity should be zero for e=0"
+
+    def test_calc_apollon_at_epoch(self):
+        """Test that longitude at J1900.0 matches L0."""
+        pos = calc_apollon(self.J1900)
+        # At epoch, longitude should equal L0
+        expected_L0 = APOLLON_KEPLERIAN_ELEMENTS.L0
+        assert abs(pos[0] - expected_L0) < 0.01, (
+            f"At epoch, longitude should be {expected_L0}, got {pos[0]}"
+        )
+
+    def test_calc_apollon_progression(self):
+        """Test that Apollon progresses correctly over time."""
+        pos1 = calc_apollon(self.J2000)
+        pos2 = calc_apollon(self.J2000 + 365.25)  # 1 year later
+
+        # Calculate expected motion in 1 year
+        expected_motion = APOLLON_KEPLERIAN_ELEMENTS.n * 365.25
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        assert abs(actual_motion - expected_motion) < 0.01, (
+            f"Annual motion should be {expected_motion:.4f} deg, got {actual_motion:.4f}"
+        )
+
+    def test_calc_apollon_orbital_period(self):
+        """Test that Apollon completes one orbit in expected period."""
+        # Orbital period from Kepler's 3rd law: T = a^1.5 years
+        a = APOLLON_KEPLERIAN_ELEMENTS.a
+        expected_period_years = a**1.5  # ~590.3 years
+
+        # One full orbit should advance longitude by ~360 degrees
+        period_days = expected_period_years * 365.25
+        pos1 = calc_apollon(self.J2000)
+        pos2 = calc_apollon(self.J2000 + period_days)
+
+        # After one full period, should be back to same longitude (within tolerance)
+        diff = abs(pos2[0] - pos1[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 1.0, (
+            f"After one orbit ({expected_period_years:.1f} years), "
+            f"longitude should return near start, diff = {diff:.2f} deg"
+        )
+
+    def test_calc_apollon_keplerian_elements_valid(self):
+        """Test that Apollon Keplerian elements have valid values."""
+        elements = APOLLON_KEPLERIAN_ELEMENTS
+        assert elements.name == "Apollon"
+        assert elements.a > 64.0, "Apollon should be beyond Kronos"
+        assert elements.e == 0.0, "Apollon should have circular orbit"
+        assert elements.i == 0.0, "Apollon should be on ecliptic"
+        assert 0 < elements.n < 1.0, "Mean motion should be small but positive"
+
+    def test_calc_apollon_vs_uranian_different_methods(self):
+        """Test that calc_apollon uses different method from calc_uranian_position.
+
+        The two methods use different algorithms:
+        - calc_apollon: Simple Keplerian propagation from J1900.0 epoch
+        - calc_uranian_position: Secular polynomial formula from J2000.0 epoch
+
+        They may give different longitudes but both should produce valid positions
+        that progress at similar rates over time.
+        """
+        keplerian_pos = calc_apollon(self.J2000)
+        uranian_pos = calc_uranian_position(SE_APOLLON, self.J2000)
+
+        # Both should be in valid range
+        assert 0.0 <= keplerian_pos[0] < 360.0
+        assert 0.0 <= uranian_pos[0] < 360.0
+
+        # Keplerian should show prograde motion
+        assert keplerian_pos[3] > 0, "Keplerian motion should be prograde"
+        # Uranian velocity may be very small or briefly negative due to oscillation
+        # Check that it's reasonable (within 1 deg/day for these slow bodies)
+        assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
+
+    def test_se_apollon_constant_value(self):
+        """Test that SE_APOLLON has correct value (SE_FICT_OFFSET + 4 = 44)."""
+        assert SE_APOLLON == 44
+        assert SE_APOLLON == SE_FICT_OFFSET + 4
+
+    def test_calc_apollon_exportable_from_main_module(self):
+        """Test that calc_apollon is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_apollon")
+        pos = libephemeris.calc_apollon(self.J2000)
+        assert len(pos) == 6
+
+    def test_apollon_slower_than_kronos(self):
+        """Test that Apollon moves slower than Kronos (larger semi-major axis)."""
+        kronos_pos = calc_kronos(self.J2000)
+        apollon_pos = calc_apollon(self.J2000)
+
+        # Apollon has larger semi-major axis, so slower motion
+        assert apollon_pos[3] < kronos_pos[3], "Apollon should move slower than Kronos"
+
+    def test_apollon_farther_than_kronos(self):
+        """Test that Apollon is farther from Sun than Kronos."""
+        kronos_pos = calc_kronos(self.J2000)
+        apollon_pos = calc_apollon(self.J2000)
+
+        # Apollon has larger semi-major axis
+        assert apollon_pos[2] > kronos_pos[2], (
+            "Apollon should be farther from Sun than Kronos"
         )
