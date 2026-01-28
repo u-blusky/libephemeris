@@ -30,6 +30,8 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] VALIDATE TRUE NODE AGAINST PYSWISSEPH WITH 1000 RANDOM DATES: Create a comprehensive test file tests/test_precision/test_true_node_precision.py that compares calc_true_lunar_node against pyswisseph swe.calc_ut(jd, swe.TRUE_NODE, flags) for 1000 random dates spanning 1900-2100, calculate the maximum difference, mean difference, and standard deviation, assert that maximum difference is less than 0.01 degrees (36 arcseconds), generate a report of dates with largest discrepancies for debugging.
 
+- [ ] MOVE TRUE NODE PRECISION COMPARISON TO COMPARE_SCRIPTS: The True Node precision comparison tests were incorrectly created in tests/test_precision/test_true_node_precision.py but all pyswisseph comparison scripts must reside in the compare_scripts/ directory following the project convention, so your task is to move the True Node comparison logic from tests/test_precision/test_true_node_precision.py to compare_scripts/compare_lunar.py integrating it with the existing lunar comparison functions (the file already contains comparison functions for Mean Node, Mean Lilith, and other lunar points), ensure the comparison covers 1000 random dates spanning 1900-2100, calculates maximum/mean/standard deviation of differences, and reports dates with largest discrepancies, after moving the comparison logic you should delete the original tests/test_precision/test_true_node_precision.py file to avoid duplication, update compare_scripts/compare_lunar.py to include a new function compare_true_node_precision() that performs the same validation, and ensure the comparison is included when running compare_scripts/run_all_compare.py or compare_scripts/compare_lunar.py directly.
+
 - [x] VALIDATE TRUE NODE AT HISTORICAL DATES: Create tests comparing True Node precision at historically significant dates like eclipses where the node position is important, test dates from -1000 to 1900 to verify the polynomial validity warnings in lunar.py are appropriate and the precision degradation is as expected.
 
 - [x] VALIDATE TRUE NODE VELOCITY CALCULATION: Currently the True Node returns only position (longitude, 0, 0) but Swiss Ephemeris also returns velocity, verify that when SEFLG_SPEED flag is used the velocity is calculated correctly via numerical differentiation, compare velocity values against pyswisseph and ensure they agree within 0.001 degrees/day.
@@ -61,6 +63,8 @@ This document contains detailed TODO items for improving libephemeris precision 
 - [x] IMPLEMENT ALTERNATIVE TRUE LILITH METHOD: Research and potentially implement an alternative method for True Lilith based on osculating orbital elements (computing semi-major axis, eccentricity, and argument of perigee from state vectors) rather than the eccentricity vector method, compare both approaches to determine which matches Swiss Ephemeris better.
 
 - [x] VALIDATE TRUE LILITH AGAINST PYSWISSEPH: Create a comprehensive test file tests/test_precision/test_true_lilith_precision.py comparing calc_true_lilith against swe.calc_ut(jd, swe.OSCU_APOG, flags) for 500 random dates, the current error is 5-7 degrees, track progress as corrections are added, target final error less than 0.5 degrees.
+
+- [ ] MOVE TRUE LILITH PRECISION COMPARISON TO COMPARE_SCRIPTS: The True Lilith (Osculating Apogee) precision comparison tests were incorrectly created in tests/test_precision/test_true_lilith_precision.py and tests/test_lunar/test_true_lilith_precision.py but all pyswisseph comparison scripts must reside in the compare_scripts/ directory following the project convention, so your task is to move the True Lilith comparison logic to compare_scripts/compare_lunar.py integrating it with the existing lunar comparison functions, ensure the comparison covers 500+ random dates, compares longitude/latitude/distance against swe.calc_ut(jd, swe.OSCU_APOG, flags), calculates maximum/mean/standard deviation of differences, and tracks progress toward the target error of less than 0.5 degrees, after moving the comparison logic delete the original test files (tests/test_precision/test_true_lilith_precision.py and tests/test_lunar/test_true_lilith_precision.py) to avoid duplication, add a new function compare_true_lilith_precision() to compare_scripts/compare_lunar.py, and ensure the comparison is included in the compare_scripts/run_all_compare.py execution.
 
 - [x] VALIDATE TRUE LILITH LATITUDE: The True Lilith also has an ecliptic latitude component (unlike Mean Lilith which is always on the ecliptic), verify that the latitude calculation in calc_true_lilith (line 592-594) is correct by comparing against pyswisseph.
 
@@ -354,7 +358,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT LUNAR CRESCENT VISIBILITY: Already available via swe_heliacal_pheno_ut for SE_MOON which returns dret[16]=WMoon (crescent width), dret[17]=qYal (Yallop q-test), dret[18]=qCrit (Yallop criterion), dret[25]=LMoon (crescent length) - these are the standard Islamic calendar visibility parameters implemented in heliacal.py lines 1304-1314.
 
-- [ ] VALIDATE HELIACAL EVENTS AGAINST PYSWISSEPH: Create tests comparing heliacal event times against pyswisseph for several planets and bright stars.
+- [ ] VALIDATE HELIACAL EVENTS AGAINST PYSWISSEPH: Add comprehensive comparison tests to compare_scripts/compare_heliacal.py (which already exists with basic heliacal comparison infrastructure) that compare heliacal event times against pyswisseph swe.heliacal_ut() for several planets (Mercury, Venus, Mars, Jupiter, Saturn) and bright stars (Sirius, Canopus, Arcturus, Vega, Capella), the tests should compare heliacal rising, heliacal setting, evening first, and morning last events at multiple geographic locations (latitude 0°, 30°N, 45°N, 60°N) and verify that the calculated event times agree with pyswisseph within 1 day for planets and 2 days for stars, also compare swe_vis_limit_mag() output for visibility limiting magnitude calculations.
 
 ---
 
@@ -426,7 +430,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [ ] IMPROVE KOCH POLAR LATITUDE HANDLING: Similar to Placidus, improve Koch house calculation for polar latitudes with appropriate fallbacks.
 
-- [ ] VERIFY ALL 19 HOUSE SYSTEMS: Create comprehensive tests comparing all 19 house systems (Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Topocentric, Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural, Gauquelin, APC, Sripati) against pyswisseph at 100+ random locations and times.
+- [ ] VERIFY ALL 19 HOUSE SYSTEMS: Add comprehensive comparison tests to compare_scripts/compare_houses.py and compare_scripts/compare_houses_ext.py that compare all 19 house systems (Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Topocentric, Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural, Gauquelin, APC, Sripati) against pyswisseph swe.houses_ex() at 100+ random locations (varying latitude from -60° to +60°, longitude from -180° to +180°) and times (spanning 1900-2100), verify that all 12 house cusps agree within 0.001 degrees, and that special points (Ascendant, MC, ARMC, Vertex, Equatorial Ascendant) also match within the same tolerance.
 
 - [ ] DOCUMENT HOUSE SYSTEM ALGORITHMS: Document the mathematical algorithm and formula used for each house system in code comments or separate documentation.
 
@@ -436,7 +440,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## LOW PRIORITY: Ayanamsha Improvements
 
-- [ ] VERIFY ALL 43 AYANAMSHA MODES: Create comprehensive tests comparing all 43 ayanamsha modes against pyswisseph at multiple dates (J2000.0, 1900, 2000, 2100) to verify accuracy.
+- [ ] VERIFY ALL 43 AYANAMSHA MODES: Add comprehensive comparison tests to compare_scripts/compare_sidereal.py that compare all 43 ayanamsha modes against pyswisseph swe.get_ayanamsa_ex() at multiple dates (J2000.0, 1900, 1950, 2000, 2050, 2100) to verify accuracy, for each ayanamsha mode verify that the ayanamsha value matches pyswisseph within 0.0001 degrees (0.36 arcseconds), also test swe.set_sid_mode() configuration and verify that sidereal planet positions calculated with each ayanamsha mode match pyswisseph within the same tolerance.
 
 - [ ] IMPROVE TRUE CITRA AYANAMSHA PRECISION: Currently docs/PRECISION.md notes star-based ayanamshas have ±0.06° precision, improve True Citra by using more precise Spica coordinates with full proper motion correction.
 
@@ -458,7 +462,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## OPTIONAL: Performance and Architecture
 
-- [ ] BENCHMARK AGAINST PYSWISSEPH: Create comprehensive benchmarks comparing calculation speed for planets, houses, and other functions against pyswisseph, quantify the performance difference.
+- [ ] BENCHMARK AGAINST PYSWISSEPH: Create comprehensive benchmarks in compare_scripts/ directory (either as a new file compare_scripts/compare_benchmark.py or integrated into compare_scripts/compare_all.py) that compare calculation speed for planets, houses, lunar points, minor bodies, and other functions against pyswisseph, quantify the performance difference by running each calculation type 10000+ times and reporting mean/median/min/max execution times for both libephemeris and pyswisseph, generate a performance report showing the ratio of execution times.
 
 - [ ] PROFILE HOT PATHS: Use Python profiling tools to identify the most time-consuming functions and optimize them.
 
@@ -496,7 +500,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## DOCUMENTATION AND TESTING
 
-- [ ] CREATE PRECISION VALIDATION TEST SUITE: Create a new test directory tests/test_precision_validation/ with comprehensive tests comparing every calculation type against pyswisseph.
+- [ ] CREATE PRECISION VALIDATION TEST SUITE: The compare_scripts/ directory already contains the infrastructure for pyswisseph comparison tests (compare_planets.py, compare_lunar.py, compare_houses.py, compare_sidereal.py, compare_eclipses.py, compare_heliacal.py, compare_minor_bodies.py, etc.) so the task is to ensure all comparison scripts are comprehensive and cover every calculation type, run compare_scripts/run_all_compare.py to execute all comparisons and generate a unified precision report, ensure that all body types (Sun through Pluto, lunar nodes, lunar apsides, minor bodies, hypothetical planets), all house systems, all ayanamshas, all eclipse types, and all other calculation functions are covered by the existing compare_scripts files, add any missing comparison functions to the appropriate compare_scripts/*.py files rather than creating a separate tests/test_precision_validation/ directory.
 
 - [ ] TEST ALL PLANETS 1000 DATES: Create test comparing Sun, Moon, Mercury through Pluto positions at 1000 random dates.
 
