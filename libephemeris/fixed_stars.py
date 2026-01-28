@@ -103,6 +103,14 @@ from .constants import (
     SE_ALGORAB,
     SE_ALPHECCA,
     SE_DENEB_ALGEDI,
+    SE_ASTEROPE,
+    SE_CELAENO,
+    SE_ELECTRA,
+    SE_MAIA,
+    SE_MEROPE,
+    SE_TAYGETA,
+    SE_ATLAS,
+    SE_PLEIONE,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -885,6 +893,113 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=2.81,
     ),
+    # ======== PLEIADES CLUSTER STARS ========
+    # The Pleiades (M45) is an open star cluster in Taurus
+    # These are the 9 brightest named stars visible to the naked eye
+    StarCatalogEntry(
+        id=SE_ASTEROPE,
+        name="Asterope",
+        nomenclature="21Tau",
+        hip_number=17579,
+        data=StarData(
+            ra_j2000=56.476958,  # 03h 45m 54.5s (21 Tauri)
+            dec_j2000=24.554722,  # +24° 33' 17"
+            pm_ra=0.01935,  # 19.35 mas/yr
+            pm_dec=-0.04573,  # -45.73 mas/yr
+        ),
+        magnitude=5.76,
+    ),
+    StarCatalogEntry(
+        id=SE_CELAENO,
+        name="Celaeno",
+        nomenclature="16Tau",
+        hip_number=17489,
+        data=StarData(
+            ra_j2000=56.200830,  # 03h 44m 48.2s (16 Tauri)
+            dec_j2000=24.289389,  # +24° 17' 22"
+            pm_ra=0.02066,  # 20.66 mas/yr
+            pm_dec=-0.04454,  # -44.54 mas/yr
+        ),
+        magnitude=5.45,
+    ),
+    StarCatalogEntry(
+        id=SE_ELECTRA,
+        name="Electra",
+        nomenclature="17Tau",
+        hip_number=17499,
+        data=StarData(
+            ra_j2000=56.218908,  # 03h 44m 52.5s (17 Tauri)
+            dec_j2000=24.113336,  # +24° 06' 48"
+            pm_ra=0.02093,  # 20.93 mas/yr
+            pm_dec=-0.04516,  # -45.16 mas/yr
+        ),
+        magnitude=3.70,
+    ),
+    StarCatalogEntry(
+        id=SE_MAIA,
+        name="Maia",
+        nomenclature="20Tau",
+        hip_number=17573,
+        data=StarData(
+            ra_j2000=56.456819,  # 03h 45m 49.6s (20 Tauri)
+            dec_j2000=24.367750,  # +24° 22' 04"
+            pm_ra=0.02112,  # 21.12 mas/yr
+            pm_dec=-0.04572,  # -45.72 mas/yr
+        ),
+        magnitude=3.87,
+    ),
+    StarCatalogEntry(
+        id=SE_MEROPE,
+        name="Merope",
+        nomenclature="23Tau",
+        hip_number=17608,
+        data=StarData(
+            ra_j2000=56.581502,  # 03h 46m 19.6s (23 Tauri)
+            dec_j2000=23.948353,  # +23° 56' 54"
+            pm_ra=0.02161,  # 21.61 mas/yr
+            pm_dec=-0.04258,  # -42.58 mas/yr
+        ),
+        magnitude=4.14,
+    ),
+    StarCatalogEntry(
+        id=SE_TAYGETA,
+        name="Taygeta",
+        nomenclature="19Tau",
+        hip_number=17531,
+        data=StarData(
+            ra_j2000=56.302063,  # 03h 45m 12.5s (19 Tauri)
+            dec_j2000=24.467278,  # +24° 28' 02"
+            pm_ra=0.02029,  # 20.29 mas/yr
+            pm_dec=-0.04105,  # -41.05 mas/yr
+        ),
+        magnitude=4.30,
+    ),
+    StarCatalogEntry(
+        id=SE_ATLAS,
+        name="Atlas",
+        nomenclature="27Tau",
+        hip_number=17847,
+        data=StarData(
+            ra_j2000=57.290596,  # 03h 49m 09.7s (27 Tauri)
+            dec_j2000=24.053417,  # +24° 03' 12"
+            pm_ra=0.01748,  # 17.48 mas/yr
+            pm_dec=-0.04459,  # -44.59 mas/yr
+        ),
+        magnitude=3.62,
+    ),
+    StarCatalogEntry(
+        id=SE_PLEIONE,
+        name="Pleione",
+        nomenclature="28Tau",
+        hip_number=17851,
+        data=StarData(
+            ra_j2000=57.296738,  # 03h 49m 11.2s (28 Tauri)
+            dec_j2000=24.136750,  # +24° 08' 12"
+            pm_ra=0.01830,  # 18.30 mas/yr
+            pm_dec=-0.04728,  # -47.28 mas/yr
+        ),
+        magnitude=5.09,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -1400,6 +1515,34 @@ STAR_ALIASES: dict[str, int] = {
     "DECAP": SE_DENEB_ALGEDI,
     "SCHEDDI": SE_DENEB_ALGEDI,
     "DHANAB AL-JADY": SE_DENEB_ALGEDI,
+    # ======== ASTEROPE (21 Tauri - Pleiades) ========
+    "21 TAURI": SE_ASTEROPE,
+    "21 TAU": SE_ASTEROPE,
+    "STEROPE": SE_ASTEROPE,
+    "STEROPE I": SE_ASTEROPE,
+    # ======== CELAENO (16 Tauri - Pleiades) ========
+    "16 TAURI": SE_CELAENO,
+    "16 TAU": SE_CELAENO,
+    "CELENO": SE_CELAENO,
+    # ======== ELECTRA (17 Tauri - Pleiades) ========
+    "17 TAURI": SE_ELECTRA,
+    "17 TAU": SE_ELECTRA,
+    # ======== MAIA (20 Tauri - Pleiades) ========
+    "20 TAURI": SE_MAIA,
+    "20 TAU": SE_MAIA,
+    # ======== MEROPE (23 Tauri - Pleiades) ========
+    "23 TAURI": SE_MEROPE,
+    "23 TAU": SE_MEROPE,
+    # ======== TAYGETA (19 Tauri - Pleiades) ========
+    "19 TAURI": SE_TAYGETA,
+    "19 TAU": SE_TAYGETA,
+    "TAYGETE": SE_TAYGETA,
+    # ======== ATLAS (27 Tauri - Pleiades) ========
+    "27 TAURI": SE_ATLAS,
+    "27 TAU": SE_ATLAS,
+    # ======== PLEIONE (28 Tauri - Pleiades) ========
+    "28 TAURI": SE_PLEIONE,
+    "28 TAU": SE_PLEIONE,
 }
 
 

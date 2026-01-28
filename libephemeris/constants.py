@@ -423,6 +423,16 @@ SE_ALGORAB: int = SE_FIXSTAR_OFFSET + 54  # Delta Corvi - Behenian star
 SE_ALPHECCA: int = SE_FIXSTAR_OFFSET + 55  # Alpha Coronae Borealis - Behenian star
 SE_DENEB_ALGEDI: int = SE_FIXSTAR_OFFSET + 56  # Delta Capricorni - Behenian star
 
+# Pleiades cluster stars (visible members)
+SE_ASTEROPE: int = SE_FIXSTAR_OFFSET + 57  # 21 Tauri - Pleiades member
+SE_CELAENO: int = SE_FIXSTAR_OFFSET + 58  # 16 Tauri - Pleiades member
+SE_ELECTRA: int = SE_FIXSTAR_OFFSET + 59  # 17 Tauri - Pleiades member
+SE_MAIA: int = SE_FIXSTAR_OFFSET + 60  # 20 Tauri - Pleiades member
+SE_MEROPE: int = SE_FIXSTAR_OFFSET + 61  # 23 Tauri - Pleiades member
+SE_TAYGETA: int = SE_FIXSTAR_OFFSET + 62  # 19 Tauri - Pleiades member
+SE_ATLAS: int = SE_FIXSTAR_OFFSET + 63  # 27 Tauri - Pleiades member
+SE_PLEIONE: int = SE_FIXSTAR_OFFSET + 64  # 28 Tauri - Pleiades member
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree
