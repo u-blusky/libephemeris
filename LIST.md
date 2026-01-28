@@ -258,47 +258,47 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT BESSELIAN ELEMENT TIME DERIVATIVES: Calculate the hourly changes in all Besselian elements (dx/dt, dy/dt, dd/dt, dl1/dt, dl2/dt, dmu/dt) for interpolation during the eclipse.
 
-- [ ] CREATE BESSELIAN ELEMENTS DATA STRUCTURE: Create a dataclass or named tuple BesselianElements to hold all elements and their derivatives for a given reference time.
+- [x] CREATE BESSELIAN ELEMENTS DATA STRUCTURE: Create a dataclass or named tuple BesselianElements to hold all elements and their derivatives for a given reference time.
 
-- [ ] IMPLEMENT BESSELIAN ELEMENTS INTERPOLATION: Implement function to interpolate Besselian elements to any time during the eclipse using the elements and derivatives at the reference time.
+- [x] IMPLEMENT BESSELIAN ELEMENTS INTERPOLATION: Implement function to interpolate Besselian elements to any time during the eclipse using the elements and derivatives at the reference time.
 
 ---
 
 ## MEDIUM PRIORITY: Eclipses - Timing and Circumstances
 
-- [ ] IMPROVE ECLIPSE TIMING PRECISION OVERALL: Currently the file eclipse.py calculates solar and lunar eclipses with timing precision of approximately 1-2 minutes as noted in docs/PRECISION.md lines 305-307, but Swiss Ephemeris achieves precision of seconds, the task is to reduce timing error to less than 10 seconds by implementing proper Besselian element calculations.
+- [x] IMPROVE ECLIPSE TIMING PRECISION OVERALL: Currently the file eclipse.py calculates solar and lunar eclipses with timing precision of approximately 1-2 minutes as noted in docs/PRECISION.md lines 305-307, but Swiss Ephemeris achieves precision of seconds, the task is to reduce timing error to less than 10 seconds by implementing proper Besselian element calculations.
 
-- [ ] IMPLEMENT ECLIPSE FIRST CONTACT TIME C1: Using Besselian elements, implement precise calculation of first external contact time C1 (when the Moon's disk first touches the Sun's disk externally).
+- [x] IMPLEMENT ECLIPSE FIRST CONTACT TIME C1: Using Besselian elements, implement precise calculation of first external contact time C1 (when the Moon's disk first touches the Sun's disk externally).
 
-- [ ] IMPLEMENT ECLIPSE SECOND CONTACT TIME C2: Implement precise calculation of second contact time C2 (when totality or annularity begins, the Moon is fully inside/outside the Sun's disk).
+- [x] IMPLEMENT ECLIPSE SECOND CONTACT TIME C2: Implement precise calculation of second contact time C2 (when totality or annularity begins, the Moon is fully inside/outside the Sun's disk).
 
-- [ ] IMPLEMENT ECLIPSE MAXIMUM TIME: Implement precise calculation of the time of maximum eclipse when the separation between Moon and Sun centers is minimum.
+- [x] IMPLEMENT ECLIPSE MAXIMUM TIME: Implement precise calculation of the time of maximum eclipse when the separation between Moon and Sun centers is minimum.
 
-- [ ] IMPLEMENT ECLIPSE THIRD CONTACT TIME C3: Implement precise calculation of third contact time C3 (when totality or annularity ends).
+- [x] IMPLEMENT ECLIPSE THIRD CONTACT TIME C3: Implement precise calculation of third contact time C3 (when totality or annularity ends).
 
-- [ ] IMPLEMENT ECLIPSE FOURTH CONTACT TIME C4: Implement precise calculation of fourth external contact time C4 (when the Moon's disk completely separates from the Sun's disk).
+- [x] IMPLEMENT ECLIPSE FOURTH CONTACT TIME C4: Implement precise calculation of fourth external contact time C4 (when the Moon's disk completely separates from the Sun's disk).
 
-- [ ] IMPLEMENT LUNAR ECLIPSE PENUMBRAL CONTACTS P1 P4: For lunar eclipses, implement calculation of penumbral contact times P1 (Moon enters penumbra) and P4 (Moon exits penumbra).
+- [x] IMPLEMENT LUNAR ECLIPSE PENUMBRAL CONTACTS P1 P4: For lunar eclipses, implement calculation of penumbral contact times P1 (Moon enters penumbra) and P4 (Moon exits penumbra).
 
-- [ ] IMPLEMENT LUNAR ECLIPSE UMBRAL CONTACTS U1 U2 U3 U4: For lunar eclipses, implement calculation of umbral contact times U1 (Moon enters umbra), U2 (totality begins), U3 (totality ends), U4 (Moon exits umbra).
+- [x] IMPLEMENT LUNAR ECLIPSE UMBRAL CONTACTS U1 U2 U3 U4: For lunar eclipses, implement calculation of umbral contact times U1 (Moon enters umbra), U2 (totality begins), U3 (totality ends), U4 (Moon exits umbra).
 
-- [ ] IMPLEMENT ECLIPSE DURATION CALCULATION: Calculate the duration of totality or annularity for solar eclipses, and duration of umbral/total phase for lunar eclipses.
+- [x] IMPLEMENT ECLIPSE DURATION CALCULATION: Calculate the duration of totality or annularity for solar eclipses, and duration of umbral/total phase for lunar eclipses.
 
-- [ ] IMPLEMENT SAROS SERIES NUMBER CALCULATION: Implement function get_saros_number(jd_eclipse) that determines which Saros series (numbered approximately 1-180 for solar, 1-180 for lunar) an eclipse belongs to, the Saros cycle is 6585.32 days, implement by relating to known reference eclipses.
+- [x] IMPLEMENT SAROS SERIES NUMBER CALCULATION: Implement function get_saros_number(jd_eclipse) that determines which Saros series (numbered approximately 1-180 for solar, 1-180 for lunar) an eclipse belongs to, the Saros cycle is 6585.32 days, implement by relating to known reference eclipses.
 
-- [ ] IMPLEMENT INEX SERIES NUMBER CALCULATION: Implement function get_inex_number(jd_eclipse) that determines which Inex series an eclipse belongs to, the Inex cycle is 10571.95 days (358 synodic months, 28.945 years).
+- [x] IMPLEMENT INEX SERIES NUMBER CALCULATION: Implement function get_inex_number(jd_eclipse) that determines which Inex series an eclipse belongs to, the Inex cycle is 10571.95 days (358 synodic months, 28.945 years).
 
-- [ ] VALIDATE ECLIPSE TIMING AGAINST PYSWISSEPH: Create tests comparing eclipse times against pyswisseph for a list of known eclipses including the total solar eclipses of 2017-08-21, 2024-04-08, and the lunar eclipses of 2018-01-31, 2022-11-08, verify timing agrees within 10 seconds.
+- [x] VALIDATE ECLIPSE TIMING AGAINST PYSWISSEPH: Create tests comparing eclipse times against pyswisseph for a list of known eclipses including the total solar eclipses of 2017-08-21, 2024-04-08, and the lunar eclipses of 2018-01-31, 2022-11-08, verify timing agrees within 10 seconds.
 
 ---
 
 ## MEDIUM PRIORITY: Eclipses - Geography and Paths
 
-- [ ] IMPLEMENT ECLIPSE PATH WIDTH CALCULATION: For central solar eclipses, calculate the width of the path of totality or annularity in kilometers at any point along the central line.
+- [x] IMPLEMENT ECLIPSE PATH WIDTH CALCULATION: For central solar eclipses, calculate the width of the path of totality or annularity in kilometers at any point along the central line.
 
-- [ ] IMPLEMENT ECLIPSE CENTRAL LINE COORDINATES: Implement function to calculate the geographic coordinates (latitude, longitude) of points along the central line of a solar eclipse.
+- [x] IMPLEMENT ECLIPSE CENTRAL LINE COORDINATES: Implement function to calculate the geographic coordinates (latitude, longitude) of points along the central line of a solar eclipse.
 
-- [ ] IMPLEMENT ECLIPSE NORTHERN LIMIT: Calculate the northern limit of the umbral/antumbral shadow path.
+- [x] IMPLEMENT ECLIPSE NORTHERN LIMIT: Calculate the northern limit of the umbral/antumbral shadow path.
 
 - [ ] IMPLEMENT ECLIPSE SOUTHERN LIMIT: Calculate the southern limit of the umbral/antumbral shadow path.
 
