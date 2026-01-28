@@ -78,6 +78,9 @@ SE_PLANET_X_LOWELL: int = (
     SE_PLUTO_LOWELL  # Alias - Lowell's "Planet X" prediction (led to Pluto discovery)
 )
 SE_PLUTO_PICKERING: int = SE_FICT_OFFSET + 14  # 54 - Pickering's Pluto position
+SE_PLANET_X_PICKERING: int = (
+    SE_PLUTO_PICKERING  # Alias - Pickering's "Planet O" prediction (1919)
+)
 
 # Additional hypothetical bodies
 SE_VULCAN: int = SE_FICT_OFFSET + 15  # 55 - Intra-Mercurial planet
@@ -100,6 +103,7 @@ NIBIRU: int = SE_NIBIRU
 PLANET_X_LEVERRIER: int = SE_PLANET_X_LEVERRIER
 PLANET_X_ADAMS: int = SE_PLANET_X_ADAMS
 PLANET_X_LOWELL: int = SE_PLANET_X_LOWELL
+PLANET_X_PICKERING: int = SE_PLANET_X_PICKERING
 VULCAN: int = SE_VULCAN
 WHITE_MOON: int = SE_WHITE_MOON
 PROSERPINA: int = SE_PROSERPINA
@@ -1148,6 +1152,82 @@ LOWELL_PLANET_X_ELEMENTS = LowellPlanetXElements(
 
 
 # =============================================================================
+# PICKERING PLANET X (PLANET O) ORBITAL ELEMENTS (seorbel.txt #15)
+# =============================================================================
+# William H. Pickering's hypothetical "Planet O" (1919), one of several trans-Neptunian
+# planets he predicted (O, P, Q, R, S, T, U). Planet O was his most famous prediction.
+#
+# Historical note: Pickering, like Lowell, based his predictions on supposed
+# perturbations in the orbits of outer planets. These perturbations were later
+# found to be largely observational errors. Pickering's predictions, though detailed,
+# did not lead to any discoveries.
+#
+# Planet O orbital elements from Pickering's 1919 paper:
+#   - Semi-major axis: 51.9 AU (further out than Lowell's prediction)
+#   - Eccentricity: 0.31
+#   - Inclination: 15° to ecliptic
+#   - Orbital period: ~373.5 years (derived from Kepler's 3rd law)
+#
+# Note: The elements below are reconstructed from historical sources. The epoch
+# is set to J1900.0 to match other hypothetical bodies in seorbel.txt.
+
+
+@dataclass
+class PickeringPlanetXElements:
+    """
+    Orbital elements for Pickering's hypothetical Planet O/X.
+
+    William H. Pickering predicted this trans-Neptunian planet in 1919 based on
+    analysis of supposed perturbations in Uranus and Neptune orbits.
+
+    Attributes:
+        name: Name of the body
+        epoch: Reference epoch (Julian Day TT)
+        a: Semi-major axis (AU)
+        e: Eccentricity
+        i: Inclination (degrees)
+        omega: Argument of perihelion (degrees)
+        Omega: Longitude of ascending node (degrees)
+        M0: Mean anomaly at epoch (degrees)
+        n: Mean motion (degrees per day)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    omega: float
+    Omega: float
+    M0: float
+    n: float
+
+
+# Pickering Planet X (Planet O) orbital elements
+# Based on Pickering's 1919 prediction
+# Epoch: J1900.0 (JD 2415020.0) - matching other hypothetical bodies
+#
+# Elements from historical sources:
+#   - Semi-major axis: 51.9 AU
+#   - Eccentricity: 0.31
+#   - Inclination: 15.0 degrees
+#   - Mean motion: 360 / (51.9^1.5 * 365.25) = 0.00264 deg/day
+#   - Orbital period: ~373.5 years
+PICKERING_PLANET_X_ELEMENTS = PickeringPlanetXElements(
+    name="Planet X Pickering",
+    epoch=2415020.0,  # J1900.0 (matching other hypothetical bodies)
+    a=51.9,  # Semi-major axis in AU
+    e=0.31,  # Eccentricity from Pickering's prediction
+    i=15.0,  # Inclination in degrees
+    omega=100.0,  # Argument of perihelion in degrees (estimated)
+    Omega=110.0,  # Longitude of ascending node in degrees (estimated)
+    M0=15.0,  # Mean anomaly at epoch (degrees, estimated)
+    # n = 360 / (a^1.5 * 365.25) = 360 / (373.87 * 365.25) = 0.002637 deg/day
+    n=360.0 / (51.9**1.5 * 365.25),
+)
+
+
+# =============================================================================
 # HYPOTHETICAL BODY NAME MAPPING
 # =============================================================================
 
@@ -1166,7 +1246,7 @@ HYPOTHETICAL_NAMES: Dict[int, str] = {
     SE_NEPTUNE_LEVERRIER: "Neptune-Leverrier",
     SE_NEPTUNE_ADAMS: "Neptune-Adams",
     SE_PLUTO_LOWELL: "Planet X Lowell",
-    SE_PLUTO_PICKERING: "Pluto-Pickering",
+    SE_PLUTO_PICKERING: "Planet X Pickering",
     SE_VULCAN: "Vulcan",
     SE_WHITE_MOON: "White Moon (Selena)",
     SE_PROSERPINA: "Proserpina",
@@ -2957,6 +3037,154 @@ def _calc_planet_x_lowell_raw(jd_tt: float) -> Tuple[float, float, float]:
     return (longitude, latitude, distance)
 
 
+def calc_planet_x_pickering(
+    jd_tt: float,
+) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the heliocentric position of Pickering's Planet X using Keplerian propagation.
+
+    William H. Pickering's hypothetical "Planet O" was a trans-Neptunian planet he predicted
+    in 1919 based on supposed perturbations in Uranus and Neptune orbits. Pickering proposed
+    several hypothetical planets (O, P, Q, R, S, T, U), with Planet O being the most famous.
+
+    Historical note: Like Lowell's Planet X, Pickering's predictions were based on supposed
+    perturbations that later proved to be observational errors. No planet was ever found
+    at Pickering's predicted positions.
+
+    Orbital elements from Pickering's 1919 prediction:
+        - Semi-major axis: 51.9 AU
+        - Eccentricity: 0.31
+        - Inclination: 15 degrees to ecliptic
+        - Orbital period: ~373.5 years (derived from Kepler's 3rd law)
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Heliocentric ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees
+            - distance: Distance from Sun in AU
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_planet_x_pickering
+        >>> pos = calc_planet_x_pickering(2451545.0)  # J2000.0
+        >>> print(f"Planet X Pickering at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
+    """
+    elements = PICKERING_PLANET_X_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    # Position in orbital plane
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    # Rotate to ecliptic frame
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    # Convert to spherical coordinates
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    # Calculate velocity via numerical differentiation
+    dt_step = 1.0  # 1 day step for daily velocity
+    pos_next = _calc_planet_x_pickering_raw(jd_tt + dt_step)
+
+    dlon = pos_next[0] - longitude
+    # Handle wrap-around
+    if dlon > 180.0:
+        dlon -= 360.0
+    elif dlon < -180.0:
+        dlon += 360.0
+
+    dlat = pos_next[1] - latitude
+    ddist = pos_next[2] - distance
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def _calc_planet_x_pickering_raw(jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate raw Planet X Pickering position without velocity (helper for differentiation).
+    """
+    elements = PICKERING_PLANET_X_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    return (longitude, latitude, distance)
+
+
 def calc_hypothetical_position(
     ipl: int, jd_tt: float
 ) -> Tuple[float, float, float, float, float, float]:
@@ -3017,6 +3245,10 @@ def calc_hypothetical_position(
     # Planet X Lowell (Lowell's predicted trans-Neptunian planet)
     if ipl == SE_PLANET_X_LOWELL:
         return calc_planet_x_lowell(jd_tt)
+
+    # Planet X Pickering (Pickering's predicted trans-Neptunian planet)
+    if ipl == SE_PLANET_X_PICKERING:
+        return calc_planet_x_pickering(jd_tt)
 
     # Other Keplerian bodies
     if ipl in HYPOTHETICAL_ELEMENTS:

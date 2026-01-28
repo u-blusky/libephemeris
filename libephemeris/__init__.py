@@ -189,6 +189,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_vulcan,  # Vulcan - hypothetical intramercurial planet
     calc_waldemath,  # Waldemath Moon - hypothetical second moon of Earth (seorbel.txt #18)
     calc_proserpina,  # Proserpina - hypothetical trans-Plutonian planet
+    calc_planet_x_pickering,  # Pickering's Planet O/X prediction (1919)
     calc_white_moon_position,  # White Moon (Selena) - opposite to Black Moon Lilith
     calc_uranian_planet,
     calc_hypothetical_position,
@@ -196,6 +197,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     TRANSPLUTO_KEPLERIAN_ELEMENTS,
     VULCAN_ELEMENTS,  # Vulcan orbital elements from seorbel.txt
     WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements from seorbel.txt #18
+    PICKERING_PLANET_X_ELEMENTS,  # Pickering's Planet O/X orbital elements
     SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
     SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
     SE_ZEUS as SE_ZEUS_HYPO,  # Alias to avoid conflict with constants.py
@@ -210,6 +212,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     SE_WALDEMATH as SE_WALDEMATH_HYPO,  # Alias to avoid conflict with constants.py
     SE_WHITE_MOON as SE_WHITE_MOON_HYPO,  # Alias to avoid conflict with constants.py
     SE_PROSERPINA as SE_PROSERPINA_HYPO,  # Alias to avoid conflict with constants.py
+    SE_PLANET_X_PICKERING as SE_PLANET_X_PICKERING_HYPO,  # Alias to avoid conflict with constants.py
 )
 
 
@@ -565,6 +568,7 @@ __all__ = [
     "calc_transpluto",  # Transpluto (Isis) - hypothetical trans-Plutonian planet
     "calc_vulcan",  # Vulcan - hypothetical intramercurial planet
     "calc_waldemath",  # Waldemath Moon - hypothetical second moon of Earth
+    "calc_planet_x_pickering",  # Pickering's Planet O/X prediction (1919)
     "calc_white_moon_position",  # White Moon (Selena) - opposite to Black Moon Lilith
     "calc_uranian_planet",
     "calc_hypothetical_position",
@@ -572,4 +576,5 @@ __all__ = [
     "TRANSPLUTO_KEPLERIAN_ELEMENTS",
     "VULCAN_ELEMENTS",
     "WALDEMATH_ELEMENTS",  # Waldemath Moon orbital elements
+    "PICKERING_PLANET_X_ELEMENTS",  # Pickering's Planet O/X orbital elements
 ]

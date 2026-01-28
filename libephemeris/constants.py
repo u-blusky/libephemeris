@@ -134,6 +134,21 @@ SE_PLANET_X_LOWELL: int = (
 )  # 53 - Lowell's Planet X (Pluto prediction)
 PLANET_X_LOWELL: int = SE_PLANET_X_LOWELL  # Pyswisseph-compatible alias
 
+# Planet X Pickering - William H. Pickering's predicted "Planet O" (1919)
+# Pickering proposed several trans-Neptunian planets (Planet O, P, Q, R, S, T, U).
+# His most famous prediction, "Planet O" (1919), had the following orbital elements:
+# - Semi-major axis: 51.9 AU
+# - Eccentricity: 0.31
+# - Inclination: 15°
+# - Orbital period: ~373.5 years
+# Like Lowell's Planet X, these predictions were based on supposed perturbations in outer
+# planet orbits, which later proved to be observational errors.
+# This uses seorbel.txt #15 (SE_FICT_OFFSET + 14 = 54).
+SE_PLANET_X_PICKERING: int = (
+    SE_FICT_OFFSET + 14
+)  # 54 - Pickering's Planet O/X prediction
+PLANET_X_PICKERING: int = SE_PLANET_X_PICKERING  # Pyswisseph-compatible alias
+
 # White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
 # In Swiss Ephemeris, this is calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
 # Note: Some systems use True Lilith + 180° instead; libephemeris supports both via calc_white_moon_position()

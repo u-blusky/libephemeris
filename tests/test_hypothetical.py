@@ -34,6 +34,8 @@ from libephemeris.hypothetical import (
     PLANET_X_ADAMS,
     SE_PLANET_X_LOWELL,
     PLANET_X_LOWELL,
+    SE_PLANET_X_PICKERING,
+    PLANET_X_PICKERING,
     # Functions
     is_hypothetical_body,
     get_hypothetical_name,
@@ -47,6 +49,7 @@ from libephemeris.hypothetical import (
     calc_waldemath,  # Waldemath Moon (hypothetical second moon of Earth)
     calc_proserpina,  # Proserpina (hypothetical trans-Plutonian planet)
     calc_planet_x_lowell,  # Lowell's Planet X prediction
+    calc_planet_x_pickering,  # Pickering's Planet O/X prediction
     calc_hypothetical_position,
     list_hypothetical_bodies,
     calc_cupido,
@@ -75,6 +78,7 @@ from libephemeris.hypothetical import (
     VULCAN_ELEMENTS,
     WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements
     LOWELL_PLANET_X_ELEMENTS,  # Lowell's Planet X orbital elements
+    PICKERING_PLANET_X_ELEMENTS,  # Pickering's Planet O/X orbital elements
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -3405,6 +3409,164 @@ class TestPlanetXLowell:
         for i in range(10):
             jd = self.J2000 + i * 365.25 * 28.2  # Sample every ~28 years (1/10 orbit)
             pos = calc_planet_x_lowell(jd)
+            distances.append(pos[2])
+
+        # Distance should vary (not all the same)
+        assert max(distances) - min(distances) > 1.0, (
+            "Distance should vary due to non-zero eccentricity"
+        )
+
+
+class TestPlanetXPickering:
+    """Tests for Pickering's hypothetical Planet X (Planet O) calculations."""
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_planet_x_pickering_returns_tuple(self):
+        """Test that calc_planet_x_pickering returns a tuple of 6 floats."""
+        pos = calc_planet_x_pickering(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        assert all(isinstance(v, float) for v in pos)
+
+    def test_calc_planet_x_pickering_longitude_range(self):
+        """Test that longitude is within valid range."""
+        for jd in [self.J1900, self.J2000, self.J2000 + 36525]:
+            pos = calc_planet_x_pickering(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
+
+    def test_calc_planet_x_pickering_latitude_range(self):
+        """Test that latitude is within valid range for 15 degree inclination."""
+        for jd in [self.J2000, self.J2000 + 36525]:
+            pos = calc_planet_x_pickering(jd)
+            # Latitude should be within ±inclination (15 degrees)
+            assert -16.0 <= pos[1] <= 16.0, f"Latitude {pos[1]} out of range"
+
+    def test_calc_planet_x_pickering_distance_range(self):
+        """Test that distance is within expected range for e=0.31, a=51.9 AU."""
+        # Perihelion = a * (1 - e) = 51.9 * (1 - 0.31) = 35.8 AU
+        # Aphelion = a * (1 + e) = 51.9 * (1 + 0.31) = 68.0 AU
+        perihelion = 51.9 * (1.0 - 0.31)
+        aphelion = 51.9 * (1.0 + 0.31)
+
+        test_dates = [self.J2000, self.J2000 + 36525, self.J2000 + 73050]
+        for jd in test_dates:
+            pos = calc_planet_x_pickering(jd)
+            assert perihelion - 0.1 <= pos[2] <= aphelion + 0.1, (
+                f"Distance {pos[2]} AU outside valid range [{perihelion:.2f}, {aphelion:.2f}]"
+            )
+
+    def test_calc_planet_x_pickering_velocity_positive(self):
+        """Test that Planet X Pickering has prograde motion."""
+        pos = calc_planet_x_pickering(self.J2000)
+        assert pos[3] > 0, "Planet X Pickering should have prograde motion"
+
+    def test_calc_planet_x_pickering_velocity_magnitude(self):
+        """Test that daily motion is reasonable for a ~373 year period."""
+        pos = calc_planet_x_pickering(self.J2000)
+        # Mean motion ~360 / (373.5 * 365.25) = 0.00264 deg/day
+        # Actual motion varies due to eccentricity
+        assert 0.001 < pos[3] < 0.01, (
+            f"Daily motion {pos[3]} deg/day seems unreasonable for 373-year orbit"
+        )
+
+    def test_se_planet_x_pickering_constant_value(self):
+        """Test that SE_PLANET_X_PICKERING has correct value (SE_FICT_OFFSET + 14 = 54)."""
+        assert SE_PLANET_X_PICKERING == 54
+        assert SE_PLANET_X_PICKERING == SE_FICT_OFFSET + 14
+
+    def test_planet_x_pickering_pyswisseph_alias(self):
+        """Test that PLANET_X_PICKERING alias works."""
+        assert PLANET_X_PICKERING == SE_PLANET_X_PICKERING
+
+    def test_planet_x_pickering_identified_as_hypothetical(self):
+        """Test that Planet X Pickering is identified as a hypothetical body."""
+        assert is_hypothetical_body(SE_PLANET_X_PICKERING)
+
+    def test_planet_x_pickering_name(self):
+        """Test that get_hypothetical_name returns correct name."""
+        name = get_hypothetical_name(SE_PLANET_X_PICKERING)
+        assert "Planet X" in name or "Pickering" in name
+
+    def test_planet_x_pickering_in_hypothetical_names(self):
+        """Test that Planet X Pickering is in HYPOTHETICAL_NAMES dictionary."""
+        assert SE_PLANET_X_PICKERING in HYPOTHETICAL_NAMES
+
+    def test_calc_planet_x_pickering_via_calc_hypothetical_position(self):
+        """Test that calc_hypothetical_position routes Planet X Pickering correctly."""
+        pos1 = calc_hypothetical_position(SE_PLANET_X_PICKERING, self.J2000)
+        pos2 = calc_planet_x_pickering(self.J2000)
+        assert pos1 == pos2
+
+    def test_pickering_planet_x_elements_valid(self):
+        """Test that Pickering Planet X orbital elements are valid."""
+        elements = PICKERING_PLANET_X_ELEMENTS
+        assert elements.name == "Planet X Pickering"
+        assert abs(elements.a - 51.9) < 0.001, "Semi-major axis should be 51.9 AU"
+        assert abs(elements.e - 0.31) < 0.001, "Eccentricity should be 0.31"
+        assert abs(elements.i - 15.0) < 0.001, "Inclination should be 15 degrees"
+        assert elements.n > 0, "Mean motion should be positive"
+
+    def test_planet_x_pickering_orbital_period(self):
+        """Test that Planet X Pickering has approximately 373.5 year orbital period."""
+        # From Kepler's 3rd law: Period = a^1.5 years = 51.9^1.5 ≈ 373.5 years
+        elements = PICKERING_PLANET_X_ELEMENTS
+        period_days = 360.0 / elements.n
+        period_years = period_days / 365.25
+
+        # Verify period is approximately 373.5 years
+        assert 365.0 < period_years < 385.0, (
+            f"Planet X Pickering period should be ~373.5 years, got {period_years:.1f}"
+        )
+
+    def test_planet_x_pickering_progression(self):
+        """Test that Planet X Pickering progresses correctly over time."""
+        pos1 = calc_planet_x_pickering(self.J2000)
+        pos2 = calc_planet_x_pickering(self.J2000 + 365.25 * 10)  # 10 years later
+
+        # Calculate actual motion (handle wrap-around)
+        motion = pos2[0] - pos1[0]
+        if motion < -180:
+            motion += 360
+        elif motion > 180:
+            motion -= 360
+
+        # Should have moved noticeably in 10 years (~9-12 degrees)
+        assert 5.0 < abs(motion) < 20.0, (
+            f"10-year motion {motion:.2f} deg seems unreasonable"
+        )
+
+    def test_planet_x_pickering_different_from_lowell(self):
+        """Test that Planet X Pickering has different orbit characteristics than Lowell's."""
+        # Pickering's Planet O: a=51.9 AU, e=0.31, i=15 deg, period ~373.5 years
+        # Lowell's Planet X: a=43.0 AU, e=0.202, i=10 deg, period ~282 years
+        # They should give different positions
+        pickering_elements = PICKERING_PLANET_X_ELEMENTS
+        lowell_elements = LOWELL_PLANET_X_ELEMENTS
+
+        # Pickering predicted a larger semi-major axis than Lowell
+        assert pickering_elements.a > lowell_elements.a, (
+            "Pickering's Planet X should have larger orbit than Lowell's"
+        )
+
+        # They should give different longitudes at J2000
+        pos_pickering = calc_planet_x_pickering(self.J2000)
+        pos_lowell = calc_planet_x_lowell(self.J2000)
+
+        # Positions should be different
+        assert (
+            abs(pos_pickering[0] - pos_lowell[0]) > 1.0
+            or abs(pos_pickering[1] - pos_lowell[1]) > 0.5
+        ), "Pickering and Lowell Planet X positions should be different"
+
+    def test_planet_x_pickering_distance_varies(self):
+        """Test that distance varies over time (non-circular orbit)."""
+        # With e=0.31, distance should vary significantly over the orbit
+        distances = []
+        for i in range(10):
+            jd = self.J2000 + i * 365.25 * 37.35  # Sample every ~37 years (1/10 orbit)
+            pos = calc_planet_x_pickering(jd)
             distances.append(pos[2])
 
         # Distance should vary (not all the same)
