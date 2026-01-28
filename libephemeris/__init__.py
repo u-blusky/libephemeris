@@ -144,6 +144,9 @@ from .eclipse import (
     # Eclipse path width calculation
     calc_eclipse_path_width,
     swe_calc_eclipse_path_width,
+    # Eclipse central line coordinates
+    calc_eclipse_central_line,
+    swe_calc_eclipse_central_line,
     # Saros series calculation
     get_saros_number,
     SAROS_CYCLE_DAYS,
@@ -545,6 +548,9 @@ __all__ = [
     # Eclipse path width calculation
     "calc_eclipse_path_width",
     "swe_calc_eclipse_path_width",
+    # Eclipse central line coordinates
+    "calc_eclipse_central_line",
+    "swe_calc_eclipse_central_line",
     # Saros series calculation
     "get_saros_number",
     "SAROS_CYCLE_DAYS",
