@@ -636,6 +636,7 @@ SE_ECL_ANNULAR_TOTAL: int = (
     32  # Hybrid eclipse (annular at some locations, total at others)
 )
 SE_ECL_PENUMBRAL: int = 64  # Penumbral lunar eclipse
+SE_ECL_GRAZING: int = 65536  # Grazing occultation (target passes near lunar limb)
 
 # Composite eclipse type masks
 SE_ECL_ALLTYPES_SOLAR: int = (
@@ -657,7 +658,10 @@ SE_ECL_3RD_VISIBLE: int = 2048  # Third contact visible
 SE_ECL_4TH_VISIBLE: int = 4096  # Fourth contact visible
 SE_ECL_ONE_TRY: int = 32768  # Try only once (optimization flag)
 
-# =============================================================================
+# pyswisseph-compatible alias for grazing occultation
+ECL_GRAZING: int = SE_ECL_GRAZING
+
+# ============================================================================
 # NODAL/APSIDAL CALCULATION METHOD FLAGS
 # =============================================================================
 # Method flags for nod_aps() and nod_aps_ut() functions

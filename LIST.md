@@ -326,9 +326,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT LUN_OCCULT_WHERE: Implement swe_lun_occult_where(jd, planet, starname, flags) that determines where on Earth an occultation is visible at a given time.
 
-- [ ] IMPLEMENT PLANETARY OCCULTATION SEARCH: Extend occultation functions to handle mutual planetary occultations (e.g., when Jupiter occults a star).
+- [x] IMPLEMENT PLANETARY OCCULTATION SEARCH: Extend occultation functions to handle mutual planetary occultations (e.g., when Jupiter occults a star).
 
-- [ ] IMPLEMENT GRAZING OCCULTATION DETECTION: Detect and flag grazing occultations where the star passes near the lunar limb.
+- [x] IMPLEMENT GRAZING OCCULTATION DETECTION: Detect and flag grazing occultations where the star passes near the lunar limb.
 
 ---
 

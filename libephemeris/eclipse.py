@@ -44,6 +44,7 @@ from .constants import (
     SE_ECL_ALLTYPES_SOLAR,
     SE_ECL_ALLTYPES_LUNAR,
     SE_ECL_PENUMBRAL,
+    SE_ECL_GRAZING,
     SE_ECL_VISIBLE,
     SE_ECL_MAX_VISIBLE,
     SE_ECL_1ST_VISIBLE,
@@ -5026,6 +5027,13 @@ def lun_occult_when_glob(
                 )
 
                 # Determine occultation type
+                # Grazing threshold: when the target passes within the outer 10%
+                # of the Moon's disc (min_sep > 0.9 * moon_r). Grazing occultations
+                # are scientifically interesting because the star may flash in/out
+                # multiple times due to lunar limb topography (mountains/valleys).
+                grazing_threshold = 0.9 * moon_r
+                is_grazing = min_sep > grazing_threshold
+
                 if min_sep < abs(moon_r - target_r):
                     if target_r > moon_r:
                         # Target larger than Moon (only for Sun - but Sun is not handled here)
@@ -5036,6 +5044,10 @@ def lun_occult_when_glob(
                 else:
                     # Partial occultation
                     ecl_type = SE_ECL_PARTIAL
+
+                # Add grazing flag if applicable
+                if is_grazing:
+                    ecl_type |= SE_ECL_GRAZING
 
                 # Build tret tuple with pyswisseph indices (10 elements):
                 # [0]: time of maximum occultation
@@ -13253,10 +13265,19 @@ def planet_occult_when_glob(
                 )
 
                 # Determine occultation type
+                # Grazing threshold: when the target passes within the outer 10%
+                # of the occulting planet's disc
+                grazing_threshold = 0.9 * occ_r
+                is_grazing = min_sep > grazing_threshold
+
                 if min_sep < abs(occ_r - target_r):
                     ecl_type = SE_ECL_TOTAL
                 else:
                     ecl_type = SE_ECL_PARTIAL
+
+                # Add grazing flag if applicable
+                if is_grazing:
+                    ecl_type |= SE_ECL_GRAZING
 
                 tret = (
                     jd_max,  # [0] Time of maximum
