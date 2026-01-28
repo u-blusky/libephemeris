@@ -2497,48 +2497,115 @@ def _calc_keplerian_position_raw(ipl: int, jd_tt: float) -> Tuple[float, float, 
 
 def calc_white_moon_position(
     jd_tt: float,
+    use_true_lilith: bool = False,
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Calculate the position of the White Moon (Selena).
 
-    The White Moon is a symbolic point representing the second Moon of Earth.
-    Its position is calculated as the point 180 degrees opposite to the
-    Black Moon Lilith (mean lunar apogee).
+    The White Moon (also called Selena) is a symbolic astrological point defined
+    as the lunar perigee - the point 180 degrees opposite to Black Moon Lilith
+    (the lunar apogee). It represents the closest approach of the Moon to Earth,
+    symbolically associated with positive lunar qualities.
+
+    Swiss Ephemeris Definition:
+        White Moon Selena = Mean Lilith + 180° (default, matching Swiss Ephemeris)
+        This uses the mean lunar apogee, which ignores short-period oscillations.
+
+    True Lilith-based Definition:
+        White Moon Selena = True Lilith + 180° (optional via use_true_lilith=True)
+        This uses the osculating (true) lunar apogee, which includes perturbations.
+        The true apogee oscillates ±5-10° from the mean position.
+
+    Astronomical Background:
+        - Black Moon Lilith (lunar apogee) = point where Moon is farthest from Earth
+        - White Moon Selena (lunar perigee) = point where Moon is closest to Earth
+        - Mean apogee progresses at ~40.69°/year (apsidal precession period ~8.85 years)
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
+        use_true_lilith: If True, calculate based on True (osculating) Lilith
+                         instead of Mean Lilith. Default is False to match
+                         the Swiss Ephemeris convention.
 
     Returns:
         Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees (0 for mean-based, varies for true)
+            - distance: Distance (0 for symbolic point, or apogee distance for true)
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
 
     Note:
-        This is a symbolic calculation. The White Moon is not a physical body.
+        This is a symbolic calculation. The White Moon is not a physical body,
+        but rather a calculated point representing the lunar perigee direction.
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_white_moon_position
+        >>> pos = calc_white_moon_position(2451545.0)  # J2000.0, mean-based
+        >>> print(f"White Moon at {pos[0]:.4f} deg")
+        >>> pos_true = calc_white_moon_position(2451545.0, use_true_lilith=True)
+        >>> print(f"White Moon (true) at {pos_true[0]:.4f} deg")
+
+    References:
+        - Swiss Ephemeris documentation on fictitious objects
+        - Jacobson: "The Dark Moon Lilith in Astrology" (1961)
     """
-    # Import lunar module to get mean Lilith position
+    # Import lunar module to get Lilith position
     from . import lunar
 
-    # Mean Lilith longitude
-    lilith_lon = lunar.calc_mean_lilith(jd_tt)
+    if use_true_lilith:
+        # Use True (osculating) Lilith - includes perturbations
+        lilith_lon, lilith_lat, lilith_dist = lunar.calc_true_lilith(jd_tt)
 
-    # White Moon is opposite to Black Moon
-    longitude = (lilith_lon + 180.0) % 360.0
+        # White Moon is opposite to Black Moon
+        longitude = (lilith_lon + 180.0) % 360.0
 
-    # Latitude, distance, and velocities are simplified
-    latitude = 0.0
-    distance = 0.0  # Symbolic point, no meaningful distance
+        # For true-based calculation, latitude is opposite (symmetric point)
+        # Note: True Lilith has non-zero latitude due to inclination of apsidal line
+        latitude = -lilith_lat  # Opposite point has opposite latitude
 
-    # Velocity is opposite to Lilith velocity
-    dt = 1.0 / 86400.0
-    lilith_next = lunar.calc_mean_lilith(jd_tt + dt)
-    lilith_dlon = (lilith_next - lilith_lon) / dt
-    if lilith_dlon > 180.0 / dt:
-        lilith_dlon -= 360.0 / dt
-    elif lilith_dlon < -180.0 / dt:
-        lilith_dlon += 360.0 / dt
+        # Distance is same as Lilith (apogee distance = perigee distance conceptually,
+        # but for a symbolic point we use 0)
+        distance = 0.0  # Symbolic point, no meaningful distance
 
-    dlon = lilith_dlon  # Same rate, just offset by 180 degrees
-    dlat = 0.0
-    ddist = 0.0
+        # Calculate velocity via numerical differentiation
+        dt = 1.0 / 86400.0  # 1 second step
+        lilith_next_lon, lilith_next_lat, _ = lunar.calc_true_lilith(jd_tt + dt)
+
+        lilith_dlon = (lilith_next_lon - lilith_lon) / dt
+        # Handle wrap-around
+        if lilith_dlon > 180.0 / dt:
+            lilith_dlon -= 360.0 / dt
+        elif lilith_dlon < -180.0 / dt:
+            lilith_dlon += 360.0 / dt
+
+        dlon = lilith_dlon  # Same rate, just offset by 180 degrees
+        dlat = -(lilith_next_lat - lilith_lat) / dt  # Opposite latitude change
+        ddist = 0.0
+    else:
+        # Use Mean Lilith - default, matching Swiss Ephemeris convention
+        lilith_lon = lunar.calc_mean_lilith(jd_tt)
+
+        # White Moon is opposite to Black Moon
+        longitude = (lilith_lon + 180.0) % 360.0
+
+        # Latitude, distance, and velocities are simplified for mean calculation
+        latitude = 0.0
+        distance = 0.0  # Symbolic point, no meaningful distance
+
+        # Calculate velocity via numerical differentiation
+        dt = 1.0 / 86400.0  # 1 second step
+        lilith_next = lunar.calc_mean_lilith(jd_tt + dt)
+        lilith_dlon = (lilith_next - lilith_lon) / dt
+        if lilith_dlon > 180.0 / dt:
+            lilith_dlon -= 360.0 / dt
+        elif lilith_dlon < -180.0 / dt:
+            lilith_dlon += 360.0 / dt
+
+        dlon = lilith_dlon  # Same rate, just offset by 180 degrees
+        dlat = 0.0
+        ddist = 0.0
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 

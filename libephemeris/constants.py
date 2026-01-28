@@ -107,6 +107,16 @@ VULCAN: int = SE_VULCAN  # Pyswisseph-compatible alias
 SE_WALDEMATH: int = SE_FICT_OFFSET + 18  # 58 - Waldemath's hypothetical Dark Moon
 WALDEMATH: int = SE_WALDEMATH  # Pyswisseph-compatible alias
 
+# White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
+# In Swiss Ephemeris, this is calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
+# Note: Some systems use True Lilith + 180° instead; libephemeris supports both via calc_white_moon_position()
+SE_WHITE_MOON: int = (
+    SE_FICT_OFFSET + 16
+)  # 56 - White Moon Selena (opposite to Black Moon Lilith)
+WHITE_MOON: int = SE_WHITE_MOON  # Pyswisseph-compatible alias
+SE_SELENA: int = SE_WHITE_MOON  # Alias - Selena is another name for White Moon
+SELENA: int = SE_WHITE_MOON  # Pyswisseph-compatible alias
+
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
 # Trans-Neptunian Objects (TNOs) - Catalog number + offset

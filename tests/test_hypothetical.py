@@ -372,6 +372,142 @@ class TestWhiteMoonCalculations:
         pos = calc_white_moon_position(self.J2000)
         assert 0.0 <= pos[0] < 360.0
 
+    def test_calc_white_moon_latitude_zero_for_mean(self):
+        """Test that White Moon (mean-based) has zero latitude."""
+        pos = calc_white_moon_position(self.J2000, use_true_lilith=False)
+        assert pos[1] == 0.0, "Mean-based White Moon should have zero latitude"
+
+    def test_calc_white_moon_distance_zero(self):
+        """Test that White Moon distance is zero (symbolic point)."""
+        pos = calc_white_moon_position(self.J2000)
+        assert pos[2] == 0.0, "White Moon is a symbolic point with no distance"
+
+    def test_calc_white_moon_velocity_positive(self):
+        """Test that White Moon has positive (prograde) velocity."""
+        pos = calc_white_moon_position(self.J2000)
+        # Mean Lilith/apogee moves prograde at ~40.69 deg/year = ~0.111 deg/day
+        assert pos[3] > 0, "White Moon should have prograde motion"
+        # Velocity should be roughly 0.1-0.2 deg/day for mean-based
+        assert 0.05 < pos[3] < 0.5, (
+            f"White Moon velocity should be ~0.1 deg/day, got {pos[3]}"
+        )
+
+    def test_calc_white_moon_progression(self):
+        """Test that White Moon progresses correctly over time."""
+        pos1 = calc_white_moon_position(self.J2000)
+        pos2 = calc_white_moon_position(self.J2000 + 365.25)  # 1 year later
+
+        # Mean apogee moves ~40.69 deg/year
+        expected_motion = 40.69
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        assert abs(actual_motion - expected_motion) < 2.0, (
+            f"Annual motion should be ~{expected_motion:.2f} deg, got {actual_motion:.2f}"
+        )
+
+    def test_calc_white_moon_true_lilith_opposite(self):
+        """Test that White Moon (true) is 180 degrees from True Lilith."""
+        from libephemeris import lunar
+
+        true_lilith_lon, true_lilith_lat, _ = lunar.calc_true_lilith(self.J2000)
+        white_moon_pos = calc_white_moon_position(self.J2000, use_true_lilith=True)
+        white_moon_lon = white_moon_pos[0]
+
+        # Should be 180 degrees apart
+        diff = abs(white_moon_lon - true_lilith_lon)
+        if diff > 180:
+            diff = 360 - diff
+        assert abs(diff - 180.0) < 0.1, (
+            f"White Moon (true) should be 180 deg from True Lilith, got {diff}"
+        )
+
+    def test_calc_white_moon_true_has_latitude(self):
+        """Test that White Moon (true-based) can have non-zero latitude."""
+        from libephemeris import lunar
+
+        # True Lilith has latitude due to inclination
+        _, true_lilith_lat, _ = lunar.calc_true_lilith(self.J2000)
+        white_moon_pos = calc_white_moon_position(self.J2000, use_true_lilith=True)
+
+        # White Moon latitude should be opposite to True Lilith latitude
+        assert abs(white_moon_pos[1] + true_lilith_lat) < 0.01, (
+            f"White Moon latitude should be opposite to True Lilith: "
+            f"got {white_moon_pos[1]}, expected {-true_lilith_lat}"
+        )
+
+    def test_calc_white_moon_mean_vs_true_differ(self):
+        """Test that mean-based and true-based White Moon can differ."""
+        pos_mean = calc_white_moon_position(self.J2000, use_true_lilith=False)
+        pos_true = calc_white_moon_position(self.J2000, use_true_lilith=True)
+
+        # Mean and true Lilith can differ by several degrees
+        # So White Moon positions should also differ
+        diff = abs(pos_mean[0] - pos_true[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        # The difference should typically be a few degrees (True Lilith oscillates ±5-10° from mean)
+        # But for some dates they might be closer
+        assert diff < 15.0, (
+            f"Mean vs true White Moon difference seems too large: {diff} deg"
+        )
+
+    def test_calc_white_moon_multiple_dates(self):
+        """Test White Moon calculation at multiple dates."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000 - 3652.5,  # 10 years before J2000
+            self.J2000,
+            self.J2000 + 3652.5,  # 10 years after J2000
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_white_moon_position(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude out of range at JD {jd}"
+            assert isinstance(pos[0], float), f"Longitude should be float at JD {jd}"
+
+    def test_calc_white_moon_exportable_from_main_module(self):
+        """Test that calc_white_moon_position is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_white_moon_position")
+        pos = libephemeris.calc_white_moon_position(self.J2000)
+        assert len(pos) == 6
+
+    def test_se_white_moon_in_constants(self):
+        """Test that SE_WHITE_MOON is defined in constants.py."""
+        from libephemeris import constants
+
+        assert hasattr(constants, "SE_WHITE_MOON")
+        assert constants.SE_WHITE_MOON == 56  # SE_FICT_OFFSET + 16
+
+    def test_white_moon_aliases_in_constants(self):
+        """Test that White Moon aliases are defined in constants.py."""
+        from libephemeris import constants
+
+        assert hasattr(constants, "WHITE_MOON")
+        assert hasattr(constants, "SE_SELENA")
+        assert hasattr(constants, "SELENA")
+        assert constants.WHITE_MOON == constants.SE_WHITE_MOON
+        assert constants.SE_SELENA == constants.SE_WHITE_MOON
+        assert constants.SELENA == constants.SE_WHITE_MOON
+
+    def test_calc_white_moon_default_uses_mean(self):
+        """Test that default behavior uses Mean Lilith."""
+        pos_default = calc_white_moon_position(self.J2000)
+        pos_mean = calc_white_moon_position(self.J2000, use_true_lilith=False)
+
+        # Default should be same as explicit use_true_lilith=False
+        assert pos_default[0] == pos_mean[0], "Default should use Mean Lilith"
+        assert pos_default[1] == pos_mean[1]
+        assert pos_default[3] == pos_mean[3]
+
 
 class TestWaldemathCalculations:
     """Tests for Waldemath Moon (hypothetical second moon of Earth) calculations."""
