@@ -4700,10 +4700,10 @@ def swe_lun_eclipse_how(
 
 def lun_occult_when_glob(
     tjdut: float,
-    body: "int | str",
+    planet: int,
+    starname: str,
     flags: int = SEFLG_SWIEPH,
-    ecltype: int = 0,
-    backwards: bool = False,
+    direction: int = 0,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Find the next lunar occultation of a planet or fixed star globally (UT).
@@ -4716,12 +4716,11 @@ def lun_occult_when_glob(
 
     Args:
         tjdut: Julian Day (UT) to start search from
-        body: Planet identifier (int) or star name (str)
+        planet: Planet identifier (int). Use 0 if searching for a star.
+        starname: Star name (str). Use empty string "" if searching for a planet.
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
-        ecltype: Bit flags for eclipse type wanted:
-            - SE_ECL_TOTAL, SE_ECL_PARTIAL, SE_ECL_ANNULAR
-            - 0 for any type
-        backwards: If True, search backward in time
+        direction: Search direction. 0 or positive = forward in time,
+                   negative = backward in time.
 
     Returns:
         Tuple containing:
@@ -4743,7 +4742,7 @@ def lun_occult_when_glob(
 
     Raises:
         RuntimeError: If no occultation found within search limit
-        ValueError: If body is invalid
+        ValueError: If neither planet nor starname is specified
 
     Algorithm:
         1. Calculate Moon's position and the target body's position
@@ -4761,24 +4760,19 @@ def lun_occult_when_glob(
         >>> # Find next occultation of Regulus by the Moon
         >>> from libephemeris import julday
         >>> jd = julday(2024, 1, 1, 0)
-        >>> retflags, tret = lun_occult_when_glob(jd, "Regulus")
+        >>> retflags, tret = lun_occult_when_glob(jd, 0, "Regulus", SEFLG_SWIEPH, 0)
         >>> print(f"Occultation at JD {tret[0]:.5f}")
 
         >>> # Find next occultation of Venus by the Moon
-        >>> retflags, tret = lun_occult_when_glob(jd, SE_VENUS)
+        >>> retflags, tret = lun_occult_when_glob(jd, SE_VENUS, "", SEFLG_SWIEPH, 0)
         >>> print(f"Venus occultation at JD {tret[0]:.5f}")
 
     References:
         - Swiss Ephemeris: swe_lun_occult_when_glob()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
-    # Determine if body is planet ID or star name
-    if isinstance(body, str):
-        planet = 0
-        star_name = body
-    else:
-        planet = body
-        star_name = ""
+    # Use starname as star_name for internal consistency
+    star_name = starname
     from .state import get_planets, get_timescale
     from .fixed_stars import swe_fixstar_ut
     from .constants import (
@@ -5309,9 +5303,9 @@ def lun_occult_when_loc(
     for _ in range(MAX_OCCULTATIONS):
         # Find next global occultation
         try:
-            # Determine body argument for new signature
-            body: "int | str" = star_name if planet == 0 else planet
-            global_type, global_times = lun_occult_when_glob(jd, body, flags)
+            global_type, global_times = lun_occult_when_glob(
+                jd, planet, star_name, flags
+            )
         except RuntimeError:
             raise RuntimeError(
                 f"No lunar occultation of {'star ' + star_name if planet == 0 else 'planet ' + str(planet)} "

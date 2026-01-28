@@ -320,9 +320,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT LUNAR ECLIPSE GAMMA: Calculate the gamma parameter for lunar eclipses (distance of Moon center from shadow axis in Earth radii).
 
-- [ ] IMPLEMENT LUN_OCCULT_WHEN_LOC: Implement swe_lun_occult_when_loc(jd_start, planet, starname, flags, geopos, direction) that finds when an occultation of a planet or star by the Moon is visible from a given location, the calculation requires finding when the Moon's disk overlaps the target as seen from the observer accounting for parallax.
+- [x] IMPLEMENT LUN_OCCULT_WHEN_LOC: Implement swe_lun_occult_when_loc(jd_start, planet, starname, flags, geopos, direction) that finds when an occultation of a planet or star by the Moon is visible from a given location, the calculation requires finding when the Moon's disk overlaps the target as seen from the observer accounting for parallax.
 
-- [ ] IMPLEMENT LUN_OCCULT_WHEN_GLOB: Implement swe_lun_occult_when_glob(jd_start, planet, starname, flags, direction) that finds the next occultation visible anywhere on Earth.
+- [x] IMPLEMENT LUN_OCCULT_WHEN_GLOB: Implement swe_lun_occult_when_glob(jd_start, planet, starname, flags, direction) that finds the next occultation visible anywhere on Earth.
 
 - [ ] IMPLEMENT LUN_OCCULT_WHERE: Implement swe_lun_occult_where(jd, planet, starname, flags) that determines where on Earth an occultation is visible at a given time.
 

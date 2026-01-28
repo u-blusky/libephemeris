@@ -17,6 +17,7 @@ from libephemeris import (
     lun_occult_when_glob,
     SE_ECL_TOTAL,
     SE_ECL_PARTIAL,
+    SEFLG_SWIEPH,
 )
 
 
@@ -27,7 +28,7 @@ class TestLunOccultWhere:
         """Test that return values have correct structure."""
         # First find a known occultation time
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Now get where it's visible
@@ -48,7 +49,7 @@ class TestLunOccultWhere:
         """Test that function finds valid location during a known occultation."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get where it's visible
@@ -80,7 +81,7 @@ class TestLunOccultWhere:
         """Test that occultation type flags are set correctly."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get where it's visible
@@ -93,7 +94,7 @@ class TestLunOccultWhere:
         """Test that geographic limits are reasonable."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get where it's visible
@@ -124,7 +125,7 @@ class TestLunOccultWhere:
         """Test that occultation attributes are reasonable."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get where it's visible
@@ -167,7 +168,7 @@ class TestLunOccultWhere:
         """Test that swe_lun_occult_where is an alias."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         ocl_type1, geopos1, attr1 = lun_occult_where(jd_max, 0, "Regulus")
@@ -185,7 +186,7 @@ class TestLunOccultWhere:
         """
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get where it's visible
@@ -205,7 +206,7 @@ class TestLunOccultWhereEdgeCases:
         """Test occultation location changes during an event."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get location at maximum
@@ -224,7 +225,7 @@ class TestLunOccultWhereEdgeCases:
         """
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get where it's visible
@@ -239,7 +240,7 @@ class TestLunOccultWhereEdgeCases:
         """Test that fraction covered is 1.0 for total occultation."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get where it's visible
@@ -257,7 +258,7 @@ class TestLunOccultWhereIntegration:
         """Test that lun_occult_where is consistent with lun_occult_when_glob."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        glob_type, times = lun_occult_when_glob(jd_start, "Regulus")
+        glob_type, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Get where it's visible
@@ -277,7 +278,7 @@ class TestLunOccultWhereIntegration:
         """Test that calling the function multiple times gives same result."""
         # Find a Regulus occultation
         jd_start = julday(2017, 1, 1, 0)
-        retflags, times = lun_occult_when_glob(jd_start, "Regulus")
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
         jd_max = times[0]
 
         # Call multiple times
