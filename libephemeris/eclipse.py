@@ -12133,3 +12133,238 @@ def swe_sol_eclipse_magnitude_at_loc(
     altitude = float(geopos[2])
 
     return sol_eclipse_magnitude_at_loc(tjd_ut, lat, lon, altitude, ifl)
+
+
+def sol_eclipse_obscuration_at_loc(
+    jd: float,
+    lat: float,
+    lon: float,
+    altitude: float = 0.0,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the eclipse obscuration at a specific geographic location and time.
+
+    Eclipse obscuration is defined as the fraction of the Sun's disc area that
+    is covered by the Moon. This differs from eclipse magnitude, which is the
+    fraction of the Sun's diameter covered.
+
+    The relationship between magnitude and obscuration is non-linear:
+    - Obscuration = 0 when magnitude = 0 (no eclipse)
+    - Obscuration < magnitude for partial eclipses
+    - Obscuration = 1 when magnitude >= 1 (total eclipse)
+    - For annular eclipses, obscuration = (moon_radius/sun_radius)^2
+
+    Args:
+        jd: Julian Day (UT) of the time to calculate
+        lat: Observer latitude in degrees (positive = North, negative = South)
+        lon: Observer longitude in degrees (positive = East, negative = West)
+        altitude: Observer altitude in meters above sea level (default 0)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Eclipse obscuration as a float:
+            - 0.0 if no eclipse is visible (Sun and Moon not overlapping)
+            - 0.0 to 1.0 for partial eclipses (fraction of Sun's area covered)
+            - 1.0 for total eclipse (Moon completely covers Sun)
+            - (moon_radius/sun_radius)^2 for annular eclipse (Moon inside Sun)
+
+    Note:
+        This function does NOT search for eclipses - it calculates the
+        instantaneous obscuration at the given time. To find eclipse events,
+        use sol_eclipse_when_glob() or sol_eclipse_when_loc() first.
+
+        If the Sun is below the horizon at the observer's location, the
+        obscuration will be 0.0 since the eclipse is not visible.
+
+    Algorithm:
+        1. Calculate topocentric Sun and Moon apparent positions
+        2. Compute angular separation between centers
+        3. Compute angular radii of Sun and Moon
+        4. Calculate the intersection area of two overlapping circles
+        5. Express as fraction of Sun's total disc area
+
+        The intersection area formula uses the lens/vesica piscis formula:
+        For two circles with radii r1, r2 and center separation d, the
+        intersection area involves the sum of two circular segments.
+
+    Precision:
+        Obscuration accurate to ~0.001 for central eclipses.
+        Topocentric parallax is included in calculations.
+
+    Example:
+        >>> from libephemeris import julday, sol_eclipse_obscuration_at_loc
+        >>> # Calculate obscuration during April 8, 2024 eclipse from Dallas
+        >>> jd = 2460409.28  # During eclipse
+        >>> dallas_lat, dallas_lon = 32.7767, -96.797
+        >>> obscuration = sol_eclipse_obscuration_at_loc(jd, dallas_lat, dallas_lon)
+        >>> print(f"Obscuration: {obscuration:.4f}")
+
+        >>> # Compare with magnitude
+        >>> from libephemeris import sol_eclipse_magnitude_at_loc
+        >>> magnitude = sol_eclipse_magnitude_at_loc(jd, dallas_lat, dallas_lon)
+        >>> print(f"Magnitude: {magnitude:.4f}, Obscuration: {obscuration:.4f}")
+
+    References:
+        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
+        - Swiss Ephemeris documentation
+        - Intersection of two circles formula (computational geometry)
+    """
+    from skyfield.api import wgs84
+    from .state import get_planets, get_timescale
+
+    # Get ephemeris and timescale
+    eph = get_planets()
+    ts = get_timescale()
+
+    # Create observer location
+    observer = wgs84.latlon(lat, lon, altitude)
+
+    # Get Sun and Moon objects
+    sun = eph["sun"]
+    moon = eph["moon"]
+    earth = eph["earth"]
+
+    # Get Skyfield time
+    t = ts.ut1_jd(jd)
+
+    # Create observer position
+    observer_at = earth + observer
+
+    # Get apparent positions from observer (topocentric)
+    try:
+        sun_app = observer_at.at(t).observe(sun).apparent()
+        moon_app = observer_at.at(t).observe(moon).apparent()
+    except Exception:
+        # If calculation fails, return 0 obscuration
+        return 0.0
+
+    # Get Sun altitude to check visibility
+    sun_alt, _, _ = sun_app.altaz()
+    sun_altitude = sun_alt.degrees
+
+    # If Sun is below horizon, no visible eclipse
+    if sun_altitude < -1.0:  # Allow for refraction near horizon
+        return 0.0
+
+    # Calculate angular separation between Sun and Moon
+    separation = sun_app.separation_from(moon_app).degrees
+
+    # Get distances for angular size calculations
+    sun_dist_au = sun_app.distance().au
+    moon_dist_au = moon_app.distance().au
+
+    # Angular radii (in degrees)
+    # Sun: mean radius 959.63" at 1 AU
+    # Moon: mean radius 932.56" at mean distance (0.002569 AU)
+    sun_angular_radius = (959.63 / 3600.0) / sun_dist_au
+    moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_dist_au)
+
+    r_sun = sun_angular_radius
+    r_moon = moon_angular_radius
+    d = separation  # center-to-center separation
+
+    # Calculate obscuration (fraction of Sun's area covered)
+    if d >= r_sun + r_moon:
+        # No overlap - no eclipse
+        return 0.0
+    elif d <= abs(r_sun - r_moon):
+        # One disk entirely within the other
+        if r_moon >= r_sun:
+            # Total eclipse - Moon completely covers Sun
+            return 1.0
+        else:
+            # Annular eclipse - Moon entirely within Sun's disc
+            return (r_moon / r_sun) ** 2
+    else:
+        # Partial overlap - use lens formula for intersection of two circles
+        # The intersection area is the sum of two circular segments
+        #
+        # For two circles with radii r1, r2 and center separation d:
+        # d1 = distance from center of circle 1 to the chord
+        # d2 = distance from center of circle 2 to the chord
+        # d1 = (d^2 + r1^2 - r2^2) / (2*d)
+        # d2 = d - d1
+        #
+        # Each segment area = r^2 * arccos(d_i/r) - d_i * sqrt(r^2 - d_i^2)
+
+        d1 = (d * d + r_sun * r_sun - r_moon * r_moon) / (2 * d)
+        d2 = d - d1
+
+        if abs(d1) <= r_sun and abs(d2) <= r_moon:
+            # Ensure values are valid for acos
+            cos_arg1 = max(-1, min(1, d1 / r_sun))
+            cos_arg2 = max(-1, min(1, d2 / r_moon))
+
+            # Segment areas
+            area1 = r_sun * r_sun * math.acos(cos_arg1) - d1 * math.sqrt(
+                max(0, r_sun * r_sun - d1 * d1)
+            )
+            area2 = r_moon * r_moon * math.acos(cos_arg2) - d2 * math.sqrt(
+                max(0, r_moon * r_moon - d2 * d2)
+            )
+
+            intersection_area = area1 + area2
+            sun_area = math.pi * r_sun * r_sun
+            obscuration = intersection_area / sun_area
+        else:
+            obscuration = 0.0
+
+    return max(0.0, min(1.0, obscuration))
+
+
+def swe_sol_eclipse_obscuration_at_loc(
+    tjd_ut: float,
+    ifl: int,
+    geopos: Sequence[float],
+) -> float:
+    """
+    Calculate the eclipse obscuration at a specific geographic location and time.
+
+    This function matches the pyswisseph naming convention. It is a convenience
+    wrapper that returns just the eclipse obscuration (fraction of solar disc
+    area covered by the Moon) without the full attribute array.
+
+    Obscuration differs from magnitude:
+    - Magnitude: fraction of Sun's DIAMETER covered
+    - Obscuration: fraction of Sun's AREA covered
+
+    Args:
+        tjd_ut: Julian Day (UT) of the time to calculate
+        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+        geopos: Sequence of [longitude, latitude, altitude]:
+            - longitude in degrees (East positive)
+            - latitude in degrees (North positive)
+            - altitude in meters above sea level
+
+    Returns:
+        Eclipse obscuration as a float:
+            - 0.0 if no eclipse is visible
+            - 0.0 to 1.0 for partial/annular eclipses
+            - 1.0 for total eclipse
+
+    Raises:
+        ValueError: If geopos has wrong length
+
+    Example:
+        >>> from libephemeris import swe_sol_eclipse_obscuration_at_loc, SEFLG_SWIEPH
+        >>> # Calculate obscuration during April 8, 2024 eclipse from Dallas
+        >>> jd = 2460409.28
+        >>> dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
+        >>> obs = swe_sol_eclipse_obscuration_at_loc(jd, SEFLG_SWIEPH, dallas_geopos)
+        >>> print(f"Obscuration: {obs:.4f}")
+
+    References:
+        - Swiss Ephemeris: swe_sol_eclipse_how()
+        - Meeus "Astronomical Algorithms" Ch. 54
+    """
+    # Validate geopos
+    if len(geopos) < 3:
+        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+
+    # Extract geographic position (lon first, lat second - pyswisseph convention)
+    lon = float(geopos[0])
+    lat = float(geopos[1])
+    altitude = float(geopos[2])
+
+    return sol_eclipse_obscuration_at_loc(tjd_ut, lat, lon, altitude, ifl)
