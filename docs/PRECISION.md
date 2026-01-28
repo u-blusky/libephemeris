@@ -358,11 +358,28 @@ pos, _ = ephem.fixstar_ut("Aldebaran", jd, SEFLG_SPEED)
 ### Implemented Features
 
 | Function | Precision |
-|----------|-----------|
-| Solar eclipse timing | ~1-2 minutes |
-| Lunar eclipse timing | ~1-2 minutes |
+|----------|-----------| 
+| Solar eclipse timing | < 10 seconds |
+| Lunar eclipse timing | < 10 seconds |
 | Occultation timing | ~1-2 minutes |
 | Eclipse magnitude | ~0.01 |
+
+### High-Precision Eclipse Timing
+
+Solar and lunar eclipse times are calculated using proper Besselian elements,
+achieving timing precision of better than 10 seconds compared to Swiss Ephemeris.
+This is accomplished by:
+
+1. **Refined Eclipse Maximum**: The time of maximum eclipse is found by minimizing
+   the gamma parameter (shadow axis distance from Earth center) using golden
+   section search, achieving sub-second precision.
+
+2. **Accurate Contact Times**: First/fourth contacts (penumbral limits) and
+   second/third contacts (umbral limits) are calculated by finding when the
+   shadow cone boundaries cross Earth's limb using Besselian element geometry.
+
+3. **Full Ephemeris Precision**: All calculations use high-precision JPL DE
+   ephemeris positions for the Moon and Sun.
 
 ### Not Implemented
 
