@@ -180,10 +180,12 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_cupido,
     calc_hades,
     calc_zeus,
+    calc_kronos,
     calc_hypothetical_position,
     SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
     SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
     SE_ZEUS as SE_ZEUS_HYPO,  # Alias to avoid conflict with constants.py
+    SE_KRONOS as SE_KRONOS_HYPO,  # Alias to avoid conflict with constants.py
 )
 
 
@@ -531,5 +533,6 @@ __all__ = [
     "calc_cupido",
     "calc_hades",
     "calc_zeus",
+    "calc_kronos",
     "calc_hypothetical_position",
 ]
