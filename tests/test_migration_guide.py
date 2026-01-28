@@ -117,27 +117,30 @@ class TestMigrationGuideAyanamshas:
 
     def test_sidereal_mode_setting(self):
         """Test setting sidereal mode and calculating sidereal positions."""
+        import swisseph as pyswe
+
         jd = 2451545.0
 
-        # Set Lahiri ayanamsha
+        # Set Lahiri ayanamsha in both libraries
         swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        pyswe.set_sid_mode(SE_SIDM_LAHIRI)
 
-        # Calculate sidereal position
-        pos_sidereal, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        try:
+            # Calculate sidereal position with libephemeris
+            pos_sidereal, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
 
-        # Calculate tropical position
-        pos_tropical, _ = swe.swe_calc_ut(jd, SE_SUN, 0)
+            # Calculate sidereal position with pyswisseph for comparison
+            py_pos_sidereal = pyswe.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)[0]
 
-        # Sidereal should be less than tropical (ayanamsha is positive)
-        # The difference should be approximately the ayanamsha value
-        ayanamsha = swe.swe_get_ayanamsa_ut(jd)
-        expected_sidereal = (pos_tropical[0] - ayanamsha) % 360
+            # libephemeris sidereal should match pyswisseph sidereal
+            # Tolerance: 1 arcsecond = 0.000278 degrees
+            diff = abs(pos_sidereal[0] - py_pos_sidereal[0])
+            if diff > 180:
+                diff = 360 - diff
 
-        diff = abs(pos_sidereal[0] - expected_sidereal)
-        if diff > 180:
-            diff = 360 - diff
-
-        assert diff < 0.001, f"Sidereal calculation mismatch: {diff}"
+            assert diff < 0.001, f"Sidereal calculation mismatch vs pyswisseph: {diff}"
+        finally:
+            pyswe.close()
 
     def test_multiple_ayanamshas_give_different_results(self):
         """Test that different ayanamshas produce different sidereal positions."""

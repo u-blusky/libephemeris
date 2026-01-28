@@ -5462,12 +5462,15 @@ def lun_occult_when_loc(
                 moonset_time = (t_low + t_high) / 2
 
         # Prepare times tuple (10 elements)
+        # Map from global indices to local indices:
+        # Global: [0]=max, [1]=local noon, [2]=begin, [3]=end, [4]=total begin, [5]=total end
+        # Local: [0]=max, [1]=first, [2]=second, [3]=third, [4]=fourth
         times = (
             global_times[0],  # [0] Maximum
-            global_times[1],  # [1] First contact
-            global_times[2],  # [2] Second contact (total begins)
-            global_times[3],  # [3] Third contact (total ends)
-            global_times[4],  # [4] Fourth contact
+            global_times[2],  # [1] First contact (global: occultation begin)
+            global_times[4],  # [2] Second contact (global: totality begin)
+            global_times[5],  # [3] Third contact (global: totality end)
+            global_times[3],  # [4] Fourth contact (global: occultation end)
             0.0,  # [5] Reserved
             0.0,  # [6] Reserved
             moonrise_time,  # [7] Moonrise during occultation

@@ -310,9 +310,8 @@ CUPIDO_KEPLERIAN_ELEMENTS = CupidoKeplerianElements(
     i=0.0,  # Assumed on ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=237.4667,  # Mean longitude at J1900.0 (degrees)
-    # n = 360 / (a^1.5 * 365.25) = 360 / (262.49 * 365.25) = 0.003757 deg/day
-    n=0.003757,
+    L0=105.301693,  # Mean longitude at J1900.0 derived from pyswisseph
+    n=0.0037945179,  # Mean motion deg/day derived from pyswisseph
 )
 
 
@@ -360,9 +359,8 @@ HADES_KEPLERIAN_ELEMENTS = HadesKeplerianElements(
     i=1.0500,  # Inclination in degrees
     omega=148.1796,  # Argument of perihelion in degrees
     Omega=161.3339,  # Longitude of ascending node in degrees
-    M0=27.6496,  # Mean anomaly at epoch in degrees
-    # n = 360 / (a^1.5 * 365.25) = 360 / (360.47 * 365.25) = 0.002736 deg/day
-    n=360.0 / (50.66744**1.5 * 365.25),
+    M0=26.850162,  # Mean anomaly at epoch in degrees derived from pyswisseph
+    n=0.00278759,  # Mean motion deg/day derived from pyswisseph
 )
 
 
@@ -410,9 +408,8 @@ ZEUS_KEPLERIAN_ELEMENTS = ZeusKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=355.2310,  # Mean longitude at J1900.0 (degrees)
-    # n = 360 / (a^1.5 * 365.25) = 360 / (455.68 * 365.25) = 0.002163 deg/day
-    n=360.0 / (59.21436**1.5 * 365.25),
+    L0=104.289095,  # Mean longitude at J1900.0 derived from pyswisseph
+    n=0.0022203750,  # Mean motion deg/day derived from pyswisseph
 )
 
 
@@ -460,9 +457,8 @@ KRONOS_KEPLERIAN_ELEMENTS = KronosKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=129.3326,  # Mean longitude at J1900.0 (degrees)
-    # n = 360 / (a^1.5 * 365.25) = 360 / (521.94 * 365.25) = 0.001888 deg/day
-    n=360.0 / (64.81690**1.5 * 365.25),
+    L0=17.111353,  # Mean longitude at J1900.0 derived from pyswisseph
+    n=0.0019351856,  # Mean motion deg/day derived from pyswisseph
 )
 
 
@@ -510,9 +506,8 @@ APOLLON_KEPLERIAN_ELEMENTS = ApollonKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=37.4667,  # Mean longitude at J1900.0 (degrees)
-    # n = 360 / (a^1.5 * 365.25) = 360 / (590.25 * 365.25) = 0.001669 deg/day
-    n=360.0 / (70.361180**1.5 * 365.25),
+    L0=138.565328,  # Mean longitude at J1900.0 derived from pyswisseph
+    n=0.0017177599,  # Mean motion deg/day derived from pyswisseph
 )
 
 
@@ -560,9 +555,8 @@ ADMETOS_KEPLERIAN_ELEMENTS = AdmetosKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=107.3807,  # Mean longitude at J1900.0 (degrees)
-    # n = 360 / (a^1.5 * 365.25) = 360 / (633.15 * 365.25) = 0.001556 deg/day
-    n=360.0 / (73.736396**1.5 * 365.25),
+    L0=350.613913,  # Mean longitude at J1900.0 derived from pyswisseph
+    n=0.0016016766,  # Mean motion deg/day derived from pyswisseph
 )
 
 
@@ -611,9 +605,8 @@ VULKANUS_KEPLERIAN_ELEMENTS = VulkanusKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=118.0983,  # Mean longitude at J1900.0 (degrees)
-    # n = 360 / (a^1.5 * 365.25) = 360 / (681.48 * 365.25) = 0.001446 deg/day
-    n=360.0 / (77.445895**1.5 * 365.25),
+    L0=55.397715,  # Mean longitude at J1900.0 derived from pyswisseph
+    n=0.0015069325,  # Mean motion deg/day derived from pyswisseph
 )
 
 
@@ -662,9 +655,8 @@ POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=182.4817,  # Mean longitude at J1900.0 (degrees)
-    # n = 360 / (a^1.5 * 365.25) = 360 / (765.35 * 365.25) = 0.001287 deg/day
-    n=360.0 / (83.666307**1.5 * 365.25),
+    L0=166.140256,  # Mean longitude at J1900.0 derived from pyswisseph
+    n=0.0013256078,  # Mean motion deg/day derived from pyswisseph
 )
 
 
@@ -2178,16 +2170,7 @@ def calc_cupido(jd_tt: float) -> Tuple[float, float, float, float, float, float]
     Calculate the position of Cupido using Keplerian propagation.
 
     Cupido is the first Hamburg School Uranian planet. This function uses
-    simple Keplerian propagation with orbital elements from Swiss Ephemeris
-    seorbel.txt documentation:
-        - Semi-major axis: 40.99837 AU
-        - Eccentricity: 0.00 (nearly circular orbit)
-        - Orbital period: ~262.5 years
-
-    For a circular orbit (e=0), the calculation simplifies to:
-        longitude = L0 + n * (jd_tt - epoch)
-
-    where L0 is the mean longitude at epoch and n is the mean motion.
+    orbital elements calibrated against pyswisseph for exact compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2206,29 +2189,7 @@ def calc_cupido(jd_tt: float) -> Tuple[float, float, float, float, float, float]
         >>> pos = calc_cupido(2451545.0)  # J2000.0
         >>> print(f"Cupido at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = CUPIDO_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # For a circular orbit (e = 0), mean longitude = true longitude
-    # Simply propagate the mean longitude
-    longitude = (elements.L0 + elements.n * dt) % 360.0
-
-    # Cupido is assumed to be on the ecliptic (zero inclination)
-    latitude = 0.0
-
-    # Distance is constant for circular orbit (equal to semi-major axis)
-    distance = elements.a
-
-    # Daily motion is simply the mean motion for circular orbit
-    dlon = elements.n
-
-    # No latitude or distance change for circular orbit on ecliptic
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    return calc_uranian_planet(SE_CUPIDO, jd_tt)
 
 
 def calc_hades(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
@@ -2236,15 +2197,7 @@ def calc_hades(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
     Calculate the position of Hades using Keplerian propagation.
 
     Hades is the second Hamburg School Uranian planet. This function uses
-    Keplerian propagation with orbital elements from Swiss Ephemeris
-    seorbel.txt documentation:
-        - Semi-major axis: 50.66744 AU
-        - Eccentricity: 0.00245 (nearly circular orbit)
-        - Inclination: 1.05 degrees
-        - Orbital period: ~360.5 years
-
-    Unlike Cupido which has a perfectly circular orbit, Hades has small but
-    non-zero eccentricity and inclination, requiring full Keplerian mechanics.
+    orbital elements calibrated against pyswisseph for exact compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2263,115 +2216,7 @@ def calc_hades(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
         >>> pos = calc_hades(2451545.0)  # J2000.0
         >>> print(f"Hades at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = HADES_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # Mean anomaly
-    M = (elements.M0 + elements.n * dt) % 360.0
-    M_rad = math.radians(M)
-
-    # Solve Kepler's equation for eccentric anomaly
-    E = _solve_kepler_equation(M_rad, elements.e)
-
-    # True anomaly
-    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
-    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
-
-    # Distance from Sun (heliocentric)
-    r = elements.a * (1.0 - elements.e * math.cos(E))
-
-    # Argument of latitude (measured from ascending node)
-    u = nu + math.radians(elements.omega)
-
-    # Convert to ecliptic coordinates
-    i_rad = math.radians(elements.i)
-    Omega_rad = math.radians(elements.Omega)
-
-    # Position in orbital plane
-    x_orb = r * math.cos(u)
-    y_orb = r * math.sin(u)
-
-    # Rotate to ecliptic frame
-    cos_i = math.cos(i_rad)
-    sin_i = math.sin(i_rad)
-    cos_Omega = math.cos(Omega_rad)
-    sin_Omega = math.sin(Omega_rad)
-
-    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
-    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
-    z_ecl = sin_i * y_orb
-
-    # Convert to spherical coordinates
-    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
-    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
-    distance = r
-
-    # Calculate velocity via numerical differentiation
-    dt_step = 1.0  # 1 day step for daily velocity
-    pos_next = _calc_hades_raw(jd_tt + dt_step)
-
-    dlon = pos_next[0] - longitude
-    # Handle wrap-around
-    if dlon > 180.0:
-        dlon -= 360.0
-    elif dlon < -180.0:
-        dlon += 360.0
-
-    dlat = pos_next[1] - latitude
-    ddist = pos_next[2] - distance
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
-
-
-def _calc_hades_raw(jd_tt: float) -> Tuple[float, float, float]:
-    """
-    Calculate raw Hades position without velocity (helper for differentiation).
-    """
-    elements = HADES_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # Mean anomaly
-    M = (elements.M0 + elements.n * dt) % 360.0
-    M_rad = math.radians(M)
-
-    # Solve Kepler's equation for eccentric anomaly
-    E = _solve_kepler_equation(M_rad, elements.e)
-
-    # True anomaly
-    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
-    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
-
-    # Distance from Sun (heliocentric)
-    r = elements.a * (1.0 - elements.e * math.cos(E))
-
-    # Argument of latitude (measured from ascending node)
-    u = nu + math.radians(elements.omega)
-
-    # Convert to ecliptic coordinates
-    i_rad = math.radians(elements.i)
-    Omega_rad = math.radians(elements.Omega)
-
-    x_orb = r * math.cos(u)
-    y_orb = r * math.sin(u)
-
-    cos_i = math.cos(i_rad)
-    sin_i = math.sin(i_rad)
-    cos_Omega = math.cos(Omega_rad)
-    sin_Omega = math.sin(Omega_rad)
-
-    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
-    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
-    z_ecl = sin_i * y_orb
-
-    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
-    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
-    distance = r
-
-    return (longitude, latitude, distance)
+    return calc_uranian_planet(SE_HADES, jd_tt)
 
 
 def calc_zeus(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
@@ -2379,16 +2224,7 @@ def calc_zeus(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
     Calculate the position of Zeus using Keplerian propagation.
 
     Zeus is the third Hamburg School Uranian planet. This function uses
-    simple Keplerian propagation with orbital elements from Swiss Ephemeris
-    seorbel.txt documentation:
-        - Semi-major axis: 59.21436 AU
-        - Eccentricity: 0.00 (circular orbit)
-        - Orbital period: ~455.7 years
-
-    For a circular orbit (e=0), the calculation simplifies to:
-        longitude = L0 + n * (jd_tt - epoch)
-
-    where L0 is the mean longitude at epoch and n is the mean motion.
+    orbital elements calibrated against pyswisseph for exact compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2407,29 +2243,7 @@ def calc_zeus(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
         >>> pos = calc_zeus(2451545.0)  # J2000.0
         >>> print(f"Zeus at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = ZEUS_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # For a circular orbit (e = 0), mean longitude = true longitude
-    # Simply propagate the mean longitude
-    longitude = (elements.L0 + elements.n * dt) % 360.0
-
-    # Zeus is assumed to be on the ecliptic (zero inclination)
-    latitude = 0.0
-
-    # Distance is constant for circular orbit (equal to semi-major axis)
-    distance = elements.a
-
-    # Daily motion is simply the mean motion for circular orbit
-    dlon = elements.n
-
-    # No latitude or distance change for circular orbit on ecliptic
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    return calc_uranian_planet(SE_ZEUS, jd_tt)
 
 
 def calc_kronos(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
@@ -2437,16 +2251,7 @@ def calc_kronos(jd_tt: float) -> Tuple[float, float, float, float, float, float]
     Calculate the position of Kronos using Keplerian propagation.
 
     Kronos is the fourth Hamburg School Uranian planet. This function uses
-    simple Keplerian propagation with orbital elements from Swiss Ephemeris
-    seorbel.txt documentation:
-        - Semi-major axis: 64.81690 AU
-        - Eccentricity: 0.00 (circular orbit)
-        - Orbital period: ~521.9 years
-
-    For a circular orbit (e=0), the calculation simplifies to:
-        longitude = L0 + n * (jd_tt - epoch)
-
-    where L0 is the mean longitude at epoch and n is the mean motion.
+    orbital elements calibrated against pyswisseph for exact compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2465,29 +2270,7 @@ def calc_kronos(jd_tt: float) -> Tuple[float, float, float, float, float, float]
         >>> pos = calc_kronos(2451545.0)  # J2000.0
         >>> print(f"Kronos at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = KRONOS_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # For a circular orbit (e = 0), mean longitude = true longitude
-    # Simply propagate the mean longitude
-    longitude = (elements.L0 + elements.n * dt) % 360.0
-
-    # Kronos is assumed to be on the ecliptic (zero inclination)
-    latitude = 0.0
-
-    # Distance is constant for circular orbit (equal to semi-major axis)
-    distance = elements.a
-
-    # Daily motion is simply the mean motion for circular orbit
-    dlon = elements.n
-
-    # No latitude or distance change for circular orbit on ecliptic
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    return calc_uranian_planet(SE_KRONOS, jd_tt)
 
 
 def calc_apollon(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
@@ -2495,16 +2278,7 @@ def calc_apollon(jd_tt: float) -> Tuple[float, float, float, float, float, float
     Calculate the position of Apollon using Keplerian propagation.
 
     Apollon is the fifth Hamburg School Uranian planet. This function uses
-    simple Keplerian propagation with orbital elements from Swiss Ephemeris
-    seorbel.txt documentation:
-        - Semi-major axis: 70.361180 AU
-        - Eccentricity: 0.00 (circular orbit)
-        - Orbital period: ~590.3 years
-
-    For a circular orbit (e=0), the calculation simplifies to:
-        longitude = L0 + n * (jd_tt - epoch)
-
-    where L0 is the mean longitude at epoch and n is the mean motion.
+    orbital elements calibrated against pyswisseph for exact compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2523,29 +2297,7 @@ def calc_apollon(jd_tt: float) -> Tuple[float, float, float, float, float, float
         >>> pos = calc_apollon(2451545.0)  # J2000.0
         >>> print(f"Apollon at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = APOLLON_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # For a circular orbit (e = 0), mean longitude = true longitude
-    # Simply propagate the mean longitude
-    longitude = (elements.L0 + elements.n * dt) % 360.0
-
-    # Apollon is assumed to be on the ecliptic (zero inclination)
-    latitude = 0.0
-
-    # Distance is constant for circular orbit (equal to semi-major axis)
-    distance = elements.a
-
-    # Daily motion is simply the mean motion for circular orbit
-    dlon = elements.n
-
-    # No latitude or distance change for circular orbit on ecliptic
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    return calc_uranian_planet(SE_APOLLON, jd_tt)
 
 
 def calc_admetos(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
@@ -2553,16 +2305,7 @@ def calc_admetos(jd_tt: float) -> Tuple[float, float, float, float, float, float
     Calculate the position of Admetos using Keplerian propagation.
 
     Admetos is the sixth Hamburg School Uranian planet. This function uses
-    simple Keplerian propagation with orbital elements from Swiss Ephemeris
-    seorbel.txt documentation:
-        - Semi-major axis: 73.736396 AU
-        - Eccentricity: 0.00 (circular orbit)
-        - Orbital period: ~633.2 years
-
-    For a circular orbit (e=0), the calculation simplifies to:
-        longitude = L0 + n * (jd_tt - epoch)
-
-    where L0 is the mean longitude at epoch and n is the mean motion.
+    orbital elements calibrated against pyswisseph for exact compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2581,29 +2324,7 @@ def calc_admetos(jd_tt: float) -> Tuple[float, float, float, float, float, float
         >>> pos = calc_admetos(2451545.0)  # J2000.0
         >>> print(f"Admetos at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = ADMETOS_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # For a circular orbit (e = 0), mean longitude = true longitude
-    # Simply propagate the mean longitude
-    longitude = (elements.L0 + elements.n * dt) % 360.0
-
-    # Admetos is assumed to be on the ecliptic (zero inclination)
-    latitude = 0.0
-
-    # Distance is constant for circular orbit (equal to semi-major axis)
-    distance = elements.a
-
-    # Daily motion is simply the mean motion for circular orbit
-    dlon = elements.n
-
-    # No latitude or distance change for circular orbit on ecliptic
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    return calc_uranian_planet(SE_ADMETOS, jd_tt)
 
 
 def calc_vulkanus(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
@@ -2611,16 +2332,7 @@ def calc_vulkanus(jd_tt: float) -> Tuple[float, float, float, float, float, floa
     Calculate the position of Vulkanus using Keplerian propagation.
 
     Vulkanus is the seventh Hamburg School Uranian planet. This function uses
-    simple Keplerian propagation with orbital elements from Swiss Ephemeris
-    seorbel.txt documentation:
-        - Semi-major axis: 77.445895 AU
-        - Eccentricity: 0.00 (circular orbit)
-        - Orbital period: ~681.5 years
-
-    For a circular orbit (e=0), the calculation simplifies to:
-        longitude = L0 + n * (jd_tt - epoch)
-
-    where L0 is the mean longitude at epoch and n is the mean motion.
+    orbital elements calibrated against pyswisseph for exact compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2639,29 +2351,7 @@ def calc_vulkanus(jd_tt: float) -> Tuple[float, float, float, float, float, floa
         >>> pos = calc_vulkanus(2451545.0)  # J2000.0
         >>> print(f"Vulkanus at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = VULKANUS_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # For a circular orbit (e = 0), mean longitude = true longitude
-    # Simply propagate the mean longitude
-    longitude = (elements.L0 + elements.n * dt) % 360.0
-
-    # Vulkanus is assumed to be on the ecliptic (zero inclination)
-    latitude = 0.0
-
-    # Distance is constant for circular orbit (equal to semi-major axis)
-    distance = elements.a
-
-    # Daily motion is simply the mean motion for circular orbit
-    dlon = elements.n
-
-    # No latitude or distance change for circular orbit on ecliptic
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    return calc_uranian_planet(SE_VULKANUS, jd_tt)
 
 
 def calc_poseidon(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
@@ -2669,16 +2359,7 @@ def calc_poseidon(jd_tt: float) -> Tuple[float, float, float, float, float, floa
     Calculate the position of Poseidon using Keplerian propagation.
 
     Poseidon is the eighth Hamburg School Uranian planet. This function uses
-    simple Keplerian propagation with orbital elements from Swiss Ephemeris
-    seorbel.txt documentation:
-        - Semi-major axis: 83.666307 AU
-        - Eccentricity: 0.00 (circular orbit)
-        - Orbital period: ~765.4 years
-
-    For a circular orbit (e=0), the calculation simplifies to:
-        longitude = L0 + n * (jd_tt - epoch)
-
-    where L0 is the mean longitude at epoch and n is the mean motion.
+    orbital elements calibrated against pyswisseph for exact compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2697,29 +2378,7 @@ def calc_poseidon(jd_tt: float) -> Tuple[float, float, float, float, float, floa
         >>> pos = calc_poseidon(2451545.0)  # J2000.0
         >>> print(f"Poseidon at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = POSEIDON_KEPLERIAN_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # For a circular orbit (e = 0), mean longitude = true longitude
-    # Simply propagate the mean longitude
-    longitude = (elements.L0 + elements.n * dt) % 360.0
-
-    # Poseidon is assumed to be on the ecliptic (zero inclination)
-    latitude = 0.0
-
-    # Distance is constant for circular orbit (equal to semi-major axis)
-    distance = elements.a
-
-    # Daily motion is simply the mean motion for circular orbit
-    dlon = elements.n
-
-    # No latitude or distance change for circular orbit on ecliptic
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    return calc_uranian_planet(SE_POSEIDON, jd_tt)
 
 
 def calc_transpluto(jd_tt: float) -> Tuple[float, float, float, float, float, float]:

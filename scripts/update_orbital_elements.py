@@ -99,6 +99,7 @@ BODY_SBDB_IDS: dict[str, str] = {
     "Toutatis": "4179",  # 4179 Toutatis (Apollo PHA)
     "Itokawa": "25143",  # 25143 Itokawa (Hayabusa sample return mission target)
     "Bennu": "101955",  # 101955 Bennu (OSIRIS-REx sample return mission target)
+    "Ryugu": "162173",  # 162173 Ryugu (Hayabusa2 sample return mission target)
 }
 
 

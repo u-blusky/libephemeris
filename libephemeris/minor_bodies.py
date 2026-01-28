@@ -1667,6 +1667,8 @@ def _build_local_name_cache() -> None:
         "gonggong": 225088,
         "varuna": 20000,
         "apophis": 99942,
+        "flora": 8,
+        "eunomia": 15,
         "hygiea": 10,
         "interamnia": 704,
         "davida": 511,
