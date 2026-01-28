@@ -111,6 +111,7 @@ from .eclipse import (
     swe_heliacal_pheno_ut,
     vis_limit_mag,
     swe_vis_limit_mag,
+    calc_besselian_x,
 )
 from .utils import (
     degnorm,
@@ -471,6 +472,8 @@ __all__ = [
     "swe_lun_occult_when_loc",
     "lun_occult_where",
     "swe_lun_occult_where",
+    # Besselian elements
+    "calc_besselian_x",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",
