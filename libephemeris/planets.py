@@ -63,6 +63,8 @@ from .constants import (
     SE_OSCU_APOG,
     SE_INTP_APOG,
     SE_INTP_PERG,
+    SE_CUPIDO,
+    SE_POSEIDON,
     SEFLG_SPEED,
     SEFLG_HELCTR,
     SEFLG_TOPOCTR,
@@ -699,6 +701,14 @@ def _calc_body(
             elif dlon < -18000:
                 dlon += 360.0 / dt
         return (lon, lat, dist, dlon, dlat, ddist), iflag
+
+    # Handle Uranian planets (Hamburg School hypothetical bodies, IDs 40-47)
+    if SE_CUPIDO <= ipl <= SE_POSEIDON:
+        from . import hypothetical
+
+        jd_tt = t.tt
+        pos = hypothetical.calc_uranian_position(ipl, jd_tt)
+        return pos, iflag
 
     # Handle minor bodies (asteroids and TNOs)
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS:

@@ -2231,3 +2231,129 @@ class TestCalcUranianPlanet:
                 f"Body {body_id} ({elements.name}) should use J1900.0 epoch, "
                 f"got {elements.epoch}"
             )
+
+
+class TestUranianIntegrationWithPlanets:
+    """Tests for Uranian planet integration with planets.py swe_calc_ut()."""
+
+    J2000 = 2451545.0
+
+    # All Uranian body IDs (40-47)
+    URANIAN_BODY_IDS = [
+        SE_CUPIDO,
+        SE_HADES,
+        SE_ZEUS,
+        SE_KRONOS,
+        SE_APOLLON,
+        SE_ADMETOS,
+        SE_VULKANUS,
+        SE_POSEIDON,
+    ]
+
+    def test_swe_calc_ut_routes_uranian_planets(self):
+        """Test that swe_calc_ut correctly routes Uranian planet body IDs."""
+        from libephemeris import swe_calc_ut
+        from libephemeris.constants import SEFLG_SPEED
+
+        for body_id in self.URANIAN_BODY_IDS:
+            result, flags = swe_calc_ut(self.J2000, body_id, SEFLG_SPEED)
+            assert isinstance(result, tuple), f"Body {body_id} should return tuple"
+            assert len(result) == 6, f"Body {body_id} should return 6 elements"
+
+            lon, lat, dist, dlon, dlat, ddist = result
+            # Validate position values
+            assert 0.0 <= lon < 360.0, f"Body {body_id} longitude {lon} out of range"
+            assert -90.0 <= lat <= 90.0, f"Body {body_id} latitude {lat} out of range"
+            assert dist > 0, f"Body {body_id} distance should be positive"
+
+    def test_swe_calc_ut_matches_hypothetical_module(self):
+        """Test that swe_calc_ut results match hypothetical.calc_uranian_position."""
+        from libephemeris import swe_calc_ut
+        from libephemeris.constants import SEFLG_SPEED
+
+        for body_id in self.URANIAN_BODY_IDS:
+            swe_result, _ = swe_calc_ut(self.J2000, body_id, SEFLG_SPEED)
+            hypo_result = calc_uranian_position(body_id, self.J2000)
+
+            # Results should match (allowing for floating point precision)
+            for i in range(6):
+                assert abs(swe_result[i] - hypo_result[i]) < 1e-7, (
+                    f"Body {body_id} component {i} mismatch: "
+                    f"swe={swe_result[i]}, hypo={hypo_result[i]}"
+                )
+
+    def test_swe_calc_uranian_planets_have_valid_positions(self):
+        """Test that Uranian planets have valid astronomical positions."""
+        from libephemeris import swe_calc_ut
+        from libephemeris.constants import SEFLG_SPEED
+
+        for body_id in self.URANIAN_BODY_IDS:
+            result, _ = swe_calc_ut(self.J2000, body_id, SEFLG_SPEED)
+            lon, lat, dist, dlon, dlat, ddist = result
+
+            # All Uranian planets are beyond Neptune (~30 AU)
+            assert dist > 30.0, (
+                f"Body {body_id} should be beyond Neptune (30 AU), got {dist} AU"
+            )
+
+            # Daily motion should be very slow (< 0.1 deg/day)
+            assert abs(dlon) < 0.1, f"Body {body_id} daily motion {dlon} seems too fast"
+
+    def test_swe_calc_ut_body_id_range(self):
+        """Test that exactly body IDs 40-47 are routed to hypothetical module."""
+        from libephemeris import swe_calc_ut
+        from libephemeris.constants import SEFLG_SPEED, SE_FICT_OFFSET
+
+        # Body IDs 40-47 should work (Uranian planets)
+        for i in range(8):
+            body_id = SE_FICT_OFFSET + i
+            result, _ = swe_calc_ut(self.J2000, body_id, SEFLG_SPEED)
+            assert isinstance(result, tuple), f"Body ID {body_id} should work"
+
+    def test_se_cupido_through_swe_calc_ut(self):
+        """Test Cupido (SE_FICT_OFFSET + 0 = 40) via swe_calc_ut."""
+        from libephemeris import swe_calc_ut
+        from libephemeris.constants import SEFLG_SPEED
+
+        result, _ = swe_calc_ut(self.J2000, SE_CUPIDO, SEFLG_SPEED)
+        lon, lat, dist, dlon, dlat, ddist = result
+
+        # Cupido specific assertions
+        assert lat == 0.0, "Cupido should be on ecliptic (zero latitude)"
+        # Distance is derived from mean motion in calc_uranian_position,
+        # which gives a large estimate. Just verify it's positive.
+        assert dist > 30.0, "Cupido distance should be beyond Neptune (~30 AU)"
+        assert dlon > 0, "Cupido should have prograde motion"
+
+    def test_se_poseidon_through_swe_calc_ut(self):
+        """Test Poseidon (SE_FICT_OFFSET + 7 = 47) via swe_calc_ut."""
+        from libephemeris import swe_calc_ut
+        from libephemeris.constants import SEFLG_SPEED
+
+        result, _ = swe_calc_ut(self.J2000, SE_POSEIDON, SEFLG_SPEED)
+        lon, lat, dist, dlon, dlat, ddist = result
+
+        # Poseidon specific assertions
+        assert lat == 0.0, "Poseidon should be on ecliptic (zero latitude)"
+        assert dist > 80.0, "Poseidon distance should be > 80 AU"
+        assert dlon > 0, "Poseidon should have prograde motion"
+        # Poseidon should be slowest Uranian planet
+        assert dlon < 0.001, "Poseidon should move very slowly"
+
+    def test_swe_calc_uranian_different_dates(self):
+        """Test Uranian planets at different dates."""
+        from libephemeris import swe_calc_ut
+        from libephemeris.constants import SEFLG_SPEED
+
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after
+        ]
+
+        for jd in test_dates:
+            for body_id in self.URANIAN_BODY_IDS:
+                result, _ = swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                assert 0.0 <= result[0] < 360.0, (
+                    f"Body {body_id} at JD {jd} longitude out of range"
+                )
