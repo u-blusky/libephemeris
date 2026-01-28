@@ -31,9 +31,37 @@ from typing import Tuple
 from .constants import (
     SE_SUN,
     SE_MOON,
+    SE_MERCURY,
+    SE_VENUS,
     SEFLG_SPEED,
     SEFLG_SWIEPH,
 )
+
+# Inner planets (orbit inside Earth's orbit)
+# These have both inferior conjunction (between Earth and Sun)
+# and superior conjunction (behind the Sun)
+INNER_PLANETS = {SE_MERCURY, SE_VENUS}
+
+# Outer planets (orbit outside Earth's orbit)
+# These only have one type of conjunction (behind the Sun)
+# SE_EVENING_FIRST and SE_MORNING_LAST are not applicable to these
+
+
+def is_inner_planet(body: int) -> bool:
+    """
+    Check if a body is an inner planet (Mercury or Venus).
+
+    Inner planets orbit inside Earth's orbit and have both inferior
+    and superior conjunctions with the Sun. They can appear as both
+    morning and evening stars.
+
+    Args:
+        body: Planet ID constant (SE_MERCURY, SE_VENUS, etc.)
+
+    Returns:
+        True if the body is Mercury or Venus, False otherwise
+    """
+    return body in INNER_PLANETS
 
 
 def heliacal_ut(
@@ -70,7 +98,9 @@ def heliacal_ut(
             - SE_HELIACAL_RISING (1): Morning first visibility (heliacal rising)
             - SE_HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
             - SE_EVENING_FIRST (3): First evening visibility (after superior conjunction)
+              Note: Only valid for inner planets (Mercury, Venus)
             - SE_MORNING_LAST (4): Last morning visibility (before superior conjunction)
+              Note: Only valid for inner planets (Mercury, Venus)
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
@@ -79,7 +109,8 @@ def heliacal_ut(
             - retflag: Return flag (event_type on success, negative on error)
 
     Raises:
-        ValueError: If invalid body ID or event_type
+        ValueError: If invalid body ID, event_type, or if SE_EVENING_FIRST/SE_MORNING_LAST
+            is used with an outer planet (Mars, Jupiter, Saturn, etc.)
 
     Algorithm:
         The algorithm searches for the moment when:
@@ -137,6 +168,17 @@ def heliacal_ut(
             f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
             "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
         )
+
+    # SE_EVENING_FIRST and SE_MORNING_LAST are only valid for inner planets
+    # (Mercury and Venus) because they relate to superior conjunction visibility.
+    # Outer planets only have one type of conjunction and these events don't apply.
+    if event_type in (SE_EVENING_FIRST, SE_MORNING_LAST):
+        if not is_inner_planet(body):
+            raise ValueError(
+                "SE_EVENING_FIRST and SE_MORNING_LAST are only valid for inner planets "
+                "(Mercury, Venus). For outer planets, use SE_HELIACAL_RISING or "
+                "SE_HELIACAL_SETTING."
+            )
 
     # Sun and Moon are not valid for heliacal events
     if body == SE_SUN:
@@ -571,9 +613,9 @@ def swe_heliacal_ut(
             - SE_HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
               Exists for all visible planets and stars.
             - SE_EVENING_FIRST (3): First evening visibility after superior
-              conjunction. Exists for Mercury, Venus, and the Moon.
+              conjunction. Only valid for inner planets (Mercury, Venus).
             - SE_MORNING_LAST (4): Last morning visibility before superior
-              conjunction. Exists for Mercury, Venus, and the Moon.
+              conjunction. Only valid for inner planets (Mercury, Venus).
         hel_flag: Calculation flags (bitmap). Contains ephemeris flags like
             SEFLG_SWIEPH, plus heliacal-specific flags:
             - SE_HELFLAG_OPTICAL_PARAMS (512): Use optical instrument parameters

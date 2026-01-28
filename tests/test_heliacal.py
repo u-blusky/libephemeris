@@ -927,3 +927,322 @@ class TestHeliacalPhenoMoon:
         assert isinstance(l_moon, float)
         assert isinstance(q_yallop, float)
         assert isinstance(illumination, float)
+
+
+# =============================================================================
+# PLANET-SPECIFIC HELIACAL TESTS
+# =============================================================================
+
+
+class TestHeliacalInnerOuterPlanets:
+    """Test proper handling of inner vs outer planet geometry."""
+
+    def test_is_inner_planet_mercury(self):
+        """Test that Mercury is identified as an inner planet."""
+        from libephemeris import is_inner_planet, INNER_PLANETS
+
+        assert is_inner_planet(SE_MERCURY)
+        assert SE_MERCURY in INNER_PLANETS
+
+    def test_is_inner_planet_venus(self):
+        """Test that Venus is identified as an inner planet."""
+        from libephemeris import is_inner_planet, INNER_PLANETS
+
+        assert is_inner_planet(SE_VENUS)
+        assert SE_VENUS in INNER_PLANETS
+
+    def test_is_inner_planet_mars(self):
+        """Test that Mars is NOT an inner planet."""
+        from libephemeris import is_inner_planet
+
+        assert not is_inner_planet(SE_MARS)
+
+    def test_is_inner_planet_jupiter(self):
+        """Test that Jupiter is NOT an inner planet."""
+        from libephemeris import is_inner_planet
+
+        assert not is_inner_planet(SE_JUPITER)
+
+    def test_is_inner_planet_saturn(self):
+        """Test that Saturn is NOT an inner planet."""
+        from libephemeris import is_inner_planet
+
+        assert not is_inner_planet(SE_SATURN)
+
+
+class TestHeliacalOuterPlanetValidation:
+    """Test that outer planets reject invalid event types."""
+
+    def test_mars_evening_first_raises_error(self):
+        """Test that Mars with SE_EVENING_FIRST raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        with pytest.raises(ValueError, match="inner planets"):
+            heliacal_ut(jd_start, lat, lon, body=SE_MARS, event_type=SE_EVENING_FIRST)
+
+    def test_mars_morning_last_raises_error(self):
+        """Test that Mars with SE_MORNING_LAST raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        with pytest.raises(ValueError, match="inner planets"):
+            heliacal_ut(jd_start, lat, lon, body=SE_MARS, event_type=SE_MORNING_LAST)
+
+    def test_jupiter_evening_first_raises_error(self):
+        """Test that Jupiter with SE_EVENING_FIRST raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        with pytest.raises(ValueError, match="inner planets"):
+            heliacal_ut(
+                jd_start, lat, lon, body=SE_JUPITER, event_type=SE_EVENING_FIRST
+            )
+
+    def test_jupiter_morning_last_raises_error(self):
+        """Test that Jupiter with SE_MORNING_LAST raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        with pytest.raises(ValueError, match="inner planets"):
+            heliacal_ut(jd_start, lat, lon, body=SE_JUPITER, event_type=SE_MORNING_LAST)
+
+    def test_saturn_evening_first_raises_error(self):
+        """Test that Saturn with SE_EVENING_FIRST raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        with pytest.raises(ValueError, match="inner planets"):
+            heliacal_ut(jd_start, lat, lon, body=SE_SATURN, event_type=SE_EVENING_FIRST)
+
+    def test_saturn_morning_last_raises_error(self):
+        """Test that Saturn with SE_MORNING_LAST raises ValueError."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        with pytest.raises(ValueError, match="inner planets"):
+            heliacal_ut(jd_start, lat, lon, body=SE_SATURN, event_type=SE_MORNING_LAST)
+
+
+class TestHeliacalInnerPlanetEventTypes:
+    """Test that inner planets accept all event types."""
+
+    def test_mercury_heliacal_rising(self):
+        """Test Mercury heliacal rising works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_HELIACAL_RISING
+        )
+
+        assert retflag in (SE_HELIACAL_RISING, -1)
+        if retflag > 0:
+            assert jd_event > jd_start
+
+    def test_mercury_heliacal_setting(self):
+        """Test Mercury heliacal setting works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_HELIACAL_SETTING
+        )
+
+        assert retflag in (SE_HELIACAL_SETTING, -1)
+        if retflag > 0:
+            assert jd_event > jd_start
+
+    def test_mercury_evening_first(self):
+        """Test Mercury evening first visibility works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_EVENING_FIRST
+        )
+
+        # Should not raise an error - inner planets can use this event type
+        assert retflag in (SE_EVENING_FIRST, -1)
+
+    def test_mercury_morning_last(self):
+        """Test Mercury morning last visibility works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_MORNING_LAST
+        )
+
+        # Should not raise an error - inner planets can use this event type
+        assert retflag in (SE_MORNING_LAST, -1)
+
+    def test_venus_evening_first(self):
+        """Test Venus evening first visibility works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_VENUS, event_type=SE_EVENING_FIRST
+        )
+
+        # Should not raise an error - inner planets can use this event type
+        assert retflag in (SE_EVENING_FIRST, -1)
+
+    def test_venus_morning_last(self):
+        """Test Venus morning last visibility works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_VENUS, event_type=SE_MORNING_LAST
+        )
+
+        # Should not raise an error - inner planets can use this event type
+        assert retflag in (SE_MORNING_LAST, -1)
+
+
+class TestHeliacalOuterPlanetRisingSetting:
+    """Test that outer planets work correctly with heliacal rising/setting."""
+
+    def test_mars_heliacal_rising(self):
+        """Test Mars heliacal rising works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_RISING
+        )
+
+        assert retflag in (SE_HELIACAL_RISING, -1)
+        if retflag > 0:
+            assert jd_event > jd_start
+
+    def test_mars_heliacal_setting(self):
+        """Test Mars heliacal setting works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_SETTING
+        )
+
+        assert retflag in (SE_HELIACAL_SETTING, -1)
+        if retflag > 0:
+            assert jd_event > jd_start
+
+    def test_jupiter_heliacal_rising(self):
+        """Test Jupiter heliacal rising works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_RISING
+        )
+
+        assert retflag in (SE_HELIACAL_RISING, -1)
+        if retflag > 0:
+            assert jd_event > jd_start
+
+    def test_jupiter_heliacal_setting(self):
+        """Test Jupiter heliacal setting works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_SETTING
+        )
+
+        assert retflag in (SE_HELIACAL_SETTING, -1)
+        if retflag > 0:
+            assert jd_event > jd_start
+
+    def test_saturn_heliacal_rising(self):
+        """Test Saturn heliacal rising works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_SATURN, event_type=SE_HELIACAL_RISING
+        )
+
+        assert retflag in (SE_HELIACAL_RISING, -1)
+        if retflag > 0:
+            assert jd_event > jd_start
+
+    def test_saturn_heliacal_setting(self):
+        """Test Saturn heliacal setting works."""
+        jd_start = julday(2024, 1, 1, 0)
+        lat, lon = 41.9028, 12.4964
+
+        jd_event, retflag = heliacal_ut(
+            jd_start, lat, lon, body=SE_SATURN, event_type=SE_HELIACAL_SETTING
+        )
+
+        assert retflag in (SE_HELIACAL_SETTING, -1)
+        if retflag > 0:
+            assert jd_event > jd_start
+
+
+class TestSweHeliacalUtOuterPlanetValidation:
+    """Test that swe_heliacal_ut also validates inner/outer planet constraints."""
+
+    def test_mars_evening_first_via_swe_api_raises_error(self):
+        """Test that Mars with SE_EVENING_FIRST raises ValueError via swe API."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        with pytest.raises(ValueError, match="inner planets"):
+            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Mars", SE_EVENING_FIRST)
+
+    def test_jupiter_morning_last_via_swe_api_raises_error(self):
+        """Test that Jupiter with SE_MORNING_LAST raises ValueError via swe API."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        with pytest.raises(ValueError, match="inner planets"):
+            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Jupiter", SE_MORNING_LAST)
+
+    def test_saturn_evening_first_via_swe_api_raises_error(self):
+        """Test that Saturn with SE_EVENING_FIRST raises ValueError via swe API."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        with pytest.raises(ValueError, match="inner planets"):
+            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Saturn", SE_EVENING_FIRST)
+
+    def test_mercury_evening_first_via_swe_api_works(self):
+        """Test that Mercury with SE_EVENING_FIRST works via swe API."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        # Should not raise an error
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Mercury", SE_EVENING_FIRST
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50
+
+    def test_venus_morning_last_via_swe_api_works(self):
+        """Test that Venus with SE_MORNING_LAST works via swe API."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        # Should not raise an error
+        dret, retflag = swe_heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", SE_MORNING_LAST
+        )
+
+        assert isinstance(dret, tuple)
+        assert len(dret) == 50

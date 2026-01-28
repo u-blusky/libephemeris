@@ -183,6 +183,8 @@ from .heliacal import (
     swe_heliacal_pheno_ut,
     vis_limit_mag,
     swe_vis_limit_mag,
+    is_inner_planet,
+    INNER_PLANETS,
 )
 from .extinction import (
     # Extinction calculation functions
@@ -659,6 +661,8 @@ __all__ = [
     "swe_heliacal_pheno_ut",
     "vis_limit_mag",
     "swe_vis_limit_mag",
+    "is_inner_planet",
+    "INNER_PLANETS",
     # Atmospheric extinction
     "calc_airmass",
     "calc_extinction_coefficient",
