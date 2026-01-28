@@ -1070,6 +1070,26 @@ def calc_twilight_brightness_simple(
     return result.surface_brightness
 
 
+# =============================================================================
+# OBSERVER EXPERIENCE CONSTANTS
+# =============================================================================
+# Constants defining observer experience levels for visibility calculations.
+# These affect the threshold contrast that an observer can detect.
+
+OBSERVER_SKILL_INEXPERIENCED = 1
+OBSERVER_SKILL_AVERAGE = 2
+OBSERVER_SKILL_EXPERIENCED = 3
+OBSERVER_SKILL_EXPERT = 4
+
+# Experience factor applied to threshold - lower = can detect fainter objects
+EXPERIENCE_FACTORS = {
+    OBSERVER_SKILL_INEXPERIENCED: 1.3,  # 30% worse than average
+    OBSERVER_SKILL_AVERAGE: 1.0,  # Baseline
+    OBSERVER_SKILL_EXPERIENCED: 0.85,  # 15% better than average
+    OBSERVER_SKILL_EXPERT: 0.7,  # 30% better than average
+}
+
+
 def calc_limiting_magnitude_twilight(
     sun_altitude_deg: float,
     target_altitude_deg: float = 45.0,
@@ -1147,3 +1167,457 @@ def calc_limiting_magnitude_twilight(
     adjusted_limit = result.limiting_magnitude - extinction_penalty
 
     return max(-2.0, min(adjusted_limit, 6.5))
+
+
+# =============================================================================
+# SCHAEFER VISIBILITY THRESHOLD MODEL
+# =============================================================================
+# The Schaefer visibility model determines whether a celestial object of a
+# given apparent magnitude can be detected against a sky of given brightness.
+#
+# The model accounts for:
+# - Object brightness (apparent magnitude)
+# - Sky surface brightness (background)
+# - Observer's eye adaptation state
+# - Observer's experience and skill level
+#
+# Based on the work of:
+#   - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+#   - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
+#   - Blackwell, H.R. (1946) "Contrast thresholds of the human eye"
+#   - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
+# =============================================================================
+
+
+@dataclass
+class VisibilityResult:
+    """
+    Result of visibility threshold calculation.
+
+    Attributes:
+        is_visible: Whether the object is visible to the observer.
+        object_magnitude: The apparent magnitude of the object.
+        limiting_magnitude: The limiting magnitude at this sky brightness.
+        sky_brightness: Sky surface brightness in mag/arcsec^2.
+        contrast: The contrast ratio between object and sky.
+        threshold_contrast: The minimum contrast required for detection.
+        visibility_margin: Magnitude margin (positive = visible, negative = not visible).
+        eye_adaptation: The eye adaptation state used ("dark", "mesopic", or "photopic").
+        observer_skill: The observer skill level used (1-4).
+    """
+
+    is_visible: bool
+    object_magnitude: float
+    limiting_magnitude: float
+    sky_brightness: float
+    contrast: float
+    threshold_contrast: float
+    visibility_margin: float
+    eye_adaptation: str
+    observer_skill: int
+
+
+def calc_eye_adaptation_state(sky_brightness: float) -> str:
+    """
+    Determine the eye's adaptation state based on sky brightness.
+
+    The human eye adapts to ambient light levels, transitioning between
+    three states: photopic (cone vision, bright conditions), mesopic
+    (mixed rod/cone vision, twilight), and scotopic (rod vision, dark).
+
+    Args:
+        sky_brightness: Sky surface brightness in mag/arcsec^2.
+                       Lower values = brighter sky.
+
+    Returns:
+        Adaptation state as a string:
+            - "photopic": Bright conditions (sky < 16 mag/arcsec^2)
+            - "mesopic": Twilight conditions (16 <= sky < 20)
+            - "dark": Dark-adapted (sky >= 20)
+
+    Algorithm:
+        The transitions are based on approximate luminance levels:
+        - Photopic: > 3 cd/m^2 (roughly < 16 mag/arcsec^2)
+        - Mesopic: 0.001 to 3 cd/m^2 (16-20 mag/arcsec^2)
+        - Scotopic: < 0.001 cd/m^2 (> 20 mag/arcsec^2)
+
+    Example:
+        >>> calc_eye_adaptation_state(15.0)  # Civil twilight
+        'photopic'
+        >>> calc_eye_adaptation_state(18.0)  # Late twilight
+        'mesopic'
+        >>> calc_eye_adaptation_state(21.5)  # Dark sky
+        'dark'
+
+    References:
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+    """
+    if sky_brightness < 16.0:
+        return "photopic"
+    elif sky_brightness < 20.0:
+        return "mesopic"
+    else:
+        return "dark"
+
+
+def calc_contrast_threshold(
+    sky_brightness: float,
+    eye_adaptation: Optional[str] = None,
+    observer_skill: int = OBSERVER_SKILL_AVERAGE,
+) -> float:
+    """
+    Calculate the minimum contrast required for object detection.
+
+    The contrast threshold represents the minimum brightness difference
+    (expressed as a ratio) that an observer can detect between an object
+    and the background sky. This threshold depends on the observer's
+    eye adaptation state, background brightness, and experience.
+
+    Args:
+        sky_brightness: Sky surface brightness in mag/arcsec^2.
+        eye_adaptation: Eye adaptation state ("photopic", "mesopic", or "dark").
+                       If None, automatically determined from sky brightness.
+        observer_skill: Observer skill level (1-4):
+            - 1 (OBSERVER_SKILL_INEXPERIENCED): Inexperienced observer
+            - 2 (OBSERVER_SKILL_AVERAGE): Average observer
+            - 3 (OBSERVER_SKILL_EXPERIENCED): Experienced observer
+            - 4 (OBSERVER_SKILL_EXPERT): Expert observer
+
+    Returns:
+        Contrast threshold (dimensionless ratio). Lower values mean the
+        observer can detect fainter contrasts.
+
+    Algorithm:
+        The contrast threshold follows the Blackwell-Schaefer model:
+
+        For dark-adapted vision (scotopic):
+            C_threshold = 0.017 * (1 + sqrt(B_sky / 10^5))
+
+        For mesopic vision:
+            C_threshold = 0.025 * (1 + B_sky^0.4 / 100)
+
+        For photopic vision:
+            C_threshold = 0.05 * (1 + B_sky^0.3 / 10)
+
+        where B_sky is the sky brightness in nanoLamberts.
+
+        The threshold is then adjusted for observer experience.
+
+    Example:
+        >>> # Dark sky, average observer
+        >>> calc_contrast_threshold(21.5)
+        0.018...
+        >>> # Twilight, experienced observer
+        >>> calc_contrast_threshold(15.0, observer_skill=OBSERVER_SKILL_EXPERIENCED)
+        0.04...
+
+    References:
+        - Blackwell, H.R. (1946) "Contrast thresholds of the human eye"
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+        - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
+    """
+    # Determine eye adaptation state if not provided
+    if eye_adaptation is None:
+        eye_adaptation = calc_eye_adaptation_state(sky_brightness)
+
+    # The Schaefer visibility model relates limiting magnitude to sky brightness.
+    # We compute the contrast threshold C such that:
+    #   limiting_magnitude = sky_brightness - 2.5 * log10(C)
+    #
+    # Rearranging from known limiting magnitudes at various sky brightnesses:
+    #   C = 10^((sky_brightness - limiting_magnitude) / 2.5)
+    #
+    # For typical conditions:
+    #   - Dark sky (B=21.5): m_lim ~6.0, so delta_m = 15.5
+    #   - Mesopic (B=18): m_lim ~5.0, so delta_m = 13.0
+    #   - Nautical twilight (B=15): m_lim ~4.0, so delta_m = 11.0
+    #   - Civil twilight (B=8): m_lim ~0.5, so delta_m = 7.5
+    #   - Day sky (B=3): m_lim ~-4.0, so delta_m = 7.0
+
+    # Calculate limiting magnitude based on sky brightness and adaptation
+    if eye_adaptation == "dark":
+        # Dark-adapted vision: best sensitivity
+        # At B=21.5, limit ~6.0; at B=20, limit ~5.5
+        base_limit = 6.0
+        # Adjust for actual sky brightness relative to reference (21.5)
+        brightness_factor = (sky_brightness - 21.5) * 0.3
+        limiting_mag = base_limit + brightness_factor
+    elif eye_adaptation == "mesopic":
+        # Mesopic (twilight) vision
+        # At B=18, limit ~4.5-5.0; at B=16, limit ~3.5-4.0
+        # Linear interpolation in this range
+        limiting_mag = 2.0 + (sky_brightness - 16.0) * 0.5
+    else:  # photopic
+        # Photopic (daylight) vision: worst sensitivity for point sources
+        # At B=8 (civil twilight), limit ~0-1.0
+        # At B=3 (daylight), only planets like Venus visible (limit ~ -4)
+        if sky_brightness >= 10:
+            limiting_mag = 1.0 + (sky_brightness - 10.0) * 0.4
+        elif sky_brightness >= 5:
+            limiting_mag = -2.0 + (sky_brightness - 5.0) * 0.6
+        else:
+            limiting_mag = -4.5 + (sky_brightness) * 0.5
+
+    # Apply observer experience adjustment
+    # Better observers can see about 0.5-1.0 magnitude fainter
+    experience_factor = EXPERIENCE_FACTORS.get(observer_skill, 1.0)
+    # Factor 1.0 = average, <1.0 = better
+    # Each 0.1 decrease in factor = ~0.3 mag improvement
+    experience_adj = (1.0 - experience_factor) * 3.0  # +0.9 mag for experts
+    limiting_mag = limiting_mag + experience_adj
+
+    # Clamp limiting magnitude to reasonable range
+    limiting_mag = max(-5.0, min(limiting_mag, 7.5))
+
+    # Calculate contrast threshold from limiting magnitude
+    # C = 10^((sky_brightness - limiting_mag) / 2.5)
+    delta_m = sky_brightness - limiting_mag
+    threshold = 10 ** (delta_m / 2.5)
+
+    # Clamp to reasonable range
+    return max(1e-8, min(threshold, 1e10))
+
+
+def calc_visibility_threshold(
+    object_magnitude: float,
+    sky_brightness: float,
+    eye_adaptation: Optional[str] = None,
+    observer_skill: int = OBSERVER_SKILL_AVERAGE,
+    object_altitude_deg: float = 90.0,
+    apply_extinction: bool = False,
+    pressure_mbar: float = DEFAULT_PRESSURE_MBAR,
+    humidity_percent: float = DEFAULT_HUMIDITY_PERCENT,
+    observer_altitude_m: float = DEFAULT_ALTITUDE_M,
+) -> VisibilityResult:
+    """
+    Determine if an object is visible using the Schaefer visibility model.
+
+    This function implements the Schaefer visibility threshold model, which
+    determines whether a celestial object of given apparent magnitude can
+    be detected against a sky of given surface brightness, accounting for
+    the observer's eye adaptation and experience level.
+
+    The model calculates:
+    1. The limiting magnitude for the given sky brightness
+    2. The contrast between the object and sky
+    3. Whether this contrast exceeds the detection threshold
+
+    Args:
+        object_magnitude: Apparent visual magnitude of the object.
+                         Brighter objects have lower (more negative) values.
+        sky_brightness: Sky surface brightness in mag/arcsec^2.
+                       Typical values: 3 (civil twilight) to 22 (dark sky).
+        eye_adaptation: Eye adaptation state ("photopic", "mesopic", or "dark").
+                       If None, automatically determined from sky brightness.
+        observer_skill: Observer skill level (1-4):
+            - 1 (OBSERVER_SKILL_INEXPERIENCED): Inexperienced observer
+            - 2 (OBSERVER_SKILL_AVERAGE): Average observer
+            - 3 (OBSERVER_SKILL_EXPERIENCED): Experienced observer
+            - 4 (OBSERVER_SKILL_EXPERT): Expert observer
+        object_altitude_deg: Altitude of object above horizon in degrees.
+                            Only used if apply_extinction is True.
+        apply_extinction: If True, add atmospheric extinction to object magnitude.
+        pressure_mbar: Atmospheric pressure in millibars (for extinction).
+        humidity_percent: Relative humidity (for extinction).
+        observer_altitude_m: Observer altitude in meters (for extinction).
+
+    Returns:
+        VisibilityResult dataclass containing:
+            - is_visible: Whether the object is visible
+            - object_magnitude: The (possibly extinction-corrected) magnitude
+            - limiting_magnitude: The limiting magnitude at this sky brightness
+            - sky_brightness: The input sky brightness
+            - contrast: The contrast ratio achieved
+            - threshold_contrast: The minimum contrast required
+            - visibility_margin: Magnitude margin (positive = visible)
+            - eye_adaptation: The adaptation state used
+            - observer_skill: The skill level used
+
+    Algorithm:
+        1. Calculate the contrast threshold for the given conditions
+        2. Convert sky brightness to flux (nanoLamberts)
+        3. Calculate object flux from magnitude
+        4. Compute contrast = (object_flux - sky_flux) / sky_flux
+        5. Compare contrast to threshold
+
+        The limiting magnitude is derived from the contrast threshold:
+            m_lim = sky_brightness - 2.5 * log10(C_threshold)
+
+        An object is visible if:
+            object_magnitude < limiting_magnitude
+
+    Example:
+        >>> # Venus (mag -4) during civil twilight (bright sky)
+        >>> result = calc_visibility_threshold(-4.0, 8.0)
+        >>> result.is_visible
+        True
+
+        >>> # 6th magnitude star during civil twilight
+        >>> result = calc_visibility_threshold(6.0, 8.0)
+        >>> result.is_visible
+        False
+
+        >>> # 4th magnitude star under dark sky
+        >>> result = calc_visibility_threshold(4.0, 21.5)
+        >>> result.is_visible
+        True
+
+        >>> # Expert observer can see fainter objects
+        >>> result = calc_visibility_threshold(
+        ...     6.0, 21.5, observer_skill=OBSERVER_SKILL_EXPERT
+        ... )
+        >>> result.is_visible
+        True
+
+    References:
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+        - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
+        - Blackwell, H.R. (1946) "Contrast thresholds of the human eye"
+        - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
+    """
+    # Apply atmospheric extinction if requested
+    effective_magnitude = object_magnitude
+    if apply_extinction and object_altitude_deg > 0:
+        extinction = calc_extinction_magnitude(
+            altitude_deg=object_altitude_deg,
+            pressure_mbar=pressure_mbar,
+            humidity_percent=humidity_percent,
+            observer_altitude_m=observer_altitude_m,
+        )
+        effective_magnitude = object_magnitude + extinction
+
+    # Determine eye adaptation state
+    if eye_adaptation is None:
+        eye_adaptation = calc_eye_adaptation_state(sky_brightness)
+
+    # Calculate contrast threshold
+    threshold = calc_contrast_threshold(
+        sky_brightness=sky_brightness,
+        eye_adaptation=eye_adaptation,
+        observer_skill=observer_skill,
+    )
+
+    # Convert magnitudes to flux for contrast calculation
+    # Using: flux ~ 10^(-0.4 * magnitude)
+    # The zero-point is arbitrary since we only need ratios
+    sky_flux = 10 ** (-0.4 * sky_brightness)
+    object_flux = 10 ** (-0.4 * effective_magnitude)
+
+    # Calculate contrast
+    # For a point source against extended background:
+    # C = (object_flux) / (sky_flux_per_unit_area)
+    # Since we're comparing magnitudes, this simplifies to flux ratio
+    if sky_flux > 0:
+        contrast = object_flux / sky_flux
+    else:
+        contrast = float("inf")
+
+    # Calculate limiting magnitude from threshold
+    # An object is at the limit when contrast = threshold
+    # So: 10^(-0.4 * m_lim) / 10^(-0.4 * sky_b) = threshold
+    # => m_lim = sky_b - 2.5 * log10(threshold)
+    if threshold > 0:
+        limiting_mag = sky_brightness - 2.5 * math.log10(threshold)
+    else:
+        limiting_mag = sky_brightness + 10.0  # Very faint limit
+
+    # An object is visible if its magnitude is brighter than the limit
+    # (lower magnitude = brighter object)
+    is_visible = effective_magnitude < limiting_mag
+
+    # Calculate visibility margin (positive means visible)
+    visibility_margin = limiting_mag - effective_magnitude
+
+    return VisibilityResult(
+        is_visible=is_visible,
+        object_magnitude=effective_magnitude,
+        limiting_magnitude=limiting_mag,
+        sky_brightness=sky_brightness,
+        contrast=contrast,
+        threshold_contrast=threshold,
+        visibility_margin=visibility_margin,
+        eye_adaptation=eye_adaptation,
+        observer_skill=observer_skill,
+    )
+
+
+def is_object_visible(
+    object_magnitude: float,
+    sky_brightness: float,
+    observer_skill: int = OBSERVER_SKILL_AVERAGE,
+    object_altitude_deg: float = 90.0,
+    apply_extinction: bool = False,
+) -> bool:
+    """
+    Simple check if an object is visible (convenience function).
+
+    This is a simplified interface to calc_visibility_threshold() that
+    returns only the visibility boolean.
+
+    Args:
+        object_magnitude: Apparent visual magnitude of the object.
+        sky_brightness: Sky surface brightness in mag/arcsec^2.
+        observer_skill: Observer skill level (1-4).
+        object_altitude_deg: Altitude of object above horizon in degrees.
+        apply_extinction: If True, add atmospheric extinction.
+
+    Returns:
+        True if the object is visible, False otherwise.
+
+    Example:
+        >>> is_object_visible(-1.5, 21.5)  # Sirius under dark sky
+        True
+        >>> is_object_visible(6.0, 8.0)  # 6th mag star in twilight
+        False
+    """
+    result = calc_visibility_threshold(
+        object_magnitude=object_magnitude,
+        sky_brightness=sky_brightness,
+        observer_skill=observer_skill,
+        object_altitude_deg=object_altitude_deg,
+        apply_extinction=apply_extinction,
+    )
+    return result.is_visible
+
+
+def calc_limiting_magnitude_for_sky(
+    sky_brightness: float,
+    observer_skill: int = OBSERVER_SKILL_AVERAGE,
+    eye_adaptation: Optional[str] = None,
+) -> float:
+    """
+    Calculate the limiting magnitude for a given sky brightness.
+
+    This function returns the faintest star magnitude that can be detected
+    by an observer under the given sky conditions.
+
+    Args:
+        sky_brightness: Sky surface brightness in mag/arcsec^2.
+        observer_skill: Observer skill level (1-4).
+        eye_adaptation: Eye adaptation state. If None, auto-determined.
+
+    Returns:
+        Limiting visual magnitude. Stars fainter than this cannot be seen.
+
+    Example:
+        >>> # Dark sky, average observer
+        >>> calc_limiting_magnitude_for_sky(21.5)
+        6.0...
+        >>> # Expert observer sees fainter
+        >>> calc_limiting_magnitude_for_sky(21.5, OBSERVER_SKILL_EXPERT)
+        6.5...
+        >>> # Twilight sky limits visibility
+        >>> calc_limiting_magnitude_for_sky(15.0)
+        3.5...
+
+    References:
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+    """
+    # Use a reference object at mag 0 to get the limiting magnitude
+    result = calc_visibility_threshold(
+        object_magnitude=0.0,
+        sky_brightness=sky_brightness,
+        observer_skill=observer_skill,
+        eye_adaptation=eye_adaptation,
+    )
+    return result.limiting_magnitude

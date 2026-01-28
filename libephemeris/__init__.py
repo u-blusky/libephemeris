@@ -217,6 +217,18 @@ from .extinction import (
     TWILIGHT_NAUTICAL_END,
     TWILIGHT_ASTRONOMICAL_END,
     DARK_SKY_BRIGHTNESS_V,
+    # Schaefer visibility threshold model
+    VisibilityResult,
+    calc_eye_adaptation_state,
+    calc_contrast_threshold,
+    calc_visibility_threshold,
+    is_object_visible,
+    calc_limiting_magnitude_for_sky,
+    OBSERVER_SKILL_INEXPERIENCED,
+    OBSERVER_SKILL_AVERAGE,
+    OBSERVER_SKILL_EXPERIENCED,
+    OBSERVER_SKILL_EXPERT,
+    EXPERIENCE_FACTORS,
 )
 from .utils import (
     degnorm,
@@ -675,6 +687,18 @@ __all__ = [
     "TWILIGHT_NAUTICAL_END",
     "TWILIGHT_ASTRONOMICAL_END",
     "DARK_SKY_BRIGHTNESS_V",
+    # Schaefer visibility threshold model
+    "VisibilityResult",
+    "calc_eye_adaptation_state",
+    "calc_contrast_threshold",
+    "calc_visibility_threshold",
+    "is_object_visible",
+    "calc_limiting_magnitude_for_sky",
+    "OBSERVER_SKILL_INEXPERIENCED",
+    "OBSERVER_SKILL_AVERAGE",
+    "OBSERVER_SKILL_EXPERIENCED",
+    "OBSERVER_SKILL_EXPERT",
+    "EXPERIENCE_FACTORS",
     # Utilities
     "degnorm",
     "radnorm",
