@@ -340,13 +340,13 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT TWILIGHT SKY BRIGHTNESS MODEL: Implement model for sky brightness during civil twilight (Sun 0° to -6°), nautical twilight (-6° to -12°), and astronomical twilight (-12° to -18°) as a function of Sun altitude, azimuth relative to target, and atmospheric conditions.
 
-- [ ] IMPLEMENT VISIBILITY THRESHOLD MODEL: Implement the Schaefer visibility model that determines whether an object of given magnitude is visible against a sky of given brightness, accounting for the observer's eye adaptation and experience.
+- [x] IMPLEMENT VISIBILITY THRESHOLD MODEL: Implement the Schaefer visibility model that determines whether an object of given magnitude is visible against a sky of given brightness, accounting for the observer's eye adaptation and experience.
 
-- [ ] IMPLEMENT HELIACAL_UT MAIN FUNCTION: Implement swe_heliacal_ut(jd_start, geopos, datm, dobs, object_name, event_type, hel_flag) as described in Swiss Ephemeris documentation section 5.1, where event_type specifies heliacal rising, heliacal setting, evening first, or morning last.
+- [x] IMPLEMENT HELIACAL_UT MAIN FUNCTION: Implement swe_heliacal_ut(jd_start, geopos, datm, dobs, object_name, event_type, hel_flag) as described in Swiss Ephemeris documentation section 5.1, where event_type specifies heliacal rising, heliacal setting, evening first, or morning last.
 
-- [ ] IMPLEMENT VIS_LIMIT_MAG FUNCTION: Implement swe_vis_limit_mag(jd, geopos, datm, dobs, object_name, flags) that calculates the limiting magnitude for visibility of a celestial object given atmospheric conditions and observer parameters.
+- [x] IMPLEMENT VIS_LIMIT_MAG FUNCTION: Implement swe_vis_limit_mag(jd, geopos, datm, dobs, object_name, flags) that calculates the limiting magnitude for visibility of a celestial object given atmospheric conditions and observer parameters.
 
-- [ ] IMPLEMENT HELIACAL_PHENO_UT FUNCTION: Implement swe_heliacal_pheno_ut for computing detailed heliacal phenomena information.
+- [x] IMPLEMENT HELIACAL_PHENO_UT FUNCTION: Implement swe_heliacal_pheno_ut for computing detailed heliacal phenomena information.
 
 - [ ] IMPLEMENT HELIACAL EVENTS FOR PLANETS: Ensure heliacal calculations work correctly for Mercury, Venus, Mars, Jupiter, Saturn including proper handling of inferior/superior conjunction geometry for inner planets.
 
