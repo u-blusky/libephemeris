@@ -57,6 +57,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "build>=1.0.0",
     "twine>=5.0.0",
+    "pytest-sugar>=1.1.1",
 ]
 docs = [
     "sphinx>=7.0.0",
@@ -88,7 +89,8 @@ format = "ruff format ."
 format-black = "black libephemeris tests"
 lint = "ruff check . --fix"
 test = "pytest"
-test-fast = "pytest -n auto"
+"test:progress" = "pytest --no-header -q"
+"test:fast" = "pytest -n auto"
 coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"
 typecheck = "mypy libephemeris"
 pre-commit-install = "pre-commit install"
@@ -150,3 +152,4 @@ output = "coverage.xml"
 
 [tool.coverage.html]
 directory = "htmlcov"
+
