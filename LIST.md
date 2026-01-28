@@ -334,9 +334,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## LOW PRIORITY: Heliacal Events
 
-- [ ] CREATE HELIACAL.PY MODULE: Create a new module libephemeris/heliacal.py to contain all heliacal event calculation functions including swe_heliacal_ut, swe_vis_limit_mag, and swe_heliacal_pheno_ut.
+- [x] CREATE HELIACAL.PY MODULE: Create a new module libephemeris/heliacal.py to contain all heliacal event calculation functions including swe_heliacal_ut, swe_vis_limit_mag, and swe_heliacal_pheno_ut.
 
-- [ ] IMPLEMENT ATMOSPHERIC EXTINCTION MODEL: Implement the atmospheric extinction model needed for heliacal calculations, extinction increases the apparent magnitude of objects near the horizon, use the formula from Schaefer or Green where extinction in magnitudes is approximately 0.28 * sec(z) where z is zenith angle, with adjustments for wavelength and atmospheric conditions.
+- [x] IMPLEMENT ATMOSPHERIC EXTINCTION MODEL: Implement the atmospheric extinction model needed for heliacal calculations, extinction increases the apparent magnitude of objects near the horizon, use the formula from Schaefer or Green where extinction in magnitudes is approximately 0.28 * sec(z) where z is zenith angle, with adjustments for wavelength and atmospheric conditions.
 
 - [ ] IMPLEMENT TWILIGHT SKY BRIGHTNESS MODEL: Implement model for sky brightness during civil twilight (Sun 0° to -6°), nautical twilight (-6° to -12°), and astronomical twilight (-12° to -18°) as a function of Sun altitude, azimuth relative to target, and atmospheric conditions.
 
