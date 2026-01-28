@@ -114,6 +114,7 @@ from .eclipse import (
     calc_besselian_x,
     calc_besselian_y,
     calc_besselian_d,
+    calc_besselian_l1,
 )
 from .utils import (
     degnorm,
@@ -478,6 +479,7 @@ __all__ = [
     "calc_besselian_x",
     "calc_besselian_y",
     "calc_besselian_d",
+    "calc_besselian_l1",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",
