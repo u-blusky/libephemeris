@@ -352,9 +352,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT HELIACAL EVENTS FOR STARS: Ensure heliacal calculations work for bright fixed stars, determine visibility based on star magnitude and atmospheric conditions.
 
-- [ ] IMPLEMENT LUNAR CRESCENT VISIBILITY: Implement calculation of lunar crescent visibility for Islamic calendar applications, determining when the new crescent moon first becomes visible after conjunction.
-
-- [ ] IMPLEMENT AKHET RISING: Implement the ancient Egyptian concept of akhet rising (heliacal rising of a star).
+- [x] IMPLEMENT LUNAR CRESCENT VISIBILITY: Already available via swe_heliacal_pheno_ut for SE_MOON which returns dret[16]=WMoon (crescent width), dret[17]=qYal (Yallop q-test), dret[18]=qCrit (Yallop criterion), dret[25]=LMoon (crescent length) - these are the standard Islamic calendar visibility parameters implemented in heliacal.py lines 1304-1314.
 
 - [ ] VALIDATE HELIACAL EVENTS AGAINST PYSWISSEPH: Create tests comparing heliacal event times against pyswisseph for several planets and bright stars.
 
@@ -384,75 +382,43 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [ ] ADD ZODIACAL CONSTELLATION BRIGHT STARS: Add key bright stars from each zodiacal constellation used in astrological interpretation.
 
-- [ ] EXPAND TO 100 BRIGHTEST STARS: Expand the star catalog to include the 100 brightest stars visible from Earth, using Hipparcos catalog data.
+- [ ] BUILD STAR CATALOG FROM HIPPARCOS: Create a script using astroquery.vizier to fetch Hipparcos I/239/hip_main catalog data for ~800-1000 astrologically relevant stars, convert to StarCatalogEntry format with RA/Dec J2000, proper motion, magnitude - no Swiss Ephemeris file dependencies, required for swe_fixstar/swe_fixstar2 compatibility.
 
-- [ ] IMPORT FULL SEFSTARS.TXT CATALOG: Create a script to parse and import the complete Swiss Ephemeris sefstars.txt file containing 800+ stars, convert to StarCatalogEntry format.
+- [ ] CREATE STAR NAME MAPPING: Build a mapping from common star names (Regulus, Spica, Aldebaran, etc.) and Bayer/Flamsteed designations to Hipparcos HIP numbers, sourced from IAU Working Group on Star Names catalog, stored as Python dict in fixed_stars.py.
 
-- [ ] ADD RADIAL VELOCITY DATA: Add radial velocity field to StarData dataclass and populate for nearby high proper motion stars where this significantly affects position over centuries.
+- [ ] IMPLEMENT PROPER MOTION PROPAGATION: Calculate star positions at any epoch by applying proper motion from Hipparcos J1991.25 reference epoch to target date using standard astrometric formulas including cos(dec) correction.
 
-- [ ] ADD PARALLAX DATA: Add parallax field to StarData for nearby stars where annual parallax is significant (>10 mas).
+- [ ] IMPLEMENT STAR SEARCH BY BAYER DESIGNATION: Implement search for stars by Bayer designation like "Alpha Leonis", "Beta Persei", "Gamma Virginis" parsing Greek letter names - required for swe_fixstar2 compatibility with designation search.
 
-- [ ] ADD SPECTRAL TYPE DATA: Add spectral type (O/B/A/F/G/K/M class) to StarCatalogEntry for informational purposes.
+- [ ] IMPLEMENT STAR SEARCH BY FLAMSTEED NUMBER: Implement search for stars by Flamsteed number like "32 Leonis", "87 Virginis" - required for swe_fixstar2 compatibility.
 
-- [ ] ADD VARIABLE STAR FLAG: Add flag indicating if a star is a known variable (like Algol, Mira) with variability type and period if applicable.
+- [ ] IMPLEMENT STAR SEARCH BY HIPPARCOS NUMBER: Implement search for stars by HIP number like "HIP 49669", "HIP 65474" - required for swe_fixstar2 compatibility.
 
-- [ ] IMPLEMENT STAR SEARCH BY BAYER DESIGNATION: Implement search for stars by Bayer designation like "Alpha Leonis", "Beta Persei", "Gamma Virginis" parsing Greek letter names.
-
-- [ ] IMPLEMENT STAR SEARCH BY FLAMSTEED NUMBER: Implement search for stars by Flamsteed number like "32 Leonis", "87 Virginis".
-
-- [ ] IMPLEMENT STAR SEARCH BY HIPPARCOS NUMBER: Implement search for stars by HIP number like "HIP 49669", "HIP 65474".
-
-- [ ] IMPLEMENT STAR SEARCH BY HD NUMBER: Implement search for stars by Henry Draper catalog number like "HD 87901".
-
-- [ ] IMPLEMENT STAR SEARCH BY COMMON NAME: Implement fuzzy search for stars by common name handling alternate spellings (Betelgeuse/Betelgeux, Fomalhaut/Formalhaut) and transliterations.
+- [ ] IMPLEMENT STAR SEARCH BY COMMON NAME: Implement fuzzy search for stars by common name handling alternate spellings (Betelgeuse/Betelgeux, Fomalhaut/Formalhaut) - required for swe_fixstar/swe_fixstar2 compatibility.
 
 ---
 
 ## LOW PRIORITY: Planetary Phenomena
 
-- [ ] VERIFY SWE_PHENO_UT IMPLEMENTATION: Verify the current implementation status of swe_pheno_ut in libephemeris, document what is implemented and what is missing.
+- [ ] VERIFY SWE_PHENO_UT IMPLEMENTATION: Verify the current implementation of swe_pheno_ut in libephemeris returns all 20 output values matching Swiss Ephemeris exactly - this is a core SE function for planetary phenomena.
 
-- [ ] IMPLEMENT PHASE ANGLE CALCULATION: Ensure phase angle (Sun-planet-Earth angle) is calculated correctly for all planets.
+- [ ] IMPLEMENT PHASE ANGLE CALCULATION: Ensure phase angle (Sun-planet-Earth angle) is calculated correctly for all planets as part of swe_pheno_ut output.
 
-- [ ] IMPLEMENT ILLUMINATED FRACTION CALCULATION: Implement phase (illuminated fraction of disk visible from Earth) calculation for all planets using the phase angle.
+- [ ] IMPLEMENT ILLUMINATED FRACTION CALCULATION: Implement phase (illuminated fraction of disk visible from Earth) calculation for all planets as part of swe_pheno_ut output.
 
-- [ ] IMPLEMENT MERCURY MAGNITUDE FORMULA: Implement apparent magnitude calculation for Mercury using the formula from Meeus Chapter 41 which accounts for Mercury's large phase angle range.
+- [ ] IMPLEMENT PLANET MAGNITUDE FORMULAS: Implement apparent magnitude calculation for Mercury, Venus, Mars, Jupiter, Saturn using formulas from Meeus Chapter 41 - required for swe_pheno_ut compatibility.
 
-- [ ] IMPLEMENT VENUS MAGNITUDE FORMULA: Implement apparent magnitude for Venus with its unique magnitude curve that peaks near dichotomy due to atmospheric effects.
+- [ ] IMPLEMENT PLANET APPARENT DIAMETER CALCULATION: Calculate apparent angular diameter in arcseconds for each planet based on physical radius and geocentric distance - part of swe_pheno_ut output.
 
-- [ ] IMPLEMENT MARS MAGNITUDE FORMULA: Implement apparent magnitude for Mars including the opposition surge effect.
-
-- [ ] IMPLEMENT JUPITER MAGNITUDE FORMULA: Implement apparent magnitude for Jupiter based on phase angle and distance.
-
-- [ ] IMPLEMENT SATURN MAGNITUDE FORMULA: Implement apparent magnitude for Saturn including the effect of ring tilt angle on total brightness.
-
-- [ ] IMPLEMENT SATURN RING TILT CALCULATION: Calculate the tilt angle of Saturn's rings as seen from Earth, needed for magnitude calculation.
-
-- [ ] IMPLEMENT URANUS NEPTUNE MAGNITUDE FORMULAS: Implement simplified magnitude formulas for Uranus and Neptune.
-
-- [ ] IMPLEMENT PLANET APPARENT DIAMETER CALCULATION: Calculate apparent angular diameter in arcseconds for each planet based on physical radius and geocentric distance.
-
-- [ ] IMPLEMENT DETAILED MOON PHASE FUNCTION: Implement swe_lun_phase(jd) returning phase angle (0-360°), illumination fraction (0.0-1.0), phase name, and lunar age in days.
-
-- [ ] IMPLEMENT MOON PHASE NAME DETERMINATION: Return appropriate phase name (New, Waxing Crescent, First Quarter, Waxing Gibbous, Full, Waning Gibbous, Last Quarter, Waning Crescent) based on phase angle.
-
-- [ ] IMPLEMENT ELONGATION CALCULATION: Ensure elongation from Sun is calculated correctly, properly distinguish between morning star (western elongation) and evening star (eastern elongation).
-
-- [ ] IMPLEMENT RETROGRADE STATION FINDER: Implement function to find exact times when a planet stations retrograde or direct, using root-finding on the velocity.
-
-- [ ] IMPLEMENT CONJUNCTION FINDER: Implement function to find planetary conjunctions with the Sun (superior and inferior) and with other planets.
-
-- [ ] IMPLEMENT OPPOSITION FINDER: Implement function to find when outer planets are at opposition (opposite the Sun in the sky).
-
-- [ ] IMPLEMENT GREATEST ELONGATION FINDER: Implement function to find times of greatest eastern and western elongation for Mercury and Venus.
+- [ ] IMPLEMENT ELONGATION CALCULATION: Ensure elongation from Sun is calculated correctly as part of swe_pheno_ut, properly distinguish between morning star (western elongation) and evening star (eastern elongation).
 
 ---
 
 ## LOW PRIORITY: House System Improvements
 
-- [ ] IMPLEMENT CO-ASCENDANT CALCULATION: Currently docs/PRECISION.md line 121 states "Co-Ascendant: Not implemented (returns 0.0)", implement the Co-Ascendant in houses.py as defined by Walter Koch (Ascendant calculated at the same sidereal time but at latitude 0° equator).
+- [ ] IMPLEMENT CO-ASCENDANT CALCULATION: Currently docs/PRECISION.md line 121 states "Co-Ascendant: Not implemented (returns 0.0)", implement the Co-Ascendant in houses.py as defined by Walter Koch - required for swe_houses_ex2 ascmc[4] output.
 
-- [ ] IMPLEMENT POLAR ASCENDANT CALCULATION: Currently docs/PRECISION.md line 122 states "Polar Ascendant: Not implemented (returns 0.0)", implement the Polar Ascendant in houses.py as the Ascendant calculated at the same sidereal time at latitude 90°.
+- [ ] IMPLEMENT POLAR ASCENDANT CALCULATION: Currently docs/PRECISION.md line 122 states "Polar Ascendant: Not implemented (returns 0.0)", implement the Polar Ascendant in houses.py - required for swe_houses_ex2 ascmc[5] output.
 
 - [ ] VERIFY GAUQUELIN SECTOR IMPLEMENTATION: Currently docs/PRECISION.md line 106 notes that Gauquelin sectors use "Placidus approximation (not true 36-sector)", verify the implementation correctly divides diurnal and nocturnal arcs into 18 sectors each.
 
@@ -482,7 +448,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [ ] IMPROVE GALACTIC CENTER AYANAMSHAS: Improve Galactic Center based ayanamshas (0 Sag, Rgilbrand, Cochrane, Mula Wilhelm) using current best coordinates for Sgr A* (the radio source at the Galactic Center).
 
-- [ ] IMPLEMENT CUSTOM AYANAMSHA: Implement swe_set_sid_mode with SE_SIDM_USER option allowing users to define custom ayanamsha with their own initial value at a reference epoch and annual precession rate.
+- [ ] IMPLEMENT CUSTOM AYANAMSHA: Implement swe_set_sid_mode with SE_SIDM_USER option allowing users to define custom ayanamsha with their own initial value and precession rate - this is a documented SE feature.
 
 - [ ] DOCUMENT AYANAMSHA DEFINITIONS: Create documentation explaining the astronomical and historical basis for each ayanamsha mode, what reference point it uses, and when it was zero.
 
@@ -496,10 +462,6 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [ ] PROFILE HOT PATHS: Use Python profiling tools to identify the most time-consuming functions and optimize them.
 
-- [ ] IMPLEMENT BATCH CALCULATION: Implement batch calculation mode for computing positions at many dates efficiently, leveraging Skyfield's vectorized calculation capability.
-
-- [ ] ADD POSITION CACHING: Implement optional caching of recently computed positions using an LRU cache to speed up repeated queries.
-
 - [ ] EVALUATE DE440 DE441 UPGRADE: Currently libephemeris uses DE421 as default, evaluate upgrading to DE440 (2020) or DE441 which have improved accuracy especially for outer planets and extended time range.
 
 - [ ] ADD DE440 SUPPORT: Add support for DE440 ephemeris with documentation on how to download and configure it.
@@ -512,17 +474,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## OPTIONAL: Planetary Moons
 
-- [ ] IMPLEMENT JUPITER GALILEAN MOON POSITIONS: Implement positions for Io, Europa, Ganymede, Callisto using JPL satellite ephemeris file jup365.bsp.
-
-- [ ] IMPLEMENT SATURN MAJOR MOON POSITIONS: Implement positions for Titan, Rhea, Iapetus, Dione, Tethys, Enceladus using sat441.bsp.
-
-- [ ] IMPLEMENT MARS MOON POSITIONS: Implement positions for Phobos and Deimos using mar097.bsp.
-
-- [ ] IMPLEMENT URANUS MOON POSITIONS: Implement positions for major Uranian moons (Miranda, Ariel, Umbriel, Titania, Oberon) using ura111.bsp.
-
-- [ ] IMPLEMENT NEPTUNE MOON POSITIONS: Implement positions for Triton and Nereid using nep095.bsp.
-
-- [ ] IMPLEMENT PLUTO MOON POSITIONS: Implement positions for Charon, Nix, Hydra, Kerberos, Styx using plu058.bsp.
+- [ ] IMPLEMENT PLANETARY MOON POSITIONS: Implement support for planetary moons (Galilean moons, Titan, etc.) using JPL satellite SPK files (jup365.bsp, sat441.bsp, etc.) - Swiss Ephemeris 2.10+ supports SE_MOON_IO, SE_MOON_EUROPA, etc. via swe_calc_ut with appropriate body IDs.
 
 ---
 
@@ -614,4 +566,4 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ---
 
-This list contains approximately 300 detailed TODO items covering all aspects of improving libephemeris precision to match Swiss Ephemeris.
+This list contains approximately 235 detailed TODO items covering all aspects of improving libephemeris precision to match Swiss Ephemeris. Items marked [x] are completed; remaining items focus on 1:1 SE API compatibility.
