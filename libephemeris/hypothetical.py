@@ -649,6 +649,140 @@ POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
 )
 
 
+# =============================================================================
+# UNIFIED URANIAN KEPLERIAN ELEMENTS
+# =============================================================================
+# This dataclass and dictionary provide a unified structure for all Uranian
+# planets, enabling the generic calc_uranian_planet() function.
+
+
+@dataclass
+class UranianKeplerianElements:
+    """
+    Unified Keplerian orbital elements for Uranian (Hamburg School) planets.
+
+    This dataclass supports both circular orbits (e=0) and elliptic orbits
+    with small eccentricity. For circular orbits, M0 represents the mean
+    longitude at epoch; for elliptic orbits, it represents the mean anomaly.
+
+    Attributes:
+        name: Name of the hypothetical body
+        epoch: Reference epoch (Julian Day TT)
+        a: Semi-major axis (AU)
+        e: Eccentricity (0 for circular orbits)
+        i: Inclination (degrees)
+        omega: Argument of perihelion (degrees)
+        Omega: Longitude of ascending node (degrees)
+        M0: Mean anomaly at epoch (degrees) - for circular orbits, this is
+            the mean longitude since omega=Omega=0
+        n: Mean motion (degrees per day)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    omega: float
+    Omega: float
+    M0: float
+    n: float
+
+
+# Unified dictionary of all Uranian planet Keplerian elements
+# All elements use J1900.0 (JD 2415020.0) as epoch, matching Swiss Ephemeris seorbel.txt
+URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
+    SE_CUPIDO: UranianKeplerianElements(
+        name="Cupido",
+        epoch=2415020.0,  # J1900.0
+        a=40.99837,
+        e=0.00,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=237.4667,  # Mean longitude at epoch (L0)
+        n=0.003757,
+    ),
+    SE_HADES: UranianKeplerianElements(
+        name="Hades",
+        epoch=2415020.0,  # J1900.0
+        a=50.66744,
+        e=0.00245,
+        i=1.0500,
+        omega=148.1796,
+        Omega=161.3339,
+        M0=27.6496,  # True mean anomaly
+        n=360.0 / (50.66744**1.5 * 365.25),
+    ),
+    SE_ZEUS: UranianKeplerianElements(
+        name="Zeus",
+        epoch=2415020.0,  # J1900.0
+        a=59.21436,
+        e=0.00,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=355.2310,  # Mean longitude at epoch (L0)
+        n=360.0 / (59.21436**1.5 * 365.25),
+    ),
+    SE_KRONOS: UranianKeplerianElements(
+        name="Kronos",
+        epoch=2415020.0,  # J1900.0
+        a=64.81690,
+        e=0.00,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=129.3326,  # Mean longitude at epoch (L0)
+        n=360.0 / (64.81690**1.5 * 365.25),
+    ),
+    SE_APOLLON: UranianKeplerianElements(
+        name="Apollon",
+        epoch=2415020.0,  # J1900.0
+        a=70.361180,
+        e=0.00,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=37.4667,  # Mean longitude at epoch (L0)
+        n=360.0 / (70.361180**1.5 * 365.25),
+    ),
+    SE_ADMETOS: UranianKeplerianElements(
+        name="Admetos",
+        epoch=2415020.0,  # J1900.0
+        a=73.736396,
+        e=0.00,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=107.3807,  # Mean longitude at epoch (L0)
+        n=360.0 / (73.736396**1.5 * 365.25),
+    ),
+    SE_VULKANUS: UranianKeplerianElements(
+        name="Vulkanus",
+        epoch=2415020.0,  # J1900.0
+        a=77.445895,
+        e=0.00,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=118.0983,  # Mean longitude at epoch (L0)
+        n=360.0 / (77.445895**1.5 * 365.25),
+    ),
+    SE_POSEIDON: UranianKeplerianElements(
+        name="Poseidon",
+        epoch=2415020.0,  # J1900.0
+        a=83.666307,
+        e=0.00,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=182.4817,  # Mean longitude at epoch (L0)
+        n=360.0 / (83.666307**1.5 * 365.25),
+    ),
+}
+
+
 # Other hypothetical body elements
 # Transpluto (Isis) elements from Swiss Ephemeris
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
@@ -1426,6 +1560,185 @@ def calc_poseidon(jd_tt: float) -> Tuple[float, float, float, float, float, floa
     ddist = 0.0
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def calc_uranian_planet(
+    body_id: int, jd_tt: float
+) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the position of any Uranian planet using Keplerian propagation.
+
+    This generic function handles all eight Hamburg School Uranian planets
+    (Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon) by
+    looking up their orbital elements from the URANIAN_KEPLERIAN_ELEMENTS
+    dictionary and performing Keplerian propagation.
+
+    For circular orbits (e=0), the calculation simplifies to mean longitude
+    propagation. For elliptic orbits (e>0, like Hades), full Keplerian
+    mechanics with Kepler's equation solving is used.
+
+    Args:
+        body_id: Uranian planet ID (SE_CUPIDO through SE_POSEIDON, i.e., 40-47)
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees
+            - distance: Distance from Sun in AU
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
+
+    Raises:
+        ValueError: If body_id is not a valid Uranian planet ID.
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_uranian_planet, SE_CUPIDO
+        >>> pos = calc_uranian_planet(SE_CUPIDO, 2451545.0)  # J2000.0
+        >>> print(f"Cupido at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
+    """
+    if body_id not in URANIAN_KEPLERIAN_ELEMENTS:
+        raise ValueError(
+            f"Body ID {body_id} is not a valid Uranian planet. "
+            f"Valid IDs: {list(URANIAN_KEPLERIAN_ELEMENTS.keys())}"
+        )
+
+    elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Check if this is a circular orbit (e=0)
+    if elements.e == 0.0:
+        # For circular orbit, simply propagate mean longitude
+        longitude = (elements.M0 + elements.n * dt) % 360.0
+        latitude = 0.0
+        distance = elements.a
+
+        # For circular orbit, velocities are constant
+        dlon = elements.n
+        dlat = 0.0
+        ddist = 0.0
+
+        return (longitude, latitude, distance, dlon, dlat, ddist)
+
+    # Elliptic orbit: full Keplerian propagation
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    # Position in orbital plane
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    # Rotate to ecliptic frame
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    # Convert to spherical coordinates
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    # Calculate velocity via numerical differentiation
+    dt_step = 1.0  # 1 day step for daily velocity
+    pos_next = _calc_uranian_planet_raw(body_id, jd_tt + dt_step)
+
+    dlon = pos_next[0] - longitude
+    # Handle wrap-around
+    if dlon > 180.0:
+        dlon -= 360.0
+    elif dlon < -180.0:
+        dlon += 360.0
+
+    dlat = pos_next[1] - latitude
+    ddist = pos_next[2] - distance
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def _calc_uranian_planet_raw(body_id: int, jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate raw Uranian planet position without velocity (helper for differentiation).
+
+    This internal helper function calculates only position (no velocity) for use
+    in numerical differentiation to compute velocities.
+
+    Args:
+        body_id: Uranian planet ID
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance)
+    """
+    elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Check if this is a circular orbit (e=0)
+    if elements.e == 0.0:
+        longitude = (elements.M0 + elements.n * dt) % 360.0
+        latitude = 0.0
+        distance = elements.a
+        return (longitude, latitude, distance)
+
+    # Elliptic orbit
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+    u = nu + math.radians(elements.omega)
+
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    return (longitude, latitude, distance)
 
 
 def calc_transpluto_position(

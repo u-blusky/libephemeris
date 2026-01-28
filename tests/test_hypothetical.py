@@ -31,6 +31,7 @@ from libephemeris.hypothetical import (
     get_hypothetical_name,
     calc_uranian_longitude,
     calc_uranian_position,
+    calc_uranian_planet,
     calc_transpluto_position,
     calc_white_moon_position,
     calc_waldemath_position,
@@ -46,6 +47,7 @@ from libephemeris.hypothetical import (
     calc_poseidon,
     # Data structures
     URANIAN_ELEMENTS,
+    URANIAN_KEPLERIAN_ELEMENTS,
     HYPOTHETICAL_ELEMENTS,
     HYPOTHETICAL_NAMES,
     CUPIDO_KEPLERIAN_ELEMENTS,
@@ -1947,3 +1949,285 @@ class TestCalcPoseidon:
         assert poseidon_pos[2] > vulkanus_pos[2], (
             "Poseidon should be farther from Sun than Vulkanus"
         )
+
+
+class TestCalcUranianPlanet:
+    """Tests for the generic calc_uranian_planet Keplerian propagation function."""
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    # All Uranian body IDs
+    URANIAN_BODY_IDS = [
+        SE_CUPIDO,
+        SE_HADES,
+        SE_ZEUS,
+        SE_KRONOS,
+        SE_APOLLON,
+        SE_ADMETOS,
+        SE_VULKANUS,
+        SE_POSEIDON,
+    ]
+
+    def test_calc_uranian_planet_returns_tuple(self):
+        """Test that calc_uranian_planet returns correct tuple format."""
+        for body_id in self.URANIAN_BODY_IDS:
+            pos = calc_uranian_planet(body_id, self.J2000)
+            assert isinstance(pos, tuple), f"Body {body_id} should return tuple"
+            assert len(pos) == 6, f"Body {body_id} should return 6 elements"
+            lon, lat, dist, dlon, dlat, ddist = pos
+            assert isinstance(lon, float), f"Body {body_id} longitude should be float"
+            assert isinstance(lat, float), f"Body {body_id} latitude should be float"
+            assert isinstance(dist, float), f"Body {body_id} distance should be float"
+            assert isinstance(dlon, float), f"Body {body_id} dlon should be float"
+            assert isinstance(dlat, float), f"Body {body_id} dlat should be float"
+            assert isinstance(ddist, float), f"Body {body_id} ddist should be float"
+
+    def test_calc_uranian_planet_longitude_range(self):
+        """Test that longitude is in valid range for all bodies."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for body_id in self.URANIAN_BODY_IDS:
+            for jd in test_dates:
+                pos = calc_uranian_planet(body_id, jd)
+                assert 0.0 <= pos[0] < 360.0, (
+                    f"Body {body_id} longitude {pos[0]} out of range at JD {jd}"
+                )
+
+    def test_calc_uranian_planet_invalid_body(self):
+        """Test that invalid body ID raises ValueError."""
+        with pytest.raises(ValueError):
+            calc_uranian_planet(0, self.J2000)  # SE_SUN is not a Uranian planet
+
+        with pytest.raises(ValueError):
+            calc_uranian_planet(48, self.J2000)  # SE_ISIS is not a Uranian planet
+
+        with pytest.raises(ValueError):
+            calc_uranian_planet(999, self.J2000)
+
+    def test_calc_uranian_planet_matches_individual_functions(self):
+        """Test that generic function matches individual calc_* functions."""
+        # Test that calc_uranian_planet matches calc_cupido
+        generic = calc_uranian_planet(SE_CUPIDO, self.J2000)
+        individual = calc_cupido(self.J2000)
+        assert generic == individual, "calc_uranian_planet should match calc_cupido"
+
+        # Test that calc_uranian_planet matches calc_hades
+        generic = calc_uranian_planet(SE_HADES, self.J2000)
+        individual = calc_hades(self.J2000)
+        assert generic == individual, "calc_uranian_planet should match calc_hades"
+
+        # Test that calc_uranian_planet matches calc_zeus
+        generic = calc_uranian_planet(SE_ZEUS, self.J2000)
+        individual = calc_zeus(self.J2000)
+        assert generic == individual, "calc_uranian_planet should match calc_zeus"
+
+        # Test that calc_uranian_planet matches calc_kronos
+        generic = calc_uranian_planet(SE_KRONOS, self.J2000)
+        individual = calc_kronos(self.J2000)
+        assert generic == individual, "calc_uranian_planet should match calc_kronos"
+
+        # Test that calc_uranian_planet matches calc_apollon
+        generic = calc_uranian_planet(SE_APOLLON, self.J2000)
+        individual = calc_apollon(self.J2000)
+        assert generic == individual, "calc_uranian_planet should match calc_apollon"
+
+        # Test that calc_uranian_planet matches calc_admetos
+        generic = calc_uranian_planet(SE_ADMETOS, self.J2000)
+        individual = calc_admetos(self.J2000)
+        assert generic == individual, "calc_uranian_planet should match calc_admetos"
+
+        # Test that calc_uranian_planet matches calc_vulkanus
+        generic = calc_uranian_planet(SE_VULKANUS, self.J2000)
+        individual = calc_vulkanus(self.J2000)
+        assert generic == individual, "calc_uranian_planet should match calc_vulkanus"
+
+        # Test that calc_uranian_planet matches calc_poseidon
+        generic = calc_uranian_planet(SE_POSEIDON, self.J2000)
+        individual = calc_poseidon(self.J2000)
+        assert generic == individual, "calc_uranian_planet should match calc_poseidon"
+
+    def test_calc_uranian_planet_all_bodies_have_elements(self):
+        """Test that all Uranian body IDs have elements in URANIAN_KEPLERIAN_ELEMENTS."""
+        for body_id in self.URANIAN_BODY_IDS:
+            assert body_id in URANIAN_KEPLERIAN_ELEMENTS, (
+                f"Body ID {body_id} should have Keplerian elements"
+            )
+
+    def test_calc_uranian_planet_velocity_positive(self):
+        """Test that daily motion is positive (prograde) for all bodies."""
+        for body_id in self.URANIAN_BODY_IDS:
+            pos = calc_uranian_planet(body_id, self.J2000)
+            assert pos[3] > 0, (
+                f"Body {body_id} ({URANIAN_KEPLERIAN_ELEMENTS[body_id].name}) "
+                f"should have prograde motion"
+            )
+
+    def test_calc_uranian_planet_distance_matches_semi_major_axis(self):
+        """Test that distance matches semi-major axis for circular orbits."""
+        for body_id in self.URANIAN_BODY_IDS:
+            elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
+            pos = calc_uranian_planet(body_id, self.J2000)
+
+            if elements.e == 0.0:
+                # For circular orbit, distance = semi-major axis exactly
+                assert pos[2] == elements.a, (
+                    f"Body {body_id} ({elements.name}) distance should equal "
+                    f"semi-major axis {elements.a} for circular orbit, got {pos[2]}"
+                )
+            else:
+                # For elliptic orbit, distance should be within eccentricity range
+                min_dist = elements.a * (1 - elements.e)
+                max_dist = elements.a * (1 + elements.e)
+                assert min_dist <= pos[2] <= max_dist, (
+                    f"Body {body_id} ({elements.name}) distance {pos[2]} "
+                    f"should be between {min_dist} and {max_dist}"
+                )
+
+    def test_calc_uranian_planet_at_epoch(self):
+        """Test that longitude at epoch matches M0 for circular orbits."""
+        for body_id in self.URANIAN_BODY_IDS:
+            elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
+            if elements.e == 0.0:  # Only test circular orbits
+                pos = calc_uranian_planet(body_id, elements.epoch)
+                # At epoch, mean anomaly/longitude should equal M0
+                diff = abs(pos[0] - elements.M0)
+                if diff > 180:
+                    diff = 360 - diff
+                assert diff < 0.01, (
+                    f"Body {body_id} ({elements.name}) at epoch should have "
+                    f"longitude {elements.M0}, got {pos[0]}"
+                )
+
+    def test_calc_uranian_planet_progression(self):
+        """Test that all bodies progress correctly over time."""
+        for body_id in self.URANIAN_BODY_IDS:
+            elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
+            pos1 = calc_uranian_planet(body_id, self.J2000)
+            pos2 = calc_uranian_planet(body_id, self.J2000 + 365.25)  # 1 year later
+
+            # Calculate expected motion in 1 year
+            expected_motion = elements.n * 365.25
+
+            # Calculate actual motion (handle wrap-around)
+            actual_motion = pos2[0] - pos1[0]
+            if actual_motion < -180:
+                actual_motion += 360
+            elif actual_motion > 180:
+                actual_motion -= 360
+
+            # Allow more tolerance for elliptic orbits due to velocity variation
+            tolerance = 0.1 if elements.e > 0 else 0.01
+            assert abs(actual_motion - expected_motion) < tolerance, (
+                f"Body {body_id} ({elements.name}) annual motion should be "
+                f"{expected_motion:.4f} deg, got {actual_motion:.4f}"
+            )
+
+    def test_calc_uranian_planet_exportable_from_main_module(self):
+        """Test that calc_uranian_planet is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_uranian_planet")
+        pos = libephemeris.calc_uranian_planet(SE_CUPIDO, self.J2000)
+        assert len(pos) == 6
+
+    def test_uranian_keplerian_elements_exportable(self):
+        """Test that URANIAN_KEPLERIAN_ELEMENTS is exported from main module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "URANIAN_KEPLERIAN_ELEMENTS")
+        assert SE_CUPIDO in libephemeris.URANIAN_KEPLERIAN_ELEMENTS
+
+    def test_calc_uranian_planet_circular_orbits_have_constant_velocity(self):
+        """Test that circular orbit bodies have constant velocity."""
+        for body_id in self.URANIAN_BODY_IDS:
+            elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
+            if elements.e == 0.0:
+                pos = calc_uranian_planet(body_id, self.J2000)
+                assert pos[3] == elements.n, (
+                    f"Body {body_id} ({elements.name}) velocity should equal "
+                    f"mean motion {elements.n} for circular orbit, got {pos[3]}"
+                )
+                assert pos[4] == 0.0, (
+                    f"Body {body_id} ({elements.name}) latitude velocity should be 0"
+                )
+                assert pos[5] == 0.0, (
+                    f"Body {body_id} ({elements.name}) distance velocity should be 0"
+                )
+
+    def test_calc_uranian_planet_hades_has_elliptic_orbit(self):
+        """Test that Hades has small but non-zero eccentricity."""
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_HADES]
+        assert elements.e > 0, "Hades should have non-zero eccentricity"
+        assert elements.e < 0.01, "Hades eccentricity should be small"
+
+        pos = calc_uranian_planet(SE_HADES, self.J2000)
+        # Hades should have small latitude due to inclination
+        assert abs(pos[1]) <= elements.i + 0.1, (
+            f"Hades latitude {pos[1]} should be within inclination {elements.i}"
+        )
+
+    def test_calc_uranian_planet_bodies_ordered_by_distance(self):
+        """Test that bodies are in correct order by distance from Sun."""
+        distances = {}
+        for body_id in self.URANIAN_BODY_IDS:
+            pos = calc_uranian_planet(body_id, self.J2000)
+            distances[body_id] = pos[2]
+
+        # Cupido < Hades < Zeus < Kronos < Apollon < Admetos < Vulkanus < Poseidon
+        assert distances[SE_CUPIDO] < distances[SE_HADES]
+        assert distances[SE_HADES] < distances[SE_ZEUS]
+        assert distances[SE_ZEUS] < distances[SE_KRONOS]
+        assert distances[SE_KRONOS] < distances[SE_APOLLON]
+        assert distances[SE_APOLLON] < distances[SE_ADMETOS]
+        assert distances[SE_ADMETOS] < distances[SE_VULKANUS]
+        assert distances[SE_VULKANUS] < distances[SE_POSEIDON]
+
+    def test_calc_uranian_planet_bodies_ordered_by_velocity(self):
+        """Test that bodies are in correct order by velocity (faster = closer)."""
+        velocities = {}
+        for body_id in self.URANIAN_BODY_IDS:
+            pos = calc_uranian_planet(body_id, self.J2000)
+            velocities[body_id] = pos[3]
+
+        # Poseidon < Vulkanus < Admetos < Apollon < Kronos < Zeus < Hades < Cupido
+        assert velocities[SE_POSEIDON] < velocities[SE_VULKANUS]
+        assert velocities[SE_VULKANUS] < velocities[SE_ADMETOS]
+        assert velocities[SE_ADMETOS] < velocities[SE_APOLLON]
+        assert velocities[SE_APOLLON] < velocities[SE_KRONOS]
+        assert velocities[SE_KRONOS] < velocities[SE_ZEUS]
+        assert velocities[SE_ZEUS] < velocities[SE_HADES]
+        assert velocities[SE_HADES] < velocities[SE_CUPIDO]
+
+    @pytest.mark.parametrize(
+        "body_id,expected_name",
+        [
+            (SE_CUPIDO, "Cupido"),
+            (SE_HADES, "Hades"),
+            (SE_ZEUS, "Zeus"),
+            (SE_KRONOS, "Kronos"),
+            (SE_APOLLON, "Apollon"),
+            (SE_ADMETOS, "Admetos"),
+            (SE_VULKANUS, "Vulkanus"),
+            (SE_POSEIDON, "Poseidon"),
+        ],
+    )
+    def test_calc_uranian_planet_elements_have_correct_names(
+        self, body_id, expected_name
+    ):
+        """Test that URANIAN_KEPLERIAN_ELEMENTS has correct names."""
+        elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
+        assert elements.name == expected_name
+
+    def test_calc_uranian_planet_all_use_j1900_epoch(self):
+        """Test that all Uranian elements use J1900.0 as epoch."""
+        j1900 = 2415020.0
+        for body_id in self.URANIAN_BODY_IDS:
+            elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
+            assert elements.epoch == j1900, (
+                f"Body {body_id} ({elements.name}) should use J1900.0 epoch, "
+                f"got {elements.epoch}"
+            )
