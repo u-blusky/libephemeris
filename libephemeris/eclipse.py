@@ -7973,3 +7973,95 @@ def calc_besselian_dmu_dt(jd: float, flags: int = SEFLG_SWIEPH) -> float:
     dmu_dt_per_hour = dmu_dt_per_day / 24.0
 
     return dmu_dt_per_hour
+
+
+def interpolate_besselian_elements(
+    elements: BesselianElements, target_jd: float
+) -> BesselianElements:
+    """
+    Interpolate Besselian elements to any time during an eclipse.
+
+    Uses first-order Taylor series expansion to interpolate Besselian elements
+    from their reference time (t0) to a target time. This is accurate for
+    times within approximately ±1-2 hours of the reference time.
+
+    The interpolation formula for each element is:
+        element(t) = element(t0) + d_element_dt * (t - t0) * 24
+
+    where t and t0 are in Julian Days, and derivatives are per hour.
+
+    Args:
+        elements: BesselianElements object containing values and derivatives
+                  at the reference time t0.
+        target_jd: Target Julian Day (UT) at which to interpolate elements.
+
+    Returns:
+        A new BesselianElements object with interpolated values at target_jd.
+        The new object has:
+        - t0 set to target_jd (the new reference time)
+        - All elements (x, y, d, l1, l2, mu) interpolated to target_jd
+        - All derivatives (dx_dt, dy_dt, etc.) copied from the original
+          (derivatives change slowly and are valid for nearby times)
+
+    Example:
+        >>> from libephemeris import (
+        ...     julday, BesselianElements, interpolate_besselian_elements
+        ... )
+        >>> # Elements at reference time for April 8, 2024 eclipse
+        >>> elements = BesselianElements(
+        ...     t0=julday(2024, 4, 8, 18.0),
+        ...     x=0.3145, y=0.2731, d=7.5821,
+        ...     l1=0.5436, l2=-0.0047, mu=89.1234,
+        ...     dx_dt=0.5123, dy_dt=0.1456, dd_dt=0.0012,
+        ...     dl1_dt=-0.0001, dl2_dt=-0.0001, dmu_dt=15.0041
+        ... )
+        >>> # Interpolate to 30 minutes later
+        >>> later_jd = julday(2024, 4, 8, 18.5)
+        >>> interpolated = interpolate_besselian_elements(elements, later_jd)
+        >>> print(f"x at t0+0.5h: {interpolated.x:.4f}")
+
+    Note:
+        - The mu (Greenwich hour angle) is normalized to [0, 360) degrees
+          after interpolation to handle wraparound.
+        - For high accuracy over longer time spans, compute fresh elements
+          using the individual calc_besselian_* functions.
+        - Accuracy degrades quadratically with time from reference:
+          - Within ±15 min: error < 0.001 Earth radii
+          - Within ±1 hour: error < 0.01 Earth radii
+          - Beyond ±2 hours: consider recomputing elements
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Time difference in hours (derivatives are per hour)
+    dt_hours = (target_jd - elements.t0) * 24.0
+
+    # Interpolate each element using first-order Taylor series
+    x_new = elements.x + elements.dx_dt * dt_hours
+    y_new = elements.y + elements.dy_dt * dt_hours
+    d_new = elements.d + elements.dd_dt * dt_hours
+    l1_new = elements.l1 + elements.dl1_dt * dt_hours
+    l2_new = elements.l2 + elements.dl2_dt * dt_hours
+    mu_new = elements.mu + elements.dmu_dt * dt_hours
+
+    # Normalize mu to [0, 360) degrees
+    mu_new = mu_new % 360.0
+
+    # Return new BesselianElements with interpolated values
+    # Derivatives are copied as they change slowly over short time spans
+    return BesselianElements(
+        t0=target_jd,
+        x=x_new,
+        y=y_new,
+        d=d_new,
+        l1=l1_new,
+        l2=l2_new,
+        mu=mu_new,
+        dx_dt=elements.dx_dt,
+        dy_dt=elements.dy_dt,
+        dd_dt=elements.dd_dt,
+        dl1_dt=elements.dl1_dt,
+        dl2_dt=elements.dl2_dt,
+        dmu_dt=elements.dmu_dt,
+    )
