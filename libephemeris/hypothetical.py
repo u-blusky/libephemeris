@@ -497,6 +497,56 @@ APOLLON_KEPLERIAN_ELEMENTS = ApollonKeplerianElements(
 )
 
 
+@dataclass
+class AdmetosKeplerianElements:
+    """
+    Keplerian orbital elements for Admetos from Swiss Ephemeris seorbel.txt.
+
+    Admetos is the sixth Hamburg School Uranian planet. Like Cupido, Zeus,
+    Kronos, and Apollon, Admetos has a circular orbit (e=0) on the ecliptic (i=0).
+
+    Attributes:
+        name: Name of the body
+        epoch: Reference epoch (Julian Day TT)
+        a: Semi-major axis (AU)
+        e: Eccentricity
+        i: Inclination (degrees)
+        omega: Argument of perihelion (degrees)
+        Omega: Longitude of ascending node (degrees)
+        L0: Mean longitude at epoch (degrees)
+        n: Mean motion (degrees per day)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    omega: float
+    Omega: float
+    L0: float
+    n: float
+
+
+# Admetos Keplerian elements from Swiss Ephemeris seorbel.txt
+# Epoch: J1900.0 (JD 2415020.0)
+# From seorbel.txt line: J1900, J1900, 107.3807, 73.736396, 0.00000, 0.0000, 0.0000, 0.0000, Admetos
+# Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
+# For circular orbit (e=0), mean anomaly = mean longitude (since omega and Omega are 0)
+ADMETOS_KEPLERIAN_ELEMENTS = AdmetosKeplerianElements(
+    name="Admetos",
+    epoch=2415020.0,  # J1900.0
+    a=73.736396,  # Semi-major axis in AU
+    e=0.00,  # Circular orbit
+    i=0.0,  # On ecliptic
+    omega=0.0,  # Irrelevant for e=0
+    Omega=0.0,  # Assumed zero ascending node
+    L0=107.3807,  # Mean longitude at J1900.0 (degrees)
+    # n = 360 / (a^1.5 * 365.25) = 360 / (633.15 * 365.25) = 0.001556 deg/day
+    n=360.0 / (73.736396**1.5 * 365.25),
+)
+
+
 # Other hypothetical body elements
 # Transpluto (Isis) elements from Swiss Ephemeris
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
@@ -1087,6 +1137,64 @@ def calc_apollon(jd_tt: float) -> Tuple[float, float, float, float, float, float
     longitude = (elements.L0 + elements.n * dt) % 360.0
 
     # Apollon is assumed to be on the ecliptic (zero inclination)
+    latitude = 0.0
+
+    # Distance is constant for circular orbit (equal to semi-major axis)
+    distance = elements.a
+
+    # Daily motion is simply the mean motion for circular orbit
+    dlon = elements.n
+
+    # No latitude or distance change for circular orbit on ecliptic
+    dlat = 0.0
+    ddist = 0.0
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def calc_admetos(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the position of Admetos using Keplerian propagation.
+
+    Admetos is the sixth Hamburg School Uranian planet. This function uses
+    simple Keplerian propagation with orbital elements from Swiss Ephemeris
+    seorbel.txt documentation:
+        - Semi-major axis: 73.736396 AU
+        - Eccentricity: 0.00 (circular orbit)
+        - Orbital period: ~633.2 years
+
+    For a circular orbit (e=0), the calculation simplifies to:
+        longitude = L0 + n * (jd_tt - epoch)
+
+    where L0 is the mean longitude at epoch and n is the mean motion.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees (always 0 for Admetos)
+            - distance: Distance from Sun in AU (73.736396 AU, constant)
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day (always 0)
+            - ddist: Daily distance change in AU/day (always 0 for e=0)
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_admetos
+        >>> pos = calc_admetos(2451545.0)  # J2000.0
+        >>> print(f"Admetos at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
+    """
+    elements = ADMETOS_KEPLERIAN_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # For a circular orbit (e = 0), mean longitude = true longitude
+    # Simply propagate the mean longitude
+    longitude = (elements.L0 + elements.n * dt) % 360.0
+
+    # Admetos is assumed to be on the ecliptic (zero inclination)
     latitude = 0.0
 
     # Distance is constant for circular orbit (equal to semi-major axis)

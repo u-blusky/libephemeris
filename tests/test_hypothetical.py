@@ -41,6 +41,7 @@ from libephemeris.hypothetical import (
     calc_zeus,
     calc_kronos,
     calc_apollon,
+    calc_admetos,
     # Data structures
     URANIAN_ELEMENTS,
     HYPOTHETICAL_ELEMENTS,
@@ -50,6 +51,7 @@ from libephemeris.hypothetical import (
     ZEUS_KEPLERIAN_ELEMENTS,
     KRONOS_KEPLERIAN_ELEMENTS,
     APOLLON_KEPLERIAN_ELEMENTS,
+    ADMETOS_KEPLERIAN_ELEMENTS,
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -1388,4 +1390,188 @@ class TestCalcApollon:
         # Apollon has larger semi-major axis
         assert apollon_pos[2] > kronos_pos[2], (
             "Apollon should be farther from Sun than Kronos"
+        )
+
+
+class TestCalcAdmetos:
+    """Tests for the calc_admetos Keplerian propagation function."""
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_admetos_returns_tuple(self):
+        """Test that calc_admetos returns correct tuple format."""
+        pos = calc_admetos(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        lon, lat, dist, dlon, dlat, ddist = pos
+        assert isinstance(lon, float)
+        assert isinstance(lat, float)
+        assert isinstance(dist, float)
+        assert isinstance(dlon, float)
+        assert isinstance(dlat, float)
+        assert isinstance(ddist, float)
+
+    def test_calc_admetos_longitude_range(self):
+        """Test that longitude is in valid range."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_admetos(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
+
+    def test_calc_admetos_latitude_zero(self):
+        """Test that Admetos has zero latitude (on ecliptic)."""
+        pos = calc_admetos(self.J2000)
+        assert pos[1] == 0.0, "Admetos should have zero latitude"
+
+    def test_calc_admetos_distance_correct(self):
+        """Test that Admetos distance matches semi-major axis (circular orbit)."""
+        pos = calc_admetos(self.J2000)
+        # For circular orbit, distance = semi-major axis = 73.736396 AU
+        assert abs(pos[2] - 73.736396) < 0.001, (
+            f"Admetos distance should be ~73.736396 AU, got {pos[2]}"
+        )
+
+    def test_calc_admetos_distance_constant(self):
+        """Test that distance is constant for circular orbit."""
+        pos1 = calc_admetos(self.J2000)
+        pos2 = calc_admetos(self.J2000 + 365.25 * 50)  # 50 years later
+        assert pos1[2] == pos2[2], "Distance should be constant for circular orbit"
+
+    def test_calc_admetos_velocity_positive(self):
+        """Test that daily motion is positive (prograde)."""
+        pos = calc_admetos(self.J2000)
+        assert pos[3] > 0, "Admetos should have prograde motion"
+
+    def test_calc_admetos_velocity_constant(self):
+        """Test that velocity is constant for circular orbit."""
+        pos = calc_admetos(self.J2000)
+        # For circular orbit, daily motion = mean motion
+        expected_n = ADMETOS_KEPLERIAN_ELEMENTS.n
+        assert pos[3] == expected_n, (
+            f"Daily motion should be {expected_n}, got {pos[3]}"
+        )
+
+    def test_calc_admetos_latitude_velocity_zero(self):
+        """Test that latitude and distance velocity are zero."""
+        pos = calc_admetos(self.J2000)
+        assert pos[4] == 0.0, "Latitude velocity should be zero"
+        assert pos[5] == 0.0, "Distance velocity should be zero for e=0"
+
+    def test_calc_admetos_at_epoch(self):
+        """Test that longitude at J1900.0 matches L0."""
+        pos = calc_admetos(self.J1900)
+        # At epoch, longitude should equal L0
+        expected_L0 = ADMETOS_KEPLERIAN_ELEMENTS.L0
+        assert abs(pos[0] - expected_L0) < 0.01, (
+            f"At epoch, longitude should be {expected_L0}, got {pos[0]}"
+        )
+
+    def test_calc_admetos_progression(self):
+        """Test that Admetos progresses correctly over time."""
+        pos1 = calc_admetos(self.J2000)
+        pos2 = calc_admetos(self.J2000 + 365.25)  # 1 year later
+
+        # Calculate expected motion in 1 year
+        expected_motion = ADMETOS_KEPLERIAN_ELEMENTS.n * 365.25
+
+        # Calculate actual motion (handle wrap-around)
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < -180:
+            actual_motion += 360
+        elif actual_motion > 180:
+            actual_motion -= 360
+
+        assert abs(actual_motion - expected_motion) < 0.01, (
+            f"Annual motion should be {expected_motion:.4f} deg, got {actual_motion:.4f}"
+        )
+
+    def test_calc_admetos_orbital_period(self):
+        """Test that Admetos completes one orbit in expected period."""
+        # Orbital period from Kepler's 3rd law: T = a^1.5 years
+        a = ADMETOS_KEPLERIAN_ELEMENTS.a
+        expected_period_years = a**1.5  # ~633.2 years
+
+        # One full orbit should advance longitude by ~360 degrees
+        period_days = expected_period_years * 365.25
+        pos1 = calc_admetos(self.J2000)
+        pos2 = calc_admetos(self.J2000 + period_days)
+
+        # After one full period, should be back to same longitude (within tolerance)
+        diff = abs(pos2[0] - pos1[0])
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff < 1.0, (
+            f"After one orbit ({expected_period_years:.1f} years), "
+            f"longitude should return near start, diff = {diff:.2f} deg"
+        )
+
+    def test_calc_admetos_keplerian_elements_valid(self):
+        """Test that Admetos Keplerian elements have valid values."""
+        elements = ADMETOS_KEPLERIAN_ELEMENTS
+        assert elements.name == "Admetos"
+        assert elements.a > 70.0, "Admetos should be beyond Apollon"
+        assert elements.e == 0.0, "Admetos should have circular orbit"
+        assert elements.i == 0.0, "Admetos should be on ecliptic"
+        assert 0 < elements.n < 1.0, "Mean motion should be small but positive"
+
+    def test_calc_admetos_vs_uranian_different_methods(self):
+        """Test that calc_admetos uses different method from calc_uranian_position.
+
+        The two methods use different algorithms:
+        - calc_admetos: Simple Keplerian propagation from J1900.0 epoch
+        - calc_uranian_position: Secular polynomial formula from J2000.0 epoch
+
+        They may give different longitudes but both should produce valid positions
+        that progress at similar rates over time.
+        """
+        keplerian_pos = calc_admetos(self.J2000)
+        uranian_pos = calc_uranian_position(SE_ADMETOS, self.J2000)
+
+        # Both should be in valid range
+        assert 0.0 <= keplerian_pos[0] < 360.0
+        assert 0.0 <= uranian_pos[0] < 360.0
+
+        # Keplerian should show prograde motion
+        assert keplerian_pos[3] > 0, "Keplerian motion should be prograde"
+        # Uranian velocity may be very small or briefly negative due to oscillation
+        # Check that it's reasonable (within 1 deg/day for these slow bodies)
+        assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
+
+    def test_se_admetos_constant_value(self):
+        """Test that SE_ADMETOS has correct value (SE_FICT_OFFSET + 5 = 45)."""
+        assert SE_ADMETOS == 45
+        assert SE_ADMETOS == SE_FICT_OFFSET + 5
+
+    def test_calc_admetos_exportable_from_main_module(self):
+        """Test that calc_admetos is exported from main libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "calc_admetos")
+        pos = libephemeris.calc_admetos(self.J2000)
+        assert len(pos) == 6
+
+    def test_admetos_slower_than_apollon(self):
+        """Test that Admetos moves slower than Apollon (larger semi-major axis)."""
+        apollon_pos = calc_apollon(self.J2000)
+        admetos_pos = calc_admetos(self.J2000)
+
+        # Admetos has larger semi-major axis, so slower motion
+        assert admetos_pos[3] < apollon_pos[3], (
+            "Admetos should move slower than Apollon"
+        )
+
+    def test_admetos_farther_than_apollon(self):
+        """Test that Admetos is farther from Sun than Apollon."""
+        apollon_pos = calc_apollon(self.J2000)
+        admetos_pos = calc_admetos(self.J2000)
+
+        # Admetos has larger semi-major axis
+        assert admetos_pos[2] > apollon_pos[2], (
+            "Admetos should be farther from Sun than Apollon"
         )
