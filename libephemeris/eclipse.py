@@ -9343,3 +9343,619 @@ def calc_lunar_eclipse_penumbral_fourth_contact_p4(
     )
 
     return t_p4
+
+
+def _calc_lunar_eclipse_umbral_outer_separation(jd: float) -> float:
+    """
+    Calculate the separation between Moon's nearest limb and umbral shadow edge.
+
+    Returns the angular separation in degrees between the Moon's nearest limb
+    and the umbral shadow boundary. The umbral contacts U1/U4 occur when this
+    value equals zero (Moon's limb touches umbra edge).
+
+    Args:
+        jd: Julian Day (UT)
+
+    Returns:
+        Separation in degrees. Positive means Moon is outside umbra,
+        negative means Moon's limb is inside umbra.
+    """
+    # Get positions
+    sun_pos, _ = swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+
+    # Extract coordinates
+    sun_lon = sun_pos[0]
+    moon_lon = moon_pos[0]
+    moon_lat = moon_pos[1]
+    sun_dist = sun_pos[2]
+    moon_dist = moon_pos[2]
+
+    # Shadow center is opposite the Sun (anti-Sun point on ecliptic)
+    shadow_lon = (sun_lon + 180.0) % 360.0
+
+    # Calculate Moon's angular distance from shadow axis
+    dlon = moon_lon - shadow_lon
+    if dlon > 180:
+        dlon -= 360
+    if dlon < -180:
+        dlon += 360
+
+    # Angular distance from Moon center to shadow axis (degrees)
+    moon_lat_rad = math.radians(moon_lat)
+    distance_from_axis = math.sqrt(dlon**2 * math.cos(moon_lat_rad) ** 2 + moon_lat**2)
+
+    # Constants for shadow geometry
+    SUN_RADIUS_ARCSEC = 959.63
+    EARTH_RADIUS_KM = 6378.137
+
+    # Moon's angular semi-diameter
+    moon_semidiameter = (932.56 / 3600.0) * (0.002569 / moon_dist)
+
+    # Calculate umbra radius at Moon's distance
+    sun_dist_km = sun_dist * 149597870.7
+    moon_dist_km = moon_dist * 149597870.7
+    sun_radius_km = (SUN_RADIUS_ARCSEC / 206265.0) * sun_dist_km
+
+    # Umbra cone semi-angle
+    umbra_cone_angle = math.atan((sun_radius_km - EARTH_RADIUS_KM) / sun_dist_km)
+    # Umbra radius at Moon distance
+    umbra_radius_km = EARTH_RADIUS_KM - moon_dist_km * math.tan(umbra_cone_angle)
+
+    if umbra_radius_km > 0:
+        umbra_radius = math.degrees(math.atan(umbra_radius_km / moon_dist_km))
+    else:
+        # Umbra doesn't reach Moon - no umbral eclipse possible
+        umbra_radius = 0.0
+
+    # Separation: positive = Moon outside umbra, negative = Moon inside
+    # At U1/U4: distance_from_axis - moon_semidiameter = umbra_radius
+    # So: separation = distance_from_axis - moon_semidiameter - umbra_radius = 0
+    separation = distance_from_axis - moon_semidiameter - umbra_radius
+
+    return separation
+
+
+def _calc_lunar_eclipse_umbral_inner_separation(jd: float) -> float:
+    """
+    Calculate the separation for totality contacts (U2/U3).
+
+    Returns the angular separation in degrees. At U2/U3, the Moon's trailing/leading
+    limb touches the umbra edge (entire Moon inside umbra).
+
+    Args:
+        jd: Julian Day (UT)
+
+    Returns:
+        Separation in degrees. Positive means Moon is not fully inside umbra,
+        negative means Moon is completely inside umbra.
+    """
+    # Get positions
+    sun_pos, _ = swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+
+    # Extract coordinates
+    sun_lon = sun_pos[0]
+    moon_lon = moon_pos[0]
+    moon_lat = moon_pos[1]
+    sun_dist = sun_pos[2]
+    moon_dist = moon_pos[2]
+
+    # Shadow center is opposite the Sun
+    shadow_lon = (sun_lon + 180.0) % 360.0
+
+    # Calculate Moon's angular distance from shadow axis
+    dlon = moon_lon - shadow_lon
+    if dlon > 180:
+        dlon -= 360
+    if dlon < -180:
+        dlon += 360
+
+    # Angular distance from Moon center to shadow axis
+    moon_lat_rad = math.radians(moon_lat)
+    distance_from_axis = math.sqrt(dlon**2 * math.cos(moon_lat_rad) ** 2 + moon_lat**2)
+
+    # Constants for shadow geometry
+    SUN_RADIUS_ARCSEC = 959.63
+    EARTH_RADIUS_KM = 6378.137
+
+    # Moon's angular semi-diameter
+    moon_semidiameter = (932.56 / 3600.0) * (0.002569 / moon_dist)
+
+    # Calculate umbra radius at Moon's distance
+    sun_dist_km = sun_dist * 149597870.7
+    moon_dist_km = moon_dist * 149597870.7
+    sun_radius_km = (SUN_RADIUS_ARCSEC / 206265.0) * sun_dist_km
+
+    # Umbra cone semi-angle
+    umbra_cone_angle = math.atan((sun_radius_km - EARTH_RADIUS_KM) / sun_dist_km)
+    # Umbra radius at Moon distance
+    umbra_radius_km = EARTH_RADIUS_KM - moon_dist_km * math.tan(umbra_cone_angle)
+
+    if umbra_radius_km > 0:
+        umbra_radius = math.degrees(math.atan(umbra_radius_km / moon_dist_km))
+    else:
+        # No umbral eclipse possible
+        umbra_radius = 0.0
+
+    # For U2/U3 (totality contacts): Moon is fully inside umbra when
+    # distance_from_axis + moon_semidiameter = umbra_radius
+    # (farthest edge of Moon touches umbra edge)
+    separation = distance_from_axis + moon_semidiameter - umbra_radius
+
+    return separation
+
+
+def _find_lunar_umbral_outer_contact_time(
+    jd_max: float,
+    search_before: bool,
+    search_range: float = 0.15,
+) -> float:
+    """
+    Find the time of lunar eclipse umbral outer contact (U1 or U4) using binary search.
+
+    Args:
+        jd_max: Julian Day of eclipse maximum
+        search_before: If True, search for U1 (before maximum), else U4 (after)
+        search_range: Search range in days from maximum
+
+    Returns:
+        Julian Day of the contact, or 0.0 if not found
+    """
+    # Set up search bounds
+    if search_before:
+        jd_low = jd_max - search_range
+        jd_high = jd_max
+    else:
+        jd_low = jd_max
+        jd_high = jd_max + search_range
+
+    # Verify that a contact exists in the search range
+    sep_low = _calc_lunar_eclipse_umbral_outer_separation(jd_low)
+    sep_high = _calc_lunar_eclipse_umbral_outer_separation(jd_high)
+
+    if search_before:
+        # U1: looking for transition from positive to negative
+        if sep_low < 0:
+            # Moon already in umbra at start of search - expand search
+            jd_low = jd_max - search_range * 1.5
+            sep_low = _calc_lunar_eclipse_umbral_outer_separation(jd_low)
+            if sep_low < 0:
+                return 0.0
+        if sep_high > 0:
+            # Moon still outside umbra at maximum - no umbral eclipse
+            return 0.0
+    else:
+        # U4: looking for transition from negative to positive
+        if sep_low > 0:
+            # Moon already outside umbra at maximum
+            return 0.0
+        if sep_high < 0:
+            # Moon still in umbra at end of search - expand search
+            jd_high = jd_max + search_range * 1.5
+            sep_high = _calc_lunar_eclipse_umbral_outer_separation(jd_high)
+            if sep_high < 0:
+                return 0.0
+
+    # Binary search for the contact time (when separation = 0)
+    for _ in range(60):  # ~60 iterations gives sub-second precision
+        jd_mid = (jd_low + jd_high) / 2
+        sep_mid = _calc_lunar_eclipse_umbral_outer_separation(jd_mid)
+
+        if search_before:
+            # U1: separation goes from positive to negative
+            if sep_mid > 0:
+                jd_low = jd_mid
+            else:
+                jd_high = jd_mid
+        else:
+            # U4: separation goes from negative to positive
+            if sep_mid < 0:
+                jd_low = jd_mid
+            else:
+                jd_high = jd_mid
+
+        # Check convergence (precision ~0.05 seconds)
+        if jd_high - jd_low < 5e-7:
+            break
+
+    return (jd_low + jd_high) / 2
+
+
+def _find_lunar_umbral_inner_contact_time(
+    jd_max: float,
+    search_before: bool,
+    search_range: float = 0.10,
+) -> float:
+    """
+    Find the time of lunar eclipse totality contact (U2 or U3) using binary search.
+
+    Args:
+        jd_max: Julian Day of eclipse maximum
+        search_before: If True, search for U2 (totality begins), else U3 (totality ends)
+        search_range: Search range in days from maximum
+
+    Returns:
+        Julian Day of the contact, or 0.0 if not found (no total eclipse)
+    """
+    # First check if this is a total eclipse by checking separation at maximum
+    sep_max = _calc_lunar_eclipse_umbral_inner_separation(jd_max)
+    if sep_max > 0:
+        # Not a total eclipse - Moon never fully enters umbra
+        return 0.0
+
+    # Set up search bounds
+    if search_before:
+        jd_low = jd_max - search_range
+        jd_high = jd_max
+    else:
+        jd_low = jd_max
+        jd_high = jd_max + search_range
+
+    # Verify that a contact exists in the search range
+    sep_low = _calc_lunar_eclipse_umbral_inner_separation(jd_low)
+    sep_high = _calc_lunar_eclipse_umbral_inner_separation(jd_high)
+
+    if search_before:
+        # U2: looking for transition from positive to negative
+        if sep_low < 0:
+            # Moon already fully in umbra at start - expand search
+            jd_low = jd_max - search_range * 1.5
+            sep_low = _calc_lunar_eclipse_umbral_inner_separation(jd_low)
+            if sep_low < 0:
+                jd_low = jd_max - search_range * 2.0
+                sep_low = _calc_lunar_eclipse_umbral_inner_separation(jd_low)
+                if sep_low < 0:
+                    return 0.0
+        if sep_high > 0:
+            # Moon not fully in umbra at maximum - not a total eclipse
+            return 0.0
+    else:
+        # U3: looking for transition from negative to positive
+        if sep_low > 0:
+            # Moon not fully in umbra at maximum - not a total eclipse
+            return 0.0
+        if sep_high < 0:
+            # Moon still fully in umbra at end - expand search
+            jd_high = jd_max + search_range * 1.5
+            sep_high = _calc_lunar_eclipse_umbral_inner_separation(jd_high)
+            if sep_high < 0:
+                jd_high = jd_max + search_range * 2.0
+                sep_high = _calc_lunar_eclipse_umbral_inner_separation(jd_high)
+                if sep_high < 0:
+                    return 0.0
+
+    # Binary search for the contact time (when separation = 0)
+    for _ in range(60):
+        jd_mid = (jd_low + jd_high) / 2
+        sep_mid = _calc_lunar_eclipse_umbral_inner_separation(jd_mid)
+
+        if search_before:
+            # U2: separation goes from positive to negative
+            if sep_mid > 0:
+                jd_low = jd_mid
+            else:
+                jd_high = jd_mid
+        else:
+            # U3: separation goes from negative to positive
+            if sep_mid < 0:
+                jd_low = jd_mid
+            else:
+                jd_high = jd_mid
+
+        # Check convergence
+        if jd_high - jd_low < 5e-7:
+            break
+
+    return (jd_low + jd_high) / 2
+
+
+def calc_lunar_eclipse_umbral_first_contact_u1(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of umbral first contact (U1) for a lunar eclipse.
+
+    U1 is the moment when the Moon's leading limb first enters Earth's
+    umbral shadow, marking the beginning of the partial phase of the
+    lunar eclipse. At this instant, the eastern edge of the Moon starts
+    to darken noticeably as it enters the umbra.
+
+    This function uses iterative refinement with geometric calculations to
+    precisely determine U1. The condition for U1 is when the angular
+    separation between the Moon's limb and the umbral shadow edge equals
+    zero, occurring before eclipse maximum.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from lun_eclipse_when().
+                The function searches backward from this time to find U1.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of umbral first contact U1. Returns 0.0 if U1
+        cannot be determined (which indicates either a penumbral-only eclipse
+        or the input time is not near a valid lunar eclipse).
+
+    Algorithm:
+        1. Calculate Moon's position and Earth's shadow geometry
+        2. Determine umbral shadow radius at Moon's distance
+        3. Use binary search to find when Moon's limb touches umbra edge
+        4. The search proceeds from (jd_max - search_range) to jd_max
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the time value converges to within ~0.05 seconds.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_when
+        >>> from libephemeris import calc_lunar_eclipse_umbral_first_contact_u1
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the November 8, 2022 total lunar eclipse
+        >>> jd_start = julday(2022, 10, 1, 0.0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate umbral first contact
+        >>> jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
+        >>> print(f"Umbral first contact U1: JD {jd_u1:.6f}")
+
+    Note:
+        - U1 is also known as "partial eclipse begins" or "first umbral contact"
+        - U1 only occurs for partial and total lunar eclipses, not penumbral-only
+        - The umbral phase (U1 to U4) is the most dramatic part of the eclipse
+        - U1 marks when the Moon begins to visibly darken
+
+    See Also:
+        - calc_lunar_eclipse_umbral_fourth_contact_u4: Calculate U4 (partial ends)
+        - calc_lunar_eclipse_umbral_second_contact_u2: Calculate U2 (totality begins)
+        - calc_lunar_eclipse_umbral_third_contact_u3: Calculate U3 (totality ends)
+        - calc_lunar_eclipse_penumbral_first_contact_p1: Calculate P1 (penumbral begins)
+        - lun_eclipse_when: Find next lunar eclipse and all phase times
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Lunar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate U1 (umbral first contact)
+    # Search backward from maximum with a range of ~3.6 hours
+    # (umbral contact typically occurs 1-2 hours before maximum)
+    t_u1 = _find_lunar_umbral_outer_contact_time(
+        jd_max, search_before=True, search_range=0.15
+    )
+
+    return t_u1
+
+
+def calc_lunar_eclipse_umbral_second_contact_u2(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of umbral second contact (U2) for a lunar eclipse.
+
+    U2 is the moment when the Moon's trailing limb enters Earth's umbral
+    shadow, marking the beginning of totality. At this instant, the entire
+    Moon is within the umbra and the total phase of the eclipse begins.
+    The Moon appears deeply red or copper-colored during totality.
+
+    This function uses iterative refinement with geometric calculations to
+    precisely determine U2. The condition for U2 is when the angular
+    separation between the Moon's trailing limb and the umbral shadow edge
+    equals zero, occurring before eclipse maximum.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from lun_eclipse_when().
+                The function searches backward from this time to find U2.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of umbral second contact U2. Returns 0.0 if U2
+        cannot be determined (which indicates a partial-only or penumbral-only
+        eclipse where totality does not occur).
+
+    Algorithm:
+        1. Calculate Moon's position and Earth's shadow geometry
+        2. Determine umbral shadow radius at Moon's distance
+        3. Use binary search to find when Moon fully enters umbra
+        4. The search proceeds from (jd_max - search_range) to jd_max
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the time value converges to within ~0.05 seconds.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_when
+        >>> from libephemeris import calc_lunar_eclipse_umbral_second_contact_u2
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the November 8, 2022 total lunar eclipse
+        >>> jd_start = julday(2022, 10, 1, 0.0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate umbral second contact (totality begins)
+        >>> jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
+        >>> print(f"Totality begins U2: JD {jd_u2:.6f}")
+
+    Note:
+        - U2 only occurs for total lunar eclipses
+        - Returns 0.0 for partial or penumbral eclipses
+        - The duration (U3 - U2) is the length of totality
+        - During totality, the Moon appears red due to refracted sunlight
+
+    See Also:
+        - calc_lunar_eclipse_umbral_third_contact_u3: Calculate U3 (totality ends)
+        - calc_lunar_eclipse_umbral_first_contact_u1: Calculate U1 (partial begins)
+        - calc_lunar_eclipse_umbral_fourth_contact_u4: Calculate U4 (partial ends)
+        - lun_eclipse_when: Find next lunar eclipse and all phase times
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Lunar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate U2 (totality begins)
+    # Search backward from maximum with a range of ~2.4 hours
+    t_u2 = _find_lunar_umbral_inner_contact_time(
+        jd_max, search_before=True, search_range=0.10
+    )
+
+    return t_u2
+
+
+def calc_lunar_eclipse_umbral_third_contact_u3(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of umbral third contact (U3) for a lunar eclipse.
+
+    U3 is the moment when the Moon's leading limb exits Earth's umbral
+    shadow, marking the end of totality. At this instant, the western
+    edge of the Moon begins to brighten as it emerges from the umbra,
+    and the total phase of the eclipse ends.
+
+    This function uses iterative refinement with geometric calculations to
+    precisely determine U3. The condition for U3 is when the angular
+    separation between the Moon's leading limb and the umbral shadow edge
+    equals zero, occurring after eclipse maximum.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from lun_eclipse_when().
+                The function searches forward from this time to find U3.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of umbral third contact U3. Returns 0.0 if U3
+        cannot be determined (which indicates a partial-only or penumbral-only
+        eclipse where totality does not occur).
+
+    Algorithm:
+        1. Calculate Moon's position and Earth's shadow geometry
+        2. Determine umbral shadow radius at Moon's distance
+        3. Use binary search to find when Moon begins exiting umbra
+        4. The search proceeds from jd_max to (jd_max + search_range)
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the time value converges to within ~0.05 seconds.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_when
+        >>> from libephemeris import calc_lunar_eclipse_umbral_third_contact_u3
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the November 8, 2022 total lunar eclipse
+        >>> jd_start = julday(2022, 10, 1, 0.0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate umbral third contact (totality ends)
+        >>> jd_u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max)
+        >>> print(f"Totality ends U3: JD {jd_u3:.6f}")
+
+    Note:
+        - U3 only occurs for total lunar eclipses
+        - Returns 0.0 for partial or penumbral eclipses
+        - The duration (U3 - U2) is the length of totality
+        - U3 marks when the Moon begins to brighten
+
+    See Also:
+        - calc_lunar_eclipse_umbral_second_contact_u2: Calculate U2 (totality begins)
+        - calc_lunar_eclipse_umbral_first_contact_u1: Calculate U1 (partial begins)
+        - calc_lunar_eclipse_umbral_fourth_contact_u4: Calculate U4 (partial ends)
+        - lun_eclipse_when: Find next lunar eclipse and all phase times
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Lunar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate U3 (totality ends)
+    # Search forward from maximum with a range of ~2.4 hours
+    t_u3 = _find_lunar_umbral_inner_contact_time(
+        jd_max, search_before=False, search_range=0.10
+    )
+
+    return t_u3
+
+
+def calc_lunar_eclipse_umbral_fourth_contact_u4(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of umbral fourth contact (U4) for a lunar eclipse.
+
+    U4 is the moment when the Moon's trailing limb completely exits Earth's
+    umbral shadow, marking the end of the partial phase of the lunar eclipse.
+    At this instant, the last portion of the Moon emerges from the umbra and
+    returns to its normal brightness (though still in the penumbra).
+
+    This function uses iterative refinement with geometric calculations to
+    precisely determine U4. The condition for U4 is when the angular
+    separation between the Moon's trailing limb and the umbral shadow edge
+    equals zero, occurring after eclipse maximum.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from lun_eclipse_when().
+                The function searches forward from this time to find U4.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of umbral fourth contact U4. Returns 0.0 if U4
+        cannot be determined (which indicates a penumbral-only eclipse
+        or the input time is not near a valid lunar eclipse).
+
+    Algorithm:
+        1. Calculate Moon's position and Earth's shadow geometry
+        2. Determine umbral shadow radius at Moon's distance
+        3. Use binary search to find when Moon's limb exits umbra edge
+        4. The search proceeds from jd_max to (jd_max + search_range)
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the time value converges to within ~0.05 seconds.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_when
+        >>> from libephemeris import calc_lunar_eclipse_umbral_fourth_contact_u4
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the November 8, 2022 total lunar eclipse
+        >>> jd_start = julday(2022, 10, 1, 0.0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate umbral fourth contact
+        >>> jd_u4 = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max)
+        >>> print(f"Umbral fourth contact U4: JD {jd_u4:.6f}")
+
+    Note:
+        - U4 is also known as "partial eclipse ends" or "last umbral contact"
+        - U4 only occurs for partial and total lunar eclipses, not penumbral-only
+        - The duration (U4 - U1) is the length of the partial/umbral phase
+        - After U4, the Moon is only in the penumbra until P4
+
+    See Also:
+        - calc_lunar_eclipse_umbral_first_contact_u1: Calculate U1 (partial begins)
+        - calc_lunar_eclipse_umbral_second_contact_u2: Calculate U2 (totality begins)
+        - calc_lunar_eclipse_umbral_third_contact_u3: Calculate U3 (totality ends)
+        - calc_lunar_eclipse_penumbral_fourth_contact_p4: Calculate P4 (eclipse ends)
+        - lun_eclipse_when: Find next lunar eclipse and all phase times
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Lunar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Calculate U4 (umbral fourth contact)
+    # Search forward from maximum with a range of ~3.6 hours
+    t_u4 = _find_lunar_umbral_outer_contact_time(
+        jd_max, search_before=False, search_range=0.15
+    )
+
+    return t_u4

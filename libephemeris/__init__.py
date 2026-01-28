@@ -133,6 +133,10 @@ from .eclipse import (
     calc_eclipse_fourth_contact_c4,
     calc_lunar_eclipse_penumbral_first_contact_p1,
     calc_lunar_eclipse_penumbral_fourth_contact_p4,
+    calc_lunar_eclipse_umbral_first_contact_u1,
+    calc_lunar_eclipse_umbral_second_contact_u2,
+    calc_lunar_eclipse_umbral_third_contact_u3,
+    calc_lunar_eclipse_umbral_fourth_contact_u4,
 )
 from .utils import (
     degnorm,
@@ -516,6 +520,11 @@ __all__ = [
     # Lunar eclipse penumbral contact points
     "calc_lunar_eclipse_penumbral_first_contact_p1",
     "calc_lunar_eclipse_penumbral_fourth_contact_p4",
+    # Lunar eclipse umbral contact points
+    "calc_lunar_eclipse_umbral_first_contact_u1",
+    "calc_lunar_eclipse_umbral_second_contact_u2",
+    "calc_lunar_eclipse_umbral_third_contact_u3",
+    "calc_lunar_eclipse_umbral_fourth_contact_u4",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",
