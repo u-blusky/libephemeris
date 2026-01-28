@@ -184,6 +184,28 @@ from .heliacal import (
     vis_limit_mag,
     swe_vis_limit_mag,
 )
+from .extinction import (
+    # Extinction calculation functions
+    calc_airmass,
+    calc_extinction_coefficient,
+    calc_extinction_magnitude,
+    calc_simple_extinction,
+    apparent_magnitude_with_extinction,
+    get_extinction_for_heliacal,
+    # Individual component functions
+    calc_rayleigh_coefficient,
+    calc_aerosol_coefficient,
+    calc_ozone_coefficient,
+    calc_water_vapor_coefficient,
+    # Data class for extinction components
+    ExtinctionCoefficients,
+    # Constants
+    WAVELENGTH_U,
+    WAVELENGTH_B,
+    WAVELENGTH_V,
+    WAVELENGTH_R,
+    WAVELENGTH_I,
+)
 from .utils import (
     degnorm,
     radnorm,
@@ -613,6 +635,23 @@ __all__ = [
     "swe_heliacal_pheno_ut",
     "vis_limit_mag",
     "swe_vis_limit_mag",
+    # Atmospheric extinction
+    "calc_airmass",
+    "calc_extinction_coefficient",
+    "calc_extinction_magnitude",
+    "calc_simple_extinction",
+    "apparent_magnitude_with_extinction",
+    "get_extinction_for_heliacal",
+    "calc_rayleigh_coefficient",
+    "calc_aerosol_coefficient",
+    "calc_ozone_coefficient",
+    "calc_water_vapor_coefficient",
+    "ExtinctionCoefficients",
+    "WAVELENGTH_U",
+    "WAVELENGTH_B",
+    "WAVELENGTH_V",
+    "WAVELENGTH_R",
+    "WAVELENGTH_I",
     # Utilities
     "degnorm",
     "radnorm",
