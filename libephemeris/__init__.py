@@ -125,6 +125,7 @@ from .eclipse import (
     calc_besselian_dl2_dt,
     calc_besselian_dmu_dt,
     interpolate_besselian_elements,
+    calc_eclipse_first_contact_c1,
 )
 from .utils import (
     degnorm,

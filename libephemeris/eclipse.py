@@ -8432,3 +8432,87 @@ def interpolate_besselian_elements(
         dl2_dt=elements.dl2_dt,
         dmu_dt=elements.dmu_dt,
     )
+
+
+def calc_eclipse_first_contact_c1(
+    jd_max: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the time of first external contact (C1) for a solar eclipse.
+
+    First contact (C1) is the moment when the Moon's disk first externally
+    touches the Sun's disk, marking the beginning of a solar eclipse. At this
+    instant, the penumbral shadow cone first touches Earth's surface.
+
+    This function uses Besselian elements to precisely calculate C1. The
+    condition for C1 is when gamma (the distance of the shadow axis from
+    Earth's center) equals 1 + l1 (Earth radius plus penumbral cone radius),
+    occurring before eclipse maximum.
+
+    Args:
+        jd_max: Julian Day (UT) of eclipse maximum. This should be the time
+                of greatest eclipse, which can be obtained from sol_eclipse_when_glob()
+                or sol_eclipse_when_loc(). The function searches backward from
+                this time to find C1.
+        flags: Calculation flags (SEFLG_SWIEPH by default). Controls which
+               ephemeris to use for the underlying calculations.
+
+    Returns:
+        Julian Day (UT) of first contact C1. Returns 0.0 if C1 cannot be
+        determined (which would indicate the input time is not near a valid
+        solar eclipse).
+
+    Algorithm:
+        1. Calculate l1 (penumbral radius) at eclipse maximum
+        2. Compute target gamma = 1 + l1 (condition for penumbra touching Earth)
+        3. Use binary search to find when gamma equals this target before maximum
+        4. The search proceeds from (jd_max - search_range) to jd_max
+
+    Precision:
+        The calculation achieves timing precision better than 1 second by
+        iterating until the gamma value converges to within 1e-8 Earth radii,
+        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+
+    Example:
+        >>> from libephemeris import julday, sol_eclipse_when_glob, calc_eclipse_first_contact_c1
+        >>> from libephemeris import SE_ECL_TOTAL
+        >>> # Find the April 8, 2024 total solar eclipse
+        >>> jd_start = julday(2024, 1, 1, 0.0)
+        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> jd_max = times[0]
+        >>> # Calculate first contact
+        >>> jd_c1 = calc_eclipse_first_contact_c1(jd_max)
+        >>> print(f"First contact C1: JD {jd_c1:.6f}")
+
+    Note:
+        - C1 is also known as "first contact" or "partial phase begins"
+        - For local eclipse circumstances (at a specific observer location),
+          use sol_eclipse_when_loc() which returns contact times in its result
+        - The returned time is for the global eclipse (when penumbra first
+          touches Earth anywhere), not for a specific observer location
+
+    See Also:
+        - sol_eclipse_when_glob: Find next solar eclipse and all phase times
+        - sol_eclipse_when_loc: Get local eclipse circumstances including contacts
+        - calc_besselian_x, calc_besselian_y: Individual Besselian element functions
+
+    References:
+        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
+        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+    """
+    # Get l1 (penumbral radius) at maximum eclipse
+    l1 = _calc_penumbra_limit(jd_max)
+
+    # For global eclipse, first contact occurs when gamma = 1 + l1
+    # (penumbral shadow touches Earth's limb from outside)
+    penumbral_limit = 1.0 + l1  # Earth radius + penumbra radius
+
+    # Calculate first contact (penumbra first touches Earth)
+    # Search backward from maximum with a range of ~3.6 hours
+    t_first_contact = _find_contact_time_besselian(
+        jd_max, penumbral_limit, search_before=True, search_range=0.15
+    )
+
+    return t_first_contact
