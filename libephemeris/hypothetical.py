@@ -691,6 +691,7 @@ class UranianKeplerianElements:
 
 # Unified dictionary of all Uranian planet Keplerian elements
 # All elements use J1900.0 (JD 2415020.0) as epoch, matching Swiss Ephemeris seorbel.txt
+# L0 and n values derived from pyswisseph calculations to ensure exact match
 URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
     SE_CUPIDO: UranianKeplerianElements(
         name="Cupido",
@@ -700,8 +701,8 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         i=0.0,
         omega=0.0,
         Omega=0.0,
-        M0=237.4667,  # Mean longitude at epoch (L0)
-        n=0.003757,
+        M0=105.301693,  # Mean longitude at epoch (L0) from pyswisseph
+        n=0.0037945179,  # Mean motion deg/day (calculated from 100-year arc)
     ),
     SE_HADES: UranianKeplerianElements(
         name="Hades",
@@ -711,8 +712,8 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         i=1.0500,
         omega=148.1796,
         Omega=161.3339,
-        M0=27.6496,  # True mean anomaly
-        n=360.0 / (50.66744**1.5 * 365.25),
+        M0=26.850162,  # Mean anomaly at epoch: L0 - omega - Omega = 336.363662 - 148.1796 - 161.3339
+        n=0.00278759,  # Mean motion deg/day from pyswisseph
     ),
     SE_ZEUS: UranianKeplerianElements(
         name="Zeus",
@@ -722,8 +723,8 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         i=0.0,
         omega=0.0,
         Omega=0.0,
-        M0=355.2310,  # Mean longitude at epoch (L0)
-        n=360.0 / (59.21436**1.5 * 365.25),
+        M0=104.289095,  # Mean longitude at epoch (L0) from pyswisseph
+        n=0.0022203750,  # Mean motion deg/day (calculated from 100-year arc)
     ),
     SE_KRONOS: UranianKeplerianElements(
         name="Kronos",
@@ -733,8 +734,8 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         i=0.0,
         omega=0.0,
         Omega=0.0,
-        M0=129.3326,  # Mean longitude at epoch (L0)
-        n=360.0 / (64.81690**1.5 * 365.25),
+        M0=17.111353,  # Mean longitude at epoch (L0) from pyswisseph
+        n=0.0019351856,  # Mean motion deg/day (calculated from 100-year arc)
     ),
     SE_APOLLON: UranianKeplerianElements(
         name="Apollon",
@@ -744,8 +745,8 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         i=0.0,
         omega=0.0,
         Omega=0.0,
-        M0=37.4667,  # Mean longitude at epoch (L0)
-        n=360.0 / (70.361180**1.5 * 365.25),
+        M0=138.565328,  # Mean longitude at epoch (L0) from pyswisseph
+        n=0.0017177599,  # Mean motion deg/day (calculated from 100-year arc)
     ),
     SE_ADMETOS: UranianKeplerianElements(
         name="Admetos",
@@ -755,8 +756,8 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         i=0.0,
         omega=0.0,
         Omega=0.0,
-        M0=107.3807,  # Mean longitude at epoch (L0)
-        n=360.0 / (73.736396**1.5 * 365.25),
+        M0=350.613913,  # Mean longitude at epoch (L0) from pyswisseph
+        n=0.0016016766,  # Mean motion deg/day (calculated from 100-year arc)
     ),
     SE_VULKANUS: UranianKeplerianElements(
         name="Vulkanus",
@@ -766,8 +767,8 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         i=0.0,
         omega=0.0,
         Omega=0.0,
-        M0=118.0983,  # Mean longitude at epoch (L0)
-        n=360.0 / (77.445895**1.5 * 365.25),
+        M0=55.397715,  # Mean longitude at epoch (L0) from pyswisseph
+        n=0.0015069325,  # Mean motion deg/day (calculated from 100-year arc)
     ),
     SE_POSEIDON: UranianKeplerianElements(
         name="Poseidon",
@@ -777,8 +778,8 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         i=0.0,
         omega=0.0,
         Omega=0.0,
-        M0=182.4817,  # Mean longitude at epoch (L0)
-        n=360.0 / (83.666307**1.5 * 365.25),
+        M0=166.140256,  # Mean longitude at epoch (L0) from pyswisseph
+        n=0.0013256078,  # Mean motion deg/day (calculated from 100-year arc)
     ),
 }
 

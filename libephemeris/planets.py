@@ -707,7 +707,9 @@ def _calc_body(
         from . import hypothetical
 
         jd_tt = t.tt
-        pos = hypothetical.calc_uranian_position(ipl, jd_tt)
+        # Use calc_uranian_planet() which uses Keplerian elements from seorbel.txt
+        # to match pyswisseph's Uranian planet calculations
+        pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
         return pos, iflag
 
     # Handle minor bodies (asteroids and TNOs)
