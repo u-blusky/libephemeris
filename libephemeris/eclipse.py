@@ -30,7 +30,7 @@ References:
 """
 
 import math
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, Union
 from .constants import (
     SE_SUN,
     SE_MOON,
@@ -5604,7 +5604,7 @@ def swe_lun_occult_when_loc(
 
 def lun_occult_where(
     jd: float,
-    planet: int,
+    body: Union[int, str],
     star_name: str = "",
     flags: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
@@ -5620,10 +5620,12 @@ def lun_occult_where(
 
     Args:
         jd: Julian Day (UT) of the moment to calculate
-        planet: Planet ID to check for occultation (SE_MERCURY, SE_VENUS, etc.)
-            Set to 0 if searching for a fixed star occultation.
-        star_name: Name of fixed star to check (e.g. "Regulus", "Spica").
-            Only used if planet is 0.
+        body: Planet ID (int) or star name (str) to check for occultation.
+            For planets use SE_MERCURY, SE_VENUS, etc.
+            For stars use the star name as a string (e.g. "Regulus").
+            Set to 0 if using the star_name parameter for backward compatibility.
+        star_name: (Deprecated) Name of fixed star to check (e.g. "Regulus").
+            For backward compatibility only. Prefer passing star name as body.
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
@@ -5637,15 +5639,15 @@ def lun_occult_where(
                 [3]: Geographic latitude of northern limit (degrees)
                 [4]: Geographic longitude of southern limit (degrees)
                 [5]: Geographic latitude of southern limit (degrees)
-                [6]: Geographic longitude of sunrise limit (degrees)
-                [7]: Geographic latitude of sunrise limit (degrees)
-                [8]: Geographic longitude of sunset limit (degrees)
-                [9]: Geographic latitude of sunset limit (degrees)
+                [6]: Geographic longitude of northern penumbra limit (degrees)
+                [7]: Geographic latitude of northern penumbra limit (degrees)
+                [8]: Geographic longitude of southern penumbra limit (degrees)
+                [9]: Geographic latitude of southern penumbra limit (degrees)
             - attr: Tuple of 20 floats with occultation attributes:
-                [0]: Fraction of target covered by Moon (0-1)
+                [0]: Fraction of target covered by Moon (magnitude)
                 [1]: Ratio of lunar diameter to target diameter
                 [2]: Fraction of disc covered (obscuration)
-                [3]: Diameter of core shadow in km (0 for stars)
+                [3]: Diameter of core shadow in km
                 [4]: Moon's azimuth at central line (degrees)
                 [5]: True altitude of Moon at central line (degrees)
                 [6]: Apparent altitude of Moon (with refraction)
@@ -5653,7 +5655,7 @@ def lun_occult_where(
                 [8-19]: Reserved for future use
 
     Raises:
-        ValueError: If neither planet nor star_name is specified
+        ValueError: If neither planet ID nor star name is specified
 
     Note:
         If there is no occultation at the given time (Moon too far from the
@@ -5662,16 +5664,19 @@ def lun_occult_where(
     Algorithm:
         1. Calculate Moon and target positions at the given time
         2. Check if angular separation is small enough for occultation
-        3. Find sub-lunar point (where Moon is overhead)
+        3. Use gradient descent to find point of minimum Moon-target separation
         4. Calculate path limits based on occultation geometry
-        5. Determine where occultation is visible above horizon
+        5. Calculate attributes at the central line location
 
     Example:
-        >>> # Find where Regulus occultation is visible
+        >>> # Find where Regulus occultation is visible (pyswisseph style)
         >>> from libephemeris import julday, lun_occult_where
         >>> jd = julday(2017, 6, 28, 10.0)  # During a known occultation
-        >>> retflag, geopos, attr = lun_occult_where(jd, 0, "Regulus")
+        >>> retflag, geopos, attr = lun_occult_where(jd, "Regulus")
         >>> print(f"Central line at lon={geopos[0]:.2f}, lat={geopos[1]:.2f}")
+        >>>
+        >>> # Or using planet ID for planet occultation
+        >>> retflag, geopos, attr = lun_occult_where(jd, SE_VENUS)
 
     References:
         - Swiss Ephemeris: swe_lun_occult_where()
@@ -5692,6 +5697,18 @@ def lun_occult_where(
     from .fixed_stars import FIXED_STARS, _resolve_star_id
     from .planets import _PLANET_MAP
     from .state import get_planets, get_timescale
+
+    # Handle the body parameter - can be int (planet ID) or str (star name)
+    # This provides compatibility with both pyswisseph API (body as int or str)
+    # and our legacy API (planet int + star_name str)
+    if isinstance(body, str):
+        # body is a star name
+        planet = 0
+        star_name = body
+    else:
+        # body is a planet ID
+        planet = body
+        # star_name may be passed for backward compatibility with planet=0
 
     if planet == 0 and not star_name:
         raise ValueError(
@@ -5807,15 +5824,87 @@ def lun_occult_where(
     gmst = t.gmst  # in hours
     gmst_deg = gmst * 15.0  # Convert to degrees
 
-    # Sub-lunar point: where Moon is directly overhead
+    # Initial guess: Sub-lunar point (where Moon is directly overhead)
     # Longitude: where Moon's RA = Local Sidereal Time
     # LST = GMST + longitude, so longitude = RA - GMST
-    central_lon = moon_ra - gmst_deg
-    # Normalize to -180 to +180
-    central_lon = ((central_lon + 180) % 360) - 180
+    init_lon = moon_ra - gmst_deg
+    init_lon = ((init_lon + 180) % 360) - 180
+    init_lat = moon_dec
 
-    # Sub-lunar point latitude = Moon's declination
-    central_lat = moon_dec
+    # Helper to get target position for topocentric calculations
+    def _get_target_for_observer(observer_at, time_obj):
+        """Get target apparent position from observer location."""
+        if planet == 0:
+            # Fixed star
+            star_id, err, _ = _resolve_star_id(star_name)
+            if err is not None:
+                raise ValueError(err)
+            star = FIXED_STARS[star_id]
+            t_years = (jd - 2451545.0) / 365.25
+            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+
+            from skyfield.api import Star
+
+            star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+            return observer_at.at(time_obj).observe(star_obj).apparent()
+        else:
+            target_name = _PLANET_MAP[planet]
+            target = eph[target_name]
+            return observer_at.at(time_obj).observe(target).apparent()
+
+    # Function to calculate Moon-target separation at a given location
+    def get_separation(lat: float, lon: float) -> float:
+        """Get angular separation between Moon and target from observer location."""
+        try:
+            observer = wgs84.latlon(lat, lon, 0.0)
+            observer_at = earth + observer
+            moon_app = observer_at.at(t).observe(moon_body).apparent()
+            target_app = _get_target_for_observer(observer_at, t)
+            return moon_app.separation_from(target_app).degrees
+        except Exception:
+            return 999.0  # Return large value on error
+
+    # Gradient descent to find minimum separation (occultation center)
+    # This finds the point on Earth where Moon and target appear closest
+    central_lat = init_lat
+    central_lon = init_lon
+
+    # Use a multi-scale search: start coarse, then refine
+    for scale in [5.0, 1.0, 0.1, 0.01, 0.001]:
+        best_sep = get_separation(central_lat, central_lon)
+
+        # Search in a small grid around current best
+        improved = True
+        iterations = 0
+        while improved and iterations < 50:
+            improved = False
+            iterations += 1
+
+            for dlat, dlon in [
+                (scale, 0),
+                (-scale, 0),
+                (0, scale),
+                (0, -scale),
+                (scale, scale),
+                (scale, -scale),
+                (-scale, scale),
+                (-scale, -scale),
+            ]:
+                test_lat = max(-89.0, min(89.0, central_lat + dlat))
+                test_lon = central_lon + dlon
+                # Normalize longitude
+                test_lon = ((test_lon + 180) % 360) - 180
+
+                sep = get_separation(test_lat, test_lon)
+                if sep < best_sep:
+                    best_sep = sep
+                    central_lat = test_lat
+                    central_lon = test_lon
+                    improved = True
+
+    # Normalize longitude to -180 to +180
+    central_lon = ((central_lon + 180) % 360) - 180
 
     # Clamp latitude to valid range
     central_lat = max(-90.0, min(90.0, central_lat))
@@ -5865,30 +5954,25 @@ def lun_occult_where(
 
         # Get apparent positions from observer
         moon_app = observer_at.at(t).observe(moon_body).apparent()
-
-        if planet == 0:
-            # Fixed star
-            star_id, err, _ = _resolve_star_id(star_name)
-            if err is not None:
-                raise ValueError(err)
-            star = FIXED_STARS[star_id]
-            t_years = (jd - 2451545.0) / 365.25
-            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
-
-            from skyfield.api import Star
-
-            star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-            target_app = observer_at.at(t).observe(star_obj).apparent()
-        else:
-            target_name = _PLANET_MAP[planet]
-            target = eph[target_name]
-            target_app = observer_at.at(t).observe(target).apparent()
+        target_app = _get_target_for_observer(observer_at, t)
 
         # Get Moon altitude and azimuth at central line
         moon_alt, moon_az, _ = moon_app.altaz()
         moon_altitude = moon_alt.degrees
         moon_azimuth = moon_az.degrees
+
+        # Calculate apparent altitude with refraction
+        if moon_altitude > -1.0:
+            if moon_altitude > 0:
+                # Bennett's formula for refraction
+                refraction = 1.0 / math.tan(
+                    math.radians(moon_altitude + 7.31 / (moon_altitude + 4.4))
+                )
+                apparent_alt = moon_altitude + refraction / 60.0
+            else:
+                apparent_alt = moon_altitude + 0.58
+        else:
+            apparent_alt = moon_altitude
 
         # Calculate local angular separation
         local_separation = moon_app.separation_from(target_app).degrees
@@ -5899,7 +5983,7 @@ def lun_occult_where(
         local_moon_diameter = 2 * local_moon_radius
         local_target_diameter = 2 * target_radius
 
-        # Fraction covered
+        # Fraction covered (magnitude)
         if local_separation < abs(local_moon_radius - target_radius):
             fraction_covered = 1.0
         elif local_separation < local_moon_radius + target_radius:
@@ -5910,26 +5994,28 @@ def lun_occult_where(
         else:
             fraction_covered = 0.0
 
-        # Ratio of target diameter to Moon diameter
-        if local_moon_diameter > 0:
-            diameter_ratio = local_target_diameter / local_moon_diameter
+        # Ratio of lunar diameter to target diameter
+        if local_target_diameter > 0:
+            diameter_ratio = local_moon_diameter / local_target_diameter
         else:
-            diameter_ratio = 0.0
+            diameter_ratio = 999.0  # Moon much larger than star
 
     except Exception:
         # If calculation fails, use defaults
         moon_azimuth = 0.0
         moon_altitude = 0.0
+        apparent_alt = 0.0
         local_separation = separation
         local_moon_diameter = 2 * moon_radius
         local_target_diameter = 2 * target_radius
         fraction_covered = 0.0
         diameter_ratio = 0.0
+        local_moon_radius = moon_radius
 
-    # Determine occultation type
-    if separation < abs(moon_radius - target_radius):
-        if target_radius > moon_radius:
-            # Target larger than Moon (rare, e.g., Sun during solar eclipse)
+    # Determine occultation type based on local separation at central line
+    if local_separation < abs(local_moon_radius - target_radius):
+        if target_radius > local_moon_radius:
+            # Target larger than Moon (very rare for occultations)
             eclipse_type = SE_ECL_ANNULAR
         else:
             # Total occultation
@@ -5946,10 +6032,10 @@ def lun_occult_where(
         north_lat,  # [3] Northern limit latitude
         south_lon,  # [4] Southern limit longitude
         south_lat,  # [5] Southern limit latitude
-        sunrise_lon,  # [6] Sunrise limit longitude
-        sunrise_lat,  # [7] Sunrise limit latitude
-        sunset_lon,  # [8] Sunset limit longitude
-        sunset_lat,  # [9] Sunset limit latitude
+        sunrise_lon,  # [6] Penumbra north limit longitude
+        sunrise_lat,  # [7] Penumbra north limit latitude
+        sunset_lon,  # [8] Penumbra south limit longitude
+        sunset_lat,  # [9] Penumbra south limit latitude
     )
 
     attr = (
@@ -5959,7 +6045,7 @@ def lun_occult_where(
         path_width_km,  # [3] Diameter of core shadow in km
         moon_azimuth,  # [4] Moon azimuth at central line
         moon_altitude,  # [5] True altitude of Moon
-        moon_altitude,  # [6] Apparent altitude (with refraction)
+        apparent_alt,  # [6] Apparent altitude (with refraction)
         local_separation,  # [7] Angular distance Moon center from target
         0.0,  # [8] Reserved
         0.0,  # [9] Reserved

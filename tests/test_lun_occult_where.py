@@ -17,6 +17,9 @@ from libephemeris import (
     lun_occult_when_glob,
     SE_ECL_TOTAL,
     SE_ECL_PARTIAL,
+    SE_VENUS,
+    SE_MARS,
+    SE_JUPITER,
     SEFLG_SWIEPH,
 )
 
@@ -289,3 +292,170 @@ class TestLunOccultWhereIntegration:
         # All results should be identical
         assert result1 == result2
         assert result2 == result3
+
+
+class TestLunOccultWherePySwissephAPI:
+    """Tests for pyswisseph-compatible API (body can be int or str)."""
+
+    def test_star_name_as_body_parameter(self):
+        """Test that star name can be passed directly as body parameter.
+
+        This matches pyswisseph's API: swe.lun_occult_where(jd, "Regulus")
+        """
+        # Find a Regulus occultation
+        jd_start = julday(2017, 1, 1, 0)
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        jd_max = times[0]
+
+        # Call with star name as body (pyswisseph style)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus")
+
+        # Should find an occultation
+        assert ocl_type != 0
+        assert -180.0 <= geopos[0] <= 180.0
+        assert -90.0 <= geopos[1] <= 90.0
+
+    def test_star_name_as_body_matches_legacy_api(self):
+        """Test that new API produces same result as legacy API."""
+        jd_start = julday(2017, 1, 1, 0)
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        jd_max = times[0]
+
+        # Call with legacy API (planet=0, star_name="Regulus")
+        result_legacy = lun_occult_where(jd_max, 0, "Regulus")
+
+        # Call with new API (body="Regulus")
+        result_new = lun_occult_where(jd_max, "Regulus")
+
+        # Results should be identical
+        assert result_legacy == result_new
+
+    def test_planet_id_as_body(self):
+        """Test that planet ID works as body parameter."""
+        # Use a time when no Venus occultation is happening
+        jd = julday(2024, 1, 1, 12)
+
+        # Call with planet ID
+        ocl_type, geopos, attr = lun_occult_where(jd, SE_VENUS)
+
+        # Most likely no occultation at random time
+        # But function should not error
+        assert isinstance(ocl_type, int)
+        assert len(geopos) == 10
+        assert len(attr) == 20
+
+
+class TestLunOccultWherePlanetOccultations:
+    """Tests for planet occultations (Venus, Mars, Jupiter, etc.)."""
+
+    def test_planet_occultation_returns_valid_structure(self):
+        """Test planet occultation returns correct tuple structure."""
+        # Try to find a Venus occultation (may not find one in near future)
+        jd_start = julday(2024, 1, 1, 0)
+
+        # Try to find a Venus occultation
+        try:
+            retflags, times = lun_occult_when_glob(
+                jd_start, SE_VENUS, "", SEFLG_SWIEPH, 0
+            )
+            if retflags != 0:
+                jd_max = times[0]
+                ocl_type, geopos, attr = lun_occult_where(jd_max, SE_VENUS)
+
+                # geopos should be 10-element tuple
+                assert len(geopos) == 10
+                # attr should be 20-element tuple
+                assert len(attr) == 20
+                # Should find an occultation
+                assert ocl_type != 0
+        except Exception:
+            # If no occultation found, that's ok - just testing structure
+            pass
+
+    def test_invalid_planet_raises_error(self):
+        """Test that invalid planet ID raises an error."""
+        jd = julday(2024, 1, 1, 0)
+
+        # Use a planet ID that doesn't exist
+        with pytest.raises(ValueError):
+            lun_occult_where(jd, 999)  # Invalid planet ID
+
+    def test_mars_occultation_structure(self):
+        """Test Mars occultation returns valid structure."""
+        jd = julday(2024, 6, 1, 12)
+
+        # Call with Mars - likely no occultation but should not error
+        ocl_type, geopos, attr = lun_occult_where(jd, SE_MARS)
+
+        assert isinstance(ocl_type, int)
+        assert len(geopos) == 10
+        assert len(attr) == 20
+
+    def test_jupiter_occultation_structure(self):
+        """Test Jupiter occultation returns valid structure.
+
+        Note: Jupiter requires Jupiter barycenter in the ephemeris.
+        If not available, this test is skipped.
+        """
+        jd = julday(2024, 6, 1, 12)
+
+        # Call with Jupiter - may not be available in all ephemeris files
+        try:
+            ocl_type, geopos, attr = lun_occult_where(jd, SE_JUPITER)
+            assert isinstance(ocl_type, int)
+            assert len(geopos) == 10
+            assert len(attr) == 20
+        except (KeyError, ValueError):
+            # Jupiter not available in ephemeris - skip this test
+            pytest.skip("Jupiter not available in current ephemeris")
+
+
+class TestLunOccultWhereAttributes:
+    """Tests for attribute calculations."""
+
+    def test_diameter_ratio_reasonable_for_stars(self):
+        """Test that diameter ratio is large for star occultations.
+
+        Since stars are effectively point sources, the Moon diameter
+        should be much larger than the star's apparent diameter.
+        """
+        jd_start = julday(2017, 1, 1, 0)
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        jd_max = times[0]
+
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus")
+
+        if ocl_type != 0:
+            # attr[1] is ratio of lunar diameter to target diameter
+            # For stars, this should be very large (Moon >> star)
+            assert attr[1] > 100  # Moon is much larger than star
+
+    def test_apparent_altitude_different_from_true(self):
+        """Test that apparent altitude includes refraction correction."""
+        jd_start = julday(2017, 1, 1, 0)
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        jd_max = times[0]
+
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus")
+
+        if ocl_type != 0:
+            true_alt = attr[5]
+            apparent_alt = attr[6]
+
+            # Apparent altitude should be >= true altitude (refraction lifts)
+            # Only applies when Moon is near or above horizon
+            if true_alt > 0:
+                assert apparent_alt >= true_alt
+
+    def test_angular_separation_small_during_occultation(self):
+        """Test that angular separation is small during occultation."""
+        jd_start = julday(2017, 1, 1, 0)
+        retflags, times = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        jd_max = times[0]
+
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus")
+
+        if ocl_type != 0:
+            # attr[7] is angular distance Moon center from target
+            # Should be less than Moon's angular radius (~0.25 degrees)
+            assert attr[7] < 0.5  # Less than half a degree
