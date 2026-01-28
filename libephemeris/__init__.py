@@ -147,6 +147,9 @@ from .eclipse import (
     # Eclipse central line coordinates
     calc_eclipse_central_line,
     swe_calc_eclipse_central_line,
+    # Eclipse northern limit coordinates
+    calc_eclipse_northern_limit,
+    swe_calc_eclipse_northern_limit,
     # Saros series calculation
     get_saros_number,
     SAROS_CYCLE_DAYS,
