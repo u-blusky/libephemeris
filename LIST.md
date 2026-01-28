@@ -300,9 +300,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT ECLIPSE NORTHERN LIMIT: Calculate the northern limit of the umbral/antumbral shadow path.
 
-- [ ] IMPLEMENT ECLIPSE SOUTHERN LIMIT: Calculate the southern limit of the umbral/antumbral shadow path.
+- [x] IMPLEMENT ECLIPSE SOUTHERN LIMIT: Calculate the southern limit of the umbral/antumbral shadow path.
 
-- [ ] IMPLEMENT COMPLETE SOL_ECLIPSE_WHERE: Implement or complete swe_sol_eclipse_where(jd, flags) that returns comprehensive geographic information about where an eclipse is visible including central line coordinates, northern and southern limits, and path width.
+- [x] IMPLEMENT COMPLETE SOL_ECLIPSE_WHERE: Implement or complete swe_sol_eclipse_where(jd, flags) that returns comprehensive geographic information about where an eclipse is visible including central line coordinates, northern and southern limits, and path width.
 
 - [ ] IMPLEMENT SOL_ECLIPSE_HOW WITH FULL DETAILS: Enhance swe_sol_eclipse_how to return all eclipse circumstances at a given location including times of all contacts, maximum obscuration percentage, position angle of contacts, altitude and azimuth of Sun during eclipse, etc.
 

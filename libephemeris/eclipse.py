@@ -2480,6 +2480,128 @@ def swe_sol_eclipse_where(
     else:
         eclipse_type |= SE_ECL_PARTIAL
 
+    # Calculate umbra and penumbra limits using Besselian elements
+    # This uses the same algorithm as calc_eclipse_northern_limit and
+    # calc_eclipse_southern_limit but for a single point in time
+
+    # WGS84 ellipsoid parameters
+    EARTH_FLATTENING_CALC = 1.0 / 298.257223563
+
+    # Get Besselian elements at this time
+    x_bes = calc_besselian_x(tjd_ut, ifl)
+    y_bes = calc_besselian_y(tjd_ut, ifl)
+    d_bes = calc_besselian_d(tjd_ut, ifl)
+    mu_bes = calc_besselian_mu(tjd_ut, ifl)
+    l2_bes = calc_besselian_l2(tjd_ut, ifl)  # umbra/antumbra radius
+    l1_bes = calc_besselian_l1(tjd_ut, ifl)  # penumbra radius
+
+    # Calculate gamma - distance from shadow axis to Earth center
+    gamma = math.sqrt(x_bes * x_bes + y_bes * y_bes)
+
+    # Initialize limit coordinates to 0.0 (will be filled if applicable)
+    umbra_n_lon, umbra_n_lat = 0.0, 0.0
+    umbra_s_lon, umbra_s_lat = 0.0, 0.0
+    penumbra_n_lon, penumbra_n_lat = 0.0, 0.0
+    penumbra_s_lon, penumbra_s_lat = 0.0, 0.0
+
+    def calc_limit_point(
+        x_val: float,
+        y_val: float,
+        shadow_radius: float,
+        d_val: float,
+        mu_val: float,
+        north: bool,
+    ) -> Tuple[float, float]:
+        """
+        Calculate the geographic coordinates of a limit point.
+
+        Args:
+            x_val: Besselian x coordinate
+            y_val: Besselian y coordinate
+            shadow_radius: Shadow radius (l1 for penumbra, |l2| for umbra)
+            d_val: Declination of shadow axis in degrees
+            mu_val: Hour angle of shadow axis in degrees
+            north: True for northern limit, False for southern limit
+
+        Returns:
+            Tuple of (longitude, latitude) in degrees, or (0.0, 0.0) if invalid
+        """
+        # Offset y by the shadow radius (north or south)
+        if north:
+            y_offset = y_val + shadow_radius
+        else:
+            y_offset = y_val - shadow_radius
+
+        # Calculate gamma for the limit point
+        gamma_limit = math.sqrt(x_val * x_val + y_offset * y_offset)
+
+        # Check if this point is on Earth's surface
+        max_gamma_surface = 1.0 + EARTH_FLATTENING_CALC
+        if gamma_limit >= max_gamma_surface:
+            return 0.0, 0.0
+
+        # Calculate z-factor (height above fundamental plane)
+        if gamma_limit > 0.9999:
+            z_factor = 0.0
+        else:
+            z_factor = math.sqrt(max(0, 1.0 - gamma_limit * gamma_limit))
+
+        d_rad = math.radians(d_val)
+        sin_d = math.sin(d_rad)
+        cos_d = math.cos(d_rad)
+
+        # Calculate latitude using the y_offset component and shadow axis declination
+        sin_lat = y_offset * cos_d + z_factor * sin_d
+
+        # Clamp to valid range
+        sin_lat = max(-1.0, min(1.0, sin_lat))
+        lat = math.degrees(math.asin(sin_lat))
+
+        # For longitude, use the hour angle and x displacement
+        if abs(cos_d) > 0.001:
+            cos_lat = math.cos(math.radians(lat))
+            if cos_lat > 0.001:
+                lon_offset = math.degrees(math.atan2(x_val, z_factor * cos_d))
+            else:
+                lon_offset = 0.0
+        else:
+            lon_offset = 0.0
+
+        # The longitude of the limit point
+        lon = -mu_val + lon_offset
+
+        # Apply correction for Earth's oblateness
+        lat_geodetic = lat * (
+            1.0 + EARTH_FLATTENING_CALC * math.sin(math.radians(lat)) ** 2
+        )
+
+        # Normalize longitude to -180 to +180
+        lon = ((lon + 180.0) % 360.0) - 180.0
+
+        return lon, lat_geodetic
+
+    # Calculate umbra limits if the umbral shadow touches Earth
+    umbra_radius = abs(l2_bes)
+    max_gamma_umbra = 1.0 + EARTH_FLATTENING_CALC + umbra_radius
+    if gamma < max_gamma_umbra and umbra_radius > 0.001:
+        umbra_n_lon, umbra_n_lat = calc_limit_point(
+            x_bes, y_bes, umbra_radius, d_bes, mu_bes, north=True
+        )
+        umbra_s_lon, umbra_s_lat = calc_limit_point(
+            x_bes, y_bes, umbra_radius, d_bes, mu_bes, north=False
+        )
+
+    # Calculate penumbra limits if the penumbral shadow touches Earth
+    penumbra_radius = abs(l1_bes)
+    max_gamma_penumbra = 1.0 + EARTH_FLATTENING_CALC + penumbra_radius
+    if gamma < max_gamma_penumbra and penumbra_radius > 0.001:
+        penumbra_n_lon, penumbra_n_lat = calc_limit_point(
+            x_bes, y_bes, penumbra_radius, d_bes, mu_bes, north=True
+        )
+        penumbra_s_lon, penumbra_s_lat = calc_limit_point(
+            x_bes, y_bes, penumbra_radius, d_bes, mu_bes, north=False
+        )
+
     # Prepare return tuples (pyswisseph format)
     # geopos: 10 floats per pyswisseph documentation
     # [0] longitude central line
@@ -2492,20 +2614,17 @@ def swe_sol_eclipse_where(
     # [7] lat northern limit penumbra
     # [8] lon southern limit penumbra
     # [9] lat southern limit penumbra
-    # Note: umbra/penumbra limit calculations require complex shadow geometry
-    # For now we provide the central line and zeros for limits (consistent with
-    # pyswisseph behavior when limits cannot be calculated)
     geopos = (
         central_lon,  # [0] longitude central line
         central_lat,  # [1] latitude central line
-        0.0,  # [2] lon northern limit umbra
-        0.0,  # [3] lat northern limit umbra
-        0.0,  # [4] lon southern limit umbra
-        0.0,  # [5] lat southern limit umbra
-        0.0,  # [6] lon northern limit penumbra
-        0.0,  # [7] lat northern limit penumbra
-        0.0,  # [8] lon southern limit penumbra
-        0.0,  # [9] lat southern limit penumbra
+        umbra_n_lon,  # [2] lon northern limit umbra
+        umbra_n_lat,  # [3] lat northern limit umbra
+        umbra_s_lon,  # [4] lon southern limit umbra
+        umbra_s_lat,  # [5] lat southern limit umbra
+        penumbra_n_lon,  # [6] lon northern limit penumbra
+        penumbra_n_lat,  # [7] lat northern limit penumbra
+        penumbra_s_lon,  # [8] lon southern limit penumbra
+        penumbra_s_lat,  # [9] lat southern limit penumbra
     )
 
     # attr: 20 floats per pyswisseph documentation

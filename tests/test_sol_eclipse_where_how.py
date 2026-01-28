@@ -458,6 +458,146 @@ class TestSweSolEclipseHowEdgeCases:
 # a newer pyswisseph version with eclipse support is installed.
 
 
+class TestSweSolEclipseWhereLimits:
+    """Test swe_sol_eclipse_where returns proper umbra and penumbra limits."""
+
+    def setup_method(self):
+        """Set up test fixtures for April 8, 2024 total solar eclipse."""
+        # JD during maximum totality in Mexico
+        self.tjd_ut = 2460409.26
+
+    def test_umbra_limits_are_calculated(self):
+        """Test that umbra limit coordinates are returned for total eclipse."""
+        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+
+        # For a total eclipse, umbra limits should be non-zero
+        if retflag & SE_ECL_TOTAL:
+            umbra_n_lon, umbra_n_lat = geopos[2], geopos[3]
+            umbra_s_lon, umbra_s_lat = geopos[4], geopos[5]
+
+            # At least one of the umbra limits should be non-zero
+            umbra_defined = (
+                umbra_n_lon != 0.0
+                or umbra_n_lat != 0.0
+                or umbra_s_lon != 0.0
+                or umbra_s_lat != 0.0
+            )
+            assert umbra_defined, "Umbra limits should be calculated for total eclipse"
+
+    def test_penumbra_limits_are_calculated(self):
+        """Test that penumbra limit coordinates are returned for eclipse."""
+        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+
+        # Penumbra limits should be non-zero during an eclipse
+        if retflag != 0:
+            penumbra_n_lon, penumbra_n_lat = geopos[6], geopos[7]
+            penumbra_s_lon, penumbra_s_lat = geopos[8], geopos[9]
+
+            # At least one of the penumbra limits should be non-zero
+            penumbra_defined = (
+                penumbra_n_lon != 0.0
+                or penumbra_n_lat != 0.0
+                or penumbra_s_lon != 0.0
+                or penumbra_s_lat != 0.0
+            )
+            assert penumbra_defined, (
+                "Penumbra limits should be calculated during an eclipse"
+            )
+
+    def test_northern_limit_north_of_central(self):
+        """Test that northern umbra limit is north of central line."""
+        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+
+        if retflag & SE_ECL_TOTAL:
+            central_lat = geopos[1]
+            umbra_n_lat = geopos[3]
+
+            # Northern limit latitude should be >= central latitude
+            if umbra_n_lat != 0.0:
+                assert umbra_n_lat >= central_lat - 0.1, (
+                    f"Northern umbra limit ({umbra_n_lat:.2f}) should be "
+                    f">= central line ({central_lat:.2f})"
+                )
+
+    def test_southern_limit_south_of_central(self):
+        """Test that southern umbra limit is south of central line."""
+        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+
+        if retflag & SE_ECL_TOTAL:
+            central_lat = geopos[1]
+            umbra_s_lat = geopos[5]
+
+            # Southern limit latitude should be <= central latitude
+            if umbra_s_lat != 0.0:
+                assert umbra_s_lat <= central_lat + 0.1, (
+                    f"Southern umbra limit ({umbra_s_lat:.2f}) should be "
+                    f"<= central line ({central_lat:.2f})"
+                )
+
+    def test_penumbra_wider_than_umbra(self):
+        """Test that penumbra limits are wider than umbra limits."""
+        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+
+        if retflag & SE_ECL_TOTAL:
+            umbra_n_lat = geopos[3]
+            umbra_s_lat = geopos[5]
+            penumbra_n_lat = geopos[7]
+            penumbra_s_lat = geopos[9]
+
+            # Only check if all limits are defined
+            if (
+                umbra_n_lat != 0.0
+                and umbra_s_lat != 0.0
+                and penumbra_n_lat != 0.0
+                and penumbra_s_lat != 0.0
+            ):
+                umbra_width = umbra_n_lat - umbra_s_lat
+                penumbra_width = penumbra_n_lat - penumbra_s_lat
+
+                # Penumbra should be wider than umbra
+                assert penumbra_width >= umbra_width, (
+                    f"Penumbra width ({penumbra_width:.2f}) should be >= "
+                    f"umbra width ({umbra_width:.2f})"
+                )
+
+    def test_limits_have_valid_coordinates(self):
+        """Test that limit coordinates are in valid ranges."""
+        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+
+        if retflag != 0:
+            for i in range(0, 10, 2):  # Check longitudes
+                lon = geopos[i]
+                if lon != 0.0:
+                    assert -180 <= lon <= 180, f"Longitude {lon} out of range"
+
+            for i in range(1, 10, 2):  # Check latitudes
+                lat = geopos[i]
+                if lat != 0.0:
+                    assert -90 <= lat <= 90, f"Latitude {lat} out of range"
+
+    def test_limits_reasonable_for_apr2024(self):
+        """Test that limits are in reasonable geographic locations for Apr 2024."""
+        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+
+        if retflag & SE_ECL_TOTAL:
+            # All points should be in the Americas region for this eclipse
+            # Central line should be near Mexico
+            central_lon, central_lat = geopos[0], geopos[1]
+
+            # Check umbra limits are roughly in North America
+            umbra_n_lat = geopos[3]
+            umbra_s_lat = geopos[5]
+
+            if umbra_n_lat != 0.0 and umbra_s_lat != 0.0:
+                # Latitudes should be between 10°N and 50°N for this eclipse
+                assert 10 < umbra_n_lat < 50, (
+                    f"Northern umbra lat {umbra_n_lat} unexpected for Apr 2024"
+                )
+                assert 10 < umbra_s_lat < 50, (
+                    f"Southern umbra lat {umbra_s_lat} unexpected for Apr 2024"
+                )
+
+
 @pytest.mark.skip(reason="pyswisseph installed doesn't have eclipse functions")
 class TestComparisonWithPyswisseph:
     """Compare results with pyswisseph for validation."""
