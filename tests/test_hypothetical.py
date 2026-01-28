@@ -32,6 +32,8 @@ from libephemeris.hypothetical import (
     SE_PLANET_X_ADAMS,
     SE_NEPTUNE_ADAMS,
     PLANET_X_ADAMS,
+    SE_PLANET_X_LOWELL,
+    PLANET_X_LOWELL,
     # Functions
     is_hypothetical_body,
     get_hypothetical_name,
@@ -44,6 +46,7 @@ from libephemeris.hypothetical import (
     calc_waldemath_position,
     calc_waldemath,  # Waldemath Moon (hypothetical second moon of Earth)
     calc_proserpina,  # Proserpina (hypothetical trans-Plutonian planet)
+    calc_planet_x_lowell,  # Lowell's Planet X prediction
     calc_hypothetical_position,
     list_hypothetical_bodies,
     calc_cupido,
@@ -71,6 +74,7 @@ from libephemeris.hypothetical import (
     TRANSPLUTO_KEPLERIAN_ELEMENTS,
     VULCAN_ELEMENTS,
     WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements
+    LOWELL_PLANET_X_ELEMENTS,  # Lowell's Planet X orbital elements
 )
 from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
 
@@ -3231,4 +3235,179 @@ class TestProserpina:
         # Transpluto: eccentric (e=0.3), 77.775 AU semi-major axis
         assert proserpina_pos[2] != transpluto_pos[2], (
             "Proserpina and Transpluto should have different distances"
+        )
+
+
+class TestPlanetXLowell:
+    """Tests for Lowell's Planet X calculations.
+
+    Percival Lowell predicted a trans-Neptunian planet in 1915 based on perceived
+    perturbations in Uranus's orbit. The search for this planet led to Pluto's
+    discovery in 1930, though Pluto was too small to be Lowell's Planet X.
+
+    Lowell's orbital elements:
+        - Semi-major axis: 43.0 AU
+        - Eccentricity: 0.202
+        - Inclination: 10 degrees
+        - Orbital period: ~282 years
+    """
+
+    J2000 = 2451545.0
+    J1900 = 2415020.0
+
+    def test_calc_planet_x_lowell_returns_tuple(self):
+        """Test that calc_planet_x_lowell returns correct tuple format."""
+        pos = calc_planet_x_lowell(self.J2000)
+        assert isinstance(pos, tuple)
+        assert len(pos) == 6
+        lon, lat, dist, dlon, dlat, ddist = pos
+        assert isinstance(lon, float)
+        assert isinstance(lat, float)
+        assert isinstance(dist, float)
+        assert isinstance(dlon, float)
+        assert isinstance(dlat, float)
+        assert isinstance(ddist, float)
+
+    def test_calc_planet_x_lowell_longitude_range(self):
+        """Test that longitude is in valid range."""
+        test_dates = [
+            self.J2000 - 36525,  # 100 years before J2000
+            self.J2000,
+            self.J2000 + 36525,  # 100 years after J2000
+        ]
+        for jd in test_dates:
+            pos = calc_planet_x_lowell(jd)
+            assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
+
+    def test_calc_planet_x_lowell_latitude_nonzero(self):
+        """Test that Planet X Lowell has non-zero latitude (10 deg inclination)."""
+        # With 10 degree inclination, latitude should vary between -10 and +10
+        pos = calc_planet_x_lowell(self.J2000)
+        # Latitude should be within inclination bounds
+        assert -11.0 <= pos[1] <= 11.0, (
+            f"Latitude {pos[1]} should be within inclination (10 deg)"
+        )
+
+    def test_calc_planet_x_lowell_distance_range(self):
+        """Test that Planet X Lowell distance is reasonable for e=0.202 orbit."""
+        elements = LOWELL_PLANET_X_ELEMENTS
+        # For e=0.202, a=43 AU:
+        # perihelion = a(1-e) = 43 * 0.798 = 34.31 AU
+        # aphelion = a(1+e) = 43 * 1.202 = 51.69 AU
+        perihelion = elements.a * (1 - elements.e)
+        aphelion = elements.a * (1 + elements.e)
+
+        # Test at multiple dates
+        test_dates = [self.J2000, self.J2000 + 36525, self.J2000 + 73050]
+        for jd in test_dates:
+            pos = calc_planet_x_lowell(jd)
+            assert perihelion - 0.1 <= pos[2] <= aphelion + 0.1, (
+                f"Distance {pos[2]} AU outside valid range [{perihelion:.2f}, {aphelion:.2f}]"
+            )
+
+    def test_calc_planet_x_lowell_velocity_positive(self):
+        """Test that Planet X Lowell has prograde motion."""
+        pos = calc_planet_x_lowell(self.J2000)
+        assert pos[3] > 0, "Planet X Lowell should have prograde motion"
+
+    def test_calc_planet_x_lowell_velocity_magnitude(self):
+        """Test that daily motion is reasonable for a ~282 year period."""
+        pos = calc_planet_x_lowell(self.J2000)
+        # Mean motion ~360 / (282 * 365.25) = 0.0035 deg/day
+        # Actual motion varies due to eccentricity
+        assert 0.001 < pos[3] < 0.01, (
+            f"Daily motion {pos[3]} deg/day seems unreasonable for 282-year orbit"
+        )
+
+    def test_se_planet_x_lowell_constant_value(self):
+        """Test that SE_PLANET_X_LOWELL has correct value (SE_FICT_OFFSET + 13 = 53)."""
+        assert SE_PLANET_X_LOWELL == 53
+        assert SE_PLANET_X_LOWELL == SE_FICT_OFFSET + 13
+
+    def test_planet_x_lowell_pyswisseph_alias(self):
+        """Test that PLANET_X_LOWELL alias works."""
+        assert PLANET_X_LOWELL == SE_PLANET_X_LOWELL
+
+    def test_planet_x_lowell_identified_as_hypothetical(self):
+        """Test that Planet X Lowell is identified as a hypothetical body."""
+        assert is_hypothetical_body(SE_PLANET_X_LOWELL)
+
+    def test_planet_x_lowell_name(self):
+        """Test that get_hypothetical_name returns correct name."""
+        name = get_hypothetical_name(SE_PLANET_X_LOWELL)
+        assert "Planet X" in name or "Lowell" in name
+
+    def test_planet_x_lowell_in_hypothetical_names(self):
+        """Test that Planet X Lowell is in HYPOTHETICAL_NAMES dictionary."""
+        assert SE_PLANET_X_LOWELL in HYPOTHETICAL_NAMES
+
+    def test_calc_planet_x_lowell_via_calc_hypothetical_position(self):
+        """Test that calc_hypothetical_position routes Planet X Lowell correctly."""
+        pos1 = calc_hypothetical_position(SE_PLANET_X_LOWELL, self.J2000)
+        pos2 = calc_planet_x_lowell(self.J2000)
+        assert pos1 == pos2
+
+    def test_lowell_planet_x_elements_valid(self):
+        """Test that Lowell Planet X orbital elements are valid."""
+        elements = LOWELL_PLANET_X_ELEMENTS
+        assert elements.name == "Planet X Lowell"
+        assert abs(elements.a - 43.0) < 0.001, "Semi-major axis should be 43 AU"
+        assert abs(elements.e - 0.202) < 0.001, "Eccentricity should be 0.202"
+        assert abs(elements.i - 10.0) < 0.001, "Inclination should be 10 degrees"
+        assert elements.n > 0, "Mean motion should be positive"
+
+    def test_planet_x_lowell_orbital_period(self):
+        """Test that Planet X Lowell has approximately 282 year orbital period."""
+        # From Kepler's 3rd law: Period = a^1.5 years = 43^1.5 ≈ 282 years
+        elements = LOWELL_PLANET_X_ELEMENTS
+        period_days = 360.0 / elements.n
+        period_years = period_days / 365.25
+
+        # Verify period is approximately 282 years
+        assert 275.0 < period_years < 290.0, (
+            f"Planet X Lowell period should be ~282 years, got {period_years:.1f}"
+        )
+
+    def test_planet_x_lowell_progression(self):
+        """Test that Planet X Lowell progresses correctly over time."""
+        pos1 = calc_planet_x_lowell(self.J2000)
+        pos2 = calc_planet_x_lowell(self.J2000 + 365.25 * 10)  # 10 years later
+
+        # Calculate actual motion (handle wrap-around)
+        motion = pos2[0] - pos1[0]
+        if motion < -180:
+            motion += 360
+        elif motion > 180:
+            motion -= 360
+
+        # Should have moved noticeably in 10 years (~12-15 degrees)
+        assert 8.0 < abs(motion) < 20.0, (
+            f"10-year motion {motion:.2f} deg seems unreasonable"
+        )
+
+    def test_planet_x_lowell_different_from_pluto(self):
+        """Test that Planet X Lowell has different orbit characteristics than Pluto."""
+        # Lowell's Planet X: a=43 AU, e=0.202, i=10 deg, period ~282 years
+        # Real Pluto: a=39.5 AU, e=0.25, i=17 deg, period ~248 years
+        # They should give different positions
+        elements = LOWELL_PLANET_X_ELEMENTS
+
+        # Lowell predicted a larger semi-major axis than Pluto has
+        pluto_a = 39.5
+        assert elements.a > pluto_a, (
+            "Lowell's Planet X should have larger orbit than Pluto"
+        )
+
+    def test_planet_x_lowell_distance_varies(self):
+        """Test that distance varies over time (non-circular orbit)."""
+        # With e=0.202, distance should vary significantly over the orbit
+        distances = []
+        for i in range(10):
+            jd = self.J2000 + i * 365.25 * 28.2  # Sample every ~28 years (1/10 orbit)
+            pos = calc_planet_x_lowell(jd)
+            distances.append(pos[2])
+
+        # Distance should vary (not all the same)
+        assert max(distances) - min(distances) > 1.0, (
+            "Distance should vary due to non-zero eccentricity"
         )

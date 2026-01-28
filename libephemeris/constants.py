@@ -123,6 +123,17 @@ SE_PLANET_X_ADAMS: int = (
 )  # 52 - Adams' Planet X (Neptune prediction)
 PLANET_X_ADAMS: int = SE_PLANET_X_ADAMS  # Pyswisseph-compatible alias
 
+# Planet X Lowell - Percival Lowell's predicted "Planet X" that led to Pluto's discovery
+# Lowell predicted a trans-Neptunian planet based on perceived perturbations in Uranus's orbit.
+# The search based on his predictions eventually led to Clyde Tombaugh's discovery of Pluto in 1930,
+# though Pluto was too small to be Lowell's predicted Planet X.
+# This uses Lowell's orbital elements from seorbel.txt #14 (SE_FICT_OFFSET + 13 = 53).
+# Orbital elements (1915 prediction): a=43.0 AU, e=0.202, i=10°
+SE_PLANET_X_LOWELL: int = (
+    SE_FICT_OFFSET + 13
+)  # 53 - Lowell's Planet X (Pluto prediction)
+PLANET_X_LOWELL: int = SE_PLANET_X_LOWELL  # Pyswisseph-compatible alias
+
 # White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
 # In Swiss Ephemeris, this is calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
 # Note: Some systems use True Lilith + 180° instead; libephemeris supports both via calc_white_moon_position()

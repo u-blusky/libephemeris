@@ -74,6 +74,9 @@ SE_PLANET_X_ADAMS: int = (
     SE_NEPTUNE_ADAMS  # Alias - Adams' calculated "Planet X" (independently derived)
 )
 SE_PLUTO_LOWELL: int = SE_FICT_OFFSET + 13  # 53 - Lowell's Pluto position
+SE_PLANET_X_LOWELL: int = (
+    SE_PLUTO_LOWELL  # Alias - Lowell's "Planet X" prediction (led to Pluto discovery)
+)
 SE_PLUTO_PICKERING: int = SE_FICT_OFFSET + 14  # 54 - Pickering's Pluto position
 
 # Additional hypothetical bodies
@@ -96,6 +99,7 @@ TRANSPLUTO: int = SE_TRANSPLUTO
 NIBIRU: int = SE_NIBIRU
 PLANET_X_LEVERRIER: int = SE_PLANET_X_LEVERRIER
 PLANET_X_ADAMS: int = SE_PLANET_X_ADAMS
+PLANET_X_LOWELL: int = SE_PLANET_X_LOWELL
 VULCAN: int = SE_VULCAN
 WHITE_MOON: int = SE_WHITE_MOON
 PROSERPINA: int = SE_PROSERPINA
@@ -1065,6 +1069,85 @@ WALDEMATH_ELEMENTS = WaldemathElements(
 
 
 # =============================================================================
+# LOWELL PLANET X ORBITAL ELEMENTS (seorbel.txt #14)
+# =============================================================================
+# Percival Lowell's hypothetical "Planet X" that led to the search which discovered Pluto.
+# Lowell calculated these orbital elements in 1915 based on perceived perturbations
+# in Uranus's orbit. The search for this predicted planet led Clyde Tombaugh to
+# discover Pluto in 1930 at Lowell Observatory.
+#
+# Historical note: Pluto turned out to be far too small (0.2% of Earth's mass) to
+# cause the perturbations Lowell attributed to "Planet X". The perceived perturbations
+# were later explained as observational errors. Pluto's discovery near Lowell's
+# predicted position was essentially a coincidence.
+#
+# Lowell's 1915 prediction from "Memoir on a Trans-Neptunian Planet":
+#   - Semi-major axis: 43.0 AU
+#   - Eccentricity: 0.202
+#   - Inclination: 10° to ecliptic
+#   - Longitude of perihelion: ~204° (1930)
+#   - Mean longitude at 1930.0: ~102°
+#   - Orbital period: ~282 years
+
+
+@dataclass
+class LowellPlanetXElements:
+    """
+    Orbital elements for Lowell's hypothetical Planet X.
+
+    Percival Lowell predicted this trans-Neptunian planet in 1915 based on
+    analysis of supposed perturbations in Uranus's orbit. The search for this
+    planet led to the discovery of Pluto in 1930, though Pluto was far too
+    small to be Lowell's Planet X.
+
+    Attributes:
+        name: Name of the body
+        epoch: Reference epoch (Julian Day TT)
+        a: Semi-major axis (AU)
+        e: Eccentricity
+        i: Inclination (degrees)
+        omega: Argument of perihelion (degrees)
+        Omega: Longitude of ascending node (degrees)
+        M0: Mean anomaly at epoch (degrees)
+        n: Mean motion (degrees per day)
+    """
+
+    name: str
+    epoch: float
+    a: float
+    e: float
+    i: float
+    omega: float
+    Omega: float
+    M0: float
+    n: float
+
+
+# Lowell Planet X orbital elements
+# Based on Lowell's 1915 prediction "Memoir on a Trans-Neptunian Planet"
+# Epoch: J1930.0 (JD 2425977.0) - chosen as it's close to Pluto's discovery date
+#
+# Elements derived from Lowell's published predictions:
+#   - Semi-major axis: 43.0 AU
+#   - Eccentricity: 0.202
+#   - Inclination: 10.0 degrees
+#   - Mean motion: 360 / (43^1.5 * 365.25) = 0.003497 deg/day
+#   - Orbital period: ~282 years
+LOWELL_PLANET_X_ELEMENTS = LowellPlanetXElements(
+    name="Planet X Lowell",
+    epoch=2415020.0,  # J1900.0 (matching other hypothetical bodies)
+    a=43.0,  # Semi-major axis in AU
+    e=0.202,  # Eccentricity from Lowell's prediction
+    i=10.0,  # Inclination in degrees
+    omega=204.9,  # Argument of perihelion in degrees
+    Omega=67.5,  # Longitude of ascending node in degrees
+    M0=11.2,  # Mean anomaly at epoch (degrees)
+    # n = 360 / (a^1.5 * 365.25) = 360 / (281.98 * 365.25) = 0.003497 deg/day
+    n=360.0 / (43.0**1.5 * 365.25),
+)
+
+
+# =============================================================================
 # HYPOTHETICAL BODY NAME MAPPING
 # =============================================================================
 
@@ -1082,7 +1165,7 @@ HYPOTHETICAL_NAMES: Dict[int, str] = {
     SE_HARRINGTON: "Harrington",
     SE_NEPTUNE_LEVERRIER: "Neptune-Leverrier",
     SE_NEPTUNE_ADAMS: "Neptune-Adams",
-    SE_PLUTO_LOWELL: "Pluto-Lowell",
+    SE_PLUTO_LOWELL: "Planet X Lowell",
     SE_PLUTO_PICKERING: "Pluto-Pickering",
     SE_VULCAN: "Vulcan",
     SE_WHITE_MOON: "White Moon (Selena)",
@@ -2725,6 +2808,155 @@ def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, fl
     return (longitude, latitude, distance, dlon, dlat, ddist)
 
 
+def calc_planet_x_lowell(
+    jd_tt: float,
+) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the heliocentric position of Lowell's Planet X using Keplerian propagation.
+
+    Percival Lowell's hypothetical "Planet X" was a trans-Neptunian planet he predicted
+    in 1915 based on perceived perturbations in Uranus's orbit. The search for this
+    planet at Lowell Observatory led to Clyde Tombaugh's discovery of Pluto in 1930.
+
+    Historical note: Pluto was far too small (0.2% of Earth's mass) to cause the
+    perturbations Lowell attributed to "Planet X". The perceived perturbations were
+    later explained as observational errors. Pluto's discovery near Lowell's predicted
+    position was essentially a fortunate coincidence.
+
+    Orbital elements from Lowell's 1915 prediction "Memoir on a Trans-Neptunian Planet":
+        - Semi-major axis: 43.0 AU
+        - Eccentricity: 0.202
+        - Inclination: 10 degrees to ecliptic
+        - Orbital period: ~282 years
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Heliocentric ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees
+            - distance: Distance from Sun in AU
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_planet_x_lowell
+        >>> pos = calc_planet_x_lowell(2451545.0)  # J2000.0
+        >>> print(f"Planet X Lowell at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
+    """
+    elements = LOWELL_PLANET_X_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    # Position in orbital plane
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    # Rotate to ecliptic frame
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    # Convert to spherical coordinates
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    # Calculate velocity via numerical differentiation
+    dt_step = 1.0  # 1 day step for daily velocity
+    pos_next = _calc_planet_x_lowell_raw(jd_tt + dt_step)
+
+    dlon = pos_next[0] - longitude
+    # Handle wrap-around
+    if dlon > 180.0:
+        dlon -= 360.0
+    elif dlon < -180.0:
+        dlon += 360.0
+
+    dlat = pos_next[1] - latitude
+    ddist = pos_next[2] - distance
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
+def _calc_planet_x_lowell_raw(jd_tt: float) -> Tuple[float, float, float]:
+    """
+    Calculate raw Planet X Lowell position without velocity (helper for differentiation).
+    """
+    elements = LOWELL_PLANET_X_ELEMENTS
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly
+    M = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M)
+
+    # Solve Kepler's equation for eccentric anomaly
+    E = _solve_kepler_equation(M_rad, elements.e)
+
+    # True anomaly
+    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
+
+    # Distance from Sun (heliocentric)
+    r = elements.a * (1.0 - elements.e * math.cos(E))
+
+    # Argument of latitude (measured from ascending node)
+    u = nu + math.radians(elements.omega)
+
+    # Convert to ecliptic coordinates
+    i_rad = math.radians(elements.i)
+    Omega_rad = math.radians(elements.Omega)
+
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    cos_i = math.cos(i_rad)
+    sin_i = math.sin(i_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+
+    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
+    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
+    z_ecl = sin_i * y_orb
+
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
+    distance = r
+
+    return (longitude, latitude, distance)
+
+
 def calc_hypothetical_position(
     ipl: int, jd_tt: float
 ) -> Tuple[float, float, float, float, float, float]:
@@ -2781,6 +3013,10 @@ def calc_hypothetical_position(
     # Proserpina (hypothetical trans-Plutonian planet)
     if ipl == SE_PROSERPINA:
         return calc_proserpina(jd_tt)
+
+    # Planet X Lowell (Lowell's predicted trans-Neptunian planet)
+    if ipl == SE_PLANET_X_LOWELL:
+        return calc_planet_x_lowell(jd_tt)
 
     # Other Keplerian bodies
     if ipl in HYPOTHETICAL_ELEMENTS:
