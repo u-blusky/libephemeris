@@ -33,6 +33,7 @@ from .constants import (
     SE_MOON,
     SE_MERCURY,
     SE_VENUS,
+    SE_FIXSTAR_OFFSET,
     SEFLG_SPEED,
     SEFLG_SWIEPH,
 )
@@ -45,6 +46,38 @@ INNER_PLANETS = {SE_MERCURY, SE_VENUS}
 # Outer planets (orbit outside Earth's orbit)
 # These only have one type of conjunction (behind the Sun)
 # SE_EVENING_FIRST and SE_MORNING_LAST are not applicable to these
+
+
+def is_fixed_star(body: int) -> bool:
+    """
+    Check if a body ID corresponds to a fixed star.
+
+    Args:
+        body: Body ID constant
+
+    Returns:
+        True if the body is a fixed star (ID >= SE_FIXSTAR_OFFSET), False otherwise
+    """
+    return body >= SE_FIXSTAR_OFFSET
+
+
+def _get_star_magnitude(star_id: int) -> float:
+    """
+    Get the visual magnitude of a fixed star from the catalog.
+
+    Args:
+        star_id: Star ID (SE_* constant, e.g., SE_SIRIUS)
+
+    Returns:
+        Visual magnitude of the star. Brighter stars have lower/negative values.
+        Returns 6.0 (faint) if star not found.
+    """
+    from .fixed_stars import STAR_CATALOG
+
+    for entry in STAR_CATALOG:
+        if entry.id == star_id:
+            return entry.magnitude
+    return 6.0  # Default to faint star if not found
 
 
 def is_inner_planet(body: int) -> bool:
@@ -172,7 +205,13 @@ def heliacal_ut(
     # SE_EVENING_FIRST and SE_MORNING_LAST are only valid for inner planets
     # (Mercury and Venus) because they relate to superior conjunction visibility.
     # Outer planets only have one type of conjunction and these events don't apply.
+    # Fixed stars only have heliacal rising and setting.
     if event_type in (SE_EVENING_FIRST, SE_MORNING_LAST):
+        if is_fixed_star(body):
+            raise ValueError(
+                "SE_EVENING_FIRST and SE_MORNING_LAST are not valid for fixed stars. "
+                "For fixed stars, use SE_HELIACAL_RISING or SE_HELIACAL_SETTING."
+            )
         if not is_inner_planet(body):
             raise ValueError(
                 "SE_EVENING_FIRST and SE_MORNING_LAST are only valid for inner planets "
@@ -186,28 +225,61 @@ def heliacal_ut(
     if body == SE_MOON:
         raise ValueError("SE_MOON is not valid for heliacal calculations")
 
-    # Validate body
-    if body not in _PLANET_MAP:
+    # Check if this is a fixed star
+    is_star = is_fixed_star(body)
+
+    # Validate body - must be either a known planet or a fixed star
+    if not is_star and body not in _PLANET_MAP:
         raise ValueError(f"illegal planet number {body}.")
 
     # Get ephemeris and timescale
     eph = get_planets()
     ts = get_timescale()
 
-    # Get celestial bodies
-    target_name = _PLANET_MAP[body]
-    # Try planet center first, fall back to barycenter if not available
-    from .planets import _PLANET_FALLBACK
-
-    try:
-        target = eph[target_name]
-    except KeyError:
-        if target_name in _PLANET_FALLBACK:
-            target = eph[_PLANET_FALLBACK[target_name]]
-        else:
-            raise
     sun = eph["sun"]
     earth = eph["earth"]
+
+    # Get target - either planet or star
+    target = None
+    star_object = None
+    star_magnitude = 0.0  # Default, will be set for stars
+
+    if is_star:
+        # For fixed stars, create a Skyfield Star object
+        from skyfield.api import Star
+        from .fixed_stars import STAR_CATALOG
+
+        star_magnitude = _get_star_magnitude(body)
+
+        # Find star data from catalog
+        star_data = None
+        for entry in STAR_CATALOG:
+            if entry.id == body:
+                star_data = entry.data
+                break
+
+        if star_data is None:
+            raise ValueError(f"Star ID {body} not found in catalog")
+
+        # Create Skyfield Star object for position calculations
+        star_object = Star(
+            ra_hours=star_data.ra_j2000 / 15.0,
+            dec_degrees=star_data.dec_j2000,
+            ra_mas_per_year=star_data.pm_ra * 1000.0,
+            dec_mas_per_year=star_data.pm_dec * 1000.0,
+        )
+    else:
+        # For planets, get the target from ephemeris
+        target_name = _PLANET_MAP[body]
+        from .planets import _PLANET_FALLBACK
+
+        try:
+            target = eph[target_name]
+        except KeyError:
+            if target_name in _PLANET_FALLBACK:
+                target = eph[_PLANET_FALLBACK[target_name]]
+            else:
+                raise
 
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
@@ -225,26 +297,38 @@ def heliacal_ut(
         sun_app = observer_at.at(t).observe(sun).apparent()
         sun_alt, _, _ = sun_app.altaz()
 
-        # Body position
-        body_app = observer_at.at(t).observe(target).apparent()
+        # Body position (handle both planets and stars)
+        if is_star and star_object is not None:
+            body_app = observer_at.at(t).observe(star_object).apparent()
+        else:
+            body_app = observer_at.at(t).observe(target).apparent()
         body_alt, body_az, _ = body_app.altaz()
 
         return sun_alt.degrees, body_alt.degrees, body_az.degrees
 
     def _get_elongation(jd: float) -> float:
         """Get the elongation of body from Sun in degrees."""
-        try:
-            pheno, _ = swe_pheno_ut(jd, body, flags)
-            return pheno[2]  # Elongation
-        except Exception:
-            # Fallback: calculate elongation manually
-            t = ts.ut1_jd(jd)
-            sun_app = earth.at(t).observe(sun).apparent()
+        if not is_star:
+            try:
+                pheno, _ = swe_pheno_ut(jd, body, flags)
+                return pheno[2]  # Elongation
+            except Exception:
+                pass
+
+        # For stars or fallback: calculate elongation manually
+        t = ts.ut1_jd(jd)
+        sun_app = earth.at(t).observe(sun).apparent()
+        if is_star and star_object is not None:
+            body_app = earth.at(t).observe(star_object).apparent()
+        else:
             body_app = earth.at(t).observe(target).apparent()
-            return body_app.separation_from(sun_app).degrees
+        return body_app.separation_from(sun_app).degrees
 
     def _get_body_magnitude(jd: float) -> float:
         """Get the visual magnitude of the body."""
+        if is_star:
+            # For fixed stars, return the catalog magnitude
+            return star_magnitude
         try:
             pheno, _ = swe_pheno_ut(jd, body, flags)
             return pheno[4]  # Visual magnitude
@@ -826,13 +910,19 @@ def _parse_object_name(object_name: str) -> int:
     except ValueError:
         pass
 
-    # For fixed stars, we currently don't support them in heliacal_ut
-    # The Swiss Ephemeris supports fixed stars, but our implementation
-    # only supports planets at this time
+    # Try to resolve as a fixed star name
+    from .fixed_stars import resolve_star_name
+
+    star_id = resolve_star_name(object_name)
+    if star_id is not None:
+        return star_id
+
+    # Object not recognized
     raise ValueError(
         f"Object '{object_name}' not recognized. "
-        "Use planet names (Mercury, Venus, Mars, Jupiter, Saturn, etc.) "
-        "or planet IDs (2-9 for Mercury-Pluto)."
+        "Use planet names (Mercury, Venus, Mars, Jupiter, Saturn, etc.), "
+        "planet IDs (2-9 for Mercury-Pluto), or fixed star names "
+        "(Sirius, Regulus, Aldebaran, etc.)."
     )
 
 
@@ -940,28 +1030,61 @@ def heliacal_pheno_ut(
             "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
         )
 
-    # Validate body
-    if body not in _PLANET_MAP:
+    # Check if this is a fixed star
+    is_star = is_fixed_star(body)
+
+    # Validate body - must be either a known planet or a fixed star
+    if not is_star and body not in _PLANET_MAP:
         raise ValueError(f"illegal planet number {body}.")
 
     # Get ephemeris and timescale
     eph = get_planets()
     ts = get_timescale()
 
-    # Get celestial bodies
-    target_name = _PLANET_MAP[body]
-    # Try planet center first, fall back to barycenter if not available
-    from .planets import _PLANET_FALLBACK
-
-    try:
-        target = eph[target_name]
-    except KeyError:
-        if target_name in _PLANET_FALLBACK:
-            target = eph[_PLANET_FALLBACK[target_name]]
-        else:
-            raise
     sun = eph["sun"]
     earth = eph["earth"]
+
+    # Get target - either planet or star
+    target = None
+    star_object = None
+    star_magnitude = 0.0
+
+    if is_star:
+        # For fixed stars, create a Skyfield Star object
+        from skyfield.api import Star
+        from .fixed_stars import STAR_CATALOG
+
+        star_magnitude = _get_star_magnitude(body)
+
+        # Find star data from catalog
+        star_data = None
+        for entry in STAR_CATALOG:
+            if entry.id == body:
+                star_data = entry.data
+                break
+
+        if star_data is None:
+            raise ValueError(f"Star ID {body} not found in catalog")
+
+        # Create Skyfield Star object for position calculations
+        star_object = Star(
+            ra_hours=star_data.ra_j2000 / 15.0,
+            dec_degrees=star_data.dec_j2000,
+            ra_mas_per_year=star_data.pm_ra * 1000.0,
+            dec_mas_per_year=star_data.pm_dec * 1000.0,
+        )
+    else:
+        # For planets, get the target from ephemeris
+        target_name = _PLANET_MAP[body]
+        from .planets import _PLANET_FALLBACK
+
+        try:
+            target = eph[target_name]
+        except KeyError:
+            if target_name in _PLANET_FALLBACK:
+                target = eph[_PLANET_FALLBACK[target_name]]
+            else:
+                raise
 
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
@@ -979,14 +1102,20 @@ def heliacal_pheno_ut(
     sun_alt_deg = sun_alt_topo.degrees
     sun_az_deg = sun_az.degrees
 
-    # Calculate body position
-    body_app = observer_at.at(t).observe(target).apparent()
+    # Calculate body position (handle both planets and stars)
+    if is_star and star_object is not None:
+        body_app = observer_at.at(t).observe(star_object).apparent()
+    else:
+        body_app = observer_at.at(t).observe(target).apparent()
     body_alt_topo, body_az, body_dist = body_app.altaz()
     body_alt_deg = body_alt_topo.degrees
     body_az_deg = body_az.degrees
 
     # Get geocentric altitude (without refraction or topocentric correction)
-    body_geo = earth.at(t).observe(target).apparent()
+    if is_star and star_object is not None:
+        body_geo = earth.at(t).observe(star_object).apparent()
+    else:
+        body_geo = earth.at(t).observe(target).apparent()
     body_geo_ra, body_geo_dec, body_geo_dist = body_geo.radec()
 
     # Calculate geocentric altitude using hour angle
@@ -1035,18 +1164,26 @@ def heliacal_pheno_ut(
     while daz_act < -180:
         daz_act += 360
 
-    # Get elongation (longitude difference) from Sun using pheno
-    try:
-        pheno, _ = swe_pheno_ut(jd, body, flags)
-        elongation = pheno[2]  # Elongation
-        magnitude = pheno[4]  # Visual magnitude
-        phase_angle = pheno[1]  # Phase angle
-    except Exception:
-        # Calculate elongation manually
+    # Get elongation (longitude difference) from Sun
+    # For fixed stars, always calculate manually since swe_pheno_ut doesn't support them
+    if is_star:
+        # Calculate elongation manually for stars
         sun_geo = earth.at(t).observe(sun).apparent()
         elongation = body_geo.separation_from(sun_geo).degrees
-        magnitude = 0.0
-        phase_angle = 0.0
+        magnitude = star_magnitude
+        phase_angle = 0.0  # Stars don't have phase angle
+    else:
+        try:
+            pheno, _ = swe_pheno_ut(jd, body, flags)
+            elongation = pheno[2]  # Elongation
+            magnitude = pheno[4]  # Visual magnitude
+            phase_angle = pheno[1]  # Phase angle
+        except Exception:
+            # Calculate elongation manually
+            sun_geo = earth.at(t).observe(sun).apparent()
+            elongation = body_geo.separation_from(sun_geo).degrees
+            magnitude = 0.0
+            phase_angle = 0.0
 
     # Calculate extinction coefficient (simplified Schaefer model)
     # k = k_rayleigh + k_aerosol + k_ozone
@@ -1068,13 +1205,17 @@ def heliacal_pheno_ut(
         min_tav = 7.0 + magnitude * 0.7
 
     # Parallax of object (in degrees)
-    # Parallax = arcsin(Earth_radius / distance)
-    # Earth radius ~ 6371 km, distance in AU (1 AU ~ 149,597,870.7 km)
-    earth_radius_au = 6371.0 / 149597870.7
-    if body_geo_dist.au > 0:
-        parallax = math.degrees(math.asin(earth_radius_au / body_geo_dist.au))
-    else:
+    # Fixed stars have essentially zero parallax
+    if is_star:
         parallax = 0.0
+    else:
+        # Parallax = arcsin(Earth_radius / distance)
+        # Earth radius ~ 6371 km, distance in AU (1 AU ~ 149,597,870.7 km)
+        earth_radius_au = 6371.0 / 149597870.7
+        if body_geo_dist.au > 0:
+            parallax = math.degrees(math.asin(earth_radius_au / body_geo_dist.au))
+        else:
+            parallax = 0.0
 
     # Calculate rise/set times for object and Sun
     # For morning events, we look for rise times; for evening, set times

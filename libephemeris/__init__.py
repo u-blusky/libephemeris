@@ -184,6 +184,7 @@ from .heliacal import (
     vis_limit_mag,
     swe_vis_limit_mag,
     is_inner_planet,
+    is_fixed_star,
     INNER_PLANETS,
 )
 from .extinction import (
@@ -662,6 +663,7 @@ __all__ = [
     "vis_limit_mag",
     "swe_vis_limit_mag",
     "is_inner_planet",
+    "is_fixed_star",
     "INNER_PLANETS",
     # Atmospheric extinction
     "calc_airmass",
