@@ -115,6 +115,7 @@ from .constants import (
     SE_SECUNDA_HYADUM,
     SE_THETA_TAURI,
     SE_AIN,
+    SE_MEISSA,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -596,6 +597,19 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_dec=-0.00139,  # -1.39 mas/yr
         ),
         magnitude=2.06,
+    ),
+    StarCatalogEntry(
+        id=SE_MEISSA,
+        name="Meissa",
+        nomenclature="laOri",
+        hip_number=26207,
+        data=StarData(
+            ra_j2000=83.784486,  # 05h 35m 08.3s
+            dec_j2000=9.934156,  # +09° 56' 03"
+            pm_ra=0.00250,  # 2.50 mas/yr
+            pm_dec=-0.00088,  # -0.88 mas/yr
+        ),
+        magnitude=3.33,
     ),
     StarCatalogEntry(
         id=SE_DIPHDA,
@@ -1385,6 +1399,15 @@ STAR_ALIASES: dict[str, int] = {
     "κ ORI": SE_SAIPH,
     "KAORI": SE_SAIPH,
     "SAIF AL-JABBAR": SE_SAIPH,
+    # ======== MEISSA (Lambda Orionis) ========
+    "LAMBDA ORIONIS": SE_MEISSA,
+    "LAMBDA ORI": SE_MEISSA,
+    "39 ORI": SE_MEISSA,
+    "λ ORI": SE_MEISSA,
+    "LAORI": SE_MEISSA,
+    "HEKA": SE_MEISSA,
+    "HEAD OF ORION": SE_MEISSA,
+    "AL-MAISAN": SE_MEISSA,
     # ======== DIPHDA (Beta Ceti) ========
     "FROG": SE_DIPHDA,
     "BETA CETI": SE_DIPHDA,
