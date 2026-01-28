@@ -228,27 +228,27 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT PROSERPINA HYPOTHETICAL: Add the hypothetical planet Proserpina as used by some astrologers, get elements from seorbel.txt if present, add SE_PROSERPINA to constants.py, implement in hypothetical.py.
 
-- [ ] IMPLEMENT PLANET X LEVERRIER: Add the hypothetical Planet X as calculated by Leverrier (the one that led to Neptune's discovery), as documented in Swiss Ephemeris section 2.7.8, add SE_PLANET_X_LEVERRIER to constants.py.
+- [x] IMPLEMENT PLANET X LEVERRIER: Add the hypothetical Planet X as calculated by Leverrier (the one that led to Neptune's discovery), as documented in Swiss Ephemeris section 2.7.8, add SE_PLANET_X_LEVERRIER to constants.py.
 
-- [ ] IMPLEMENT PLANET X ADAMS: Add the hypothetical Planet X as calculated by Adams (similar to Leverrier's but independently derived), add SE_PLANET_X_ADAMS to constants.py.
+- [x] IMPLEMENT PLANET X ADAMS: Add the hypothetical Planet X as calculated by Adams (similar to Leverrier's but independently derived), add SE_PLANET_X_ADAMS to constants.py.
 
-- [ ] IMPLEMENT PLANET X LOWELL: Add the hypothetical Planet X as calculated by Percival Lowell (the one that led to Pluto's discovery though Pluto was too small to be Lowell's Planet X), add SE_PLANET_X_LOWELL to constants.py.
+- [x] IMPLEMENT PLANET X LOWELL: Add the hypothetical Planet X as calculated by Percival Lowell (the one that led to Pluto's discovery though Pluto was too small to be Lowell's Planet X), add SE_PLANET_X_LOWELL to constants.py.
 
-- [ ] IMPLEMENT PLANET X PICKERING: Add the hypothetical Planet X as calculated by Pickering, add SE_PLANET_X_PICKERING to constants.py.
+- [x] IMPLEMENT PLANET X PICKERING: Add the hypothetical Planet X as calculated by Pickering, add SE_PLANET_X_PICKERING to constants.py.
 
-- [ ] CREATE SEORBEL.TXT PARSER: Create a function parse_seorbel(filepath) that can parse the Swiss Ephemeris seorbel.txt file format to extract orbital elements for any fictitious body, this allows users to add custom hypothetical bodies by providing a seorbel.txt format file.
+- [x] CREATE SEORBEL.TXT PARSER: Create a function parse_seorbel(filepath) that can parse the Swiss Ephemeris seorbel.txt file format to extract orbital elements for any fictitious body, this allows users to add custom hypothetical bodies by providing a seorbel.txt format file.
 
-- [ ] DOWNLOAD AND INCLUDE SEORBEL.TXT: Download the seorbel.txt file from Swiss Ephemeris GitHub repository and include it in the libephemeris package data, or extract the needed orbital elements into Python constants.
+- [x] DOWNLOAD AND INCLUDE SEORBEL.TXT: Download the seorbel.txt file from Swiss Ephemeris GitHub repository and include it in the libephemeris package data, or extract the needed orbital elements into Python constants.
 
 ---
 
 ## MEDIUM PRIORITY: Eclipses - Besselian Elements
 
-- [ ] IMPLEMENT BESSELIAN ELEMENT X CALCULATION: Implement calculation of the Besselian x coordinate which is the x-component of the Moon's shadow axis in the fundamental plane (the plane through Earth's center perpendicular to the Moon-Sun line), this requires precise Moon and Sun positions and the shadow cone geometry.
+- [x] IMPLEMENT BESSELIAN ELEMENT X CALCULATION: Implement calculation of the Besselian x coordinate which is the x-component of the Moon's shadow axis in the fundamental plane (the plane through Earth's center perpendicular to the Moon-Sun line), this requires precise Moon and Sun positions and the shadow cone geometry.
 
-- [ ] IMPLEMENT BESSELIAN ELEMENT Y CALCULATION: Implement calculation of the Besselian y coordinate which is the y-component of the Moon's shadow axis in the fundamental plane.
+- [x] IMPLEMENT BESSELIAN ELEMENT Y CALCULATION: Implement calculation of the Besselian y coordinate which is the y-component of the Moon's shadow axis in the fundamental plane.
 
-- [ ] IMPLEMENT BESSELIAN ELEMENT D CALCULATION: Implement calculation of d, the declination of the Moon's shadow axis relative to the fundamental plane.
+- [x] IMPLEMENT BESSELIAN ELEMENT D CALCULATION: Implement calculation of d, the declination of the Moon's shadow axis relative to the fundamental plane.
 
 - [ ] IMPLEMENT BESSELIAN ELEMENT L1 CALCULATION: Implement calculation of l1, the radius of the penumbral shadow cone where it intersects the fundamental plane.
 

@@ -113,6 +113,7 @@ from .eclipse import (
     swe_vis_limit_mag,
     calc_besselian_x,
     calc_besselian_y,
+    calc_besselian_d,
 )
 from .utils import (
     degnorm,
@@ -476,6 +477,7 @@ __all__ = [
     # Besselian elements
     "calc_besselian_x",
     "calc_besselian_y",
+    "calc_besselian_d",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",
