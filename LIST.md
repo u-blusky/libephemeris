@@ -348,9 +348,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT HELIACAL_PHENO_UT FUNCTION: Implement swe_heliacal_pheno_ut for computing detailed heliacal phenomena information.
 
-- [ ] IMPLEMENT HELIACAL EVENTS FOR PLANETS: Ensure heliacal calculations work correctly for Mercury, Venus, Mars, Jupiter, Saturn including proper handling of inferior/superior conjunction geometry for inner planets.
+- [x] IMPLEMENT HELIACAL EVENTS FOR PLANETS: Ensure heliacal calculations work correctly for Mercury, Venus, Mars, Jupiter, Saturn including proper handling of inferior/superior conjunction geometry for inner planets.
 
-- [ ] IMPLEMENT HELIACAL EVENTS FOR STARS: Ensure heliacal calculations work for bright fixed stars, determine visibility based on star magnitude and atmospheric conditions.
+- [x] IMPLEMENT HELIACAL EVENTS FOR STARS: Ensure heliacal calculations work for bright fixed stars, determine visibility based on star magnitude and atmospheric conditions.
 
 - [ ] IMPLEMENT LUNAR CRESCENT VISIBILITY: Implement calculation of lunar crescent visibility for Islamic calendar applications, determining when the new crescent moon first becomes visible after conjunction.
 
