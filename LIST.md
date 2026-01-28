@@ -324,7 +324,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT LUN_OCCULT_WHEN_GLOB: Implement swe_lun_occult_when_glob(jd_start, planet, starname, flags, direction) that finds the next occultation visible anywhere on Earth.
 
-- [ ] IMPLEMENT LUN_OCCULT_WHERE: Implement swe_lun_occult_where(jd, planet, starname, flags) that determines where on Earth an occultation is visible at a given time.
+- [x] IMPLEMENT LUN_OCCULT_WHERE: Implement swe_lun_occult_where(jd, planet, starname, flags) that determines where on Earth an occultation is visible at a given time.
 
 - [ ] IMPLEMENT PLANETARY OCCULTATION SEARCH: Extend occultation functions to handle mutual planetary occultations (e.g., when Jupiter occults a star).
 
