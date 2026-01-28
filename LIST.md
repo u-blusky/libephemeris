@@ -224,9 +224,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT WALDEMATH BLACK MOON: Add support for Dr. Waldemath's hypothetical second moon of Earth also called the Waldemath Moon or Dark Moon as documented in Swiss Ephemeris section 2.7.7, this is different from Mean Lilith and True Lilith which are lunar apogee points, get orbital elements from seorbel.txt, add SE_WALDEMATH to constants.py, implement calc_waldemath(jd_tt) in hypothetical.py.
 
-- [ ] IMPLEMENT WHITE MOON SELENA: Add support for White Moon also called Selena which in most systems is defined as the lunar perigee opposite to Black Moon Lilith (Mean Lilith + 180° or True Lilith + 180°), add SE_WHITE_MOON to constants.py, implement in hypothetical.py, verify which definition Swiss Ephemeris uses (mean or true based).
+- [x] IMPLEMENT WHITE MOON SELENA: Add support for White Moon also called Selena which in most systems is defined as the lunar perigee opposite to Black Moon Lilith (Mean Lilith + 180° or True Lilith + 180°), add SE_WHITE_MOON to constants.py, implement in hypothetical.py, verify which definition Swiss Ephemeris uses (mean or true based).
 
-- [ ] IMPLEMENT PROSERPINA HYPOTHETICAL: Add the hypothetical planet Proserpina as used by some astrologers, get elements from seorbel.txt if present, add SE_PROSERPINA to constants.py, implement in hypothetical.py.
+- [x] IMPLEMENT PROSERPINA HYPOTHETICAL: Add the hypothetical planet Proserpina as used by some astrologers, get elements from seorbel.txt if present, add SE_PROSERPINA to constants.py, implement in hypothetical.py.
 
 - [ ] IMPLEMENT PLANET X LEVERRIER: Add the hypothetical Planet X as calculated by Leverrier (the one that led to Neptune's discovery), as documented in Swiss Ephemeris section 2.7.8, add SE_PLANET_X_LEVERRIER to constants.py.
 

@@ -37,6 +37,7 @@ from libephemeris.hypothetical import (
     calc_white_moon_position,
     calc_waldemath_position,
     calc_waldemath,  # Waldemath Moon (hypothetical second moon of Earth)
+    calc_proserpina,  # Proserpina (hypothetical trans-Plutonian planet)
     calc_hypothetical_position,
     list_hypothetical_bodies,
     calc_cupido,
@@ -3051,3 +3052,149 @@ class TestCalcVulcan:
         # Vulcan moves much faster than Vulkanus
         assert vulcan_pos[3] > 15.0, "Vulcan should move > 15 deg/day"
         assert vulkanus_pos[3] < 0.01, "Vulkanus should move < 0.01 deg/day"
+
+
+class TestProserpina:
+    """
+    Tests for the hypothetical planet Proserpina.
+
+    Proserpina is a hypothetical trans-Plutonian planet used by some astrologers.
+    This is NOT the same as the asteroid 26 Proserpina. Unlike other hypothetical
+    bodies documented in Swiss Ephemeris seorbel.txt, Proserpina is not part of
+    the standard Swiss Ephemeris fictitious bodies.
+
+    The implementation uses a simple circular orbit model with:
+        - Semi-major axis: 81.0 AU (beyond Neptune and Pluto)
+        - Eccentricity: 0.0 (circular orbit)
+        - Orbital period: ~729 years (derived from Kepler's 3rd law)
+    """
+
+    # Test epochs
+    J2000 = 2451545.0  # Jan 1, 2000, 12:00 TT
+    J1900 = 2415020.0  # Jan 0.5, 1900 TT (Dec 31, 1899, 12:00 TT)
+
+    def test_calc_proserpina_returns_6_tuple(self):
+        """Test that calc_proserpina returns a 6-element tuple."""
+        pos = calc_proserpina(self.J2000)
+        assert len(pos) == 6
+
+    def test_calc_proserpina_longitude_in_range(self):
+        """Test that Proserpina longitude is in valid range [0, 360)."""
+        pos = calc_proserpina(self.J2000)
+        assert 0.0 <= pos[0] < 360.0
+
+    def test_calc_proserpina_latitude_zero(self):
+        """Test that Proserpina latitude is zero (on ecliptic plane)."""
+        pos = calc_proserpina(self.J2000)
+        assert pos[1] == 0.0, "Proserpina should be on ecliptic (lat=0)"
+
+    def test_calc_proserpina_distance(self):
+        """Test that Proserpina distance is at 81 AU."""
+        pos = calc_proserpina(self.J2000)
+        assert abs(pos[2] - 81.0) < 0.001, (
+            f"Proserpina distance should be 81.0 AU, got {pos[2]:.4f}"
+        )
+
+    def test_calc_proserpina_slow_motion(self):
+        """Test that Proserpina has very slow daily motion (~0.00135 deg/day)."""
+        pos = calc_proserpina(self.J2000)
+        # Expected motion: n = 360 / (81^1.5 * 365.25) = ~0.00135 deg/day
+        expected_n = 360.0 / (81.0**1.5 * 365.25)
+        assert abs(pos[3] - expected_n) < 0.0001, (
+            f"Proserpina daily motion should be ~{expected_n:.6f} deg/day, got {pos[3]:.6f}"
+        )
+
+    def test_calc_proserpina_velocity_positive(self):
+        """Test that Proserpina has prograde motion."""
+        pos = calc_proserpina(self.J2000)
+        assert pos[3] > 0, "Proserpina should have prograde motion"
+
+    def test_calc_proserpina_lat_velocity_zero(self):
+        """Test that Proserpina latitude velocity is zero."""
+        pos = calc_proserpina(self.J2000)
+        assert pos[4] == 0.0, (
+            "Latitude velocity should be 0 for circular ecliptic orbit"
+        )
+
+    def test_calc_proserpina_dist_velocity_zero(self):
+        """Test that Proserpina distance velocity is zero (circular orbit)."""
+        pos = calc_proserpina(self.J2000)
+        assert pos[5] == 0.0, "Distance velocity should be 0 for circular orbit"
+
+    def test_calc_proserpina_orbital_period(self):
+        """Test that Proserpina has approximately 729 year orbital period."""
+        # From Kepler's 3rd law: Period = a^1.5 years = 81^1.5 = 729.3 years
+        elements = HYPOTHETICAL_ELEMENTS[SE_PROSERPINA]
+        period_days = 360.0 / elements.n
+        period_years = period_days / 365.25
+
+        # Verify period is approximately 729 years
+        assert 720.0 < period_years < 740.0, (
+            f"Proserpina period should be ~729 years, got {period_years:.1f}"
+        )
+
+    def test_calc_proserpina_progression(self):
+        """Test that Proserpina progresses correctly over time."""
+        pos1 = calc_proserpina(self.J2000)
+        pos2 = calc_proserpina(self.J2000 + 365.25)  # 1 year later
+
+        # Calculate expected motion in 1 year
+        elements = HYPOTHETICAL_ELEMENTS[SE_PROSERPINA]
+        expected_motion = elements.n * 365.25  # ~0.49 deg/year
+
+        # Calculate actual motion
+        actual_motion = pos2[0] - pos1[0]
+        if actual_motion < 0:
+            actual_motion += 360.0
+
+        assert abs(actual_motion - expected_motion) < 0.001, (
+            f"Annual motion should be ~{expected_motion:.4f} deg, got {actual_motion:.4f}"
+        )
+
+    def test_se_proserpina_constant_value(self):
+        """Test that SE_PROSERPINA has correct value (SE_FICT_OFFSET + 17 = 57)."""
+        assert SE_PROSERPINA == 57
+        assert SE_PROSERPINA == SE_FICT_OFFSET + 17
+
+    def test_calc_proserpina_via_calc_hypothetical_position(self):
+        """Test that calc_hypothetical_position routes Proserpina correctly."""
+        pos1 = calc_hypothetical_position(SE_PROSERPINA, self.J2000)
+        pos2 = calc_proserpina(self.J2000)
+        assert pos1 == pos2
+
+    def test_proserpina_name_in_hypothetical_names(self):
+        """Test that Proserpina is in HYPOTHETICAL_NAMES dictionary."""
+        assert SE_PROSERPINA in HYPOTHETICAL_NAMES
+        assert HYPOTHETICAL_NAMES[SE_PROSERPINA] == "Proserpina"
+
+    def test_proserpina_identified_as_hypothetical(self):
+        """Test that Proserpina is identified as a hypothetical body."""
+        assert is_hypothetical_body(SE_PROSERPINA)
+
+    def test_proserpina_name_via_get_hypothetical_name(self):
+        """Test that get_hypothetical_name returns correct name for Proserpina."""
+        assert get_hypothetical_name(SE_PROSERPINA) == "Proserpina"
+
+    def test_proserpina_in_hypothetical_elements(self):
+        """Test that Proserpina has orbital elements defined."""
+        assert SE_PROSERPINA in HYPOTHETICAL_ELEMENTS
+        elements = HYPOTHETICAL_ELEMENTS[SE_PROSERPINA]
+        assert elements.name == "Proserpina"
+        assert abs(elements.a - 81.0) < 0.001, "Semi-major axis should be 81 AU"
+        assert elements.e == 0.0, "Eccentricity should be 0 (circular orbit)"
+        assert elements.i == 0.0, "Inclination should be 0 (on ecliptic)"
+
+    def test_proserpina_different_from_transpluto(self):
+        """Test that Proserpina is different from Transpluto (Isis)."""
+        assert SE_PROSERPINA != SE_ISIS
+        assert SE_PROSERPINA != SE_TRANSPLUTO
+
+        proserpina_pos = calc_proserpina(self.J2000)
+        transpluto_pos = calc_transpluto(self.J2000)
+
+        # Both are trans-Plutonian but have different orbits
+        # Proserpina: circular, 81 AU
+        # Transpluto: eccentric (e=0.3), 77.775 AU semi-major axis
+        assert proserpina_pos[2] != transpluto_pos[2], (
+            "Proserpina and Transpluto should have different distances"
+        )

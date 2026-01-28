@@ -865,14 +865,17 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     ),
     SE_PROSERPINA: HypotheticalElements(
         name="Proserpina",
-        epoch=2451545.0,
-        a=81.0,  # AU
-        e=0.15,
-        i=0.0,
-        omega=0.0,
-        Omega=0.0,
-        M0=0.0,
-        n=0.000445,  # ~2200 year period
+        epoch=2451545.0,  # J2000.0
+        a=81.0,  # Semi-major axis in AU (trans-Plutonian)
+        e=0.0,  # Circular orbit (simplest astrological model)
+        i=0.0,  # On ecliptic plane
+        omega=0.0,  # Irrelevant for circular orbit
+        Omega=0.0,  # Assumed zero ascending node
+        M0=0.0,  # Mean anomaly at J2000.0 (arbitrary starting point)
+        # Mean motion: n = 360 / (a^1.5 * 365.25) deg/day
+        # Period = 81^1.5 = 729.3 years
+        # n = 360 / (729.3 * 365.25) = 0.001352 deg/day
+        n=360.0 / (81.0**1.5 * 365.25),  # ~0.001352 deg/day
     ),
 }
 
@@ -2649,6 +2652,71 @@ def calc_waldemath_position(
     return calc_waldemath(jd_tt)
 
 
+def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate the heliocentric position of Proserpina using Keplerian propagation.
+
+    Proserpina is a hypothetical trans-Plutonian planet used by some astrologers.
+    This is NOT the same as the asteroid 26 Proserpina. Unlike other hypothetical
+    bodies documented in Swiss Ephemeris seorbel.txt, Proserpina is not part of
+    the standard Swiss Ephemeris fictitious bodies.
+
+    The name "Proserpina" refers to the Roman goddess of the underworld (Greek:
+    Persephone), wife of Pluto. In astrological usage, it represents transformation,
+    cycles of death and rebirth, and the shadow self.
+
+    Orbital elements used (traditional astrological):
+        - Epoch: J2000.0 (JD 2451545.0)
+        - Semi-major axis: 81.0 AU (beyond Neptune and Pluto)
+        - Eccentricity: 0.0 (circular orbit)
+        - Inclination: 0.0 degrees (on ecliptic)
+        - Orbital period: ~729 years (derived from Kepler's 3rd law)
+
+    Note: Different astrologers may use different orbital elements for Proserpina.
+    This implementation uses a simple circular orbit model.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
+            - longitude: Heliocentric ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees (0 for circular orbit on ecliptic)
+            - distance: Distance from Sun in AU (81.0 AU, constant for circular orbit)
+            - dlon: Daily longitude change in degrees/day
+            - dlat: Daily latitude change in degrees/day (0)
+            - ddist: Daily distance change in AU/day (0 for circular orbit)
+
+    Example:
+        >>> from libephemeris.hypothetical import calc_proserpina
+        >>> pos = calc_proserpina(2451545.0)  # J2000.0
+        >>> print(f"Proserpina at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
+    """
+    elements = HYPOTHETICAL_ELEMENTS[SE_PROSERPINA]
+
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # For a circular orbit (e = 0), mean longitude = true longitude
+    # Simply propagate the mean longitude
+    longitude = (elements.M0 + elements.n * dt) % 360.0
+
+    # Proserpina is assumed to be on the ecliptic (zero inclination)
+    latitude = 0.0
+
+    # Distance is constant for circular orbit (equal to semi-major axis)
+    distance = elements.a
+
+    # Daily motion is simply the mean motion for circular orbit
+    dlon = elements.n
+
+    # No latitude or distance change for circular orbit on ecliptic
+    dlat = 0.0
+    ddist = 0.0
+
+    return (longitude, latitude, distance, dlon, dlat, ddist)
+
+
 def calc_hypothetical_position(
     ipl: int, jd_tt: float
 ) -> Tuple[float, float, float, float, float, float]:
@@ -2701,6 +2769,10 @@ def calc_hypothetical_position(
     # Waldemath Black Moon
     if ipl == SE_WALDEMATH:
         return calc_waldemath_position(jd_tt)
+
+    # Proserpina (hypothetical trans-Plutonian planet)
+    if ipl == SE_PROSERPINA:
+        return calc_proserpina(jd_tt)
 
     # Other Keplerian bodies
     if ipl in HYPOTHETICAL_ELEMENTS:

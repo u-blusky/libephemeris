@@ -117,6 +117,12 @@ WHITE_MOON: int = SE_WHITE_MOON  # Pyswisseph-compatible alias
 SE_SELENA: int = SE_WHITE_MOON  # Alias - Selena is another name for White Moon
 SELENA: int = SE_WHITE_MOON  # Pyswisseph-compatible alias
 
+# Proserpina - hypothetical trans-Plutonian planet used by some astrologers
+# This is a hypothetical body not in the standard Swiss Ephemeris seorbel.txt
+# Orbital elements are based on traditional astrological sources
+SE_PROSERPINA: int = SE_FICT_OFFSET + 17  # 57 - Hypothetical trans-Plutonian planet
+PROSERPINA: int = SE_PROSERPINA  # Pyswisseph-compatible alias
+
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
 # Trans-Neptunian Objects (TNOs) - Catalog number + offset

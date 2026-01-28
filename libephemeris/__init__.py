@@ -188,6 +188,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_transpluto,  # Transpluto (Isis) - hypothetical trans-Plutonian planet
     calc_vulcan,  # Vulcan - hypothetical intramercurial planet
     calc_waldemath,  # Waldemath Moon - hypothetical second moon of Earth (seorbel.txt #18)
+    calc_proserpina,  # Proserpina - hypothetical trans-Plutonian planet
     calc_white_moon_position,  # White Moon (Selena) - opposite to Black Moon Lilith
     calc_uranian_planet,
     calc_hypothetical_position,
@@ -208,6 +209,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     SE_VULCAN as SE_VULCAN_HYPO,  # Alias to avoid conflict with constants.py
     SE_WALDEMATH as SE_WALDEMATH_HYPO,  # Alias to avoid conflict with constants.py
     SE_WHITE_MOON as SE_WHITE_MOON_HYPO,  # Alias to avoid conflict with constants.py
+    SE_PROSERPINA as SE_PROSERPINA_HYPO,  # Alias to avoid conflict with constants.py
 )
 
 
