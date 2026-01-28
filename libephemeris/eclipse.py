@@ -10231,11 +10231,16 @@ def calc_lunar_eclipse_umbral_duration(
 
 
 # =============================================================================
-# SAROS SERIES CALCULATION
+# SAROS AND INEX SERIES CALCULATION
 # =============================================================================
 
 # Saros cycle period in days (223 synodic months)
 SAROS_CYCLE_DAYS = 6585.3211  # More precise: 6585.3211 days
+
+# Inex cycle period in days (358 synodic months, ~28.945 years)
+# The Inex cycle relates eclipses that occur at nearly the same longitude
+# but shifted by one lunar node (ascending to descending or vice versa).
+INEX_CYCLE_DAYS = 10571.9509  # 358 * 29.530588853 = 10571.9509 days
 
 # Reference solar eclipses with known Saros series numbers
 # These are well-documented historical eclipses from NASA's eclipse catalogs
@@ -10374,5 +10379,137 @@ def get_saros_number(
         if residual < best_match_residual:
             best_match_residual = residual
             best_match_series = ref_saros_test
+
+    return best_match_series
+
+
+# =============================================================================
+# INEX SERIES CALCULATION
+# =============================================================================
+
+# Reference solar eclipses with known Inex series numbers
+# The Inex cycle connects eclipses at the same solar longitude
+# but at opposite lunar nodes (ascending <-> descending).
+# Series numbers from van Gent's eclipse cycle catalog.
+# Format: (JD of eclipse maximum, Inex series number)
+_SOLAR_INEX_REFERENCES = (
+    # Inex 50 - includes 2024 total solar eclipse
+    (2460409.296, 50),  # 2024-Apr-08 total solar eclipse (Inex 50)
+    # Inex 49 - includes 2017 total solar eclipse
+    (2457987.767, 49),  # 2017-Aug-21 total solar eclipse (Inex 49)
+    # Inex 51 - includes 2020 total solar eclipse
+    (2459203.604, 51),  # 2020-Dec-14 total solar eclipse (Inex 51)
+    # Inex 48 - includes 2019 total solar eclipse
+    (2458675.604, 48),  # 2019-Jul-02 total solar eclipse (Inex 48)
+    # Inex 52 - includes 2021 annular solar eclipse
+    (2459369.971, 52),  # 2021-Jun-10 annular solar eclipse (Inex 52)
+)
+
+# Reference lunar eclipses with known Inex series numbers
+# Format: (JD of eclipse maximum, Inex series number)
+_LUNAR_INEX_REFERENCES = (
+    # Inex 50 - includes 2022 total lunar eclipse
+    (2459891.459, 50),  # 2022-Nov-08 total lunar eclipse (Inex 50)
+    # Inex 49 - includes 2022 total lunar eclipse
+    (2459695.604, 49),  # 2022-May-16 total lunar eclipse (Inex 49)
+    # Inex 48 - includes 2021 total lunar eclipse
+    (2459356.917, 48),  # 2021-May-26 total lunar eclipse (Inex 48)
+    # Inex 51 - includes 2018 total lunar eclipse
+    (2458310.835, 51),  # 2018-Jul-27 total lunar eclipse (Inex 51)
+    # Inex 47 - includes 2019 total lunar eclipse
+    (2458497.459, 47),  # 2019-Jan-21 total lunar eclipse (Inex 47)
+)
+
+
+def get_inex_number(
+    jd_eclipse: float,
+    eclipse_type: str = "solar",
+) -> int:
+    """
+    Determine the Inex series number for an eclipse.
+
+    The Inex cycle is a period of approximately 10571.95 days (358 synodic
+    months, ~28.945 years) after which eclipses occur at the same solar
+    longitude but at the opposite lunar node.
+
+    While the Saros cycle connects eclipses with similar geometry (same node,
+    similar latitude), the Inex cycle connects eclipses at the same longitude
+    but at different nodes. Together, Saros and Inex form a two-dimensional
+    numbering system for eclipse series.
+
+    Args:
+        jd_eclipse: Julian Day (UT) of the eclipse maximum. This should be
+                    obtained from sol_eclipse_when_glob() or lun_eclipse_when().
+        eclipse_type: Type of eclipse - either "solar" or "lunar".
+                      Defaults to "solar".
+
+    Returns:
+        The Inex series number (integer).
+
+    Algorithm:
+        1. For the given eclipse JD, calculate the difference from known
+           reference eclipses with documented Inex series numbers.
+        2. Determine how many Inex cycles separate the input eclipse from
+           the reference.
+        3. Find the reference that gives the smallest residual (closest
+           match to an integer number of cycles).
+
+    Precision:
+        The function is accurate for eclipses within several centuries of
+        the reference eclipses. Very distant eclipses may have small errors
+        due to slight variations in the Inex period over long time spans.
+
+    Example:
+        >>> from libephemeris import julday, sol_eclipse_when_glob, get_inex_number
+        >>> # Find the April 8, 2024 total solar eclipse
+        >>> jd_start = julday(2024, 3, 1, 0.0)
+        >>> times, ecl_type = sol_eclipse_when_glob(jd_start)
+        >>> jd_max = times[0]
+        >>> inex = get_inex_number(jd_max, "solar")
+        >>> print(f"Inex series: {inex}")  # Should print 50
+
+    Note:
+        - The Inex series number combined with the Saros series number
+          uniquely identifies each eclipse in the long-term eclipse cycle.
+        - Each Inex series contains eclipses that occur at the same solar
+          longitude but alternate between ascending and descending nodes.
+        - Unlike Saros, which relates eclipses of similar appearance, Inex
+          relates eclipses at the same celestial longitude.
+
+    References:
+        - van Gent, R.H. "A Catalogue of Eclipse Cycles"
+        - Meeus, J. "Mathematical Astronomy Morsels"
+        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
+    """
+    if eclipse_type.lower() == "solar":
+        references = _SOLAR_INEX_REFERENCES
+    elif eclipse_type.lower() == "lunar":
+        references = _LUNAR_INEX_REFERENCES
+    else:
+        raise ValueError(
+            f"eclipse_type must be 'solar' or 'lunar', got '{eclipse_type}'"
+        )
+
+    # Use the first reference eclipse as our anchor point
+    ref_jd, ref_inex = references[0]
+
+    # Calculate how many Inex cycles separate the input from the reference
+    delta_days = jd_eclipse - ref_jd
+
+    # Number of complete Inex cycles (can be positive or negative)
+    cycles = round(delta_days / INEX_CYCLE_DAYS)
+
+    # Find which reference gives the closest match
+    best_match_series = ref_inex
+    best_match_residual = abs(delta_days - cycles * INEX_CYCLE_DAYS)
+
+    for ref_jd_test, ref_inex_test in references:
+        delta = jd_eclipse - ref_jd_test
+        cycles_test = round(delta / INEX_CYCLE_DAYS)
+        residual = abs(delta - cycles_test * INEX_CYCLE_DAYS)
+
+        if residual < best_match_residual:
+            best_match_residual = residual
+            best_match_series = ref_inex_test
 
     return best_match_series

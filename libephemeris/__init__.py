@@ -144,6 +144,9 @@ from .eclipse import (
     # Saros series calculation
     get_saros_number,
     SAROS_CYCLE_DAYS,
+    # Inex series calculation
+    get_inex_number,
+    INEX_CYCLE_DAYS,
 )
 from .utils import (
     degnorm,
@@ -539,6 +542,9 @@ __all__ = [
     # Saros series calculation
     "get_saros_number",
     "SAROS_CYCLE_DAYS",
+    # Inex series calculation
+    "get_inex_number",
+    "INEX_CYCLE_DAYS",
     # Rise/Set/Transit
     "rise_trans",
     "swe_rise_trans",
