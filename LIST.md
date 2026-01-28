@@ -308,17 +308,17 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT ECLIPSE MAGNITUDE AT LOCATION: Calculate the eclipse magnitude (fraction of solar diameter covered) at any specified geographic location.
 
-- [ ] IMPLEMENT ECLIPSE OBSCURATION AT LOCATION: Calculate the obscuration (fraction of solar disk area covered) at any specified geographic location.
+- [x] IMPLEMENT ECLIPSE OBSCURATION AT LOCATION: Calculate the obscuration (fraction of solar disk area covered) at any specified geographic location.
 
 ---
 
 ## MEDIUM PRIORITY: Eclipses - Lunar and Occultations
 
-- [ ] IMPLEMENT LUNAR ECLIPSE UMBRAL MAGNITUDE: Calculate the umbral magnitude (fraction of Moon's diameter within the umbral shadow) for lunar eclipses.
+- [x] IMPLEMENT LUNAR ECLIPSE UMBRAL MAGNITUDE: Calculate the umbral magnitude (fraction of Moon's diameter within the umbral shadow) for lunar eclipses.
 
-- [ ] IMPLEMENT LUNAR ECLIPSE PENUMBRAL MAGNITUDE: Calculate the penumbral magnitude for lunar eclipses.
+- [x] IMPLEMENT LUNAR ECLIPSE PENUMBRAL MAGNITUDE: Calculate the penumbral magnitude for lunar eclipses.
 
-- [ ] IMPLEMENT LUNAR ECLIPSE GAMMA: Calculate the gamma parameter for lunar eclipses (distance of Moon center from shadow axis in Earth radii).
+- [x] IMPLEMENT LUNAR ECLIPSE GAMMA: Calculate the gamma parameter for lunar eclipses (distance of Moon center from shadow axis in Earth radii).
 
 - [ ] IMPLEMENT LUN_OCCULT_WHEN_LOC: Implement swe_lun_occult_when_loc(jd_start, planet, starname, flags, geopos, direction) that finds when an occultation of a planet or star by the Moon is visible from a given location, the calculation requires finding when the Moon's disk overlaps the target as seen from the observer accounting for parallax.
 

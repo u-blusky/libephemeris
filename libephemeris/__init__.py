@@ -112,6 +112,9 @@ from .eclipse import (
     # Lunar eclipse penumbral magnitude
     lun_eclipse_penumbral_magnitude,
     swe_lun_eclipse_penumbral_magnitude,
+    # Lunar eclipse gamma parameter
+    lun_eclipse_gamma,
+    swe_lun_eclipse_gamma,
     lun_occult_when_glob,
     swe_lun_occult_when_glob,
     lun_occult_when_loc,

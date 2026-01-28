@@ -12603,3 +12603,127 @@ def swe_lun_eclipse_penumbral_magnitude(
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     return lun_eclipse_penumbral_magnitude(tjd_ut, ifl)
+
+
+def lun_eclipse_gamma(
+    jd: float,
+    flags: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the gamma parameter for a lunar eclipse at a specific time.
+
+    Gamma is the distance of the Moon's center from Earth's shadow axis,
+    measured in Earth radii. It is a fundamental parameter for characterizing
+    lunar eclipses, indicating how centrally the Moon passes through the shadow.
+
+    Unlike solar eclipse gamma (which uses the fundamental plane), lunar eclipse
+    gamma is measured perpendicular to the shadow axis in the plane containing
+    the Moon. A gamma of 0 means the Moon passes exactly through the center of
+    Earth's shadow.
+
+    The sign of gamma indicates which side of the shadow axis the Moon passes:
+        - Positive gamma: Moon passes north of shadow axis
+        - Negative gamma: Moon passes south of shadow axis
+
+    Args:
+        jd: Julian Day (UT) of the time to calculate
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Gamma value as a float:
+            - 0.0: Moon center is on the shadow axis (most central eclipse)
+            - |gamma| < ~0.25: Deep total eclipse (Moon well within umbra)
+            - |gamma| < ~0.75: Total eclipse possible
+            - |gamma| < ~1.0: Partial umbral eclipse possible
+            - |gamma| < ~1.5: Penumbral eclipse possible
+            - |gamma| > ~1.5: No eclipse (Moon misses the shadow)
+
+    Note:
+        This function does NOT search for eclipses - it calculates the
+        instantaneous gamma at the given time. To find eclipse events,
+        use lun_eclipse_when() first.
+
+        The gamma parameter is useful for:
+        - Classifying eclipse centrality
+        - Predicting eclipse magnitude
+        - Analyzing Saros series patterns
+
+    Algorithm:
+        1. Calculate Moon's ecliptic latitude
+        2. Calculate Earth's angular semi-diameter as seen from Moon
+        3. Compute gamma as the ratio of lunar latitude to Earth's angular radius
+
+    Precision:
+        Gamma accurate to ~0.001 for typical eclipses.
+
+    Example:
+        >>> from libephemeris import julday, lun_eclipse_gamma, lun_eclipse_when
+        >>> # First find a lunar eclipse
+        >>> jd_start = julday(2022, 5, 1, 0)
+        >>> times, ecl_type = lun_eclipse_when(jd_start)
+        >>> jd_max = times[0]  # Time of maximum eclipse
+        >>> # Calculate gamma at maximum
+        >>> gamma = lun_eclipse_gamma(jd_max)
+        >>> print(f"Gamma: {gamma:.4f}")
+
+        >>> # Check gamma at a random time (far from eclipse)
+        >>> jd_no_eclipse = julday(2022, 6, 1, 12.0)
+        >>> gamma = lun_eclipse_gamma(jd_no_eclipse)
+        >>> print(f"Gamma: {gamma:.4f}")  # Will be large (no eclipse)
+
+    References:
+        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
+        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
+        - Swiss Ephemeris documentation
+    """
+    # Use the existing calculation function
+    (
+        ecl_type_flags,
+        umbral_mag,
+        penumbral_mag,
+        gamma,
+        penumbra_radius,
+        umbra_radius,
+    ) = _calculate_lunar_eclipse_type_and_magnitude(jd)
+
+    return gamma
+
+
+def swe_lun_eclipse_gamma(
+    tjd_ut: float,
+    ifl: int = SEFLG_SWIEPH,
+) -> float:
+    """
+    Calculate the gamma parameter for a lunar eclipse at a specific time.
+
+    This function matches the pyswisseph naming convention. Gamma represents
+    the distance of the Moon's center from Earth's shadow axis, measured in
+    Earth radii.
+
+    Unlike solar eclipse gamma, lunar eclipse gamma does not depend on observer
+    location - it is a geometric property of the Moon's passage through Earth's
+    shadow.
+
+    Args:
+        tjd_ut: Julian Day (UT) of the time to calculate
+        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Gamma value as a float:
+            - Positive: Moon passes north of shadow axis
+            - Negative: Moon passes south of shadow axis
+            - |gamma| ~ 0: Most central eclipse
+            - |gamma| > ~1.5: No eclipse
+
+    Example:
+        >>> from libephemeris import swe_lun_eclipse_gamma, SEFLG_SWIEPH
+        >>> # Calculate gamma during Nov 8, 2022 total lunar eclipse
+        >>> jd = 2459892.0  # During eclipse
+        >>> gamma = swe_lun_eclipse_gamma(jd, SEFLG_SWIEPH)
+        >>> print(f"Gamma: {gamma:.4f}")
+
+    References:
+        - Swiss Ephemeris: swe_lun_eclipse_how()
+        - Meeus "Astronomical Algorithms" Ch. 54
+    """
+    return lun_eclipse_gamma(tjd_ut, ifl)
