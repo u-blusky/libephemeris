@@ -150,6 +150,9 @@ from .eclipse import (
     # Eclipse northern limit coordinates
     calc_eclipse_northern_limit,
     swe_calc_eclipse_northern_limit,
+    # Eclipse southern limit coordinates
+    calc_eclipse_southern_limit,
+    swe_calc_eclipse_southern_limit,
     # Saros series calculation
     get_saros_number,
     SAROS_CYCLE_DAYS,
