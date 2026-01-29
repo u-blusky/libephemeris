@@ -450,11 +450,11 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPROVE TRUE MULA AYANAMSHA PRECISION: Improve True Mula ayanamsha precision.
 
-- [ ] IMPROVE GALACTIC CENTER AYANAMSHAS: Improve Galactic Center based ayanamshas (0 Sag, Rgilbrand, Cochrane, Mula Wilhelm) using current best coordinates for Sgr A* (the radio source at the Galactic Center).
+- [x] IMPROVE GALACTIC CENTER AYANAMSHAS: Improve Galactic Center based ayanamshas (0 Sag, Rgilbrand, Cochrane, Mula Wilhelm) using current best coordinates for Sgr A* (the radio source at the Galactic Center).
 
-- [ ] IMPLEMENT CUSTOM AYANAMSHA: Implement swe_set_sid_mode with SE_SIDM_USER option allowing users to define custom ayanamsha with their own initial value and precession rate - this is a documented SE feature.
+- [x] IMPLEMENT CUSTOM AYANAMSHA: Implement swe_set_sid_mode with SE_SIDM_USER option allowing users to define custom ayanamsha with their own initial value and precession rate - this is a documented SE feature.
 
-- [ ] DOCUMENT AYANAMSHA DEFINITIONS: Create documentation explaining the astronomical and historical basis for each ayanamsha mode, what reference point it uses, and when it was zero.
+- [x] DOCUMENT AYANAMSHA DEFINITIONS: Create documentation explaining the astronomical and historical basis for each ayanamsha mode, what reference point it uses, and when it was zero.
 
 - [ ] VALIDATE LAHIRI AGAINST IAE: Validate the Lahiri ayanamsha against the Indian Astronomical Ephemeris official values as described in Swiss Ephemeris Appendix E.
 
