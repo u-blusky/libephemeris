@@ -1120,73 +1120,84 @@ def swe_houses_armc_ex2(
     swe_houses_ex2(). It calculates house cusps directly from the ARMC value and
     also returns the velocities (derivatives) of house cusps and angles.
 
+    Velocities are only calculated when the SEFLG_SPEED flag is set in the flags
+    parameter. When SEFLG_SPEED is not set, zero velocities are returned for
+    efficiency. This is useful for progressed chart applications where the rate
+    of change of house cusps is needed.
+
     Velocities are calculated using centered finite differences at ±1 minute
     intervals, with ARMC shifted by ±0.25° (corresponding to 1 minute of sidereal time).
 
-    Note: The flags parameter is accepted for API compatibility but currently
-    has no effect since sidereal mode requires a Julian Day for ayanamsa calculation,
-    which is not available when using ARMC directly.
+    Note: The sidereal flag (SEFLG_SIDEREAL) has no effect since sidereal mode
+    requires a Julian Day for ayanamsa calculation, which is not available when
+    using ARMC directly.
 
     Args:
         armc: Right Ascension of Medium Coeli in degrees (0-360)
         lat: Geographic latitude in degrees (positive North, negative South)
         eps: True obliquity of the ecliptic in degrees
         hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
-        flags: Calculation flags bitmask (reserved for future use)
+        flags: Calculation flags bitmask. Use SEFLG_SPEED to compute velocities.
 
     Returns:
         Tuple containing:
             - cusps: Tuple of 12 house cusp longitudes in degrees
             - ascmc: Tuple of 8 angles (Asc, MC, ARMC, Vertex, EquAsc, CoAsc, CoAscKoch, PolarAsc)
-            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day
-            - ascmc_speed: Tuple of 8 angle velocities in degrees/day
+            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day (0.0 if SEFLG_SPEED not set)
+            - ascmc_speed: Tuple of 8 angle velocities in degrees/day (0.0 if SEFLG_SPEED not set)
 
     Example:
         >>> eps = 23.4393  # true obliquity
         >>> armc = 292.957  # ARMC in degrees
         >>> cusps, ascmc, cusps_speed, ascmc_speed = swe_houses_armc_ex2(
-        ...     armc, 41.9, eps, ord('P'), 0
+        ...     armc, 41.9, eps, ord('P'), SEFLG_SPEED
         ... )
         >>> # cusps_speed[0] is the velocity of the 1st house cusp (same as ASC)
     """
-    # ARMC shift for 1 minute of time: 360° / (24 * 60 min) = 0.25° per minute
-    # This corresponds to dt = 1/1440 days used in swe_houses_ex2
-    d_armc = 360.0 / (24.0 * 60.0)  # 0.25° = 1 minute in ARMC
-    dt = 1.0 / 1440.0  # 1 minute in days (for velocity calculation)
-
     # Calculate positions at current ARMC
     cusps, ascmc = swe_houses_armc(armc, lat, eps, hsys)
 
-    # Calculate positions at ARMC - d_armc (1 minute earlier)
-    cusps_before, ascmc_before = swe_houses_armc(armc - d_armc, lat, eps, hsys)
+    # Only calculate velocities if SEFLG_SPEED flag is set
+    if flags & SEFLG_SPEED:
+        # ARMC shift for 1 minute of time: 360° / (24 * 60 min) = 0.25° per minute
+        # This corresponds to dt = 1/1440 days used in swe_houses_ex2
+        d_armc = 360.0 / (24.0 * 60.0)  # 0.25° = 1 minute in ARMC
+        dt = 1.0 / 1440.0  # 1 minute in days (for velocity calculation)
 
-    # Calculate positions at ARMC + d_armc (1 minute later)
-    cusps_after, ascmc_after = swe_houses_armc(armc + d_armc, lat, eps, hsys)
+        # Calculate positions at ARMC - d_armc (1 minute earlier)
+        cusps_before, ascmc_before = swe_houses_armc(armc - d_armc, lat, eps, hsys)
 
-    # Calculate velocities using centered finite differences
-    # velocity = (pos_after - pos_before) / (2 * dt)
-    # Result is in degrees/day
+        # Calculate positions at ARMC + d_armc (1 minute later)
+        cusps_after, ascmc_after = swe_houses_armc(armc + d_armc, lat, eps, hsys)
 
-    def angular_diff_local(pos2: float, pos1: float) -> float:
-        """Calculate angular difference handling 360° wraparound."""
-        diff = pos2 - pos1
-        if diff > 180:
-            diff -= 360
-        elif diff < -180:
-            diff += 360
-        return diff
+        # Calculate velocities using centered finite differences
+        # velocity = (pos_after - pos_before) / (2 * dt)
+        # Result is in degrees/day
 
-    # Calculate cusp velocities
-    cusps_speed = tuple(
-        angular_diff_local(cusps_after[i], cusps_before[i]) / (2 * dt)
-        for i in range(len(cusps))
-    )
+        def angular_diff_local(pos2: float, pos1: float) -> float:
+            """Calculate angular difference handling 360° wraparound."""
+            diff = pos2 - pos1
+            if diff > 180:
+                diff -= 360
+            elif diff < -180:
+                diff += 360
+            return diff
 
-    # Calculate ascmc velocities
-    ascmc_speed = tuple(
-        angular_diff_local(ascmc_after[i], ascmc_before[i]) / (2 * dt)
-        for i in range(len(ascmc))
-    )
+        # Calculate cusp velocities
+        cusps_speed = tuple(
+            angular_diff_local(cusps_after[i], cusps_before[i]) / (2 * dt)
+            for i in range(len(cusps))
+        )
+
+        # Calculate ascmc velocities
+        ascmc_speed = tuple(
+            angular_diff_local(ascmc_after[i], ascmc_before[i]) / (2 * dt)
+            for i in range(len(ascmc))
+        )
+    else:
+        # Return zero velocities when SEFLG_SPEED is not set
+        cusps_speed = tuple(0.0 for _ in range(len(cusps)))
+        ascmc_speed = tuple(0.0 for _ in range(len(ascmc)))
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 
@@ -1238,67 +1249,79 @@ def swe_houses_ex2(
     Extended house calculation returning cusps, angles, and their velocities.
 
     This function is an extended version of swe_houses_ex() that also returns
-    the velocities (derivatives) of house cusps and angles. Velocities are
-    calculated using centered finite differences at ±1 minute intervals.
+    the velocities (derivatives) of house cusps and angles.
 
-    This is useful for calculating when a cusp changes zodiac sign.
+    Velocities are only calculated when the SEFLG_SPEED flag is set in the flags
+    parameter. When SEFLG_SPEED is not set, zero velocities are returned for
+    efficiency. This is useful for progressed chart applications where the rate
+    of change of house cusps is needed.
+
+    Velocities are calculated using centered finite differences at ±1 minute
+    intervals.
 
     Args:
         tjdut: Julian Day in Universal Time (UT1)
         lat: Geographic latitude in degrees
         lon: Geographic longitude in degrees
         hsys: House system identifier (int or bytes)
-        flags: Calculation flags bitmask (e.g., SEFLG_SIDEREAL)
+        flags: Calculation flags bitmask. Use SEFLG_SPEED to compute velocities.
+               SEFLG_SIDEREAL can also be used for sidereal calculations.
 
     Returns:
         Tuple containing:
             - cusps: Tuple of 12 house cusp longitudes in degrees
             - ascmc: Tuple of 8 angles (Asc, MC, etc.)
-            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day
-            - ascmc_speed: Tuple of 8 angle velocities in degrees/day
+            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day (0.0 if SEFLG_SPEED not set)
+            - ascmc_speed: Tuple of 8 angle velocities in degrees/day (0.0 if SEFLG_SPEED not set)
 
     Example:
         >>> cusps, ascmc, cusps_speed, ascmc_speed = swe_houses_ex2(
-        ...     2451545.0, 41.9, 12.5, ord('P'), 0
+        ...     2451545.0, 41.9, 12.5, ord('P'), SEFLG_SPEED
         ... )
         >>> # cusps_speed[0] is the velocity of the 1st house cusp (ASC)
     """
-    # Time step for finite differences: 1 minute = 1/1440 days
-    dt = 1.0 / 1440.0
-
     # Calculate positions at current time
     cusps, ascmc = swe_houses_ex(tjdut, lat, lon, hsys, flags)
 
-    # Calculate positions at t - dt
-    cusps_before, ascmc_before = swe_houses_ex(tjdut - dt, lat, lon, hsys, flags)
+    # Only calculate velocities if SEFLG_SPEED flag is set
+    if flags & SEFLG_SPEED:
+        # Time step for finite differences: 1 minute = 1/1440 days
+        dt = 1.0 / 1440.0
 
-    # Calculate positions at t + dt
-    cusps_after, ascmc_after = swe_houses_ex(tjdut + dt, lat, lon, hsys, flags)
+        # Calculate positions at t - dt
+        cusps_before, ascmc_before = swe_houses_ex(tjdut - dt, lat, lon, hsys, flags)
 
-    # Calculate velocities using centered finite differences
-    # velocity = (pos_after - pos_before) / (2 * dt)
-    # Convert to degrees/day: dt is in days, so result is already in deg/day
+        # Calculate positions at t + dt
+        cusps_after, ascmc_after = swe_houses_ex(tjdut + dt, lat, lon, hsys, flags)
 
-    def angular_diff(pos2: float, pos1: float) -> float:
-        """Calculate angular difference handling 360° wraparound."""
-        diff = pos2 - pos1
-        if diff > 180:
-            diff -= 360
-        elif diff < -180:
-            diff += 360
-        return diff
+        # Calculate velocities using centered finite differences
+        # velocity = (pos_after - pos_before) / (2 * dt)
+        # Convert to degrees/day: dt is in days, so result is already in deg/day
 
-    # Calculate cusp velocities
-    cusps_speed = tuple(
-        angular_diff(cusps_after[i], cusps_before[i]) / (2 * dt)
-        for i in range(len(cusps))
-    )
+        def angular_diff(pos2: float, pos1: float) -> float:
+            """Calculate angular difference handling 360° wraparound."""
+            diff = pos2 - pos1
+            if diff > 180:
+                diff -= 360
+            elif diff < -180:
+                diff += 360
+            return diff
 
-    # Calculate ascmc velocities
-    ascmc_speed = tuple(
-        angular_diff(ascmc_after[i], ascmc_before[i]) / (2 * dt)
-        for i in range(len(ascmc))
-    )
+        # Calculate cusp velocities
+        cusps_speed = tuple(
+            angular_diff(cusps_after[i], cusps_before[i]) / (2 * dt)
+            for i in range(len(cusps))
+        )
+
+        # Calculate ascmc velocities
+        ascmc_speed = tuple(
+            angular_diff(ascmc_after[i], ascmc_before[i]) / (2 * dt)
+            for i in range(len(ascmc))
+        )
+    else:
+        # Return zero velocities when SEFLG_SPEED is not set
+        cusps_speed = tuple(0.0 for _ in range(len(cusps)))
+        ascmc_speed = tuple(0.0 for _ in range(len(ascmc)))
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 

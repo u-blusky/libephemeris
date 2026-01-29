@@ -162,13 +162,13 @@ class TestCoAscendantHousesArmcEx2:
 
     @pytest.mark.comparison
     def test_houses_armc_ex2_coascendant(self):
-        """swe_houses_armc_ex2 should return correct Co-Ascendants and velocities."""
+        """swe_houses_armc_ex2 should return correct Co-Ascendants and velocities when SEFLG_SPEED is set."""
         armc = 292.957072438026
         lat = 41.9
         eps = 23.43767671605485
 
         cusps_lib, ascmc_lib, cusps_speed_lib, ascmc_speed_lib = (
-            ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"))
+            ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"), SEFLG_SPEED)
         )
         cusps_swe, ascmc_swe, cusps_speed_swe, ascmc_speed_swe = swe.houses_armc_ex2(
             armc, lat, eps, b"P"
@@ -197,15 +197,15 @@ class TestCoAscendantHousesEx2:
 
     @pytest.mark.comparison
     def test_houses_ex2_coascendant(self):
-        """swe_houses_ex2 should return correct Co-Ascendants and velocities."""
+        """swe_houses_ex2 should return correct Co-Ascendant positions."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
         cusps_lib, ascmc_lib, cusps_speed_lib, ascmc_speed_lib = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), 0
+            jd, lat, lon, ord("P"), SEFLG_SPEED
         )
         cusps_swe, ascmc_swe, cusps_speed_swe, ascmc_speed_swe = swe.houses_ex2(
-            jd, lat, lon, b"P", 0
+            jd, lat, lon, b"P", SEFLG_SPEED
         )
 
         # Compare Co-Ascendant positions

@@ -629,10 +629,10 @@ class TestHousesEx2:
 
     @pytest.mark.unit
     def test_houses_ex2_velocities_are_reasonable(self):
-        """Cusp velocities should be in a reasonable range."""
+        """Cusp velocities should be in a reasonable range when SEFLG_SPEED is set."""
         jd = 2451545.0
         cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, 41.9, 12.5, ord("P"), 0
+            jd, 41.9, 12.5, ord("P"), SEFLG_SPEED
         )
 
         # House cusps move roughly at the speed of Earth's rotation
@@ -662,10 +662,10 @@ class TestHousesEx2:
         hsys = ord("P")
 
         cusps_lib, ascmc_lib, cusps_speed_lib, ascmc_speed_lib = ephem.swe_houses_ex2(
-            jd, lat, lon, hsys, 0
+            jd, lat, lon, hsys, SEFLG_SPEED
         )
         cusps_swe, ascmc_swe, cusps_speed_swe, ascmc_speed_swe = swe.houses_ex2(
-            jd, lat, lon, bytes([hsys]), 0
+            jd, lat, lon, bytes([hsys]), SEFLG_SPEED
         )
 
         # Compare cusp positions (tolerance 0.1 degrees)
@@ -706,10 +706,10 @@ class TestHousesEx2:
         lat, lon = 41.9, 12.5
 
         cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, lat, lon, hsys, 0
+            jd, lat, lon, hsys, SEFLG_SPEED
         )
         cusps_swe, ascmc_swe, cusps_speed_swe, ascmc_speed_swe = swe.houses_ex2(
-            jd, lat, lon, bytes([hsys]), 0
+            jd, lat, lon, bytes([hsys]), SEFLG_SPEED
         )
 
         # Compare cusp velocities
@@ -719,7 +719,7 @@ class TestHousesEx2:
 
     @pytest.mark.unit
     def test_houses_ex2_with_sidereal(self):
-        """houses_ex2 should work with SEFLG_SIDEREAL."""
+        """houses_ex2 should work with SEFLG_SIDEREAL and SEFLG_SPEED."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
@@ -727,11 +727,11 @@ class TestHousesEx2:
         ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
 
         cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SIDEREAL
+            jd, lat, lon, ord("P"), SEFLG_SIDEREAL | SEFLG_SPEED
         )
 
         # Cusps should be shifted from tropical by about 23-24 degrees
-        cusps_trop, _, _, _ = ephem.swe_houses_ex2(jd, lat, lon, ord("P"), 0)
+        cusps_trop, _, _, _ = ephem.swe_houses_ex2(jd, lat, lon, ord("P"), SEFLG_SPEED)
 
         # Check that sidereal cusps differ from tropical
         ayanamsa = ephem.swe_get_ayanamsa_ut(jd)

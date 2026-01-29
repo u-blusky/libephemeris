@@ -321,13 +321,13 @@ class TestHousesArmcEx2Basic:
 
     @pytest.mark.unit
     def test_houses_armc_ex2_velocities_are_reasonable(self):
-        """Velocities should be in reasonable range for house cusps."""
+        """Velocities should be in reasonable range for house cusps when SEFLG_SPEED is set."""
         armc = 292.957
         lat = 41.9
         eps = 23.4393
 
         _, _, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P")
+            armc, lat, eps, ord("P"), SEFLG_SPEED
         )
 
         # House cusps and angles rotate with Earth: ~360°/day
@@ -346,13 +346,13 @@ class TestHousesArmcEx2Basic:
 
     @pytest.mark.unit
     def test_houses_armc_ex2_velocities_are_positive(self):
-        """Velocities should generally be positive (prograde motion)."""
+        """Velocities should generally be positive (prograde motion) when SEFLG_SPEED is set."""
         armc = 150.0
         lat = 45.0
         eps = 23.44
 
         _, _, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P")
+            armc, lat, eps, ord("P"), SEFLG_SPEED
         )
 
         # Most cusps should have positive velocity (increasing longitude)
@@ -510,13 +510,13 @@ class TestHousesArmcEx2VsPyswisseph:
 
     @pytest.mark.comparison
     def test_houses_armc_ex2_velocities_match_pyswisseph(self):
-        """houses_armc_ex2 velocities should be close to pyswisseph."""
+        """houses_armc_ex2 velocities should be close to pyswisseph when SEFLG_SPEED is set."""
         armc = 150.0
         lat = 45.0
         eps = 23.44
 
         _, _, cusps_speed_lib, ascmc_speed_lib = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P")
+            armc, lat, eps, ord("P"), SEFLG_SPEED
         )
         _, _, cusps_speed_swe, ascmc_speed_swe = swe.houses_armc_ex2(
             armc, lat, eps, b"P"
