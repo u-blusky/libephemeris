@@ -410,11 +410,11 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT ILLUMINATED FRACTION CALCULATION: Implement phase (illuminated fraction of disk visible from Earth) calculation for all planets as part of swe_pheno_ut output.
 
-- [ ] IMPLEMENT PLANET MAGNITUDE FORMULAS: Implement apparent magnitude calculation for Mercury, Venus, Mars, Jupiter, Saturn using formulas from Meeus Chapter 41 - required for swe_pheno_ut compatibility.
+- [x] IMPLEMENT PLANET MAGNITUDE FORMULAS: Implement apparent magnitude calculation for Mercury, Venus, Mars, Jupiter, Saturn using formulas from Meeus Chapter 41 - required for swe_pheno_ut compatibility.
 
-- [ ] IMPLEMENT PLANET APPARENT DIAMETER CALCULATION: Calculate apparent angular diameter in arcseconds for each planet based on physical radius and geocentric distance - part of swe_pheno_ut output.
+- [x] IMPLEMENT PLANET APPARENT DIAMETER CALCULATION: Calculate apparent angular diameter in arcseconds for each planet based on physical radius and geocentric distance - part of swe_pheno_ut output.
 
-- [ ] IMPLEMENT ELONGATION CALCULATION: Ensure elongation from Sun is calculated correctly as part of swe_pheno_ut, properly distinguish between morning star (western elongation) and evening star (eastern elongation).
+- [x] IMPLEMENT ELONGATION CALCULATION: Ensure elongation from Sun is calculated correctly as part of swe_pheno_ut, properly distinguish between morning star (western elongation) and evening star (eastern elongation).
 
 ---
 

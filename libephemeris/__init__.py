@@ -35,6 +35,12 @@ from .planets import (
     swe_pheno,
     swe_pheno_ut,
     get_planet_name,
+    # Elongation helper functions
+    get_elongation_from_sun,
+    get_signed_elongation,
+    is_morning_star,
+    is_evening_star,
+    get_elongation_type,
 )
 from .houses import (
     swe_houses,
@@ -490,6 +496,12 @@ __all__ = [
     "pheno",
     "swe_pheno_ut",
     "pheno_ut",
+    # Elongation helper functions
+    "get_elongation_from_sun",
+    "get_signed_elongation",
+    "is_morning_star",
+    "is_evening_star",
+    "get_elongation_type",
     # Houses
     "swe_houses",
     "houses",

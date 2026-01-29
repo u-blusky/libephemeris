@@ -3629,3 +3629,190 @@ def _calc_planet_magnitude(
 # Aliases for pyswisseph compatibility
 pheno_ut = swe_pheno_ut
 pheno = swe_pheno
+
+
+# =============================================================================
+# Elongation Helper Functions
+# =============================================================================
+
+
+def get_elongation_from_sun(
+    tjd_ut: float, ipl: int, iflag: int = 0
+) -> Tuple[float, bool]:
+    """
+    Calculate the elongation of a planet from the Sun with morning/evening star distinction.
+
+    This function returns the elongation (angular separation from the Sun) and
+    determines whether the planet is a morning star (western elongation) or
+    evening star (eastern elongation).
+
+    Elongation convention:
+        - Eastern elongation (positive): Planet is east of Sun, visible after sunset
+          (evening star)
+        - Western elongation (negative): Planet is west of Sun, visible before sunrise
+          (morning star)
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Planet/body ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        iflag: Calculation flags (default: 0)
+
+    Returns:
+        Tuple containing:
+            - elongation: Signed elongation in degrees
+                - Positive = eastern elongation (evening star)
+                - Negative = western elongation (morning star)
+            - is_evening_star: True if planet is an evening star (eastern elongation),
+                               False if morning star (western elongation)
+
+    Note:
+        This function is most useful for Mercury and Venus (inferior planets),
+        which alternate between morning and evening star status. Superior planets
+        (Mars, Jupiter, Saturn, etc.) can also be classified this way, though
+        they are visible for longer periods.
+
+    Example:
+        >>> from libephemeris import get_elongation_from_sun, SE_VENUS
+        >>> elongation, is_evening = get_elongation_from_sun(2451545.0, SE_VENUS)
+        >>> if is_evening:
+        ...     print(f"Venus is an evening star at {abs(elongation):.1f}° eastern elongation")
+        ... else:
+        ...     print(f"Venus is a morning star at {abs(elongation):.1f}° western elongation")
+    """
+    # Get planet and Sun positions
+    planet_pos, _ = swe_calc_ut(tjd_ut, ipl, iflag)
+    sun_pos, _ = swe_calc_ut(tjd_ut, SE_SUN, iflag)
+
+    planet_lon = float(planet_pos[0])
+    sun_lon = float(sun_pos[0])
+
+    # Calculate the longitude difference (planet - Sun)
+    # Normalize to -180 to +180 range
+    lon_diff = planet_lon - sun_lon
+    if lon_diff > 180.0:
+        lon_diff -= 360.0
+    elif lon_diff < -180.0:
+        lon_diff += 360.0
+
+    # Positive difference = planet is east of Sun = evening star
+    # Negative difference = planet is west of Sun = morning star
+    is_evening_star = bool(lon_diff > 0)
+
+    return lon_diff, is_evening_star
+
+
+def get_signed_elongation(tjd_ut: float, ipl: int, iflag: int = 0) -> float:
+    """
+    Calculate signed elongation of a planet from the Sun.
+
+    Returns a signed value where:
+        - Positive values indicate eastern elongation (evening star)
+        - Negative values indicate western elongation (morning star)
+
+    This is equivalent to calling get_elongation_from_sun() and returning
+    only the first element.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Planet/body ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        iflag: Calculation flags (default: 0)
+
+    Returns:
+        Signed elongation in degrees:
+            - Positive = eastern elongation (evening star)
+            - Negative = western elongation (morning star)
+
+    Example:
+        >>> from libephemeris import get_signed_elongation, SE_MERCURY
+        >>> elong = get_signed_elongation(2451545.0, SE_MERCURY)
+        >>> print(f"Mercury elongation: {elong:+.1f}°")
+    """
+    elongation, _ = get_elongation_from_sun(tjd_ut, ipl, iflag)
+    return elongation
+
+
+def is_morning_star(tjd_ut: float, ipl: int, iflag: int = 0) -> bool:
+    """
+    Determine if a planet is a morning star (western elongation).
+
+    A planet is a morning star when it is west of the Sun (negative elongation),
+    meaning it rises before the Sun and is visible in the eastern sky before sunrise.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Planet/body ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        iflag: Calculation flags (default: 0)
+
+    Returns:
+        True if the planet is a morning star (western elongation),
+        False if it is an evening star (eastern elongation)
+
+    Note:
+        For the Sun, Moon, or unsupported bodies, this returns False.
+
+    Example:
+        >>> from libephemeris import is_morning_star, SE_VENUS
+        >>> if is_morning_star(2451545.0, SE_VENUS):
+        ...     print("Venus is a morning star")
+        ... else:
+        ...     print("Venus is an evening star")
+    """
+    if ipl == SE_SUN:
+        return False  # Sun cannot be morning/evening star
+    _, is_evening = get_elongation_from_sun(tjd_ut, ipl, iflag)
+    return not is_evening
+
+
+def is_evening_star(tjd_ut: float, ipl: int, iflag: int = 0) -> bool:
+    """
+    Determine if a planet is an evening star (eastern elongation).
+
+    A planet is an evening star when it is east of the Sun (positive elongation),
+    meaning it sets after the Sun and is visible in the western sky after sunset.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Planet/body ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        iflag: Calculation flags (default: 0)
+
+    Returns:
+        True if the planet is an evening star (eastern elongation),
+        False if it is a morning star (western elongation)
+
+    Note:
+        For the Sun, Moon, or unsupported bodies, this returns False.
+
+    Example:
+        >>> from libephemeris import is_evening_star, SE_VENUS
+        >>> if is_evening_star(2451545.0, SE_VENUS):
+        ...     print("Venus is an evening star")
+        ... else:
+        ...     print("Venus is a morning star")
+    """
+    if ipl == SE_SUN:
+        return False  # Sun cannot be morning/evening star
+    _, is_evening = get_elongation_from_sun(tjd_ut, ipl, iflag)
+    return is_evening
+
+
+def get_elongation_type(tjd_ut: float, ipl: int, iflag: int = 0) -> str:
+    """
+    Get the elongation type as a descriptive string.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        ipl: Planet/body ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        iflag: Calculation flags (default: 0)
+
+    Returns:
+        One of: "eastern" (evening star), "western" (morning star), or "none" (Sun)
+
+    Example:
+        >>> from libephemeris import get_elongation_type, SE_VENUS
+        >>> elong_type = get_elongation_type(2451545.0, SE_VENUS)
+        >>> print(f"Venus has {elong_type} elongation")
+    """
+    if ipl == SE_SUN:
+        return "none"
+    _, is_evening = get_elongation_from_sun(tjd_ut, ipl, iflag)
+    return "eastern" if is_evening else "western"

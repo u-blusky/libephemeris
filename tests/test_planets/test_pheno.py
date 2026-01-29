@@ -1721,3 +1721,308 @@ class TestApparentDiameterAllPlanets:
                         f"Planet {planet_id} at JD {jd}: "
                         f"diameter SE={swe_diam:.2f}as, LIB={lib_diam:.2f}as"
                     )
+
+
+class TestElongationHelpers:
+    """
+    Tests for elongation helper functions that distinguish between
+    morning star (western elongation) and evening star (eastern elongation).
+
+    These functions extend the basic swe_pheno_ut elongation calculation
+    by providing signed elongation values and morning/evening star classification.
+
+    Convention:
+        - Eastern elongation (positive): Planet is east of Sun = evening star
+          (visible after sunset in the western sky)
+        - Western elongation (negative): Planet is west of Sun = morning star
+          (visible before sunrise in the eastern sky)
+    """
+
+    @pytest.mark.unit
+    def test_get_elongation_from_sun_returns_tuple(self):
+        """get_elongation_from_sun should return (elongation, is_evening_star)."""
+        jd = 2451545.0
+        result = ephem.get_elongation_from_sun(jd, SE_VENUS)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        elongation, is_evening = result
+        assert isinstance(elongation, float)
+        assert isinstance(is_evening, bool)
+
+    @pytest.mark.unit
+    def test_get_signed_elongation_returns_float(self):
+        """get_signed_elongation should return a float."""
+        jd = 2451545.0
+        result = ephem.get_signed_elongation(jd, SE_VENUS)
+        assert isinstance(result, float)
+
+    @pytest.mark.unit
+    def test_is_morning_star_returns_bool(self):
+        """is_morning_star should return a boolean."""
+        jd = 2451545.0
+        result = ephem.is_morning_star(jd, SE_VENUS)
+        assert isinstance(result, bool)
+
+    @pytest.mark.unit
+    def test_is_evening_star_returns_bool(self):
+        """is_evening_star should return a boolean."""
+        jd = 2451545.0
+        result = ephem.is_evening_star(jd, SE_VENUS)
+        assert isinstance(result, bool)
+
+    @pytest.mark.unit
+    def test_get_elongation_type_returns_string(self):
+        """get_elongation_type should return 'eastern', 'western', or 'none'."""
+        jd = 2451545.0
+        result = ephem.get_elongation_type(jd, SE_VENUS)
+        assert result in ("eastern", "western", "none")
+
+    @pytest.mark.unit
+    def test_morning_evening_mutually_exclusive(self):
+        """A planet cannot be both morning star and evening star at same time."""
+        jd = 2451545.0
+        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER]:
+            is_morning = ephem.is_morning_star(jd, planet_id)
+            is_evening = ephem.is_evening_star(jd, planet_id)
+            assert is_morning != is_evening, (
+                f"Planet {planet_id} cannot be both morning and evening star"
+            )
+
+    @pytest.mark.unit
+    def test_signed_elongation_range(self):
+        """Signed elongation should be between -180 and +180 degrees."""
+        jd = 2451545.0
+        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]:
+            elong = ephem.get_signed_elongation(jd, planet_id)
+            assert -180.0 <= elong <= 180.0, (
+                f"Planet {planet_id} signed elongation {elong} out of range"
+            )
+
+    @pytest.mark.unit
+    def test_absolute_elongation_matches_pheno(self):
+        """Absolute value of signed elongation should match swe_pheno_ut result."""
+        jd = 2451545.0
+        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]:
+            signed_elong = ephem.get_signed_elongation(jd, planet_id)
+            pheno_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+            pheno_elong = pheno_attr[2]
+
+            # Allow small tolerance due to different calculation methods
+            # (pheno uses spherical trig, signed uses ecliptic longitude)
+            diff = abs(abs(signed_elong) - pheno_elong)
+            assert diff < 1.0, (
+                f"Planet {planet_id}: |signed|={abs(signed_elong):.4f}, "
+                f"pheno={pheno_elong:.4f}, diff={diff:.4f}"
+            )
+
+    @pytest.mark.unit
+    def test_sun_elongation_type_is_none(self):
+        """Sun should return 'none' for elongation type."""
+        jd = 2451545.0
+        assert ephem.get_elongation_type(jd, SE_SUN) == "none"
+
+    @pytest.mark.unit
+    def test_sun_is_not_morning_or_evening_star(self):
+        """Sun cannot be morning or evening star."""
+        jd = 2451545.0
+        assert not ephem.is_morning_star(jd, SE_SUN)
+        assert not ephem.is_evening_star(jd, SE_SUN)
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "planet_id,planet_name",
+        [
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
+        ],
+    )
+    def test_signed_elongation_matches_swe_positions(self, planet_id, planet_name):
+        """
+        Signed elongation should match the longitude difference from Swiss Ephemeris.
+        """
+        jd = 2451545.0
+        swe.set_ephe_path(None)
+
+        # Calculate expected elongation from Swiss Ephemeris positions
+        pos_planet = swe.calc_ut(jd, planet_id, 0)[0][0]
+        pos_sun = swe.calc_ut(jd, 0, 0)[0][0]  # SE_SUN = 0
+
+        expected_diff = pos_planet - pos_sun
+        if expected_diff > 180.0:
+            expected_diff -= 360.0
+        elif expected_diff < -180.0:
+            expected_diff += 360.0
+
+        lib_elong = ephem.get_signed_elongation(jd, planet_id)
+
+        diff = abs(expected_diff - lib_elong)
+        assert diff < 0.01, (
+            f"{planet_name}: SWE={expected_diff:.4f}, LIB={lib_elong:.4f}, "
+            f"diff={diff:.4f}"
+        )
+
+    @pytest.mark.comparison
+    def test_venus_transitions_morning_evening(self):
+        """
+        Venus should transition between morning and evening star over time.
+
+        Venus has a synodic period of ~584 days, alternating between
+        evening star (eastern elongation) and morning star (western elongation).
+        """
+        # Find dates where Venus changes from evening to morning star
+        jd_start = 2460500.0  # Starting point in 2024
+
+        morning_found = False
+        evening_found = False
+
+        for i in range(0, 365, 10):  # Check over a year
+            jd = jd_start + i
+            is_morning = ephem.is_morning_star(jd, SE_VENUS)
+            if is_morning:
+                morning_found = True
+            else:
+                evening_found = True
+
+            if morning_found and evening_found:
+                break
+
+        assert morning_found, "Venus should be a morning star at some point"
+        assert evening_found, "Venus should be an evening star at some point"
+
+    @pytest.mark.comparison
+    def test_mercury_transitions_frequently(self):
+        """
+        Mercury should transition between morning and evening star multiple times per year.
+
+        Mercury has a synodic period of ~116 days, so it transitions
+        several times per year.
+        """
+        jd_start = 2460000.0
+
+        transition_count = 0
+        prev_is_evening = ephem.is_evening_star(jd_start, SE_MERCURY)
+
+        for i in range(1, 365):  # Check over a year
+            jd = jd_start + i
+            is_evening = ephem.is_evening_star(jd, SE_MERCURY)
+            if is_evening != prev_is_evening:
+                transition_count += 1
+                prev_is_evening = is_evening
+
+        # Mercury should transition at least 5-6 times per year
+        assert transition_count >= 5, (
+            f"Mercury should transition at least 5 times per year, "
+            f"found {transition_count}"
+        )
+
+    @pytest.mark.comparison
+    def test_eastern_elongation_positive(self):
+        """Eastern elongation (evening star) should have positive signed elongation."""
+        # Find a date where Venus is east of Sun
+        jd = 2460600.0  # Choose a date when Venus is evening star
+
+        # Check over a range to find an evening star configuration
+        for delta in range(0, 200, 10):
+            test_jd = jd + delta
+            if ephem.is_evening_star(test_jd, SE_VENUS):
+                elong = ephem.get_signed_elongation(test_jd, SE_VENUS)
+                assert elong > 0, (
+                    f"Evening star should have positive elongation, got {elong}"
+                )
+                elong_type = ephem.get_elongation_type(test_jd, SE_VENUS)
+                assert elong_type == "eastern", (
+                    f"Evening star should have eastern elongation, got {elong_type}"
+                )
+                return
+
+        pytest.fail("Could not find Venus as evening star in test range")
+
+    @pytest.mark.comparison
+    def test_western_elongation_negative(self):
+        """Western elongation (morning star) should have negative signed elongation."""
+        # Find a date where Venus is west of Sun
+        jd = 2460700.0  # Choose a date when Venus might be morning star
+
+        # Check over a range to find a morning star configuration
+        for delta in range(0, 200, 10):
+            test_jd = jd + delta
+            if ephem.is_morning_star(test_jd, SE_VENUS):
+                elong = ephem.get_signed_elongation(test_jd, SE_VENUS)
+                assert elong < 0, (
+                    f"Morning star should have negative elongation, got {elong}"
+                )
+                elong_type = ephem.get_elongation_type(test_jd, SE_VENUS)
+                assert elong_type == "western", (
+                    f"Morning star should have western elongation, got {elong_type}"
+                )
+                return
+
+        pytest.fail("Could not find Venus as morning star in test range")
+
+    @pytest.mark.comparison
+    def test_elongation_consistency_across_planets(self):
+        """
+        Test signed elongation consistency across all planets at multiple dates.
+        """
+        test_dates = [
+            2451545.0,  # J2000
+            2455000.0,  # 2009
+            2459000.0,  # 2020
+            2460000.0,  # 2023
+        ]
+
+        planets = [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]
+        swe.set_ephe_path(None)
+
+        for jd in test_dates:
+            for planet_id in planets:
+                # Get libephemeris signed elongation
+                lib_elong = ephem.get_signed_elongation(jd, planet_id)
+                is_evening = ephem.is_evening_star(jd, planet_id)
+                is_morning = ephem.is_morning_star(jd, planet_id)
+                elong_type = ephem.get_elongation_type(jd, planet_id)
+
+                # Verify consistency
+                if lib_elong > 0:
+                    assert is_evening, (
+                        f"Planet {planet_id} at JD {jd}: positive elongation "
+                        f"should be evening star"
+                    )
+                    assert not is_morning
+                    assert elong_type == "eastern"
+                else:
+                    assert is_morning, (
+                        f"Planet {planet_id} at JD {jd}: negative elongation "
+                        f"should be morning star"
+                    )
+                    assert not is_evening
+                    assert elong_type == "western"
+
+    @pytest.mark.comparison
+    def test_moon_elongation_full_range(self):
+        """
+        Moon elongation should cover full range from -180 to +180 over its orbit.
+
+        Note: The Moon is traditionally not called a "morning star" or "evening star",
+        but the elongation functions work for it too.
+        """
+        jd_start = 2451545.0
+
+        min_elong = 180.0
+        max_elong = -180.0
+
+        for i in range(30):  # One lunar month
+            jd = jd_start + i
+            elong = ephem.get_signed_elongation(jd, SE_MOON)
+            min_elong = min(min_elong, elong)
+            max_elong = max(max_elong, elong)
+
+        # Moon elongation should span a wide range
+        elong_range = max_elong - min_elong
+        assert elong_range > 300, (
+            f"Moon elongation range {elong_range:.1f}° should be > 300°"
+        )
