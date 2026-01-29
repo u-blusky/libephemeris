@@ -1678,6 +1678,366 @@ FIXED_STARS = {entry.id: entry.data for entry in STAR_CATALOG}
 # Build lookup from canonical name to star ID
 _STAR_NAME_TO_ID = {entry.name.upper(): entry.id for entry in STAR_CATALOG}
 
+
+# =============================================================================
+# BAYER DESIGNATION PARSING
+# =============================================================================
+# Maps Greek letter names to their 2-letter Bayer abbreviations used in
+# the nomenclature field of STAR_CATALOG entries.
+#
+# Format: "Alpha Leonis" -> "al" + "Leo" -> "alLeo"
+# =============================================================================
+
+# Greek letter names to 2-letter abbreviations
+# These match the nomenclature format used in STAR_CATALOG
+GREEK_LETTER_ABBREV: dict[str, str] = {
+    "ALPHA": "al",
+    "BETA": "be",
+    "GAMMA": "ga",
+    "DELTA": "de",
+    "EPSILON": "ep",
+    "ZETA": "ze",
+    "ETA": "et",
+    "THETA": "th",
+    "IOTA": "io",
+    "KAPPA": "ka",
+    "LAMBDA": "la",
+    "MU": "mu",
+    "NU": "nu",
+    "XI": "xi",
+    "OMICRON": "om",
+    "PI": "pi",
+    "RHO": "rh",
+    "SIGMA": "si",
+    "TAU": "ta",
+    "UPSILON": "up",
+    "PHI": "ph",
+    "CHI": "ch",
+    "PSI": "ps",
+    "OMEGA": "om",  # Note: same abbrev as omicron in some catalogs
+}
+
+# Constellation names (genitive and nominative forms) to 3-letter IAU abbreviations
+# Both forms map to the same abbreviation to support "Alpha Leonis" and "Alpha Leo"
+CONSTELLATION_ABBREV: dict[str, str] = {
+    # Andromeda
+    "ANDROMEDAE": "And",
+    "ANDROMEDA": "And",
+    # Antlia
+    "ANTLIAE": "Ant",
+    "ANTLIA": "Ant",
+    # Apus
+    "APODIS": "Aps",
+    "APUS": "Aps",
+    # Aquarius
+    "AQUARII": "Aqr",
+    "AQUARIUS": "Aqr",
+    # Aquila
+    "AQUILAE": "Aql",
+    "AQUILA": "Aql",
+    # Ara
+    "ARAE": "Ara",
+    "ARA": "Ara",
+    # Aries
+    "ARIETIS": "Ari",
+    "ARIES": "Ari",
+    # Auriga
+    "AURIGAE": "Aur",
+    "AURIGA": "Aur",
+    # Bootes
+    "BOOTIS": "Boo",
+    "BOOTES": "Boo",
+    # Caelum
+    "CAELI": "Cae",
+    "CAELUM": "Cae",
+    # Camelopardalis
+    "CAMELOPARDALIS": "Cam",
+    # Cancer
+    "CANCRI": "Cnc",
+    "CANCER": "Cnc",
+    # Canes Venatici
+    "CANUM VENATICORUM": "CVn",
+    "CANES VENATICI": "CVn",
+    # Canis Major
+    "CANIS MAJORIS": "CMa",
+    "CANIS MAJOR": "CMa",
+    # Canis Minor
+    "CANIS MINORIS": "CMi",
+    "CANIS MINOR": "CMi",
+    # Capricornus
+    "CAPRICORNI": "Cap",
+    "CAPRICORNUS": "Cap",
+    # Carina
+    "CARINAE": "Car",
+    "CARINA": "Car",
+    # Cassiopeia
+    "CASSIOPEIAE": "Cas",
+    "CASSIOPEIA": "Cas",
+    # Centaurus
+    "CENTAURI": "Cen",
+    "CENTAURUS": "Cen",
+    # Cepheus
+    "CEPHEI": "Cep",
+    "CEPHEUS": "Cep",
+    # Cetus
+    "CETI": "Cet",
+    "CETUS": "Cet",
+    # Chamaeleon
+    "CHAMAELEONTIS": "Cha",
+    "CHAMAELEON": "Cha",
+    # Circinus
+    "CIRCINI": "Cir",
+    "CIRCINUS": "Cir",
+    # Columba
+    "COLUMBAE": "Col",
+    "COLUMBA": "Col",
+    # Coma Berenices
+    "COMAE BERENICES": "Com",
+    "COMA BERENICES": "Com",
+    # Corona Australis
+    "CORONAE AUSTRALIS": "CrA",
+    "CORONA AUSTRALIS": "CrA",
+    # Corona Borealis
+    "CORONAE BOREALIS": "CrB",
+    "CORONA BOREALIS": "CrB",
+    # Corvus
+    "CORVI": "Crv",
+    "CORVUS": "Crv",
+    # Crater
+    "CRATERIS": "Crt",
+    "CRATER": "Crt",
+    # Crux
+    "CRUCIS": "Cru",
+    "CRUX": "Cru",
+    # Cygnus
+    "CYGNI": "Cyg",
+    "CYGNUS": "Cyg",
+    # Delphinus
+    "DELPHINI": "Del",
+    "DELPHINUS": "Del",
+    # Dorado
+    "DORADUS": "Dor",
+    "DORADO": "Dor",
+    # Draco
+    "DRACONIS": "Dra",
+    "DRACO": "Dra",
+    # Equuleus
+    "EQUULEI": "Equ",
+    "EQUULEUS": "Equ",
+    # Eridanus
+    "ERIDANI": "Eri",
+    "ERIDANUS": "Eri",
+    # Fornax
+    "FORNACIS": "For",
+    "FORNAX": "For",
+    # Gemini
+    "GEMINORUM": "Gem",
+    "GEMINI": "Gem",
+    # Grus
+    "GRUIS": "Gru",
+    "GRUS": "Gru",
+    # Hercules
+    "HERCULIS": "Her",
+    "HERCULES": "Her",
+    # Horologium
+    "HOROLOGII": "Hor",
+    "HOROLOGIUM": "Hor",
+    # Hydra
+    "HYDRAE": "Hya",
+    "HYDRA": "Hya",
+    # Hydrus
+    "HYDRI": "Hyi",
+    "HYDRUS": "Hyi",
+    # Indus
+    "INDI": "Ind",
+    "INDUS": "Ind",
+    # Lacerta
+    "LACERTAE": "Lac",
+    "LACERTA": "Lac",
+    # Leo
+    "LEONIS": "Leo",
+    "LEO": "Leo",
+    # Leo Minor
+    "LEONIS MINORIS": "LMi",
+    "LEO MINOR": "LMi",
+    # Lepus
+    "LEPORIS": "Lep",
+    "LEPUS": "Lep",
+    # Libra
+    "LIBRAE": "Lib",
+    "LIBRA": "Lib",
+    # Lupus
+    "LUPI": "Lup",
+    "LUPUS": "Lup",
+    # Lynx
+    "LYNCIS": "Lyn",
+    "LYNX": "Lyn",
+    # Lyra
+    "LYRAE": "Lyr",
+    "LYRA": "Lyr",
+    # Mensa
+    "MENSAE": "Men",
+    "MENSA": "Men",
+    # Microscopium
+    "MICROSCOPII": "Mic",
+    "MICROSCOPIUM": "Mic",
+    # Monoceros
+    "MONOCEROTIS": "Mon",
+    "MONOCEROS": "Mon",
+    # Musca
+    "MUSCAE": "Mus",
+    "MUSCA": "Mus",
+    # Norma
+    "NORMAE": "Nor",
+    "NORMA": "Nor",
+    # Octans
+    "OCTANTIS": "Oct",
+    "OCTANS": "Oct",
+    # Ophiuchus
+    "OPHIUCHI": "Oph",
+    "OPHIUCHUS": "Oph",
+    # Orion
+    "ORIONIS": "Ori",
+    "ORION": "Ori",
+    # Pavo
+    "PAVONIS": "Pav",
+    "PAVO": "Pav",
+    # Pegasus
+    "PEGASI": "Peg",
+    "PEGASUS": "Peg",
+    # Perseus
+    "PERSEI": "Per",
+    "PERSEUS": "Per",
+    # Phoenix
+    "PHOENICIS": "Phe",
+    "PHOENIX": "Phe",
+    # Pictor
+    "PICTORIS": "Pic",
+    "PICTOR": "Pic",
+    # Pisces
+    "PISCIUM": "Psc",
+    "PISCES": "Psc",
+    # Piscis Austrinus
+    "PISCIS AUSTRINI": "PsA",
+    "PISCIS AUSTRINUS": "PsA",
+    # Puppis
+    "PUPPIS": "Pup",
+    # Pyxis
+    "PYXIDIS": "Pyx",
+    "PYXIS": "Pyx",
+    # Reticulum
+    "RETICULI": "Ret",
+    "RETICULUM": "Ret",
+    # Sagitta
+    "SAGITTAE": "Sge",
+    "SAGITTA": "Sge",
+    # Sagittarius
+    "SAGITTARII": "Sgr",
+    "SAGITTARIUS": "Sgr",
+    # Scorpius
+    "SCORPII": "Sco",
+    "SCORPIUS": "Sco",
+    # Sculptor
+    "SCULPTORIS": "Scl",
+    "SCULPTOR": "Scl",
+    # Scutum
+    "SCUTI": "Sct",
+    "SCUTUM": "Sct",
+    # Serpens
+    "SERPENTIS": "Ser",
+    "SERPENS": "Ser",
+    # Sextans
+    "SEXTANTIS": "Sex",
+    "SEXTANS": "Sex",
+    # Taurus
+    "TAURI": "Tau",
+    "TAURUS": "Tau",
+    # Telescopium
+    "TELESCOPII": "Tel",
+    "TELESCOPIUM": "Tel",
+    # Triangulum
+    "TRIANGULI": "Tri",
+    "TRIANGULUM": "Tri",
+    # Triangulum Australe
+    "TRIANGULI AUSTRALIS": "TrA",
+    "TRIANGULUM AUSTRALE": "TrA",
+    # Tucana
+    "TUCANAE": "Tuc",
+    "TUCANA": "Tuc",
+    # Ursa Major
+    "URSAE MAJORIS": "UMa",
+    "URSA MAJOR": "UMa",
+    # Ursa Minor
+    "URSAE MINORIS": "UMi",
+    "URSA MINOR": "UMi",
+    # Vela
+    "VELORUM": "Vel",
+    "VELA": "Vel",
+    # Virgo
+    "VIRGINIS": "Vir",
+    "VIRGO": "Vir",
+    # Volans
+    "VOLANTIS": "Vol",
+    "VOLANS": "Vol",
+    # Vulpecula
+    "VULPECULAE": "Vul",
+    "VULPECULA": "Vul",
+}
+
+
+def _parse_bayer_designation(designation: str) -> str | None:
+    """
+    Parse a Bayer designation into nomenclature format.
+
+    Converts designations like "Alpha Leonis", "Beta Persei", "Gamma Virginis"
+    into the nomenclature format used in STAR_CATALOG (e.g., "alLeo", "bePer", "gaVir").
+
+    Args:
+        designation: Bayer designation string (e.g., "Alpha Leonis", "Beta Persei")
+
+    Returns:
+        Nomenclature string if parsed successfully (e.g., "alLeo"), None otherwise
+
+    Examples:
+        >>> _parse_bayer_designation("Alpha Leonis")
+        'alLeo'
+        >>> _parse_bayer_designation("Beta Persei")
+        'bePer'
+        >>> _parse_bayer_designation("Gamma Virginis")
+        'gaVir'
+        >>> _parse_bayer_designation("Invalid Name")
+        None
+    """
+    if not designation:
+        return None
+
+    # Normalize: uppercase for matching
+    parts = designation.upper().strip().split()
+
+    if len(parts) < 2:
+        return None
+
+    # First part should be a Greek letter name
+    greek_letter = parts[0]
+    if greek_letter not in GREEK_LETTER_ABBREV:
+        return None
+
+    letter_abbrev = GREEK_LETTER_ABBREV[greek_letter]
+
+    # Remaining parts form the constellation name
+    constellation_name = " ".join(parts[1:])
+
+    # Look up constellation abbreviation
+    if constellation_name not in CONSTELLATION_ABBREV:
+        return None
+
+    const_abbrev = CONSTELLATION_ABBREV[constellation_name]
+
+    # Build nomenclature: letter abbreviation (lowercase) + constellation abbreviation
+    # e.g., "al" + "Leo" = "alLeo"
+    return letter_abbrev + const_abbrev
+
+
 # STAR_ALIASES: Maps alternative star names to canonical SE_* constant IDs
 # Includes: common names, Bayer designations (full and abbreviated),
 # Flamsteed numbers, Arabic names, Latin names, Greek transliterations
@@ -2512,7 +2872,8 @@ def resolve_star_name(name: str) -> int | None:
     2. If name starts with comma (pyswisseph convention), do prefix search
     3. Try exact match in STAR_ALIASES dictionary
     4. Try exact match against canonical star names in STAR_CATALOG
-    5. Try fuzzy matching (alias contains search term for short inputs)
+    5. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
+    6. Try fuzzy matching (alias contains search term for short inputs)
 
     Args:
         name: Star name, alias, designation, or comma-prefixed partial name
@@ -2526,6 +2887,8 @@ def resolve_star_name(name: str) -> int | None:
         >>> resolve_star_name(",alg")  # Prefix search for Algol
         1000003
         >>> resolve_star_name("Alpha Leo")
+        1000001
+        >>> resolve_star_name("Alpha Leonis")  # Full Bayer designation
         1000001
         >>> resolve_star_name("SIRIUS")
         1000004
@@ -2577,7 +2940,14 @@ def resolve_star_name(name: str) -> int | None:
         if entry.nomenclature.upper() == normalized:
             return entry.id
 
-    # 4. Try fuzzy matching: check if any alias CONTAINS the search term
+    # 4. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
+    parsed_nomenclature = _parse_bayer_designation(name.strip())
+    if parsed_nomenclature:
+        for entry in STAR_CATALOG:
+            if entry.nomenclature.upper() == parsed_nomenclature.upper():
+                return entry.id
+
+    # 5. Try fuzzy matching: check if any alias CONTAINS the search term
     # Only for reasonably short inputs (avoid false positives)
     if len(normalized) >= 3:
         for alias, star_id in STAR_ALIASES.items():
@@ -2937,9 +3307,10 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     Supports multiple lookup methods:
     1. Exact star name (case-insensitive): "Regulus", "SPICA"
     2. Hipparcos catalog number (as string): "49669", ",49669"
-    3. Partial name search (case-insensitive): "Reg", "pic"
-    4. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
-    5. Format with comma: "Regulus,alLeo" (takes first part)
+    3. Bayer designation with Greek letter names: "Alpha Leonis", "Beta Persei"
+    4. Partial name search (case-insensitive): "Reg", "pic"
+    5. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
+    6. Format with comma: "Regulus,alLeo" (takes first part)
 
     Args:
         star_name: Star identifier - can be name, catalog number, or search string
@@ -2948,11 +3319,13 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         Tuple of (StarCatalogEntry, error_message). If error, entry is None.
 
     Examples:
-        >>> entry, err = _resolve_star2("Regulus")      # Exact name
-        >>> entry, err = _resolve_star2("49669")        # HIP number
-        >>> entry, err = _resolve_star2(",49669")       # HIP with leading comma
-        >>> entry, err = _resolve_star2("Reg")          # Partial match
-        >>> entry, err = _resolve_star2("alLeo")        # Nomenclature
+        >>> entry, err = _resolve_star2("Regulus")         # Exact name
+        >>> entry, err = _resolve_star2("49669")           # HIP number
+        >>> entry, err = _resolve_star2(",49669")          # HIP with leading comma
+        >>> entry, err = _resolve_star2("Alpha Leonis")    # Bayer designation
+        >>> entry, err = _resolve_star2("Beta Persei")     # Bayer designation
+        >>> entry, err = _resolve_star2("Reg")             # Partial match
+        >>> entry, err = _resolve_star2("alLeo")           # Nomenclature
     """
     search = star_name.strip()
 
@@ -2984,7 +3357,14 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         if entry.nomenclature.upper() == search_upper:
             return entry, None
 
-    # 3. Try partial name match (prefix search, case-insensitive)
+    # 3. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
+    parsed_nomenclature = _parse_bayer_designation(search)
+    if parsed_nomenclature:
+        for entry in STAR_CATALOG:
+            if entry.nomenclature.upper() == parsed_nomenclature.upper():
+                return entry, None
+
+    # 4. Try partial name match (prefix search, case-insensitive)
     matches: List[StarCatalogEntry] = []
     for entry in STAR_CATALOG:
         if entry.name.upper().startswith(search_upper):
@@ -2996,7 +3376,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         names = ", ".join(m.name for m in matches)
         return None, f"Ambiguous star name '{star_name}' matches: {names}"
 
-    # 4. Try partial nomenclature match
+    # 5. Try partial nomenclature match
     for entry in STAR_CATALOG:
         if entry.nomenclature.upper().startswith(search_upper):
             matches.append(entry)
@@ -3007,7 +3387,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         names = ", ".join(m.name for m in matches)
         return None, f"Ambiguous star name '{star_name}' matches: {names}"
 
-    # 5. Try substring match in name (anywhere in the name)
+    # 6. Try substring match in name (anywhere in the name)
     for entry in STAR_CATALOG:
         if search_upper in entry.name.upper():
             matches.append(entry)
