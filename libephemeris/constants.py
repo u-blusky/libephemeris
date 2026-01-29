@@ -446,6 +446,11 @@ SE_MEISSA: int = SE_FIXSTAR_OFFSET + 69  # Lambda Orionis - Orion's head
 SE_PHECDA: int = SE_FIXSTAR_OFFSET + 70  # Gamma Ursae Majoris - bowl star
 SE_MEGREZ: int = SE_FIXSTAR_OFFSET + 71  # Delta Ursae Majoris - bowl-handle junction
 
+# Crux (Southern Cross) - completing the constellation
+SE_DELTA_CRUCIS: int = (
+    SE_FIXSTAR_OFFSET + 72
+)  # Delta Crucis - fourth star of Southern Cross
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree

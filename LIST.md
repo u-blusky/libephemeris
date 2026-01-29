@@ -376,7 +376,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD URSA MAJOR STARS: Add all Big Dipper stars: Dubhe, Merak, Phecda, Megrez, Alioth, Mizar (with Alcor), Alkaid.
 
-- [ ] ADD SOUTHERN CROSS STARS: Add Crux constellation stars: Acrux (Alpha Crucis), Mimosa/Becrux (Beta Crucis), Gacrux (Gamma Crucis), Delta Crucis.
+- [x] ADD SOUTHERN CROSS STARS: Add Crux constellation stars: Acrux (Alpha Crucis), Mimosa/Becrux (Beta Crucis), Gacrux (Gamma Crucis), Delta Crucis.
 
 - [ ] ADD CENTAURUS BRIGHT STARS: Add Alpha Centauri (Rigil Kentaurus), Beta Centauri (Hadar), and other bright Centaurus stars.
 

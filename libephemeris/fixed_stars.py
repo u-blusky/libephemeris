@@ -118,6 +118,7 @@ from .constants import (
     SE_MEISSA,
     SE_PHECDA,
     SE_MEGREZ,
+    SE_DELTA_CRUCIS,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -1101,6 +1102,21 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=3.53,
     ),
+    # ======== SOUTHERN CROSS (CRUX) CONSTELLATION ========
+    # Completing the Crux constellation - Acrux, Mimosa, Gacrux already defined above
+    StarCatalogEntry(
+        id=SE_DELTA_CRUCIS,
+        name="Delta Crucis",
+        nomenclature="deCru",
+        hip_number=59747,
+        data=StarData(
+            ra_j2000=183.786301,  # 12h 15m 08.7s (Delta Crucis)
+            dec_j2000=-58.748927,  # -58° 44' 56"
+            pm_ra=-0.03568,  # -35.68 mas/yr
+            pm_dec=-0.01011,  # -10.11 mas/yr
+        ),
+        magnitude=2.80,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -1347,6 +1363,13 @@ STAR_ALIASES: dict[str, int] = {
     "GACRU": SE_GACRUX,
     "CRUX GAMMA": SE_GACRUX,
     "RUBIDEA": SE_GACRUX,
+    # ======== DELTA CRUCIS (Delta Crucis) ========
+    "DELTA CRUCIS": SE_DELTA_CRUCIS,
+    "DELTA CRU": SE_DELTA_CRUCIS,
+    "δ CRU": SE_DELTA_CRUCIS,
+    "DECRU": SE_DELTA_CRUCIS,
+    "CRUX DELTA": SE_DELTA_CRUCIS,
+    "DECRUX": SE_DELTA_CRUCIS,
     # ======== HADAR (Beta Centauri) ========
     "BETA CENTAURI": SE_HADAR,
     "BETA CEN": SE_HADAR,
