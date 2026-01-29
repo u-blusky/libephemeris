@@ -1351,12 +1351,16 @@ STARS = {
         parallax=0.01244,  # 12.44 mas (Hipparcos)
         radial_velocity=1.0,  # +1.0 km/s (towards us is negative, away is positive)
     ),
-    # REVATI (Zeta Piscium, HIP 7097 - component A)
+    # REVATI (Zeta Piscium A, HIP 5737)
+    # High-precision Gaia DR3 values for True Revati ayanamsha
+    # Proper motion includes rigorous space motion corrections
     "REVATI": StarData(
-        ra_j2000=18.438229,
-        dec_j2000=7.575354,
-        pm_ra=0.14500,
-        pm_dec=-0.05569,
+        ra_j2000=18.4328583349,  # 01h 13m 43.8860s (Gaia DR3 J2000.0)
+        dec_j2000=7.5753601597,  # +07° 34' 31.296" (Gaia DR3 J2000.0)
+        pm_ra=0.142693,  # 142.693 mas/yr (Gaia DR3 mu_alpha*)
+        pm_dec=-0.053051,  # -53.051 mas/yr (Gaia DR3 mu_delta)
+        parallax=0.0244595,  # 24.4595 mas (Gaia DR3)
+        radial_velocity=15.0,  # +15.0 km/s (SIMBAD - away from us)
     ),
     # PUSHYA (Delta Cancri, HIP 43834)
     "PUSHYA": StarData(
