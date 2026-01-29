@@ -3093,21 +3093,53 @@ def _calc_nod_aps_osculating(
 # PLANETARY PHENOMENA: Phase, Elongation, Magnitude
 # =============================================================================
 
-# Semi-diameters of planets at 1 AU (in arcseconds)
-# Used for apparent diameter calculations
-# From Astronomical Almanac and planetary data
-_PLANET_SEMI_DIAMETER_AU = {
-    SE_SUN: 959.63,  # Sun's semi-diameter at 1 AU
-    SE_MOON: 358.473,  # Moon's semi-diameter (adjusted for geocentric distance ~0.00257 AU)
-    SE_MERCURY: 3.36,  # Mercury at 1 AU
-    SE_VENUS: 8.34,  # Venus at 1 AU
-    SE_MARS: 4.68,  # Mars at 1 AU
-    SE_JUPITER: 98.44,  # Jupiter at 1 AU
-    SE_SATURN: 82.73,  # Saturn (disk only) at 1 AU
-    SE_URANUS: 35.02,  # Uranus at 1 AU
-    SE_NEPTUNE: 33.50,  # Neptune at 1 AU
-    SE_PLUTO: 1.64,  # Pluto at 1 AU (approximate)
+# Physical equatorial radii of celestial bodies in kilometers
+# Sources: IAU 2015 nominal values, NASA Planetary Fact Sheet
+# These are used to calculate apparent angular diameters
+_BODY_RADIUS_KM = {
+    SE_SUN: 695700.0,  # Solar radius (IAU 2015 nominal)
+    SE_MOON: 1737.4,  # Lunar mean radius
+    SE_MERCURY: 2439.7,  # Mercury equatorial radius
+    SE_VENUS: 6051.8,  # Venus equatorial radius
+    SE_MARS: 3396.2,  # Mars equatorial radius
+    SE_JUPITER: 71492.0,  # Jupiter equatorial radius
+    SE_SATURN: 60268.0,  # Saturn equatorial radius (disk only, excludes rings)
+    SE_URANUS: 25559.0,  # Uranus equatorial radius
+    SE_NEPTUNE: 24764.0,  # Neptune equatorial radius
+    SE_PLUTO: 1188.3,  # Pluto mean radius
 }
+
+# 1 AU in kilometers (IAU 2012 definition)
+_AU_KM = 149597870.7
+
+# Conversion factor: radians to arcseconds
+_RAD_TO_ARCSEC = 206264.80624709636  # (180/pi) * 3600
+
+
+def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
+    """
+    Calculate apparent angular diameter in arcseconds.
+
+    Uses the small-angle approximation which is accurate for all solar system bodies
+    as seen from Earth (maximum angular size is ~0.5 degrees for Sun/Moon).
+
+    The formula is:
+        diameter_arcsec = 2 * radius_km / distance_km * RAD_TO_ARCSEC
+                        = 2 * radius_km / (distance_au * AU_KM) * RAD_TO_ARCSEC
+
+    Args:
+        radius_km: Physical radius of the body in kilometers
+        distance_au: Distance from observer to body in AU
+
+    Returns:
+        Apparent angular diameter in arcseconds
+    """
+    if distance_au <= 0:
+        return 0.0
+    distance_km = distance_au * _AU_KM
+    # Angular diameter = 2 * arctan(radius/distance) ≈ 2 * radius/distance (small angle)
+    return 2.0 * radius_km / distance_km * _RAD_TO_ARCSEC
+
 
 # Visual magnitude parameters for outer planets
 # Using simplified formula: V = V(1,0) + 5*log10(r*d) + phase_correction
@@ -3231,12 +3263,10 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         phase = 1.0
         elongation = 0.0
 
-        # Apparent diameter of Sun
+        # Apparent diameter of Sun based on physical radius
         sun_dist_au = sun_dist.au
-        if sun_dist_au > 0:
-            diameter = 2.0 * _PLANET_SEMI_DIAMETER_AU.get(SE_SUN, 959.63) / sun_dist_au
-        else:
-            diameter = 1919.26  # Default solar diameter in arcsec
+        sun_radius_km = _BODY_RADIUS_KM.get(SE_SUN, 695700.0)
+        diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
 
         # Sun magnitude (approximately -26.74 at 1 AU)
         magnitude = (
@@ -3343,13 +3373,9 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         # Phase (illuminated fraction)
         phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
 
-        # Moon's apparent diameter
-        # Moon's mean semi-diameter at mean distance (384400 km) is about 15.5 arcmin = 930 arcsec
-        # At distance r (in AU), semi-diameter = 930 * (mean_dist / r)
-        # Mean distance in AU ≈ 0.00257 AU
-        mean_moon_dist_au = 0.00257
-        moon_semi_diam = 930.0 * mean_moon_dist_au / r_moon if r_moon > 0 else 930.0
-        diameter = 2.0 * moon_semi_diam
+        # Moon's apparent diameter based on physical radius
+        moon_radius_km = _BODY_RADIUS_KM.get(SE_MOON, 1737.4)
+        diameter = _calc_apparent_diameter(moon_radius_km, r_moon)
 
         # Moon's magnitude (simplified formula)
         # Full Moon is about -12.7, varies with phase
@@ -3404,9 +3430,11 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
     # Phase (illuminated fraction)
     phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
 
-    # Apparent diameter
-    semi_diam = _PLANET_SEMI_DIAMETER_AU.get(ipl, 1.0)
-    diameter = 2.0 * semi_diam / target_geo_dist if target_geo_dist > 0 else 0.0
+    # Apparent diameter based on physical radius
+    body_radius_km = _BODY_RADIUS_KM.get(
+        ipl, 1000.0
+    )  # Default 1000 km for unknown bodies
+    diameter = _calc_apparent_diameter(body_radius_km, target_geo_dist)
 
     # Visual magnitude
     # For Saturn, we need ecliptic coordinates for ring tilt calculation

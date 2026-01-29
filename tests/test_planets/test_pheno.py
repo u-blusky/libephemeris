@@ -1388,3 +1388,336 @@ class TestIlluminatedFractionAllPlanets:
                     )
 
                 prev_illumination = illumination
+
+
+class TestApparentDiameterAllPlanets:
+    """
+    Comprehensive tests for apparent angular diameter calculation.
+
+    The apparent diameter is the angular size of a celestial body as seen from Earth,
+    calculated from the body's physical radius and geocentric distance:
+
+        diameter = 2 * arctan(radius / distance) ≈ 2 * radius / distance (in radians)
+        diameter_arcsec = diameter_rad * (180/π) * 3600
+
+    This corresponds to attr[3] in the swe_pheno_ut output (in arcseconds).
+    """
+
+    # Tolerance for diameter comparison with Swiss Ephemeris (relative)
+    DIAMETER_REL_TOL = 0.05  # 5% tolerance
+
+    @pytest.mark.unit
+    def test_sun_diameter_typical_range(self):
+        """
+        Sun apparent diameter should be around 32 arcminutes (~1920 arcsec).
+
+        The Sun's diameter varies from ~31.5' (aphelion) to ~32.5' (perihelion)
+        due to Earth's elliptical orbit.
+        """
+        jd = 2451545.0  # J2000
+        attr, _ = ephem.pheno_ut(jd, SE_SUN, 0)
+
+        diameter = attr[3]
+        # Sun diameter ~32 arcmin = ~1920 arcsec (±3%)
+        assert 1850 < diameter < 1980, (
+            f"Sun diameter {diameter:.1f} arcsec outside expected range [1850, 1980]"
+        )
+
+    @pytest.mark.unit
+    def test_sun_diameter_varies_with_distance(self):
+        """
+        Sun diameter should be larger at perihelion than aphelion.
+
+        Earth is closest to Sun around January 3 (perihelion) and
+        farthest around July 4 (aphelion).
+        """
+        # Approximate dates
+        jd_perihelion = 2451547.5  # ~Jan 3, 2000
+        jd_aphelion = 2451731.5  # ~Jul 4, 2000
+
+        attr_peri, _ = ephem.pheno_ut(jd_perihelion, SE_SUN, 0)
+        attr_aph, _ = ephem.pheno_ut(jd_aphelion, SE_SUN, 0)
+
+        # Perihelion should have larger diameter
+        assert attr_peri[3] > attr_aph[3], (
+            f"Sun should be larger at perihelion ({attr_peri[3]:.2f}) "
+            f"than aphelion ({attr_aph[3]:.2f})"
+        )
+
+    @pytest.mark.unit
+    def test_moon_diameter_typical_range(self):
+        """
+        Moon apparent diameter should be around 31 arcminutes (~1860 arcsec).
+
+        The Moon's diameter varies from ~29.4' (apogee) to ~33.5' (perigee)
+        due to its elliptical orbit.
+        """
+        jd = 2451545.0
+        attr, _ = ephem.pheno_ut(jd, SE_MOON, 0)
+
+        diameter = attr[3]
+        # Moon diameter typically 29-34 arcmin = 1740-2040 arcsec
+        assert 1700 < diameter < 2100, (
+            f"Moon diameter {diameter:.1f} arcsec outside expected range [1700, 2100]"
+        )
+
+    @pytest.mark.unit
+    def test_moon_diameter_varies_with_distance(self):
+        """
+        Moon diameter should vary noticeably over an anomalistic month.
+
+        The Moon's apparent size varies by about 14% between perigee and apogee.
+        """
+        jd_start = 2451545.0
+        diameters = []
+
+        # Sample over 30 days (more than one anomalistic month of ~27.5 days)
+        for i in range(30):
+            jd = jd_start + i
+            attr, _ = ephem.pheno_ut(jd, SE_MOON, 0)
+            diameters.append(attr[3])
+
+        min_diam = min(diameters)
+        max_diam = max(diameters)
+
+        # Should see at least 10% variation
+        variation = (max_diam - min_diam) / min_diam
+        assert variation > 0.08, (
+            f"Moon diameter variation {variation:.1%} should be > 8%"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "planet_id,planet_name,min_diam,max_diam",
+        [
+            (SE_MERCURY, "Mercury", 4, 14),  # 4.5" to 13" typically
+            (SE_VENUS, "Venus", 10, 66),  # 9.7" to 66" (crescent to near-inferior)
+            (SE_MARS, "Mars", 3, 26),  # 3.5" to 25" (far to opposition)
+            (SE_JUPITER, "Jupiter", 30, 51),  # 30" to 50"
+            (SE_SATURN, "Saturn", 15, 21),  # 15" to 21" (disk only)
+        ],
+    )
+    def test_planet_diameter_in_typical_range(
+        self, planet_id, planet_name, min_diam, max_diam
+    ):
+        """
+        Planet apparent diameter should be within expected observable range.
+
+        These ranges account for varying Earth-planet distances.
+        """
+        jd = 2451545.0
+        attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+
+        diameter = attr[3]
+        assert min_diam < diameter < max_diam, (
+            f"{planet_name} diameter {diameter:.2f} arcsec "
+            f"outside typical range [{min_diam}, {max_diam}]"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "planet_id,planet_name,max_expected",
+        [
+            (SE_URANUS, "Uranus", 4.5),  # 3.4" to 4.1"
+            (SE_NEPTUNE, "Neptune", 2.5),  # 2.2" to 2.4"
+            (SE_PLUTO, "Pluto", 0.2),  # ~0.11"
+        ],
+    )
+    def test_outer_planet_diameter_small(self, planet_id, planet_name, max_expected):
+        """
+        Distant planets should have very small apparent diameters.
+        """
+        jd = 2451545.0
+        attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+
+        diameter = attr[3]
+        assert 0 < diameter < max_expected, (
+            f"{planet_name} diameter {diameter:.3f} arcsec "
+            f"should be in (0, {max_expected})"
+        )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "planet_id,planet_name",
+        [
+            (SE_SUN, "Sun"),
+            (SE_MOON, "Moon"),
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
+            (SE_URANUS, "Uranus"),
+            (SE_NEPTUNE, "Neptune"),
+            (SE_PLUTO, "Pluto"),
+        ],
+    )
+    def test_diameter_matches_swiss_ephemeris(self, planet_id, planet_name):
+        """
+        Apparent diameter should match Swiss Ephemeris within tolerance.
+
+        Note: Swiss Ephemeris returns diameter in degrees, libephemeris in arcseconds.
+        """
+        test_dates = [
+            2451545.0,  # J2000
+            2455000.0,  # 2009
+            2459000.0,  # 2020
+            2460000.0,  # 2023
+        ]
+
+        swe.set_ephe_path(None)
+
+        for jd in test_dates:
+            swe_attr = swe.pheno_ut(jd, planet_id, 0)
+            lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+
+            # Convert Swiss Ephemeris degrees to arcseconds
+            swe_diam_arcsec = swe_attr[3] * 3600
+            lib_diam_arcsec = lib_attr[3]
+
+            if swe_diam_arcsec > 0:
+                rel_diff = abs(swe_diam_arcsec - lib_diam_arcsec) / swe_diam_arcsec
+                assert rel_diff < self.DIAMETER_REL_TOL, (
+                    f"{planet_name} at JD {jd}: diameter "
+                    f"SE={swe_diam_arcsec:.2f}as, LIB={lib_diam_arcsec:.2f}as, "
+                    f"rel_diff={rel_diff:.2%}"
+                )
+
+    @pytest.mark.unit
+    def test_diameter_inversely_proportional_to_distance(self):
+        """
+        Diameter should be inversely proportional to distance.
+
+        As a planet moves farther away, its apparent diameter decreases.
+        """
+        jd_start = 2451545.0
+
+        # Test with Mars over ~2 years (covers close and far configurations)
+        distances = []
+        diameters = []
+
+        for i in range(0, 780, 30):  # ~2 years in monthly steps
+            jd = jd_start + i
+            # Get Mars position
+            pos, _ = ephem.calc_ut(jd, SE_MARS, 0)
+            distance = pos[2]  # Distance in AU
+
+            # Get Mars diameter
+            attr, _ = ephem.pheno_ut(jd, SE_MARS, 0)
+            diameter = attr[3]
+
+            distances.append(distance)
+            diameters.append(diameter)
+
+        # Check inverse relationship: diameter * distance should be roughly constant
+        products = [d * dist for d, dist in zip(diameters, distances)]
+        avg_product = sum(products) / len(products)
+
+        for i, product in enumerate(products):
+            rel_diff = abs(product - avg_product) / avg_product
+            assert rel_diff < 0.05, (
+                f"Mars: diameter*distance at step {i} deviates by {rel_diff:.2%} "
+                f"from average (expected constant due to fixed physical size)"
+            )
+
+    @pytest.mark.unit
+    def test_jupiter_largest_planet_diameter(self):
+        """
+        Jupiter should have the largest apparent diameter of all planets.
+        """
+        jd = 2451545.0
+
+        planet_diameters = {}
+        for planet_id in [SE_MARS, SE_JUPITER, SE_SATURN, SE_URANUS, SE_NEPTUNE]:
+            attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+            planet_diameters[planet_id] = attr[3]
+
+        jupiter_diam = planet_diameters[SE_JUPITER]
+
+        for planet_id, diam in planet_diameters.items():
+            if planet_id != SE_JUPITER:
+                assert jupiter_diam > diam, (
+                    f"Jupiter ({jupiter_diam:.2f}as) should be larger than "
+                    f"planet {planet_id} ({diam:.2f}as)"
+                )
+
+    @pytest.mark.unit
+    def test_diameter_positive_for_all_bodies(self):
+        """
+        All supported bodies should have positive apparent diameters.
+        """
+        jd = 2451545.0
+        bodies = [
+            SE_SUN,
+            SE_MOON,
+            SE_MERCURY,
+            SE_VENUS,
+            SE_MARS,
+            SE_JUPITER,
+            SE_SATURN,
+            SE_URANUS,
+            SE_NEPTUNE,
+            SE_PLUTO,
+        ]
+
+        for body_id in bodies:
+            attr, _ = ephem.pheno_ut(jd, body_id, 0)
+            assert attr[3] > 0, f"Body {body_id}: diameter should be positive"
+
+    @pytest.mark.unit
+    def test_diameter_formula_using_physical_radius(self):
+        """
+        Verify diameter calculation uses the correct formula.
+
+        For a body with physical radius R at distance D:
+        diameter_arcsec = 2 * R / D * (180/π * 3600) = 2 * R / D * 206264.806
+
+        We verify this by checking the relationship between calculated diameter
+        and known physical parameters.
+        """
+        # Sun: radius ~695700 km, at ~1 AU
+        # Expected diameter: 2 * 695700 / 149597870.7 * 206264.806 ≈ 1919.1 arcsec
+        jd = 2451545.0
+        attr_sun, _ = ephem.pheno_ut(jd, SE_SUN, 0)
+
+        # The Sun's diameter should be close to the theoretical value
+        # (within a few percent due to actual distance variation)
+        theoretical_sun_diam = 2 * 695700 / 149597870.7 * 206264.806
+        assert abs(attr_sun[3] - theoretical_sun_diam) / theoretical_sun_diam < 0.02, (
+            f"Sun diameter {attr_sun[3]:.2f}as differs from theoretical "
+            f"{theoretical_sun_diam:.2f}as by more than 2%"
+        )
+
+    @pytest.mark.comparison
+    def test_diameter_at_multiple_dates_matches_swe(self):
+        """
+        Diameter calculations should match Swiss Ephemeris across multiple dates.
+
+        This tests the diameter calculation for various Earth-planet configurations.
+        """
+        test_dates = [
+            2451545.0,  # J2000
+            2451590.0,
+            2451635.0,
+            2451680.0,
+            2451725.0,
+            2459580.5,
+            2460310.5,
+        ]
+
+        swe.set_ephe_path(None)
+
+        for jd in test_dates:
+            for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]:
+                swe_attr = swe.pheno_ut(jd, planet_id, 0)
+                lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+
+                swe_diam = swe_attr[3] * 3600  # Convert to arcsec
+                lib_diam = lib_attr[3]
+
+                if swe_diam > 0:
+                    rel_diff = abs(swe_diam - lib_diam) / swe_diam
+                    assert rel_diff < 0.05, (
+                        f"Planet {planet_id} at JD {jd}: "
+                        f"diameter SE={swe_diam:.2f}as, LIB={lib_diam:.2f}as"
+                    )
