@@ -124,6 +124,11 @@ from .constants import (
     SE_EPSILON_CENTAURI,
     SE_ETA_CENTAURI,
     SE_ZETA_CENTAURI,
+    SE_SARGAS,
+    SE_DSCHUBBA,
+    SE_GRAFFIAS,
+    SE_LESATH,
+    SE_ZOSMA,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -1189,6 +1194,73 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=2.55,
     ),
+    # Scorpius constellation stars
+    StarCatalogEntry(
+        id=SE_SARGAS,
+        name="Sargas",
+        nomenclature="thSco",
+        hip_number=86228,
+        data=StarData(
+            ra_j2000=264.329711,  # 17h 37m 19.1s
+            dec_j2000=-42.997824,  # -42° 59' 52"
+            pm_ra=0.00596,  # 5.96 mas/yr
+            pm_dec=-0.03012,  # -30.12 mas/yr
+        ),
+        magnitude=1.87,
+    ),
+    StarCatalogEntry(
+        id=SE_DSCHUBBA,
+        name="Dschubba",
+        nomenclature="deSco",
+        hip_number=78401,
+        data=StarData(
+            ra_j2000=240.083359,  # 16h 00m 20.0s
+            dec_j2000=-22.621710,  # -22° 37' 18"
+            pm_ra=-0.01008,  # -10.08 mas/yr
+            pm_dec=-0.02514,  # -25.14 mas/yr
+        ),
+        magnitude=2.32,
+    ),
+    StarCatalogEntry(
+        id=SE_GRAFFIAS,
+        name="Graffias",
+        nomenclature="beSco",
+        hip_number=78820,
+        data=StarData(
+            ra_j2000=241.359296,  # 16h 05m 26.2s
+            dec_j2000=-19.805453,  # -19° 48' 20"
+            pm_ra=-0.00550,  # -5.50 mas/yr
+            pm_dec=-0.02513,  # -25.13 mas/yr
+        ),
+        magnitude=2.56,
+    ),
+    StarCatalogEntry(
+        id=SE_LESATH,
+        name="Lesath",
+        nomenclature="upSco",
+        hip_number=85696,
+        data=StarData(
+            ra_j2000=262.690901,  # 17h 30m 45.8s
+            dec_j2000=-37.295811,  # -37° 17' 45"
+            pm_ra=-0.00285,  # -2.85 mas/yr
+            pm_dec=-0.02924,  # -29.24 mas/yr
+        ),
+        magnitude=2.70,
+    ),
+    # Leo constellation stars
+    StarCatalogEntry(
+        id=SE_ZOSMA,
+        name="Zosma",
+        nomenclature="deLeo",
+        hip_number=54872,
+        data=StarData(
+            ra_j2000=168.527089,  # 11h 14m 06.5s (Delta Leonis)
+            dec_j2000=20.523611,  # +20° 31' 25"
+            pm_ra=0.14328,  # 143.28 mas/yr
+            pm_dec=-0.12912,  # -129.12 mas/yr
+        ),
+        magnitude=2.56,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -1825,6 +1897,46 @@ STAR_ALIASES: dict[str, int] = {
     "EPTAU": SE_AIN,
     "OCULUS BOREALIS": SE_AIN,
     "BULL'S EYE": SE_AIN,
+    # ======== SARGAS (Theta Scorpii) ========
+    "THETA SCORPII": SE_SARGAS,
+    "THETA SCO": SE_SARGAS,
+    "θ SCO": SE_SARGAS,
+    "THSCO": SE_SARGAS,
+    "GIRTAB": SE_SARGAS,
+    "SCORPION'S TAIL": SE_SARGAS,
+    # ======== DSCHUBBA (Delta Scorpii) ========
+    "DELTA SCORPII": SE_DSCHUBBA,
+    "DELTA SCO": SE_DSCHUBBA,
+    "δ SCO": SE_DSCHUBBA,
+    "DESCO": SE_DSCHUBBA,
+    "ICLARCRAU": SE_DSCHUBBA,
+    "ICLARKRAV": SE_DSCHUBBA,
+    "SCORPION'S FOREHEAD": SE_DSCHUBBA,
+    # ======== GRAFFIAS (Beta Scorpii) ========
+    "BETA SCORPII": SE_GRAFFIAS,
+    "BETA SCO": SE_GRAFFIAS,
+    "β SCO": SE_GRAFFIAS,
+    "BESCO": SE_GRAFFIAS,
+    "ACRAB": SE_GRAFFIAS,
+    "AKRAB": SE_GRAFFIAS,
+    "ELACRAB": SE_GRAFFIAS,
+    # ======== LESATH (Upsilon Scorpii) ========
+    "UPSILON SCORPII": SE_LESATH,
+    "UPSILON SCO": SE_LESATH,
+    "υ SCO": SE_LESATH,
+    "UPSCO": SE_LESATH,
+    "STINGER": SE_LESATH,
+    "34 SCO": SE_LESATH,
+    # ======== ZOSMA (Delta Leonis) ========
+    "DELTA LEONIS": SE_ZOSMA,
+    "DELTA LEO": SE_ZOSMA,
+    "68 LEO": SE_ZOSMA,
+    "δ LEO": SE_ZOSMA,
+    "DELEO": SE_ZOSMA,
+    "DHUR": SE_ZOSMA,
+    "DUHR": SE_ZOSMA,
+    "LION'S HIP": SE_ZOSMA,
+    "LION'S BACK": SE_ZOSMA,
 }
 
 

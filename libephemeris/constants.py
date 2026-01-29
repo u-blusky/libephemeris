@@ -458,6 +458,15 @@ SE_EPSILON_CENTAURI: int = SE_FIXSTAR_OFFSET + 75  # Epsilon Centauri
 SE_ETA_CENTAURI: int = SE_FIXSTAR_OFFSET + 76  # Eta Centauri
 SE_ZETA_CENTAURI: int = SE_FIXSTAR_OFFSET + 77  # Zeta Centauri
 
+# Scorpius constellation - completing the bright stars
+SE_SARGAS: int = SE_FIXSTAR_OFFSET + 78  # Theta Scorpii
+SE_DSCHUBBA: int = SE_FIXSTAR_OFFSET + 79  # Delta Scorpii
+SE_GRAFFIAS: int = SE_FIXSTAR_OFFSET + 80  # Beta Scorpii
+SE_LESATH: int = SE_FIXSTAR_OFFSET + 81  # Upsilon Scorpii
+
+# Leo constellation - completing the bright stars
+SE_ZOSMA: int = SE_FIXSTAR_OFFSET + 82  # Delta Leonis
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree

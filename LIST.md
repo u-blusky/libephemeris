@@ -378,11 +378,11 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD SOUTHERN CROSS STARS: Add Crux constellation stars: Acrux (Alpha Crucis), Mimosa/Becrux (Beta Crucis), Gacrux (Gamma Crucis), Delta Crucis.
 
-- [ ] ADD CENTAURUS BRIGHT STARS: Add Alpha Centauri (Rigil Kentaurus), Beta Centauri (Hadar), and other bright Centaurus stars.
+- [x] ADD CENTAURUS BRIGHT STARS: Add Alpha Centauri (Rigil Kentaurus), Beta Centauri (Hadar), and other bright Centaurus stars.
 
-- [ ] ADD SCORPIUS CONSTELLATION STARS: Ensure Scorpius stars are complete: Antares, Shaula, Sargas, Dschubba, Graffias, Lesath.
+- [x] ADD SCORPIUS CONSTELLATION STARS: Ensure Scorpius stars are complete: Antares, Shaula, Sargas, Dschubba, Graffias, Lesath.
 
-- [ ] ADD LEO CONSTELLATION STARS: Ensure Leo stars are complete: Regulus, Denebola, Algieba, Zosma.
+- [x] ADD LEO CONSTELLATION STARS: Ensure Leo stars are complete: Regulus, Denebola, Algieba, Zosma.
 
 - [ ] ADD ZODIACAL CONSTELLATION BRIGHT STARS: Add key bright stars from each zodiacal constellation used in astrological interpretation.
 
