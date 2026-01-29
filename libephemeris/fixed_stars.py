@@ -3372,11 +3372,12 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     Supports multiple lookup methods:
     1. Exact star name (case-insensitive): "Regulus", "SPICA"
     2. Hipparcos catalog number (as string): "49669", ",49669"
-    3. Bayer designation with Greek letter names: "Alpha Leonis", "Beta Persei"
-    4. Flamsteed designation with number + constellation: "32 Leonis", "87 Virginis"
-    5. Partial name search (case-insensitive): "Reg", "pic"
-    6. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
-    7. Format with comma: "Regulus,alLeo" (takes first part)
+    3. Hipparcos catalog number with HIP prefix: "HIP 49669", "HIP65474"
+    4. Bayer designation with Greek letter names: "Alpha Leonis", "Beta Persei"
+    5. Flamsteed designation with number + constellation: "32 Leonis", "87 Virginis"
+    6. Partial name search (case-insensitive): "Reg", "pic"
+    7. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
+    8. Format with comma: "Regulus,alLeo" (takes first part)
 
     Args:
         star_name: Star identifier - can be name, catalog number, or search string
@@ -3388,6 +3389,8 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         >>> entry, err = _resolve_star2("Regulus")         # Exact name
         >>> entry, err = _resolve_star2("49669")           # HIP number
         >>> entry, err = _resolve_star2(",49669")          # HIP with leading comma
+        >>> entry, err = _resolve_star2("HIP 49669")       # HIP with prefix
+        >>> entry, err = _resolve_star2("HIP65474")        # HIP with prefix (no space)
         >>> entry, err = _resolve_star2("Alpha Leonis")    # Bayer designation
         >>> entry, err = _resolve_star2("Beta Persei")     # Bayer designation
         >>> entry, err = _resolve_star2("32 Leonis")       # Flamsteed designation
@@ -3407,6 +3410,18 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
             if entry.hip_number == hip_number:
                 return entry, None
         return None, f"could not find star name {hip_number}"
+
+    # Check for "HIP NNNNN" format (case-insensitive)
+    search_upper_temp = search.upper()
+    if search_upper_temp.startswith("HIP ") or search_upper_temp.startswith("HIP"):
+        # Extract the numeric part after "HIP" (with or without space)
+        hip_part = search[3:].strip()
+        if hip_part.isdigit():
+            hip_number = int(hip_part)
+            for entry in STAR_CATALOG:
+                if entry.hip_number == hip_number:
+                    return entry, None
+            return None, f"could not find star name HIP {hip_number}"
 
     # Handle comma-separated format (e.g., "Regulus,alLeo")
     if "," in search:
@@ -3487,6 +3502,7 @@ def swe_fixstar2_ut(
     Enhanced version of swe_fixstar_ut() that supports flexible star lookup:
     - Star name (full or partial): "Regulus", "Reg"
     - Hipparcos catalog number: "49669", ",49669"
+    - Hipparcos with HIP prefix: "HIP 49669", "HIP65474"
     - Bayer/Flamsteed designation: "alLeo", "alVir"
 
     Returns the full star name along with the position, allowing identification
