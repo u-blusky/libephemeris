@@ -1362,12 +1362,16 @@ STARS = {
         parallax=0.0244595,  # 24.4595 mas (Gaia DR3)
         radial_velocity=15.0,  # +15.0 km/s (SIMBAD - away from us)
     ),
-    # PUSHYA (Delta Cancri, HIP 43834)
+    # PUSHYA (Delta Cancri / Asellus Australis, HIP 42911)
+    # High-precision Gaia DR3 values for True Pushya ayanamsha
+    # Proper motion includes rigorous space motion corrections
     "PUSHYA": StarData(
-        ra_j2000=131.17125,
-        dec_j2000=18.154306,
-        pm_ra=-0.01844,
-        pm_dec=-0.22781,
+        ra_j2000=131.1712460977,  # 08h 44m 41.0991810454s (Gaia DR3 J2000.0)
+        dec_j2000=18.1543080691,  # +18° 09' 15.509048595" (Gaia DR3 J2000.0)
+        pm_ra=-0.018435,  # -18.435 mas/yr (Gaia DR3 mu_alpha*)
+        pm_dec=-0.227813,  # -227.813 mas/yr (Gaia DR3 mu_delta)
+        parallax=0.0238271,  # 23.8271 mas (Gaia DR3)
+        radial_velocity=17.14,  # +17.14 km/s (SIMBAD - away from us)
     ),
     # MULA (Lambda Scorpii / Shaula, HIP 85927)
     "MULA": StarData(
@@ -1982,8 +1986,8 @@ def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
         ),  # Zeta Psc adjusted
         SE_SIDM_TRUE_PUSHYA: (
             "Delta Cancri",
-            8.743533,
-            18.154311,
+            8.7447497792,  # 08h 44m 41.0991810454s (Gaia DR3)
+            18.1543080691,  # +18° 09' 15.509048595" (Gaia DR3)
             106.0,
         ),  # Delta Cnc at 106°
         SE_SIDM_TRUE_MULA: (
