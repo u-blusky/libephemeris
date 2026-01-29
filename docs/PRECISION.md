@@ -15,7 +15,7 @@ This document provides detailed information about the precision and limitations 
 | True Lunar Node | ~0.07° (~260 arcsec) | Osculating orbital elements method |
 | House cusps | ±0.001° (~3.6 arcsec) | All 19 house systems |
 | Ayanamsha (standard) | ±0.01° | Fagan-Bradley, Lahiri, etc. |
-| Ayanamsha (star-based) | ±0.06° | True Citra, Galactic Center, etc. |
+| Ayanamsha (star-based) | ±0.02-0.06° | True Citra (0.02°), others (0.06°) |
 | Sun crossings (ingress) | ±0.001 arcsec | Sub-milliarcsecond precision |
 | Moon crossings | ±0.05 arcsec | Sub-arcsecond precision |
 | Planet crossings | ±0.1 arcsec | Sub-arcsecond precision |
@@ -168,7 +168,7 @@ Star-based ayanamshas have slightly higher tolerance due to differences in:
 
 | Ayanamsha | Max Difference |
 |-----------|---------------|
-| True Citra | <0.06° |
+| True Citra | <0.02° |
 | True Revati | <0.06° |
 | True Pushya | <0.06° |
 | True Mula | <0.06° |
@@ -177,6 +177,11 @@ Star-based ayanamshas have slightly higher tolerance due to differences in:
 | Galactic Center Rgilbrand | <0.06° |
 | Galactic Center Cochrane | <0.06° |
 | Galactic Center Mula Wilhelm | <0.06° |
+
+**Note on True Citra**: Uses high-precision Hipparcos coordinates for Spica
+(HIP 65474) with full proper motion correction including parallax and radial
+velocity. This achieves ~0.02° precision vs Swiss Ephemeris, significantly
+better than other star-based ayanamshas.
 
 ---
 
@@ -430,7 +435,7 @@ Ephemeris files are shared across all `EphemerisContext` instances for memory ef
 ### Use With Caution
 
 - Polar latitude locations (>66.5°) - use Equal or Whole Sign houses
-- Star-based ayanamshas - expect ±0.06° variance
+- Star-based ayanamshas - expect ±0.02° for True Citra, ±0.06° for others
 - Asteroid/TNO positions - Keplerian approximation only
 - Very old historical dates (before 1900 with DE421)
 

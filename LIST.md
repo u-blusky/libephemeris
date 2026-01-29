@@ -430,19 +430,19 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPROVE KOCH POLAR LATITUDE HANDLING: Similar to Placidus, improve Koch house calculation for polar latitudes with appropriate fallbacks.
 
-- [ ] VERIFY ALL 19 HOUSE SYSTEMS: Add comprehensive comparison tests to compare_scripts/compare_houses.py and compare_scripts/compare_houses_ext.py that compare all 19 house systems (Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Topocentric, Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural, Gauquelin, APC, Sripati) against pyswisseph swe.houses_ex() at 100+ random locations (varying latitude from -60° to +60°, longitude from -180° to +180°) and times (spanning 1900-2100), verify that all 12 house cusps agree within 0.001 degrees, and that special points (Ascendant, MC, ARMC, Vertex, Equatorial Ascendant) also match within the same tolerance.
+- [x] VERIFY ALL 19 HOUSE SYSTEMS: Add comprehensive comparison tests to compare_scripts/compare_houses.py and compare_scripts/compare_houses_ext.py that compare all 19 house systems (Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Topocentric, Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural, Gauquelin, APC, Sripati) against pyswisseph swe.houses_ex() at 100+ random locations (varying latitude from -60° to +60°, longitude from -180° to +180°) and times (spanning 1900-2100), verify that all 12 house cusps agree within 0.001 degrees, and that special points (Ascendant, MC, ARMC, Vertex, Equatorial Ascendant) also match within the same tolerance.
 
-- [ ] DOCUMENT HOUSE SYSTEM ALGORITHMS: Document the mathematical algorithm and formula used for each house system in code comments or separate documentation.
+- [x] DOCUMENT HOUSE SYSTEM ALGORITHMS: Document the mathematical algorithm and formula used for each house system in code comments or separate documentation.
 
-- [ ] IMPLEMENT HOUSE CUSP VELOCITY: When SEFLG_SPEED is set, calculate the rate of change of house cusps for progressed chart applications.
+- [x] IMPLEMENT HOUSE CUSP VELOCITY: When SEFLG_SPEED is set, calculate the rate of change of house cusps for progressed chart applications.
 
 ---
 
 ## LOW PRIORITY: Ayanamsha Improvements
 
-- [ ] VERIFY ALL 43 AYANAMSHA MODES: Add comprehensive comparison tests to compare_scripts/compare_sidereal.py that compare all 43 ayanamsha modes against pyswisseph swe.get_ayanamsa_ex() at multiple dates (J2000.0, 1900, 1950, 2000, 2050, 2100) to verify accuracy, for each ayanamsha mode verify that the ayanamsha value matches pyswisseph within 0.0001 degrees (0.36 arcseconds), also test swe.set_sid_mode() configuration and verify that sidereal planet positions calculated with each ayanamsha mode match pyswisseph within the same tolerance.
+- [x] VERIFY ALL 43 AYANAMSHA MODES: Add comprehensive comparison tests to compare_scripts/compare_sidereal.py that compare all 43 ayanamsha modes against pyswisseph swe.get_ayanamsa_ex() at multiple dates (J2000.0, 1900, 1950, 2000, 2050, 2100) to verify accuracy, for each ayanamsha mode verify that the ayanamsha value matches pyswisseph within 0.0001 degrees (0.36 arcseconds), also test swe.set_sid_mode() configuration and verify that sidereal planet positions calculated with each ayanamsha mode match pyswisseph within the same tolerance.
 
-- [ ] IMPROVE TRUE CITRA AYANAMSHA PRECISION: Currently docs/PRECISION.md notes star-based ayanamshas have ±0.06° precision, improve True Citra by using more precise Spica coordinates with full proper motion correction.
+- [x] IMPROVE TRUE CITRA AYANAMSHA PRECISION: Currently docs/PRECISION.md notes star-based ayanamshas have ±0.06° precision, improve True Citra by using more precise Spica coordinates with full proper motion correction.
 
 - [ ] IMPROVE TRUE REVATI AYANAMSHA PRECISION: Similar improvement for True Revati ayanamsha using precise Zeta Piscium coordinates.
 
