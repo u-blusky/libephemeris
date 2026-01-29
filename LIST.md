@@ -456,13 +456,13 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] DOCUMENT AYANAMSHA DEFINITIONS: Create documentation explaining the astronomical and historical basis for each ayanamsha mode, what reference point it uses, and when it was zero.
 
-- [ ] VALIDATE LAHIRI AGAINST IAE: Validate the Lahiri ayanamsha against the Indian Astronomical Ephemeris official values as described in Swiss Ephemeris Appendix E.
+- [x] VALIDATE LAHIRI AGAINST IAE: Validate the Lahiri ayanamsha against the Indian Astronomical Ephemeris official values as described in Swiss Ephemeris Appendix E.
 
 ---
 
 ## OPTIONAL: Performance and Architecture
 
-- [ ] BENCHMARK AGAINST PYSWISSEPH: Create comprehensive benchmarks in compare_scripts/ directory (either as a new file compare_scripts/compare_benchmark.py or integrated into compare_scripts/compare_all.py) that compare calculation speed for planets, houses, lunar points, minor bodies, and other functions against pyswisseph, quantify the performance difference by running each calculation type 10000+ times and reporting mean/median/min/max execution times for both libephemeris and pyswisseph, generate a performance report showing the ratio of execution times.
+- [x] BENCHMARK AGAINST PYSWISSEPH: Create comprehensive benchmarks in compare_scripts/ directory (either as a new file compare_scripts/compare_benchmark.py or integrated into compare_scripts/compare_all.py) that compare calculation speed for planets, houses, lunar points, minor bodies, and other functions against pyswisseph, quantify the performance difference by running each calculation type 10000+ times and reporting mean/median/min/max execution times for both libephemeris and pyswisseph, generate a performance report showing the ratio of execution times.
 
 - [ ] PROFILE HOT PATHS: Use Python profiling tools to identify the most time-consuming functions and optimize them.
 

@@ -233,7 +233,7 @@ def example_coverage_check():
             coverage = eph.get_spk_coverage(path)
             if coverage:
                 start_jd, end_jd = coverage
-                print(f"\nSPK coverage:")
+                print("\nSPK coverage:")
                 print(f"  Start: JD {start_jd:.1f}")
                 print(f"  End:   JD {end_jd:.1f}")
 
@@ -251,7 +251,7 @@ def example_coverage_check():
                 try:
                     pos, _ = eph.calc_ut(jd_bad, eph.SE_CHIRON, 0)
                     print(f"\nCalculation at JD {jd_bad} (outside coverage):")
-                    print(f"  Should have raised error!")
+                    print("  Should have raised error!")
                 except ValueError as e:
                     print(f"\nCalculation at JD {jd_bad} (outside coverage):")
                     print(f"  Correctly raised error: {e}")
