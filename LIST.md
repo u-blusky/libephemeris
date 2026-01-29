@@ -444,11 +444,11 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPROVE TRUE CITRA AYANAMSHA PRECISION: Currently docs/PRECISION.md notes star-based ayanamshas have ±0.06° precision, improve True Citra by using more precise Spica coordinates with full proper motion correction.
 
-- [ ] IMPROVE TRUE REVATI AYANAMSHA PRECISION: Similar improvement for True Revati ayanamsha using precise Zeta Piscium coordinates.
+- [x] IMPROVE TRUE REVATI AYANAMSHA PRECISION: Similar improvement for True Revati ayanamsha using precise Zeta Piscium coordinates.
 
-- [ ] IMPROVE TRUE PUSHYA AYANAMSHA PRECISION: Improve True Pushya ayanamsha precision.
+- [x] IMPROVE TRUE PUSHYA AYANAMSHA PRECISION: Improve True Pushya ayanamsha precision.
 
-- [ ] IMPROVE TRUE MULA AYANAMSHA PRECISION: Improve True Mula ayanamsha precision.
+- [x] IMPROVE TRUE MULA AYANAMSHA PRECISION: Improve True Mula ayanamsha precision.
 
 - [ ] IMPROVE GALACTIC CENTER AYANAMSHAS: Improve Galactic Center based ayanamshas (0 Sag, Rgilbrand, Cochrane, Mula Wilhelm) using current best coordinates for Sgr A* (the radio source at the Galactic Center).
 

@@ -1374,11 +1374,16 @@ STARS = {
         radial_velocity=17.14,  # +17.14 km/s (SIMBAD - away from us)
     ),
     # MULA (Lambda Scorpii / Shaula, HIP 85927)
+    # High-precision Hipparcos 2007 values for True Mula ayanamsha
+    # (Gaia DR3 unavailable - star too bright at V=1.63)
+    # Proper motion includes rigorous space motion corrections
     "MULA": StarData(
-        ra_j2000=263.402167,
-        dec_j2000=-37.103822,
-        pm_ra=-0.00890,
-        pm_dec=-0.02995,
+        ra_j2000=263.40216717,  # 17h 33m 36.52012s (Hipparcos 2007 J2000.0)
+        dec_j2000=-37.10382356,  # -37° 06' 13.7648" (Hipparcos 2007 J2000.0)
+        pm_ra=-0.00853,  # -8.53 mas/yr (Hipparcos 2007 mu_alpha*)
+        pm_dec=-0.03080,  # -30.80 mas/yr (Hipparcos 2007 mu_delta)
+        parallax=0.00571,  # 5.71 mas (Hipparcos 2007)
+        radial_velocity=-3.00,  # -3.00 km/s (SIMBAD - approaching us)
     ),
     # Galactic Center (Sgr A*)
     # Radio position from Reid & Brunthaler (2004)
