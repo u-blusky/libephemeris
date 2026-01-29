@@ -1398,6 +1398,24 @@ def _houses_placidus(
         3. Use iterative solution to find ecliptic longitude at each time division
         4. Calculate opposite houses by adding 180°
 
+    Mathematical Formulas:
+        Ascensional Difference: AD = arcsin(tan(φ) · tan(δ))
+        Semi-diurnal Arc: SA = 90° + AD (above horizon)
+        Semi-nocturnal Arc: SA = 90° - AD (below horizon)
+
+        House 11: H₁₁ = SA/3 = (90° + AD)/3; RA₁₁ = ARMC + H₁₁
+        House 12: H₁₂ = 2·SA/3 = 2·(90° + AD)/3; RA₁₂ = ARMC + H₁₂
+        House 2:  H₂ = 2·(90° - AD)/3; RA₂ = ARMC + 180° - H₂
+        House 3:  H₃ = (90° - AD)/3; RA₃ = ARMC + 180° - H₃
+
+        Iterative convergence (threshold 1e-7°):
+            1. tan(δ) = sin(RA) · tan(ε)
+            2. AD = arcsin(tan(φ) · tan(δ))
+            3. RA_new = ARMC ± H(AD)
+            4. Repeat until |RA_new - RA| < 1e-7°
+
+        RA to ecliptic: λ = atan2(sin(RA), cos(RA) · cos(ε))
+
     Note: Polar latitude handling
         Placidus is undefined at latitudes > ~66° where some ecliptic points never
         rise/set (circumpolar behavior). At polar latitudes, swe_houses() raises
@@ -1731,6 +1749,27 @@ def _houses_koch(
         3. Iteratively solve for ecliptic longitude at each OA value
         4. Calculate opposite houses by adding 180°
 
+    Mathematical Formulas:
+        Oblique Ascension: OA = RA - AD
+        where AD = arcsin(tan(φ) · tan(δ))
+
+        Quadrant MC→Asc (houses 11, 12):
+            OA₁₁ = OA_MC + (OA_Asc - OA_MC)/3
+            OA₁₂ = OA_MC + 2·(OA_Asc - OA_MC)/3
+
+        Quadrant Asc→IC (houses 2, 3):
+            OA₂ = OA_Asc + (OA_IC - OA_Asc)/3
+            OA₃ = OA_Asc + 2·(OA_IC - OA_Asc)/3
+
+        Iterative solution for target OA (threshold 1e-7°):
+            1. RA = target_OA (initial guess)
+            2. tan(δ) = sin(RA) · tan(ε)
+            3. AD = arcsin(tan(φ) · tan(δ))
+            4. RA_new = target_OA + AD
+            5. Repeat until |RA_new - RA| < 1e-7°
+
+        RA to ecliptic: λ = atan2(sin(RA), cos(RA) · cos(ε))
+
     Note: Polar latitude handling
         Koch is undefined at latitudes > ~66° where some ecliptic points never
         rise/set (circumpolar behavior). At polar latitudes, swe_houses() raises
@@ -1876,6 +1915,20 @@ def _houses_regiomontanus(
         3. Project to ecliptic using spherical trigonometry
         4. Calculate cusp longitude from pole and RAMC offset
 
+    Mathematical Formulas:
+        Hour angle offset: H = 30°, 60°, 120°, 150° for houses 11, 12, 2, 3
+
+        Pole of projection:
+            tan(P) = tan(φ) · sin(H)
+
+        Right Ascension offset:
+            R = ARMC + H - 90°
+
+        Ecliptic longitude:
+            λ = atan2(cos(R), -(sin(R)·cos(ε) + tan(P)·sin(ε)))
+
+        Opposite houses: λ_{i+6} = (λᵢ + 180°) mod 360°
+
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
         lat: Geographic latitude in degrees
@@ -1938,6 +1991,22 @@ def _houses_campanus(
         2. For each segment, calculate azimuth and altitude
         3. Transform to equatorial coordinates
         4. Project to ecliptic longitude
+
+    Mathematical Formulas:
+        Prime vertical offset: h_pv = 30°, 60°, 120°, 150°
+
+        Prime vertical to hour angle transformation:
+            tan(H_eff) = tan(h_pv) · cos(φ)
+            (Adjust H_eff by +180° if h_pv > 90°)
+
+        Pole calculation:
+            tan(P) = tan(φ) · sin(H_eff)
+
+        Right Ascension offset:
+            R = ARMC + H_eff - 90°
+
+        Ecliptic projection:
+            λ = atan2(cos(R), -(sin(R)·cos(ε) + tan(P)·sin(ε)))
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -2016,6 +2085,15 @@ def _houses_equal(asc: float) -> List[float]:
     Simplest house system: each house is exactly 30° of ecliptic longitude.
     House 1 starts at Ascendant, each subsequent house adds 30°.
 
+    Mathematical Formula:
+        λᵢ = (λ_Asc + (i-1) × 30°) mod 360°
+        where i = 1, 2, ..., 12
+
+    Properties:
+        - Works at all latitudes including polar regions
+        - MC may not coincide with 10th house cusp
+        - Computationally exact (no astronomical calculations)
+
     Args:
         asc: Ascendant longitude in degrees
 
@@ -2038,6 +2116,22 @@ def _houses_whole_sign(asc: float) -> List[float]:
     Algorithm:
         1. Find zodiac sign of Ascendant (floor(asc / 30) * 30)
         2. Each house = one complete sign (30° intervals from sign 0°)
+
+    Mathematical Formula:
+        start = floor(λ_Asc / 30°) × 30°
+        λᵢ = (start + (i-1) × 30°) mod 360°
+        where i = 1, 2, ..., 12
+
+    Example:
+        If Asc = 15° Taurus (45°), then:
+        - House 1 starts at 30° (0° Taurus)
+        - House 2 starts at 60° (0° Gemini)
+        - etc.
+
+    Properties:
+        - Works at all latitudes including polar regions
+        - Computationally exact (no astronomical calculations)
+        - House cusps always at 0° of each sign
 
     Args:
         asc: Ascendant longitude in degrees
@@ -2064,6 +2158,28 @@ def _houses_porphyry(asc: float, mc: float) -> List[float]:
         1. Calculate arc from Asc to MC, divide by 3
         2. Calculate arc from MC to Desc (MC+180), divide by 3
         3. Opposite houses are 180° from each other
+
+    Mathematical Formulas:
+        Quadrant MC→Asc (houses 11, 12):
+            step = (λ_Asc - λ_MC) mod 360° / 3
+            λ₁₁ = λ_MC + step
+            λ₁₂ = λ_MC + 2·step
+
+        Quadrant Asc→IC (houses 2, 3):
+            step = (λ_IC - λ_Asc) mod 360° / 3
+            λ₂ = λ_Asc + step
+            λ₃ = λ_Asc + 2·step
+
+        Opposite houses:
+            λ₅ = (λ₁₁ + 180°) mod 360°
+            λ₆ = (λ₁₂ + 180°) mod 360°
+            λ₈ = (λ₂ + 180°) mod 360°
+            λ₉ = (λ₃ + 180°) mod 360°
+
+    Properties:
+        - Works at all latitudes including polar regions
+        - Used as fallback when Placidus/Koch fail
+        - Computationally simple (no trigonometry)
 
     Args:
         asc: Ascendant longitude in degrees
@@ -2114,6 +2230,26 @@ def _houses_alcabitius(
         1. Calculate RA of Ascendant and MC
         2. Divide RA intervals between angles
         3. Convert RA divisions back to ecliptic longitude
+
+    Mathematical Formulas:
+        Right Ascension of Ascendant:
+            RA_Asc = atan2(sin(λ_Asc)·cos(ε), cos(λ_Asc))
+
+        Quadrant MC→Asc (houses 11, 12):
+            arc = (RA_Asc - ARMC) mod 360°
+            step = arc / 3
+            RA₁₁ = ARMC + step
+            RA₁₂ = ARMC + 2·step
+
+        Quadrant Asc→IC (houses 2, 3):
+            RA_IC = (ARMC + 180°) mod 360°
+            arc = (RA_IC - RA_Asc) mod 360°
+            step = arc / 3
+            RA₂ = RA_Asc + step
+            RA₃ = RA_Asc + 2·step
+
+        RA to ecliptic conversion:
+            λ = atan2(sin(RA), cos(RA)·cos(ε))
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -2182,6 +2318,27 @@ def _houses_polich_page(
     Developed in 1960s to account for observer's actual position on Earth's surface
     rather than at Earth's center. Uses modified pole calculations.
 
+    Algorithm:
+        Similar to Regiomontanus but with modified pole factors that account
+        for the topocentric (observer-centered) perspective.
+
+    Mathematical Formulas:
+        Pole factors:
+            For houses 11, 3: factor = 1/3
+            For houses 12, 2: factor = 2/3
+
+        Pole calculation (modified from Regiomontanus):
+            tan(P) = tan(φ) × factor
+
+        Hour angle offsets:
+            H = 30°, 60°, 120°, 150° for houses 11, 12, 2, 3
+
+        Right Ascension offset:
+            R = ARMC + H - 90°
+
+        Ecliptic projection:
+            λ = atan2(cos(R), -(sin(R)·cos(ε) + tan(P)·sin(ε)))
+
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
         lat: Geographic latitude in degrees
@@ -2244,6 +2401,20 @@ def _houses_morinus(
         1. Divide equator into 30° RA sections from 0h RA
         2. Convert each RA to ecliptic longitude using obliquity
 
+    Mathematical Formulas:
+        For each house at RA = ARMC + (i-10)×30° where i = 10, 11, 12, 1, 2, 3:
+
+        Projection via ecliptic poles:
+            tan(λ) = tan(RA) × cos(ε)
+
+        Using atan2 for proper quadrant:
+            λ = atan2(sin(RA)·cos(ε), cos(RA))
+
+    Properties:
+        - Location-independent (ignores latitude)
+        - Morinus 1st cusp differs from standard Ascendant
+        - Morinus 10th cusp differs from standard MC
+
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
         lat: Geographic latitude in degrees
@@ -2299,6 +2470,22 @@ def _houses_meridian(
     Based on meridian passages, divides RA from MC in equal 30° intervals.
     Related to Morinus but starts from MC instead of 0° Aries.
 
+    Algorithm:
+        Projects equator points (ARMC + n×30°) to ecliptic via celestial poles.
+
+    Mathematical Formulas:
+        For each house at RA = ARMC + (i-10)×30° where i = 10, 11, 12, 1, 2, 3:
+
+        Projection via celestial poles:
+            tan(λ) = tan(RA) / cos(ε)
+
+        Using atan2 for proper quadrant:
+            λ = atan2(sin(RA), cos(RA)·cos(ε))
+
+    Difference from Morinus:
+        Morinus:  λ = atan2(sin(RA)·cos(ε), cos(RA))
+        Meridian: λ = atan2(sin(RA), cos(RA)·cos(ε))
+
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
         lat: Geographic latitude in degrees
@@ -2347,6 +2534,16 @@ def _houses_vehlow(asc: float) -> List[float]:
     Variant of Equal houses where the Ascendant falls at 15° into House 1
     rather than at the cusp. Each house is still 30°.
 
+    Mathematical Formula:
+        start = (λ_Asc - 15°) mod 360°
+        λᵢ = (start + (i-1) × 30°) mod 360°
+        where i = 1, 2, ..., 12
+
+    Properties:
+        - Ascendant falls exactly at 15° into House 1
+        - Works at all latitudes including polar regions
+        - Computationally exact (no astronomical calculations)
+
     Args:
         asc: Ascendant longitude in degrees
 
@@ -2373,6 +2570,16 @@ def _houses_carter(
         1. Calculate RA of Ascendant
         2. Add 30° RA increments for each house
         3. Convert each RA to ecliptic longitude
+
+    Mathematical Formulas:
+        Right Ascension of Ascendant:
+            RA_Asc = atan2(sin(λ_Asc)·cos(ε), cos(λ_Asc))
+
+        For each house i (1-12):
+            RA = RA_Asc + (i-1) × 30°
+
+        RA to ecliptic conversion via celestial poles:
+            λ = atan2(sin(RA), cos(RA)·cos(ε))
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -2428,6 +2635,28 @@ def _houses_gauquelin(
     - Sector 10: Upper culmination (MC)
     - Sector 19: Setting (Descendant)
     - Sector 28: Lower culmination (IC)
+
+    Mathematical Formulas:
+        Arc calculation:
+            arc_diurnal = (RA_Desc - RA_Asc) mod 360°
+            arc_nocturnal = 360° - arc_diurnal
+
+        Sector RA positions (1-36):
+            For sectors 1-18 (diurnal):
+                RA_sector = RA_Asc + (sector-1)/18 × arc_diurnal
+
+            For sectors 19-36 (nocturnal):
+                RA_sector = RA_Desc + (sector-19)/18 × arc_nocturnal
+
+        House cusp mapping (middle sector of each triplet):
+            House n cusp = sector (3n-1) longitude
+
+        RA to ecliptic:
+            λ = atan2(sin(RA), cos(RA)·cos(ε))
+
+    Polar Limitation:
+        Fails within polar circle (|φ| >= 90° - ε) due to undefined
+        diurnal/nocturnal arcs.
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -2588,6 +2817,28 @@ def _houses_krusinski(
     5. Divide circle into 30° segments
     6. Transform each cusp back to ecliptic
 
+    Mathematical Formulas:
+        Coordinate rotation (cotrans - rotation around x-axis):
+            x' = x
+            y' = y·cos(θ) + z·sin(θ)
+            z' = -y·sin(θ) + z·cos(θ)
+
+        Algorithm steps:
+            A0. x = [λ_Asc, 0, 1]  (ecliptic coordinates)
+            A1. x = cotrans(x, -ε)  (transform to equatorial)
+            A2. x[0] = x[0] - (ARMC - 90°)  (rotate)
+            A3. x = cotrans(x, -(90° - φ))  (transform to horizontal)
+            A4. Save horizon_lon; set x[0] = 0
+            A5. x = cotrans(x, -90°)  (transform to house circle)
+
+        For each cusp i (0-5):
+            B0. x_cusp = [30°·i, 0, 1]
+            B1. x_cusp = cotrans(x_cusp, 90°)
+            B2. x_cusp[0] += horizon_lon
+            B3. x_cusp = cotrans(x_cusp, 90° - φ)
+            B4. x_cusp[0] += (ARMC - 90°)
+            B5. λ = atan(tan(RA)/cos(ε)) with quadrant adjustment
+
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
         lat: Geographic latitude in degrees
@@ -2698,6 +2949,27 @@ def _houses_horizontal(
     Algorithm from Swiss Ephemeris swehouse.c lines 1083-1155.
     Uses co-latitude transformation and Campanus-like calculation.
 
+    Mathematical Formulas:
+        Co-latitude transformation:
+            φ' = 90° - φ  (for φ > 0)
+            φ' = -90° - φ (for φ < 0)
+
+        Intermediate azimuths:
+            fh1 = arcsin(sin(φ')/2)
+            fh2 = arcsin(√3/2 · sin(φ'))
+            xh1 = arctan(√3 / cos(φ'))
+            xh2 = arctan(1/(√3 · cos(φ')))
+
+        ARMC rotation:
+            θ' = ARMC + 180°
+
+        House cusps (using modified Ascendant formula):
+            cusps[11] = Asc(θ' + 90° - xh1, ε, φ, fh1)
+            cusps[12] = Asc(θ' + 90° - xh2, ε, φ, fh2)
+            cusps[1]  = Asc(θ' + 90°, ε, φ, φ')
+            cusps[2]  = Asc(θ' + 90° + xh2, ε, φ, fh2)
+            cusps[3]  = Asc(θ' + 90° + xh1, ε, φ, fh1)
+
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
         lat: Geographic latitude in degrees
@@ -2801,8 +3073,34 @@ def _houses_natural_gradient(
 ) -> List[float]:
     """
     Natural Gradient house system ('N').
+
     In Swiss Ephemeris, 'N' maps to "Equal houses with 0° Aries as cusp 1".
     This is effectively a Whole Sign system starting from 0° Aries.
+
+    Mathematical Formula:
+        λᵢ = (i-1) × 30°
+        where i = 1, 2, ..., 12
+
+    Result:
+        House 1 = 0° Aries (0°)
+        House 2 = 0° Taurus (30°)
+        House 3 = 0° Gemini (60°)
+        ... etc.
+
+    Properties:
+        - Independent of time and location
+        - Works at all latitudes
+        - Computationally exact
+
+    Args:
+        armc: Sidereal time at Greenwich (RAMC) in degrees (unused)
+        lat: Geographic latitude in degrees (unused)
+        eps: True obliquity of ecliptic in degrees (unused)
+        asc: Ascendant longitude in degrees (unused)
+        mc: Midheaven longitude in degrees (unused)
+
+    Returns:
+        List of 13 house cusp longitudes
     """
     cusps = [0.0] * 13
     for i in range(1, 13):
@@ -2813,6 +3111,27 @@ def _houses_natural_gradient(
 def _apc_sector(n: int, ph: float, e: float, az: float) -> float:
     """
     Calculate one sector of APC (Ascendant-Parallel Circle) house system.
+
+    Mathematical Formulas:
+        Ascensional difference of Ascendant:
+            kv = arctan(tan(φ)·tan(ε)·cos(ARMC) / (1 + tan(φ)·tan(ε)·sin(ARMC)))
+
+        Declination of Ascendant:
+            δ_Asc = arctan(sin(kv) / tan(φ))
+
+        House cusp calculation (for house n):
+            For n < 8 (below horizon):
+                k = n - 1
+                a = kv + ARMC + π/2 + k·(π/2 - kv)/3
+
+            For n >= 8 (above horizon):
+                k = n - 13
+                a = kv + ARMC + π/2 + k·(π/2 + kv)/3
+
+        Ecliptic longitude:
+            λ = atan2(tan(δ_Asc)·tan(φ)·sin(ARMC) + sin(a),
+                      cos(ε)·(tan(δ_Asc)·tan(φ)·cos(ARMC) + cos(a))
+                      + sin(ε)·tan(φ)·sin(ARMC - a))
 
     Args:
         n: House number (1-12)
@@ -2881,6 +3200,27 @@ def _houses_apc(
 
     Based on the great circle parallel to the horizon passing through the Ascendant.
     Algorithm from Swiss Ephemeris swehouse.c lines 1806-1829.
+
+    Mathematical Formulas:
+        The APC system uses the parallel circle that passes through the Ascendant
+        and is tilted at the declination of the Ascendant.
+
+        Ascensional difference of Ascendant:
+            kv = arctan(tan(φ)·tan(ε)·cos(ARMC) / (1 + tan(φ)·tan(ε)·sin(ARMC)))
+
+        Declination of Ascendant:
+            δ_Asc = arctan(sin(kv) / tan(φ))
+
+        For each house n (1-12):
+            Below horizon (n < 8): k = n - 1
+                a = kv + ARMC + π/2 + k·(π/2 - kv)/3
+
+            Above horizon (n >= 8): k = n - 13
+                a = kv + ARMC + π/2 + k·(π/2 + kv)/3
+
+            λ = atan2(tan(δ_Asc)·tan(φ)·sin(ARMC) + sin(a),
+                      cos(ε)·(tan(δ_Asc)·tan(φ)·cos(ARMC) + cos(a))
+                      + sin(ε)·tan(φ)·sin(ARMC - a))
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
