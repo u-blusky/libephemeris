@@ -442,6 +442,10 @@ SE_AIN: int = SE_FIXSTAR_OFFSET + 68  # Epsilon Tauri - Hyades member
 # Orion constellation - completing the major stars
 SE_MEISSA: int = SE_FIXSTAR_OFFSET + 69  # Lambda Orionis - Orion's head
 
+# Ursa Major (Big Dipper) - completing the asterism
+SE_PHECDA: int = SE_FIXSTAR_OFFSET + 70  # Gamma Ursae Majoris - bowl star
+SE_MEGREZ: int = SE_FIXSTAR_OFFSET + 71  # Delta Ursae Majoris - bowl-handle junction
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree

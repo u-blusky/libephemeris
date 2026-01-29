@@ -116,6 +116,8 @@ from .constants import (
     SE_THETA_TAURI,
     SE_AIN,
     SE_MEISSA,
+    SE_PHECDA,
+    SE_MEGREZ,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -753,6 +755,32 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_dec=-0.01680,  # -16.80 mas/yr
         ),
         magnitude=3.99,
+    ),
+    StarCatalogEntry(
+        id=SE_PHECDA,
+        name="Phecda",
+        nomenclature="gaUMa",
+        hip_number=58001,
+        data=StarData(
+            ra_j2000=178.457679,  # 11h 53m 49.8s (Gamma Ursae Majoris)
+            dec_j2000=53.694758,  # +53° 41' 41"
+            pm_ra=0.10744,  # 107.44 mas/yr
+            pm_dec=0.01137,  # 11.37 mas/yr
+        ),
+        magnitude=2.44,
+    ),
+    StarCatalogEntry(
+        id=SE_MEGREZ,
+        name="Megrez",
+        nomenclature="deUMa",
+        hip_number=59774,
+        data=StarData(
+            ra_j2000=183.856503,  # 12h 15m 25.6s (Delta Ursae Majoris)
+            dec_j2000=57.032615,  # +57° 01' 57"
+            pm_ra=0.10328,  # 103.28 mas/yr
+            pm_dec=0.00768,  # 7.68 mas/yr
+        ),
+        magnitude=3.31,
     ),
     StarCatalogEntry(
         id=SE_VINDEMIATRIX,
@@ -1495,6 +1523,22 @@ STAR_ALIASES: dict[str, int] = {
     "SAIDAK": SE_ALCOR,
     "SUHA": SE_ALCOR,
     "AL-SAHJA": SE_ALCOR,
+    # ======== PHECDA (Gamma Ursae Majoris) ========
+    "GAMMA URSAE MAJORIS": SE_PHECDA,
+    "GAMMA UMA": SE_PHECDA,
+    "64 UMA": SE_PHECDA,
+    "γ UMA": SE_PHECDA,
+    "GAUMA": SE_PHECDA,
+    "PHAD": SE_PHECDA,
+    "PHEKDA": SE_PHECDA,
+    "PHACD": SE_PHECDA,
+    # ======== MEGREZ (Delta Ursae Majoris) ========
+    "DELTA URSAE MAJORIS": SE_MEGREZ,
+    "DELTA UMA": SE_MEGREZ,
+    "69 UMA": SE_MEGREZ,
+    "δ UMA": SE_MEGREZ,
+    "DEUMA": SE_MEGREZ,
+    "KAFFA": SE_MEGREZ,
     # ======== VINDEMIATRIX (Epsilon Virginis) ========
     "GRAPE GATHERER": SE_VINDEMIATRIX,
     "EPSILON VIRGINIS": SE_VINDEMIATRIX,
