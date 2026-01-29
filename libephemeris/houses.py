@@ -1398,9 +1398,13 @@ def _houses_placidus(
         3. Use iterative solution to find ecliptic longitude at each time division
         4. Calculate opposite houses by adding 180°
 
-    FIXME: Precision - Polar latitude failure
-        Placidus undefined at latitudes > ~66° where some ecliptic points never
-        rise/set. Falls back to Porphyry when iteration fails.
+    Note: Polar latitude handling
+        Placidus is undefined at latitudes > ~66° where some ecliptic points never
+        rise/set (circumpolar behavior). At polar latitudes, swe_houses() raises
+        PolarCircleError with detailed information about the threshold and
+        recommended alternatives. Use swe_houses_with_fallback() for automatic
+        fallback to Porphyry. The polar threshold is approximately 90° - obliquity.
+        Internal fallback to Porphyry is retained as a safety net.
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -1717,16 +1721,23 @@ def _houses_koch(
     """
     Koch (Birthplace/GOH) house system.
 
-    Trisects the Oblique Ascension between major angles. Similar to Placidus
-    but uses a different astronomical quantity (OA instead of time divisions).
+    Trisects the Oblique Ascension between major angles. Also known as the
+    Birthplace system or GOH (Geburtsort-Häusersystem). Similar to Placidus
+    but uses Oblique Ascension divisions instead of time-based divisions.
 
     Algorithm:
         1. Calculate Oblique Ascension (OA = RA - AD) for MC, Asc, IC
         2. Divide OA intervals into thirds between angles
         3. Iteratively solve for ecliptic longitude at each OA value
+        4. Calculate opposite houses by adding 180°
 
-    FIXME: Precision - Polar latitude failure
-        Koch undefined at high latitudes like Placidus. Falls back to Porphyry.
+    Note: Polar latitude handling
+        Koch is undefined at latitudes > ~66° where some ecliptic points never
+        rise/set (circumpolar behavior). At polar latitudes, swe_houses() raises
+        PolarCircleError with detailed information about the threshold and
+        recommended alternatives. Use swe_houses_with_fallback() for automatic
+        fallback to Porphyry. The polar threshold is approximately 90° - obliquity.
+        Internal fallback to Porphyry is retained as a safety net.
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees

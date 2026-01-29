@@ -424,11 +424,11 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT POLAR ASCENDANT CALCULATION: Currently docs/PRECISION.md line 122 states "Polar Ascendant: Not implemented (returns 0.0)", implement the Polar Ascendant in houses.py - required for swe_houses_ex2 ascmc[5] output.
 
-- [ ] VERIFY GAUQUELIN SECTOR IMPLEMENTATION: Currently docs/PRECISION.md line 106 notes that Gauquelin sectors use "Placidus approximation (not true 36-sector)", verify the implementation correctly divides diurnal and nocturnal arcs into 18 sectors each.
+- [x] VERIFY GAUQUELIN SECTOR IMPLEMENTATION: Currently docs/PRECISION.md line 106 notes that Gauquelin sectors use "Placidus approximation (not true 36-sector)", verify the implementation correctly divides diurnal and nocturnal arcs into 18 sectors each.
 
-- [ ] IMPROVE PLACIDUS POLAR LATITUDE HANDLING: Currently Placidus houses fall back to Porphyry above 66.5° latitude (Arctic Circle), implement better handling with clearer warnings.
+- [x] IMPROVE PLACIDUS POLAR LATITUDE HANDLING: Currently Placidus houses fall back to Porphyry above 66.5° latitude (Arctic Circle), implement better handling with clearer warnings.
 
-- [ ] IMPROVE KOCH POLAR LATITUDE HANDLING: Similar to Placidus, improve Koch house calculation for polar latitudes with appropriate fallbacks.
+- [x] IMPROVE KOCH POLAR LATITUDE HANDLING: Similar to Placidus, improve Koch house calculation for polar latitudes with appropriate fallbacks.
 
 - [ ] VERIFY ALL 19 HOUSE SYSTEMS: Add comprehensive comparison tests to compare_scripts/compare_houses.py and compare_scripts/compare_houses_ext.py that compare all 19 house systems (Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Topocentric, Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural, Gauquelin, APC, Sripati) against pyswisseph swe.houses_ex() at 100+ random locations (varying latitude from -60° to +60°, longitude from -180° to +180°) and times (spanning 1900-2100), verify that all 12 house cusps agree within 0.001 degrees, and that special points (Ascendant, MC, ARMC, Vertex, Equatorial Ascendant) also match within the same tolerance.
 

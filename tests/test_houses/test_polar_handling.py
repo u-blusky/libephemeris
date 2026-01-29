@@ -467,3 +467,228 @@ class TestKochAndGauquelinPolar:
         assert used_fallback is True
         assert "Gauquelin" in warning
         assert len(cusps) == 12
+
+
+class TestKochPolarCircleErrorDetails:
+    """Test that Koch PolarCircleError provides helpful information (similar to Placidus)."""
+
+    @pytest.mark.unit
+    def test_koch_error_includes_latitude(self):
+        """Koch error message should include the problematic latitude."""
+        jd = 2451545.0
+
+        with pytest.raises(PolarCircleError) as exc_info:
+            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+
+        assert exc_info.value.latitude == 70.0
+        assert "70" in str(exc_info.value)
+
+    @pytest.mark.unit
+    def test_koch_error_includes_threshold(self):
+        """Koch error message should include the threshold."""
+        jd = 2451545.0
+
+        with pytest.raises(PolarCircleError) as exc_info:
+            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+
+        assert exc_info.value.threshold is not None
+        assert exc_info.value.threshold > 66.0
+        assert exc_info.value.threshold < 67.0
+
+    @pytest.mark.unit
+    def test_koch_error_includes_house_system(self):
+        """Koch error message should include the house system."""
+        jd = 2451545.0
+
+        with pytest.raises(PolarCircleError) as exc_info:
+            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+
+        assert exc_info.value.house_system == "K"
+        assert "Koch" in str(exc_info.value)
+
+    @pytest.mark.unit
+    def test_koch_error_suggests_alternatives(self):
+        """Koch error message should suggest alternative house systems."""
+        jd = 2451545.0
+
+        with pytest.raises(PolarCircleError) as exc_info:
+            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+
+        msg = str(exc_info.value).lower()
+        assert "porphyry" in msg or "equal" in msg or "whole sign" in msg
+
+    @pytest.mark.unit
+    def test_koch_error_mentions_fallback_function(self):
+        """Koch error message should mention swe_houses_with_fallback."""
+        jd = 2451545.0
+
+        with pytest.raises(PolarCircleError) as exc_info:
+            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+
+        assert "fallback" in str(exc_info.value).lower()
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("lat", [67.0, 70.0, 80.0, 89.0])
+    def test_koch_northern_polar_latitudes(self, lat):
+        """Koch at northern polar latitudes should raise detailed error."""
+        jd = 2451545.0
+
+        with pytest.raises(PolarCircleError) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, ord("K"))
+
+        assert exc_info.value.latitude == lat
+        # Should mention Northern
+        assert "N" in str(exc_info.value) or "Northern" in str(exc_info.value)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("lat", [-67.0, -70.0, -80.0, -89.0])
+    def test_koch_southern_polar_latitudes(self, lat):
+        """Koch at southern polar latitudes should raise detailed error."""
+        jd = 2451545.0
+
+        with pytest.raises(PolarCircleError) as exc_info:
+            ephem.swe_houses(jd, lat, 0.0, ord("K"))
+
+        assert exc_info.value.latitude == lat
+        # Should mention Southern
+        assert "S" in str(exc_info.value) or "Southern" in str(exc_info.value)
+
+
+class TestKochPolarEdgeCases:
+    """Test Koch edge cases at and near the polar circle threshold."""
+
+    @pytest.mark.unit
+    def test_koch_just_below_threshold(self):
+        """Koch at latitude just below threshold should work normally."""
+        jd = 2451545.0
+
+        # At J2000, obliquity is ~23.44deg, so threshold is ~66.56deg
+        # Test at 66.0deg which should be safely below
+        cusps, ascmc = ephem.swe_houses(jd, 66.0, 0.0, ord("K"))
+        assert len(cusps) == 12
+
+    @pytest.mark.unit
+    def test_koch_just_above_threshold(self):
+        """Koch at latitude just above threshold should raise error."""
+        jd = 2451545.0
+
+        # At 67deg it should definitely fail
+        with pytest.raises(PolarCircleError):
+            ephem.swe_houses(jd, 67.0, 0.0, ord("K"))
+
+    @pytest.mark.unit
+    def test_koch_matches_porphyry_when_fallback_used(self):
+        """Koch fallback cusps should match direct Porphyry calculation."""
+        jd = 2451545.0
+        lat = 70.0
+
+        # Get fallback result
+        cusps_fallback, ascmc_fallback, used_fallback, _ = (
+            ephem.swe_houses_with_fallback(jd, lat, 0.0, ord("K"))
+        )
+
+        # Get direct Porphyry
+        cusps_porphyry, ascmc_porphyry = ephem.swe_houses(jd, lat, 0.0, ord("O"))
+
+        # Should match
+        assert used_fallback is True
+        for i in range(12):
+            assert abs(cusps_fallback[i] - cusps_porphyry[i]) < 0.001
+
+    @pytest.mark.unit
+    def test_koch_returns_valid_cusps_at_extreme_latitudes(self):
+        """Koch fallback should return valid cusps even at extreme polar latitudes."""
+        jd = 2451545.0
+
+        for lat in [80.0, 85.0, 89.0, -80.0, -85.0, -89.0]:
+            cusps, ascmc, _, _ = ephem.swe_houses_with_fallback(jd, lat, 0.0, ord("K"))
+            for cusp in cusps:
+                assert 0 <= cusp < 360
+
+    @pytest.mark.unit
+    def test_koch_custom_fallback_system(self):
+        """Koch should use custom fallback system when specified."""
+        jd = 2451545.0
+
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            jd,
+            70.0,
+            0.0,
+            ord("K"),
+            fallback_hsys=ord("E"),  # Equal houses
+        )
+
+        assert used_fallback is True
+        assert "Equal" in warning
+
+    @pytest.mark.unit
+    def test_koch_warning_includes_threshold(self):
+        """Koch warning message should include the threshold."""
+        jd = 2451545.0
+
+        _, _, _, warning = ephem.swe_houses_with_fallback(jd, 70.0, 0.0, ord("K"))
+
+        assert "threshold" in warning.lower()
+
+
+class TestKochBackwardCompatibility:
+    """Test Koch backward compatibility with existing code."""
+
+    @pytest.mark.unit
+    def test_koch_still_raises_error_type(self):
+        """Koch PolarCircleError should still be catchable as the base Error."""
+        jd = 2451545.0
+
+        # Old code catching Error should still work
+        try:
+            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            pytest.fail("Should have raised an error")
+        except ephem.Error:
+            pass  # Old code would catch this
+
+    @pytest.mark.unit
+    def test_koch_error_message_still_mentions_polar_circle(self):
+        """Koch error message should still contain 'polar circle' for compatibility."""
+        jd = 2451545.0
+
+        with pytest.raises(PolarCircleError) as exc_info:
+            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+
+        # Tests may check for this string
+        assert "polar" in str(exc_info.value).lower()
+
+    @pytest.mark.unit
+    def test_koch_houses_armc_also_raises_polar_error(self):
+        """Koch swe_houses_armc should also raise PolarCircleError."""
+        armc = 280.0
+        eps = 23.44
+
+        with pytest.raises(PolarCircleError):
+            ephem.swe_houses_armc(armc, 70.0, eps, ord("K"))
+
+    @pytest.mark.unit
+    def test_koch_armc_fallback_works(self):
+        """swe_houses_armc_with_fallback should work for Koch."""
+        armc = 280.0
+        eps = 23.44
+
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+            armc, 70.0, eps, ord("K")
+        )
+
+        assert used_fallback is True
+        assert "Koch" in warning
+        assert len(cusps) == 12
+
+    @pytest.mark.unit
+    def test_koch_armc_custom_fallback(self):
+        """Koch swe_houses_armc_with_fallback should use custom fallback when specified."""
+        armc = 280.0
+        eps = 23.44
+
+        _, _, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+            armc, 70.0, eps, ord("K"), fallback_hsys=ord("W")
+        )
+
+        assert used_fallback is True
+        assert "Whole Sign" in warning
