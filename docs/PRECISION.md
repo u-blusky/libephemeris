@@ -119,8 +119,10 @@ LibEphemeris supports all 19 Swiss Ephemeris house systems:
 | MC (Midheaven) | <0.001° |
 | ARMC | <0.001° |
 | Vertex | <0.01° |
-| Co-Ascendant | Not implemented (returns 0.0) |
-| Polar Ascendant | Not implemented (returns 0.0) |
+| Equatorial Ascendant | <0.001° |
+| Co-Ascendant (Koch) | <0.001° |
+| Co-Ascendant (Munkasey) | <0.001° |
+| Polar Ascendant | <0.001° |
 
 ### Polar Latitude Limitations
 

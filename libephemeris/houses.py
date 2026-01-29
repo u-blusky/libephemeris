@@ -53,8 +53,6 @@ Polar Latitudes:
 - Equal/Whole Sign work at all latitudes
 
 Unimplemented Features (marked with FIXME):
-- Co-Ascendant (standard and Koch variants): Returns 0.0
-- Polar Ascendant: Returns 0.0
 - Gauquelin: Uses Placidus approximation (not true 36-sector algorithm)
 - Krusinski-Pisa: Uses Porphyry fallback
 - APC Houses: Uses Porphyry fallback
@@ -485,9 +483,9 @@ def swe_houses(
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
     # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
-    # Swiss Ephemeris returns 0.0 as fallback in this case.
+    # Swiss Ephemeris returns 180.0 as fallback in this case.
     if abs(lat) < 1e-10:
-        co_asc = 0.0
+        co_asc = 180.0
     else:
         coasc2_armc = (armc_deg + 90.0) % 360.0
         if lat >= 0:
@@ -762,9 +760,9 @@ def swe_houses_armc(
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
     # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
-    # Swiss Ephemeris returns 0.0 as fallback in this case.
+    # Swiss Ephemeris returns 180.0 as fallback in this case.
     if abs(lat) < 1e-10:
-        co_asc = 0.0
+        co_asc = 180.0
     else:
         coasc2_armc = (armc_deg + 90.0) % 360.0
         if lat >= 0:
