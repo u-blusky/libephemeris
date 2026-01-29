@@ -3109,22 +3109,19 @@ _PLANET_SEMI_DIAMETER_AU = {
     SE_PLUTO: 1.64,  # Pluto at 1 AU (approximate)
 }
 
-# Visual magnitude parameters for planets
-# Format: (V(1,0), B1, B2) - absolute magnitude and phase coefficients
-# V(1,0) = magnitude at 1 AU from Sun, 1 AU from Earth, phase angle 0
-# Phase function: V = V(1,0) + 5*log10(r*d) + B1*i + B2*i^2
-# where r = heliocentric distance, d = geocentric distance, i = phase angle in degrees
-# From Astronomical Algorithms (Meeus) and Harris (1961)
+# Visual magnitude parameters for outer planets
+# Using simplified formula: V = V(1,0) + 5*log10(r*d) + phase_correction
+# For Mercury, Venus, Mars, Jupiter, Saturn we use Mallama 2018 formulas
+# (implemented directly in _calc_planet_magnitude)
 _PLANET_MAG_PARAMS = {
-    SE_MERCURY: (-0.42, 0.0380, -0.000273, 0.000002),  # Mercury: 4th order polynomial
-    SE_VENUS: (-4.40, 0.0009, 0.000239, -0.00000065),  # Venus: 4th order polynomial
-    SE_MARS: (-1.52, 0.016, 0.0, 0.0),  # Mars: linear phase
-    SE_JUPITER: (-9.40, 0.005, 0.0, 0.0),  # Jupiter: nearly constant
-    SE_SATURN: (-8.88, 0.044, 0.0, 0.0),  # Saturn (ring contribution varies)
+    # Mercury, Venus, Mars, Jupiter, Saturn use Mallama 2018 formulas
     SE_URANUS: (-7.19, 0.002, 0.0, 0.0),  # Uranus
     SE_NEPTUNE: (-6.87, 0.0, 0.0, 0.0),  # Neptune: nearly constant
     SE_PLUTO: (-1.00, 0.041, 0.0, 0.0),  # Pluto (approximate)
 }
+
+# J2000 epoch for Saturn ring calculations
+_J2000 = 2451545.0
 
 
 def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
@@ -3412,8 +3409,45 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
     diameter = 2.0 * semi_diam / target_geo_dist if target_geo_dist > 0 else 0.0
 
     # Visual magnitude
+    # For Saturn, we need ecliptic coordinates for ring tilt calculation
+    geo_lon = 0.0
+    geo_lat = 0.0
+    helio_lon = 0.0
+    helio_lat = 0.0
+    tjd = 0.0
+
+    if ipl == SE_SATURN:
+        # Get Julian day from Skyfield time object
+        tjd = t.tt
+
+        # Get geocentric ecliptic coordinates
+        try:
+            geo_ecl_lat, geo_ecl_lon, _ = target_pos_geo.frame_latlon(ecliptic_frame)
+            geo_lon = geo_ecl_lon.degrees
+            geo_lat = geo_ecl_lat.degrees
+        except Exception:
+            geo_lon = 0.0
+            geo_lat = 0.0
+
+        # Get heliocentric ecliptic coordinates
+        try:
+            helio_ecl_lat, helio_ecl_lon, _ = target_helio.frame_latlon(ecliptic_frame)
+            helio_lon = helio_ecl_lon.degrees
+            helio_lat = helio_ecl_lat.degrees
+        except Exception:
+            helio_lon = 0.0
+            helio_lat = 0.0
+
     magnitude = _calc_planet_magnitude(
-        ipl, target_helio_dist, target_geo_dist, phase_angle
+        ipl,
+        target_helio_dist,
+        target_geo_dist,
+        phase_angle,
+        geo_lon,
+        geo_lat,
+        helio_lon,
+        helio_lat,
+        tjd,
     )
 
     # Return tuple with at least 20 elements (Swiss Ephemeris compatibility)
@@ -3422,53 +3456,146 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
 
 
 def _calc_planet_magnitude(
-    ipl: int, helio_dist: float, geo_dist: float, phase_angle: float
+    ipl: int,
+    helio_dist: float,
+    geo_dist: float,
+    phase_angle: float,
+    geo_lon: float = 0.0,
+    geo_lat: float = 0.0,
+    helio_lon: float = 0.0,
+    helio_lat: float = 0.0,
+    tjd: float = 0.0,
 ) -> float:
     """
     Calculate visual magnitude of a planet.
 
-    Uses empirical formulas from Astronomical Algorithms (Meeus) and
-    Harris (1961) for phase corrections.
+    Uses Mallama 2018 formulas for Mercury, Venus, Mars, Jupiter, Saturn
+    for Swiss Ephemeris compatibility. These formulas are from:
+    A. Mallama, J. Hilton, "Computing Apparent Planetary Magnitudes for
+    The Astronomical Almanac" (2018).
 
     Args:
         ipl: Planet ID
         helio_dist: Heliocentric distance in AU
         geo_dist: Geocentric distance in AU
         phase_angle: Phase angle in degrees
+        geo_lon: Geocentric ecliptic longitude in degrees (for Saturn)
+        geo_lat: Geocentric ecliptic latitude in degrees (for Saturn)
+        helio_lon: Heliocentric ecliptic longitude in degrees (for Saturn)
+        helio_lat: Heliocentric ecliptic latitude in degrees (for Saturn)
+        tjd: Julian day (for Saturn ring tilt calculation)
 
     Returns:
         Visual magnitude (smaller = brighter)
     """
-    if ipl not in _PLANET_MAG_PARAMS:
-        # Unknown planet - return approximate magnitude
-        # Using generic formula: V = 5 * log10(r * d) + H
-        H = 10.0  # Assumed absolute magnitude
-        if helio_dist > 0 and geo_dist > 0:
-            return H + 5.0 * math.log10(helio_dist * geo_dist)
-        return H
-
-    V0, B1, B2, B3 = _PLANET_MAG_PARAMS[ipl]
-
     # Distance factor: 5 * log10(r * d)
     if helio_dist > 0 and geo_dist > 0:
         dist_factor = 5.0 * math.log10(helio_dist * geo_dist)
     else:
         dist_factor = 0.0
 
-    # Phase factor (polynomial in phase angle)
-    i = phase_angle
-    phase_factor = B1 * i + B2 * i**2 + B3 * i**3
+    a = phase_angle  # Phase angle in degrees
 
-    magnitude = V0 + dist_factor + phase_factor
+    # Mercury - Mallama 2018, 6th order polynomial
+    if ipl == SE_MERCURY:
+        a2 = a * a
+        a3 = a2 * a
+        a4 = a3 * a
+        a5 = a4 * a
+        a6 = a5 * a
+        magnitude = (
+            -0.613
+            + a * 6.3280e-02
+            - a2 * 1.6336e-03
+            + a3 * 3.3644e-05
+            - a4 * 3.4265e-07
+            + a5 * 1.6893e-09
+            - a6 * 3.0334e-12
+        )
+        magnitude += dist_factor
+        return magnitude
 
-    # Special handling for Saturn's rings
+    # Venus - Mallama 2018, piecewise polynomial
+    if ipl == SE_VENUS:
+        a2 = a * a
+        a3 = a2 * a
+        a4 = a3 * a
+        if a <= 163.7:
+            magnitude = (
+                -4.384
+                - a * 1.044e-03
+                + a2 * 3.687e-04
+                - a3 * 2.814e-06
+                + a4 * 8.938e-09
+            )
+        else:
+            magnitude = 236.05828 - a * 2.81914e00 + a2 * 8.39034e-03
+        magnitude += dist_factor
+        return magnitude
+
+    # Mars - Mallama 2018, piecewise polynomial
+    if ipl == SE_MARS:
+        a2 = a * a
+        if a <= 50.0:
+            magnitude = -1.601 + a * 0.02267 - a2 * 0.0001302
+        else:
+            magnitude = -0.367 - a * 0.02573 + a2 * 0.0003445
+        magnitude += dist_factor
+        return magnitude
+
+    # Jupiter - Mallama 2018
+    if ipl == SE_JUPITER:
+        a2 = a * a
+        magnitude = -9.395 - a * 3.7e-04 + a2 * 6.16e-04
+        magnitude += dist_factor
+        return magnitude
+
+    # Saturn - Mallama 2018 with ring tilt from Meeus
     if ipl == SE_SATURN:
-        # Ring contribution varies with tilt - simplified approximation
-        # Full ring opening adds about -1 mag, edge-on adds +1 mag
-        # This would require ring tilt calculation - using average for now
-        pass
+        # Ring tilt calculation from Meeus, p. 301ff
+        # T is centuries from J2000
+        T = (tjd - _J2000) / 36525.0
 
-    return magnitude
+        # Ring plane inclination and ascending node
+        incl = math.radians(28.075216 - 0.012998 * T + 0.000004 * T * T)
+        omega = math.radians(169.508470 + 1.394681 * T + 0.000412 * T * T)
+
+        # sinB is the sine of the ring tilt angle as seen from Earth/Sun
+        # B is the "mean tilt of the ring plane to the Earth and Sun"
+        # From Meeus formulae for ring visibility
+
+        # Geocentric position contribution
+        sin_B = math.sin(incl) * math.cos(math.radians(geo_lat)) * math.sin(
+            math.radians(geo_lon) - omega
+        ) - math.cos(incl) * math.sin(math.radians(geo_lat))
+
+        # Heliocentric position contribution
+        sin_B2 = math.sin(incl) * math.cos(math.radians(helio_lat)) * math.sin(
+            math.radians(helio_lon) - omega
+        ) - math.cos(incl) * math.sin(math.radians(helio_lat))
+
+        # Mean of the two tilt angles
+        sin_B = abs(math.sin((math.asin(sin_B) + math.asin(sin_B2)) / 2.0))
+
+        # Mallama 2018 formula for Saturn with ring contribution
+        magnitude = (
+            -8.914 - 1.825 * sin_B + 0.026 * a - 0.378 * sin_B * math.exp(-2.25 * a)
+        )
+        magnitude += dist_factor
+        return magnitude
+
+    # Outer planets using simplified formula
+    if ipl in _PLANET_MAG_PARAMS:
+        V0, B1, B2, B3 = _PLANET_MAG_PARAMS[ipl]
+        phase_factor = B1 * a + B2 * a**2 + B3 * a**3
+        magnitude = V0 + dist_factor + phase_factor
+        return magnitude
+
+    # Unknown planet - return approximate magnitude
+    H = 10.0  # Assumed absolute magnitude
+    if helio_dist > 0 and geo_dist > 0:
+        return H + 5.0 * math.log10(helio_dist * geo_dist)
+    return H
 
 
 # Aliases for pyswisseph compatibility
