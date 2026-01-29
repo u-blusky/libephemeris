@@ -53,7 +53,6 @@ Polar Latitudes:
 - Equal/Whole Sign work at all latitudes
 
 Unimplemented Features (marked with FIXME):
-- Gauquelin: Uses Placidus approximation (not true 36-sector algorithm)
 - Krusinski-Pisa: Uses Porphyry fallback
 - APC Houses: Uses Porphyry fallback
 

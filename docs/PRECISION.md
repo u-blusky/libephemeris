@@ -104,7 +104,7 @@ LibEphemeris supports all 19 Swiss Ephemeris house systems:
 | Alcabitus (B) | ~0.01° | Medieval system |
 | Vehlow (V) | Exact | Equal variant |
 | Horizontal (H) | ~0.01° | Falls back to Porphyry if iteration fails |
-| Gauquelin (G) | Approximation | Uses Placidus approximation (not true 36-sector) |
+| Gauquelin (G) | ~0.01° | True 36-sector algorithm (18 diurnal + 18 nocturnal) |
 | Krusinski-Pisa (U) | ~0.01° | Uses Porphyry fallback |
 | Carter Poli-Equatorial (F) | ~0.01° | |
 | APC Houses (Y) | ~0.01° | Uses Porphyry fallback |
