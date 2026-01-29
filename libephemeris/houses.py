@@ -77,7 +77,7 @@ from .constants import SEFLG_SIDEREAL, SEFLG_SPEED
 from .state import get_timescale
 from .planets import swe_get_ayanamsa_ut
 from skyfield.nutationlib import iau2000b_radians
-from .exceptions import Error
+from .exceptions import Error, PolarCircleError
 
 
 def _is_polar_circle(lat: float, eps: float) -> bool:
@@ -99,6 +99,115 @@ def _is_polar_circle(lat: float, eps: float) -> bool:
     # This happens when |lat| + obliquity > 90°
     # For typical obliquity of ~23.44°, this is lat > ~66.56°
     return abs(lat) + eps > 90.0
+
+
+def get_polar_latitude_threshold(obliquity: float = 23.44) -> float:
+    """
+    Calculate the polar latitude threshold for a given obliquity.
+
+    At latitudes beyond this threshold, some house systems (Placidus, Koch,
+    Gauquelin) cannot be calculated because ecliptic points can be circumpolar
+    (never rising or setting).
+
+    The threshold is calculated as: 90° - obliquity
+
+    For the current epoch (J2000), obliquity is approximately 23.44°,
+    giving a threshold of approximately 66.56°.
+
+    Args:
+        obliquity: True obliquity of the ecliptic in degrees.
+                   Default is 23.44° (approximate J2000 value).
+
+    Returns:
+        The polar latitude threshold in degrees. Latitudes with
+        abs(lat) > threshold will trigger polar circle errors.
+
+    Example:
+        >>> get_polar_latitude_threshold()
+        66.56
+        >>> get_polar_latitude_threshold(23.5)
+        66.5
+    """
+    return 90.0 - obliquity
+
+
+def _get_polar_circle_info(lat: float, eps: float, house_system: str) -> dict:
+    """
+    Get detailed information about a polar circle condition.
+
+    Args:
+        lat: Geographic latitude in degrees
+        eps: True obliquity of the ecliptic in degrees
+        house_system: House system character (e.g., 'P', 'K', 'G')
+
+    Returns:
+        Dictionary with polar circle information:
+        - is_polar: Whether the location is within the polar circle
+        - latitude: The input latitude
+        - threshold: The polar circle threshold for the given obliquity
+        - obliquity: The obliquity used
+        - excess: How many degrees beyond the threshold (if polar)
+        - house_system: The house system character
+        - hemisphere: 'N' for north, 'S' for south
+    """
+    threshold = get_polar_latitude_threshold(eps)
+    is_polar = abs(lat) > threshold
+    excess = abs(lat) - threshold if is_polar else 0.0
+    hemisphere = "N" if lat >= 0 else "S"
+
+    return {
+        "is_polar": is_polar,
+        "latitude": lat,
+        "threshold": threshold,
+        "obliquity": eps,
+        "excess": excess,
+        "house_system": house_system,
+        "hemisphere": hemisphere,
+    }
+
+
+def _raise_polar_circle_error(
+    lat: float, eps: float, house_system: str, func_name: str
+) -> None:
+    """
+    Raise a PolarCircleError with detailed information.
+
+    Args:
+        lat: Geographic latitude in degrees
+        eps: True obliquity of the ecliptic in degrees
+        house_system: House system character (e.g., 'P', 'K', 'G')
+        func_name: Name of the function raising the error
+
+    Raises:
+        PolarCircleError: Always raised with detailed polar circle information
+    """
+    info = _get_polar_circle_info(lat, eps, house_system)
+    threshold = info["threshold"]
+    hemisphere = "Northern" if info["hemisphere"] == "N" else "Southern"
+
+    # Map house system codes to names
+    system_names = {
+        "P": "Placidus",
+        "K": "Koch",
+        "G": "Gauquelin",
+    }
+    system_name = system_names.get(house_system, house_system)
+
+    message = (
+        f"{func_name}: {system_name} house system cannot be calculated at "
+        f"latitude {abs(lat):.2f}°{info['hemisphere']} (within {hemisphere} polar circle). "
+        f"Polar threshold for obliquity {eps:.2f}° is ±{threshold:.2f}°. "
+        f"Consider using Porphyry ('O'), Equal ('E'), or Whole Sign ('W') house systems "
+        f"which work at all latitudes, or use swe_houses_with_fallback() for automatic fallback."
+    )
+
+    raise PolarCircleError(
+        message=message,
+        latitude=lat,
+        threshold=threshold,
+        obliquity=eps,
+        house_system=house_system,
+    )
 
 
 def angular_diff(a: float, b: float) -> float:
@@ -522,9 +631,9 @@ def swe_houses(
 
     # Check for polar circle condition for Placidus/Koch/Gauquelin
     # These systems cannot be calculated when abs(lat) + eps > 90°
-    # Swiss Ephemeris raises an error in this case
+    # Raise detailed PolarCircleError with useful information
     if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
-        raise Error("swe_houses: within polar circle, switched to Porphyry")
+        _raise_polar_circle_error(lat, eps, hsys_char, "swe_houses")
 
     cusps = [0.0] * 13
 
@@ -590,6 +699,143 @@ def swe_houses(
     # Return 12-element cusps array (pyswisseph compatible: no padding at index 0)
     # cusps[1:13] contains houses 1-12
     return tuple(cusps[1:13]), tuple(ascmc)
+
+
+def swe_houses_with_fallback(
+    jd_ut: float,
+    lat: float,
+    lon: float,
+    hsys: int,
+    fallback_hsys: int = ord("O"),
+) -> tuple[tuple[float, ...], tuple[float, ...], bool, str | None]:
+    """
+    Calculate house cusps with automatic fallback for polar latitudes.
+
+    This convenience function attempts to calculate houses using the requested
+    system, and automatically falls back to a polar-safe system (default: Porphyry)
+    if the location is within the polar circle.
+
+    This is useful for applications that need to handle polar latitudes gracefully
+    without explicit error handling for each calculation.
+
+    Args:
+        jd_ut: Julian Day in Universal Time
+        lat: Geographic latitude in degrees (positive North, negative South)
+        lon: Geographic longitude in degrees (positive East, negative West)
+        hsys: Primary house system identifier (e.g., ord('P') for Placidus)
+        fallback_hsys: Fallback house system for polar latitudes.
+                       Default: ord('O') (Porphyry).
+                       Other good choices: ord('E') (Equal), ord('W') (Whole Sign)
+
+    Returns:
+        Tuple containing:
+            - cusps: Tuple of 12 house cusp longitudes (houses 1-12) in degrees
+            - ascmc: Tuple of 8 angles
+            - used_fallback: True if fallback system was used
+            - warning_message: Informational message if fallback was used, else None
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> jd = 2451545.0
+        >>> # This would fail with Placidus at 70°N, but uses fallback
+        >>> cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        ...     jd, 70.0, 0.0, ord('P')
+        ... )
+        >>> if used_fallback:
+        ...     print(f"Used fallback: {warning}")
+        >>> # cusps and ascmc are valid regardless of latitude
+
+    See Also:
+        swe_houses: Standard function that raises PolarCircleError at polar latitudes
+        get_polar_latitude_threshold: Returns the threshold for a given obliquity
+    """
+    try:
+        cusps, ascmc = swe_houses(jd_ut, lat, lon, hsys)
+        return cusps, ascmc, False, None
+    except PolarCircleError as e:
+        # Use fallback house system
+        cusps, ascmc = swe_houses(jd_ut, lat, lon, fallback_hsys)
+
+        # Generate informational warning message
+        hsys_char = chr(hsys)
+        fallback_char = chr(fallback_hsys)
+        system_names = {
+            "P": "Placidus",
+            "K": "Koch",
+            "G": "Gauquelin",
+            "O": "Porphyry",
+            "E": "Equal",
+            "W": "Whole Sign",
+        }
+        primary_name = system_names.get(hsys_char, hsys_char)
+        fallback_name = system_names.get(fallback_char, fallback_char)
+
+        warning = (
+            f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
+            f"(polar circle threshold: {e.threshold:.2f}°). "
+            f"Using {fallback_name} as fallback."
+        )
+        return cusps, ascmc, True, warning
+
+
+def swe_houses_armc_with_fallback(
+    armc: float,
+    lat: float,
+    eps: float,
+    hsys: int,
+    fallback_hsys: int = ord("O"),
+) -> tuple[tuple[float, ...], tuple[float, ...], bool, str | None]:
+    """
+    Calculate house cusps from ARMC with automatic fallback for polar latitudes.
+
+    Similar to swe_houses_with_fallback, but calculates from ARMC instead of
+    Julian Day.
+
+    Args:
+        armc: Right Ascension of Medium Coeli in degrees (0-360)
+        lat: Geographic latitude in degrees (positive North, negative South)
+        eps: True obliquity of the ecliptic in degrees
+        hsys: Primary house system identifier (e.g., ord('P') for Placidus)
+        fallback_hsys: Fallback house system for polar latitudes.
+                       Default: ord('O') (Porphyry).
+
+    Returns:
+        Tuple containing:
+            - cusps: Tuple of 12 house cusp longitudes (houses 1-12) in degrees
+            - ascmc: Tuple of 8 angles
+            - used_fallback: True if fallback system was used
+            - warning_message: Informational message if fallback was used, else None
+
+    See Also:
+        swe_houses_armc: Standard function that raises PolarCircleError at polar latitudes
+    """
+    try:
+        cusps, ascmc = swe_houses_armc(armc, lat, eps, hsys)
+        return cusps, ascmc, False, None
+    except PolarCircleError as e:
+        # Use fallback house system
+        cusps, ascmc = swe_houses_armc(armc, lat, eps, fallback_hsys)
+
+        # Generate informational warning message
+        hsys_char = chr(hsys)
+        fallback_char = chr(fallback_hsys)
+        system_names = {
+            "P": "Placidus",
+            "K": "Koch",
+            "G": "Gauquelin",
+            "O": "Porphyry",
+            "E": "Equal",
+            "W": "Whole Sign",
+        }
+        primary_name = system_names.get(hsys_char, hsys_char)
+        fallback_name = system_names.get(fallback_char, fallback_char)
+
+        warning = (
+            f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
+            f"(polar circle threshold: {e.threshold:.2f}°). "
+            f"Using {fallback_name} as fallback."
+        )
+        return cusps, ascmc, True, warning
 
 
 def swe_houses_armc(
@@ -796,9 +1042,9 @@ def swe_houses_armc(
 
     # Check for polar circle condition for Placidus/Koch/Gauquelin
     # These systems cannot be calculated when abs(lat) + eps > 90°
-    # Swiss Ephemeris raises an error in this case
+    # Raise detailed PolarCircleError with useful information
     if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
-        raise Error("swe_houses_armc: within polar circle, switched to Porphyry")
+        _raise_polar_circle_error(lat, eps, hsys_char, "swe_houses_armc")
 
     cusps = [0.0] * 13
 

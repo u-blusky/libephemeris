@@ -1,5 +1,5 @@
 from .constants import *
-from .exceptions import Error
+from .exceptions import Error, PolarCircleError
 from .time_utils import (
     swe_julday,
     swe_revjul,
@@ -53,6 +53,10 @@ from .houses import (
     house_pos,
     gauquelin_sector,
     swe_gauquelin_sector,
+    # Polar latitude handling
+    swe_houses_with_fallback,
+    swe_houses_armc_with_fallback,
+    get_polar_latitude_threshold,
 )
 from .state import (
     set_topo as swe_set_topo,
