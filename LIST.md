@@ -384,21 +384,21 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] ADD LEO CONSTELLATION STARS: Ensure Leo stars are complete: Regulus, Denebola, Algieba, Zosma.
 
-- [ ] ADD ZODIACAL CONSTELLATION BRIGHT STARS: Add key bright stars from each zodiacal constellation used in astrological interpretation.
+- [x] ADD ZODIACAL CONSTELLATION BRIGHT STARS: Add key bright stars from each zodiacal constellation used in astrological interpretation.
 
-- [ ] BUILD STAR CATALOG FROM HIPPARCOS: Create a script using astroquery.vizier to fetch Hipparcos I/239/hip_main catalog data for ~800-1000 astrologically relevant stars, convert to StarCatalogEntry format with RA/Dec J2000, proper motion, magnitude - no Swiss Ephemeris file dependencies, required for swe_fixstar/swe_fixstar2 compatibility.
+- [x] BUILD STAR CATALOG FROM HIPPARCOS: Create a script using astroquery.vizier to fetch Hipparcos I/239/hip_main catalog data for ~800-1000 astrologically relevant stars, convert to StarCatalogEntry format with RA/Dec J2000, proper motion, magnitude - no Swiss Ephemeris file dependencies, required for swe_fixstar/swe_fixstar2 compatibility.
 
-- [ ] CREATE STAR NAME MAPPING: Build a mapping from common star names (Regulus, Spica, Aldebaran, etc.) and Bayer/Flamsteed designations to Hipparcos HIP numbers, sourced from IAU Working Group on Star Names catalog, stored as Python dict in fixed_stars.py.
+- [x] CREATE STAR NAME MAPPING: Build a mapping from common star names (Regulus, Spica, Aldebaran, etc.) and Bayer/Flamsteed designations to Hipparcos HIP numbers, sourced from IAU Working Group on Star Names catalog, stored as Python dict in fixed_stars.py.
 
-- [ ] IMPLEMENT PROPER MOTION PROPAGATION: Calculate star positions at any epoch by applying proper motion from Hipparcos J1991.25 reference epoch to target date using standard astrometric formulas including cos(dec) correction.
+- [x] IMPLEMENT PROPER MOTION PROPAGATION: Calculate star positions at any epoch by applying proper motion from Hipparcos J1991.25 reference epoch to target date using standard astrometric formulas including cos(dec) correction.
 
-- [ ] IMPLEMENT STAR SEARCH BY BAYER DESIGNATION: Implement search for stars by Bayer designation like "Alpha Leonis", "Beta Persei", "Gamma Virginis" parsing Greek letter names - required for swe_fixstar2 compatibility with designation search.
+- [x] IMPLEMENT STAR SEARCH BY BAYER DESIGNATION: Implement search for stars by Bayer designation like "Alpha Leonis", "Beta Persei", "Gamma Virginis" parsing Greek letter names - required for swe_fixstar2 compatibility with designation search.
 
-- [ ] IMPLEMENT STAR SEARCH BY FLAMSTEED NUMBER: Implement search for stars by Flamsteed number like "32 Leonis", "87 Virginis" - required for swe_fixstar2 compatibility.
+- [x] IMPLEMENT STAR SEARCH BY FLAMSTEED NUMBER: Implement search for stars by Flamsteed number like "32 Leonis", "87 Virginis" - required for swe_fixstar2 compatibility.
 
-- [ ] IMPLEMENT STAR SEARCH BY HIPPARCOS NUMBER: Implement search for stars by HIP number like "HIP 49669", "HIP 65474" - required for swe_fixstar2 compatibility.
+- [x] IMPLEMENT STAR SEARCH BY HIPPARCOS NUMBER: Implement search for stars by HIP number like "HIP 49669", "HIP 65474" - required for swe_fixstar2 compatibility.
 
-- [ ] IMPLEMENT STAR SEARCH BY COMMON NAME: Implement fuzzy search for stars by common name handling alternate spellings (Betelgeuse/Betelgeux, Fomalhaut/Formalhaut) - required for swe_fixstar/swe_fixstar2 compatibility.
+- [x] IMPLEMENT STAR SEARCH BY COMMON NAME: Implement fuzzy search for stars by common name handling alternate spellings (Betelgeuse/Betelgeux, Fomalhaut/Formalhaut) - required for swe_fixstar/swe_fixstar2 compatibility.
 
 ---
 

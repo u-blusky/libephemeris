@@ -2915,7 +2915,234 @@ STAR_ALIASES: dict[str, int] = {
     "AL-RISHA": SE_ALRESCHA,
     "THE KNOT": SE_ALRESCHA,
     "THE CORD": SE_ALRESCHA,
+    # ======== ALTERNATE SPELLINGS / COMMON MISSPELLINGS ========
+    # Betelgeuse variants (Arabic: yad al-jawza / ibt al-jawza)
+    "BETELGEUX": SE_BETELGEUSE,
+    "BEETLEJUICE": SE_BETELGEUSE,
+    "BETELGUESE": SE_BETELGEUSE,
+    "BETELGUEUSE": SE_BETELGEUSE,
+    "BETELEGEUSE": SE_BETELGEUSE,
+    "BETEIGEUZE": SE_BETELGEUSE,
+    # Fomalhaut variants (Arabic: fum al-hut)
+    "FORMALHAUT": SE_FOMALHAUT,
+    "FOMALHUT": SE_FOMALHAUT,
+    "FOMALAUT": SE_FOMALHAUT,
+    "FOMALHAULT": SE_FOMALHAUT,
+    "FUMALHAUT": SE_FOMALHAUT,
+    # Aldebaran variants (Arabic: al-dabaran)
+    "ALDEBRAN": SE_ALDEBARAN,
+    "ALDEBERON": SE_ALDEBARAN,
+    "ALDEBERAN": SE_ALDEBARAN,
+    "ALDERBARAN": SE_ALDEBARAN,
+    "ALDEBARIN": SE_ALDEBARAN,
+    # Algol variants (Arabic: ra's al-ghul)
+    "ALGOL": SE_ALGOL,  # Already canonical but ensure alias exists
+    "ALGHOL": SE_ALGOL,
+    "ALGOUL": SE_ALGOL,
+    "AL-GHUL": SE_ALGOL,
+    # Arcturus variants (Greek: arktos + ouros = bear guard)
+    "ARCHTURUS": SE_ARCTURUS,
+    "ARTURUS": SE_ARCTURUS,
+    "ARKCTURUS": SE_ARCTURUS,
+    "ARCTUROS": SE_ARCTURUS,
+    # Antares variants (Greek: anti + Ares = rival of Mars)
+    "ANTARIES": SE_ANTARES,
+    "ANTARAS": SE_ANTARES,
+    "ANTARRES": SE_ANTARES,
+    # Rigel variants (Arabic: rijl = foot)
+    "RIEGEL": SE_RIGEL,
+    "RIJEL": SE_RIGEL,
+    "RIGIL": SE_RIGEL,
+    # Vega variants (Arabic: an-nasr al-waqi)
+    "VEGHA": SE_VEGA,
+    # Polaris variants
+    "POLARRIS": SE_POLARIS,
+    "POLARIUS": SE_POLARIS,
+    # Procyon variants (Greek: pro + kyon = before the dog)
+    "PROCION": SE_PROCYON,
+    "PROCIAN": SE_PROCYON,
+    # Capella variants (Latin: she-goat)
+    "CAPELA": SE_CAPELLA,
+    "CAPPELLA": SE_CAPELLA,
+    # Deneb variants (Arabic: dhanab = tail)
+    "DANEB": SE_DENEB,
+    "DHENEB": SE_DENEB,
+    # Altair variants (Arabic: al-nasr al-ta'ir = flying eagle)
+    "ALTIAR": SE_ALTAIR,
+    "ALTARE": SE_ALTAIR,
+    # Sirius variants (Greek: seirios = scorching)
+    "SYRIUS": SE_SIRIUS,
+    "SIRUIS": SE_SIRIUS,
+    "SIRUS": SE_SIRIUS,
+    # Spica variants (Latin: ear of wheat)
+    "SPIKA": SE_SPICA_STAR,
+    "SPICCA": SE_SPICA_STAR,
+    # Regulus variants (Latin: little king)
+    "REGULAS": SE_REGULUS,
+    "REGULIS": SE_REGULUS,
+    # Canopus variants
+    "CANOPIS": SE_CANOPUS,
+    "CANPOUS": SE_CANOPUS,
+    "CANOPOS": SE_CANOPUS,
+    # Achernar variants (Arabic: akhir an-nahr = end of river)
+    "ACHENAR": SE_ACHERNAR,
+    "ARCHENAR": SE_ACHERNAR,
+    "ACHERNAN": SE_ACHERNAR,
+    # Castor/Pollux variants
+    "CASTOR": SE_CASTOR,  # Ensure canonical exists
+    "KASTOR": SE_CASTOR,
+    "POLUX": SE_POLLUX,
+    "POLLUCKS": SE_POLLUX,
 }
+
+
+# Phonetic normalization for fuzzy matching of star common names
+# Maps phonetically similar character sequences to canonical forms
+_PHONETIC_REPLACEMENTS: list[tuple[str, str]] = [
+    # Double consonants to single
+    ("LL", "L"),
+    ("TT", "T"),
+    ("SS", "S"),
+    ("RR", "R"),
+    ("PP", "P"),
+    ("CC", "C"),
+    ("NN", "N"),
+    ("MM", "M"),
+    ("FF", "F"),
+    # Common vowel confusions
+    ("EU", "U"),  # Betelgeuse -> Betelguse
+    ("EI", "I"),  # Beteigeuze -> Betigeuze
+    ("AU", "A"),  # Fomalhaut -> Fomalhat
+    ("AE", "E"),
+    ("OE", "E"),
+    ("OU", "O"),
+    # Silent/ambiguous endings
+    ("UE$", "U"),  # Betelgeuse -> Betelgeus
+    ("E$", ""),  # trailing silent e
+    # Common consonant confusions
+    ("GH", "G"),  # Alghol -> Algol
+    ("PH", "F"),
+    ("CK", "K"),
+    ("CH", "K"),
+    ("SCH", "SH"),
+    # X sounds
+    ("X", "KS"),
+    # Vowel simplification
+    ("EE", "E"),
+    ("AA", "A"),
+    ("OO", "O"),
+    ("II", "I"),
+    ("UU", "U"),
+    # Remove isolated vowels between consonants for approximate matching
+    ("(?<=[BCDFGHJKLMNPQRSTVWXYZ])I(?=[BCDFGHJKLMNPQRSTVWXYZ])", ""),
+]
+
+
+def _normalize_phonetic(name: str) -> str:
+    """
+    Normalize a star name for phonetic fuzzy matching.
+
+    Applies a series of transformations to reduce phonetically similar
+    names to the same normalized form. This allows matching alternate
+    spellings like:
+    - Betelgeuse / Betelgeux / Beetlejuice
+    - Fomalhaut / Formalhaut / Fomalaut
+    - Aldebaran / Aldebran / Aldeberan
+
+    Args:
+        name: Star name to normalize
+
+    Returns:
+        Phonetically normalized name (uppercase, consonants preserved)
+
+    Examples:
+        >>> _normalize_phonetic("Betelgeuse")
+        'BETLGUS'
+        >>> _normalize_phonetic("Betelgeux")
+        'BETLGUS'
+        >>> _normalize_phonetic("Fomalhaut")
+        'FOMALHAT'
+    """
+    import re
+
+    result = name.upper().strip()
+
+    # Remove non-alphabetic characters
+    result = re.sub(r"[^A-Z]", "", result)
+
+    # Apply phonetic replacements (order matters for some)
+    for pattern, replacement in _PHONETIC_REPLACEMENTS:
+        if pattern.endswith("$"):
+            # End-of-string pattern
+            actual_pattern = pattern[:-1]
+            if result.endswith(actual_pattern):
+                result = result[: -len(actual_pattern)] + replacement
+        elif pattern.startswith("(?"):
+            # Regex pattern
+            result = re.sub(pattern, replacement, result)
+        else:
+            result = result.replace(pattern, replacement)
+
+    # Remove vowels except leading vowel (keeps consonant skeleton)
+    if len(result) > 1:
+        first_char = result[0]
+        rest = result[1:]
+        rest = re.sub(r"[AEIOU]", "", rest)
+        result = first_char + rest
+
+    return result
+
+
+def _fuzzy_match_star(name: str) -> int | None:
+    """
+    Find a star using fuzzy phonetic matching.
+
+    This function normalizes the input name and compares it against
+    normalized versions of all star aliases and canonical names.
+    It's used as a fallback when exact matching fails.
+
+    Args:
+        name: Star name to search for (may be misspelled)
+
+    Returns:
+        Star ID if a unique match is found, None otherwise
+
+    Examples:
+        >>> _fuzzy_match_star("Betelgeux")  # Alternate spelling
+        SE_BETELGEUSE
+        >>> _fuzzy_match_star("Formalhaut")  # Common misspelling
+        SE_FOMALHAUT
+    """
+    normalized_input = _normalize_phonetic(name)
+
+    if len(normalized_input) < 3:
+        # Too short for reliable fuzzy matching
+        return None
+
+    matches: list[int] = []
+    matched_names: list[str] = []
+
+    # Check against canonical names in STAR_CATALOG
+    for entry in STAR_CATALOG:
+        if _normalize_phonetic(entry.name) == normalized_input:
+            if entry.id not in matches:
+                matches.append(entry.id)
+                matched_names.append(entry.name)
+
+    # Check against aliases
+    for alias, star_id in STAR_ALIASES.items():
+        if _normalize_phonetic(alias) == normalized_input:
+            if star_id not in matches:
+                matches.append(star_id)
+                matched_names.append(alias)
+
+    if len(matches) == 1:
+        return matches[0]
+    elif len(matches) > 1:
+        # Ambiguous match - return None to avoid false positives
+        return None
+
+    return None
 
 
 def resolve_star_name(name: str) -> int | None:
@@ -2930,6 +3157,7 @@ def resolve_star_name(name: str) -> int | None:
     5. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
     6. Try Flamsteed designation with number + constellation (e.g., "32 Leonis")
     7. Try fuzzy matching (alias contains search term for short inputs)
+    8. Try phonetic fuzzy matching for common misspellings
 
     Args:
         name: Star name, alias, designation, or comma-prefixed partial name
@@ -2950,6 +3178,10 @@ def resolve_star_name(name: str) -> int | None:
         1000001
         >>> resolve_star_name("SIRIUS")
         1000004
+        >>> resolve_star_name("Betelgeux")  # Alternate spelling
+        SE_BETELGEUSE
+        >>> resolve_star_name("Formalhaut")  # Common misspelling
+        SE_FOMALHAUT
     """
     if not name:
         return None
@@ -3021,6 +3253,11 @@ def resolve_star_name(name: str) -> int | None:
         for entry in STAR_CATALOG:
             if normalized in entry.name.upper():
                 return entry.id
+
+    # 7. Try phonetic fuzzy matching for common misspellings
+    fuzzy_result = _fuzzy_match_star(name)
+    if fuzzy_result is not None:
+        return fuzzy_result
 
     return None
 
@@ -3378,6 +3615,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     6. Partial name search (case-insensitive): "Reg", "pic"
     7. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
     8. Format with comma: "Regulus,alLeo" (takes first part)
+    9. Phonetic fuzzy matching for alternate spellings: "Betelgeux", "Formalhaut"
 
     Args:
         star_name: Star identifier - can be name, catalog number, or search string
@@ -3396,6 +3634,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         >>> entry, err = _resolve_star2("32 Leonis")       # Flamsteed designation
         >>> entry, err = _resolve_star2("Reg")             # Partial match
         >>> entry, err = _resolve_star2("alLeo")           # Nomenclature
+        >>> entry, err = _resolve_star2("Betelgeux")       # Alternate spelling
     """
     search = star_name.strip()
 
@@ -3489,6 +3728,13 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     elif len(matches) > 1:
         names = ", ".join(m.name for m in matches)
         return None, f"Ambiguous star name '{star_name}' matches: {names}"
+
+    # 7. Try phonetic fuzzy matching for common misspellings
+    fuzzy_result = _fuzzy_match_star(star_name)
+    if fuzzy_result is not None:
+        for entry in STAR_CATALOG:
+            if entry.id == fuzzy_result:
+                return entry, None
 
     return None, f"could not find star name {star_name.lower()}"
 
