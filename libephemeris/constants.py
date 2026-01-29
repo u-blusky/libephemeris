@@ -451,6 +451,13 @@ SE_DELTA_CRUCIS: int = (
     SE_FIXSTAR_OFFSET + 72
 )  # Delta Crucis - fourth star of Southern Cross
 
+# Centaurus - completing the bright stars of the constellation
+SE_MENKENT: int = SE_FIXSTAR_OFFSET + 73  # Theta Centauri
+SE_MUHLIFAIN: int = SE_FIXSTAR_OFFSET + 74  # Gamma Centauri
+SE_EPSILON_CENTAURI: int = SE_FIXSTAR_OFFSET + 75  # Epsilon Centauri
+SE_ETA_CENTAURI: int = SE_FIXSTAR_OFFSET + 76  # Eta Centauri
+SE_ZETA_CENTAURI: int = SE_FIXSTAR_OFFSET + 77  # Zeta Centauri
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree

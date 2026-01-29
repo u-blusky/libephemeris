@@ -119,6 +119,11 @@ from .constants import (
     SE_PHECDA,
     SE_MEGREZ,
     SE_DELTA_CRUCIS,
+    SE_MENKENT,
+    SE_MUHLIFAIN,
+    SE_EPSILON_CENTAURI,
+    SE_ETA_CENTAURI,
+    SE_ZETA_CENTAURI,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -1117,6 +1122,73 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=2.80,
     ),
+    # ======== CENTAURUS CONSTELLATION ========
+    # Completing the bright stars of Centaurus (Alpha and Beta already defined above)
+    StarCatalogEntry(
+        id=SE_MENKENT,
+        name="Menkent",
+        nomenclature="thCen",
+        hip_number=68933,
+        data=StarData(
+            ra_j2000=211.670528,  # 14h 06m 40.9s (Theta Centauri)
+            dec_j2000=-36.369958,  # -36° 22' 12"
+            pm_ra=-0.51965,  # -519.65 mas/yr
+            pm_dec=-0.51774,  # -517.74 mas/yr
+        ),
+        magnitude=2.06,
+    ),
+    StarCatalogEntry(
+        id=SE_MUHLIFAIN,
+        name="Muhlifain",
+        nomenclature="gaCen",
+        hip_number=61932,
+        data=StarData(
+            ra_j2000=190.379200,  # 12h 41m 31.0s (Gamma Centauri)
+            dec_j2000=-48.959889,  # -48° 57' 36"
+            pm_ra=-0.18550,  # -185.50 mas/yr
+            pm_dec=0.00560,  # 5.60 mas/yr
+        ),
+        magnitude=2.17,
+    ),
+    StarCatalogEntry(
+        id=SE_EPSILON_CENTAURI,
+        name="Epsilon Centauri",
+        nomenclature="epCen",
+        hip_number=66657,
+        data=StarData(
+            ra_j2000=204.971958,  # 13h 39m 53.3s (Epsilon Centauri)
+            dec_j2000=-53.466389,  # -53° 27' 59"
+            pm_ra=-0.01218,  # -12.18 mas/yr
+            pm_dec=-0.01225,  # -12.25 mas/yr
+        ),
+        magnitude=2.30,
+    ),
+    StarCatalogEntry(
+        id=SE_ETA_CENTAURI,
+        name="Eta Centauri",
+        nomenclature="etCen",
+        hip_number=71352,
+        data=StarData(
+            ra_j2000=218.876841,  # 14h 35m 30.4s (Eta Centauri)
+            dec_j2000=-42.157811,  # -42° 09' 28"
+            pm_ra=-0.03423,  # -34.23 mas/yr
+            pm_dec=-0.03267,  # -32.67 mas/yr
+        ),
+        magnitude=2.31,
+    ),
+    StarCatalogEntry(
+        id=SE_ZETA_CENTAURI,
+        name="Zeta Centauri",
+        nomenclature="zeCen",
+        hip_number=68002,
+        data=StarData(
+            ra_j2000=208.885225,  # 13h 55m 32.5s (Zeta Centauri)
+            dec_j2000=-47.288375,  # -47° 17' 18"
+            pm_ra=-0.02206,  # -22.06 mas/yr
+            pm_dec=-0.01046,  # -10.46 mas/yr
+        ),
+        magnitude=2.55,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -1386,6 +1458,33 @@ STAR_ALIASES: dict[str, int] = {
     "RIGIL KENT": SE_RIGIL_KENT,
     "FOOT OF CENTAUR": SE_RIGIL_KENT,
     "BUNGULA": SE_RIGIL_KENT,
+    # ======== MENKENT (Theta Centauri) ========
+    "THETA CENTAURI": SE_MENKENT,
+    "THETA CEN": SE_MENKENT,
+    "θ CEN": SE_MENKENT,
+    "THCEN": SE_MENKENT,
+    "HARATAN": SE_MENKENT,
+    # ======== MUHLIFAIN (Gamma Centauri) ========
+    "GAMMA CENTAURI": SE_MUHLIFAIN,
+    "GAMMA CEN": SE_MUHLIFAIN,
+    "γ CEN": SE_MUHLIFAIN,
+    "GACEN": SE_MUHLIFAIN,
+    # ======== EPSILON CENTAURI ========
+    "EPSILON CENTAURI": SE_EPSILON_CENTAURI,
+    "EPSILON CEN": SE_EPSILON_CENTAURI,
+    "ε CEN": SE_EPSILON_CENTAURI,
+    "EPCEN": SE_EPSILON_CENTAURI,
+    # ======== ETA CENTAURI ========
+    "ETA CENTAURI": SE_ETA_CENTAURI,
+    "ETA CEN": SE_ETA_CENTAURI,
+    "η CEN": SE_ETA_CENTAURI,
+    "ETCEN": SE_ETA_CENTAURI,
+    # ======== ZETA CENTAURI ========
+    "ZETA CENTAURI": SE_ZETA_CENTAURI,
+    "ZETA CEN": SE_ZETA_CENTAURI,
+    "ζ CEN": SE_ZETA_CENTAURI,
+    "ZECEN": SE_ZETA_CENTAURI,
+    "ALNAIR": SE_ZETA_CENTAURI,
     # ======== SHAULA (Lambda Scorpii) ========
     "LAMBDA SCORPII": SE_SHAULA,
     "LAMBDA SCO": SE_SHAULA,
