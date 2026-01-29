@@ -129,6 +129,26 @@ from .constants import (
     SE_GRAFFIAS,
     SE_LESATH,
     SE_ZOSMA,
+    SE_HAMAL,
+    SE_SHERATAN,
+    SE_MESARTHIM,
+    SE_ACUBENS,
+    SE_TARF,
+    SE_ASELLUS_BOREALIS,
+    SE_ASELLUS_AUSTRALIS,
+    SE_KAUS_AUSTRALIS,
+    SE_NUNKI,
+    SE_KAUS_MEDIA,
+    SE_KAUS_BOREALIS,
+    SE_ASCELLA,
+    SE_ALGEDI,
+    SE_DABIH,
+    SE_NASHIRA,
+    SE_SADALSUUD,
+    SE_SADALMELIK,
+    SE_SKAT,
+    SE_ETA_PISCIUM,
+    SE_ALRESCHA,
     SEFLG_SPEED,
     SEFLG_NOABERR,
 )
@@ -1261,6 +1281,280 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=2.56,
     ),
+    # ======== ZODIACAL CONSTELLATION BRIGHT STARS ========
+    # Stars from zodiacal constellations used in astrological interpretation
+    # ======== ARIES CONSTELLATION ========
+    # The Ram - first sign of the zodiac
+    StarCatalogEntry(
+        id=SE_HAMAL,
+        name="Hamal",
+        nomenclature="alAri",
+        hip_number=9884,
+        data=StarData(
+            ra_j2000=31.793357,  # 02h 07m 10.4s (Alpha Arietis)
+            dec_j2000=23.462418,  # +23° 27' 45"
+            pm_ra=0.19050,  # 190.50 mas/yr
+            pm_dec=-0.14883,  # -148.83 mas/yr
+        ),
+        magnitude=2.00,
+    ),
+    StarCatalogEntry(
+        id=SE_SHERATAN,
+        name="Sheratan",
+        nomenclature="beAri",
+        hip_number=8903,
+        data=StarData(
+            ra_j2000=28.660046,  # 01h 54m 38.4s (Beta Arietis)
+            dec_j2000=20.808031,  # +20° 48' 29"
+            pm_ra=0.09833,  # 98.33 mas/yr
+            pm_dec=-0.11008,  # -110.08 mas/yr
+        ),
+        magnitude=2.64,
+    ),
+    StarCatalogEntry(
+        id=SE_MESARTHIM,
+        name="Mesarthim",
+        nomenclature="gaAri",
+        hip_number=8832,
+        data=StarData(
+            ra_j2000=28.382551,  # 01h 53m 31.8s (Gamma Arietis)
+            dec_j2000=19.293852,  # +19° 17' 38"
+            pm_ra=0.07972,  # 79.72 mas/yr
+            pm_dec=-0.09899,  # -98.99 mas/yr
+        ),
+        magnitude=3.88,
+    ),
+    # ======== CANCER CONSTELLATION ========
+    # The Crab - features the Beehive Cluster (M44)
+    StarCatalogEntry(
+        id=SE_ACUBENS,
+        name="Acubens",
+        nomenclature="alCnc",
+        hip_number=44066,
+        data=StarData(
+            ra_j2000=134.621761,  # 08h 58m 29.2s (Alpha Cancri)
+            dec_j2000=11.857700,  # +11° 51' 28"
+            pm_ra=-0.04069,  # -40.69 mas/yr
+            pm_dec=-0.02884,  # -28.84 mas/yr
+        ),
+        magnitude=4.25,
+    ),
+    StarCatalogEntry(
+        id=SE_TARF,
+        name="Tarf",
+        nomenclature="beCnc",
+        hip_number=42911,
+        data=StarData(
+            ra_j2000=130.821442,  # 08h 43m 17.1s (Beta Cancri)
+            dec_j2000=9.185544,  # +09° 11' 08"
+            pm_ra=-0.04711,  # -47.11 mas/yr
+            pm_dec=-0.04897,  # -48.97 mas/yr
+        ),
+        magnitude=3.52,
+    ),
+    StarCatalogEntry(
+        id=SE_ASELLUS_BOREALIS,
+        name="Asellus Borealis",
+        nomenclature="gaCnc",
+        hip_number=43103,
+        data=StarData(
+            ra_j2000=131.171248,  # 08h 44m 41.1s (Gamma Cancri)
+            dec_j2000=21.468501,  # +21° 28' 07"
+            pm_ra=-0.10759,  # -107.59 mas/yr
+            pm_dec=-0.04358,  # -43.58 mas/yr
+        ),
+        magnitude=4.66,
+    ),
+    StarCatalogEntry(
+        id=SE_ASELLUS_AUSTRALIS,
+        name="Asellus Australis",
+        nomenclature="deCnc",
+        hip_number=43834,
+        data=StarData(
+            ra_j2000=133.847504,  # 08h 55m 23.4s (Delta Cancri)
+            dec_j2000=18.154309,  # +18° 09' 15"
+            pm_ra=-0.01787,  # -17.87 mas/yr
+            pm_dec=-0.22920,  # -229.20 mas/yr
+        ),
+        magnitude=3.94,
+    ),
+    # ======== SAGITTARIUS CONSTELLATION ========
+    # The Archer - prominent in the summer sky, contains galactic center
+    StarCatalogEntry(
+        id=SE_KAUS_AUSTRALIS,
+        name="Kaus Australis",
+        nomenclature="epSgr",
+        hip_number=90185,
+        data=StarData(
+            ra_j2000=276.042993,  # 18h 24m 10.3s (Epsilon Sagittarii)
+            dec_j2000=-34.384616,  # -34° 23' 05"
+            pm_ra=-0.03907,  # -39.07 mas/yr
+            pm_dec=-0.12413,  # -124.13 mas/yr
+        ),
+        magnitude=1.85,
+    ),
+    StarCatalogEntry(
+        id=SE_NUNKI,
+        name="Nunki",
+        nomenclature="siSgr",
+        hip_number=92855,
+        data=StarData(
+            ra_j2000=283.816360,  # 18h 55m 15.9s (Sigma Sagittarii)
+            dec_j2000=-26.296724,  # -26° 17' 48"
+            pm_ra=0.01534,  # 15.34 mas/yr
+            pm_dec=-0.05341,  # -53.41 mas/yr
+        ),
+        magnitude=2.02,
+    ),
+    StarCatalogEntry(
+        id=SE_KAUS_MEDIA,
+        name="Kaus Media",
+        nomenclature="deSgr",
+        hip_number=89931,
+        data=StarData(
+            ra_j2000=275.248508,  # 18h 20m 59.6s (Delta Sagittarii)
+            dec_j2000=-29.828104,  # -29° 49' 41"
+            pm_ra=0.03210,  # 32.10 mas/yr
+            pm_dec=-0.02754,  # -27.54 mas/yr
+        ),
+        magnitude=2.70,
+    ),
+    StarCatalogEntry(
+        id=SE_KAUS_BOREALIS,
+        name="Kaus Borealis",
+        nomenclature="laSgr",
+        hip_number=90496,
+        data=StarData(
+            ra_j2000=276.992681,  # 18h 27m 58.2s (Lambda Sagittarii)
+            dec_j2000=-25.421701,  # -25° 25' 18"
+            pm_ra=-0.04440,  # -44.40 mas/yr
+            pm_dec=-0.18544,  # -185.44 mas/yr
+        ),
+        magnitude=2.81,
+    ),
+    StarCatalogEntry(
+        id=SE_ASCELLA,
+        name="Ascella",
+        nomenclature="zeSgr",
+        hip_number=93506,
+        data=StarData(
+            ra_j2000=285.653043,  # 19h 02m 36.7s (Zeta Sagittarii)
+            dec_j2000=-29.880063,  # -29° 52' 48"
+            pm_ra=0.00979,  # 9.79 mas/yr
+            pm_dec=-0.00118,  # -1.18 mas/yr
+        ),
+        magnitude=2.59,
+    ),
+    # ======== CAPRICORNUS CONSTELLATION ========
+    # The Sea Goat - complementing Deneb Algedi already defined above
+    StarCatalogEntry(
+        id=SE_ALGEDI,
+        name="Algedi",
+        nomenclature="alCap",
+        hip_number=100064,
+        data=StarData(
+            ra_j2000=304.513566,  # 20h 18m 03.3s (Alpha2 Capricorni)
+            dec_j2000=-12.544852,  # -12° 32' 41"
+            pm_ra=0.06258,  # 62.58 mas/yr
+            pm_dec=0.00203,  # 2.03 mas/yr
+        ),
+        magnitude=3.57,
+    ),
+    StarCatalogEntry(
+        id=SE_DABIH,
+        name="Dabih",
+        nomenclature="beCap",
+        hip_number=100345,
+        data=StarData(
+            ra_j2000=305.252803,  # 20h 21m 00.7s (Beta Capricorni)
+            dec_j2000=-14.781405,  # -14° 46' 53"
+            pm_ra=0.04577,  # 45.77 mas/yr
+            pm_dec=0.01247,  # 12.47 mas/yr
+        ),
+        magnitude=3.08,
+    ),
+    StarCatalogEntry(
+        id=SE_NASHIRA,
+        name="Nashira",
+        nomenclature="gaCap",
+        hip_number=106985,
+        data=StarData(
+            ra_j2000=325.022735,  # 21h 40m 05.5s (Gamma Capricorni)
+            dec_j2000=-16.662308,  # -16° 39' 44"
+            pm_ra=0.18755,  # 187.55 mas/yr
+            pm_dec=-0.02295,  # -22.95 mas/yr
+        ),
+        magnitude=3.68,
+    ),
+    # ======== AQUARIUS CONSTELLATION ========
+    # The Water Bearer
+    StarCatalogEntry(
+        id=SE_SADALSUUD,
+        name="Sadalsuud",
+        nomenclature="beAqr",
+        hip_number=106278,
+        data=StarData(
+            ra_j2000=322.889715,  # 21h 31m 33.5s (Beta Aquarii)
+            dec_j2000=-5.571172,  # -05° 34' 16"
+            pm_ra=0.01843,  # 18.43 mas/yr
+            pm_dec=-0.00845,  # -8.45 mas/yr
+        ),
+        magnitude=2.87,
+    ),
+    StarCatalogEntry(
+        id=SE_SADALMELIK,
+        name="Sadalmelik",
+        nomenclature="alAqr",
+        hip_number=109074,
+        data=StarData(
+            ra_j2000=331.445983,  # 22h 05m 47.0s (Alpha Aquarii)
+            dec_j2000=-0.319849,  # -00° 19' 11"
+            pm_ra=0.01800,  # 18.00 mas/yr
+            pm_dec=-0.00948,  # -9.48 mas/yr
+        ),
+        magnitude=2.96,
+    ),
+    StarCatalogEntry(
+        id=SE_SKAT,
+        name="Skat",
+        nomenclature="deAqr",
+        hip_number=113136,
+        data=StarData(
+            ra_j2000=343.662556,  # 22h 54m 39.0s (Delta Aquarii)
+            dec_j2000=-15.820827,  # -15° 49' 15"
+            pm_ra=0.02544,  # 25.44 mas/yr
+            pm_dec=-0.02551,  # -25.51 mas/yr
+        ),
+        magnitude=3.27,
+    ),
+    # ======== PISCES CONSTELLATION ========
+    # The Fishes - where the vernal equinox currently resides
+    StarCatalogEntry(
+        id=SE_ETA_PISCIUM,
+        name="Eta Piscium",
+        nomenclature="etPsc",
+        hip_number=5742,
+        data=StarData(
+            ra_j2000=18.437089,  # 01h 13m 44.9s (Eta Piscium)
+            dec_j2000=15.345823,  # +15° 20' 45"
+            pm_ra=0.02547,  # 25.47 mas/yr
+            pm_dec=-0.00291,  # -2.91 mas/yr
+        ),
+        magnitude=3.62,
+    ),
+    StarCatalogEntry(
+        id=SE_ALRESCHA,
+        name="Alrescha",
+        nomenclature="alPsc",
+        hip_number=7097,
+        data=StarData(
+            ra_j2000=22.870873,  # 01h 31m 29.0s (Alpha Piscium)
+            dec_j2000=2.763735,  # +02° 45' 49"
+            pm_ra=-0.01812,  # -18.12 mas/yr
+            pm_dec=-0.00786,  # -7.86 mas/yr
+        ),
+        magnitude=3.82,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -1937,6 +2231,161 @@ STAR_ALIASES: dict[str, int] = {
     "DUHR": SE_ZOSMA,
     "LION'S HIP": SE_ZOSMA,
     "LION'S BACK": SE_ZOSMA,
+    # ======== ZODIACAL CONSTELLATION BRIGHT STARS ========
+    # ======== HAMAL (Alpha Arietis) ========
+    "ALPHA ARIETIS": SE_HAMAL,
+    "ALPHA ARI": SE_HAMAL,
+    "13 ARI": SE_HAMAL,
+    "α ARI": SE_HAMAL,
+    "ALARI": SE_HAMAL,
+    "RAM'S HEAD": SE_HAMAL,
+    # ======== SHERATAN (Beta Arietis) ========
+    "BETA ARIETIS": SE_SHERATAN,
+    "BETA ARI": SE_SHERATAN,
+    "6 ARI": SE_SHERATAN,
+    "β ARI": SE_SHERATAN,
+    "BEARI": SE_SHERATAN,
+    "SHARATAN": SE_SHERATAN,
+    "AL-SHARATAIN": SE_SHERATAN,
+    # ======== MESARTHIM (Gamma Arietis) ========
+    "GAMMA ARIETIS": SE_MESARTHIM,
+    "GAMMA ARI": SE_MESARTHIM,
+    "5 ARI": SE_MESARTHIM,
+    "γ ARI": SE_MESARTHIM,
+    "GAARI": SE_MESARTHIM,
+    "MESARTIM": SE_MESARTHIM,
+    "FIRST STAR OF ARIES": SE_MESARTHIM,
+    # ======== ACUBENS (Alpha Cancri) ========
+    "ALPHA CANCRI": SE_ACUBENS,
+    "ALPHA CNC": SE_ACUBENS,
+    "65 CNC": SE_ACUBENS,
+    "α CNC": SE_ACUBENS,
+    "ALCNC": SE_ACUBENS,
+    "SERTAN": SE_ACUBENS,
+    "AL ZUBANAH": SE_ACUBENS,
+    # ======== TARF (Beta Cancri) ========
+    "BETA CANCRI": SE_TARF,
+    "BETA CNC": SE_TARF,
+    "17 CNC": SE_TARF,
+    "β CNC": SE_TARF,
+    "BECNC": SE_TARF,
+    "AL TARF": SE_TARF,
+    # ======== ASELLUS BOREALIS (Gamma Cancri) ========
+    "GAMMA CANCRI": SE_ASELLUS_BOREALIS,
+    "GAMMA CNC": SE_ASELLUS_BOREALIS,
+    "43 CNC": SE_ASELLUS_BOREALIS,
+    "γ CNC": SE_ASELLUS_BOREALIS,
+    "GACNC": SE_ASELLUS_BOREALIS,
+    "NORTHERN DONKEY": SE_ASELLUS_BOREALIS,
+    "NORTHERN ASS": SE_ASELLUS_BOREALIS,
+    # ======== ASELLUS AUSTRALIS (Delta Cancri) ========
+    "DELTA CANCRI": SE_ASELLUS_AUSTRALIS,
+    "DELTA CNC": SE_ASELLUS_AUSTRALIS,
+    "47 CNC": SE_ASELLUS_AUSTRALIS,
+    "δ CNC": SE_ASELLUS_AUSTRALIS,
+    "DECNC": SE_ASELLUS_AUSTRALIS,
+    "SOUTHERN DONKEY": SE_ASELLUS_AUSTRALIS,
+    "SOUTHERN ASS": SE_ASELLUS_AUSTRALIS,
+    # ======== KAUS AUSTRALIS (Epsilon Sagittarii) ========
+    "EPSILON SAGITTARII": SE_KAUS_AUSTRALIS,
+    "EPSILON SGR": SE_KAUS_AUSTRALIS,
+    "20 SGR": SE_KAUS_AUSTRALIS,
+    "ε SGR": SE_KAUS_AUSTRALIS,
+    "EPSGR": SE_KAUS_AUSTRALIS,
+    "SOUTHERN BOW": SE_KAUS_AUSTRALIS,
+    # ======== NUNKI (Sigma Sagittarii) ========
+    "SIGMA SAGITTARII": SE_NUNKI,
+    "SIGMA SGR": SE_NUNKI,
+    "34 SGR": SE_NUNKI,
+    "σ SGR": SE_NUNKI,
+    "SISGR": SE_NUNKI,
+    "PELAGUS": SE_NUNKI,
+    # ======== KAUS MEDIA (Delta Sagittarii) ========
+    "DELTA SAGITTARII": SE_KAUS_MEDIA,
+    "DELTA SGR": SE_KAUS_MEDIA,
+    "19 SGR": SE_KAUS_MEDIA,
+    "δ SGR": SE_KAUS_MEDIA,
+    "DESGR": SE_KAUS_MEDIA,
+    "MIDDLE BOW": SE_KAUS_MEDIA,
+    # ======== KAUS BOREALIS (Lambda Sagittarii) ========
+    "LAMBDA SAGITTARII": SE_KAUS_BOREALIS,
+    "LAMBDA SGR": SE_KAUS_BOREALIS,
+    "22 SGR": SE_KAUS_BOREALIS,
+    "λ SGR": SE_KAUS_BOREALIS,
+    "LASGR": SE_KAUS_BOREALIS,
+    "NORTHERN BOW": SE_KAUS_BOREALIS,
+    # ======== ASCELLA (Zeta Sagittarii) ========
+    "ZETA SAGITTARII": SE_ASCELLA,
+    "ZETA SGR": SE_ASCELLA,
+    "38 SGR": SE_ASCELLA,
+    "ζ SGR": SE_ASCELLA,
+    "ZESGR": SE_ASCELLA,
+    "ARMPIT": SE_ASCELLA,
+    # ======== ALGEDI (Alpha Capricorni) ========
+    "ALPHA CAPRICORNI": SE_ALGEDI,
+    "ALPHA CAP": SE_ALGEDI,
+    "6 CAP": SE_ALGEDI,
+    "α CAP": SE_ALGEDI,
+    "ALCAP": SE_ALGEDI,
+    "GIEDI": SE_ALGEDI,
+    "PRIMA GIEDI": SE_ALGEDI,
+    "THE GOAT": SE_ALGEDI,
+    # ======== DABIH (Beta Capricorni) ========
+    "BETA CAPRICORNI": SE_DABIH,
+    "BETA CAP": SE_DABIH,
+    "9 CAP": SE_DABIH,
+    "β CAP": SE_DABIH,
+    "BECAP": SE_DABIH,
+    "AL-DHABIH": SE_DABIH,
+    "LUCKY ONE OF SLAUGHTERER": SE_DABIH,
+    # ======== NASHIRA (Gamma Capricorni) ========
+    "GAMMA CAPRICORNI": SE_NASHIRA,
+    "GAMMA CAP": SE_NASHIRA,
+    "40 CAP": SE_NASHIRA,
+    "γ CAP": SE_NASHIRA,
+    "GACAP": SE_NASHIRA,
+    "FORTUNATE ONE": SE_NASHIRA,
+    "SA'D NASHIRAH": SE_NASHIRA,
+    # ======== SADALSUUD (Beta Aquarii) ========
+    "BETA AQUARII": SE_SADALSUUD,
+    "BETA AQR": SE_SADALSUUD,
+    "22 AQR": SE_SADALSUUD,
+    "β AQR": SE_SADALSUUD,
+    "BEAQR": SE_SADALSUUD,
+    "LUCKIEST OF LUCKY STARS": SE_SADALSUUD,
+    "SA'D AL-SU'UD": SE_SADALSUUD,
+    # ======== SADALMELIK (Alpha Aquarii) ========
+    "ALPHA AQUARII": SE_SADALMELIK,
+    "ALPHA AQR": SE_SADALMELIK,
+    "34 AQR": SE_SADALMELIK,
+    "α AQR": SE_SADALMELIK,
+    "ALAQR": SE_SADALMELIK,
+    "LUCKY STAR OF KING": SE_SADALMELIK,
+    "SA'D AL-MALIK": SE_SADALMELIK,
+    # ======== SKAT (Delta Aquarii) ========
+    "DELTA AQUARII": SE_SKAT,
+    "DELTA AQR": SE_SKAT,
+    "76 AQR": SE_SKAT,
+    "δ AQR": SE_SKAT,
+    "DEAQR": SE_SKAT,
+    "SCHEAT AQUARII": SE_SKAT,
+    "SHIN": SE_SKAT,
+    # ======== ETA PISCIUM ========
+    "ETA PISCIUM": SE_ETA_PISCIUM,
+    "ETA PSC": SE_ETA_PISCIUM,
+    "99 PSC": SE_ETA_PISCIUM,
+    "η PSC": SE_ETA_PISCIUM,
+    "ETPSC": SE_ETA_PISCIUM,
+    "KULLAT NUNU": SE_ETA_PISCIUM,
+    # ======== ALRESCHA (Alpha Piscium) ========
+    "ALPHA PISCIUM": SE_ALRESCHA,
+    "ALPHA PSC": SE_ALRESCHA,
+    "113 PSC": SE_ALRESCHA,
+    "α PSC": SE_ALRESCHA,
+    "ALPSC": SE_ALRESCHA,
+    "AL-RISHA": SE_ALRESCHA,
+    "THE KNOT": SE_ALRESCHA,
+    "THE CORD": SE_ALRESCHA,
 }
 
 

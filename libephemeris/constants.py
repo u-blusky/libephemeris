@@ -467,6 +467,41 @@ SE_LESATH: int = SE_FIXSTAR_OFFSET + 81  # Upsilon Scorpii
 # Leo constellation - completing the bright stars
 SE_ZOSMA: int = SE_FIXSTAR_OFFSET + 82  # Delta Leonis
 
+# ======== ZODIACAL CONSTELLATION BRIGHT STARS ========
+# Stars from zodiacal constellations used in astrological interpretation
+
+# Aries constellation - the Ram
+SE_HAMAL: int = SE_FIXSTAR_OFFSET + 83  # Alpha Arietis - brightest in Aries
+SE_SHERATAN: int = SE_FIXSTAR_OFFSET + 84  # Beta Arietis
+SE_MESARTHIM: int = SE_FIXSTAR_OFFSET + 85  # Gamma Arietis
+
+# Cancer constellation - the Crab
+SE_ACUBENS: int = SE_FIXSTAR_OFFSET + 86  # Alpha Cancri
+SE_TARF: int = SE_FIXSTAR_OFFSET + 87  # Beta Cancri - brightest in Cancer
+SE_ASELLUS_BOREALIS: int = SE_FIXSTAR_OFFSET + 88  # Gamma Cancri - Northern Donkey
+SE_ASELLUS_AUSTRALIS: int = SE_FIXSTAR_OFFSET + 89  # Delta Cancri - Southern Donkey
+
+# Sagittarius constellation - the Archer
+SE_KAUS_AUSTRALIS: int = SE_FIXSTAR_OFFSET + 90  # Epsilon Sagittarii - brightest
+SE_NUNKI: int = SE_FIXSTAR_OFFSET + 91  # Sigma Sagittarii
+SE_KAUS_MEDIA: int = SE_FIXSTAR_OFFSET + 92  # Delta Sagittarii
+SE_KAUS_BOREALIS: int = SE_FIXSTAR_OFFSET + 93  # Lambda Sagittarii
+SE_ASCELLA: int = SE_FIXSTAR_OFFSET + 94  # Zeta Sagittarii
+
+# Capricornus constellation - the Sea Goat (complementing Deneb Algedi)
+SE_ALGEDI: int = SE_FIXSTAR_OFFSET + 95  # Alpha Capricorni - the Goat
+SE_DABIH: int = SE_FIXSTAR_OFFSET + 96  # Beta Capricorni
+SE_NASHIRA: int = SE_FIXSTAR_OFFSET + 97  # Gamma Capricorni - the Fortunate One
+
+# Aquarius constellation - the Water Bearer
+SE_SADALSUUD: int = SE_FIXSTAR_OFFSET + 98  # Beta Aquarii - brightest in Aquarius
+SE_SADALMELIK: int = SE_FIXSTAR_OFFSET + 99  # Alpha Aquarii
+SE_SKAT: int = SE_FIXSTAR_OFFSET + 100  # Delta Aquarii
+
+# Pisces constellation - the Fishes
+SE_ETA_PISCIUM: int = SE_FIXSTAR_OFFSET + 101  # Eta Piscium - brightest in Pisces
+SE_ALRESCHA: int = SE_FIXSTAR_OFFSET + 102  # Alpha Piscium - the Knot
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree
