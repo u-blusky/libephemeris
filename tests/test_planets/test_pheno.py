@@ -1012,3 +1012,379 @@ class TestPhaseAngleAllPlanets:
         assert attr_full[0] < 50, (
             f"Moon near full: phase_angle={attr_full[0]:.1f}° should be < 50°"
         )
+
+
+class TestIlluminatedFractionAllPlanets:
+    """
+    Comprehensive tests for illuminated fraction (phase) calculation for all planets.
+
+    The illuminated fraction (also called "phase") represents the fraction of the
+    planet's disk that appears illuminated as seen from Earth. It is calculated
+    from the phase angle using the formula:
+
+        k = (1 + cos(i)) / 2
+
+    where i is the phase angle (Sun-planet-observer angle).
+
+    Key values:
+    - k = 1.0 (100%): Full phase - entire visible disk is illuminated
+    - k = 0.5 (50%): Half phase - half of the visible disk is illuminated
+    - k = 0.0 (0%): New phase - visible disk is not illuminated
+
+    This corresponds to attr[1] in the swe_pheno_ut output.
+    """
+
+    # Tolerance for illuminated fraction comparison with Swiss Ephemeris
+    ILLUMINATION_TOL = 0.02  # 2% tolerance
+
+    @pytest.mark.unit
+    def test_sun_always_fully_illuminated(self):
+        """
+        Sun should always have illuminated fraction = 1.0.
+
+        The Sun is the light source, so from any viewpoint it appears
+        fully illuminated (100%).
+        """
+        test_dates = [
+            2451545.0,  # J2000
+            2459580.5,  # 2022
+            2460310.5,  # 2024
+            2465000.0,  # 2037
+        ]
+
+        for jd in test_dates:
+            attr, _ = ephem.pheno_ut(jd, SE_SUN, 0)
+            assert attr[1] == 1.0, (
+                f"Sun at JD {jd}: illuminated fraction should be 1.0, got {attr[1]}"
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "planet_id,planet_name",
+        [
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
+            (SE_URANUS, "Uranus"),
+            (SE_NEPTUNE, "Neptune"),
+            (SE_PLUTO, "Pluto"),
+        ],
+    )
+    def test_illuminated_fraction_in_valid_range(self, planet_id, planet_name):
+        """
+        Illuminated fraction must always be between 0.0 and 1.0 for all planets.
+
+        The formula k = (1 + cos(i))/2 always produces values in [0, 1]
+        for any phase angle i in [0°, 180°].
+        """
+        test_dates = [
+            2451545.0,
+            2451600.0,
+            2451700.0,
+            2459500.0,
+            2459600.0,
+            2460300.0,
+        ]
+
+        for jd in test_dates:
+            attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+            illuminated_fraction = attr[1]
+
+            assert 0.0 <= illuminated_fraction <= 1.0, (
+                f"{planet_name} at JD {jd}: illuminated fraction {illuminated_fraction} "
+                f"must be in range [0.0, 1.0]"
+            )
+
+    @pytest.mark.unit
+    def test_moon_illuminated_fraction_varies_with_phase(self):
+        """
+        Moon illuminated fraction should vary from ~0 (new) to ~1 (full).
+
+        The Moon's synodic period is ~29.5 days, so sampling over a month
+        should show the full range of illumination.
+        """
+        jd_start = 2451545.0  # J2000
+        illuminations = []
+
+        # Sample over one lunar month
+        for i in range(30):
+            jd = jd_start + i
+            attr, _ = ephem.pheno_ut(jd, SE_MOON, 0)
+            illuminations.append(attr[1])
+
+        min_illum = min(illuminations)
+        max_illum = max(illuminations)
+
+        # Should see nearly full range (allowing for exact timing)
+        assert min_illum < 0.15, (
+            f"Moon minimum illumination {min_illum:.2f} should be < 0.15 (near new)"
+        )
+        assert max_illum > 0.85, (
+            f"Moon maximum illumination {max_illum:.2f} should be > 0.85 (near full)"
+        )
+
+    @pytest.mark.unit
+    def test_inner_planets_illumination_varies_widely(self):
+        """
+        Inner planets (Mercury, Venus) should show wide illumination variation.
+
+        These planets can appear as crescents (low illumination) or nearly full
+        (high illumination) depending on their orbital position.
+        """
+        jd_start = 2451545.0
+
+        for planet_id, planet_name, synodic_period in [
+            (SE_MERCURY, "Mercury", 116),
+            (SE_VENUS, "Venus", 584),
+        ]:
+            illuminations = []
+            # Sample over synodic period
+            for i in range(0, synodic_period, 5):
+                jd = jd_start + i
+                attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+                illuminations.append(attr[1])
+
+            min_illum = min(illuminations)
+            max_illum = max(illuminations)
+
+            # Inner planets should show substantial variation
+            assert max_illum - min_illum > 0.3, (
+                f"{planet_name} illumination range {max_illum - min_illum:.2f} "
+                f"should be > 0.3"
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "planet_id,planet_name,min_expected",
+        [
+            (SE_JUPITER, "Jupiter", 0.99),
+            (SE_SATURN, "Saturn", 0.99),
+            (SE_URANUS, "Uranus", 0.999),
+            (SE_NEPTUNE, "Neptune", 0.999),
+            (SE_PLUTO, "Pluto", 0.999),
+        ],
+    )
+    def test_outer_planets_nearly_fully_illuminated(
+        self, planet_id, planet_name, min_expected
+    ):
+        """
+        Outer planets should always appear nearly fully illuminated.
+
+        Due to their great distance from the Sun and Earth, outer planets
+        are always seen from nearly the same direction as they are illuminated,
+        resulting in illuminated fractions very close to 1.0.
+        """
+        test_dates = [2451545.0, 2455000.0, 2459000.0, 2460000.0]
+
+        for jd in test_dates:
+            attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+            illuminated_fraction = attr[1]
+
+            assert illuminated_fraction > min_expected, (
+                f"{planet_name} at JD {jd}: illumination {illuminated_fraction:.6f} "
+                f"should be > {min_expected}"
+            )
+
+    @pytest.mark.unit
+    def test_mars_illumination_moderate_range(self):
+        """
+        Mars illuminated fraction varies moderately (about 0.84 to 1.0).
+
+        Mars is the innermost outer planet, so it can show noticeable
+        illumination variation, but never appears as a thin crescent.
+        """
+        jd_start = 2451545.0
+        illuminations = []
+
+        # Sample over Mars synodic period (~780 days)
+        for i in range(0, 780, 10):
+            jd = jd_start + i
+            attr, _ = ephem.pheno_ut(jd, SE_MARS, 0)
+            illuminations.append(attr[1])
+
+        min_illum = min(illuminations)
+        max_illum = max(illuminations)
+
+        # Mars minimum illumination is about 84% at quadrature
+        assert min_illum > 0.80, (
+            f"Mars minimum illumination {min_illum:.2f} should be > 0.80"
+        )
+        assert min_illum < 0.95, (
+            f"Mars minimum illumination {min_illum:.2f} should show some variation"
+        )
+        assert max_illum > 0.99, (
+            f"Mars maximum illumination {max_illum:.2f} should be > 0.99 at opposition"
+        )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "planet_id,planet_name",
+        [
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
+            (SE_URANUS, "Uranus"),
+            (SE_NEPTUNE, "Neptune"),
+            (SE_PLUTO, "Pluto"),
+        ],
+    )
+    def test_illuminated_fraction_matches_swiss_ephemeris(self, planet_id, planet_name):
+        """
+        Illuminated fraction should match Swiss Ephemeris within tolerance.
+
+        This verifies the implementation produces results consistent with
+        the reference Swiss Ephemeris library.
+        """
+        test_dates = [
+            2451545.0,  # J2000
+            2451600.0,
+            2451700.0,
+            2455000.0,  # 2009
+            2459000.0,  # 2020
+            2460000.0,  # 2023
+        ]
+
+        swe.set_ephe_path(None)
+
+        for jd in test_dates:
+            swe_attr = swe.pheno_ut(jd, planet_id, 0)
+            lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+
+            swe_illumination = swe_attr[1]
+            lib_illumination = lib_attr[1]
+
+            diff = abs(swe_illumination - lib_illumination)
+            assert diff < self.ILLUMINATION_TOL, (
+                f"{planet_name} at JD {jd}: illumination SE={swe_illumination:.4f}, "
+                f"LIB={lib_illumination:.4f}, diff={diff:.4f}"
+            )
+
+    @pytest.mark.comparison
+    def test_moon_illuminated_fraction_matches_swiss_ephemeris(self):
+        """
+        Moon illuminated fraction should match Swiss Ephemeris.
+
+        The Moon requires special handling due to its proximity and
+        non-spherical orbit, but illumination should still match closely.
+        """
+        test_dates = [
+            2451545.0,
+            2451550.0,
+            2451555.0,
+            2451560.0,
+            2451565.0,
+            2451570.0,
+        ]
+
+        swe.set_ephe_path(None)
+
+        for jd in test_dates:
+            swe_attr = swe.pheno_ut(jd, SE_MOON, 0)
+            lib_attr, _ = ephem.pheno_ut(jd, SE_MOON, 0)
+
+            swe_illumination = swe_attr[1]
+            lib_illumination = lib_attr[1]
+
+            diff = abs(swe_illumination - lib_illumination)
+            # Moon allows slightly larger tolerance due to calculation complexity
+            assert diff < 0.05, (
+                f"Moon at JD {jd}: illumination SE={swe_illumination:.4f}, "
+                f"LIB={lib_illumination:.4f}, diff={diff:.4f}"
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "planet_id,planet_name",
+        [
+            (SE_MOON, "Moon"),
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
+            (SE_URANUS, "Uranus"),
+            (SE_NEPTUNE, "Neptune"),
+            (SE_PLUTO, "Pluto"),
+        ],
+    )
+    def test_illumination_formula_from_phase_angle(self, planet_id, planet_name):
+        """
+        Verify illuminated fraction is calculated correctly from phase angle.
+
+        The relationship k = (1 + cos(i))/2 must hold for all planets,
+        where i is the phase angle in degrees.
+        """
+        test_dates = [2451545.0, 2451600.0, 2455000.0, 2459000.0]
+
+        for jd in test_dates:
+            attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+            phase_angle = attr[0]
+            illumination = attr[1]
+
+            expected_illumination = (1 + math.cos(math.radians(phase_angle))) / 2
+
+            diff = abs(illumination - expected_illumination)
+            assert diff < 0.0001, (
+                f"{planet_name} at JD {jd}: illumination {illumination:.6f} != "
+                f"expected {expected_illumination:.6f} from phase_angle={phase_angle:.2f}°"
+            )
+
+    @pytest.mark.unit
+    def test_illumination_physical_interpretation(self):
+        """
+        Test that illumination values have correct physical interpretation.
+
+        Verify key boundary conditions:
+        - Phase angle 0° -> illumination 1.0 (full)
+        - Phase angle 90° -> illumination 0.5 (half)
+        - Phase angle 180° -> illumination 0.0 (new)
+        """
+        # Test the mathematical formula directly
+        test_cases = [
+            (0, 1.0),  # Full phase
+            (30, 0.933),  # Gibbous
+            (60, 0.75),  # Gibbous
+            (90, 0.5),  # Half (quarter)
+            (120, 0.25),  # Crescent
+            (150, 0.067),  # Thin crescent
+            (180, 0.0),  # New phase
+        ]
+
+        for phase_angle, expected in test_cases:
+            calculated = (1 + math.cos(math.radians(phase_angle))) / 2
+            assert abs(calculated - expected) < 0.001, (
+                f"Phase angle {phase_angle}°: expected illumination {expected}, "
+                f"calculated {calculated:.4f}"
+            )
+
+    @pytest.mark.unit
+    def test_illumination_continuous_over_time(self):
+        """
+        Illumination should change smoothly and continuously over time.
+
+        There should be no sudden jumps in illumination values between
+        consecutive time steps.
+        """
+        jd_start = 2451545.0
+
+        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_MOON]:
+            prev_illumination = None
+
+            for i in range(100):
+                jd = jd_start + i * 0.5  # Half-day steps
+                attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+                illumination = attr[1]
+
+                if prev_illumination is not None:
+                    # Change should be gradual (< 0.1 per half day typically)
+                    change = abs(illumination - prev_illumination)
+                    assert change < 0.15, (
+                        f"Planet {planet_id} at JD {jd}: illumination jumped by "
+                        f"{change:.4f} from {prev_illumination:.4f} to {illumination:.4f}"
+                    )
+
+                prev_illumination = illumination

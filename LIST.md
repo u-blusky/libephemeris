@@ -408,7 +408,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPLEMENT PHASE ANGLE CALCULATION: Ensure phase angle (Sun-planet-Earth angle) is calculated correctly for all planets as part of swe_pheno_ut output.
 
-- [ ] IMPLEMENT ILLUMINATED FRACTION CALCULATION: Implement phase (illuminated fraction of disk visible from Earth) calculation for all planets as part of swe_pheno_ut output.
+- [x] IMPLEMENT ILLUMINATED FRACTION CALCULATION: Implement phase (illuminated fraction of disk visible from Earth) calculation for all planets as part of swe_pheno_ut output.
 
 - [ ] IMPLEMENT PLANET MAGNITUDE FORMULAS: Implement apparent magnitude calculation for Mercury, Venus, Mars, Jupiter, Saturn using formulas from Meeus Chapter 41 - required for swe_pheno_ut compatibility.
 
