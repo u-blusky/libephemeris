@@ -2038,6 +2038,61 @@ def _parse_bayer_designation(designation: str) -> str | None:
     return letter_abbrev + const_abbrev
 
 
+def _parse_flamsteed_designation(designation: str) -> str | None:
+    """
+    Parse a Flamsteed designation into a normalized format for STAR_ALIASES lookup.
+
+    Converts designations like "32 Leonis", "87 Virginis", "21 Tauri"
+    into the format used in STAR_ALIASES (e.g., "32 LEO", "87 VIR", "21 TAU").
+
+    Flamsteed designations consist of a number followed by the constellation
+    name in genitive (Latin) form. This function normalizes them to the format
+    "{number} {3-letter-abbrev}" used in STAR_ALIASES.
+
+    Args:
+        designation: Flamsteed designation string (e.g., "32 Leonis", "87 Virginis")
+
+    Returns:
+        Normalized alias string if parsed successfully (e.g., "32 LEO"), None otherwise
+
+    Examples:
+        >>> _parse_flamsteed_designation("32 Leonis")
+        '32 LEO'
+        >>> _parse_flamsteed_designation("87 Virginis")
+        '87 VIR'
+        >>> _parse_flamsteed_designation("21 Tauri")
+        '21 TAU'
+        >>> _parse_flamsteed_designation("Invalid Name")
+        None
+    """
+    if not designation:
+        return None
+
+    # Normalize: strip and split
+    parts = designation.strip().split()
+
+    if len(parts) < 2:
+        return None
+
+    # First part should be a number (Flamsteed number)
+    number_str = parts[0]
+    if not number_str.isdigit():
+        return None
+
+    # Remaining parts form the constellation name
+    constellation_name = " ".join(parts[1:]).upper()
+
+    # Look up constellation abbreviation
+    if constellation_name not in CONSTELLATION_ABBREV:
+        return None
+
+    const_abbrev = CONSTELLATION_ABBREV[constellation_name]
+
+    # Build normalized alias: number + constellation abbreviation (uppercase)
+    # e.g., "32" + "LEO" = "32 LEO"
+    return f"{number_str} {const_abbrev.upper()}"
+
+
 # STAR_ALIASES: Maps alternative star names to canonical SE_* constant IDs
 # Includes: common names, Bayer designations (full and abbreviated),
 # Flamsteed numbers, Arabic names, Latin names, Greek transliterations
@@ -2873,7 +2928,8 @@ def resolve_star_name(name: str) -> int | None:
     3. Try exact match in STAR_ALIASES dictionary
     4. Try exact match against canonical star names in STAR_CATALOG
     5. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
-    6. Try fuzzy matching (alias contains search term for short inputs)
+    6. Try Flamsteed designation with number + constellation (e.g., "32 Leonis")
+    7. Try fuzzy matching (alias contains search term for short inputs)
 
     Args:
         name: Star name, alias, designation, or comma-prefixed partial name
@@ -2889,6 +2945,8 @@ def resolve_star_name(name: str) -> int | None:
         >>> resolve_star_name("Alpha Leo")
         1000001
         >>> resolve_star_name("Alpha Leonis")  # Full Bayer designation
+        1000001
+        >>> resolve_star_name("32 Leonis")  # Flamsteed designation
         1000001
         >>> resolve_star_name("SIRIUS")
         1000004
@@ -2947,7 +3005,14 @@ def resolve_star_name(name: str) -> int | None:
             if entry.nomenclature.upper() == parsed_nomenclature.upper():
                 return entry.id
 
-    # 5. Try fuzzy matching: check if any alias CONTAINS the search term
+    # 5. Try Flamsteed designation (e.g., "32 Leonis", "87 Virginis")
+    parsed_flamsteed = _parse_flamsteed_designation(name.strip())
+    if parsed_flamsteed:
+        # Look up in STAR_ALIASES using the normalized format (e.g., "32 LEO")
+        if parsed_flamsteed in STAR_ALIASES:
+            return STAR_ALIASES[parsed_flamsteed]
+
+    # 6. Try fuzzy matching: check if any alias CONTAINS the search term
     # Only for reasonably short inputs (avoid false positives)
     if len(normalized) >= 3:
         for alias, star_id in STAR_ALIASES.items():
@@ -3308,9 +3373,10 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     1. Exact star name (case-insensitive): "Regulus", "SPICA"
     2. Hipparcos catalog number (as string): "49669", ",49669"
     3. Bayer designation with Greek letter names: "Alpha Leonis", "Beta Persei"
-    4. Partial name search (case-insensitive): "Reg", "pic"
-    5. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
-    6. Format with comma: "Regulus,alLeo" (takes first part)
+    4. Flamsteed designation with number + constellation: "32 Leonis", "87 Virginis"
+    5. Partial name search (case-insensitive): "Reg", "pic"
+    6. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
+    7. Format with comma: "Regulus,alLeo" (takes first part)
 
     Args:
         star_name: Star identifier - can be name, catalog number, or search string
@@ -3324,6 +3390,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         >>> entry, err = _resolve_star2(",49669")          # HIP with leading comma
         >>> entry, err = _resolve_star2("Alpha Leonis")    # Bayer designation
         >>> entry, err = _resolve_star2("Beta Persei")     # Bayer designation
+        >>> entry, err = _resolve_star2("32 Leonis")       # Flamsteed designation
         >>> entry, err = _resolve_star2("Reg")             # Partial match
         >>> entry, err = _resolve_star2("alLeo")           # Nomenclature
     """
@@ -3363,6 +3430,16 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         for entry in STAR_CATALOG:
             if entry.nomenclature.upper() == parsed_nomenclature.upper():
                 return entry, None
+
+    # 3b. Try Flamsteed designation (e.g., "32 Leonis", "87 Virginis")
+    parsed_flamsteed = _parse_flamsteed_designation(search)
+    if parsed_flamsteed:
+        # Look up in STAR_ALIASES using the normalized format (e.g., "32 LEO")
+        if parsed_flamsteed in STAR_ALIASES:
+            star_id = STAR_ALIASES[parsed_flamsteed]
+            for entry in STAR_CATALOG:
+                if entry.id == star_id:
+                    return entry, None
 
     # 4. Try partial name match (prefix search, case-insensitive)
     matches: List[StarCatalogEntry] = []
