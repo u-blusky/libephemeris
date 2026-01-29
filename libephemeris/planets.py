@@ -1385,13 +1385,45 @@ STARS = {
         parallax=0.00571,  # 5.71 mas (Hipparcos 2007)
         radial_velocity=-3.00,  # -3.00 km/s (SIMBAD - approaching us)
     ),
-    # Galactic Center (Sgr A*)
-    # Radio position from Reid & Brunthaler (2004)
+    # Galactic Center (Sgr A*) - the supermassive black hole at the center of the
+    # Milky Way, detected as a compact radio source.
+    #
+    # ICRS J2000 position from Reid & Brunthaler (2004, ApJ 616, 872):
+    #   RA  = 17h 45m 40.0409s = 266.41683708 deg
+    #   Dec = -29° 00' 28.118" = -29.00781056 deg
+    #   Epoch: J2000.0 (based on VLBA observations)
+    #   Uncertainty: ~0.4 mas in each coordinate
+    #
+    # Apparent proper motion from Reid & Brunthaler (2020, ApJ 892, 39):
+    #   μl = -6.411 ± 0.008 mas/yr (along Galactic plane)
+    #   μb = -0.219 ± 0.007 mas/yr (toward North Galactic Pole)
+    #
+    # Conversion from Galactic to equatorial proper motion:
+    #   At Sgr A* position (l = 359.944°, b = -0.046°):
+    #   The position angle of Galactic North from celestial North is ~58.3°
+    #   Using the transformation matrix:
+    #     μα* = μl*sin(posang) + μb*cos(posang) = -6.411*sin(58.3°) + -0.219*cos(58.3°)
+    #         = -6.411*0.8507 - 0.219*0.5257 = -5.456 - 0.115 = -5.571 mas/yr
+    #   But note: the sign conventions differ; verified against:
+    #     μα* ≈ -2.70 mas/yr (Wikipedia, from Reid & Brunthaler papers)
+    #     μδ  ≈ -5.6 mas/yr
+    #   Using the equatorial proper motions from direct VLBI observation:
+    #     μα* = -3.151 ± 0.018 mas/yr (Reid & Brunthaler 2004)
+    #     μδ  = -5.547 ± 0.026 mas/yr (Reid & Brunthaler 2004)
+    #
+    # Note: This apparent motion is dominated by the Sun's orbital motion around
+    # the Galactic center (galactic rotation + solar peculiar velocity).
+    # The intrinsic motion of Sgr A* is effectively zero (<1 km/s).
+    #
+    # References:
+    # - Reid, M. J. & Brunthaler, A. 2004, ApJ, 616, 872 (position)
+    # - Reid, M. J. & Brunthaler, A. 2020, ApJ, 892, 39 (proper motion update)
+    # - Petrov et al. 2011, AJ, 142, 35 (SIMBAD reference, consistent position)
     "GAL_CENTER": StarData(
-        ra_j2000=266.416800,
-        dec_j2000=-29.007800,
-        pm_ra=-0.003,
-        pm_dec=-0.003,
+        ra_j2000=266.41683708,  # 17h 45m 40.0409s (Reid & Brunthaler 2004)
+        dec_j2000=-29.00781056,  # -29° 00' 28.118" (Reid & Brunthaler 2004)
+        pm_ra=-0.003151,  # -3.151 mas/yr -> arcsec/yr (Reid & Brunthaler 2004)
+        pm_dec=-0.005547,  # -5.547 mas/yr -> arcsec/yr (Reid & Brunthaler 2004)
     ),
     # Galactic North Pole (J2000)
     "GAL_NORTH_POLE": StarData(
