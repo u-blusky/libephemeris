@@ -151,6 +151,9 @@ from .constants import (
     SE_ALRESCHA,
     SEFLG_SPEED,
     SEFLG_NOABERR,
+    J2000,
+    J1991_25,
+    DAYS_PER_JULIAN_YEAR,
 )
 
 
@@ -198,6 +201,117 @@ class StarCatalogEntry:
     hip_number: int
     data: StarData
     magnitude: float
+
+
+def propagate_proper_motion(
+    ra_epoch: float,
+    dec_epoch: float,
+    pm_ra_cosdec: float,
+    pm_dec: float,
+    from_jd: float,
+    to_jd: float,
+) -> Tuple[float, float]:
+    """
+    Propagate star position using proper motion between two epochs.
+
+    This function applies the standard astrometric proper motion formula to
+    calculate a star's position at any target epoch, given its position and
+    proper motion at a reference epoch. This is the fundamental calculation
+    for converting Hipparcos positions (at J1991.25) to any other epoch.
+
+    The formula includes the cos(dec) correction that accounts for the
+    convergence of right ascension circles toward the celestial poles:
+
+        RA(t) = RA(t0) + pm_ra_cosdec * dt / cos(dec)
+        Dec(t) = Dec(t0) + pm_dec * dt
+
+    where dt is the time difference in Julian years (365.25 days).
+
+    Args:
+        ra_epoch: Right Ascension at reference epoch (degrees, 0-360)
+        dec_epoch: Declination at reference epoch (degrees, -90 to +90)
+        pm_ra_cosdec: Proper motion in RA including cos(dec) factor
+                      (arcseconds/year). This is mu_alpha* in Hipparcos notation.
+        pm_dec: Proper motion in Declination (arcseconds/year).
+                This is mu_delta in Hipparcos notation.
+        from_jd: Reference epoch as Julian Day (e.g., J1991_25 = 2448349.0625)
+        to_jd: Target epoch as Julian Day (e.g., J2000 = 2451545.0)
+
+    Returns:
+        Tuple[float, float]: (ra_target, dec_target) position at target epoch
+            in degrees. RA is normalized to [0, 360), Dec is in [-90, +90].
+
+    Example:
+        # Propagate Sirius from J1991.25 to J2000.0
+        >>> from libephemeris.fixed_stars import propagate_proper_motion
+        >>> from libephemeris.constants import J1991_25, J2000
+        >>> # Sirius at J1991.25 (from Hipparcos catalog)
+        >>> ra_1991, dec_1991 = propagate_proper_motion(
+        ...     ra_epoch=101.289,  # RA at J1991.25
+        ...     dec_epoch=-16.713,  # Dec at J1991.25
+        ...     pm_ra_cosdec=-0.54601,  # -546.01 mas/yr as arcsec/yr
+        ...     pm_dec=-1.22307,  # -1223.07 mas/yr as arcsec/yr
+        ...     from_jd=J1991_25,
+        ...     to_jd=J2000,
+        ... )
+
+    Notes:
+        - pm_ra_cosdec should already include the cos(dec) factor, as is
+          standard in the Hipparcos catalog (column "pmRA" or mu_alpha*).
+          This represents actual angular motion on the sky in the RA direction.
+
+        - For stars near the poles (|dec| > 89.9 degrees), numerical precision
+          may degrade due to the 1/cos(dec) factor. However, proper motion
+          values are also smaller in the RA direction for polar stars.
+
+        - This function uses the linear (first-order) proper motion model.
+          For high proper motion stars over very long time spans (>500 years),
+          the rigorous space motion approach (second-order Taylor expansion)
+          is more accurate. See Hipparcos Vol. 1, Section 1.5.5.
+
+        - The time difference is computed in Julian years (exactly 365.25 days).
+
+    References:
+        - Hipparcos and Tycho Catalogues, ESA SP-1200, Vol. 1, Section 1.2
+        - The Hipparcos proper motion reference epoch is J1991.25 (JD 2448349.0625)
+        - IAU SOFA Library: Proper motion transformations
+    """
+    import math
+
+    # Time difference in Julian years
+    dt_years = (to_jd - from_jd) / DAYS_PER_JULIAN_YEAR
+
+    # Convert proper motions from arcsec/year to degrees/year
+    pm_ra_deg_per_year = pm_ra_cosdec / 3600.0
+    pm_dec_deg_per_year = pm_dec / 3600.0
+
+    # Calculate declination at target epoch (simple linear motion)
+    dec_target = dec_epoch + pm_dec_deg_per_year * dt_years
+
+    # Clamp declination to valid range [-90, +90]
+    if dec_target > 90.0:
+        dec_target = 90.0
+    elif dec_target < -90.0:
+        dec_target = -90.0
+
+    # Calculate RA at target epoch with cos(dec) correction
+    # pm_ra_cosdec already includes cos(dec), so we divide by cos(dec)
+    # to get the actual change in RA angle
+    cos_dec = math.cos(math.radians(dec_epoch))
+
+    # Avoid division by zero at poles (|dec| = 90 degrees)
+    # At the poles, RA is undefined, so we keep it unchanged
+    if abs(cos_dec) > 1e-10:
+        ra_target = ra_epoch + (pm_ra_deg_per_year / cos_dec) * dt_years
+    else:
+        ra_target = ra_epoch
+
+    # Normalize RA to [0, 360)
+    ra_target = ra_target % 360.0
+    if ra_target < 0:
+        ra_target += 360.0
+
+    return ra_target, dec_target
 
 
 # Extended star catalog with names and catalog numbers

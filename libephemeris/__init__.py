@@ -278,6 +278,7 @@ from .fixed_stars import (
     swe_fixstar2_ut,
     swe_fixstar_mag,
     swe_fixstar2_mag,
+    propagate_proper_motion,
 )
 from .context import EphemerisContext  # NEW: Thread-safe context API
 from .spk import (  # SPK kernel support for high-precision minor body calculations
@@ -758,6 +759,8 @@ __all__ = [
     "fixstar_mag",
     "swe_fixstar2_mag",
     "fixstar2_mag",
+    # Proper motion propagation
+    "propagate_proper_motion",
     # SPK kernel support
     "download_spk",
     "register_spk_body",

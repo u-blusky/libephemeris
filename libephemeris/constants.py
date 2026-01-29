@@ -885,3 +885,30 @@ TIDAL_DE431: float = SE_TIDAL_DE431
 TIDAL_DE441: float = SE_TIDAL_DE441
 TIDAL_DEFAULT: float = SE_TIDAL_DEFAULT
 TIDAL_AUTOMATIC: float = SE_TIDAL_AUTOMATIC
+
+# =============================================================================
+# STANDARD ASTRONOMICAL EPOCHS (JULIAN DAY)
+# =============================================================================
+# Reference epochs used for astrometric calculations and proper motion.
+# All values are in Julian Day TT (Terrestrial Time).
+
+# J2000.0 epoch: Jan 1, 2000, 12:00 TT - Standard reference epoch for ICRS
+J2000: float = 2451545.0
+
+# J1991.25 epoch: Apr 2, 1991, 13:30 TT - Hipparcos catalog reference epoch
+# This is the mean epoch of observations for the Hipparcos mission.
+# Proper motion values in Hipparcos are defined relative to this epoch.
+# Reference: Hipparcos and Tycho Catalogues, ESA SP-1200, Vol. 1, Section 1.2.2
+J1991_25: float = 2448349.0625
+
+# J1900.0 epoch: Jan 0.5, 1900 TT - Historical reference epoch
+J1900: float = 2415020.0
+
+# B1950.0 epoch: Jan 0.923, 1950 - Besselian epoch for FK4 catalog
+B1950: float = 2433282.4235
+
+# Days per Julian year (exactly 365.25 days)
+DAYS_PER_JULIAN_YEAR: float = 365.25
+
+# Days per Julian century (exactly 36525 days)
+DAYS_PER_JULIAN_CENTURY: float = 36525.0
