@@ -420,9 +420,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## LOW PRIORITY: House System Improvements
 
-- [ ] IMPLEMENT CO-ASCENDANT CALCULATION: Currently docs/PRECISION.md line 121 states "Co-Ascendant: Not implemented (returns 0.0)", implement the Co-Ascendant in houses.py as defined by Walter Koch - required for swe_houses_ex2 ascmc[4] output.
+- [x] IMPLEMENT CO-ASCENDANT CALCULATION: Currently docs/PRECISION.md line 121 states "Co-Ascendant: Not implemented (returns 0.0)", implement the Co-Ascendant in houses.py as defined by Walter Koch - required for swe_houses_ex2 ascmc[4] output.
 
-- [ ] IMPLEMENT POLAR ASCENDANT CALCULATION: Currently docs/PRECISION.md line 122 states "Polar Ascendant: Not implemented (returns 0.0)", implement the Polar Ascendant in houses.py - required for swe_houses_ex2 ascmc[5] output.
+- [x] IMPLEMENT POLAR ASCENDANT CALCULATION: Currently docs/PRECISION.md line 122 states "Polar Ascendant: Not implemented (returns 0.0)", implement the Polar Ascendant in houses.py - required for swe_houses_ex2 ascmc[5] output.
 
 - [ ] VERIFY GAUQUELIN SECTOR IMPLEMENTATION: Currently docs/PRECISION.md line 106 notes that Gauquelin sectors use "Placidus approximation (not true 36-sector)", verify the implementation correctly divides diurnal and nocturnal arcs into 18 sectors each.
 
