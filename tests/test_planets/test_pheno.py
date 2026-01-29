@@ -758,3 +758,257 @@ class TestSwePheno20Values:
 
         _, flag_true = ephem.pheno_ut(jd, SE_MARS, SEFLG_TRUEPOS)
         assert isinstance(flag_true, int)
+
+
+class TestPhaseAngleAllPlanets:
+    """
+    Comprehensive tests for phase angle calculation for all planets.
+
+    The phase angle is the Sun-planet-Earth angle (the angle at the planet
+    vertex in the triangle formed by Sun, planet, and Earth). It determines
+    how much of the planet's illuminated surface is visible from Earth.
+
+    For inner planets (Mercury, Venus):
+    - Phase angle varies from 0° (superior conjunction, fully lit) to 180° (inferior conjunction)
+    - Maximum elongation corresponds to phase angle around 90°
+
+    For outer planets (Mars and beyond):
+    - Phase angle is always small (typically < 50° for Mars, < 12° for Jupiter and beyond)
+    - Opposition: phase angle ~ 0°
+    - Quadrature: maximum phase angle
+    """
+
+    # Stricter tolerance for phase angle comparison (0.5 degrees)
+    PHASE_ANGLE_TOL = 0.5
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "planet_id,planet_name",
+        [
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
+            (SE_URANUS, "Uranus"),
+            (SE_NEPTUNE, "Neptune"),
+            (SE_PLUTO, "Pluto"),
+        ],
+    )
+    def test_phase_angle_at_multiple_dates(self, planet_id, planet_name):
+        """
+        Test phase angle calculation at multiple dates throughout a year.
+
+        This ensures phase angle is calculated correctly as planets move
+        through different orbital configurations.
+        """
+        # Test dates spanning different orbital configurations
+        test_dates = [
+            2451545.0,  # J2000 (Jan 1, 2000)
+            2451590.0,  # Feb 15, 2000
+            2451635.0,  # Apr 1, 2000
+            2451680.0,  # May 16, 2000
+            2451725.0,  # Jun 30, 2000
+            2451770.0,  # Aug 14, 2000
+            2451815.0,  # Sep 28, 2000
+            2451860.0,  # Nov 12, 2000
+            2459580.5,  # Jan 1, 2022
+            2460310.5,  # Jan 1, 2024
+        ]
+
+        swe.set_ephe_path(None)
+
+        for jd in test_dates:
+            swe_attr = swe.pheno_ut(jd, planet_id, 0)
+            lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+
+            swe_phase_angle = swe_attr[0]
+            lib_phase_angle = lib_attr[0]
+
+            diff = abs(swe_phase_angle - lib_phase_angle)
+            assert diff < self.PHASE_ANGLE_TOL, (
+                f"{planet_name} at JD {jd}: phase angle SE={swe_phase_angle:.4f}°, "
+                f"LIB={lib_phase_angle:.4f}°, diff={diff:.4f}°"
+            )
+
+    @pytest.mark.comparison
+    def test_inner_planets_phase_angle_range(self):
+        """
+        Test that inner planets (Mercury, Venus) show substantial phase angle variation.
+
+        Inner planets can have phase angles from 0° to 180° depending on
+        their position relative to the Sun and Earth.
+        """
+        # Mercury: synodic period ~116 days, sample 200 days for full cycle
+        jd_start = 2451545.0  # J2000
+        phase_angles_mercury = []
+
+        for i in range(200):  # Sample over Mercury's synodic period
+            jd = jd_start + i
+            attr_mercury, _ = ephem.pheno_ut(jd, SE_MERCURY, 0)
+            phase_angles_mercury.append(attr_mercury[0])
+
+        # Mercury should show substantial phase angle variation (range > 60°)
+        mercury_range = max(phase_angles_mercury) - min(phase_angles_mercury)
+        assert mercury_range > 60, (
+            f"Mercury phase angle range {mercury_range:.1f}° should be > 60°"
+        )
+
+        # Venus: synodic period ~584 days, sample 600 days for full cycle
+        phase_angles_venus = []
+        for i in range(600):  # Sample over Venus's synodic period
+            jd = jd_start + i
+            attr_venus, _ = ephem.pheno_ut(jd, SE_VENUS, 0)
+            phase_angles_venus.append(attr_venus[0])
+
+        # Venus should show substantial phase angle variation (range > 60°)
+        venus_range = max(phase_angles_venus) - min(phase_angles_venus)
+        assert venus_range > 60, (
+            f"Venus phase angle range {venus_range:.1f}° should be > 60°"
+        )
+
+    @pytest.mark.comparison
+    def test_outer_planets_phase_angle_small(self):
+        """
+        Test that outer planets (Jupiter and beyond) have small phase angles.
+
+        Outer planets are always seen from approximately the same direction
+        as the Sun illuminates them, so phase angles are always small.
+        """
+        # Sample dates across a year
+        jd_start = 2451545.0
+        outer_planets = [
+            (SE_JUPITER, "Jupiter", 12),  # max phase angle ~12°
+            (SE_SATURN, "Saturn", 7),  # max phase angle ~7°
+            (SE_URANUS, "Uranus", 4),  # max phase angle ~4°
+            (SE_NEPTUNE, "Neptune", 2),  # max phase angle ~2°
+            (SE_PLUTO, "Pluto", 2),  # max phase angle ~2°
+        ]
+
+        for planet_id, planet_name, max_expected in outer_planets:
+            for i in range(0, 365, 30):  # Sample monthly
+                jd = jd_start + i
+                attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+                phase_angle = attr[0]
+                assert phase_angle < max_expected + 1, (
+                    f"{planet_name} at JD {jd}: phase angle {phase_angle:.2f}° "
+                    f"exceeds expected max {max_expected}°"
+                )
+
+    @pytest.mark.comparison
+    def test_mars_phase_angle_moderate(self):
+        """
+        Test that Mars has moderate phase angles (up to ~47°).
+
+        Mars is the innermost outer planet and can show significant
+        phase angles, especially near quadrature.
+        """
+        jd_start = 2451545.0
+        max_phase_angle = 0
+
+        for i in range(780):  # ~2 years (Mars synodic period ~780 days)
+            jd = jd_start + i
+            attr, _ = ephem.pheno_ut(jd, SE_MARS, 0)
+            max_phase_angle = max(max_phase_angle, attr[0])
+
+        # Mars maximum phase angle is about 47° at quadrature
+        assert 30 < max_phase_angle < 50, (
+            f"Mars max phase angle {max_phase_angle:.1f}° should be ~47°"
+        )
+
+    @pytest.mark.comparison
+    def test_phase_angle_vs_elongation_consistency(self):
+        """
+        Test that phase angle and elongation are geometrically consistent.
+
+        For outer planets at opposition (elongation ~180°), phase angle should be ~0°.
+        For outer planets at quadrature (elongation ~90°), phase angle is maximum.
+        """
+        jd_start = 2451545.0
+        swe.set_ephe_path(None)
+
+        for planet_id in [SE_JUPITER, SE_SATURN]:
+            # Find date near opposition (elongation close to 180°)
+            for i in range(400):
+                jd = jd_start + i
+                attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+                elongation = attr[2]
+                phase_angle = attr[0]
+
+                # Near opposition (elongation > 170°), phase angle should be small
+                if elongation > 170:
+                    assert phase_angle < 5, (
+                        f"Planet {planet_id} near opposition: elongation={elongation:.1f}°, "
+                        f"phase_angle={phase_angle:.1f}° should be < 5°"
+                    )
+
+    @pytest.mark.comparison
+    def test_phase_angle_formula_verification(self):
+        """
+        Verify the phase angle formula: phase = (1 + cos(phase_angle)) / 2.
+
+        This relationship must hold for all planets at all times.
+        """
+        test_dates = [
+            2451545.0,
+            2451600.0,
+            2451700.0,
+            2451800.0,
+            2459500.0,
+            2459600.0,
+            2459700.0,
+        ]
+        planets = [
+            SE_MERCURY,
+            SE_VENUS,
+            SE_MARS,
+            SE_JUPITER,
+            SE_SATURN,
+            SE_URANUS,
+            SE_NEPTUNE,
+            SE_PLUTO,
+        ]
+
+        for jd in test_dates:
+            for planet_id in planets:
+                attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+                phase_angle = attr[0]
+                phase = attr[1]
+
+                # Verify: phase = (1 + cos(phase_angle)) / 2
+                expected_phase = (1 + math.cos(math.radians(phase_angle))) / 2
+
+                diff = abs(phase - expected_phase)
+                assert diff < 0.0001, (
+                    f"Planet {planet_id} at JD {jd}: phase={phase:.6f} != "
+                    f"expected={(1 + math.cos(math.radians(phase_angle))) / 2:.6f} "
+                    f"from phase_angle={phase_angle:.2f}°"
+                )
+
+    @pytest.mark.comparison
+    def test_moon_phase_angle_at_lunar_phases(self):
+        """
+        Test Moon phase angle at known lunar phases.
+
+        - New Moon: phase angle ~180° (Moon between Sun and Earth)
+        - First Quarter: phase angle ~90°
+        - Full Moon: phase angle ~0° (Earth between Sun and Moon)
+        - Last Quarter: phase angle ~90°
+        """
+        # Approximate dates for lunar phases in Jan 2000
+        # These are rough dates for testing the general behavior
+        jd_new = 2451550.1  # Near new moon
+        jd_full = 2451565.0  # Near full moon
+
+        attr_new, _ = ephem.pheno_ut(jd_new, SE_MOON, 0)
+        attr_full, _ = ephem.pheno_ut(jd_full, SE_MOON, 0)
+
+        # Near new moon, phase angle should be high (approaching 180°)
+        assert attr_new[0] > 100, (
+            f"Moon near new: phase_angle={attr_new[0]:.1f}° should be > 100°"
+        )
+
+        # Near full moon, phase angle should be low (approaching 0°)
+        assert attr_full[0] < 50, (
+            f"Moon near full: phase_angle={attr_full[0]:.1f}° should be < 50°"
+        )

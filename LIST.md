@@ -404,9 +404,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 ## LOW PRIORITY: Planetary Phenomena
 
-- [ ] VERIFY SWE_PHENO_UT IMPLEMENTATION: Verify the current implementation of swe_pheno_ut in libephemeris returns all 20 output values matching Swiss Ephemeris exactly - this is a core SE function for planetary phenomena.
+- [x] VERIFY SWE_PHENO_UT IMPLEMENTATION: Verify the current implementation of swe_pheno_ut in libephemeris returns all 20 output values matching Swiss Ephemeris exactly - this is a core SE function for planetary phenomena.
 
-- [ ] IMPLEMENT PHASE ANGLE CALCULATION: Ensure phase angle (Sun-planet-Earth angle) is calculated correctly for all planets as part of swe_pheno_ut output.
+- [x] IMPLEMENT PHASE ANGLE CALCULATION: Ensure phase angle (Sun-planet-Earth angle) is calculated correctly for all planets as part of swe_pheno_ut output.
 
 - [ ] IMPLEMENT ILLUMINATED FRACTION CALCULATION: Implement phase (illuminated fraction of disk visible from Earth) calculation for all planets as part of swe_pheno_ut output.
 
