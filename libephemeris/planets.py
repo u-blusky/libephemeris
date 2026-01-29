@@ -1928,6 +1928,18 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
         return val % 360.0
 
+    # Handle SE_SIDM_USER (255): User-defined ayanamsha
+    # User provides: t0 (reference epoch JD), ayan_t0 (ayanamsha at t0 in degrees)
+    # Ayanamsha = ayan_t0 + precession * (tjd_tt - t0) / 36525
+    if sid_mode == SE_SIDM_USER:
+        _, t0, ayan_t0 = get_sid_mode(full=True)
+        # Calculate time in Julian centuries from user's reference epoch
+        T_user = (tjd_tt - t0) / 36525.0
+        # Standard precession rate: 5027.8 arcsec/century = 5027.8/3600 deg/century
+        precession = 5027.8
+        ayanamsa = ayan_t0 + (precession * T_user) / 3600.0
+        return ayanamsa % 360.0
+
     if sid_mode not in ayanamsha_data:
         # Default to Lahiri if unknown mode
         sid_mode = SE_SIDM_LAHIRI
