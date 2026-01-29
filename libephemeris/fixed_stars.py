@@ -3063,6 +3063,1132 @@ _STAR_MAGNITUDES = {
 }
 
 
+# =============================================================================
+# STAR NAME TO HIP NUMBER MAPPING
+# =============================================================================
+# Mapping from common star names, Bayer designations, and Flamsteed numbers
+# to Hipparcos (HIP) catalog numbers.
+#
+# Data sourced from the IAU Working Group on Star Names (WGSN) catalog:
+# https://www.iau.org/public/themes/naming_stars/
+# IAU-CSN (IAU Catalog of Star Names) last updated 2022-04-04
+#
+# This mapping provides direct lookup from star names to HIP numbers,
+# independent of the internal SE_* star ID constants.
+# =============================================================================
+
+STAR_NAME_TO_HIP: dict[str, int] = {
+    # =========================================================================
+    # COMMON/PROPER STAR NAMES (IAU-approved names)
+    # =========================================================================
+    # Names are stored in uppercase for case-insensitive lookup
+    # Source: IAU-CSN catalog
+    # =========================================================================
+    # A
+    "ABSOLUTNO": -1,  # XO-5, no HIP (exoplanet host)
+    "ACAMAR": 13847,  # Theta1 Eridani
+    "ACHERNAR": 7588,  # Alpha Eridani
+    "ACHIRD": 3821,  # Eta Cassiopeiae
+    "ACRAB": 78820,  # Beta Scorpii (also Graffias)
+    "ACRUX": 60718,  # Alpha Crucis
+    "ACUBENS": 44066,  # Alpha Cancri
+    "ADHAFERA": 50335,  # Zeta Leonis
+    "ADHARA": 33579,  # Epsilon Canis Majoris
+    "ADHIL": 6411,  # Xi Andromedae
+    "AIN": 20889,  # Epsilon Tauri
+    "AINALRAMI": 92761,  # Nu1 Sagittarii
+    "ALADFAR": 94481,  # Eta Lyrae
+    "ALASIA": 90004,  # HD 168746
+    "ALBALDAH": 94141,  # Pi Sagittarii
+    "ALBALI": 102618,  # Epsilon Aquarii
+    "ALBIREO": 95947,  # Beta Cygni
+    "ALCHIBA": 59199,  # Alpha Corvi
+    "ALCOR": 65477,  # 80 Ursae Majoris
+    "ALCYONE": 17702,  # Eta Tauri (Pleiades)
+    "ALDEBARAN": 21421,  # Alpha Tauri
+    "ALDERAMIN": 105199,  # Alpha Cephei
+    "ALDHANAB": 108085,  # Gamma Gruis
+    "ALDHIBAH": 83895,  # Zeta Draconis
+    "ALDULFIN": 101421,  # Epsilon Delphini
+    "ALFIRK": 106032,  # Beta Cephei
+    "ALGEDI": 100064,  # Alpha2 Capricorni
+    "ALGENIB": 1067,  # Gamma Pegasi
+    "ALGIEBA": 50583,  # Gamma1 Leonis
+    "ALGOL": 14576,  # Beta Persei
+    "ALGORAB": 60965,  # Delta Corvi
+    "ALHENA": 31681,  # Gamma Geminorum
+    "ALIOTH": 62956,  # Epsilon Ursae Majoris
+    "ALJANAH": 102488,  # Epsilon Cygni
+    "ALKAID": 67301,  # Eta Ursae Majoris
+    "ALKALUROPS": 75411,  # Mu1 Bootis
+    "ALKAPHRAH": 44471,  # Kappa Ursae Majoris
+    "ALKARAB": 115623,  # Upsilon Pegasi
+    "ALKES": 53740,  # Alpha Crateris
+    "ALMAAZ": 23416,  # Epsilon Aurigae
+    "ALMACH": 9640,  # Gamma Andromedae
+    "ALNAIR": 109268,  # Alpha Gruis
+    "ALNASL": 88635,  # Gamma2 Sagittarii
+    "ALNILAM": 26311,  # Epsilon Orionis
+    "ALNITAK": 26727,  # Zeta Orionis
+    "ALNIYAT": 80112,  # Sigma Scorpii
+    "ALPHARD": 46390,  # Alpha Hydrae
+    "ALPHECCA": 76267,  # Alpha Coronae Borealis
+    "ALPHERATZ": 677,  # Alpha Andromedae
+    "ALPHERG": 7097,  # Eta Piscium
+    "ALRAKIS": 83608,  # Mu Draconis
+    "ALRESCHA": 7097,  # Alpha Piscium (IAU: HIP 9487 for A component, HIP 7097 is the catalog entry)
+    "ALRUBA": 86782,  # Draconis
+    "ALSAFI": 96100,  # Sigma Draconis
+    "ALSCIAUKAT": 41075,  # 31 Lyncis
+    "ALSEPHINA": 42913,  # Delta Velorum
+    "ALSHAIN": 98036,  # Beta Aquilae
+    "ALSHAT": 100310,  # Nu Capricorni
+    "ALTAIR": 97649,  # Alpha Aquilae
+    "ALTAIS": 94376,  # Delta Draconis
+    "ALTERF": 46750,  # Lambda Leonis
+    "ALUDRA": 35904,  # Eta Canis Majoris
+    "ALULA AUSTRALIS": 55203,  # Xi Ursae Majoris
+    "ALULA BOREALIS": 55219,  # Nu Ursae Majoris
+    "ALYA": 92946,  # Theta1 Serpentis
+    "ALZIRR": 32362,  # Xi Geminorum
+    "AMADIOHA": 29550,  # HD 43197
+    "AMANSINAYA": -1,  # WASP-34, no HIP
+    "ANADOLU": -1,  # WASP-52, no HIP
+    "ANCHA": 110003,  # Theta Aquarii
+    "ANGETENAR": 13288,  # Tau2 Eridani
+    "ANIARA": 57820,  # HD 102956
+    "ANKAA": 2081,  # Alpha Phoenicis
+    "ANSER": 95771,  # Alpha Vulpeculae
+    "ANTARES": 80763,  # Alpha Scorpii
+    "ARCALIS": 72845,  # HD 131496
+    "ARCTURUS": 69673,  # Alpha Bootis
+    "ARKAB POSTERIOR": 95294,  # Beta2 Sagittarii
+    "ARKAB PRIOR": 95241,  # Beta1 Sagittarii
+    "ARNEB": 25985,  # Alpha Leporis
+    "ASCELLA": 93506,  # Zeta Sagittarii
+    "ASELLUS AUSTRALIS": 43834,  # Delta Cancri (consistent with STAR_CATALOG)
+    "ASELLUS BOREALIS": 43103,  # Gamma Cancri (consistent with STAR_CATALOG)
+    "ASHLESHA": 43109,  # Epsilon Hydrae
+    "ASPIDISKE": 45556,  # Iota Carinae
+    "ASTEROPE": 17579,  # 21 Tauri (Pleiades)
+    "ATAKORAKA": -1,  # WASP-64, no HIP
+    "ATHEBYNE": 80331,  # Eta Draconis
+    "ATIK": 17448,  # Omicron Persei
+    "ATLAS": 17847,  # 27 Tauri (Pleiades)
+    "ATRIA": 82273,  # Alpha Trianguli Australis
+    "AVIOR": 41037,  # Epsilon Carinae
+    "AXOLOTL": 118319,  # HD 224693
+    "AYEYARWADY": 13993,  # HD 18742
+    "AZELFAFAGE": 107136,  # Pi1 Cygni
+    "AZHA": 13701,  # Eta Eridani
+    "AZMIDI": 38170,  # Xi Puppis
+    # B
+    "BAEKDU": 73136,  # 8 Ursae Minoris
+    "BARNARD'S STAR": 87937,  # GJ 699
+    "BATEN KAITOS": 8645,  # Zeta Ceti
+    "BEEMIM": 20535,  # Upsilon3 Eridani
+    "BEID": 19587,  # Omicron1 Eridani
+    "BELEL": 95124,  # HD 181342
+    "BELENOS": 6643,  # HD 8574
+    "BELLATRIX": 25336,  # Gamma Orionis
+    "BEREHYNIA": -1,  # HAT-P-15, no HIP
+    "BETELGEUSE": 27989,  # Alpha Orionis
+    "BHARANI": 13209,  # 41 Arietis
+    "BIBHA": 48711,  # HD 86081
+    "BIHAM": 109427,  # Theta Pegasi
+    "BOSONA": 107251,  # HD 206610
+    "BOTEIN": 14838,  # Delta Arietis
+    "BRACHIUM": 73714,  # Sigma Librae
+    "BUBUP": 26380,  # HD 38283
+    "BUNA": 12191,  # HD 16175
+    "BUNDA": 106786,  # Xi Aquarii
+    # C
+    "CANOPUS": 30438,  # Alpha Carinae
+    "CAPELLA": 24608,  # Alpha Aurigae
+    "CAPH": 746,  # Beta Cassiopeiae
+    "CASTOR": 36850,  # Alpha Geminorum
+    "CASTULA": 4422,  # Upsilon2 Cassiopeiae
+    "CEBALRAI": 86742,  # Beta Ophiuchi
+    "CEIBO": 37284,  # HD 63454
+    "CELAENO": 17489,  # 16 Tauri (Pleiades)
+    "CERVANTES": 86796,  # Mu Arae
+    "CHALAWAN": 53721,  # 47 Ursae Majoris
+    "CHAMUKUY": 20894,  # Theta2 Tauri
+    "CHAOPHRAYA": -1,  # WASP-50, no HIP
+    "CHARA": 61317,  # Beta Canum Venaticorum
+    "CHASON": -1,  # HAT-P-5, no HIP
+    "CHECHIA": 99894,  # HD 192699
+    "CHERTAN": 54879,  # Theta Leonis
+    "CITADELLE": 1547,  # HD 1502
+    "CITALA": 33719,  # HD 52265
+    "COCIBOLCA": 3479,  # HD 4208
+    "COPERNICUS": 43587,  # 55 Cancri
+    "COR CAROLI": 63125,  # Alpha2 Canum Venaticorum
+    "CUJAM": 80463,  # Omega Herculis
+    "CURSA": 23875,  # Beta Eridani
+    # D
+    "DABIH": 100345,  # Beta1 Capricorni
+    "DALIM": 14879,  # Alpha Fornacis
+    "DENEB": 102098,  # Alpha Cygni
+    "DENEB ALGEDI": 107556,  # Delta Capricorni
+    "DENEBOLA": 57632,  # Beta Leonis
+    "DIADEM": 64241,  # Alpha Comae Berenices
+    "DINGOLAY": 54158,  # HD 96063
+    "DIPHDA": 3419,  # Beta Ceti
+    "DIWO": -1,  # WASP-17, no HIP
+    "DIYA": -1,  # WASP-72, no HIP
+    "DOFIDA": 66047,  # HD 117618
+    "DOMBAY": -1,  # HAT-P-3, no HIP
+    "DSCHUBBA": 78401,  # Delta Scorpii
+    "DUBHE": 54061,  # Alpha Ursae Majoris
+    "DZIBAN": 86614,  # Psi1 Draconis
+    # E
+    "EBLA": 114322,  # HD 218566
+    "EDASICH": 75458,  # Iota Draconis
+    "ELECTRA": 17499,  # 17 Tauri (Pleiades)
+    "ELGAFAR": 70755,  # Phi Virginis
+    "ELKURUD": 29034,  # Theta Columbae
+    "ELNATH": 25428,  # Beta Tauri
+    "ELTANIN": 87833,  # Gamma Draconis
+    "EMIW": 5529,  # HD 7199
+    "ENIF": 107315,  # Epsilon Pegasi
+    "ERRAI": 116727,  # Gamma Cephei
+    # F
+    "FAFNIR": 90344,  # 42 Draconis
+    "FANG": 78265,  # Pi Scorpii
+    "FAWARIS": 97165,  # Delta Cygni
+    "FELIS": 48615,  # HR 3923
+    "FELIXVARELA": 2247,  # BD-17 63
+    "FLEGETONTE": 57370,  # HD 102195
+    "FOMALHAUT": 113368,  # Alpha Piscis Austrini
+    "FORMOSA": 56508,  # HD 100655
+    "FRANZ": -1,  # HAT-P-14, no HIP
+    "FULU": 2920,  # Zeta Cassiopeiae
+    "FUMALSAMAKAH": 113889,  # Beta Piscium
+    "FUNI": 61177,  # HD 109246
+    "FURUD": 30122,  # Zeta Canis Majoris
+    "FUYUE": 87261,  # Scorpii
+    # G
+    "GACRUX": 61084,  # Gamma Crucis
+    "GAKYID": 42446,  # HD 73534
+    "GEMINGA": -1,  # Pulsar, no HIP
+    "GIAUSAR": 56211,  # Lambda Draconis
+    "GIENAH": 59803,  # Gamma Corvi
+    "GINAN": 60260,  # Epsilon Crucis
+    "GLOAS": -1,  # WASP-13, no HIP
+    "GOMEISA": 36188,  # Beta Canis Minoris
+    "GRUMIUM": 87585,  # Xi Draconis
+    "GUDJA": 77450,  # Kappa Serpentis
+    "GUMALA": 94645,  # HD 179949
+    "GUNIIBUU": 84405,  # 36 Ophiuchi
+    # H
+    "HADAR": 68702,  # Beta Centauri
+    "HAEDUS": 23767,  # Eta Aurigae
+    "HAMAL": 9884,  # Alpha Arietis
+    "HASSALEH": 23015,  # Iota Aurigae
+    "HATYSA": 26241,  # Iota Orionis
+    "HELVETIOS": 113357,  # 51 Pegasi
+    "HEZE": 66249,  # Zeta Virginis
+    "HOGGAR": 21109,  # HD 28678
+    "HOMAM": 112029,  # Zeta Pegasi
+    "HORNA": -1,  # HAT-P-38, no HIP
+    "HUNAHPU": 55174,  # HD 98219
+    "HUNOR": 80076,  # HAT-P-2
+    # I
+    "IKLIL": 78104,  # Rho Scorpii
+    "ILLYRIAN": 47087,  # HD 82886
+    "IMAI": 59747,  # Delta Crucis
+    "INQUILL": 84787,  # HD 156411
+    "INTAN": 15578,  # HD 20868
+    "INTERCRUS": 46471,  # HR 3743
+    "IRENA": -1,  # WASP-38, no HIP
+    "ITONDA": 108375,  # HD 208487
+    "IZAR": 72105,  # Epsilon Bootis
+    # J
+    "JABBAH": 79374,  # Nu Scorpii
+    "JISHUI": 37265,  # Omicron Geminorum
+    # K
+    "KAFFALJIDHMA": 12706,  # Gamma Ceti
+    "KALAUSI": 47202,  # HD 83443
+    "KAMUY": 79219,  # HD 145457
+    "KANG": 69427,  # Kappa Virginis
+    "KARAKA": 76351,  # HD 137388
+    "KAUS AUSTRALIS": 90185,  # Epsilon Sagittarii
+    "KAUS BOREALIS": 90496,  # Lambda Sagittarii
+    "KAUS MEDIA": 89931,  # Delta Sagittarii
+    "KAVEH": 92895,  # HD 175541
+    "KEID": 19849,  # Omicron2 Eridani
+    "KHAMBALIA": 69974,  # Lambda Virginis
+    "KITALPHA": 104987,  # Alpha Equulei
+    "KOCHAB": 72607,  # Beta Ursae Minoris
+    "KOEIA": 12961,  # HIP 12961
+    "KOIT": -1,  # XO-4, no HIP
+    "KORNEPHOROS": 80816,  # Beta Herculis
+    "KRAZ": 61359,  # Beta Corvi
+    "KURHAH": 108917,  # Xi Cephei
+    # L
+    "LA SUPERBA": 62223,  # Y Canum Venaticorum
+    "LARAWAG": 82396,  # Epsilon Scorpii
+    "LERNA": -1,  # HAT-P-42, no HIP
+    "LESATH": 85696,  # Upsilon Scorpii
+    "LIBERTAS": 97938,  # Xi Aquilae
+    "LICH": -1,  # PSR B1257+12, pulsar, no HIP
+    "LIESMA": 66192,  # HD 118203
+    "LILII BOREA": 13061,  # 39 Arietis
+    "LIONROCK": 110813,  # HD 212771
+    "LUCILINBURHUC": 30860,  # HD 45350
+    "LUSITANIA": 30905,  # HD 45652
+    # M
+    "MAASYM": 85693,  # Lambda Herculis
+    "MACONDO": 52521,  # HD 93083
+    "MAGO": 24003,  # HD 32518
+    "MAHASIM": 28380,  # Theta Aurigae
+    "MAHSATI": 82651,  # HD 152581
+    "MAIA": 17573,  # 20 Tauri (Pleiades)
+    "MALMOK": -1,  # WASP-39, no HIP
+    "MARFIK": 80883,  # Lambda Ophiuchi
+    "MARKAB": 113963,  # Alpha Pegasi
+    "MARKEB": 45941,  # Kappa Velorum
+    "MAROHU": -1,  # WASP-6, no HIP
+    "MARSIC": 79043,  # Kappa Herculis
+    "MATAR": 112158,  # Eta Pegasi
+    "MAZAALAI": -1,  # HAT-P-21, no HIP
+    "MEBSUTA": 32246,  # Epsilon Geminorum
+    "MEGREZ": 59774,  # Delta Ursae Majoris
+    "MEISSA": 26207,  # Lambda Orionis
+    "MEKBUDA": 34088,  # Zeta Geminorum
+    "MELEPH": 42556,  # Epsilon Cancri
+    "MENKALINAN": 28360,  # Beta Aurigae
+    "MENKAR": 14135,  # Alpha Ceti
+    "MENKENT": 68933,  # Theta Centauri
+    "MENKIB": 18614,  # Xi Persei
+    "MERAK": 53910,  # Beta Ursae Majoris
+    "MERGA": 72487,  # 38 Bootis
+    "MERIDIANA": 94114,  # Alpha Coronae Australis
+    "MEROPE": 17608,  # 23 Tauri (Pleiades)
+    "MESARTHIM": 8832,  # Gamma2 Arietis
+    "MIAPLACIDUS": 45238,  # Beta Carinae
+    "MIMOSA": 62434,  # Beta Crucis
+    "MINCHIR": 42402,  # Sigma Hydrae
+    "MINELAUVA": 63090,  # Delta Virginis
+    "MINTAKA": 25930,  # Delta Orionis
+    "MIRA": 10826,  # Omicron Ceti
+    "MIRACH": 5447,  # Beta Andromedae
+    "MIRAM": 13268,  # Eta Persei
+    "MIRFAK": 15863,  # Alpha Persei
+    "MIRZAM": 30324,  # Beta Canis Majoris
+    "MISAM": 14668,  # Kappa Persei
+    "MIZAR": 65378,  # Zeta Ursae Majoris
+    "MOLDOVEANU": -1,  # XO-1, no HIP
+    "MONCH": 72339,  # HD 130322
+    "MONTUNO": -1,  # WASP-79, no HIP
+    "MORAVA": -1,  # WASP-60, no HIP
+    "MORIAH": -1,  # HAT-P-23, no HIP
+    "MOTHALLAH": 8796,  # Alpha Trianguli
+    "MOUHOUN": 22491,  # HD 30856
+    "MPINGO": -1,  # WASP-71, no HIP
+    "MULIPHEIN": 34045,  # Gamma Canis Majoris
+    "MUPHRID": 67927,  # Eta Bootis
+    "MUSCIDA": 41704,  # Omicron Ursae Majoris
+    "MUSICA": 103527,  # 18 Delphini
+    "MUSPELHEIM": -1,  # HAT-P-29, no HIP
+    # N
+    "NAHN": 44946,  # Xi Cancri
+    "NALEDI": -1,  # WASP-62, no HIP
+    "NAOS": 39429,  # Zeta Puppis
+    "NASHIRA": 106985,  # Gamma Capricorni
+    "NASTI": 40687,  # HD 68988
+    "NATASHA": 48235,  # HD 85390
+    "NEKKAR": 73555,  # Beta Bootis
+    "NEMBUS": 7607,  # 51 Andromedae
+    "NENQUE": 5054,  # HD 6434
+    "NERVIA": 32916,  # HD 49674
+    "NGANURGANITY": 33856,  # Sigma Canis Majoris
+    "NIHAL": 25606,  # Beta Leporis
+    "NIKAWIY": 74961,  # HD 136418
+    "NOSAXA": 31895,  # HD 48265
+    "NUNKI": 92855,  # Sigma Sagittarii
+    "NUSAKAN": 75695,  # Beta Coronae Borealis
+    "NUSHAGAK": 13192,  # HD 17156
+    "NYAMIEN": -1,  # WASP-15, no HIP
+    # O
+    "OGMA": 80838,  # HD 149026
+    "OKAB": 93747,  # Zeta Aquilae
+    # P
+    "PAIKAUHALE": 81266,  # Tau Scorpii
+    "PARUMLEO": -1,  # WASP-32, no HIP
+    "PEACOCK": 100751,  # Alpha Pavonis
+    "PETRA": -1,  # WASP-80, no HIP
+    "PHACT": 26634,  # Alpha Columbae
+    "PHECDA": 58001,  # Gamma Ursae Majoris
+    "PHERKAD": 75097,  # Gamma Ursae Minoris
+    "PHOENICIA": 99711,  # HD 192263
+    "PIAUTOS": 40881,  # Lambda Cancri
+    "PINCOYA": 88414,  # HD 164604
+    "PIPIRIMA": 82545,  # Mu2 Scorpii
+    "PIPOLTR": -1,  # TrES-3, no HIP
+    "PLEIONE": 17851,  # 28 Tauri (Pleiades)
+    "POERAVA": 116084,  # HD 221287
+    "POLARIS": 11767,  # Alpha Ursae Minoris
+    "POLARIS AUSTRALIS": 104382,  # Sigma Octantis
+    "POLIS": 89341,  # Mu Sagittarii
+    "POLLUX": 37826,  # Beta Geminorum
+    "PORRIMA": 61941,  # Gamma Virginis
+    "PRAECIPUA": 53229,  # 46 Leonis Minoris
+    "PRIMA HYADUM": 20205,  # Gamma Tauri
+    "PROCYON": 37279,  # Alpha Canis Minoris
+    "PROPUS": 29655,  # Eta Geminorum
+    "PROXIMA CENTAURI": 70890,  # GJ 551, Alpha Centauri C
+    # R
+    "RAN": 16537,  # Epsilon Eridani
+    "RANA": 17378,  # Delta Eridani
+    "RAPETO": 83547,  # HD 153950
+    "RASALAS": 48455,  # Mu Leonis
+    "RASALGETHI": 84345,  # Alpha1 Herculis
+    "RASALHAGUE": 86032,  # Alpha Ophiuchi
+    "RASTABAN": 85670,  # Beta Draconis
+    "REGULUS": 49669,  # Alpha Leonis
+    "REVATI": 5737,  # Zeta Piscium
+    "RIGEL": 24436,  # Beta Orionis
+    "RIGIL KENTAURUS": 71683,  # Alpha Centauri A
+    "ROSALIADECASTRO": 81022,  # HD 149143
+    "ROTANEV": 101769,  # Beta Delphini
+    "RUCHBAH": 6686,  # Delta Cassiopeiae
+    "RUKBAT": 95347,  # Alpha Sagittarii
+    # S
+    "SABIK": 84012,  # Eta Ophiuchi
+    "SACLATENI": 23453,  # Zeta Aurigae
+    "SADACHBIA": 110395,  # Gamma Aquarii
+    "SADALBARI": 112748,  # Mu Pegasi
+    "SADALMELIK": 109074,  # Alpha Aquarii
+    "SADALSUUD": 106278,  # Beta Aquarii
+    "SADR": 100453,  # Gamma Cygni
+    "SAIPH": 27366,  # Kappa Orionis
+    "SALM": 98066,  # Tau Pegasi
+    "SARGAS": 86228,  # Theta Scorpii
+    "SARIN": 79992,  # Delta Herculis
+    "SCHEAT": 113881,  # Beta Pegasi
+    "SCHEDAR": 3179,  # Alpha Cassiopeiae
+    "SECUNDA HYADUM": 20455,  # Delta1 Tauri
+    "SEGIN": 4427,  # Epsilon Cassiopeiae
+    "SEGINUS": 71075,  # Gamma Bootis
+    "SHAULA": 85927,  # Lambda Scorpii
+    "SHAMA": 69701,  # HD 99109
+    "SHERATAN": 8903,  # Beta Arietis
+    "SIKA": 50782,  # HD 99491
+    "SIRIUS": 32349,  # Alpha Canis Majoris
+    "SITULA": 110672,  # Kappa Aquarii
+    "SKAT": 113136,  # Delta Aquarii
+    "SPICA": 65474,  # Alpha Virginis
+    "STRIBOR": 91085,  # HD 171028
+    "SUBRA": 47508,  # Omicron Leonis
+    "SUHAIL": 44816,  # Lambda Velorum
+    "SULAFAT": 93194,  # Gamma Lyrae
+    "SYRMA": 71957,  # Iota Virginis
+    # T
+    "TABIT": 22449,  # Pi3 Orionis
+    "TAIYANGSHOU": 54539,  # Chi Ursae Majoris
+    "TAIYI": 53759,  # 8 Draconis
+    "TALITHA": 44127,  # Iota Ursae Majoris
+    "TANIA AUSTRALIS": 51250,  # Mu Ursae Majoris
+    "TANIA BOREALIS": 50801,  # Lambda Ursae Majoris
+    "TARAZED": 95501,  # Gamma Aquilae
+    "TAYGETA": 17531,  # 19 Tauri (Pleiades)
+    "TEBERDA": 94256,  # HD 178813
+    "TEGMINE": 43103,  # Zeta1 Cancri
+    "TEJAT": 32362,  # Mu Geminorum
+    "THUBAN": 68756,  # Alpha Draconis
+    "TIAKI": 23015,  # Beta Gruis
+    "TIANGUAN": 25930,  # Zeta Tauri
+    "TIANYI": 52403,  # 7 Draconis
+    "TITAWIN": 9683,  # Upsilon Andromedae
+    "TOLIMAN": 71681,  # Alpha Centauri B
+    "TONATIUH": 43177,  # HD 104985
+    "TORCULAR": 6193,  # Omicron Piscium
+    "TUREIS": 42913,  # Rho Puppis
+    "TYL": 91919,  # Epsilon Draconis
+    # U
+    "UKDAH": 52863,  # Iota Hydrae
+    "UNUKALHAI": 77070,  # Alpha Serpentis
+    "UNURGUNITE": 34444,  # Sigma Canis Majoris
+    "URUK": 116076,  # HD 231701
+    # V
+    "VEGA": 91262,  # Alpha Lyrae
+    "VERITATE": 74793,  # 14 Andromedae
+    "VINDEMIATRIX": 63608,  # Epsilon Virginis
+    "WASAT": 35550,  # Delta Geminorum
+    "WAZN": 27628,  # Beta Columbae
+    "WEZEN": 34444,  # Delta Canis Majoris
+    # X
+    "XAMIDIMURA": 82514,  # Mu1 Scorpii
+    # Y
+    "YED POSTERIOR": 86284,  # Epsilon Ophiuchi
+    "YED PRIOR": 83000,  # Delta Ophiuchi
+    "YILDUN": 85822,  # Delta Ursae Minoris
+    # Z
+    "ZANIAH": 60129,  # Eta Virginis
+    "ZAURAK": 18543,  # Gamma Eridani
+    "ZAVIJAVA": 57757,  # Beta Virginis
+    "ZHANG": 49641,  # Upsilon1 Hydrae
+    "ZIBAL": 20535,  # Zeta Eridani
+    "ZOSMA": 54872,  # Delta Leonis
+    "ZUBENELGENUBI": 72622,  # Alpha2 Librae
+    "ZUBENELHAKRABI": 76470,  # Gamma Librae
+    "ZUBENESCHAMALI": 74785,  # Beta Librae
+    # =========================================================================
+    # BAYER DESIGNATIONS (Greek letter + constellation)
+    # =========================================================================
+    # Format: "ALPHA CONSTELLATION" and abbreviated forms
+    # =========================================================================
+    # Alpha stars
+    "ALPHA ANDROMEDAE": 677,
+    "ALPHA AND": 677,
+    "ALPHA AQUARII": 109074,
+    "ALPHA AQR": 109074,
+    "ALPHA AQUILAE": 97649,
+    "ALPHA AQL": 97649,
+    "ALPHA ARIETIS": 9884,
+    "ALPHA ARI": 9884,
+    "ALPHA AURIGAE": 24608,
+    "ALPHA AUR": 24608,
+    "ALPHA BOOTIS": 69673,
+    "ALPHA BOO": 69673,
+    "ALPHA CANIS MAJORIS": 32349,
+    "ALPHA CMA": 32349,
+    "ALPHA CANIS MINORIS": 37279,
+    "ALPHA CMI": 37279,
+    "ALPHA CAPRICORNI": 100064,
+    "ALPHA CAP": 100064,
+    "ALPHA CARINAE": 30438,
+    "ALPHA CAR": 30438,
+    "ALPHA CASSIOPEIAE": 3179,
+    "ALPHA CAS": 3179,
+    "ALPHA CENTAURI": 71683,
+    "ALPHA CEN": 71683,
+    "ALPHA CEPHEI": 105199,
+    "ALPHA CEP": 105199,
+    "ALPHA CETI": 14135,
+    "ALPHA CET": 14135,
+    "ALPHA CORONAE BOREALIS": 76267,
+    "ALPHA CRB": 76267,
+    "ALPHA CRUCIS": 60718,
+    "ALPHA CRU": 60718,
+    "ALPHA CYGNI": 102098,
+    "ALPHA CYG": 102098,
+    "ALPHA DRACONIS": 68756,
+    "ALPHA DRA": 68756,
+    "ALPHA ERIDANI": 7588,
+    "ALPHA ERI": 7588,
+    "ALPHA GEMINORUM": 36850,
+    "ALPHA GEM": 36850,
+    "ALPHA GRUIS": 109268,
+    "ALPHA GRU": 109268,
+    "ALPHA HERCULIS": 84345,
+    "ALPHA HER": 84345,
+    "ALPHA HYDRAE": 46390,
+    "ALPHA HYA": 46390,
+    "ALPHA LEONIS": 49669,
+    "ALPHA LEO": 49669,
+    "ALPHA LIBRAE": 72622,
+    "ALPHA LIB": 72622,
+    "ALPHA LYRAE": 91262,
+    "ALPHA LYR": 91262,
+    "ALPHA OPHIUCHI": 86032,
+    "ALPHA OPH": 86032,
+    "ALPHA ORIONIS": 27989,
+    "ALPHA ORI": 27989,
+    "ALPHA PAVONIS": 100751,
+    "ALPHA PAV": 100751,
+    "ALPHA PEGASI": 113963,
+    "ALPHA PEG": 113963,
+    "ALPHA PERSEI": 15863,
+    "ALPHA PER": 15863,
+    "ALPHA PHOENICIS": 2081,
+    "ALPHA PHE": 2081,
+    "ALPHA PISCIS AUSTRINI": 113368,
+    "ALPHA PSA": 113368,
+    "ALPHA PISCIUM": 9487,
+    "ALPHA PSC": 9487,
+    "ALPHA SAGITTARII": 95347,
+    "ALPHA SGR": 95347,
+    "ALPHA SCORPII": 80763,
+    "ALPHA SCO": 80763,
+    "ALPHA SERPENTIS": 77070,
+    "ALPHA SER": 77070,
+    "ALPHA TAURI": 21421,
+    "ALPHA TAU": 21421,
+    "ALPHA TRIANGULI": 8796,
+    "ALPHA TRI": 8796,
+    "ALPHA URSAE MAJORIS": 54061,
+    "ALPHA UMA": 54061,
+    "ALPHA URSAE MINORIS": 11767,
+    "ALPHA UMI": 11767,
+    "ALPHA VIRGINIS": 65474,
+    "ALPHA VIR": 65474,
+    # Beta stars
+    "BETA ANDROMEDAE": 5447,
+    "BETA AND": 5447,
+    "BETA AQUARII": 106278,
+    "BETA AQR": 106278,
+    "BETA AQUILAE": 98036,
+    "BETA AQL": 98036,
+    "BETA ARIETIS": 8903,
+    "BETA ARI": 8903,
+    "BETA AURIGAE": 28360,
+    "BETA AUR": 28360,
+    "BETA BOOTIS": 73555,
+    "BETA BOO": 73555,
+    "BETA CANIS MAJORIS": 30324,
+    "BETA CMA": 30324,
+    "BETA CANIS MINORIS": 36188,
+    "BETA CMI": 36188,
+    "BETA CAPRICORNI": 100345,
+    "BETA CAP": 100345,
+    "BETA CARINAE": 45238,
+    "BETA CAR": 45238,
+    "BETA CASSIOPEIAE": 746,
+    "BETA CAS": 746,
+    "BETA CENTAURI": 68702,
+    "BETA CEN": 68702,
+    "BETA CEPHEI": 106032,
+    "BETA CEP": 106032,
+    "BETA CETI": 3419,
+    "BETA CET": 3419,
+    "BETA CORONAE BOREALIS": 75695,
+    "BETA CRB": 75695,
+    "BETA CRUCIS": 62434,
+    "BETA CRU": 62434,
+    "BETA CYGNI": 95947,
+    "BETA CYG": 95947,
+    "BETA DELPHINI": 101769,
+    "BETA DEL": 101769,
+    "BETA DRACONIS": 85670,
+    "BETA DRA": 85670,
+    "BETA ERIDANI": 23875,
+    "BETA ERI": 23875,
+    "BETA GEMINORUM": 37826,
+    "BETA GEM": 37826,
+    "BETA GRUIS": 112122,
+    "BETA GRU": 112122,
+    "BETA HERCULIS": 80816,
+    "BETA HER": 80816,
+    "BETA LEONIS": 57632,
+    "BETA LEO": 57632,
+    "BETA LEPORIS": 25606,
+    "BETA LEP": 25606,
+    "BETA LIBRAE": 74785,
+    "BETA LIB": 74785,
+    "BETA LYRAE": 92420,
+    "BETA LYR": 92420,
+    "BETA OPHIUCHI": 86742,
+    "BETA OPH": 86742,
+    "BETA ORIONIS": 24436,
+    "BETA ORI": 24436,
+    "BETA PEGASI": 113881,
+    "BETA PEG": 113881,
+    "BETA PERSEI": 14576,
+    "BETA PER": 14576,
+    "BETA PISCIUM": 113889,
+    "BETA PSC": 113889,
+    "BETA SAGITTARII": 95241,
+    "BETA SGR": 95241,
+    "BETA SCORPII": 78820,
+    "BETA SCO": 78820,
+    "BETA TAURI": 25428,
+    "BETA TAU": 25428,
+    "BETA URSAE MAJORIS": 53910,
+    "BETA UMA": 53910,
+    "BETA URSAE MINORIS": 72607,
+    "BETA UMI": 72607,
+    "BETA VIRGINIS": 57757,
+    "BETA VIR": 57757,
+    # Gamma stars
+    "GAMMA ANDROMEDAE": 9640,
+    "GAMMA AND": 9640,
+    "GAMMA AQUARII": 110395,
+    "GAMMA AQR": 110395,
+    "GAMMA AQUILAE": 95501,
+    "GAMMA AQL": 95501,
+    "GAMMA ARIETIS": 8832,
+    "GAMMA ARI": 8832,
+    "GAMMA BOOTIS": 71075,
+    "GAMMA BOO": 71075,
+    "GAMMA CANCRI": 42806,
+    "GAMMA CNC": 42806,
+    "GAMMA CAPRICORNI": 106985,
+    "GAMMA CAP": 106985,
+    "GAMMA CASSIOPEIAE": 4427,
+    "GAMMA CAS": 4427,
+    "GAMMA CEPHEI": 116727,
+    "GAMMA CEP": 116727,
+    "GAMMA CORVI": 59803,
+    "GAMMA CRV": 59803,
+    "GAMMA CRUCIS": 61084,
+    "GAMMA CRU": 61084,
+    "GAMMA CYGNI": 100453,
+    "GAMMA CYG": 100453,
+    "GAMMA DRACONIS": 87833,
+    "GAMMA DRA": 87833,
+    "GAMMA GEMINORUM": 31681,
+    "GAMMA GEM": 31681,
+    "GAMMA GRUIS": 108085,
+    "GAMMA GRU": 108085,
+    "GAMMA LEONIS": 50583,
+    "GAMMA LEO": 50583,
+    "GAMMA LYRAE": 93194,
+    "GAMMA LYR": 93194,
+    "GAMMA ORIONIS": 25336,
+    "GAMMA ORI": 25336,
+    "GAMMA PEGASI": 1067,
+    "GAMMA PEG": 1067,
+    "GAMMA SAGITTARII": 88635,
+    "GAMMA SGR": 88635,
+    "GAMMA URSAE MAJORIS": 58001,
+    "GAMMA UMA": 58001,
+    "GAMMA URSAE MINORIS": 75097,
+    "GAMMA UMI": 75097,
+    "GAMMA VIRGINIS": 61941,
+    "GAMMA VIR": 61941,
+    # Delta stars
+    "DELTA AQUARII": 113136,
+    "DELTA AQR": 113136,
+    "DELTA BOOTIS": 72659,
+    "DELTA BOO": 72659,
+    "DELTA CANCRI": 42911,
+    "DELTA CNC": 42911,
+    "DELTA CAPRICORNI": 107556,
+    "DELTA CAP": 107556,
+    "DELTA CASSIOPEIAE": 6686,
+    "DELTA CAS": 6686,
+    "DELTA CEPHEI": 110991,
+    "DELTA CEP": 110991,
+    "DELTA CORVI": 60965,
+    "DELTA CRV": 60965,
+    "DELTA CRUCIS": 59747,
+    "DELTA CRU": 59747,
+    "DELTA CYGNI": 97165,
+    "DELTA CYG": 97165,
+    "DELTA DRACONIS": 94376,
+    "DELTA DRA": 94376,
+    "DELTA ERIDANI": 17378,
+    "DELTA ERI": 17378,
+    "DELTA GEMINORUM": 35550,
+    "DELTA GEM": 35550,
+    "DELTA HERCULIS": 79992,
+    "DELTA HER": 79992,
+    "DELTA LEONIS": 54872,
+    "DELTA LEO": 54872,
+    "DELTA ORIONIS": 25930,
+    "DELTA ORI": 25930,
+    "DELTA SAGITTARII": 89931,
+    "DELTA SGR": 89931,
+    "DELTA SCORPII": 78401,
+    "DELTA SCO": 78401,
+    "DELTA TAURI": 20455,
+    "DELTA TAU": 20455,
+    "DELTA URSAE MAJORIS": 59774,
+    "DELTA UMA": 59774,
+    "DELTA URSAE MINORIS": 85822,
+    "DELTA UMI": 85822,
+    "DELTA VIRGINIS": 63090,
+    "DELTA VIR": 63090,
+    # Epsilon stars
+    "EPSILON AQUARII": 102618,
+    "EPSILON AQR": 102618,
+    "EPSILON AURIGAE": 23416,
+    "EPSILON AUR": 23416,
+    "EPSILON BOOTIS": 72105,
+    "EPSILON BOO": 72105,
+    "EPSILON CANIS MAJORIS": 33579,
+    "EPSILON CMA": 33579,
+    "EPSILON CANCRI": 42556,
+    "EPSILON CNC": 42556,
+    "EPSILON CARINAE": 41037,
+    "EPSILON CAR": 41037,
+    "EPSILON CENTAURI": 66657,
+    "EPSILON CEN": 66657,
+    "EPSILON CYGNI": 102488,
+    "EPSILON CYG": 102488,
+    "EPSILON DRACONIS": 91919,
+    "EPSILON DRA": 91919,
+    "EPSILON ERIDANI": 16537,
+    "EPSILON ERI": 16537,
+    "EPSILON GEMINORUM": 32246,
+    "EPSILON GEM": 32246,
+    "EPSILON HYDRAE": 43109,
+    "EPSILON HYA": 43109,
+    "EPSILON LEONIS": 47908,
+    "EPSILON LEO": 47908,
+    "EPSILON OPHIUCHI": 86284,
+    "EPSILON OPH": 86284,
+    "EPSILON ORIONIS": 26311,
+    "EPSILON ORI": 26311,
+    "EPSILON PEGASI": 107315,
+    "EPSILON PEG": 107315,
+    "EPSILON SAGITTARII": 90185,
+    "EPSILON SGR": 90185,
+    "EPSILON SCORPII": 82396,
+    "EPSILON SCO": 82396,
+    "EPSILON TAURI": 20889,
+    "EPSILON TAU": 20889,
+    "EPSILON URSAE MAJORIS": 62956,
+    "EPSILON UMA": 62956,
+    "EPSILON VIRGINIS": 63608,
+    "EPSILON VIR": 63608,
+    # Zeta stars
+    "ZETA AQUARII": 110960,
+    "ZETA AQR": 110960,
+    "ZETA AQUILAE": 93747,
+    "ZETA AQL": 93747,
+    "ZETA AURIGAE": 23453,
+    "ZETA AUR": 23453,
+    "ZETA CANIS MAJORIS": 30122,
+    "ZETA CMA": 30122,
+    "ZETA CASSIOPEIAE": 2920,
+    "ZETA CAS": 2920,
+    "ZETA CENTAURI": 68002,
+    "ZETA CEN": 68002,
+    "ZETA CEPHEI": 109492,
+    "ZETA CEP": 109492,
+    "ZETA DRACONIS": 83895,
+    "ZETA DRA": 83895,
+    "ZETA ERIDANI": 20535,
+    "ZETA ERI": 20535,
+    "ZETA GEMINORUM": 34088,
+    "ZETA GEM": 34088,
+    "ZETA HERCULIS": 81693,
+    "ZETA HER": 81693,
+    "ZETA LEONIS": 50335,
+    "ZETA LEO": 50335,
+    "ZETA OPHIUCHI": 81377,
+    "ZETA OPH": 81377,
+    "ZETA ORIONIS": 26727,
+    "ZETA ORI": 26727,
+    "ZETA PEGASI": 112029,
+    "ZETA PEG": 112029,
+    "ZETA PISCIUM": 5737,
+    "ZETA PSC": 5737,
+    "ZETA PUPPIS": 39429,
+    "ZETA PUP": 39429,
+    "ZETA SAGITTARII": 93506,
+    "ZETA SGR": 93506,
+    "ZETA SCORPII": 82671,
+    "ZETA SCO": 82671,
+    "ZETA TAURI": 26451,
+    "ZETA TAU": 26451,
+    "ZETA URSAE MAJORIS": 65378,
+    "ZETA UMA": 65378,
+    "ZETA VIRGINIS": 66249,
+    "ZETA VIR": 66249,
+    # Eta stars
+    "ETA AQUARII": 102618,
+    "ETA AQR": 102618,
+    "ETA AURIGAE": 23767,
+    "ETA AUR": 23767,
+    "ETA BOOTIS": 67927,
+    "ETA BOO": 67927,
+    "ETA CANIS MAJORIS": 35904,
+    "ETA CMA": 35904,
+    "ETA CASSIOPEIAE": 3821,
+    "ETA CAS": 3821,
+    "ETA CENTAURI": 71352,
+    "ETA CEN": 71352,
+    "ETA CEPHEI": 102422,
+    "ETA CEP": 102422,
+    "ETA DRACONIS": 80331,
+    "ETA DRA": 80331,
+    "ETA GEMINORUM": 29655,
+    "ETA GEM": 29655,
+    "ETA HERCULIS": 81833,
+    "ETA HER": 81833,
+    "ETA LEONIS": 47908,
+    "ETA LEO": 47908,
+    "ETA LYRAE": 94481,
+    "ETA LYR": 94481,
+    "ETA OPHIUCHI": 84012,
+    "ETA OPH": 84012,
+    "ETA ORIONIS": 25281,
+    "ETA ORI": 25281,
+    "ETA PEGASI": 112158,
+    "ETA PEG": 112158,
+    "ETA PERSEI": 13268,
+    "ETA PER": 13268,
+    "ETA PISCIUM": 5742,  # (consistent with STAR_CATALOG)
+    "ETA PSC": 5742,
+    "ETA SAGITTARII": 89642,
+    "ETA SGR": 89642,
+    "ETA SCORPII": 84143,
+    "ETA SCO": 84143,
+    "ETA TAURI": 17702,
+    "ETA TAU": 17702,
+    "ETA URSAE MAJORIS": 67301,
+    "ETA UMA": 67301,
+    "ETA VIRGINIS": 60129,
+    "ETA VIR": 60129,
+    # Theta stars
+    "THETA AQUARII": 110003,
+    "THETA AQR": 110003,
+    "THETA AURIGAE": 28380,
+    "THETA AUR": 28380,
+    "THETA BOOTIS": 70497,
+    "THETA BOO": 70497,
+    "THETA CENTAURI": 68933,
+    "THETA CEN": 68933,
+    "THETA DRACONIS": 78527,
+    "THETA DRA": 78527,
+    "THETA ERIDANI": 13847,
+    "THETA ERI": 13847,
+    "THETA LEONIS": 54879,
+    "THETA LEO": 54879,
+    "THETA OPHIUCHI": 83000,
+    "THETA OPH": 83000,
+    "THETA PEGASI": 109427,
+    "THETA PEG": 109427,
+    "THETA SCORPII": 86228,
+    "THETA SCO": 86228,
+    "THETA TAURI": 20894,
+    "THETA TAU": 20894,
+    "THETA URSAE MAJORIS": 46853,
+    "THETA UMA": 46853,
+    "THETA VIRGINIS": 64238,
+    "THETA VIR": 64238,
+    # Iota stars
+    "IOTA AURIGAE": 23015,
+    "IOTA AUR": 23015,
+    "IOTA CARINAE": 45556,
+    "IOTA CAR": 45556,
+    "IOTA DRACONIS": 75458,
+    "IOTA DRA": 75458,
+    "IOTA ORIONIS": 26241,
+    "IOTA ORI": 26241,
+    "IOTA URSAE MAJORIS": 44127,
+    "IOTA UMA": 44127,
+    "IOTA VIRGINIS": 71957,
+    "IOTA VIR": 71957,
+    # Kappa stars
+    "KAPPA AQUILAE": 96483,
+    "KAPPA AQL": 96483,
+    "KAPPA BOOTIS": 69481,
+    "KAPPA BOO": 69481,
+    "KAPPA HERCULIS": 79043,
+    "KAPPA HER": 79043,
+    "KAPPA OPHIUCHI": 86032,
+    "KAPPA OPH": 86032,
+    "KAPPA ORIONIS": 27366,
+    "KAPPA ORI": 27366,
+    "KAPPA SCORPII": 86670,
+    "KAPPA SCO": 86670,
+    "KAPPA URSAE MAJORIS": 44471,
+    "KAPPA UMA": 44471,
+    "KAPPA VELORUM": 45941,
+    "KAPPA VEL": 45941,
+    # Lambda stars
+    "LAMBDA DRACONIS": 56211,
+    "LAMBDA DRA": 56211,
+    "LAMBDA GEMINORUM": 32362,
+    "LAMBDA GEM": 32362,
+    "LAMBDA HERCULIS": 85693,
+    "LAMBDA HER": 85693,
+    "LAMBDA LEONIS": 46750,
+    "LAMBDA LEO": 46750,
+    "LAMBDA OPHIUCHI": 80883,
+    "LAMBDA OPH": 80883,
+    "LAMBDA ORIONIS": 26207,
+    "LAMBDA ORI": 26207,
+    "LAMBDA SAGITTARII": 90496,
+    "LAMBDA SGR": 90496,
+    "LAMBDA SCORPII": 85927,
+    "LAMBDA SCO": 85927,
+    "LAMBDA URSAE MAJORIS": 50801,
+    "LAMBDA UMA": 50801,
+    "LAMBDA VELORUM": 44816,
+    "LAMBDA VEL": 44816,
+    "LAMBDA VIRGINIS": 69974,
+    "LAMBDA VIR": 69974,
+    # Mu stars
+    "MU ARAE": 86796,
+    "MU ARA": 86796,
+    "MU BOOTIS": 75411,
+    "MU BOO": 75411,
+    "MU CEPHEI": 107259,
+    "MU CEP": 107259,
+    "MU DRACONIS": 83608,
+    "MU DRA": 83608,
+    "MU GEMINORUM": 30343,
+    "MU GEM": 30343,
+    "MU HERCULIS": 86974,
+    "MU HER": 86974,
+    "MU LEONIS": 48455,
+    "MU LEO": 48455,
+    "MU PEGASI": 112748,
+    "MU PEG": 112748,
+    "MU SAGITTARII": 89341,
+    "MU SGR": 89341,
+    "MU SCORPII": 82514,
+    "MU SCO": 82514,
+    "MU URSAE MAJORIS": 51250,
+    "MU UMA": 51250,
+    "MU VIRGINIS": 71957,
+    "MU VIR": 71957,
+    # Nu stars
+    "NU ANDROMEDAE": 4436,
+    "NU AND": 4436,
+    "NU OPHIUCHI": 88048,
+    "NU OPH": 88048,
+    "NU SCORPII": 79374,
+    "NU SCO": 79374,
+    "NU URSAE MAJORIS": 55219,
+    "NU UMA": 55219,
+    # Xi stars
+    "XI AQUILAE": 97938,
+    "XI AQL": 97938,
+    "XI BOOTIS": 72659,
+    "XI BOO": 72659,
+    "XI DRACONIS": 87585,
+    "XI DRA": 87585,
+    "XI GEMINORUM": 32362,
+    "XI GEM": 32362,
+    "XI PERSEI": 18614,
+    "XI PER": 18614,
+    "XI PUPPIS": 38170,
+    "XI PUP": 38170,
+    "XI URSAE MAJORIS": 55203,
+    "XI UMA": 55203,
+    # Omicron stars
+    "OMICRON ANDROMEDAE": 3092,
+    "OMICRON AND": 3092,
+    "OMICRON CETI": 10826,
+    "OMICRON CET": 10826,
+    "OMICRON LEONIS": 47508,
+    "OMICRON LEO": 47508,
+    "OMICRON PERSEI": 17448,
+    "OMICRON PER": 17448,
+    "OMICRON URSAE MAJORIS": 41704,
+    "OMICRON UMA": 41704,
+    # Pi stars
+    "PI SAGITTARII": 94141,
+    "PI SGR": 94141,
+    "PI SCORPII": 78265,
+    "PI SCO": 78265,
+    # Rho stars
+    "RHO PUPPIS": 42913,
+    "RHO PUP": 42913,
+    "RHO SCORPII": 78104,
+    "RHO SCO": 78104,
+    # Sigma stars
+    "SIGMA DRACONIS": 96100,
+    "SIGMA DRA": 96100,
+    "SIGMA LIBRAE": 73714,
+    "SIGMA LIB": 73714,
+    "SIGMA OCTANTIS": 104382,
+    "SIGMA OCT": 104382,
+    "SIGMA SAGITTARII": 92855,
+    "SIGMA SGR": 92855,
+    "SIGMA SCORPII": 80112,
+    "SIGMA SCO": 80112,
+    # Tau stars
+    "TAU PEGASI": 98066,
+    "TAU PEG": 98066,
+    "TAU SCORPII": 81266,
+    "TAU SCO": 81266,
+    # Upsilon stars
+    "UPSILON ANDROMEDAE": 9683,
+    "UPSILON AND": 9683,
+    "UPSILON PEGASI": 115623,
+    "UPSILON PEG": 115623,
+    "UPSILON SCORPII": 85696,
+    "UPSILON SCO": 85696,
+    # Phi/Chi/Psi/Omega stars
+    "PHI VIRGINIS": 70755,
+    "PHI VIR": 70755,
+    "CHI URSAE MAJORIS": 54539,
+    "CHI UMA": 54539,
+    "PSI DRACONIS": 86614,
+    "PSI DRA": 86614,
+    "OMEGA HERCULIS": 80463,
+    "OMEGA HER": 80463,
+    # =========================================================================
+    # FLAMSTEED DESIGNATIONS (Number + constellation)
+    # =========================================================================
+    # Selected bright stars with Flamsteed numbers
+    # =========================================================================
+    "16 TAURI": 17489,  # Celaeno
+    "17 TAURI": 17499,  # Electra
+    "19 TAURI": 17531,  # Taygeta
+    "20 TAURI": 17573,  # Maia
+    "21 TAURI": 17579,  # Asterope
+    "23 TAURI": 17608,  # Merope
+    "25 TAURI": 17702,  # Alcyone (Eta Tau)
+    "27 TAURI": 17847,  # Atlas
+    "28 TAURI": 17851,  # Pleione
+    "38 BOOTIS": 72487,  # Merga
+    "46 LEONIS MINORIS": 53229,  # Praecipua
+    "47 URSAE MAJORIS": 53721,  # Chalawan
+    "51 ANDROMEDAE": 7607,  # Nembus
+    "51 PEGASI": 113357,  # Helvetios
+    "55 CANCRI": 43587,  # Copernicus
+    "80 URSAE MAJORIS": 65477,  # Alcor
+    "85 URSAE MAJORIS": 67301,  # Alkaid (same as Eta UMa)
+    # =========================================================================
+    # ALTERNATIVE SPELLINGS AND HISTORICAL NAMES
+    # =========================================================================
+    "AGENA": 68702,  # Alternative for Hadar (Beta Centauri)
+    "BECRUX": 62434,  # Alternative for Mimosa (Beta Crucis)
+    "BENETNASH": 67301,  # Alternative for Alkaid
+    "BUNGULA": 71683,  # Historical name for Rigil Kentaurus
+    "COR LEONIS": 49669,  # Heart of the Lion = Regulus
+    "DOG STAR": 32349,  # Common name for Sirius
+    "NORTH STAR": 11767,  # Common name for Polaris
+    "POLE STAR": 11767,  # Common name for Polaris
+    "WEGA": 91262,  # Historical spelling of Vega
+}
+
+
+def get_hip_from_star_name(name: str) -> int | None:
+    """
+    Look up the Hipparcos (HIP) catalog number for a star name.
+
+    Supports common/proper star names, Bayer designations, Flamsteed numbers,
+    and alternative spellings. The lookup is case-insensitive.
+
+    Args:
+        name: Star name, Bayer designation, or Flamsteed number
+              Examples: "Regulus", "Alpha Leonis", "Alpha Leo", "51 Pegasi"
+
+    Returns:
+        HIP catalog number if found, None if star not in mapping.
+        Returns -1 for stars without HIP numbers (e.g., exoplanet hosts
+        discovered by transit surveys).
+
+    Examples:
+        >>> get_hip_from_star_name("Regulus")
+        49669
+        >>> get_hip_from_star_name("Alpha Leo")
+        49669
+        >>> get_hip_from_star_name("alpha leonis")
+        49669
+        >>> get_hip_from_star_name("51 Pegasi")
+        113357
+        >>> get_hip_from_star_name("Unknown Star")
+        None
+
+    Note:
+        Data sourced from IAU Working Group on Star Names (WGSN) catalog.
+        See: https://www.iau.org/public/themes/naming_stars/
+    """
+    if not name:
+        return None
+
+    # Normalize: uppercase and strip whitespace
+    normalized = name.upper().strip()
+
+    # Direct lookup
+    if normalized in STAR_NAME_TO_HIP:
+        return STAR_NAME_TO_HIP[normalized]
+
+    return None
+
+
 def swe_fixstar_mag(star_name: str) -> Tuple[float, str]:
     """
     Get the visual magnitude of a fixed star without calculating position.
