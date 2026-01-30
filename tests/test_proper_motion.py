@@ -40,12 +40,12 @@ class TestProperMotionBasics:
             from_jd=J1991_25,
             to_jd=J2000,
         )
-        assert (
-            abs(ra_out - ra_in) < 1e-10
-        ), "RA should be unchanged with zero proper motion"
-        assert (
-            abs(dec_out - dec_in) < 1e-10
-        ), "Dec should be unchanged with zero proper motion"
+        assert abs(ra_out - ra_in) < 1e-10, (
+            "RA should be unchanged with zero proper motion"
+        )
+        assert abs(dec_out - dec_in) < 1e-10, (
+            "Dec should be unchanged with zero proper motion"
+        )
 
     def test_same_epoch_same_position(self):
         """Propagating to the same epoch should return the same position."""
@@ -199,12 +199,12 @@ class TestProperMotionMagnitude:
         # Expected change: 1 arcsec = 1/3600 degrees
         expected_change_deg = 1.0 / 3600.0
 
-        assert (
-            abs((ra_out - ra_in) - expected_change_deg) < 1e-10
-        ), f"RA change should be {expected_change_deg} degrees"
-        assert (
-            abs((dec_out - dec_in) - expected_change_deg) < 1e-10
-        ), f"Dec change should be {expected_change_deg} degrees"
+        assert abs((ra_out - ra_in) - expected_change_deg) < 1e-10, (
+            f"RA change should be {expected_change_deg} degrees"
+        )
+        assert abs((dec_out - dec_in) - expected_change_deg) < 1e-10, (
+            f"Dec change should be {expected_change_deg} degrees"
+        )
 
     def test_cos_dec_correction_at_equator(self):
         """At equator, cos(dec)=1, so pm_ra_cosdec equals actual RA change."""
@@ -224,9 +224,9 @@ class TestProperMotionMagnitude:
         )
 
         # At equator, the RA change should be exactly 1 degree
-        assert (
-            abs((ra_out - ra_in) - 1.0) < 1e-10
-        ), "RA change at equator should be 1 degree"
+        assert abs((ra_out - ra_in) - 1.0) < 1e-10, (
+            "RA change at equator should be 1 degree"
+        )
 
     def test_cos_dec_correction_at_60_degrees(self):
         """At dec=60, cos(60)=0.5, so actual RA change is 2x pm_ra_cosdec."""
@@ -247,17 +247,17 @@ class TestProperMotionMagnitude:
 
         # cos(60) = 0.5, so actual RA change = 1 / 0.5 = 2 degrees
         expected_ra_change = 1.0 / math.cos(math.radians(60.0))
-        assert (
-            abs((ra_out - ra_in) - expected_ra_change) < 1e-8
-        ), f"RA change at dec=60 should be {expected_ra_change} degrees"
+        assert abs((ra_out - ra_in) - expected_ra_change) < 1e-8, (
+            f"RA change at dec=60 should be {expected_ra_change} degrees"
+        )
 
     def test_j1991_25_to_j2000_time_interval(self):
         """Test that J1991.25 to J2000.0 is approximately 8.75 years."""
         dt_years = (J2000 - J1991_25) / DAYS_PER_JULIAN_YEAR
         expected_years = 8.75
-        assert (
-            abs(dt_years - expected_years) < 0.001
-        ), f"Time from J1991.25 to J2000 should be ~{expected_years} years, got {dt_years}"
+        assert abs(dt_years - expected_years) < 0.001, (
+            f"Time from J1991.25 to J2000 should be ~{expected_years} years, got {dt_years}"
+        )
 
 
 class TestHighProperMotionStars:
@@ -296,18 +296,18 @@ class TestHighProperMotionStars:
         expected_dec_change_deg = expected_dec_change_arcsec / 3600.0
         actual_dec_change = dec_2000 - dec_1991
 
-        assert (
-            abs(actual_dec_change - expected_dec_change_deg) < 1e-8
-        ), f"Dec change should be {expected_dec_change_deg} deg"
+        assert abs(actual_dec_change - expected_dec_change_deg) < 1e-8, (
+            f"Dec change should be {expected_dec_change_deg} deg"
+        )
 
         # Verify RA change with cos(dec) correction
         cos_dec = math.cos(math.radians(dec_1991))
         expected_ra_change_deg = (pm_ra_cosdec * dt_years / 3600.0) / cos_dec
         actual_ra_change = ra_2000 - ra_1991
 
-        assert (
-            abs(actual_ra_change - expected_ra_change_deg) < 1e-8
-        ), f"RA change should be {expected_ra_change_deg} deg"
+        assert abs(actual_ra_change - expected_ra_change_deg) < 1e-8, (
+            f"RA change should be {expected_ra_change_deg} deg"
+        )
 
 
 class TestEdgeCases:
@@ -332,9 +332,9 @@ class TestEdgeCases:
 
         # RA should wrap: 359.5 + 1.0 = 360.5 -> 0.5
         expected_ra = 0.5
-        assert (
-            abs(ra_out - expected_ra) < 1e-8
-        ), f"RA should wrap to {expected_ra}, got {ra_out}"
+        assert abs(ra_out - expected_ra) < 1e-8, (
+            f"RA should wrap to {expected_ra}, got {ra_out}"
+        )
 
     def test_ra_wraparound_negative(self):
         """RA going negative should wrap to near 360."""
@@ -355,9 +355,9 @@ class TestEdgeCases:
 
         # RA should wrap: 0.5 - 1.0 = -0.5 -> 359.5
         expected_ra = 359.5
-        assert (
-            abs(ra_out - expected_ra) < 1e-8
-        ), f"RA should wrap to {expected_ra}, got {ra_out}"
+        assert abs(ra_out - expected_ra) < 1e-8, (
+            f"RA should wrap to {expected_ra}, got {ra_out}"
+        )
 
     def test_dec_clamp_at_north_pole(self):
         """Dec should be clamped at +90 degrees."""
@@ -449,15 +449,15 @@ class TestEpochConstants:
 
     def test_j1991_25_value(self):
         """J1991.25 should be JD 2448349.0625."""
-        assert (
-            J1991_25 == 2448349.0625
-        ), f"J1991_25 should be 2448349.0625, got {J1991_25}"
+        assert J1991_25 == 2448349.0625, (
+            f"J1991_25 should be 2448349.0625, got {J1991_25}"
+        )
 
     def test_days_per_julian_year(self):
         """DAYS_PER_JULIAN_YEAR should be exactly 365.25."""
-        assert (
-            DAYS_PER_JULIAN_YEAR == 365.25
-        ), f"DAYS_PER_JULIAN_YEAR should be 365.25, got {DAYS_PER_JULIAN_YEAR}"
+        assert DAYS_PER_JULIAN_YEAR == 365.25, (
+            f"DAYS_PER_JULIAN_YEAR should be 365.25, got {DAYS_PER_JULIAN_YEAR}"
+        )
 
 
 class TestCatalogConsistency:
@@ -491,9 +491,9 @@ class TestCatalogConsistency:
         expected_dec_change = 100 * pm_dec / 3600.0
         actual_dec_change = dec_2100 - dec_j2000
 
-        assert (
-            abs(actual_dec_change - expected_dec_change) < 1e-10
-        ), f"Dec change for Regulus should be {expected_dec_change}"
+        assert abs(actual_dec_change - expected_dec_change) < 1e-10, (
+            f"Dec change for Regulus should be {expected_dec_change}"
+        )
 
     def test_roundtrip_propagation(self):
         """Propagating forward then backward should return to start."""

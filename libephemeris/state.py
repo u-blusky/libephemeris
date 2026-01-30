@@ -588,6 +588,11 @@ def close() -> None:
             # or may already be closed
             pass
 
+    # Clear computation caches for hot path optimization
+    from .cache import clear_caches
+
+    clear_caches()
+
     # Reset all global state to initial values
     _EPHEMERIS_PATH = None
     _EPHEMERIS_FILE = "de421.bsp"

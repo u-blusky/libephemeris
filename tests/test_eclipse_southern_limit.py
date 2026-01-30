@@ -126,9 +126,9 @@ class TestEclipseSouthernLimitTotalEclipse:
 
         if len(times) > 1:
             for i in range(1, len(times)):
-                assert (
-                    times[i] > times[i - 1]
-                ), "Times should be monotonically increasing"
+                assert times[i] > times[i - 1], (
+                    "Times should be monotonically increasing"
+                )
 
     def test_southern_limit_latitudes_valid(self):
         """Test that all latitudes are in valid range."""
@@ -174,9 +174,9 @@ class TestEclipseSouthernLimitAnnularEclipse:
             )
 
             # Should return points along the southern limit
-            assert (
-                len(times) > 0
-            ), "Should have southern limit points for annular eclipse"
+            assert len(times) > 0, (
+                "Should have southern limit points for annular eclipse"
+            )
 
             # All coordinates should be valid
             for lat in lats:
@@ -364,9 +364,9 @@ class TestEclipseSouthernLimitMultipleEclipses:
             )
 
             # Should have points for a central eclipse
-            assert (
-                len(times) > 0
-            ), f"Eclipse at JD {times_ecl[0]} should have southern limit"
+            assert len(times) > 0, (
+                f"Eclipse at JD {times_ecl[0]} should have southern limit"
+            )
 
             eclipses_tested += 1
             # Move past this eclipse
@@ -405,9 +405,9 @@ class TestEclipseSouthernLimitPhysicalReasonableness:
             lat_offset = lats_central[0] - lats_south[0]
             # The offset should be non-negative and within reasonable bounds
             # Allow for some variation due to projection effects
-            assert (
-                -1.0 <= lat_offset <= 10.0
-            ), f"Latitude offset {lat_offset:.2f} seems unreasonable"
+            assert -1.0 <= lat_offset <= 10.0, (
+                f"Latitude offset {lat_offset:.2f} seems unreasonable"
+            )
 
 
 class TestEclipseSouthernLimitVsNorthernLimit:
@@ -464,6 +464,6 @@ class TestEclipseSouthernLimitVsNorthernLimit:
             # Path width in degrees
             path_width_deg = lats_north[0] - lats_south[0]
             # Should be positive and reasonable (typically 0.5 to 5 degrees)
-            assert (
-                0.0 < path_width_deg < 10.0
-            ), f"Path width {path_width_deg:.2f} degrees seems unreasonable"
+            assert 0.0 < path_width_deg < 10.0, (
+                f"Path width {path_width_deg:.2f} degrees seems unreasonable"
+            )

@@ -236,9 +236,9 @@ class TestDerivativesPhysicalReasonableness:
         dd_dt = calc_besselian_dd_dt(jd)
 
         # Shadow axis declination changes slowly (< 1 deg/hour typically)
-        assert (
-            abs(dd_dt) < 1.0
-        ), f"dd/dt = {dd_dt} degrees/hour seems unreasonably large"
+        assert abs(dd_dt) < 1.0, (
+            f"dd/dt = {dd_dt} degrees/hour seems unreasonably large"
+        )
 
     def test_dl1_dt_in_reasonable_range(self):
         """Test that dl1/dt is within reasonable range."""
@@ -425,9 +425,9 @@ class TestDerivativesEdgeCases:
 
             # dmu/dt should always be approximately 15 deg/hour (positive)
             # regardless of where mu is
-            assert (
-                14.0 < dmu_dt < 16.0
-            ), f"dmu/dt = {dmu_dt} at mu = {mu:.1f} deg, expected ~15 deg/hr"
+            assert 14.0 < dmu_dt < 16.0, (
+                f"dmu/dt = {dmu_dt} at mu = {mu:.1f} deg, expected ~15 deg/hr"
+            )
 
 
 class TestInterpolationUseCase:
