@@ -219,3 +219,151 @@ class TestMigrationGuideNotImplemented:
         assert abs(pos[3]) < 0.001, "Fixed star lon velocity should be very small"
         assert abs(pos[4]) < 0.001, "Fixed star lat velocity should be very small"
         assert abs(pos[5]) < 0.001, "Fixed star dist velocity should be very small"
+
+
+class TestMigrationGuideLunarNodes:
+    """Test lunar node and Lilith calculations as documented in the migration guide."""
+
+    def test_mean_node_returns_valid_position(self):
+        """Test that mean node calculation returns valid position."""
+        from libephemeris.constants import SE_MEAN_NODE
+
+        jd = 2451545.0
+        pos, _ = swe.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)
+
+        assert 0 <= pos[0] < 360, "Mean node longitude should be in valid range"
+        # Mean node latitude is always near zero
+        assert abs(pos[1]) < 1, "Mean node latitude should be near zero"
+        # Mean node moves retrograde (~0.053 deg/day)
+        assert -0.1 < pos[3] < 0, "Mean node should move retrograde"
+
+    def test_true_node_returns_valid_position(self):
+        """Test that true node calculation returns valid position."""
+        from libephemeris.constants import SE_TRUE_NODE
+
+        jd = 2451545.0
+        pos, _ = swe.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
+
+        assert 0 <= pos[0] < 360, "True node longitude should be in valid range"
+        # True node latitude may oscillate slightly
+        assert abs(pos[1]) < 5, "True node latitude should be small"
+
+    def test_mean_and_true_node_differ(self):
+        """Test that mean and true node positions differ.
+
+        The true node oscillates around the mean node with an amplitude
+        of about 1.5 degrees.
+        """
+        from libephemeris.constants import SE_MEAN_NODE, SE_TRUE_NODE
+
+        jd = 2451545.0
+        mean_pos, _ = swe.swe_calc_ut(jd, SE_MEAN_NODE, 0)
+        true_pos, _ = swe.swe_calc_ut(jd, SE_TRUE_NODE, 0)
+
+        # The difference should be within the oscillation amplitude
+        diff = abs(mean_pos[0] - true_pos[0])
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 3, "Mean and true node should differ by less than 3 degrees"
+
+    def test_osculating_apogee_returns_valid_position(self):
+        """Test that osculating apogee (True Lilith) returns valid position.
+
+        Note: True Lilith has known precision differences from pyswisseph
+        (up to 5-7 degrees) due to different orbital element models.
+        """
+        from libephemeris.constants import SE_OSCU_APOG
+
+        jd = 2451545.0
+        pos, _ = swe.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+
+        assert 0 <= pos[0] < 360, "True Lilith longitude should be in valid range"
+        # Lilith latitude can vary
+        assert -90 <= pos[1] <= 90, "True Lilith latitude should be in valid range"
+
+
+class TestMigrationGuideMultiThreading:
+    """Test multi-threading example from the migration guide."""
+
+    def test_concurrent_chart_calculation(self):
+        """Test that concurrent calculations with EphemerisContext work correctly.
+
+        This tests the multi-threading example from the migration guide.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        def calculate_chart(location: dict, jd: float) -> dict:
+            """Thread-safe chart calculation function."""
+            ctx = EphemerisContext()
+            ctx.set_topo(location["lon"], location["lat"], 0)
+            ctx.set_sid_mode(SE_SIDM_LAHIRI)
+
+            sun, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+            moon, _ = ctx.calc_ut(jd, SE_MOON, SEFLG_SIDEREAL)
+            cusps, ascmc = ctx.houses(jd, location["lat"], location["lon"], ord("P"))
+
+            return {
+                "location": location["name"],
+                "sun": sun[0],
+                "moon": moon[0],
+                "asc": ascmc[0],
+            }
+
+        locations = [
+            {"name": "Rome", "lon": 12.5, "lat": 41.9},
+            {"name": "London", "lon": -0.1, "lat": 51.5},
+            {"name": "Tokyo", "lon": 139.7, "lat": 35.7},
+            {"name": "New York", "lon": -74.0, "lat": 40.7},
+            {"name": "Sydney", "lon": 151.2, "lat": -33.9},
+        ]
+
+        jd = 2451545.0  # J2000.0
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            results = list(
+                executor.map(lambda loc: calculate_chart(loc, jd), locations)
+            )
+
+        # Verify we got results for all locations
+        assert len(results) == 5
+
+        # Verify all results are valid
+        for r in results:
+            assert r["location"] in ["Rome", "London", "Tokyo", "New York", "Sydney"]
+            assert 0 <= r["sun"] < 360, f"{r['location']}: Sun out of range"
+            assert 0 <= r["moon"] < 360, f"{r['location']}: Moon out of range"
+            assert 0 <= r["asc"] < 360, f"{r['location']}: Asc out of range"
+
+        # Verify different locations give different ascendants
+        ascendants = [r["asc"] for r in results]
+        # At least some should be different (not all the same)
+        assert len(set(round(a, 1) for a in ascendants)) > 1
+
+    def test_context_isolation_under_concurrent_modification(self):
+        """Test that context state is truly isolated during concurrent access."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import time
+
+        def modify_and_read_context(ayanamsha: int, delay: float):
+            """Set ayanamsha, wait, then read it back."""
+            ctx = EphemerisContext()
+            ctx.set_sid_mode(ayanamsha)
+            time.sleep(delay)
+            # get_sid_mode returns int or tuple depending on full parameter
+            return ctx.get_sid_mode()
+
+        # Run concurrent modifications with different ayanamshas
+        ayanamshas = [
+            SE_SIDM_FAGAN_BRADLEY,
+            SE_SIDM_LAHIRI,
+            SE_SIDM_TRUE_CITRA,
+        ]
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(modify_and_read_context, aya, 0.01): aya
+                for aya in ayanamshas
+            }
+
+            for future in as_completed(futures):
+                expected = futures[future]
+                result = future.result()
+                assert result == expected, f"Expected {expected}, got {result}"

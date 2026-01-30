@@ -133,6 +133,31 @@ Star-based ayanamshas have slightly higher tolerance due to differences in star 
 | Angular velocity | < 0.01 degrees/day | |
 | Radial velocity | < 0.001 AU/day | |
 
+### Lunar Nodes
+
+| Component | Max Difference | Notes |
+|-----------|---------------|-------|
+| Mean Node | < 0.005 degrees | High precision |
+| True Node | < 0.14 degrees | Different oscillation model |
+
+The True Node (osculating node) shows larger differences due to different algorithms for computing the short-period oscillations. Both implementations agree on the mean position but differ on the instantaneous oscillation.
+
+### Lilith (Lunar Apogee)
+
+| Component | Max Difference | Notes |
+|-----------|---------------|-------|
+| Mean Apogee (Mean Lilith) | < 0.01 degrees | High precision |
+| Osculating Apogee (True Lilith) | 5-7 degrees | Different orbital models |
+
+**Important**: True Lilith (SE_OSCU_APOG, body ID 13) has significant precision differences from pyswisseph. This is due to fundamentally different approaches to calculating the osculating lunar apogee:
+
+- **pyswisseph**: Uses Swiss Ephemeris's analytical model with specific perturbation corrections
+- **libephemeris**: Uses Skyfield's lunar position derivative approach
+
+If your application requires exact True Lilith positions matching pyswisseph, you should:
+1. Continue using pyswisseph for True Lilith calculations, or
+2. Use Mean Apogee (SE_MEAN_APOG, body ID 12) which has high precision match
+
 ---
 
 ## Features Not Yet Implemented
@@ -318,6 +343,8 @@ ctx3.set_sid_mode(27) # True Citra
 - [ ] For multi-threaded apps: migrate to `EphemerisContext` API
 - [ ] Update tests for relaxed tolerances on star-based ayanamshas (< 0.06 degrees)
 - [ ] Handle eclipse functions that return 0 for Saros/Inex numbers
+- [ ] Review True Node usage (up to 0.14 degrees difference from pyswisseph)
+- [ ] Review True Lilith usage (5-7 degrees difference - consider using Mean Lilith)
 
 ---
 
