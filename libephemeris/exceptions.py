@@ -332,6 +332,107 @@ def validate_coordinates(lat: float, lon: float, func_name: str = "") -> None:
     validate_longitude(lon, func_name)
 
 
+def validate_jd_range(
+    jd: float, body_id: int | None = None, func_name: str = ""
+) -> None:
+    """Validate that Julian Day is within the supported ephemeris range.
+
+    This function checks if the given Julian Day falls within the date range
+    covered by the currently loaded ephemeris file. If the date is outside
+    the range, an EphemerisRangeError is raised with detailed information.
+
+    Args:
+        jd: Julian Day number (UT1 or TT) to validate
+        body_id: Optional body ID being calculated (for error message)
+        func_name: Optional function name for error message context
+
+    Raises:
+        EphemerisRangeError: If the Julian Day is outside the ephemeris range
+
+    Note:
+        This function requires the ephemeris to be loaded first. If the
+        ephemeris is not loaded, it will be loaded automatically when
+        get_current_file_data() is called via get_planets().
+
+    Example:
+        >>> from libephemeris.exceptions import validate_jd_range
+        >>> validate_jd_range(2451545.0)  # J2000.0 - OK for DE440
+        >>> validate_jd_range(3000000.0)  # Year ~3501 - raises EphemerisRangeError
+    """
+    from . import state
+    from .planets import get_planet_name
+
+    # Ensure ephemeris is loaded so we can get range information
+    state.get_planets()
+
+    # Get ephemeris file information
+    path, start_jd, end_jd, denum = state.get_current_file_data(0)
+
+    # If we couldn't get range information, skip validation
+    # (this allows fallback behavior for special cases)
+    if start_jd == 0.0 and end_jd == 0.0:
+        return
+
+    # Check if JD is within range
+    if jd < start_jd or jd > end_jd:
+        # Convert JD to calendar date for message
+        from .time_utils import swe_revjul
+
+        req_year, req_month, req_day, req_hour = swe_revjul(jd, 1)  # Gregorian
+        req_date_str = f"{req_year}-{req_month:02d}-{req_day:02d}"
+
+        start_year, start_month, start_day, _ = swe_revjul(start_jd, 1)
+        start_date = f"{start_year}-{start_month:02d}-{start_day:02d}"
+
+        end_year, end_month, end_day, _ = swe_revjul(end_jd, 1)
+        end_date = f"{end_year}-{end_month:02d}-{end_day:02d}"
+
+        # Get body name if available
+        body_name = None
+        if body_id is not None:
+            body_name = get_planet_name(body_id)
+
+        # Get ephemeris filename
+        import os
+
+        ephemeris_file = None
+        if path:
+            ephemeris_file = os.path.basename(path)
+        elif denum:
+            ephemeris_file = f"de{denum}.bsp"
+
+        # Build error message
+        parts = []
+        prefix = f"{func_name}: " if func_name else ""
+
+        if body_name and body_id is not None:
+            parts.append(f"{prefix}Cannot calculate {body_name} (ID {body_id})")
+        else:
+            parts.append(f"{prefix}Calculation failed")
+
+        parts.append(f"for JD {jd:.6f} ({req_date_str}):")
+        parts.append("date is outside ephemeris range.")
+        parts.append(f"\n  Supported range: JD {start_jd:.1f} to {end_jd:.1f}")
+        parts.append(f" ({start_date} to {end_date})")
+
+        if ephemeris_file:
+            parts.append(f"\n  Ephemeris file: {ephemeris_file}")
+
+        message = " ".join(parts[:3]) + "".join(parts[3:])
+
+        raise EphemerisRangeError(
+            message=message,
+            requested_jd=jd,
+            start_jd=start_jd,
+            end_jd=end_jd,
+            start_date=start_date,
+            end_date=end_date,
+            body_id=body_id,
+            body_name=body_name,
+            ephemeris_file=ephemeris_file,
+        )
+
+
 class EphemerisRangeError(Error):
     """Error raised when a calculation date is outside the ephemeris range.
 

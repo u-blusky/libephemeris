@@ -146,6 +146,24 @@ _PLANET_NAMES = {
 }
 
 
+def _body_uses_jpl_ephemeris(ipl: int) -> bool:
+    """Check if a body uses the JPL ephemeris for calculations.
+
+    Bodies that use the JPL ephemeris are subject to the ephemeris date range
+    limitations (e.g., DE440 covers 1550-2650). Other bodies like lunar nodes,
+    Lilith, hypothetical planets, and minor bodies with Keplerian elements
+    are calculated mathematically and don't depend on the JPL ephemeris range.
+
+    Args:
+        ipl: Planet/body ID
+
+    Returns:
+        True if the body uses JPL ephemeris, False otherwise
+    """
+    # Standard planets use JPL ephemeris
+    return ipl in _PLANET_MAP
+
+
 def _wrap_ephemeris_range_error(
     skyfield_error: Exception,
     jd: float,
@@ -438,6 +456,11 @@ def swe_calc_ut(
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
+    from .exceptions import validate_jd_range
+
+    # Validate JD range for bodies that use the JPL ephemeris
+    if _body_uses_jpl_ephemeris(ipl):
+        validate_jd_range(tjd_ut, ipl, "swe_calc_ut")
 
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
@@ -479,6 +502,11 @@ def swe_calc(
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
+    from .exceptions import validate_jd_range
+
+    # Validate JD range for bodies that use the JPL ephemeris
+    if _body_uses_jpl_ephemeris(ipl):
+        validate_jd_range(tjd, ipl, "swe_calc")
 
     ts = get_timescale()
     t = ts.tt_jd(tjd)
@@ -526,6 +554,11 @@ def swe_calc_pctr(
         >>> print(f"Moon longitude from Mars: {pos[0]:.2f}°")
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
+    from .exceptions import validate_jd_range
+
+    # Validate JD range for bodies that use the JPL ephemeris
+    if _body_uses_jpl_ephemeris(ipl) or _body_uses_jpl_ephemeris(iplctr):
+        validate_jd_range(tjd_ut, ipl, "swe_calc_pctr")
 
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
