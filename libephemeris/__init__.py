@@ -16,6 +16,16 @@ from .time_utils import (
     lmt_to_lat,
     sidtime,
     sidtime0,
+    # TAI (International Atomic Time) functions
+    TT_TAI_OFFSET_SECONDS,
+    TT_TAI_OFFSET_DAYS,
+    get_tai_utc_for_jd,
+    utc_to_tai_jd,
+    tai_jd_to_utc,
+    tt_to_tai_jd,
+    tai_to_tt_jd,
+    tai_to_utc_jd,
+    utc_jd_to_tai,
 )
 from .planets import (
     swe_calc_ut,
@@ -542,6 +552,16 @@ __all__ = [
     "lmt_to_lat",
     "sidtime",
     "sidtime0",
+    # TAI (International Atomic Time) functions
+    "TT_TAI_OFFSET_SECONDS",
+    "TT_TAI_OFFSET_DAYS",
+    "get_tai_utc_for_jd",
+    "utc_to_tai_jd",
+    "tai_jd_to_utc",
+    "tt_to_tai_jd",
+    "tai_to_tt_jd",
+    "tai_to_utc_jd",
+    "utc_jd_to_tai",
     # Planet calculation
     "swe_calc_ut",
     "calc_ut",

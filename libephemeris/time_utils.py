@@ -927,6 +927,280 @@ def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
     return sidtime(jd, 0.0, obliquity, nutation)
 
 
+# =============================================================================
+# TAI (INTERNATIONAL ATOMIC TIME) FUNCTIONS
+# =============================================================================
+
+# TT - TAI offset: TT = TAI + 32.184 seconds
+TT_TAI_OFFSET_SECONDS = 32.184
+TT_TAI_OFFSET_DAYS = TT_TAI_OFFSET_SECONDS / 86400.0
+
+
+def get_tai_utc_for_jd(jd: float) -> float:
+    """
+    Get TAI-UTC (leap seconds) for a given Julian Day.
+
+    TAI (International Atomic Time) runs continuously without leap seconds,
+    while UTC is adjusted by leap seconds to stay within 0.9 seconds of UT1.
+    This function returns the cumulative number of leap seconds at the given
+    Julian Day.
+
+    Args:
+        jd: Julian Day number (any time scale, typically UT1 or UTC)
+
+    Returns:
+        float: TAI-UTC in seconds (the cumulative leap seconds)
+
+    Note:
+        - Before 1972, the TAI-UTC relationship was more complex and this
+          function returns approximate values based on the historical record.
+        - After 1972, TAI-UTC increases by exactly 1 second with each leap
+          second, occurring on June 30 or December 31.
+        - As of 2017, TAI-UTC = 37 seconds.
+
+    Example:
+        >>> from libephemeris import get_tai_utc_for_jd, swe_julday
+        >>> # Get TAI-UTC for Jan 1, 2020
+        >>> jd = swe_julday(2020, 1, 1, 12.0)
+        >>> tai_utc = get_tai_utc_for_jd(jd)
+        >>> print(f"TAI-UTC: {tai_utc:.0f} seconds")
+        TAI-UTC: 37 seconds
+    """
+    from .iers_data import get_tai_utc, _jd_to_mjd
+
+    mjd = _jd_to_mjd(jd)
+    return get_tai_utc(mjd)
+
+
+def utc_to_tai_jd(
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    second: float,
+    calendar: int = SE_GREG_CAL,
+) -> float:
+    """
+    Convert UTC date/time to Julian Day number in TAI (International Atomic Time).
+
+    TAI is a continuous atomic time scale that does not have leap seconds.
+    It is the basis for other atomic time scales like TT (Terrestrial Time).
+
+    Args:
+        year: Calendar year (negative for BCE)
+        month: Month (1-12)
+        day: Day of month (1-31)
+        hour: Hour (0-23)
+        minute: Minute (0-59)
+        second: Second (0-60, allowing for leap seconds in UTC)
+        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+
+    Returns:
+        float: Julian Day number in TAI
+
+    Note:
+        - TAI = UTC + TAI-UTC (leap seconds)
+        - TAI runs ahead of UTC by the cumulative number of leap seconds
+        - As of 2017, TAI is 37 seconds ahead of UTC
+
+    Example:
+        >>> from libephemeris import utc_to_tai_jd
+        >>> # Convert Jan 1, 2020 00:00:00 UTC to TAI JD
+        >>> jd_tai = utc_to_tai_jd(2020, 1, 1, 0, 0, 0.0)
+        >>> print(f"JD(TAI): {jd_tai:.6f}")
+    """
+    # First get the JD in UTC (using UT1 as approximation since UTC ≈ UT1)
+    decimal_hour = hour + minute / 60.0 + second / 3600.0
+    jd_utc = swe_julday(year, month, day, decimal_hour, calendar)
+
+    # Get TAI-UTC offset (leap seconds) for this date
+    tai_utc_seconds = get_tai_utc_for_jd(jd_utc)
+
+    # TAI = UTC + TAI-UTC
+    jd_tai = jd_utc + tai_utc_seconds / 86400.0
+
+    return jd_tai
+
+
+def tai_jd_to_utc(
+    jd_tai: float, calendar: int = SE_GREG_CAL
+) -> tuple[int, int, int, int, int, float]:
+    """
+    Convert Julian Day in TAI (International Atomic Time) to UTC date/time.
+
+    This is the inverse of utc_to_tai_jd(). It converts a Julian Day number
+    in TAI back to a UTC calendar date and time.
+
+    Args:
+        jd_tai: Julian Day number in TAI
+        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+
+    Returns:
+        tuple: (year, month, day, hour, minute, second) in UTC where:
+            - year: Calendar year (negative for BCE)
+            - month: Month (1-12)
+            - day: Day of month (1-31)
+            - hour: Hour (0-23)
+            - minute: Minute (0-59)
+            - second: Second (0.0-59.999...)
+
+    Note:
+        - UTC = TAI - TAI-UTC (leap seconds)
+        - The conversion requires knowing the leap seconds at the target time
+        - This uses an iterative approach since TAI-UTC depends on the UTC date
+
+    Example:
+        >>> from libephemeris import tai_jd_to_utc, utc_to_tai_jd
+        >>> # Round-trip test
+        >>> jd_tai = utc_to_tai_jd(2020, 1, 1, 0, 0, 0.0)
+        >>> year, month, day, hour, minute, second = tai_jd_to_utc(jd_tai)
+        >>> print(f"{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:05.2f}")
+        2020-01-01 00:00:00.00
+    """
+    # First approximation: use the TAI JD to estimate the UTC date
+    # This is close since TAI-UTC is only tens of seconds
+    tai_utc_seconds = get_tai_utc_for_jd(jd_tai)
+
+    # UTC = TAI - TAI-UTC
+    jd_utc_approx = jd_tai - tai_utc_seconds / 86400.0
+
+    # Refine: get the leap seconds at the approximate UTC date
+    # (In case we crossed a leap second boundary)
+    tai_utc_seconds_refined = get_tai_utc_for_jd(jd_utc_approx)
+    jd_utc = jd_tai - tai_utc_seconds_refined / 86400.0
+
+    # Convert JD to calendar date
+    year, month, day, decimal_hour = swe_revjul(jd_utc, calendar)
+
+    # Extract time components
+    hour = int(decimal_hour)
+    minute_frac = (decimal_hour - hour) * 60.0
+    minute = int(minute_frac)
+    second = (minute_frac - minute) * 60.0
+
+    return year, month, day, hour, minute, second
+
+
+def tt_to_tai_jd(jd_tt: float) -> float:
+    """
+    Convert Julian Day in TT (Terrestrial Time) to TAI (International Atomic Time).
+
+    The relationship between TT and TAI is fixed and exact:
+    TT = TAI + 32.184 seconds
+
+    Args:
+        jd_tt: Julian Day number in TT (Terrestrial Time)
+
+    Returns:
+        float: Julian Day number in TAI
+
+    Note:
+        - TT = TAI + 32.184 seconds (exactly)
+        - Therefore TAI = TT - 32.184 seconds
+        - This offset was chosen so that TT would be continuous with ET
+          (Ephemeris Time) at the moment of the definition
+
+    Example:
+        >>> from libephemeris import tt_to_tai_jd
+        >>> # J2000.0 epoch in TT
+        >>> jd_tt = 2451545.0
+        >>> jd_tai = tt_to_tai_jd(jd_tt)
+        >>> print(f"JD(TT): {jd_tt:.6f}, JD(TAI): {jd_tai:.9f}")
+        >>> print(f"Difference: {(jd_tt - jd_tai) * 86400:.3f} seconds")
+    """
+    # TAI = TT - 32.184 seconds
+    return jd_tt - TT_TAI_OFFSET_DAYS
+
+
+def tai_to_tt_jd(jd_tai: float) -> float:
+    """
+    Convert Julian Day in TAI (International Atomic Time) to TT (Terrestrial Time).
+
+    The relationship between TT and TAI is fixed and exact:
+    TT = TAI + 32.184 seconds
+
+    Args:
+        jd_tai: Julian Day number in TAI
+
+    Returns:
+        float: Julian Day number in TT (Terrestrial Time)
+
+    Note:
+        - TT = TAI + 32.184 seconds (exactly)
+        - This offset was defined when TT replaced ET in 1984
+        - TT is used for planetary ephemeris calculations
+
+    Example:
+        >>> from libephemeris import tai_to_tt_jd, tt_to_tai_jd
+        >>> # Round-trip test
+        >>> jd_tt_orig = 2451545.0  # J2000.0
+        >>> jd_tai = tt_to_tai_jd(jd_tt_orig)
+        >>> jd_tt_back = tai_to_tt_jd(jd_tai)
+        >>> print(f"Original: {jd_tt_orig:.10f}")
+        >>> print(f"Recovered: {jd_tt_back:.10f}")
+    """
+    # TT = TAI + 32.184 seconds
+    return jd_tai + TT_TAI_OFFSET_DAYS
+
+
+def tai_to_utc_jd(jd_tai: float) -> float:
+    """
+    Convert Julian Day in TAI (International Atomic Time) to UTC Julian Day.
+
+    Args:
+        jd_tai: Julian Day number in TAI
+
+    Returns:
+        float: Julian Day number in UTC
+
+    Note:
+        - UTC = TAI - TAI-UTC (leap seconds)
+        - This is a simpler version of tai_jd_to_utc() that returns JD directly
+
+    Example:
+        >>> from libephemeris import tai_to_utc_jd, utc_to_tai_jd, swe_julday
+        >>> jd_utc = swe_julday(2020, 1, 1, 12.0)
+        >>> jd_tai = utc_to_tai_jd(2020, 1, 1, 12, 0, 0.0)
+        >>> jd_utc_back = tai_to_utc_jd(jd_tai)
+        >>> print(f"Difference: {abs(jd_utc - jd_utc_back) * 86400:.6f} seconds")
+    """
+    # First approximation
+    tai_utc_seconds = get_tai_utc_for_jd(jd_tai)
+    jd_utc_approx = jd_tai - tai_utc_seconds / 86400.0
+
+    # Refine in case we crossed a leap second boundary
+    tai_utc_seconds_refined = get_tai_utc_for_jd(jd_utc_approx)
+    jd_utc = jd_tai - tai_utc_seconds_refined / 86400.0
+
+    return jd_utc
+
+
+def utc_jd_to_tai(jd_utc: float) -> float:
+    """
+    Convert Julian Day in UTC to TAI (International Atomic Time) Julian Day.
+
+    Args:
+        jd_utc: Julian Day number in UTC
+
+    Returns:
+        float: Julian Day number in TAI
+
+    Note:
+        - TAI = UTC + TAI-UTC (leap seconds)
+        - This is a simpler version of utc_to_tai_jd() that takes JD directly
+
+    Example:
+        >>> from libephemeris import utc_jd_to_tai, swe_julday
+        >>> jd_utc = swe_julday(2020, 1, 1, 12.0)
+        >>> jd_tai = utc_jd_to_tai(jd_utc)
+        >>> print(f"JD(UTC): {jd_utc:.6f}, JD(TAI): {jd_tai:.6f}")
+        >>> print(f"TAI is ahead by: {(jd_tai - jd_utc) * 86400:.0f} seconds")
+    """
+    tai_utc_seconds = get_tai_utc_for_jd(jd_utc)
+    return jd_utc + tai_utc_seconds / 86400.0
+
+
 def utc_time_zone(
     year: int,
     month: int,
