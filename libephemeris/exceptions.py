@@ -1,6 +1,38 @@
 """Exception classes for libephemeris.
 
-This module provides pyswisseph-compatible exception classes.
+This module provides a comprehensive exception hierarchy for ephemeris calculations.
+The base Error class is pyswisseph-compatible, and specialized exceptions provide
+better categorization of error conditions.
+
+Exception Hierarchy
+-------------------
+Error (base, pyswisseph compatible)
+├── InputValidationError (input data validation errors)
+│   ├── CoordinateError (invalid latitude/longitude)
+│   └── InvalidBodyError (body not valid for this operation)
+├── DataNotFoundError (data lookup failures)
+│   ├── UnknownBodyError (unknown celestial body ID)
+│   ├── StarNotFoundError (fixed star not in catalog)
+│   └── SPKNotFoundError (SPK kernel file not found)
+├── CalculationError (calculation/algorithm failures)
+│   ├── PolarCircleError (house calculation at polar latitudes)
+│   ├── EphemerisRangeError (date outside ephemeris range)
+│   └── ConvergenceError (numerical algorithm didn't converge)
+└── ConfigurationError (missing configuration/state)
+
+This hierarchy allows users to catch broad categories of errors or specific ones:
+
+    # Catch any input validation error
+    except InputValidationError:
+        ...
+
+    # Catch only coordinate errors
+    except CoordinateError:
+        ...
+
+    # Catch all libephemeris errors
+    except Error:
+        ...
 """
 
 
@@ -29,65 +61,254 @@ class Error(Exception):
     pass
 
 
-class PolarCircleError(Error):
-    """Error raised when house calculation fails at polar latitudes.
+# =============================================================================
+# CATEGORY: INPUT VALIDATION ERRORS
+# =============================================================================
 
-    Certain house systems (Placidus, Koch, Gauquelin) cannot be calculated
-    at latitudes beyond the polar circle (~66.5°) because some ecliptic
-    points never rise or set (circumpolar behavior).
 
-    This exception provides detailed information about the polar circle
-    condition to help users understand why the calculation failed and
-    what alternatives are available.
+class InputValidationError(Error):
+    """Base class for input validation errors.
+
+    This exception category covers all cases where user-provided input
+    data is invalid, such as:
+    - Coordinates outside valid ranges
+    - Invalid body types for specific operations
+
+    Catching this exception will catch all input validation errors.
+
+    Example:
+        >>> try:
+        ...     ephem.set_topo(200.0, 91.0, 0.0)  # Invalid coordinates
+        ... except ephem.InputValidationError as e:
+        ...     print(f"Invalid input: {e}")
+    """
+
+    pass
+
+
+class CoordinateError(InputValidationError):
+    """Error raised when geographic coordinates are invalid.
+
+    This exception is raised when latitude or longitude values are outside
+    their valid ranges:
+    - Latitude: must be in [-90, 90] degrees
+    - Longitude: must be in [-180, 180] degrees
 
     Attributes:
-        latitude: The geographic latitude that triggered the error
-        threshold: The polar circle threshold latitude for the given obliquity
-        obliquity: The true obliquity of the ecliptic used in the calculation
-        house_system: The requested house system that failed (e.g., 'P', 'K', 'G')
         message: Human-readable error message
+        coordinate_name: Name of the coordinate ("latitude" or "longitude")
+        value: The invalid coordinate value
+        min_value: Minimum allowed value for this coordinate
+        max_value: Maximum allowed value for this coordinate
 
     Example:
         >>> import libephemeris as ephem
         >>> try:
-        ...     ephem.swe_houses(jd, 70.0, 0.0, ord('P'))
-        ... except ephem.PolarCircleError as e:
-        ...     print(f"Polar error at {e.latitude}° (threshold: {e.threshold}°)")
-        ...     # Use fallback house system
-        ...     cusps, ascmc = ephem.swe_houses(jd, 70.0, 0.0, ord('O'))
+        ...     ephem.set_topo(0.0, 91.0, 0.0)  # Invalid latitude
+        ... except ephem.CoordinateError as e:
+        ...     print(f"Invalid {e.coordinate_name}: {e.value}")
+        ...     print(f"Valid range: [{e.min_value}, {e.max_value}]")
+        Invalid latitude: 91.0
+        Valid range: [-90, 90]
 
     See Also:
-        swe_houses_with_fallback: Automatically falls back to Porphyry
-        get_polar_latitude_threshold: Returns the threshold for a given obliquity
+        set_topo: Sets observer location (validates coordinates)
+        swe_houses: House calculation (validates latitude)
     """
 
     def __init__(
         self,
         message: str,
-        latitude: float | None = None,
-        threshold: float | None = None,
-        obliquity: float | None = None,
-        house_system: str | None = None,
+        coordinate_name: str | None = None,
+        value: float | None = None,
+        min_value: float | None = None,
+        max_value: float | None = None,
     ):
         super().__init__(message)
-        self.latitude = latitude
-        self.threshold = threshold
-        self.obliquity = obliquity
-        self.house_system = house_system
         self.message = message
+        self.coordinate_name = coordinate_name
+        self.value = value
+        self.min_value = min_value
+        self.max_value = max_value
 
     def __str__(self) -> str:
         return self.message
 
     def __repr__(self) -> str:
         return (
-            f"PolarCircleError({self.message!r}, latitude={self.latitude}, "
-            f"threshold={self.threshold}, obliquity={self.obliquity}, "
-            f"house_system={self.house_system!r})"
+            f"CoordinateError({self.message!r}, "
+            f"coordinate_name={self.coordinate_name!r}, value={self.value}, "
+            f"min_value={self.min_value}, max_value={self.max_value})"
         )
 
 
-class SPKNotFoundError(Error):
+class InvalidBodyError(InputValidationError):
+    """Error raised when a celestial body is not valid for a specific operation.
+
+    This exception is raised when a known, valid body ID is used in an
+    operation that doesn't support that body type. For example:
+    - Sun or Moon for heliacal rising calculations
+    - Moon for retrograde station searches
+    - Earth for geocentric calculations
+
+    This is different from UnknownBodyError which is raised for completely
+    unknown body IDs.
+
+    Attributes:
+        message: Human-readable error message
+        body_id: The body ID that was rejected
+        body_name: Human-readable name of the body (if known)
+        operation: The operation that rejected the body
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.heliacal_ut(jd, geo, atmo, obs, ephem.SE_SUN, ...)
+        ... except ephem.InvalidBodyError as e:
+        ...     print(f"Cannot use {e.body_name} for {e.operation}")
+        Cannot use Sun for heliacal rising
+
+    See Also:
+        UnknownBodyError: For completely unknown body IDs
+    """
+
+    def __init__(
+        self,
+        message: str,
+        body_id: int | None = None,
+        body_name: str | None = None,
+        operation: str | None = None,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.body_id = body_id
+        self.body_name = body_name
+        self.operation = operation
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"InvalidBodyError({self.message!r}, body_id={self.body_id}, "
+            f"body_name={self.body_name!r}, operation={self.operation!r})"
+        )
+
+
+# =============================================================================
+# CATEGORY: DATA NOT FOUND ERRORS
+# =============================================================================
+
+
+class DataNotFoundError(Error):
+    """Base class for data lookup failures.
+
+    This exception category covers all cases where required data could
+    not be found, such as:
+    - Unknown celestial body IDs
+    - Fixed stars not in the catalog
+    - SPK kernel files not found
+
+    Catching this exception will catch all "not found" type errors.
+
+    Example:
+        >>> try:
+        ...     ephem.calc_ut(jd, 99999, 0)  # Unknown body
+        ... except ephem.DataNotFoundError as e:
+        ...     print(f"Data not found: {e}")
+    """
+
+    pass
+
+
+class UnknownBodyError(DataNotFoundError):
+    """Error raised when an unknown or unsupported body ID is requested.
+
+    This exception is raised when attempting to calculate the position of a
+    celestial body using an unrecognized body ID. This helps users identify
+    typos or unsupported body types early, rather than silently returning
+    zero positions.
+
+    Attributes:
+        body_id: The unrecognized body ID that was requested
+        message: Human-readable error message
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.calc_ut(2451545.0, 99999, 0)  # Invalid body ID
+        ... except ephem.UnknownBodyError as e:
+        ...     print(f"Unknown body ID: {e.body_id}")
+        Unknown body ID: 99999
+
+    See Also:
+        get_planet_name: Get name for a valid body ID
+        SE_SUN, SE_MOON, etc.: Valid body ID constants
+        InvalidBodyError: For valid bodies used in unsupported operations
+    """
+
+    def __init__(
+        self,
+        message: str,
+        body_id: int | None = None,
+    ):
+        super().__init__(message)
+        self.body_id = body_id
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return f"UnknownBodyError({self.message!r}, body_id={self.body_id})"
+
+
+class StarNotFoundError(DataNotFoundError):
+    """Error raised when a fixed star is not found in the catalog.
+
+    This exception is raised when attempting to look up a fixed star by
+    name, Hipparcos number, or other identifier that is not in the star
+    catalog.
+
+    Attributes:
+        message: Human-readable error message
+        star_id: The star identifier that was not found
+        search_type: The type of search performed ("name", "hip", etc.)
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.fixstar_ut("NonexistentStar", jd, 0)
+        ... except ephem.StarNotFoundError as e:
+        ...     print(f"Star not found: {e.star_id}")
+
+    See Also:
+        swe_fixstar_ut: Fixed star position calculation
+        swe_fixstar2_ut: Fixed star position with HIP identifier
+    """
+
+    def __init__(
+        self,
+        message: str,
+        star_id: str | None = None,
+        search_type: str | None = None,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.star_id = star_id
+        self.search_type = search_type
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"StarNotFoundError({self.message!r}, "
+            f"star_id={self.star_id!r}, search_type={self.search_type!r})"
+        )
+
+
+class SPKNotFoundError(DataNotFoundError):
     """Error raised when an SPK file is requested but not available.
 
     This exception is raised when attempting to register or load an SPK file
@@ -198,60 +419,280 @@ class SPKNotFoundError(Error):
         )
 
 
-class CoordinateError(Error):
-    """Error raised when geographic coordinates are invalid.
+# =============================================================================
+# CATEGORY: CALCULATION ERRORS
+# =============================================================================
 
-    This exception is raised when latitude or longitude values are outside
-    their valid ranges:
-    - Latitude: must be in [-90, 90] degrees
-    - Longitude: must be in [-180, 180] degrees
+
+class CalculationError(Error):
+    """Base class for calculation and algorithm failures.
+
+    This exception category covers all cases where a calculation or
+    numerical algorithm failed, such as:
+    - House calculations at polar latitudes
+    - Dates outside ephemeris range
+    - Iterative searches that didn't converge
+
+    Catching this exception will catch all calculation-related errors.
+
+    Example:
+        >>> try:
+        ...     ephem.swe_houses(jd, 70.0, 0.0, ord('P'))  # Polar latitude
+        ... except ephem.CalculationError as e:
+        ...     print(f"Calculation failed: {e}")
+    """
+
+    pass
+
+
+class PolarCircleError(CalculationError):
+    """Error raised when house calculation fails at polar latitudes.
+
+    Certain house systems (Placidus, Koch, Gauquelin) cannot be calculated
+    at latitudes beyond the polar circle (~66.5°) because some ecliptic
+    points never rise or set (circumpolar behavior).
+
+    This exception provides detailed information about the polar circle
+    condition to help users understand why the calculation failed and
+    what alternatives are available.
 
     Attributes:
+        latitude: The geographic latitude that triggered the error
+        threshold: The polar circle threshold latitude for the given obliquity
+        obliquity: The true obliquity of the ecliptic used in the calculation
+        house_system: The requested house system that failed (e.g., 'P', 'K', 'G')
         message: Human-readable error message
-        coordinate_name: Name of the coordinate ("latitude" or "longitude")
-        value: The invalid coordinate value
-        min_value: Minimum allowed value for this coordinate
-        max_value: Maximum allowed value for this coordinate
 
     Example:
         >>> import libephemeris as ephem
         >>> try:
-        ...     ephem.set_topo(0.0, 91.0, 0.0)  # Invalid latitude
-        ... except ephem.CoordinateError as e:
-        ...     print(f"Invalid {e.coordinate_name}: {e.value}")
-        ...     print(f"Valid range: [{e.min_value}, {e.max_value}]")
-        Invalid latitude: 91.0
-        Valid range: [-90, 90]
+        ...     ephem.swe_houses(jd, 70.0, 0.0, ord('P'))
+        ... except ephem.PolarCircleError as e:
+        ...     print(f"Polar error at {e.latitude}° (threshold: {e.threshold}°)")
+        ...     # Use fallback house system
+        ...     cusps, ascmc = ephem.swe_houses(jd, 70.0, 0.0, ord('O'))
 
     See Also:
-        set_topo: Sets observer location (validates coordinates)
-        swe_houses: House calculation (validates latitude)
+        swe_houses_with_fallback: Automatically falls back to Porphyry
+        get_polar_latitude_threshold: Returns the threshold for a given obliquity
     """
 
     def __init__(
         self,
         message: str,
-        coordinate_name: str | None = None,
-        value: float | None = None,
-        min_value: float | None = None,
-        max_value: float | None = None,
+        latitude: float | None = None,
+        threshold: float | None = None,
+        obliquity: float | None = None,
+        house_system: str | None = None,
     ):
         super().__init__(message)
+        self.latitude = latitude
+        self.threshold = threshold
+        self.obliquity = obliquity
+        self.house_system = house_system
         self.message = message
-        self.coordinate_name = coordinate_name
-        self.value = value
-        self.min_value = min_value
-        self.max_value = max_value
 
     def __str__(self) -> str:
         return self.message
 
     def __repr__(self) -> str:
         return (
-            f"CoordinateError({self.message!r}, "
-            f"coordinate_name={self.coordinate_name!r}, value={self.value}, "
-            f"min_value={self.min_value}, max_value={self.max_value})"
+            f"PolarCircleError({self.message!r}, latitude={self.latitude}, "
+            f"threshold={self.threshold}, obliquity={self.obliquity}, "
+            f"house_system={self.house_system!r})"
         )
+
+
+class EphemerisRangeError(CalculationError):
+    """Error raised when a calculation date is outside the ephemeris range.
+
+    This exception is raised when the requested Julian Day falls outside the
+    date range covered by the loaded ephemeris file (e.g., DE440 covers
+    1550-2650).
+
+    This exception provides detailed information about the supported date range
+    to help users understand why the calculation failed and what dates are valid.
+
+    Attributes:
+        requested_jd: The Julian Day that was requested
+        start_jd: The start of the supported Julian Day range
+        end_jd: The end of the supported Julian Day range
+        start_date: The start date in calendar format (YYYY-MM-DD)
+        end_date: The end date in calendar format (YYYY-MM-DD)
+        body_id: The body ID that was being calculated (if available)
+        body_name: Human-readable name of the body (if available)
+        ephemeris_file: The ephemeris file in use (if available)
+        message: Human-readable error message
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.calc_ut(5000000.0, ephem.SE_SUN, 0)  # Year ~8827 AD
+        ... except ephem.EphemerisRangeError as e:
+        ...     print(f"Date JD {e.requested_jd} is outside range")
+        ...     print(f"Supported: JD {e.start_jd} to {e.end_jd}")
+        ...     print(f"           ({e.start_date} to {e.end_date})")
+
+    See Also:
+        get_current_file_data: Returns information about the loaded ephemeris
+        set_ephemeris_file: Load a different ephemeris with different date range
+    """
+
+    def __init__(
+        self,
+        message: str,
+        requested_jd: float | None = None,
+        start_jd: float | None = None,
+        end_jd: float | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        body_id: int | None = None,
+        body_name: str | None = None,
+        ephemeris_file: str | None = None,
+    ):
+        super().__init__(message)
+        self.requested_jd = requested_jd
+        self.start_jd = start_jd
+        self.end_jd = end_jd
+        self.start_date = start_date
+        self.end_date = end_date
+        self.body_id = body_id
+        self.body_name = body_name
+        self.ephemeris_file = ephemeris_file
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"EphemerisRangeError({self.message!r}, "
+            f"requested_jd={self.requested_jd}, "
+            f"start_jd={self.start_jd}, end_jd={self.end_jd}, "
+            f"start_date={self.start_date!r}, end_date={self.end_date!r}, "
+            f"body_id={self.body_id}, body_name={self.body_name!r}, "
+            f"ephemeris_file={self.ephemeris_file!r})"
+        )
+
+
+class ConvergenceError(CalculationError):
+    """Error raised when a numerical algorithm fails to converge.
+
+    This exception is raised when an iterative search or calculation
+    algorithm doesn't converge within the allowed number of iterations
+    or tolerance limits. Common scenarios include:
+    - Root-finding algorithms (e.g., Brent's method)
+    - Eclipse/occultation searches
+    - Crossing time calculations
+
+    Attributes:
+        message: Human-readable error message
+        algorithm: Name of the algorithm that failed (e.g., "brent", "newton")
+        iterations: Number of iterations attempted
+        max_iterations: Maximum iterations allowed
+        tolerance: Tolerance that was being sought
+        last_value: Last computed value before failure (if available)
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.swe_solcross_ut(360.0, jd, 0)  # Search for crossing
+        ... except ephem.ConvergenceError as e:
+        ...     print(f"Algorithm '{e.algorithm}' failed after {e.iterations} iterations")
+
+    See Also:
+        swe_solcross_ut: Sun crossing a longitude
+        swe_mooncross_ut: Moon crossing a longitude
+    """
+
+    def __init__(
+        self,
+        message: str,
+        algorithm: str | None = None,
+        iterations: int | None = None,
+        max_iterations: int | None = None,
+        tolerance: float | None = None,
+        last_value: float | None = None,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.algorithm = algorithm
+        self.iterations = iterations
+        self.max_iterations = max_iterations
+        self.tolerance = tolerance
+        self.last_value = last_value
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"ConvergenceError({self.message!r}, algorithm={self.algorithm!r}, "
+            f"iterations={self.iterations}, max_iterations={self.max_iterations}, "
+            f"tolerance={self.tolerance}, last_value={self.last_value})"
+        )
+
+
+# =============================================================================
+# CATEGORY: CONFIGURATION ERRORS
+# =============================================================================
+
+
+class ConfigurationError(Error):
+    """Error raised when required configuration or state is missing.
+
+    This exception is raised when an operation requires specific
+    configuration or state that hasn't been set up, such as:
+    - Observer location not set for topocentric calculations
+    - Ephemeris path not configured
+    - Required dependencies not available
+
+    Attributes:
+        message: Human-readable error message
+        missing_config: Name of the missing configuration item
+        suggestion: Suggested action to resolve the error
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     # Trying topocentric calc without setting location
+        ...     ephem.calc_ut(jd, ephem.SE_MOON, ephem.SEFLG_TOPOCTR)
+        ... except ephem.ConfigurationError as e:
+        ...     print(f"Missing: {e.missing_config}")
+        ...     print(f"Suggestion: {e.suggestion}")
+        Missing: observer_location
+        Suggestion: Call set_topo(lon, lat, alt) first
+
+    See Also:
+        set_topo: Set observer location for topocentric calculations
+        set_ephe_path: Set ephemeris file path
+    """
+
+    def __init__(
+        self,
+        message: str,
+        missing_config: str | None = None,
+        suggestion: str | None = None,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.missing_config = missing_config
+        self.suggestion = suggestion
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"ConfigurationError({self.message!r}, "
+            f"missing_config={self.missing_config!r}, "
+            f"suggestion={self.suggestion!r})"
+        )
+
+
+# =============================================================================
+# VALIDATION HELPER FUNCTIONS
+# =============================================================================
 
 
 def validate_latitude(lat: float, func_name: str = "") -> None:
@@ -430,117 +871,4 @@ def validate_jd_range(
             body_id=body_id,
             body_name=body_name,
             ephemeris_file=ephemeris_file,
-        )
-
-
-class UnknownBodyError(Error):
-    """Error raised when an unknown or unsupported body ID is requested.
-
-    This exception is raised when attempting to calculate the position of a
-    celestial body using an unrecognized body ID. This helps users identify
-    typos or unsupported body types early, rather than silently returning
-    zero positions.
-
-    Attributes:
-        body_id: The unrecognized body ID that was requested
-        message: Human-readable error message
-
-    Example:
-        >>> import libephemeris as ephem
-        >>> try:
-        ...     ephem.calc_ut(2451545.0, 99999, 0)  # Invalid body ID
-        ... except ephem.UnknownBodyError as e:
-        ...     print(f"Unknown body ID: {e.body_id}")
-        Unknown body ID: 99999
-
-    See Also:
-        get_planet_name: Get name for a valid body ID
-        SE_SUN, SE_MOON, etc.: Valid body ID constants
-    """
-
-    def __init__(
-        self,
-        message: str,
-        body_id: int | None = None,
-    ):
-        super().__init__(message)
-        self.body_id = body_id
-        self.message = message
-
-    def __str__(self) -> str:
-        return self.message
-
-    def __repr__(self) -> str:
-        return f"UnknownBodyError({self.message!r}, body_id={self.body_id})"
-
-
-class EphemerisRangeError(Error):
-    """Error raised when a calculation date is outside the ephemeris range.
-
-    This exception is raised when the requested Julian Day falls outside the
-    date range covered by the loaded ephemeris file (e.g., DE440 covers
-    1550-2650).
-
-    This exception provides detailed information about the supported date range
-    to help users understand why the calculation failed and what dates are valid.
-
-    Attributes:
-        requested_jd: The Julian Day that was requested
-        start_jd: The start of the supported Julian Day range
-        end_jd: The end of the supported Julian Day range
-        start_date: The start date in calendar format (YYYY-MM-DD)
-        end_date: The end date in calendar format (YYYY-MM-DD)
-        body_id: The body ID that was being calculated (if available)
-        body_name: Human-readable name of the body (if available)
-        ephemeris_file: The ephemeris file in use (if available)
-        message: Human-readable error message
-
-    Example:
-        >>> import libephemeris as ephem
-        >>> try:
-        ...     ephem.calc_ut(5000000.0, ephem.SE_SUN, 0)  # Year ~8827 AD
-        ... except ephem.EphemerisRangeError as e:
-        ...     print(f"Date JD {e.requested_jd} is outside range")
-        ...     print(f"Supported: JD {e.start_jd} to {e.end_jd}")
-        ...     print(f"           ({e.start_date} to {e.end_date})")
-
-    See Also:
-        get_current_file_data: Returns information about the loaded ephemeris
-        set_ephemeris_file: Load a different ephemeris with different date range
-    """
-
-    def __init__(
-        self,
-        message: str,
-        requested_jd: float | None = None,
-        start_jd: float | None = None,
-        end_jd: float | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        body_id: int | None = None,
-        body_name: str | None = None,
-        ephemeris_file: str | None = None,
-    ):
-        super().__init__(message)
-        self.requested_jd = requested_jd
-        self.start_jd = start_jd
-        self.end_jd = end_jd
-        self.start_date = start_date
-        self.end_date = end_date
-        self.body_id = body_id
-        self.body_name = body_name
-        self.ephemeris_file = ephemeris_file
-        self.message = message
-
-    def __str__(self) -> str:
-        return self.message
-
-    def __repr__(self) -> str:
-        return (
-            f"EphemerisRangeError({self.message!r}, "
-            f"requested_jd={self.requested_jd}, "
-            f"start_jd={self.start_jd}, end_jd={self.end_jd}, "
-            f"start_date={self.start_date!r}, end_date={self.end_date!r}, "
-            f"body_id={self.body_id}, body_name={self.body_name!r}, "
-            f"ephemeris_file={self.ephemeris_file!r})"
         )

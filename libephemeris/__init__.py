@@ -1,11 +1,24 @@
 from .constants import *
 from .exceptions import (
+    # Base error class (pyswisseph compatible)
     Error,
+    # Category: Input validation errors
+    InputValidationError,
+    CoordinateError,
+    InvalidBodyError,
+    # Category: Data not found errors
+    DataNotFoundError,
+    UnknownBodyError,
+    StarNotFoundError,
+    SPKNotFoundError,
+    # Category: Calculation errors
+    CalculationError,
     PolarCircleError,
     EphemerisRangeError,
-    SPKNotFoundError,
-    CoordinateError,
-    UnknownBodyError,
+    ConvergenceError,
+    # Category: Configuration errors
+    ConfigurationError,
+    # Validation helpers
     validate_latitude,
     validate_longitude,
     validate_coordinates,
@@ -541,13 +554,24 @@ __author__ = "Giacomo Battaglia"
 __license__ = "LGPL-3.0"
 
 __all__ = [
-    # Exceptions
+    # Exceptions - Base
     "Error",
-    "EphemerisRangeError",
-    "PolarCircleError",
-    "SPKNotFoundError",
+    # Exceptions - Input Validation Category
+    "InputValidationError",
     "CoordinateError",
+    "InvalidBodyError",
+    # Exceptions - Data Not Found Category
+    "DataNotFoundError",
     "UnknownBodyError",
+    "StarNotFoundError",
+    "SPKNotFoundError",
+    # Exceptions - Calculation Category
+    "CalculationError",
+    "PolarCircleError",
+    "EphemerisRangeError",
+    "ConvergenceError",
+    # Exceptions - Configuration Category
+    "ConfigurationError",
     # Coordinate validation
     "validate_latitude",
     "validate_longitude",
