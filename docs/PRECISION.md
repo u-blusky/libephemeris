@@ -6,20 +6,23 @@ This document provides detailed information about the precision and limitations 
 
 | Component | Precision vs pyswisseph | Notes |
 |-----------|------------------------|-------|
-| Sun position | ±1 arcsec | High precision |
-| Mercury, Venus positions | ±1 arcsec | High precision |
-| Mars position | ±2 arcsec | Slightly relaxed due to perturbation differences |
-| Moon position | ±5 arcsec | Relaxed due to lunar theory differences |
-| Jupiter, Saturn positions | ±5 arcsec | Outer planets |
-| Uranus, Neptune, Pluto | ±5 arcsec | Keplerian model limitations apply to Pluto |
-| True Lunar Node | ~0.07° (~260 arcsec) | Osculating orbital elements method |
+| Sun position | ±0.2 arcsec | High precision (max 0.2", mean 0.04") |
+| Mercury, Venus positions | ±0.4 arcsec | High precision |
+| Mars position | ±0.6 arcsec | High precision |
+| Moon position | ±3.5 arcsec | Relaxed due to lunar theory differences |
+| Jupiter, Saturn positions | ±0.6 arcsec | Outer planets |
+| Uranus, Neptune, Pluto | ±1.2 arcsec | High precision with DE440 |
+| Mean Lunar Node | ~0.005° (~18 arcsec) | High precision formula |
+| True Lunar Node | ~0.14° (~520 arcsec) | Osculating orbital elements method |
+| Mean Lilith | ~0.12° (~430 arcsec) | Minor formula differences |
 | House cusps | ±0.001° (~3.6 arcsec) | All 19 house systems |
-| Ayanamsha (standard) | ±0.01° | Fagan-Bradley, Lahiri, etc. |
-| Ayanamsha (star-based) | ±0.02-0.06° | True Citra (0.02°), others (0.06°) |
+| Ayanamsha (standard) | ±0.0002° | Fagan-Bradley, Lahiri, Raman (high precision) |
+| Ayanamsha (star-based) | ±0.006-0.06° | True Citra (0.006°), others (0.06°) |
 | Sun crossings (ingress) | ±0.001 arcsec | Sub-milliarcsecond precision |
 | Moon crossings | ±0.05 arcsec | Sub-arcsecond precision |
 | Planet crossings | ±0.1 arcsec | Sub-arcsecond precision |
 | Polar houses (>66.5°) | Falls back to Porphyry | Placidus/Koch undefined |
+| Planetary moons | ±1 arcsec | Requires SPK kernel registration |
 
 ---
 
@@ -27,45 +30,44 @@ This document provides detailed information about the precision and limitations 
 
 ### Longitude Precision
 
-Tested against pyswisseph at 1000+ random dates within DE421 range (1900-2050):
+Tested against pyswisseph at 100+ random dates within DE440 range (1550-2650):
 
-| Planet | Max Difference | Tolerance |
-|--------|---------------|-----------|
-| Sun | <1 arcsec | ±1 arcsec |
-| Moon | <5 arcsec | ±5 arcsec |
-| Mercury | <1 arcsec | ±1 arcsec |
-| Venus | <1 arcsec | ±1 arcsec |
-| Mars | <2 arcsec | ±2 arcsec |
-| Jupiter | <5 arcsec | ±5 arcsec |
-| Saturn | <5 arcsec | ±5 arcsec |
-| Uranus | <5 arcsec | ±5 arcsec |
-| Neptune | <5 arcsec | ±5 arcsec |
-| Pluto | <5 arcsec | ±5 arcsec |
+| Planet | Max Difference | Mean Difference | Tolerance |
+|--------|---------------|-----------------|-----------|
+| Sun | 0.20 arcsec | 0.04 arcsec | ±0.3 arcsec |
+| Moon | 3.32 arcsec | 0.70 arcsec | ±3.5 arcsec |
+| Mercury | 0.32 arcsec | 0.05 arcsec | ±0.4 arcsec |
+| Venus | 0.33 arcsec | 0.08 arcsec | ±0.4 arcsec |
+| Mars | 0.58 arcsec | 0.06 arcsec | ±0.6 arcsec |
+| Jupiter | 0.44 arcsec | 0.12 arcsec | ±0.5 arcsec |
+| Saturn | 0.51 arcsec | 0.13 arcsec | ±0.6 arcsec |
+| Uranus | 0.50 arcsec | 0.23 arcsec | ±0.6 arcsec |
+| Neptune | 1.17 arcsec | 0.24 arcsec | ±1.2 arcsec |
+| Pluto | 0.75 arcsec | 0.26 arcsec | ±0.8 arcsec |
 
-**Note on Moon**: The Moon has a relaxed tolerance due to differences in lunar theory implementations between LibEphemeris (Skyfield/JPL DE) and pyswisseph. Both are accurate, but use slightly different models.
+**Note on Moon**: The Moon has a relaxed tolerance due to differences in lunar theory implementations between LibEphemeris (Skyfield/JPL DE440) and pyswisseph. Both are accurate, but use slightly different models.
 
-**Note on Mars**: Mars requires slightly relaxed tolerance due to differences in perturbation calculations between the implementations.
+**Note on DE440**: LibEphemeris now uses DE440 as the default ephemeris, which provides improved accuracy for outer planets with 12+ years more observational data than DE421, and uses the ICRF 3.0 reference frame.
 
 ### Latitude Precision
 
 | Planet | Max Difference |
 |--------|---------------|
-| Sun | <1 arcsec |
-| Moon | <5 arcsec |
-| Other planets | <1 arcsec |
+| Sun | <0.1 arcsec |
+| Moon | <1.3 arcsec |
+| Other planets | <0.6 arcsec |
 
 ### Distance Precision
 
 | Component | Max Difference |
 |-----------|---------------|
 | Distance (AU) | <0.0001 AU |
-| Pluto distance | <0.001 AU (Keplerian model) |
 
 ### Velocity Precision
 
 | Component | Max Difference |
 |-----------|---------------|
-| Angular velocity | <0.01°/day |
+| Angular velocity | <0.0004°/day |
 | Radial velocity | <0.001 AU/day |
 
 ---
@@ -154,9 +156,9 @@ LibEphemeris supports all 43 Swiss Ephemeris ayanamsha modes.
 
 | Category | Max Difference | Examples |
 |----------|---------------|----------|
-| Formula-based | <0.01° | Fagan-Bradley, Lahiri, Raman |
-| Epoch-based | <0.01° | J2000, J1900, B1950 |
-| Historical | <0.01° | Babylonian variants |
+| Formula-based | <0.0002° | Fagan-Bradley, Lahiri, Raman |
+| Epoch-based | <0.0002° | J2000, J1900, B1950 |
+| Historical | <0.001° | Babylonian variants |
 
 ### Star-Based Ayanamshas
 
@@ -168,7 +170,7 @@ Star-based ayanamshas have slightly higher tolerance due to differences in:
 
 | Ayanamsha | Max Difference |
 |-----------|---------------|
-| True Citra | <0.02° |
+| True Citra | <0.006° |
 | True Revati | <0.06° |
 | True Pushya | <0.06° |
 | True Mula | <0.06° |
@@ -180,7 +182,7 @@ Star-based ayanamshas have slightly higher tolerance due to differences in:
 
 **Note on True Citra**: Uses high-precision Hipparcos coordinates for Spica
 (HIP 65474) with full proper motion correction including parallax and radial
-velocity. This achieves ~0.02° precision vs Swiss Ephemeris, significantly
+velocity. This achieves ~0.006° precision vs Swiss Ephemeris, significantly
 better than other star-based ayanamshas.
 
 ---
@@ -219,20 +221,46 @@ better than other star-based ayanamshas.
 ### Julian Day Precision
 
 | Function | Precision |
-|----------|-----------|
+|----------|-----------| 
 | julday/revjul | <1e-10 days (~0.01 microseconds) |
-| Delta T | <0.5 seconds |
+| Delta T (with IERS) | <0.1 seconds (1973-present) |
+| Delta T (modeled) | <3.6 seconds (historical/future dates) |
+
+### IERS Delta T Support
+
+LibEphemeris can optionally download observed Delta T values from IERS 
+(International Earth Rotation and Reference Systems Service) for high-precision 
+calculations on recent dates (1973-present):
+
+```python
+from libephemeris import set_iers_delta_t_enabled, download_delta_t_data
+download_delta_t_data()  # Download IERS data
+set_iers_delta_t_enabled(True)  # Enable IERS Delta T
+```
+
+### TAI Time Scale Support
+
+LibEphemeris supports TAI (International Atomic Time) conversions:
+- `utc_to_tai_jd()`: Convert UTC date/time to TAI Julian Day
+- `tai_jd_to_utc()`: Convert TAI Julian Day to UTC date/time
+- `tt_to_tai_jd()`: Convert TT to TAI (fixed 32.184s offset)
+- `tai_to_tt_jd()`: Convert TAI to TT
+
+TAI is a continuous time scale without leap seconds, forming the basis for 
+TT (Terrestrial Time) where TT = TAI + 32.184 seconds exactly.
 
 ### Valid Date Ranges
 
 LibEphemeris uses JPL DE ephemerides with specific date ranges:
 
 | Ephemeris | Date Range | Precision |
-|-----------|------------|-----------|
-| DE421 (default) | 1900-2050 | Full precision |
+|-----------|------------|-----------| 
+| DE440 (default) | 1550-2650 | Full precision, ICRF 3.0 |
+| DE421 | 1900-2050 | Full precision |
 | DE422 | -3000 to 3000 | Full precision |
 | DE430 | 1550-2650 | Full precision |
 | DE431 | -13200 to 17191 | Full precision |
+| DE441 | -13200 to 17191 | Full precision |
 
 **Outside valid range**: Calculations will raise an exception with the supported date range.
 
@@ -244,16 +272,18 @@ LibEphemeris uses JPL DE ephemerides with specific date ranges:
 
 LibEphemeris uses different calculation models for some lunar points, resulting in varying precision:
 
-| Point | Max Difference vs pyswisseph | Notes |
-|-------|------------------------------|-------|
-| Mean Node | < 0.01° | High precision |
-| True Node | ~0.07° (~260 arcsec) | Osculating orbital elements method |
-| Mean Lilith | ~0.1° | Minor formula differences |
-| True Lilith | ~5-15° | Different orbital model (see below) |
-| Interpolated Apogee | ~8-10° | Smoothed osculating apogee (see below) |
-| Interpolated Perigee | ~10-15° | Smoothed osculating perigee (see below) |
+| Point | Max Difference vs pyswisseph | Mean Difference | Notes |
+|-------|------------------------------|-----------------|-------|
+| Mean Node | ~0.005° (~18 arcsec) | ~0.003° (~11 arcsec) | High precision |
+| True Node | ~0.14° (~520 arcsec) | ~0.04° (~145 arcsec) | Osculating orbital elements method |
+| Mean Lilith | ~0.12° (~430 arcsec) | ~0.07° (~250 arcsec) | Minor formula differences |
+| True Lilith | ~5-15° | - | Different orbital model (see below) |
+| Interpolated Apogee | ~8-10° | - | Smoothed osculating apogee (see below) |
+| Interpolated Perigee | ~10-15° | - | Smoothed osculating perigee (see below) |
 
-**Note on True Node**: The True Node calculation uses osculating orbital elements derived from the Moon's instantaneous position and velocity, with IAU 2006 precession correction. Mean error is ~0.02° (86 arcsec), max error ~0.07° (260 arcsec). For most astrological purposes, this precision is sufficient.
+**Note on True Node**: The True Node calculation uses osculating orbital elements derived from the Moon's instantaneous position and velocity, with IAU 2006 precession correction. Mean error is ~0.04° (145 arcsec), max error ~0.14° (520 arcsec). For most astrological purposes, this precision is sufficient.
+
+**Note on Mean Node**: The Mean Node now achieves high precision (~0.005° max), significantly better than the True Node calculation.
 
 **Note on True Lilith**: The True Lilith (osculating apogee) calculation uses the eccentricity vector method derived from JPL DE ephemeris state vectors. This differs fundamentally from Swiss Ephemeris which uses an integrated analytical lunar theory. The difference arises because the "osculating apogee" concept is model-dependent when solar perturbations are significant. Typical error is 5-15°, with occasional differences up to 25°. For applications requiring closer Swiss Ephemeris compatibility, use Mean Lilith instead.
 
@@ -338,6 +368,43 @@ dedicated SPK ephemeris files from JPL Horizons.
 
 ---
 
+## Planetary Moons
+
+LibEphemeris supports calculating positions of planetary moons (Galilean moons,
+Titan, Triton, Phobos, Deimos, Charon, etc.) using JPL satellite SPK files.
+
+### Supported Moons
+
+| System | Moons | SPK File |
+|--------|-------|----------|
+| Jupiter | Io, Europa, Ganymede, Callisto | jup365.bsp |
+| Saturn | Titan, Enceladus, Mimas, Rhea, Dione, Tethys, Iapetus | sat441.bsp |
+| Uranus | Titania, Oberon, Ariel, Umbriel, Miranda | ura116.bsp |
+| Neptune | Triton | nep102.bsp |
+| Mars | Phobos, Deimos | mar097.bsp |
+| Pluto | Charon | plu058.bsp |
+
+### Precision
+
+| Component | Precision |
+|-----------|-----------|
+| Longitude | ±1 arcsec |
+| Latitude | ±1 arcsec |
+| Distance | <0.001 AU |
+
+### Usage
+
+```python
+import libephemeris as eph
+eph.register_moon_spk('jup365.bsp')
+pos, _ = eph.calc_ut(2451545.0, eph.SE_MOON_IO, eph.SEFLG_SPEED)
+```
+
+**Note**: SPK kernels must be downloaded separately from JPL Horizons and
+registered using `register_moon_spk()` before calculating moon positions.
+
+---
+
 ## Fixed Stars
 
 ### Position Precision
@@ -411,7 +478,8 @@ LibEphemeris (pure Python with Skyfield) is approximately 10-100x slower than py
 ### Memory Usage
 
 | Resource | Approximate Size |
-|----------|-----------------|
+|----------|-----------------| 
+| DE440 ephemeris | ~128 MB |
 | DE421 ephemeris | ~16 MB |
 | DE431 ephemeris | ~3.4 GB |
 | Timescale data | ~2 MB |
@@ -431,13 +499,15 @@ Ephemeris files are shared across all `EphemerisContext` instances for memory ef
 - Progression calculations
 - Most astrological software applications
 - Research requiring reproducible, documented precision
+- Planetary moon calculations (with SPK kernels)
 
 ### Use With Caution
 
 - Polar latitude locations (>66.5°) - use Equal or Whole Sign houses
-- Star-based ayanamshas - expect ±0.02° for True Citra, ±0.06° for others
+- Star-based ayanamshas - expect ±0.006° for True Citra, ±0.06° for others
 - Asteroid/TNO positions - Keplerian approximation only
-- Very old historical dates (before 1900 with DE421)
+- True Node calculations - ~0.14° precision vs Swiss Ephemeris
+- Very old historical dates (before 1550 with DE440)
 
 ### Not Suitable For
 
@@ -445,6 +515,45 @@ Ephemeris files are shared across all `EphemerisContext` instances for memory ef
 - Spacecraft navigation (use SPICE)
 - Precise eclipse predictions for scientific purposes
 - High-precision Saros/Inex series analysis
+
+---
+
+## Precision Validation
+
+LibEphemeris includes comprehensive precision validation tooling to verify accuracy
+against pyswisseph reference values.
+
+### Precision Report Generator
+
+Generate detailed precision reports using the included script:
+
+```bash
+# Generate text report
+python compare_scripts/generate_precision_report.py
+
+# Generate JSON report for automation
+python compare_scripts/generate_precision_report.py --json
+
+# Generate CSV report for analysis
+python compare_scripts/generate_precision_report.py --csv
+
+# Increase test samples for higher confidence
+python compare_scripts/generate_precision_report.py -n 500
+```
+
+The report includes:
+- Maximum, mean, and standard deviation for each calculation type
+- P95 and P99 percentile values
+- Pass/fail status against documented tolerances
+- Support for JSON and CSV output formats
+
+### Precision Test Suite
+
+Run the precision documentation tests to verify all claims in this document:
+
+```bash
+pytest tests/test_precision/test_precision_docs.py -v
+```
 
 ---
 
