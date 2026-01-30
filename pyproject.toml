@@ -45,6 +45,24 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# High-precision IAU 2006 precession/obliquity for true lunar nodes
+precision = [
+    "pyerfa>=2.0.0",
+]
+# Automatic SPK kernel downloads from JPL Horizons
+spk = [
+    "astroquery>=0.4.0",
+]
+# Star catalog building (scripts/build_star_catalog.py)
+stars = [
+    "astroquery>=0.4.0",
+    "astropy>=5.0.0",
+]
+# All optional features
+all = [
+    "pyerfa>=2.0.0",
+    "astroquery>=0.4.0",
+]
 dev = [
     "black>=25.1.0",
     "mypy>=1.0.0",

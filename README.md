@@ -87,6 +87,32 @@ uv pip install -e .
 -   `skyfield-data>=7.0.0`
 -   A JPL ephemeris file (DE440 by default, downloaded automatically on first use if not present locally)
 
+### Optional Dependencies
+
+LibEphemeris has several optional dependencies that enhance functionality when installed:
+
+| Package | Install Command | Features Enabled |
+|---------|-----------------|------------------|
+| **pyerfa** | `pip install pyerfa` | High-precision IAU 2006 precession and obliquity for true lunar node calculations. Falls back to Lieske (1979) formulas when not installed. |
+| **astroquery** | `pip install astroquery` | Automatic SPK kernel downloads from JPL Horizons for arcsecond-level precision on asteroids and TNOs. Required for `set_auto_spk_download(True)` and `download_spk()`. |
+| **astropy** | `pip install astropy` | Required by the star catalog build script (`scripts/build_star_catalog.py`) for unit handling when querying Hipparcos data. Not needed for normal library usage. |
+
+**Installation with optional dependencies:**
+
+```bash
+# Install with high-precision lunar node support
+pip install libephemeris[precision]
+
+# Install with automatic SPK download support
+pip install libephemeris[spk]
+
+# Install with all optional features
+pip install libephemeris[all]
+
+# Install with star catalog building support (for development)
+pip install libephemeris[stars]
+```
+
 ---
 
 ## Quick Start
