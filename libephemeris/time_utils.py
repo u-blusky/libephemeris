@@ -129,14 +129,40 @@ def swe_deltat(tjd: float) -> float:
 
     Note:
         Delta T accounts for Earth's irregular rotation and is required
-        for high-precision planetary calculations. Values are obtained
-        from IERS (International Earth Rotation Service) data.
+        for high-precision planetary calculations.
 
-        For modern dates: ~0.0008 days (~69 seconds as of 2024)
-        For historical dates: Calculated from polynomial models
+        The implementation uses Skyfield's Delta T model which follows the
+        Stephenson, Morrison, and Hohenkerk (2016) approach:
+
+        **For historical dates (720 BC - ~2016):**
+            Uses cubic spline interpolation from Table S15 published in
+            "Measurement of the Earth's rotation: 720 BC to AD 2015"
+            (Stephenson, Morrison, Hohenkerk, 2016, Proc. Royal Society A).
+
+        **For dates outside the spline range:**
+            Uses the long-term parabolic model:
+                ΔT = -320 + 32.5 × u²
+            where u = (year - 1825) / 100
+
+        **For modern/recent dates:**
+            Uses observed IERS (International Earth Rotation Service) data,
+            smoothly blended with the historical model.
+
+        Typical values:
+            - Year 1000: ~1500 seconds
+            - Year 1800: ~14 seconds
+            - Year 1900: ~-3 seconds
+            - Year 2000: ~64 seconds
+            - Year 2020: ~69 seconds
 
         If a user-defined Delta T has been set via set_delta_t_userdef(),
         that value will be returned instead of the computed value.
+
+    References:
+        Stephenson F.R., Morrison L.V., Hohenkerk C.Y. (2016).
+        "Measurement of the Earth's rotation: 720 BC to AD 2015."
+        Proceedings of the Royal Society A, 472: 20160404.
+        https://doi.org/10.1098/rspa.2016.0404
     """
     # Check for user-defined Delta T first
     userdef_dt = get_delta_t_userdef()
@@ -176,6 +202,11 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
         SEFLG_MOSEPH is not supported and will return the default Delta T
         with a warning message.
 
+        The Delta T model follows Stephenson, Morrison & Hohenkerk (2016):
+            - Historical splines from Table S15 for 720 BC to ~AD 2015
+            - Long-term parabola: ΔT = -320 + 32.5 × u² (u = (year-1825)/100)
+            - Modern IERS observations for recent dates
+
         If a user-defined Delta T has been set via set_delta_t_userdef(),
         that value will be returned instead of the computed value.
 
@@ -184,6 +215,11 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
         >>> dt, err = swe_deltat_ex(2451545.0, SEFLG_SWIEPH)
         >>> print(f"Delta T: {dt * 86400:.2f} seconds")
         Delta T: 63.83 seconds
+
+    References:
+        Stephenson F.R., Morrison L.V., Hohenkerk C.Y. (2016).
+        "Measurement of the Earth's rotation: 720 BC to AD 2015."
+        Proceedings of the Royal Society A, 472: 20160404.
     """
     # Check for user-defined Delta T first
     userdef_dt = get_delta_t_userdef()
