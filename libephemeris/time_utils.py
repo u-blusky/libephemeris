@@ -13,7 +13,7 @@ All algorithms follow Meeus "Astronomical Algorithms" (1998).
 from typing import Any
 
 from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH, SEFLG_MOSEPH
-from .state import get_timescale, get_delta_t_userdef
+from .state import get_timescale, get_delta_t_userdef, get_iers_delta_t_enabled
 
 # Julian Day of Gregorian calendar reform: Oct 15, 1582
 JD_GREGORIAN_REFORM = 2299161
@@ -131,22 +131,34 @@ def swe_deltat(tjd: float) -> float:
         Delta T accounts for Earth's irregular rotation and is required
         for high-precision planetary calculations.
 
-        The implementation uses Skyfield's Delta T model which follows the
-        Stephenson, Morrison, and Hohenkerk (2016) approach:
+        The implementation uses multiple sources for Delta T:
 
-        **For historical dates (720 BC - ~2016):**
-            Uses cubic spline interpolation from Table S15 published in
-            "Measurement of the Earth's rotation: 720 BC to AD 2015"
-            (Stephenson, Morrison, Hohenkerk, 2016, Proc. Royal Society A).
+        **Priority 1: User-defined Delta T**
+            If set via set_delta_t_userdef(), that fixed value is returned.
 
-        **For dates outside the spline range:**
-            Uses the long-term parabolic model:
-                ΔT = -320 + 32.5 × u²
-            where u = (year - 1825) / 100
+        **Priority 2: IERS observed data (if enabled)**
+            If IERS Delta T is enabled via set_iers_delta_t_enabled(True),
+            and IERS data is available for the date, the observed Delta T
+            from IERS is used. This provides the highest precision for
+            recent dates (typically 1973-present).
 
-        **For modern/recent dates:**
-            Uses observed IERS (International Earth Rotation Service) data,
-            smoothly blended with the historical model.
+        **Priority 3: Skyfield's Delta T model (default)**
+            Uses Skyfield's implementation of the Stephenson, Morrison, and
+            Hohenkerk (2016) model:
+
+            **For historical dates (720 BC - ~2016):**
+                Uses cubic spline interpolation from Table S15 published in
+                "Measurement of the Earth's rotation: 720 BC to AD 2015"
+                (Stephenson, Morrison, Hohenkerk, 2016, Proc. Royal Society A).
+
+            **For dates outside the spline range:**
+                Uses the long-term parabolic model:
+                    ΔT = -320 + 32.5 × u²
+                where u = (year - 1825) / 100
+
+            **For modern/recent dates:**
+                Uses observed IERS (International Earth Rotation Service) data,
+                smoothly blended with the historical model.
 
         Typical values:
             - Year 1000: ~1500 seconds
@@ -154,9 +166,6 @@ def swe_deltat(tjd: float) -> float:
             - Year 1900: ~-3 seconds
             - Year 2000: ~64 seconds
             - Year 2020: ~69 seconds
-
-        If a user-defined Delta T has been set via set_delta_t_userdef(),
-        that value will be returned instead of the computed value.
 
     References:
         Stephenson F.R., Morrison L.V., Hohenkerk C.Y. (2016).
@@ -168,6 +177,19 @@ def swe_deltat(tjd: float) -> float:
     userdef_dt = get_delta_t_userdef()
     if userdef_dt is not None:
         return userdef_dt
+
+    # Check for IERS Delta T if enabled
+    if get_iers_delta_t_enabled():
+        try:
+            from . import iers_data
+
+            delta_t_seconds = iers_data.get_delta_t_iers(tjd)
+            if delta_t_seconds is not None:
+                # IERS returns seconds, convert to days
+                return delta_t_seconds / 86400.0
+        except Exception:
+            # Fall back to Skyfield if IERS data fails
+            pass
 
     ts = get_timescale()
     t = ts.ut1_jd(tjd)
@@ -196,16 +218,26 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
             - serr: Error message string (empty if no error/warning)
 
     Note:
+        The implementation uses multiple sources for Delta T:
+
+        **Priority 1: User-defined Delta T**
+            If set via set_delta_t_userdef(), that fixed value is returned.
+
+        **Priority 2: IERS observed data (if enabled)**
+            If IERS Delta T is enabled via set_iers_delta_t_enabled(True),
+            and IERS data is available for the date, the observed Delta T
+            from IERS is used. This provides the highest precision for
+            recent dates (typically 1973-present).
+
+        **Priority 3: Skyfield's Delta T model (default)**
+            Uses Skyfield's implementation of the Stephenson, Morrison, and
+            Hohenkerk (2016) model.
+
         Since libephemeris uses Skyfield which internally uses JPL data,
         SEFLG_SWIEPH and SEFLG_JPLEPH produce identical results.
 
         SEFLG_MOSEPH is not supported and will return the default Delta T
         with a warning message.
-
-        The Delta T model follows Stephenson, Morrison & Hohenkerk (2016):
-            - Historical splines from Table S15 for 720 BC to ~AD 2015
-            - Long-term parabola: ΔT = -320 + 32.5 × u² (u = (year-1825)/100)
-            - Modern IERS observations for recent dates
 
         If a user-defined Delta T has been set via set_delta_t_userdef(),
         that value will be returned instead of the computed value.
@@ -226,12 +258,6 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
     if userdef_dt is not None:
         return userdef_dt, ""
 
-    ts = get_timescale()
-    t = ts.ut1_jd(tjd)
-    # Skyfield returns delta_t in seconds, convert to days for Swiss Ephemeris API compatibility
-    delta_t_seconds = float(t.delta_t)
-    delta_t = delta_t_seconds / 86400.0
-
     # Determine if there's a warning based on the flag
     serr = ""
 
@@ -241,11 +267,27 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
     if ephe_selection == SEFLG_MOSEPH:
         # Moshier ephemeris is not supported, return default with warning
         serr = "Warning: SEFLG_MOSEPH not supported, using default Delta T"
-    elif ephe_selection == 0:
-        # No ephemeris flag specified, use default (no warning needed)
-        pass
     # SEFLG_SWIEPH and SEFLG_JPLEPH both use Skyfield/JPL internally
     # so no warning is needed for those
+
+    # Check for IERS Delta T if enabled
+    if get_iers_delta_t_enabled():
+        try:
+            from . import iers_data
+
+            delta_t_seconds = iers_data.get_delta_t_iers(tjd)
+            if delta_t_seconds is not None:
+                # IERS returns seconds, convert to days
+                return delta_t_seconds / 86400.0, serr
+        except Exception:
+            # Fall back to Skyfield if IERS data fails
+            pass
+
+    ts = get_timescale()
+    t = ts.ut1_jd(tjd)
+    # Skyfield returns delta_t in seconds, convert to days for Swiss Ephemeris API compatibility
+    delta_t_seconds = float(t.delta_t)
+    delta_t = delta_t_seconds / 86400.0
 
     return delta_t, serr
 

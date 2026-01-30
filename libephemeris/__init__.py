@@ -78,6 +78,34 @@ from .state import (
     get_spk_cache_dir,
     set_spk_date_padding,
     get_spk_date_padding,
+    # IERS Delta T configuration
+    set_iers_delta_t_enabled,
+    get_iers_delta_t_enabled,
+)
+from .iers_data import (
+    # IERS data download functions
+    download_iers_finals,
+    download_leap_seconds,
+    download_delta_t_data,
+    load_iers_data,
+    # IERS Delta T lookup functions
+    get_observed_delta_t,
+    get_observed_delta_t_data_range,
+    is_observed_delta_t_available,
+    get_delta_t_iers,
+    get_ut1_utc,
+    get_tai_utc,
+    get_iers_data_range,
+    is_iers_data_available,
+    # IERS cache management
+    clear_iers_cache,
+    delete_iers_cache_files,
+    get_iers_cache_info,
+    # IERS configuration
+    set_iers_cache_dir,
+    get_iers_cache_dir,
+    set_iers_auto_download,
+    get_iers_auto_download,
 )
 from .crossing import (
     swe_solcross_ut,
@@ -837,6 +865,33 @@ __all__ = [
     "get_horizons_id",
     "get_naif_id_from_ipl",
     "get_spk_body_info_from_map",
+    # IERS Delta T configuration
+    "set_iers_delta_t_enabled",
+    "get_iers_delta_t_enabled",
+    # IERS data download functions
+    "download_iers_finals",
+    "download_leap_seconds",
+    "download_delta_t_data",
+    "load_iers_data",
+    # IERS Delta T lookup functions
+    "get_observed_delta_t",
+    "get_observed_delta_t_data_range",
+    "is_observed_delta_t_available",
+    "get_delta_t_iers",
+    "get_ut1_utc",
+    "get_tai_utc",
+    "get_iers_data_range",
+    "is_iers_data_available",
+    # IERS cache management
+    "clear_iers_cache",
+    "delete_iers_cache_files",
+    "get_iers_cache_info",
+    # IERS cache directory configuration
+    "set_iers_cache_dir",
+    "get_iers_cache_dir",
+    # IERS auto-download configuration
+    "set_iers_auto_download",
+    "get_iers_auto_download",
     # Asteroid name lookup
     "get_asteroid_number",
     "clear_asteroid_name_cache",

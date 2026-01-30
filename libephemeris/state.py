@@ -67,6 +67,10 @@ _SPK_CACHE_DIR: Optional[str] = None
 # e.g., if requesting 2020-2030, with padding=365 will download 2019-2031
 _SPK_DATE_PADDING: int = 0
 
+# IERS Delta T configuration
+# When enabled, uses observed Delta T values from IERS for recent dates
+_IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
+
 
 def get_loader() -> Loader:
     """
@@ -579,7 +583,7 @@ def close() -> None:
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
     global _SPK_KERNELS, _SPK_BODY_MAP, _AUTO_SPK_DOWNLOAD
-    global _SPK_CACHE_DIR, _SPK_DATE_PADDING
+    global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
 
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:
@@ -612,6 +616,15 @@ def close() -> None:
     _AUTO_SPK_DOWNLOAD = None
     _SPK_CACHE_DIR = None
     _SPK_DATE_PADDING = 0
+    _IERS_DELTA_T_ENABLED = None
+
+    # Clear IERS cache
+    try:
+        from . import iers_data
+
+        iers_data.clear_iers_cache()
+    except ImportError:
+        pass
 
     # Close and clear SPK kernels
     for kernel in _SPK_KERNELS.values():
@@ -894,6 +907,74 @@ def get_spk_date_padding() -> int:
         30
     """
     return _SPK_DATE_PADDING
+
+
+# =============================================================================
+# IERS DELTA T CONFIGURATION
+# =============================================================================
+
+# Environment variable name for IERS Delta T
+_IERS_DELTA_T_ENV_VAR = "LIBEPHEMERIS_IERS_DELTA_T"
+
+
+def set_iers_delta_t_enabled(enabled: Optional[bool]) -> None:
+    """
+    Enable or disable using IERS observed Delta T values for recent dates.
+
+    When enabled, the library will use high-precision observed Delta T values
+    from IERS (International Earth Rotation and Reference Systems Service)
+    for dates where IERS data is available (typically 1973-present).
+
+    Args:
+        enabled: True to enable IERS Delta T, False to disable,
+                 or None to use the environment variable.
+
+    Note:
+        - IERS data must be downloaded first using `iers_data.download_iers_finals()`
+        - For dates outside the IERS data range, the standard Delta T model is used
+        - Enable `iers_data.set_iers_auto_download(True)` for automatic download
+
+    Environment Variable:
+        LIBEPHEMERIS_IERS_DELTA_T: Set to "1", "true", or "yes" to enable.
+
+    Example:
+        >>> from libephemeris import set_iers_delta_t_enabled, get_iers_delta_t_enabled
+        >>> set_iers_delta_t_enabled(True)  # Enable IERS Delta T
+        >>> get_iers_delta_t_enabled()
+        True
+    """
+    global _IERS_DELTA_T_ENABLED
+    _IERS_DELTA_T_ENABLED = enabled
+
+
+def get_iers_delta_t_enabled() -> bool:
+    """
+    Get the current IERS Delta T setting.
+
+    Returns:
+        True if IERS Delta T is enabled, False otherwise.
+
+    Note:
+        - If set_iers_delta_t_enabled() was called with an explicit value, returns that.
+        - Otherwise, checks the LIBEPHEMERIS_IERS_DELTA_T environment variable.
+        - If the environment variable is not set, returns False (disabled by default).
+
+    Example:
+        >>> from libephemeris import get_iers_delta_t_enabled
+        >>> get_iers_delta_t_enabled()  # Default is False
+        False
+        >>> import os
+        >>> os.environ['LIBEPHEMERIS_IERS_DELTA_T'] = '1'
+        >>> get_iers_delta_t_enabled()  # Now enabled via env var
+        True
+    """
+    # If explicitly set via function, use that value
+    if _IERS_DELTA_T_ENABLED is not None:
+        return _IERS_DELTA_T_ENABLED
+
+    # Otherwise check environment variable
+    env_value = os.environ.get(_IERS_DELTA_T_ENV_VAR, "").lower().strip()
+    return env_value in ("1", "true", "yes", "on", "enabled")
 
 
 # =============================================================================
