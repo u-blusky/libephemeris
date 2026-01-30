@@ -1382,3 +1382,524 @@ def swe_helio_cross(
     raise RuntimeError(
         "Maximum iterations reached in heliocentric crossing calculation"
     )
+
+
+# =============================================================================
+# RETROGRADE STATION HANDLING
+# =============================================================================
+#
+# Retrograde stations occur when a planet appears to stop and reverse direction
+# as seen from Earth. At station points, the planet's velocity approaches zero,
+# which can cause numerical instabilities in calculations.
+#
+# Two types of stations:
+#   - Retrograde Station (SR): Planet slows, stops, and begins retrograde motion
+#   - Direct Station (SD): Planet stops retrograde motion and resumes direct motion
+#
+# The functions below provide robust handling for calculations near these points.
+# =============================================================================
+
+# Tolerance for station finding (velocity threshold)
+# A planet is considered "stationary" when |velocity| < this value
+STATION_VELOCITY_TOLERANCE = 1e-6  # degrees/day
+
+
+def is_retrograde(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> bool:
+    """
+    Check if a planet is currently in retrograde motion.
+
+    A planet is retrograde when its geocentric longitude is decreasing
+    (negative velocity in longitude).
+
+    Args:
+        planet_id: Planet ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        jd_ut: Julian Day (UT) to check
+        flag: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        bool: True if planet is retrograde (velocity < 0), False otherwise
+
+    Note:
+        Sun and Moon never go retrograde from geocentric perspective.
+        Only planets beyond Earth (Mars-Pluto) and Mercury/Venus can appear retrograde.
+
+    Example:
+        >>> is_retrograde(SE_MERCURY, jd_now)
+        True  # Mercury is currently retrograde
+    """
+    if planet_id in (SE_SUN, SE_MOON):
+        # Sun and Moon are never retrograde from geocentric view
+        return False
+
+    try:
+        pos, _ = swe_calc_ut(jd_ut, planet_id, flag | SEFLG_SPEED)
+        return pos[3] < 0
+    except Exception:
+        return False
+
+
+def get_station_type(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> str:
+    """
+    Determine if a planet is near a station and what type.
+
+    Args:
+        planet_id: Planet ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        jd_ut: Julian Day (UT) to check
+        flag: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        str: One of:
+            - "direct": Planet is in direct (prograde) motion
+            - "retrograde": Planet is in retrograde motion
+            - "stationary_retrograde": Near station, about to go retrograde
+            - "stationary_direct": Near station, about to resume direct motion
+
+    Example:
+        >>> get_station_type(SE_MARS, jd_station)
+        'stationary_retrograde'
+    """
+    if planet_id in (SE_SUN, SE_MOON):
+        return "direct"
+
+    try:
+        pos, _ = swe_calc_ut(jd_ut, planet_id, flag | SEFLG_SPEED)
+        speed = pos[3]
+
+        if _is_near_station(speed):
+            # Near station - determine type by checking velocity trend
+            # Look at velocity slightly before and after
+            dt = 1.0  # 1 day
+            pos_before, _ = swe_calc_ut(jd_ut - dt, planet_id, flag | SEFLG_SPEED)
+            pos_after, _ = swe_calc_ut(jd_ut + dt, planet_id, flag | SEFLG_SPEED)
+
+            speed_before = pos_before[3]
+            speed_after = pos_after[3]
+
+            # If speed is decreasing (becoming more negative), heading to retrograde
+            if speed_before > speed_after:
+                return "stationary_retrograde"
+            else:
+                return "stationary_direct"
+        elif speed < 0:
+            return "retrograde"
+        else:
+            return "direct"
+
+    except Exception:
+        return "direct"
+
+
+def _brent_find_station(
+    get_speed_func,
+    jd_a: float,
+    jd_b: float,
+    tolerance: float = STATION_VELOCITY_TOLERANCE,
+    max_iter: int = 100,
+) -> float:
+    """
+    Find exact station time using Brent's method for root finding.
+
+    Finds when velocity = 0 (station point) within the bracket [jd_a, jd_b].
+
+    Args:
+        get_speed_func: Function(jd) -> velocity in degrees/day
+        jd_a: Start of bracket (Julian Day)
+        jd_b: End of bracket (Julian Day)
+        tolerance: Convergence tolerance for velocity
+        max_iter: Maximum iterations
+
+    Returns:
+        float: Julian Day when velocity = 0
+
+    Raises:
+        RuntimeError: If root not bracketed or convergence fails
+    """
+    fa = get_speed_func(jd_a)
+    fb = get_speed_func(jd_b)
+
+    # Check if root is bracketed (velocity changes sign)
+    if fa * fb > 0:
+        raise RuntimeError(
+            f"Station not bracketed: speed(a)={fa:.6f}, speed(b)={fb:.6f}"
+        )
+
+    # Ensure |f(a)| >= |f(b)|
+    if abs(fa) < abs(fb):
+        jd_a, jd_b = jd_b, jd_a
+        fa, fb = fb, fa
+
+    c = jd_a
+    fc = fa
+    mflag = True
+    d = 0.0
+
+    for _ in range(max_iter):
+        if abs(fb) < tolerance:
+            return jd_b
+
+        if fa != fc and fb != fc:
+            # Inverse quadratic interpolation
+            s = (
+                jd_a * fb * fc / ((fa - fb) * (fa - fc))
+                + jd_b * fa * fc / ((fb - fa) * (fb - fc))
+                + c * fa * fb / ((fc - fa) * (fc - fb))
+            )
+        else:
+            # Secant method
+            s = jd_b - fb * (jd_b - jd_a) / (fb - fa)
+
+        # Conditions for bisection fallback
+        cond1 = not (
+            (3 * jd_a + jd_b) / 4 < s < jd_b or jd_b < s < (3 * jd_a + jd_b) / 4
+        )
+        cond2 = mflag and abs(s - jd_b) >= abs(jd_b - c) / 2
+        cond3 = not mflag and abs(s - jd_b) >= abs(c - d) / 2
+        cond4 = mflag and abs(jd_b - c) < tolerance * 86400
+        cond5 = not mflag and abs(c - d) < tolerance * 86400
+
+        if cond1 or cond2 or cond3 or cond4 or cond5:
+            s = (jd_a + jd_b) / 2
+            mflag = True
+        else:
+            mflag = False
+
+        fs = get_speed_func(s)
+        d = c
+        c = jd_b
+        fc = fb
+
+        if fa * fs < 0:
+            jd_b = s
+            fb = fs
+        else:
+            jd_a = s
+            fa = fs
+
+        if abs(fa) < abs(fb):
+            jd_a, jd_b = jd_b, jd_a
+            fa, fb = fb, fa
+
+    return jd_b
+
+
+def _find_station_bracket(
+    planet_id: int,
+    jd_start: float,
+    jd_end: float,
+    flag: int,
+    num_samples: int = 50,
+) -> Tuple[float, float]:
+    """
+    Find a bracket [jd_a, jd_b] containing a station (velocity sign change).
+
+    Args:
+        planet_id: Planet ID
+        jd_start: Start of search interval
+        jd_end: End of search interval
+        flag: Calculation flags
+        num_samples: Number of samples to take
+
+    Returns:
+        Tuple[float, float]: (jd_a, jd_b) bracket containing a station
+
+    Raises:
+        RuntimeError: If no station found in interval
+    """
+    step = (jd_end - jd_start) / num_samples
+
+    pos_prev, _ = swe_calc_ut(jd_start, planet_id, flag | SEFLG_SPEED)
+    speed_prev = pos_prev[3]
+    jd_prev = jd_start
+
+    for i in range(1, num_samples + 1):
+        jd_curr = jd_start + i * step
+        pos_curr, _ = swe_calc_ut(jd_curr, planet_id, flag | SEFLG_SPEED)
+        speed_curr = pos_curr[3]
+
+        # Check for sign change (station)
+        if speed_prev * speed_curr <= 0:
+            return (jd_prev, jd_curr)
+
+        jd_prev = jd_curr
+        speed_prev = speed_curr
+
+    raise RuntimeError(
+        f"No station found for planet {planet_id} in [{jd_start}, {jd_end}]"
+    )
+
+
+def swe_find_station_ut(
+    planet_id: int,
+    jd_ut: float,
+    station_type: str = "any",
+    flag: int = SEFLG_SWIEPH,
+) -> Tuple[float, str]:
+    """
+    Find the next planetary station (stationary point) after a given date.
+
+    A station occurs when a planet's apparent velocity reaches zero, marking
+    the transition between direct and retrograde motion (or vice versa).
+
+    Args:
+        planet_id: Planet ID (SE_MERCURY through SE_PLUTO)
+        jd_ut: Julian Day (UT) to start search from
+        station_type: Type of station to find:
+            - "any": Find next station regardless of type (default)
+            - "retrograde" or "SR": Find next station where planet goes retrograde
+            - "direct" or "SD": Find next station where planet resumes direct motion
+        flag: Calculation flags (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Tuple[float, str]: (Julian Day of station, station type "SR" or "SD")
+
+    Raises:
+        ValueError: If planet_id is Sun or Moon (never station)
+        RuntimeError: If convergence fails or no station found
+
+    Note:
+        Sun and Moon never go retrograde from Earth's perspective.
+
+    Station Periods (approximate time between stations):
+        - Mercury: ~116 days (synodic period)
+        - Venus: ~584 days
+        - Mars: ~780 days
+        - Jupiter: ~399 days
+        - Saturn: ~378 days
+        - Uranus: ~370 days
+        - Neptune: ~367 days
+        - Pluto: ~367 days
+
+    Precision:
+        Typically finds station to within ~1 minute of arc in velocity
+
+    Example:
+        >>> jd_station, stype = swe_find_station_ut(SE_MERCURY, jd_now)
+        >>> print(f"Mercury stations {stype} on JD {jd_station}")
+    """
+    if planet_id in (SE_SUN, SE_MOON):
+        raise ValueError("Sun and Moon do not have retrograde stations")
+
+    # Normalize station_type
+    if station_type.upper() in ("SR", "RETROGRADE"):
+        station_type = "retrograde"
+    elif station_type.upper() in ("SD", "DIRECT"):
+        station_type = "direct"
+    else:
+        station_type = "any"
+
+    # Typical synodic periods (days) - approximate time between same-type stations
+    synodic_periods = {
+        2: 116,  # Mercury
+        3: 584,  # Venus
+        4: 780,  # Mars
+        5: 399,  # Jupiter
+        6: 378,  # Saturn
+        7: 370,  # Uranus
+        8: 367,  # Neptune
+        9: 367,  # Pluto
+    }
+
+    # Search window is half synodic period (time between SR and SD)
+    search_window = synodic_periods.get(planet_id, 400) / 2
+
+    def get_speed(jd: float) -> float:
+        pos, _ = swe_calc_ut(jd, planet_id, flag | SEFLG_SPEED)
+        return pos[3]
+
+    # Get current motion direction
+    current_speed = get_speed(jd_ut)
+
+    jd_search_start = jd_ut
+    max_attempts = 4  # Allow searching up to 2 full synodic periods
+
+    for attempt in range(max_attempts):
+        try:
+            # Find the next station bracket
+            jd_search_end = jd_search_start + search_window
+            jd_a, jd_b = _find_station_bracket(
+                planet_id, jd_search_start, jd_search_end, flag
+            )
+
+            # Find exact station time
+            jd_station = _brent_find_station(
+                get_speed, jd_a, jd_b, STATION_VELOCITY_TOLERANCE
+            )
+
+            # Determine station type by looking at motion before and after
+            speed_before = get_speed(jd_station - 1.0)
+            speed_after = get_speed(jd_station + 1.0)
+
+            if speed_before > 0 and speed_after < 0:
+                found_type = "SR"  # Stationary Retrograde
+            else:
+                found_type = "SD"  # Stationary Direct
+
+            # Check if this matches requested type
+            if station_type == "any":
+                return (jd_station, found_type)
+            elif station_type == "retrograde" and found_type == "SR":
+                return (jd_station, found_type)
+            elif station_type == "direct" and found_type == "SD":
+                return (jd_station, found_type)
+
+            # Not the right type, search for next station
+            jd_search_start = jd_station + 1.0
+
+        except RuntimeError:
+            # No station found in this window, extend search
+            jd_search_start = jd_search_start + search_window
+
+    raise RuntimeError(f"Could not find {station_type} station for planet {planet_id}")
+
+
+def swe_next_retrograde_ut(
+    planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH
+) -> Tuple[float, float]:
+    """
+    Find the next retrograde period for a planet.
+
+    Returns the start (SR) and end (SD) Julian Days for the next retrograde period.
+
+    Args:
+        planet_id: Planet ID (SE_MERCURY through SE_PLUTO)
+        jd_ut: Julian Day (UT) to start search from
+        flag: Calculation flags
+
+    Returns:
+        Tuple[float, float]: (JD of retrograde start, JD of retrograde end)
+
+    Raises:
+        ValueError: If planet is Sun or Moon
+        RuntimeError: If stations cannot be found
+
+    Example:
+        >>> jd_sr, jd_sd = swe_next_retrograde_ut(SE_MERCURY, jd_now)
+        >>> print(f"Mercury Rx: {jd_sr} to {jd_sd}")
+    """
+    # Check if currently retrograde
+    if is_retrograde(planet_id, jd_ut, flag):
+        # Find the end of current retrograde (SD), then find next SR
+        jd_sd, _ = swe_find_station_ut(planet_id, jd_ut, "direct", flag)
+        jd_sr, _ = swe_find_station_ut(planet_id, jd_sd + 1.0, "retrograde", flag)
+        jd_sd_next, _ = swe_find_station_ut(planet_id, jd_sr + 1.0, "direct", flag)
+        return (jd_sr, jd_sd_next)
+    else:
+        # Find next SR and then the following SD
+        jd_sr, _ = swe_find_station_ut(planet_id, jd_ut, "retrograde", flag)
+        jd_sd, _ = swe_find_station_ut(planet_id, jd_sr + 1.0, "direct", flag)
+        return (jd_sr, jd_sd)
+
+
+def calc_velocity_at_station(
+    planet_id: int,
+    jd_station: float,
+    flag: int = SEFLG_SWIEPH,
+    dt: float = 1.0,
+) -> Tuple[float, float, float]:
+    """
+    Calculate stable velocity components near a station point.
+
+    Near stations, the standard 1-second numerical differentiation can have
+    numerical noise issues. This function uses a wider timestep for more
+    stable velocity estimation.
+
+    Args:
+        planet_id: Planet ID
+        jd_station: Julian Day near the station
+        flag: Calculation flags
+        dt: Timestep in days for differentiation (default 1.0 day)
+
+    Returns:
+        Tuple[float, float, float]: (velocity_lon, velocity_lat, velocity_dist)
+            in degrees/day, degrees/day, AU/day respectively
+
+    Note:
+        The velocity_lon will be very close to 0 at the actual station point.
+        This function is useful for getting stable readings when the standard
+        swe_calc_ut velocity might show numerical noise.
+
+    Example:
+        >>> vlon, vlat, vdist = calc_velocity_at_station(SE_MARS, jd_station)
+        >>> print(f"Station velocity: {vlon:.6f} deg/day")  # Should be ~0
+    """
+    # Get positions at t-dt and t+dt
+    pos_before, _ = swe_calc_ut(jd_station - dt, planet_id, flag)
+    pos_after, _ = swe_calc_ut(jd_station + dt, planet_id, flag)
+
+    # Calculate velocity using central difference
+    lon_before, lat_before, dist_before = pos_before[0], pos_before[1], pos_before[2]
+    lon_after, lat_after, dist_after = pos_after[0], pos_after[1], pos_after[2]
+
+    # Handle longitude wraparound
+    dlon = lon_after - lon_before
+    if dlon > 180:
+        dlon -= 360
+    elif dlon < -180:
+        dlon += 360
+
+    v_lon = dlon / (2 * dt)
+    v_lat = (lat_after - lat_before) / (2 * dt)
+    v_dist = (dist_after - dist_before) / (2 * dt)
+
+    return (v_lon, v_lat, v_dist)
+
+
+def get_station_info(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> dict:
+    """
+    Get comprehensive information about the nearest station.
+
+    Finds the nearest station to the given date and returns detailed
+    information about it.
+
+    Args:
+        planet_id: Planet ID (SE_MERCURY through SE_PLUTO)
+        jd_ut: Julian Day (UT)
+        flag: Calculation flags
+
+    Returns:
+        dict: Station information containing:
+            - "jd_station": Julian Day of nearest station
+            - "station_type": "SR" (stationary retrograde) or "SD" (stationary direct)
+            - "days_to_station": Days until station (negative if past)
+            - "longitude_at_station": Ecliptic longitude at station
+            - "is_currently_retrograde": Current retrograde status
+            - "velocity": Current velocity in deg/day
+
+    Example:
+        >>> info = get_station_info(SE_MERCURY, jd_now)
+        >>> print(f"Next station: {info['station_type']} in {info['days_to_station']:.1f} days")
+    """
+    if planet_id in (SE_SUN, SE_MOON):
+        raise ValueError("Sun and Moon do not have stations")
+
+    # Get current state
+    pos, _ = swe_calc_ut(jd_ut, planet_id, flag | SEFLG_SPEED)
+    current_velocity = pos[3]
+    current_retrograde = current_velocity < 0
+
+    # Find next station
+    try:
+        jd_next, stype_next = swe_find_station_ut(planet_id, jd_ut, "any", flag)
+
+        # Get position at station
+        pos_station, _ = swe_calc_ut(jd_next, planet_id, flag)
+
+        return {
+            "jd_station": jd_next,
+            "station_type": stype_next,
+            "days_to_station": jd_next - jd_ut,
+            "longitude_at_station": pos_station[0],
+            "is_currently_retrograde": current_retrograde,
+            "velocity": current_velocity,
+        }
+    except RuntimeError as e:
+        # Return partial info if station search fails
+        return {
+            "jd_station": None,
+            "station_type": None,
+            "days_to_station": None,
+            "longitude_at_station": None,
+            "is_currently_retrograde": current_retrograde,
+            "velocity": current_velocity,
+            "error": str(e),
+        }
