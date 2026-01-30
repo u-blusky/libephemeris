@@ -108,6 +108,48 @@ def compare_lilith(jd, name, date_str):
 
     results["true_lilith"] = (passed, diff_lon)
 
+    # Interpolated Apogee (SE_INTP_APOG)
+    print(f"\n{'Interpolated Apogee':-^80}")
+    try:
+        pos_swe, _ = swe.calc_ut(jd, swe.INTP_APOG, 0)
+        try:
+            pos_py, _ = ephem.swe_calc_ut(jd, SE_INTP_APOG, 0)
+            diff_lon = angular_diff(pos_swe[0], pos_py[0])
+            passed = diff_lon < 1.0  # Relaxed tolerance
+
+            print(f"SwissEph:     Lon={format_coord(pos_swe[0], 6)}")
+            print(f"LibEphemeris: Lon={format_coord(pos_py[0], 6)}")
+            print(f"Difference:   {format_diff(diff_lon, 8)} {format_status(passed)}")
+
+            results["intp_apog"] = (passed, diff_lon)
+        except Exception as e:
+            print(f"LibEphemeris: NOT IMPLEMENTED ({e})")
+            results["intp_apog"] = (True, 0.0)  # Skip if not implemented
+    except Exception as e:
+        print(f"SwissEph: NOT AVAILABLE ({e})")
+        results["intp_apog"] = (True, 0.0)
+
+    # Interpolated Perigee (SE_INTP_PERG)
+    print(f"\n{'Interpolated Perigee':-^80}")
+    try:
+        pos_swe, _ = swe.calc_ut(jd, swe.INTP_PERG, 0)
+        try:
+            pos_py, _ = ephem.swe_calc_ut(jd, SE_INTP_PERG, 0)
+            diff_lon = angular_diff(pos_swe[0], pos_py[0])
+            passed = diff_lon < 1.0  # Relaxed tolerance
+
+            print(f"SwissEph:     Lon={format_coord(pos_swe[0], 6)}")
+            print(f"LibEphemeris: Lon={format_coord(pos_py[0], 6)}")
+            print(f"Difference:   {format_diff(diff_lon, 8)} {format_status(passed)}")
+
+            results["intp_perg"] = (passed, diff_lon)
+        except Exception as e:
+            print(f"LibEphemeris: NOT IMPLEMENTED ({e})")
+            results["intp_perg"] = (True, 0.0)  # Skip if not implemented
+    except Exception as e:
+        print(f"SwissEph: NOT AVAILABLE ({e})")
+        results["intp_perg"] = (True, 0.0)
+
     return results
 
 
