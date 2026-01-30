@@ -599,10 +599,25 @@ def _calc_body(
         - Minor body geocentric conversion uses Skyfield's frame transformations
         - Properly handles precession, nutation, and true obliquity of date
     """
-    from . import lunar, minor_bodies, fixed_stars, angles, arabic_parts
+    from . import (
+        lunar,
+        minor_bodies,
+        fixed_stars,
+        angles,
+        arabic_parts,
+        planetary_moons,
+    )
     from .state import get_angles_cache
 
     planets = get_planets()
+
+    # Handle planetary moons (Galilean moons, Titan, etc.)
+    if planetary_moons.is_planetary_moon(ipl):
+        result = planetary_moons.calc_moon_position(t, ipl, iflag)
+        if result is not None:
+            return result, iflag
+        # If moon not registered, return zeros (body not available)
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
 
     # Handle lunar nodes (Mean/True North/South)
     if ipl in [SE_MEAN_NODE, SE_TRUE_NODE]:

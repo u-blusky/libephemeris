@@ -71,7 +71,7 @@ class TestCloseFunction:
 
         close()
 
-        assert state._EPHEMERIS_FILE == "de421.bsp"
+        assert state._EPHEMERIS_FILE == "de440.bsp"
 
     def test_close_resets_topo(self):
         """close() should reset the _TOPO to None."""

@@ -914,3 +914,106 @@ DAYS_PER_JULIAN_YEAR: float = 365.25
 
 # Days per Julian century (exactly 36525 days)
 DAYS_PER_JULIAN_CENTURY: float = 36525.0
+
+# =============================================================================
+# PLANETARY MOON IDENTIFIERS
+# =============================================================================
+# Body IDs for planetary satellites (moons) following Swiss Ephemeris 2.10+ convention
+# These require satellite SPK files (jup365.bsp, sat441.bsp, etc.) to be registered
+# using register_moon_spk() before calculation.
+
+SE_MOON_OFFSET: int = 9000  # Base offset for planetary moon IDs
+
+# Jupiter's Galilean Moons (discovered by Galileo Galilei in 1610)
+SE_MOON_IO: int = SE_MOON_OFFSET + 1  # Jupiter I - innermost Galilean moon
+SE_MOON_EUROPA: int = SE_MOON_OFFSET + 2  # Jupiter II - potential subsurface ocean
+SE_MOON_GANYMEDE: int = SE_MOON_OFFSET + 3  # Jupiter III - largest moon in solar system
+SE_MOON_CALLISTO: int = SE_MOON_OFFSET + 4  # Jupiter IV - heavily cratered
+
+# Saturn's Major Moons
+SE_MOON_MIMAS: int = SE_MOON_OFFSET + 11  # Saturn I - "Death Star" appearance
+SE_MOON_ENCELADUS: int = SE_MOON_OFFSET + 12  # Saturn II - active geysers
+SE_MOON_TETHYS: int = SE_MOON_OFFSET + 13  # Saturn III - icy body
+SE_MOON_DIONE: int = SE_MOON_OFFSET + 14  # Saturn IV - trailing hemisphere features
+SE_MOON_RHEA: int = SE_MOON_OFFSET + 15  # Saturn V - second largest Saturn moon
+SE_MOON_TITAN: int = SE_MOON_OFFSET + 16  # Saturn VI - thick atmosphere, liquid lakes
+SE_MOON_HYPERION: int = SE_MOON_OFFSET + 17  # Saturn VII - chaotic rotation
+SE_MOON_IAPETUS: int = SE_MOON_OFFSET + 18  # Saturn VIII - two-toned surface
+
+# Uranus' Major Moons
+SE_MOON_MIRANDA: int = SE_MOON_OFFSET + 21  # Uranus V - extreme geological features
+SE_MOON_ARIEL: int = SE_MOON_OFFSET + 22  # Uranus I - brightest Uranian moon
+SE_MOON_UMBRIEL: int = SE_MOON_OFFSET + 23  # Uranus II - darkest Uranian moon
+SE_MOON_TITANIA: int = SE_MOON_OFFSET + 24  # Uranus III - largest Uranian moon
+SE_MOON_OBERON: int = SE_MOON_OFFSET + 25  # Uranus IV - outermost major Uranian moon
+
+# Neptune's Major Moon
+SE_MOON_TRITON: int = SE_MOON_OFFSET + 31  # Neptune I - retrograde orbit, captured KBO
+
+# Mars' Moons
+SE_MOON_PHOBOS: int = SE_MOON_OFFSET + 41  # Mars I - larger, closer moon
+SE_MOON_DEIMOS: int = SE_MOON_OFFSET + 42  # Mars II - smaller, farther moon
+
+# Pluto's Moon
+SE_MOON_CHARON: int = SE_MOON_OFFSET + 51  # Pluto I - largest moon (binary system)
+
+# Aliases without SE_ prefix for pyswisseph compatibility
+MOON_IO: int = SE_MOON_IO
+MOON_EUROPA: int = SE_MOON_EUROPA
+MOON_GANYMEDE: int = SE_MOON_GANYMEDE
+MOON_CALLISTO: int = SE_MOON_CALLISTO
+MOON_MIMAS: int = SE_MOON_MIMAS
+MOON_ENCELADUS: int = SE_MOON_ENCELADUS
+MOON_TETHYS: int = SE_MOON_TETHYS
+MOON_DIONE: int = SE_MOON_DIONE
+MOON_RHEA: int = SE_MOON_RHEA
+MOON_TITAN: int = SE_MOON_TITAN
+MOON_HYPERION: int = SE_MOON_HYPERION
+MOON_IAPETUS: int = SE_MOON_IAPETUS
+MOON_MIRANDA: int = SE_MOON_MIRANDA
+MOON_ARIEL: int = SE_MOON_ARIEL
+MOON_UMBRIEL: int = SE_MOON_UMBRIEL
+MOON_TITANIA: int = SE_MOON_TITANIA
+MOON_OBERON: int = SE_MOON_OBERON
+MOON_TRITON: int = SE_MOON_TRITON
+MOON_PHOBOS: int = SE_MOON_PHOBOS
+MOON_DEIMOS: int = SE_MOON_DEIMOS
+MOON_CHARON: int = SE_MOON_CHARON
+
+# =============================================================================
+# NAIF IDS FOR PLANETARY MOONS
+# =============================================================================
+# Standard NAIF SPICE IDs for planetary satellites
+
+# Jupiter system (5xx)
+NAIF_IO: int = 501
+NAIF_EUROPA: int = 502
+NAIF_GANYMEDE: int = 503
+NAIF_CALLISTO: int = 504
+
+# Saturn system (6xx)
+NAIF_MIMAS: int = 601
+NAIF_ENCELADUS: int = 602
+NAIF_TETHYS: int = 603
+NAIF_DIONE: int = 604
+NAIF_RHEA: int = 605
+NAIF_TITAN: int = 606
+NAIF_HYPERION: int = 607
+NAIF_IAPETUS: int = 608
+
+# Uranus system (7xx)
+NAIF_MIRANDA: int = 705
+NAIF_ARIEL: int = 701
+NAIF_UMBRIEL: int = 702
+NAIF_TITANIA: int = 703
+NAIF_OBERON: int = 704
+
+# Neptune system (8xx)
+NAIF_TRITON: int = 801
+
+# Mars system (4xx)
+NAIF_PHOBOS: int = 401
+NAIF_DEIMOS: int = 402
+
+# Pluto system (9xx)
+NAIF_CHARON: int = 901

@@ -622,6 +622,11 @@ def close() -> None:
     _SPK_KERNELS = {}
     _SPK_BODY_MAP = {}
 
+    # Close planetary moon kernels
+    from . import planetary_moons
+
+    planetary_moons.close_moon_kernels()
+
 
 def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
     """

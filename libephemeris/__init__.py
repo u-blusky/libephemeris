@@ -354,6 +354,42 @@ from .hypothetical import (  # Hamburg School Uranian planets
     SE_PROSERPINA as SE_PROSERPINA_HYPO,  # Alias to avoid conflict with constants.py
     SE_PLANET_X_PICKERING as SE_PLANET_X_PICKERING_HYPO,  # Alias to avoid conflict with constants.py
 )
+from .planetary_moons import (  # Planetary moons (Galilean moons, Titan, etc.)
+    register_moon_spk,
+    unregister_moon_spk,
+    list_registered_moons,
+    get_moon_name,
+    is_planetary_moon,
+    get_moon_coverage,
+    calc_moon_position,
+    close_moon_kernels,
+    # NAIF IDs for planetary moons
+    NAIF_IO,
+    NAIF_EUROPA,
+    NAIF_GANYMEDE,
+    NAIF_CALLISTO,
+    NAIF_MIMAS,
+    NAIF_ENCELADUS,
+    NAIF_TETHYS,
+    NAIF_DIONE,
+    NAIF_RHEA,
+    NAIF_TITAN,
+    NAIF_HYPERION,
+    NAIF_IAPETUS,
+    NAIF_MIRANDA,
+    NAIF_ARIEL,
+    NAIF_UMBRIEL,
+    NAIF_TITANIA,
+    NAIF_OBERON,
+    NAIF_TRITON,
+    NAIF_PHOBOS,
+    NAIF_DEIMOS,
+    NAIF_CHARON,
+    # Moon ID to NAIF mapping
+    MOON_NAIF_MAP,
+    MOON_NAMES,
+    MOON_PARENT_MAP,
+)
 
 # =============================================================================
 # PYSWISSEPH-COMPATIBLE FUNCTION ALIASES (without swe_ prefix)
@@ -836,4 +872,16 @@ __all__ = [
     "TPolynomial",
     "get_seorbel_body_by_name",
     "calc_seorbel_position",
+    # Planetary moons (Galilean moons, Titan, etc.)
+    "register_moon_spk",
+    "unregister_moon_spk",
+    "list_registered_moons",
+    "get_moon_name",
+    "is_planetary_moon",
+    "get_moon_coverage",
+    "calc_moon_position",
+    "close_moon_kernels",
+    "MOON_NAIF_MAP",
+    "MOON_NAMES",
+    "MOON_PARENT_MAP",
 ]
