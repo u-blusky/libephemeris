@@ -5,6 +5,7 @@ from .exceptions import (
     EphemerisRangeError,
     SPKNotFoundError,
     CoordinateError,
+    UnknownBodyError,
     validate_latitude,
     validate_longitude,
     validate_coordinates,
@@ -546,6 +547,7 @@ __all__ = [
     "PolarCircleError",
     "SPKNotFoundError",
     "CoordinateError",
+    "UnknownBodyError",
     # Coordinate validation
     "validate_latitude",
     "validate_longitude",

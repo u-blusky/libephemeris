@@ -433,6 +433,47 @@ def validate_jd_range(
         )
 
 
+class UnknownBodyError(Error):
+    """Error raised when an unknown or unsupported body ID is requested.
+
+    This exception is raised when attempting to calculate the position of a
+    celestial body using an unrecognized body ID. This helps users identify
+    typos or unsupported body types early, rather than silently returning
+    zero positions.
+
+    Attributes:
+        body_id: The unrecognized body ID that was requested
+        message: Human-readable error message
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.calc_ut(2451545.0, 99999, 0)  # Invalid body ID
+        ... except ephem.UnknownBodyError as e:
+        ...     print(f"Unknown body ID: {e.body_id}")
+        Unknown body ID: 99999
+
+    See Also:
+        get_planet_name: Get name for a valid body ID
+        SE_SUN, SE_MOON, etc.: Valid body ID constants
+    """
+
+    def __init__(
+        self,
+        message: str,
+        body_id: int | None = None,
+    ):
+        super().__init__(message)
+        self.body_id = body_id
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return f"UnknownBodyError({self.message!r}, body_id={self.body_id})"
+
+
 class EphemerisRangeError(Error):
     """Error raised when a calculation date is outside the ephemeris range.
 

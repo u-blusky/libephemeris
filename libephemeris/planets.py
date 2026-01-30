@@ -593,12 +593,30 @@ def _calc_body_pctr(
 
     # Validate that both bodies are in _PLANET_MAP (standard planets only for now)
     if ipl not in _PLANET_MAP:
-        # Target not supported
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+        # Target not supported - raise clear error
+        from .exceptions import UnknownBodyError
+
+        raise UnknownBodyError(
+            message=(
+                f"Unknown target body ID {ipl} for planet-centric calculation. "
+                f"swe_calc_pctr() only supports standard planets (Sun=0 through Earth=14). "
+                f"See libephemeris.constants for body ID constants."
+            ),
+            body_id=ipl,
+        )
 
     if iplctr not in _PLANET_MAP:
-        # Observer not supported
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+        # Observer not supported - raise clear error
+        from .exceptions import UnknownBodyError
+
+        raise UnknownBodyError(
+            message=(
+                f"Unknown observer/center body ID {iplctr} for planet-centric calculation. "
+                f"swe_calc_pctr() only supports standard planets (Sun=0 through Earth=14) "
+                f"as the observer. See libephemeris.constants for body ID constants."
+            ),
+            body_id=iplctr,
+        )
 
     target_name = _PLANET_MAP[ipl]
     observer_name = _PLANET_MAP[iplctr]
@@ -1031,8 +1049,20 @@ def _calc_body(
             else:
                 raise
     else:
-        # Unknown body
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+        # Unknown body - raise clear error instead of returning zeros
+        from .exceptions import UnknownBodyError
+
+        raise UnknownBodyError(
+            message=(
+                f"Unknown body ID {ipl}. "
+                f"Supported bodies include: standard planets (0-14), lunar nodes (10-11), "
+                f"Lilith/apogee (12-13, 21-22), asteroids (15-20), "
+                f"Uranian planets (40-47), Transpluto (48), minor bodies (SE_AST_OFFSET+number), "
+                f"and fixed stars (SE_FIXSTAR_OFFSET+number). "
+                f"See libephemeris.constants for all body ID constants."
+            ),
+            body_id=ipl,
+        )
 
     # 2. Identify Observer
     observer_topo = get_topo()
