@@ -49,8 +49,8 @@ def test_dates():
         (1980, 5, 20, 0.0, "Past"),
         (2024, 11, 5, 18.0, "Recent"),
         (1950, 10, 15, 6.0, "Mid-century"),
-        (1900, 1, 1, 0.0, "DE421 Start"),
-        (2050, 12, 31, 23.99, "DE421 End"),
+        (1550, 1, 1, 0.0, "DE440 Start"),
+        (2650, 1, 1, 0.0, "DE440 End"),
         (2000, 2, 29, 12.0, "Leap year"),
         (1999, 12, 31, 23.99, "Y2K eve"),
         (2000, 1, 1, 0.01, "Y2K"),
@@ -445,8 +445,27 @@ def compare_ayanamsa():
 
 
 @pytest.fixture
+def random_dates_in_de440_range():
+    """Generate random dates within DE440 valid range (1550-2650)."""
+
+    def _generate(n=100, seed=42):
+        random.seed(seed)
+        dates = []
+        for _ in range(n):
+            year = random.randint(1550, 2650)
+            month = random.randint(1, 12)
+            day = random.randint(1, 28)  # Safe for all months
+            hour = random.uniform(0, 24)
+            jd = ephem.swe_julday(year, month, day, hour)
+            dates.append((year, month, day, hour, jd))
+        return dates
+
+    return _generate
+
+
+@pytest.fixture
 def random_dates_in_de421_range():
-    """Generate random dates within DE421 valid range (1900-2050)."""
+    """Generate random dates within DE421 valid range (1900-2050) - legacy."""
 
     def _generate(n=100, seed=42):
         random.seed(seed)

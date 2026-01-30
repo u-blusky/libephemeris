@@ -13,27 +13,27 @@ class TestDateBoundaries:
     """Test date boundary conditions."""
 
     @pytest.mark.edge_case
-    def test_de421_start_1900(self):
-        """Calculations at DE421 start (1900) should work."""
-        jd = ephem.swe_julday(1900, 1, 1, 12.0)
+    def test_de440_start_1550(self):
+        """Calculations at DE440 start (1550) should work."""
+        jd = ephem.swe_julday(1550, 1, 1, 12.0)
 
         pos, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
 
         assert 0 <= pos[0] < 360
 
     @pytest.mark.edge_case
-    def test_de421_end_2050(self):
-        """Calculations at DE421 end (2050) should work."""
-        jd = ephem.swe_julday(2050, 12, 31, 12.0)
+    def test_de440_end_2650(self):
+        """Calculations at DE440 end (2650) should work."""
+        jd = ephem.swe_julday(2650, 1, 1, 12.0)
 
         pos, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
 
         assert 0 <= pos[0] < 360
 
     @pytest.mark.edge_case
-    def test_before_de421_range(self):
-        """Calculations before DE421 range should fail or return error."""
-        jd = ephem.swe_julday(1899, 1, 1, 12.0)
+    def test_before_de440_range(self):
+        """Calculations before DE440 range should fail or return error."""
+        jd = ephem.swe_julday(1549, 1, 1, 12.0)
 
         # Should either raise exception or return with error flag
         try:
@@ -44,9 +44,9 @@ class TestDateBoundaries:
             pass  # Expected to fail
 
     @pytest.mark.edge_case
-    def test_after_de421_range(self):
-        """Calculations after DE421 range should fail or return error."""
-        jd = ephem.swe_julday(2051, 1, 1, 12.0)
+    def test_after_de440_range(self):
+        """Calculations after DE440 range should fail or return error."""
+        jd = ephem.swe_julday(2651, 1, 1, 12.0)
 
         try:
             pos, flags = ephem.swe_calc_ut(jd, SE_SUN, 0)

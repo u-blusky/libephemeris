@@ -25,8 +25,8 @@ class TestTidAccBasicFunctionality:
         """get_tid_acc should return default value when not explicitly set."""
         value = ephem.get_tid_acc()
         assert value == ephem.SE_TIDAL_DEFAULT
-        assert value == ephem.SE_TIDAL_DE431
-        assert value == -25.80
+        assert value == ephem.SE_TIDAL_DE440
+        assert value == -25.936
 
     @pytest.mark.unit
     def test_set_tid_acc_de421(self):
@@ -90,6 +90,7 @@ class TestTidAccConstants:
         assert hasattr(ephem, "SE_TIDAL_DE422")
         assert hasattr(ephem, "SE_TIDAL_DE430")
         assert hasattr(ephem, "SE_TIDAL_DE431")
+        assert hasattr(ephem, "SE_TIDAL_DE440")
         assert hasattr(ephem, "SE_TIDAL_DE441")
         assert hasattr(ephem, "SE_TIDAL_DEFAULT")
         assert hasattr(ephem, "SE_TIDAL_AUTOMATIC")
@@ -101,6 +102,7 @@ class TestTidAccConstants:
         assert hasattr(ephem, "TIDAL_DE403")
         assert hasattr(ephem, "TIDAL_DE421")
         assert hasattr(ephem, "TIDAL_DE431")
+        assert hasattr(ephem, "TIDAL_DE440")
         assert hasattr(ephem, "TIDAL_DE441")
         assert hasattr(ephem, "TIDAL_DEFAULT")
         assert hasattr(ephem, "TIDAL_AUTOMATIC")
@@ -111,6 +113,7 @@ class TestTidAccConstants:
         assert ephem.SE_TIDAL_DE200 < 0
         assert ephem.SE_TIDAL_DE421 < 0
         assert ephem.SE_TIDAL_DE431 < 0
+        assert ephem.SE_TIDAL_DE440 < 0
         assert ephem.SE_TIDAL_DE441 < 0
 
     @pytest.mark.unit
@@ -119,9 +122,9 @@ class TestTidAccConstants:
         assert ephem.SE_TIDAL_AUTOMATIC == 0.0
 
     @pytest.mark.unit
-    def test_tidal_default_is_de431(self):
-        """SE_TIDAL_DEFAULT should be the DE431 value."""
-        assert ephem.SE_TIDAL_DEFAULT == ephem.SE_TIDAL_DE431
+    def test_tidal_default_is_de440(self):
+        """SE_TIDAL_DEFAULT should be the DE440 value."""
+        assert ephem.SE_TIDAL_DEFAULT == ephem.SE_TIDAL_DE440
 
 
 class TestTidAccFunctionAliases:

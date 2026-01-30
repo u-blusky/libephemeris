@@ -3,7 +3,7 @@ Global state management for libephemeris.
 
 This module maintains the library's singleton state including:
 - Ephemeris data loader (Skyfield Loader)
-- Planetary ephemeris (DE421 or other JPL files)
+- Planetary ephemeris (DE440 or other JPL files)
 - Timescale (for UTC/TT conversions)
 - Observer topocentric location
 - Sidereal mode configuration
@@ -34,7 +34,7 @@ from skyfield.jpllib import SpiceKernel
 _CONTEXT_SWAP_LOCK = threading.RLock()
 
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
-_EPHEMERIS_FILE: str = "de421.bsp"  # Ephemeris file to use (default: DE421)
+_EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
 _LOADER: Optional[Loader] = None  # Skyfield data loader
 _PLANETS: Optional[SpiceKernel] = None  # Loaded planetary ephemeris
 _TS: Optional[Timescale] = None  # Timescale object
@@ -104,7 +104,7 @@ def get_timescale() -> Timescale:
 
 def get_planets() -> SpiceKernel:
     """
-    Get or load the planetary ephemeris (DE421 by default).
+    Get or load the planetary ephemeris (DE440 by default).
 
     Returns:
         SpiceKernel: Loaded JPL ephemeris kernel containing planetary positions
@@ -113,7 +113,7 @@ def get_planets() -> SpiceKernel:
         FileNotFoundError: If ephemeris file cannot be found or downloaded
 
     Note:
-        Uses the ephemeris file set via set_ephemeris_file() (default: de421.bsp).
+        Uses the ephemeris file set via set_ephemeris_file() (default: de440.bsp).
         Searches in _EPHEMERIS_PATH if set, then workspace root, then downloads.
     """
     global _PLANETS
@@ -267,14 +267,16 @@ def set_ephemeris_file(filename: str) -> None:
     Set the ephemeris file to use for planetary calculations.
 
     Args:
-        filename: Name of the JPL ephemeris file (e.g., "de421.bsp", "de422.bsp", "de431.bsp")
+        filename: Name of the JPL ephemeris file (e.g., "de440.bsp", "de441.bsp")
 
     Note:
         This allows using different ephemeris files with varying date ranges:
-        - de421.bsp: 1900-2050 (default, 16 MB)
+        - de421.bsp: 1900-2050 (legacy, 16 MB)
         - de422.bsp: -3000-3000 (623 MB)
         - de430.bsp: 1550-2650 (128 MB)
         - de431.bsp: -13200-17191 (3.4 GB)
+        - de440.bsp: 1550-2650 (default, 128 MB) - recommended for most uses
+        - de441.bsp: -13200-17191 (3.4 GB) - for extended historical work
 
         The file will be searched in:
         1. The path set by set_ephe_path() if configured
@@ -297,16 +299,16 @@ def set_jpl_file(filename: str) -> None:
     emphasizing JPL (Jet Propulsion Laboratory) ephemeris files.
 
     Args:
-        filename: Name of the JPL ephemeris file (e.g., "de421.bsp", "de441.bsp")
+        filename: Name of the JPL ephemeris file (e.g., "de440.bsp", "de441.bsp")
 
     Note:
         Skyfield/libephemeris uses JPL Development Ephemeris (DE) files:
-        - de421.bsp: 1900-2050 (default, 16 MB)
+        - de421.bsp: 1900-2050 (legacy, 16 MB)
         - de422.bsp: -3000-3000 (623 MB)
         - de430.bsp: 1550-2650 (128 MB)
         - de431.bsp: -13200-17191 (3.4 GB)
-        - de440.bsp: 1550-2650 (128 MB)
-        - de441.bsp: -13200-17191 (3.4 GB)
+        - de440.bsp: 1550-2650 (default, 128 MB) - recommended for most uses
+        - de441.bsp: -13200-17191 (3.4 GB) - for extended historical work
 
         If the file is not found locally, Skyfield will attempt to download it.
         Use set_ephe_path() to specify a local directory containing the file.
@@ -333,24 +335,24 @@ def set_tid_acc(value: float) -> None:
                or SE_TIDAL_AUTOMATIC (0.0) to use the default.
 
     Note:
-        - The default value is based on DE431 (-25.80 arcsec/cy^2)
+        - The default value is based on DE440 (-25.936 arcsec/cy^2)
         - This setting primarily affects Delta T calculations for dates
           far from the present (historical studies, ancient astronomy)
         - For modern dates (1900-2100), the effect is negligible
         - Common values:
           - DE421: -25.85 arcsec/cy^2
-          - DE431: -25.80 arcsec/cy^2 (default)
-          - DE441: -25.936 arcsec/cy^2
+          - DE431: -25.80 arcsec/cy^2
+          - DE440/DE441: -25.936 arcsec/cy^2 (default)
 
     Example:
         >>> from libephemeris import set_tid_acc, get_tid_acc
-        >>> from libephemeris import SE_TIDAL_DE421, SE_TIDAL_DE431
+        >>> from libephemeris import SE_TIDAL_DE421, SE_TIDAL_DE440
         >>> set_tid_acc(SE_TIDAL_DE421)  # Use DE421 tidal acceleration
         >>> get_tid_acc()
         -25.85
-        >>> set_tid_acc(SE_TIDAL_DE431)  # Use DE431 tidal acceleration
+        >>> set_tid_acc(SE_TIDAL_DE440)  # Use DE440 tidal acceleration
         >>> get_tid_acc()
-        -25.8
+        -25.936
     """
     global _TIDAL_ACCELERATION
     _TIDAL_ACCELERATION = value if value != 0.0 else None
@@ -362,7 +364,7 @@ def get_tid_acc() -> float:
 
     Returns:
         float: The tidal acceleration in arcsec/century^2.
-               Returns SE_TIDAL_DEFAULT (-25.80, based on DE431) if not explicitly set.
+               Returns SE_TIDAL_DEFAULT (-25.936, based on DE440) if not explicitly set.
 
     Note:
         The tidal acceleration affects how Delta T is extrapolated for dates
@@ -370,12 +372,12 @@ def get_tid_acc() -> float:
         important for historical astronomical calculations.
 
         If set_tid_acc() was called with SE_TIDAL_AUTOMATIC (0.0),
-        this returns the default value (DE431-based).
+        this returns the default value (DE440-based).
 
     Example:
         >>> from libephemeris import get_tid_acc, set_tid_acc, SE_TIDAL_DE441
         >>> get_tid_acc()  # Default value
-        -25.8
+        -25.936
         >>> set_tid_acc(SE_TIDAL_DE441)
         >>> get_tid_acc()
         -25.936
@@ -595,7 +597,7 @@ def close() -> None:
 
     # Reset all global state to initial values
     _EPHEMERIS_PATH = None
-    _EPHEMERIS_FILE = "de421.bsp"
+    _EPHEMERIS_FILE = "de440.bsp"
     _LOADER = None
     _PLANETS = None
     _TS = None

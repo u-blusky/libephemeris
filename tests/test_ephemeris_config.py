@@ -22,11 +22,11 @@ from libephemeris import (
 from libephemeris.state import get_planets
 
 
-def test_set_ephemeris_file_defaults_to_de421():
-    """Test that default ephemeris file is de421.bsp"""
+def test_set_ephemeris_file_defaults_to_de440():
+    """Test that default ephemeris file is de440.bsp"""
     from libephemeris.state import _EPHEMERIS_FILE
 
-    assert _EPHEMERIS_FILE == "de421.bsp"
+    assert _EPHEMERIS_FILE == "de440.bsp"
 
 
 def test_set_ephemeris_file_changes_file():
@@ -44,7 +44,7 @@ def test_set_ephemeris_file_changes_file():
     assert state._PLANETS is None
 
     # Reset to default
-    set_ephemeris_file("de421.bsp")
+    set_ephemeris_file("de440.bsp")
 
 
 def test_set_ephe_path_clears_cache():
@@ -65,13 +65,13 @@ def test_set_ephe_path_clears_cache():
     set_ephe_path(None)
 
 
-def test_calculation_works_with_default_de421():
-    """Test that calculations work with the default de421.bsp file"""
+def test_calculation_works_with_default_de440():
+    """Test that calculations work with the default de440.bsp file"""
     # Reset to default
-    set_ephemeris_file("de421.bsp")
+    set_ephemeris_file("de440.bsp")
     set_ephe_path(None)
 
-    # Date within DE421 range (1900-2050)
+    # Date within DE440 range (1550-2650)
     year, month, day = 2025, 11, 29
     tjd_ut = swe_julday(year, month, day, 0.0)
 
@@ -84,13 +84,13 @@ def test_calculation_works_with_default_de421():
     assert pos[2] > 0  # Distance should be positive
 
 
-def test_calculation_fails_with_de421_out_of_range():
-    """Test that calculations fail with DE421 for dates out of range"""
+def test_calculation_fails_with_de440_out_of_range():
+    """Test that calculations fail with DE440 for dates out of range"""
     # Reset to default
-    set_ephemeris_file("de421.bsp")
+    set_ephemeris_file("de440.bsp")
     set_ephe_path(None)
 
-    # Date outside DE421 range
+    # Date outside DE440 range
     year, month, day = 3000, 1, 1
     tjd_ut = swe_julday(year, month, day, 0.0)
 
@@ -117,7 +117,7 @@ def test_set_jpl_file_changes_file():
     assert state._PLANETS is None
 
     # Reset to default
-    set_jpl_file("de421.bsp")
+    set_jpl_file("de440.bsp")
 
 
 def test_swe_set_jpl_file_alias_works():
@@ -135,7 +135,7 @@ def test_swe_set_jpl_file_alias_works():
     assert state._PLANETS is None
 
     # Reset to default
-    swe_set_jpl_file("de421.bsp")
+    swe_set_jpl_file("de440.bsp")
 
 
 def test_set_jpl_file_with_local_path():
@@ -156,7 +156,7 @@ def test_set_jpl_file_with_local_path():
 
         # Reset to defaults
         set_ephe_path(None)
-        set_jpl_file("de421.bsp")
+        set_jpl_file("de440.bsp")
 
 
 def test_get_library_path_returns_default():

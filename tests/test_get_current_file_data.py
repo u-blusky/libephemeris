@@ -22,11 +22,11 @@ from libephemeris import (
 def reset_state():
     """Reset ephemeris state before and after each test."""
     close()
-    set_ephemeris_file("de421.bsp")
+    set_ephemeris_file("de440.bsp")
     set_ephe_path(None)
     yield
     close()
-    set_ephemeris_file("de421.bsp")
+    set_ephemeris_file("de440.bsp")
     set_ephe_path(None)
 
 
@@ -47,18 +47,18 @@ def test_get_current_file_data_after_loading():
 
     path, start, end, denum = get_current_file_data(0)
 
-    # Path should be non-empty and contain de421.bsp
+    # Path should be non-empty and contain de440.bsp
     assert path != ""
-    assert "de421.bsp" in path
+    assert "de440.bsp" in path
 
-    # DE421 covers 1899-07-29 to 2053-10-09
-    # JD 2414864.5 = 1899-07-29
-    # JD 2471184.5 = 2053-10-09
-    assert start == pytest.approx(2414864.5, rel=1e-6)
-    assert end == pytest.approx(2471184.5, rel=1e-6)
+    # DE440 covers 1549-12-31 to 2650-01-25
+    # JD 2287184.5 = 1549-12-31
+    # JD 2688976.5 = 2650-01-25
+    assert start == pytest.approx(2287184.5, rel=1e-6)
+    assert end == pytest.approx(2688976.5, rel=1e-6)
 
-    # DE number should be 421
-    assert denum == 421
+    # DE number should be 440
+    assert denum == 440
 
 
 def test_get_current_file_data_ifno_0_and_1_same():

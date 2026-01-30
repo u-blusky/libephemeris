@@ -464,13 +464,13 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] BENCHMARK AGAINST PYSWISSEPH: Create comprehensive benchmarks in compare_scripts/ directory (either as a new file compare_scripts/compare_benchmark.py or integrated into compare_scripts/compare_all.py) that compare calculation speed for planets, houses, lunar points, minor bodies, and other functions against pyswisseph, quantify the performance difference by running each calculation type 10000+ times and reporting mean/median/min/max execution times for both libephemeris and pyswisseph, generate a performance report showing the ratio of execution times.
 
-- [ ] PROFILE HOT PATHS: Use Python profiling tools to identify the most time-consuming functions and optimize them.
+- [x] PROFILE HOT PATHS: Use Python profiling tools to identify the most time-consuming functions and optimize them.
 
-- [ ] EVALUATE DE440 DE441 UPGRADE: Currently libephemeris uses DE421 as default, evaluate upgrading to DE440 (2020) or DE441 which have improved accuracy especially for outer planets and extended time range.
+- [x] EVALUATE DE440 DE441 UPGRADE: Currently libephemeris uses DE421 as default, evaluate upgrading to DE440 (2020) or DE441 which have improved accuracy especially for outer planets and extended time range.
 
-- [ ] ADD DE440 SUPPORT: Add support for DE440 ephemeris with documentation on how to download and configure it.
+- [x] ADD DE440 SUPPORT: Add support for DE440 ephemeris with documentation on how to download and configure it.
 
-- [ ] ADD DE441 SUPPORT: Add support for DE441 ephemeris for extended time range calculations.
+- [x] ADD DE441 SUPPORT: Add support for DE441 ephemeris for extended time range calculations.
 
 - [ ] VERIFY THREAD SAFETY: Verify that EphemerisContext provides true thread safety for multi-threaded applications.
 

@@ -864,12 +864,13 @@ SE_TIDAL_DE403: float = -25.580  # DE403
 SE_TIDAL_DE404: float = -25.580  # DE404
 SE_TIDAL_DE405: float = -25.826  # DE405
 SE_TIDAL_DE406: float = -25.826  # DE406
-SE_TIDAL_DE421: float = -25.85  # DE421 (default in libephemeris)
+SE_TIDAL_DE421: float = -25.85  # DE421 (legacy default)
 SE_TIDAL_DE422: float = -25.85  # DE422
 SE_TIDAL_DE430: float = -25.82  # DE430
 SE_TIDAL_DE431: float = -25.80  # DE431
-SE_TIDAL_DE441: float = -25.936  # DE441 (latest)
-SE_TIDAL_DEFAULT: float = SE_TIDAL_DE431  # Default value based on DE431
+SE_TIDAL_DE440: float = -25.936  # DE440 (current default)
+SE_TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
+SE_TIDAL_DEFAULT: float = SE_TIDAL_DE440  # Default value based on DE440
 SE_TIDAL_AUTOMATIC: float = 0.0  # Let library choose based on ephemeris file
 
 # pyswisseph-compatible aliases (without SE_ prefix)
@@ -882,6 +883,7 @@ TIDAL_DE421: float = SE_TIDAL_DE421
 TIDAL_DE422: float = SE_TIDAL_DE422
 TIDAL_DE430: float = SE_TIDAL_DE430
 TIDAL_DE431: float = SE_TIDAL_DE431
+TIDAL_DE440: float = SE_TIDAL_DE440
 TIDAL_DE441: float = SE_TIDAL_DE441
 TIDAL_DEFAULT: float = SE_TIDAL_DEFAULT
 TIDAL_AUTOMATIC: float = SE_TIDAL_AUTOMATIC

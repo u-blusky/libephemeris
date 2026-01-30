@@ -44,7 +44,7 @@ LibEphemeris is born from the need for a **truly open, maintainable, and scienti
 ## Features at a Glance
 
 -   **Planetary positions**: Sun, Moon, all major planets and Pluto.
--   **High precision**: Based on NASA JPL DE421 by default (configurable to other DE files).
+-   **High precision**: Based on NASA JPL DE440 by default (configurable to other DE files).
 -   **Multiple coordinate systems**: Ecliptic, equatorial, J2000 and of-date frames.
 -   **Observation modes**: Geocentric, topocentric, heliocentric, barycentric.
 -   **Velocities**: Full 6-component state vectors (position + velocity).
@@ -85,7 +85,7 @@ uv pip install -e .
 -   Python **3.10+**
 -   `skyfield>=1.53`
 -   `skyfield-data>=7.0.0`
--   A JPL ephemeris file (DE421 by default, downloaded automatically on first use if not present locally)
+-   A JPL ephemeris file (DE440 by default, downloaded automatically on first use if not present locally)
 
 ---
 
@@ -221,7 +221,7 @@ for r in results:
 
 ## Configuring Ephemeris Files
 
-By default, LibEphemeris uses the **JPL DE421** kernel (`de421.bsp`), which covers roughly **1900–2050**. The file is:
+By default, LibEphemeris uses the **JPL DE440** kernel (`de440.bsp`), which covers roughly **1550–2650**. The file is:
 
 -   loaded from a local path if already present, or
 -   automatically downloaded via Skyfield the first time it is needed.
@@ -235,15 +235,17 @@ Use `set_ephemeris_file()` to select a different `.bsp` file:
 ```python
 from libephemeris import set_ephemeris_file
 
-set_ephemeris_file("de431.bsp")  # very long time span, larger file
+set_ephemeris_file("de441.bsp")  # very long time span, larger file
 ```
 
 Supported JPL kernels include, for example:
 
--   `de421.bsp`: 1900–2050 (default, ~16 MB)
+-   `de421.bsp`: 1900–2050 (legacy, ~16 MB)
 -   `de422.bsp`: −3000–3000 (~623 MB)
 -   `de430.bsp`: 1550–2650 (~128 MB)
 -   `de431.bsp`: −13200–17191 (~3.4 GB)
+-   `de440.bsp`: 1550–2650 (default, ~128 MB) - recommended for most uses
+-   `de441.bsp`: −13200–17191 (~3.4 GB) - for extended historical/future work
 
 If the chosen file is not present locally, Skyfield will attempt to download it.
 
@@ -402,10 +404,10 @@ pos, _ = ctx.calc_ut(2451545.0, SE_CHIRON, 0)
 
 ### Ephemeris data
 
--   **Source**: NASA JPL DE ephemerides (DE421 by default).
--   **Time span**: 1900–2050 for DE421; extendable by selecting other kernels.
+-   **Source**: NASA JPL DE ephemerides (DE440 by default).
+-   **Time span**: 1550–2650 for DE440; extendable by selecting other kernels.
 -   **Precision**: Sub-arcsecond accuracy for major planets within the supported range.
--   **Reference frame**: ICRS/J2000.0.
+-   **Reference frame**: ICRS/J2000.0 (ICRF 3.0 for DE440/DE441).
 
 ### Comparison with Swiss Ephemeris
 
