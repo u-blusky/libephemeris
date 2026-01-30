@@ -88,10 +88,10 @@ from .constants import *  # noqa: F403, F401
 from .state import get_planets, get_timescale, get_topo, get_sid_mode
 
 # Planet mapping: Primary names for planets
-# For gas giants, uses planet center (NAIF x99) if available in ephemeris,
+# For outer planets, uses planet center (NAIF x99) if available in ephemeris,
 # otherwise falls back to system barycenter (NAIF x)
-# DE421: only has centers for Mercury/Venus/Mars, barycenters for Jupiter+
-# DE440/441: has planet centers for all planets
+# DE421: has centers for Mercury/Venus/Earth/Mars (199/299/399/499), barycenters for Jupiter+
+# DE430/440/441: has centers only for Mercury/Venus/Earth (199/299/399), barycenters for Mars+
 _PLANET_MAP = {
     SE_SUN: "sun",
     SE_MOON: "moon",
@@ -106,9 +106,10 @@ _PLANET_MAP = {
     SE_EARTH: "earth",
 }
 
-# Fallback mapping for gas giants when planet center not available in ephemeris
-# DE421 only contains barycenters for outer planets
+# Fallback mapping when planet center not available in ephemeris
+# DE430/440/441 only contain barycenters for Mars and outer planets
 _PLANET_FALLBACK = {
+    "mars": "mars barycenter",
     "jupiter": "jupiter barycenter",
     "saturn": "saturn barycenter",
     "uranus": "uranus barycenter",
