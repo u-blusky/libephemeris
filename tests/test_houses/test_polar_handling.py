@@ -3,9 +3,12 @@ Comprehensive tests for improved Placidus polar latitude handling.
 
 Tests the PolarCircleError exception, get_polar_latitude_threshold(),
 swe_houses_with_fallback(), and related functionality.
+
+Also includes tests for extreme latitude (>80°) edge cases.
 """
 
 import pytest
+import math
 import libephemeris as ephem
 from libephemeris.exceptions import PolarCircleError
 
@@ -692,3 +695,360 @@ class TestKochBackwardCompatibility:
 
         assert used_fallback is True
         assert "Whole Sign" in warning
+
+
+class TestExtremeLatitudeInfo:
+    """Test the get_extreme_latitude_info() function."""
+
+    @pytest.mark.unit
+    def test_extreme_latitude_info_at_normal_latitude(self):
+        """Should return correct info for normal latitudes."""
+        info = ephem.get_extreme_latitude_info(45.0)
+
+        assert info["latitude"] == 45.0
+        assert info["is_extreme"] is False
+        assert info["is_polar_circle"] is False
+        assert info["hemisphere"] == "N"
+        assert info["affected_systems"] == []
+        assert info["unstable_systems"] == []
+        assert "E" in info["stable_systems"]
+        assert "W" in info["stable_systems"]
+        assert "O" in info["stable_systems"]
+
+    @pytest.mark.unit
+    def test_extreme_latitude_info_at_polar_circle(self):
+        """Should correctly identify polar circle locations."""
+        info = ephem.get_extreme_latitude_info(70.0)
+
+        assert info["latitude"] == 70.0
+        assert info["is_extreme"] is False  # 70 < 80
+        assert info["is_polar_circle"] is True  # 70 > ~66.56
+        assert "P" in info["affected_systems"]
+        assert "K" in info["affected_systems"]
+        assert "G" in info["affected_systems"]
+
+    @pytest.mark.unit
+    def test_extreme_latitude_info_at_extreme_latitude(self):
+        """Should correctly identify extreme latitude locations."""
+        info = ephem.get_extreme_latitude_info(85.0)
+
+        assert info["latitude"] == 85.0
+        assert info["is_extreme"] is True
+        assert info["is_polar_circle"] is True
+        assert "C" in info["unstable_systems"]  # Campanus
+        assert "R" in info["unstable_systems"]  # Regiomontanus
+        assert "T" in info["unstable_systems"]  # Topocentric
+        assert info["extreme_threshold"] == 80.0
+
+    @pytest.mark.unit
+    def test_extreme_latitude_info_southern_hemisphere(self):
+        """Should correctly identify southern hemisphere."""
+        info = ephem.get_extreme_latitude_info(-85.0)
+
+        assert info["hemisphere"] == "S"
+        assert info["is_extreme"] is True
+
+    @pytest.mark.unit
+    def test_extreme_latitude_threshold_constant(self):
+        """EXTREME_LATITUDE_THRESHOLD should be 80."""
+        assert ephem.EXTREME_LATITUDE_THRESHOLD == 80.0
+
+
+class TestExtremeLatitudeWarnings:
+    """Test that extreme latitude warnings are generated correctly."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "hsys,name",
+        [
+            (ord("C"), "Campanus"),
+            (ord("R"), "Regiomontanus"),
+            (ord("T"), "Topocentric"),
+        ],
+    )
+    def test_warning_for_unstable_systems_at_extreme_latitude(self, hsys, name):
+        """Should generate warning for potentially unstable systems at >80°."""
+        jd = 2451545.0
+
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            jd, 85.0, 0.0, hsys
+        )
+
+        # Should NOT use fallback - these systems still work
+        assert used_fallback is False
+        # But should have a warning
+        assert warning is not None
+        assert "reduced accuracy" in warning.lower() or "may have" in warning.lower()
+        assert name in warning
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "hsys",
+        [
+            ord("E"),  # Equal
+            ord("W"),  # Whole Sign
+            ord("O"),  # Porphyry
+            ord("M"),  # Morinus
+        ],
+    )
+    def test_no_warning_for_stable_systems_at_extreme_latitude(self, hsys):
+        """Stable systems should have no warning at extreme latitudes."""
+        jd = 2451545.0
+
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            jd, 85.0, 0.0, hsys
+        )
+
+        assert used_fallback is False
+        assert warning is None
+
+    @pytest.mark.unit
+    def test_polar_failing_systems_use_fallback_at_extreme_latitude(self):
+        """Placidus/Koch/Gauquelin should use fallback at extreme latitudes."""
+        jd = 2451545.0
+
+        for hsys in [ord("P"), ord("K"), ord("G")]:
+            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+                jd, 85.0, 0.0, hsys
+            )
+
+            assert used_fallback is True
+            assert warning is not None
+            assert len(cusps) == 12
+
+
+class TestCuspValidation:
+    """Test cusp validation at extreme latitudes."""
+
+    @pytest.mark.unit
+    def test_valid_cusps_at_normal_latitude(self):
+        """Cusps should be valid at normal latitudes."""
+        jd = 2451545.0
+
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            jd, 45.0, 0.0, ord("C"), validate_cusps=True
+        )
+
+        for cusp in cusps:
+            assert 0 <= cusp < 360
+            assert not math.isnan(cusp)
+            assert not math.isinf(cusp)
+
+    @pytest.mark.unit
+    def test_valid_cusps_at_extreme_latitude(self):
+        """Cusps should still be valid at extreme latitudes (possibly with fallback)."""
+        jd = 2451545.0
+
+        for lat in [80.0, 85.0, 89.0, -85.0]:
+            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+                jd, lat, 0.0, ord("C"), validate_cusps=True
+            )
+
+            # All cusps should be valid regardless of fallback
+            for cusp in cusps:
+                assert 0 <= cusp < 360
+                assert not math.isnan(cusp)
+                assert not math.isinf(cusp)
+
+    @pytest.mark.unit
+    def test_validation_can_be_disabled(self):
+        """Cusp validation should be disableable."""
+        jd = 2451545.0
+
+        # Just verify it doesn't crash with validation disabled
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            jd, 85.0, 0.0, ord("C"), validate_cusps=False
+        )
+
+        assert len(cusps) == 12
+
+
+class TestAllHouseSystemsAtExtremeLatitudes:
+    """Test all house systems at various extreme latitudes."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "lat", [80.0, 85.0, 89.0, 89.5, -80.0, -85.0, -89.0, -89.5]
+    )
+    def test_all_systems_produce_valid_output_with_fallback(self, lat):
+        """All house systems should produce valid output with fallback enabled."""
+        jd = 2451545.0
+
+        # All house system codes
+        all_systems = [
+            ord("P"),
+            ord("K"),
+            ord("R"),
+            ord("C"),
+            ord("E"),
+            ord("W"),
+            ord("O"),
+            ord("B"),
+            ord("T"),
+            ord("M"),
+            ord("X"),
+            ord("V"),
+            ord("H"),
+            ord("G"),
+            ord("U"),
+            ord("F"),
+            ord("Y"),
+            ord("N"),
+        ]
+
+        for hsys in all_systems:
+            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+                jd, lat, 0.0, hsys
+            )
+
+            # Should always get 12 valid cusps
+            assert len(cusps) == 12, f"System {chr(hsys)} at lat {lat}"
+            for i, cusp in enumerate(cusps):
+                assert 0 <= cusp < 360, (
+                    f"System {chr(hsys)} at lat {lat}: cusp {i + 1}={cusp}"
+                )
+                assert not math.isnan(cusp), (
+                    f"System {chr(hsys)} at lat {lat}: cusp {i + 1} is NaN"
+                )
+
+    @pytest.mark.unit
+    def test_89_5_degrees_latitude(self):
+        """Test at 89.5° (near pole) with fallback."""
+        jd = 2451545.0
+        lat = 89.5
+
+        # Placidus should fall back
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            jd, lat, 0.0, ord("P")
+        )
+
+        assert used_fallback is True
+        assert len(cusps) == 12
+        for cusp in cusps:
+            assert 0 <= cusp < 360
+
+    @pytest.mark.unit
+    def test_multiple_julian_days_at_extreme_latitude(self):
+        """Test multiple Julian days at extreme latitudes."""
+        lat = 85.0
+
+        julian_days = [
+            2451545.0,  # J2000.0
+            2455000.0,  # 2009
+            2460000.0,  # 2023
+        ]
+
+        for jd in julian_days:
+            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+                jd,
+                lat,
+                0.0,
+                ord("O"),  # Porphyry should always work
+            )
+
+            assert used_fallback is False
+            assert warning is None
+            assert len(cusps) == 12
+
+
+class TestArmcWithFallbackAtExtremeLatitudes:
+    """Test swe_houses_armc_with_fallback at extreme latitudes."""
+
+    @pytest.mark.unit
+    def test_armc_fallback_at_extreme_latitude(self):
+        """Should provide fallback for ARMC-based calculations at extreme latitudes."""
+        armc = 280.0
+        eps = 23.44
+        lat = 85.0
+
+        # Placidus should fail
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+            armc, lat, eps, ord("P")
+        )
+
+        assert used_fallback is True
+        assert len(cusps) == 12
+
+    @pytest.mark.unit
+    def test_armc_warning_for_unstable_systems(self):
+        """ARMC-based calculations should warn about unstable systems."""
+        armc = 280.0
+        eps = 23.44
+        lat = 85.0
+
+        # Campanus should warn but not fail
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+            armc, lat, eps, ord("C")
+        )
+
+        assert used_fallback is False
+        assert warning is not None
+        assert "Campanus" in warning
+
+    @pytest.mark.unit
+    def test_armc_cusp_validation(self):
+        """ARMC-based calculations should validate cusps."""
+        armc = 280.0
+        eps = 23.44
+        lat = 85.0
+
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+            armc, lat, eps, ord("R"), validate_cusps=True
+        )
+
+        for cusp in cusps:
+            assert 0 <= cusp < 360
+
+
+class TestEdgeCasesNearPoles:
+    """Test edge cases very near the geographic poles."""
+
+    @pytest.mark.unit
+    def test_latitude_89_9(self):
+        """Test at 89.9° latitude."""
+        jd = 2451545.0
+
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            jd, 89.9, 0.0, ord("P")
+        )
+
+        assert used_fallback is True  # Placidus fails at polar circle
+        for cusp in cusps:
+            assert 0 <= cusp < 360
+
+    @pytest.mark.unit
+    def test_latitude_exactly_90_raises_error(self):
+        """Latitude of exactly ±90 should raise ValueError."""
+        jd = 2451545.0
+
+        # 90 degrees should be at the limit
+        with pytest.raises(ValueError):
+            ephem.swe_houses(jd, 90.1, 0.0, ord("O"))
+
+    @pytest.mark.unit
+    def test_negative_extreme_latitude(self):
+        """Should handle extreme southern latitudes."""
+        jd = 2451545.0
+
+        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            jd, -89.0, 0.0, ord("O")
+        )
+
+        assert len(cusps) == 12
+        for cusp in cusps:
+            assert 0 <= cusp < 360
+
+    @pytest.mark.unit
+    def test_varying_longitudes_at_extreme_latitude(self):
+        """Test multiple longitudes at extreme latitude."""
+        jd = 2451545.0
+        lat = 85.0
+
+        for lon in [0.0, 90.0, 180.0, 270.0, -45.0, -120.0]:
+            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+                jd, lat, lon, ord("O")
+            )
+
+            assert len(cusps) == 12
+            for cusp in cusps:
+                assert 0 <= cusp < 360

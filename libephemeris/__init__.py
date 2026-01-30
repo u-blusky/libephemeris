@@ -67,6 +67,9 @@ from .houses import (
     swe_houses_with_fallback,
     swe_houses_armc_with_fallback,
     get_polar_latitude_threshold,
+    # Extreme latitude handling
+    get_extreme_latitude_info,
+    EXTREME_LATITUDE_THRESHOLD,
 )
 from .state import (
     set_topo as swe_set_topo,

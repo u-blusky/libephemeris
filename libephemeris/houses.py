@@ -166,6 +166,140 @@ def _get_polar_circle_info(lat: float, eps: float, house_system: str) -> dict:
     }
 
 
+# Default threshold for extreme latitude (80°)
+EXTREME_LATITUDE_THRESHOLD = 80.0
+
+
+def _is_extreme_latitude(
+    lat: float, threshold: float = EXTREME_LATITUDE_THRESHOLD
+) -> bool:
+    """
+    Check if latitude is at an extreme value where house calculations may be numerically unstable.
+
+    At latitudes beyond 80°, many house systems (especially Campanus, Regiomontanus,
+    and Topocentric) may produce results with reduced accuracy or numerical instability,
+    even if they don't technically fail like Placidus/Koch at polar latitudes.
+
+    This is distinct from _is_polar_circle() which checks the mathematical limit
+    where Placidus/Koch become undefined (~66.5°).
+
+    Args:
+        lat: Geographic latitude in degrees
+        threshold: Latitude threshold for "extreme" (default 80°)
+
+    Returns:
+        True if latitude is at an extreme value (abs(lat) >= threshold)
+
+    Example:
+        >>> _is_extreme_latitude(85.0)
+        True
+        >>> _is_extreme_latitude(70.0)
+        False
+    """
+    return abs(lat) >= threshold
+
+
+def get_extreme_latitude_info(lat: float, obliquity: float = 23.44) -> dict:
+    """
+    Get detailed information about a location's latitude classification for house calculations.
+
+    This function provides comprehensive information about how latitude affects
+    house calculations, including whether the location is at extreme latitude,
+    within the polar circle, and which house systems are affected.
+
+    Args:
+        lat: Geographic latitude in degrees
+        obliquity: True obliquity of the ecliptic in degrees.
+                   Default is 23.44° (approximate J2000 value).
+
+    Returns:
+        Dictionary with latitude information:
+        - latitude: The input latitude
+        - is_extreme: True if abs(lat) >= 80° (may have numerical instability)
+        - is_polar_circle: True if abs(lat) > 90° - obliquity (Placidus/Koch/Gauquelin fail)
+        - polar_threshold: The polar circle threshold latitude
+        - extreme_threshold: The extreme latitude threshold (80°)
+        - hemisphere: 'N' for north, 'S' for south
+        - affected_systems: List of house system codes that fail at this latitude
+        - unstable_systems: List of house system codes that may be numerically unstable
+        - stable_systems: List of house system codes that work reliably at all latitudes
+
+    Example:
+        >>> info = get_extreme_latitude_info(85.0)
+        >>> info['is_extreme']
+        True
+        >>> info['is_polar_circle']
+        True
+        >>> info['affected_systems']
+        ['P', 'K', 'G']
+        >>> info['stable_systems']
+        ['E', 'W', 'O', 'M', 'X', 'V', 'N']
+    """
+    polar_threshold = get_polar_latitude_threshold(obliquity)
+    is_polar = abs(lat) > polar_threshold
+    is_extreme = _is_extreme_latitude(lat)
+    hemisphere = "N" if lat >= 0 else "S"
+
+    # Systems that completely fail at polar latitudes
+    affected_systems = ["P", "K", "G"] if is_polar else []
+
+    # Systems that may be numerically unstable at extreme latitudes (>80°)
+    # but don't technically fail
+    unstable_systems = []
+    if is_extreme:
+        unstable_systems = ["C", "R", "T", "B", "H", "U", "Y", "F"]
+
+    # Systems that work reliably at all latitudes
+    stable_systems = ["E", "W", "O", "M", "X", "V", "N"]
+
+    return {
+        "latitude": lat,
+        "is_extreme": is_extreme,
+        "is_polar_circle": is_polar,
+        "polar_threshold": polar_threshold,
+        "extreme_threshold": EXTREME_LATITUDE_THRESHOLD,
+        "hemisphere": hemisphere,
+        "affected_systems": affected_systems,
+        "unstable_systems": unstable_systems,
+        "stable_systems": stable_systems,
+    }
+
+
+def _validate_cusps(cusps: list | tuple) -> tuple[bool, str | None]:
+    """
+    Validate house cusps for numerical sanity.
+
+    Checks that all cusp values are within valid range [0, 360) and are finite.
+    This helps detect numerical instability at extreme latitudes.
+
+    Args:
+        cusps: List or tuple of house cusp longitudes
+
+    Returns:
+        Tuple of (is_valid, error_message or None)
+
+    Example:
+        >>> _validate_cusps([0.0, 30.0, 60.0, 90.0])
+        (True, None)
+        >>> _validate_cusps([float('nan'), 30.0])
+        (False, 'House cusp contains NaN value')
+    """
+    for i, cusp in enumerate(cusps):
+        # Check for NaN
+        if cusp != cusp:  # NaN check (NaN != NaN is True)
+            return False, f"House cusp {i + 1} contains NaN value"
+
+        # Check for infinity
+        if cusp == float("inf") or cusp == float("-inf"):
+            return False, f"House cusp {i + 1} contains infinite value"
+
+        # Check range (should be in [0, 360))
+        if cusp < 0 or cusp >= 360:
+            return False, f"House cusp {i + 1} out of range [0, 360): {cusp}"
+
+    return True, None
+
+
 def _raise_polar_circle_error(
     lat: float, eps: float, house_system: str, func_name: str
 ) -> None:
@@ -684,6 +818,7 @@ def swe_houses_with_fallback(
     lon: float,
     hsys: int,
     fallback_hsys: int = ord("O"),
+    validate_cusps: bool = True,
 ) -> tuple[tuple[float, ...], tuple[float, ...], bool, str | None]:
     """
     Calculate house cusps with automatic fallback for polar latitudes.
@@ -691,6 +826,11 @@ def swe_houses_with_fallback(
     This convenience function attempts to calculate houses using the requested
     system, and automatically falls back to a polar-safe system (default: Porphyry)
     if the location is within the polar circle.
+
+    For extreme latitudes (>80°), this function also:
+    - Validates cusp values for numerical sanity (NaN, infinity, range)
+    - Includes warnings about potential numerical instability
+    - Falls back to a stable system if cusps are invalid
 
     This is useful for applications that need to handle polar latitudes gracefully
     without explicit error handling for each calculation.
@@ -703,13 +843,16 @@ def swe_houses_with_fallback(
         fallback_hsys: Fallback house system for polar latitudes.
                        Default: ord('O') (Porphyry).
                        Other good choices: ord('E') (Equal), ord('W') (Whole Sign)
+        validate_cusps: If True (default), validate cusp values for numerical sanity
+                        and fall back if invalid cusps are detected.
 
     Returns:
         Tuple containing:
             - cusps: Tuple of 12 house cusp longitudes (houses 1-12) in degrees
             - ascmc: Tuple of 8 angles
             - used_fallback: True if fallback system was used
-            - warning_message: Informational message if fallback was used, else None
+            - warning_message: Informational message if fallback was used or
+                               extreme latitude warning, else None
 
     Example:
         >>> import libephemeris as ephem
@@ -721,31 +864,81 @@ def swe_houses_with_fallback(
         >>> if used_fallback:
         ...     print(f"Used fallback: {warning}")
         >>> # cusps and ascmc are valid regardless of latitude
+        >>>
+        >>> # At extreme latitudes (>80°), you may get a warning even for non-failing systems
+        >>> cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        ...     jd, 85.0, 0.0, ord('C')  # Campanus at 85°N
+        ... )
+        >>> if warning:
+        ...     print(f"Warning: {warning}")
 
     See Also:
         swe_houses: Standard function that raises PolarCircleError at polar latitudes
         get_polar_latitude_threshold: Returns the threshold for a given obliquity
+        get_extreme_latitude_info: Returns detailed latitude classification information
     """
+    # House system names for error messages
+    system_names = {
+        "P": "Placidus",
+        "K": "Koch",
+        "G": "Gauquelin",
+        "O": "Porphyry",
+        "E": "Equal",
+        "W": "Whole Sign",
+        "R": "Regiomontanus",
+        "C": "Campanus",
+        "T": "Topocentric",
+        "B": "Alcabitius",
+        "M": "Morinus",
+        "X": "Meridian",
+        "H": "Horizontal",
+        "V": "Vehlow",
+        "U": "Krusinski",
+        "F": "Carter",
+        "Y": "APC",
+        "N": "Natural Gradient",
+    }
+
+    hsys_char = chr(hsys) if isinstance(hsys, int) else hsys
+    fallback_char = (
+        chr(fallback_hsys) if isinstance(fallback_hsys, int) else fallback_hsys
+    )
+    primary_name = system_names.get(hsys_char, hsys_char)
+    fallback_name = system_names.get(fallback_char, fallback_char)
+
+    # Check for extreme latitude before calculation
+    is_extreme = _is_extreme_latitude(lat)
+
     try:
         cusps, ascmc = swe_houses(jd_ut, lat, lon, hsys)
+
+        # Validate cusps if requested
+        if validate_cusps:
+            is_valid, validation_error = _validate_cusps(cusps)
+            if not is_valid:
+                # Invalid cusps detected - fall back to stable system
+                cusps, ascmc = swe_houses(jd_ut, lat, lon, fallback_hsys)
+                warning = (
+                    f"{primary_name} house system produced invalid cusps at latitude "
+                    f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
+                )
+                return cusps, ascmc, True, warning
+
+        # Generate warning for extreme latitudes even if calculation succeeded
+        if is_extreme:
+            info = get_extreme_latitude_info(lat)
+            if hsys_char in info["unstable_systems"]:
+                warning = (
+                    f"{primary_name} house system may have reduced accuracy at "
+                    f"extreme latitude {abs(lat):.2f}°{info['hemisphere']}. "
+                    f"Consider using a stable system like Porphyry, Equal, or Whole Sign."
+                )
+                return cusps, ascmc, False, warning
+
         return cusps, ascmc, False, None
     except PolarCircleError as e:
         # Use fallback house system
         cusps, ascmc = swe_houses(jd_ut, lat, lon, fallback_hsys)
-
-        # Generate informational warning message
-        hsys_char = chr(hsys)
-        fallback_char = chr(fallback_hsys)
-        system_names = {
-            "P": "Placidus",
-            "K": "Koch",
-            "G": "Gauquelin",
-            "O": "Porphyry",
-            "E": "Equal",
-            "W": "Whole Sign",
-        }
-        primary_name = system_names.get(hsys_char, hsys_char)
-        fallback_name = system_names.get(fallback_char, fallback_char)
 
         warning = (
             f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
@@ -761,12 +954,13 @@ def swe_houses_armc_with_fallback(
     eps: float,
     hsys: int,
     fallback_hsys: int = ord("O"),
+    validate_cusps: bool = True,
 ) -> tuple[tuple[float, ...], tuple[float, ...], bool, str | None]:
     """
     Calculate house cusps from ARMC with automatic fallback for polar latitudes.
 
     Similar to swe_houses_with_fallback, but calculates from ARMC instead of
-    Julian Day.
+    Julian Day. Includes the same extreme latitude handling and cusp validation.
 
     Args:
         armc: Right Ascension of Medium Coeli in degrees (0-360)
@@ -775,37 +969,83 @@ def swe_houses_armc_with_fallback(
         hsys: Primary house system identifier (e.g., ord('P') for Placidus)
         fallback_hsys: Fallback house system for polar latitudes.
                        Default: ord('O') (Porphyry).
+        validate_cusps: If True (default), validate cusp values for numerical sanity
+                        and fall back if invalid cusps are detected.
 
     Returns:
         Tuple containing:
             - cusps: Tuple of 12 house cusp longitudes (houses 1-12) in degrees
             - ascmc: Tuple of 8 angles
             - used_fallback: True if fallback system was used
-            - warning_message: Informational message if fallback was used, else None
+            - warning_message: Informational message if fallback was used or
+                               extreme latitude warning, else None
 
     See Also:
         swe_houses_armc: Standard function that raises PolarCircleError at polar latitudes
+        get_extreme_latitude_info: Returns detailed latitude classification information
     """
+    # House system names for error messages
+    system_names = {
+        "P": "Placidus",
+        "K": "Koch",
+        "G": "Gauquelin",
+        "O": "Porphyry",
+        "E": "Equal",
+        "W": "Whole Sign",
+        "R": "Regiomontanus",
+        "C": "Campanus",
+        "T": "Topocentric",
+        "B": "Alcabitius",
+        "M": "Morinus",
+        "X": "Meridian",
+        "H": "Horizontal",
+        "V": "Vehlow",
+        "U": "Krusinski",
+        "F": "Carter",
+        "Y": "APC",
+        "N": "Natural Gradient",
+    }
+
+    hsys_char = chr(hsys) if isinstance(hsys, int) else hsys
+    fallback_char = (
+        chr(fallback_hsys) if isinstance(fallback_hsys, int) else fallback_hsys
+    )
+    primary_name = system_names.get(hsys_char, hsys_char)
+    fallback_name = system_names.get(fallback_char, fallback_char)
+
+    # Check for extreme latitude before calculation
+    is_extreme = _is_extreme_latitude(lat)
+
     try:
         cusps, ascmc = swe_houses_armc(armc, lat, eps, hsys)
+
+        # Validate cusps if requested
+        if validate_cusps:
+            is_valid, validation_error = _validate_cusps(cusps)
+            if not is_valid:
+                # Invalid cusps detected - fall back to stable system
+                cusps, ascmc = swe_houses_armc(armc, lat, eps, fallback_hsys)
+                warning = (
+                    f"{primary_name} house system produced invalid cusps at latitude "
+                    f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
+                )
+                return cusps, ascmc, True, warning
+
+        # Generate warning for extreme latitudes even if calculation succeeded
+        if is_extreme:
+            info = get_extreme_latitude_info(lat, eps)
+            if hsys_char in info["unstable_systems"]:
+                warning = (
+                    f"{primary_name} house system may have reduced accuracy at "
+                    f"extreme latitude {abs(lat):.2f}°{info['hemisphere']}. "
+                    f"Consider using a stable system like Porphyry, Equal, or Whole Sign."
+                )
+                return cusps, ascmc, False, warning
+
         return cusps, ascmc, False, None
     except PolarCircleError as e:
         # Use fallback house system
         cusps, ascmc = swe_houses_armc(armc, lat, eps, fallback_hsys)
-
-        # Generate informational warning message
-        hsys_char = chr(hsys)
-        fallback_char = chr(fallback_hsys)
-        system_names = {
-            "P": "Placidus",
-            "K": "Koch",
-            "G": "Gauquelin",
-            "O": "Porphyry",
-            "E": "Equal",
-            "W": "Whole Sign",
-        }
-        primary_name = system_names.get(hsys_char, hsys_char)
-        fallback_name = system_names.get(fallback_char, fallback_char)
 
         warning = (
             f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "

@@ -532,9 +532,9 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] IMPROVE DATE RANGE ERROR MESSAGES: When calculations fail due to date outside ephemeris range, provide clear error message with supported range.
 
-- [ ] HANDLE MISSING SPK GRACEFULLY: When SPK file is requested but not available, provide helpful error message explaining how to obtain it.
+- [x] HANDLE MISSING SPK GRACEFULLY: When SPK file is requested but not available, provide helpful error message explaining how to obtain it.
 
-- [ ] HANDLE POLAR EDGE CASES: Improve error handling and fallback behavior for house calculations at extreme latitudes (>80°).
+- [x] HANDLE POLAR EDGE CASES: Improve error handling and fallback behavior for house calculations at extreme latitudes (>80°).
 
 - [ ] VALIDATE INPUT COORDINATES: Add validation for geographic coordinates (lat -90 to 90, lon -180 to 180) with clear error messages.
 
