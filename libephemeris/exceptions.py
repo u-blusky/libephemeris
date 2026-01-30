@@ -87,6 +87,117 @@ class PolarCircleError(Error):
         )
 
 
+class SPKNotFoundError(Error):
+    """Error raised when an SPK file is requested but not available.
+
+    This exception is raised when attempting to register or load an SPK file
+    that does not exist. It provides helpful instructions for obtaining the
+    required SPK file.
+
+    SPK (SPICE kernel) files contain high-precision ephemeris data for minor
+    bodies (asteroids, TNOs, comets) and are downloaded from JPL Horizons.
+
+    Attributes:
+        filepath: Path to the SPK file that was not found
+        body_name: Name of the celestial body (if known)
+        body_id: JPL Horizons identifier (if known)
+        message: Human-readable error message with instructions
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.register_spk_body(ephem.SE_CHIRON, "/path/to/chiron.bsp", 2002060)
+        ... except ephem.SPKNotFoundError as e:
+        ...     print(f"Missing SPK: {e.filepath}")
+        ...     print("Instructions:", e.message)
+
+    See Also:
+        download_spk: Download SPK file from JPL Horizons
+        download_and_register_spk: Download and register in one step
+        enable_auto_spk: Enable automatic SPK downloading
+    """
+
+    def __init__(
+        self,
+        message: str,
+        filepath: str | None = None,
+        body_name: str | None = None,
+        body_id: str | None = None,
+    ):
+        super().__init__(message)
+        self.filepath = filepath
+        self.body_name = body_name
+        self.body_id = body_id
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"SPKNotFoundError({self.message!r}, "
+            f"filepath={self.filepath!r}, body_name={self.body_name!r}, "
+            f"body_id={self.body_id!r})"
+        )
+
+    @classmethod
+    def from_filepath(
+        cls,
+        filepath: str,
+        body_name: str | None = None,
+        body_id: str | None = None,
+    ) -> "SPKNotFoundError":
+        """Create an SPKNotFoundError with a helpful message.
+
+        Args:
+            filepath: Path to the missing SPK file
+            body_name: Optional name of the celestial body
+            body_id: Optional JPL Horizons identifier
+
+        Returns:
+            SPKNotFoundError with formatted instructions
+        """
+        lines = [f"SPK file not found: {filepath}"]
+        lines.append("")
+        lines.append("To obtain this SPK file, you can:")
+        lines.append("")
+        lines.append("1. Download manually using libephemeris.download_spk():")
+        if body_id:
+            lines.append(f"   >>> import libephemeris as eph")
+            lines.append(f'   >>> eph.download_spk("{body_id}")')
+        else:
+            lines.append("   >>> import libephemeris as eph")
+            lines.append('   >>> eph.download_spk("<body_id_or_name>")')
+        lines.append("")
+        lines.append("2. Download and register in one step:")
+        if body_id and body_name:
+            lines.append(
+                f'   >>> eph.download_and_register_spk("{body_id}", eph.SE_{body_name.upper()})'
+            )
+        else:
+            lines.append(
+                '   >>> eph.download_and_register_spk("<body_id>", <libephemeris_body_id>)'
+            )
+        lines.append("")
+        lines.append("3. Enable automatic downloading (requires astroquery):")
+        lines.append("   >>> eph.set_auto_spk_download(True)")
+        lines.append("")
+        lines.append("4. Use the CLI download script:")
+        lines.append(
+            "   $ python -m libephemeris.scripts.download_spk --bodies <body_name>"
+        )
+        lines.append("")
+        lines.append("For more information, see the libephemeris documentation.")
+
+        message = "\n".join(lines)
+        return cls(
+            message=message,
+            filepath=filepath,
+            body_name=body_name,
+            body_id=body_id,
+        )
+
+
 class EphemerisRangeError(Error):
     """Error raised when a calculation date is outside the ephemeris range.
 

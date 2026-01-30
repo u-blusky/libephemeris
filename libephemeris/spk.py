@@ -38,6 +38,7 @@ from typing import Optional, Union
 
 from skyfield.framelib import ecliptic_frame
 
+from .exceptions import SPKNotFoundError
 from .state import get_library_path, get_loader, get_timescale
 
 
@@ -103,6 +104,67 @@ def _deduce_naif_id(body: str, asteroid_number: Optional[int] = None) -> Optiona
     if asteroid_number is not None:
         return asteroid_number + NAIF_ASTEROID_OFFSET
 
+    return None
+
+
+# =============================================================================
+# BODY NAME UTILITIES
+# =============================================================================
+
+# Mapping from body IDs to human-readable names for helpful error messages
+# This complements the SPK_BODY_NAME_MAP in constants.py which maps to Horizons IDs
+_BODY_NAMES: dict[int, str] = {
+    15: "Chiron",  # SE_CHIRON
+    16: "Pholus",  # SE_PHOLUS
+    17: "Ceres",  # SE_CERES
+    18: "Pallas",  # SE_PALLAS
+    19: "Juno",  # SE_JUNO
+    20: "Vesta",  # SE_VESTA
+    10000 + 136199: "Eris",  # SE_ERIS
+    10000 + 90377: "Sedna",  # SE_SEDNA
+    10000 + 136108: "Haumea",  # SE_HAUMEA
+    10000 + 136472: "Makemake",  # SE_MAKEMAKE
+    10000 + 28978: "Ixion",  # SE_IXION
+    10000 + 90482: "Orcus",  # SE_ORCUS
+    10000 + 50000: "Quaoar",  # SE_QUAOAR
+    10000 + 20000: "Varuna",  # SE_VARUNA
+    10000 + 7066: "Nessus",  # SE_NESSUS
+    10000 + 8405: "Asbolus",  # SE_ASBOLUS
+    10000 + 10199: "Chariklo",  # SE_CHARIKLO
+    10000 + 225088: "Gonggong",  # SE_GONGGONG
+    10000 + 99942: "Apophis",  # SE_APOPHIS
+    10000 + 10: "Hygiea",  # SE_HYGIEA
+    10000 + 433: "Eros",  # SE_EROS
+}
+
+
+def _get_body_name(ipl: int) -> Optional[str]:
+    """
+    Get the human-readable name for a body ID.
+
+    Args:
+        ipl: libephemeris body ID
+
+    Returns:
+        Human-readable name if known, None otherwise.
+    """
+    return _BODY_NAMES.get(ipl)
+
+
+def _get_horizons_id_for_body(ipl: int) -> Optional[str]:
+    """
+    Get the JPL Horizons target identifier for a body ID.
+
+    Args:
+        ipl: libephemeris body ID
+
+    Returns:
+        Horizons ID if available, None otherwise.
+    """
+    from .constants import SPK_BODY_NAME_MAP
+
+    if ipl in SPK_BODY_NAME_MAP:
+        return SPK_BODY_NAME_MAP[ipl][0]
     return None
 
 
@@ -329,7 +391,7 @@ def register_spk_body(
             (e.g., Chiron = 2060 -> naif_id = 2002060)
 
     Raises:
-        FileNotFoundError: If SPK file not found
+        SPKNotFoundError: If SPK file not found (with helpful instructions)
         ValueError: If naif_id not found in SPK kernel
 
     Example:
@@ -350,10 +412,24 @@ def register_spk_body(
         if os.path.exists(full_path):
             spk_file = full_path
         elif not os.path.exists(spk_file):
-            raise FileNotFoundError(f"SPK file not found: {spk_file}")
+            # Get helpful info for error message
+            body_name = _get_body_name(ipl)
+            body_id = _get_horizons_id_for_body(ipl)
+            raise SPKNotFoundError.from_filepath(
+                filepath=spk_file,
+                body_name=body_name,
+                body_id=body_id,
+            )
 
     if not os.path.exists(spk_file):
-        raise FileNotFoundError(f"SPK file not found: {spk_file}")
+        # Get helpful info for error message
+        body_name = _get_body_name(ipl)
+        body_id = _get_horizons_id_for_body(ipl)
+        raise SPKNotFoundError.from_filepath(
+            filepath=spk_file,
+            body_name=body_name,
+            body_id=body_id,
+        )
 
     # Load kernel if not already cached
     state._load_spk_kernel(spk_file)

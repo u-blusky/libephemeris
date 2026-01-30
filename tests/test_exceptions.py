@@ -127,3 +127,103 @@ class TestErrorUsagePatterns:
         """Error should store args like standard exceptions."""
         err = Error("test", "arg2", 123)
         assert err.args == ("test", "arg2", 123)
+
+
+class TestSPKNotFoundError:
+    """Test the SPKNotFoundError exception class."""
+
+    @pytest.mark.unit
+    def test_spk_not_found_error_is_error_subclass(self):
+        """SPKNotFoundError should inherit from Error."""
+        from libephemeris.exceptions import SPKNotFoundError
+
+        assert issubclass(SPKNotFoundError, Error)
+
+    @pytest.mark.unit
+    def test_spk_not_found_error_exported(self):
+        """SPKNotFoundError should be accessible via libephemeris.SPKNotFoundError."""
+        import libephemeris as eph
+        from libephemeris.exceptions import SPKNotFoundError
+
+        assert hasattr(eph, "SPKNotFoundError")
+        assert eph.SPKNotFoundError is SPKNotFoundError
+
+    @pytest.mark.unit
+    def test_spk_not_found_error_in_all(self):
+        """SPKNotFoundError should be in __all__ of libephemeris."""
+        import libephemeris as eph
+
+        assert "SPKNotFoundError" in eph.__all__
+
+    @pytest.mark.unit
+    def test_spk_not_found_error_basic(self):
+        """SPKNotFoundError can be created with a message."""
+        from libephemeris.exceptions import SPKNotFoundError
+
+        err = SPKNotFoundError("test message")
+        assert str(err) == "test message"
+
+    @pytest.mark.unit
+    def test_spk_not_found_error_with_attributes(self):
+        """SPKNotFoundError stores filepath, body_name, and body_id."""
+        from libephemeris.exceptions import SPKNotFoundError
+
+        err = SPKNotFoundError(
+            "test message",
+            filepath="/path/to/file.bsp",
+            body_name="Chiron",
+            body_id="2060",
+        )
+        assert err.filepath == "/path/to/file.bsp"
+        assert err.body_name == "Chiron"
+        assert err.body_id == "2060"
+
+    @pytest.mark.unit
+    def test_spk_not_found_error_from_filepath(self):
+        """SPKNotFoundError.from_filepath creates helpful error message."""
+        from libephemeris.exceptions import SPKNotFoundError
+
+        err = SPKNotFoundError.from_filepath(
+            filepath="/path/to/chiron.bsp",
+            body_name="Chiron",
+            body_id="2060",
+        )
+        message = str(err)
+
+        # Check that key information is in the message
+        assert "/path/to/chiron.bsp" in message
+        assert "download_spk" in message
+        assert "download_and_register_spk" in message
+        assert "set_auto_spk_download" in message
+        assert "2060" in message  # body_id should be in examples
+        assert "CHIRON" in message  # body_name should be in examples
+
+    @pytest.mark.unit
+    def test_spk_not_found_error_from_filepath_no_body_info(self):
+        """SPKNotFoundError.from_filepath works without body info."""
+        from libephemeris.exceptions import SPKNotFoundError
+
+        err = SPKNotFoundError.from_filepath(
+            filepath="/path/to/unknown.bsp",
+        )
+        message = str(err)
+
+        # Should still have instructions even without body info
+        assert "/path/to/unknown.bsp" in message
+        assert "download_spk" in message
+
+    @pytest.mark.unit
+    def test_spk_not_found_error_repr(self):
+        """SPKNotFoundError has informative repr."""
+        from libephemeris.exceptions import SPKNotFoundError
+
+        err = SPKNotFoundError(
+            "test",
+            filepath="/test.bsp",
+            body_name="Ceres",
+            body_id="1",
+        )
+        r = repr(err)
+        assert "SPKNotFoundError" in r
+        assert "/test.bsp" in r
+        assert "Ceres" in r

@@ -6,7 +6,7 @@ These tests verify:
 - NAIF ID deduction
 - Fallback to Keplerian when SPK not available
 - Coverage checking
-- Error handling
+- Error handling (SPKNotFoundError)
 
 Note: Integration tests that download actual SPK files from Horizons
 are skipped by default. Set LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1 to run them.
@@ -28,6 +28,7 @@ from libephemeris.constants import (
     NAIF_ASTEROID_OFFSET,
     SEFLG_SPEED,
 )
+from libephemeris.exceptions import SPKNotFoundError
 
 
 class TestNaifIdDeduction:
@@ -122,9 +123,48 @@ class TestSpkRegistration:
         eph.unregister_spk_body(SE_CHIRON)  # Should not raise
 
     def test_register_file_not_found(self):
-        """Register with non-existent file."""
-        with pytest.raises(FileNotFoundError):
+        """Register with non-existent file raises SPKNotFoundError."""
+        with pytest.raises(SPKNotFoundError) as exc_info:
             eph.register_spk_body(SE_CHIRON, "/nonexistent/file.bsp", NAIF_CHIRON)
+
+        # Verify the error contains helpful information
+        error = exc_info.value
+        assert "/nonexistent/file.bsp" in str(error)
+        assert error.filepath == "/nonexistent/file.bsp"
+
+    def test_register_file_not_found_with_body_name(self):
+        """SPKNotFoundError includes body name when available."""
+        with pytest.raises(SPKNotFoundError) as exc_info:
+            eph.register_spk_body(SE_CHIRON, "/path/to/missing.bsp", NAIF_CHIRON)
+
+        error = exc_info.value
+        # Should have Chiron as body name
+        assert error.body_name == "Chiron"
+        # Should include Horizons ID
+        assert error.body_id == "2060"
+        # Error message should include instructions
+        assert "download_spk" in str(error)
+
+    def test_register_file_not_found_with_eris(self):
+        """SPKNotFoundError works for SE_ERIS (TNO with high ID offset)."""
+        with pytest.raises(SPKNotFoundError) as exc_info:
+            eph.register_spk_body(SE_ERIS, "/path/to/missing_eris.bsp", NAIF_ERIS)
+
+        error = exc_info.value
+        assert error.body_name == "Eris"
+        assert error.body_id == "136199"
+
+    def test_spk_not_found_error_helpful_message(self):
+        """SPKNotFoundError message includes multiple options to obtain SPK."""
+        with pytest.raises(SPKNotFoundError) as exc_info:
+            eph.register_spk_body(SE_CERES, "/missing/ceres.bsp", NAIF_CERES)
+
+        message = str(exc_info.value)
+        # Check that key instructions are included
+        assert "download_spk" in message
+        assert "download_and_register_spk" in message
+        assert "set_auto_spk_download" in message
+        assert "libephemeris.scripts.download_spk" in message
 
 
 class TestCalcWithoutSpk:
