@@ -1998,7 +1998,1195 @@ Minor Body Resonance Detection
    **Example:**
 
    >>> from libephemeris.minor_bodies import detect_mean_motion_resonance, MINOR_BODY_ELEMENTS
-   >>> from libephemeris.constants import SE_IXION
-   >>> result = detect_mean_motion_resonance(MINOR_BODY_ELEMENTS[SE_IXION])
-   >>> if result:
-   ...     print(f"{result.resonance.name}: {result.resonance.p}:{result.resonance.q}")
+    >>> from libephemeris.constants import SE_IXION
+    >>> result = detect_mean_motion_resonance(MINOR_BODY_ELEMENTS[SE_IXION])
+    >>> if result:
+    ...     print(f"{result.resonance.name}: {result.resonance.p}:{result.resonance.q}")
+
+
+TAI (International Atomic Time) Functions
+-----------------------------------------
+
+TAI (International Atomic Time) is a high-precision time standard based on atomic
+clocks. These functions enable conversions between TAI, UTC, and TT (Terrestrial Time).
+
+Constants
+~~~~~~~~~
+
+.. data:: TT_TAI_OFFSET_SECONDS
+   :value: 32.184
+
+   Fixed offset between TT and TAI in seconds (TT = TAI + 32.184s)
+
+.. data:: TT_TAI_OFFSET_DAYS
+   :value: 0.00037268518518518...
+
+   TT - TAI offset in days (32.184 / 86400)
+
+
+get_tai_utc_for_jd
+~~~~~~~~~~~~~~~~~~
+
+.. function:: get_tai_utc_for_jd(jd)
+
+   Get the TAI-UTC offset (leap seconds) for a Julian Day.
+
+   :param jd: Julian Day number
+   :type jd: float
+   :returns: TAI-UTC offset in seconds
+   :rtype: float
+
+   **Example:**
+
+   >>> offset = get_tai_utc_for_jd(2460000.0)  # ~2023
+   >>> print(f"TAI-UTC: {offset} seconds")
+   TAI-UTC: 37.0 seconds
+
+
+utc_to_tai_jd
+~~~~~~~~~~~~~
+
+.. function:: utc_to_tai_jd(year, month, day, hour, minute, second)
+
+   Convert UTC date/time to TAI Julian Day.
+
+   :param year: Year
+   :type year: int
+   :param month: Month (1-12)
+   :type month: int
+   :param day: Day of month
+   :type day: int
+   :param hour: Hour (0-23)
+   :type hour: int
+   :param minute: Minute (0-59)
+   :type minute: int
+   :param second: Second (0-59.999...)
+   :type second: float
+   :returns: Julian Day in TAI
+   :rtype: float
+
+
+tai_jd_to_utc
+~~~~~~~~~~~~~
+
+.. function:: tai_jd_to_utc(jd_tai)
+
+   Convert TAI Julian Day to UTC date/time.
+
+   :param jd_tai: Julian Day in TAI
+   :type jd_tai: float
+   :returns: Tuple of (year, month, day, hour, minute, second)
+   :rtype: tuple
+
+
+tt_to_tai_jd
+~~~~~~~~~~~~
+
+.. function:: tt_to_tai_jd(jd_tt)
+
+   Convert Terrestrial Time (TT) Julian Day to TAI Julian Day.
+
+   :param jd_tt: Julian Day in TT
+   :type jd_tt: float
+   :returns: Julian Day in TAI
+   :rtype: float
+
+   **Note:**
+
+   TT differs from TAI by exactly 32.184 seconds.
+
+
+tai_to_tt_jd
+~~~~~~~~~~~~
+
+.. function:: tai_to_tt_jd(jd_tai)
+
+   Convert TAI Julian Day to Terrestrial Time (TT) Julian Day.
+
+   :param jd_tai: Julian Day in TAI
+   :type jd_tai: float
+   :returns: Julian Day in TT
+   :rtype: float
+
+
+IERS Data Functions
+-------------------
+
+IERS (International Earth Rotation and Reference Systems Service) provides
+Earth orientation parameters, Delta T values, and leap second data.
+
+IERS Configuration
+~~~~~~~~~~~~~~~~~~
+
+.. function:: set_iers_delta_t_enabled(enable)
+
+   Enable or disable IERS-based Delta T calculations.
+
+   When enabled, Delta T values are looked up from IERS data rather than
+   using polynomial approximations.
+
+   :param enable: True to enable IERS Delta T, False to disable
+   :type enable: bool
+
+
+.. function:: get_iers_delta_t_enabled()
+
+   Check if IERS-based Delta T is enabled.
+
+   :returns: Current IERS Delta T setting
+   :rtype: bool
+
+
+.. function:: set_iers_cache_dir(path)
+
+   Set the directory for caching IERS data files.
+
+   :param path: Directory path for IERS cache
+   :type path: str
+
+
+.. function:: get_iers_cache_dir()
+
+   Get the current IERS cache directory.
+
+   :returns: Path to IERS cache directory
+   :rtype: str
+
+
+.. function:: set_iers_auto_download(enable)
+
+   Enable or disable automatic download of IERS data.
+
+   :param enable: True to enable auto-download, False to disable
+   :type enable: bool
+
+
+.. function:: get_iers_auto_download()
+
+   Check if IERS auto-download is enabled.
+
+   :returns: Current auto-download setting
+   :rtype: bool
+
+
+IERS Data Download
+~~~~~~~~~~~~~~~~~~
+
+.. function:: download_iers_finals()
+
+   Download IERS finals2000A data (Earth orientation parameters).
+
+   :returns: Path to downloaded file
+   :rtype: str
+
+
+.. function:: download_leap_seconds()
+
+   Download leap seconds data file.
+
+   :returns: Path to downloaded file
+   :rtype: str
+
+
+.. function:: download_delta_t_data()
+
+   Download all IERS data needed for Delta T calculations.
+
+   Downloads finals2000A, leap seconds, and historical Delta T data.
+
+   :returns: Tuple of paths to downloaded files
+   :rtype: tuple
+
+
+.. function:: load_iers_data()
+
+   Load IERS data from cache into memory.
+
+   Call this after downloading to parse and prepare data for lookups.
+
+
+IERS Delta T Lookup
+~~~~~~~~~~~~~~~~~~~
+
+.. function:: get_observed_delta_t(jd)
+
+   Get observed Delta T value from IERS data.
+
+   :param jd: Julian Day number
+   :type jd: float
+   :returns: Delta T in seconds (TT - UT1), or None if data unavailable
+   :rtype: float or None
+
+
+.. function:: get_observed_delta_t_data_range()
+
+   Get the date range for available observed Delta T data.
+
+   :returns: Tuple of (start_jd, end_jd) Julian Days
+   :rtype: tuple[float, float]
+
+
+.. function:: is_observed_delta_t_available()
+
+   Check if observed Delta T data is available.
+
+   :returns: True if IERS Delta T data is loaded
+   :rtype: bool
+
+
+.. function:: get_delta_t_iers(jd)
+
+   Get Delta T using IERS data with polynomial extrapolation.
+
+   Uses observed data when available, polynomial models otherwise.
+
+   :param jd: Julian Day number
+   :type jd: float
+   :returns: Delta T in seconds
+   :rtype: float
+
+
+.. function:: get_ut1_utc(jd)
+
+   Get UT1-UTC offset from IERS data.
+
+   :param jd: Julian Day in UTC
+   :type jd: float
+   :returns: UT1-UTC offset in seconds
+   :rtype: float
+
+
+.. function:: get_tai_utc(jd)
+
+   Get TAI-UTC offset (leap seconds) from IERS data.
+
+   :param jd: Julian Day number
+   :type jd: float
+   :returns: TAI-UTC offset in seconds
+   :rtype: float
+
+
+IERS Cache Management
+~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: clear_iers_cache()
+
+   Clear in-memory IERS data cache.
+
+
+.. function:: delete_iers_cache_files()
+
+   Delete IERS data files from disk cache.
+
+
+.. function:: get_iers_cache_info()
+
+   Get information about cached IERS data.
+
+   :returns: Dictionary with cache status and file information
+   :rtype: dict
+
+
+.. function:: get_iers_data_range()
+
+   Get the date range covered by loaded IERS data.
+
+   :returns: Tuple of (start_jd, end_jd) Julian Days
+   :rtype: tuple[float, float]
+
+
+.. function:: is_iers_data_available()
+
+   Check if IERS data is available for lookups.
+
+   :returns: True if IERS data is loaded and ready
+   :rtype: bool
+
+
+Planetary Moons
+---------------
+
+Support for calculating positions of planetary moons (natural satellites)
+using JPL satellite ephemeris SPK files.
+
+Moon Registration
+~~~~~~~~~~~~~~~~~
+
+.. function:: register_moon_spk(spk_path)
+
+   Register a planetary satellite SPK file for moon calculations.
+
+   :param spk_path: Path to satellite SPK file (e.g., "jup365.bsp" for Jupiter moons)
+   :type spk_path: str
+
+   **Supported SPK files:**
+
+   - ``jup365.bsp``: Jupiter's moons (Galilean moons)
+   - ``sat441.bsp``: Saturn's moons (Titan, Enceladus, etc.)
+   - ``ura116.bsp``: Uranus's moons
+   - ``nep097.bsp``: Neptune's moons (Triton)
+   - ``mar097.bsp``: Mars's moons (Phobos, Deimos)
+   - ``plu058.bsp``: Pluto's moons (Charon)
+
+
+.. function:: unregister_moon_spk(spk_path)
+
+   Unregister a satellite SPK file.
+
+   :param spk_path: Path to SPK file to unregister
+   :type spk_path: str
+
+
+.. function:: list_registered_moons()
+
+   List all registered moon SPK files and their available targets.
+
+   :returns: Dictionary mapping SPK paths to available moon IDs
+   :rtype: dict
+
+
+Moon Calculations
+~~~~~~~~~~~~~~~~~
+
+.. function:: calc_moon_position(jd_ut, moon_id, iflag=0)
+
+   Calculate position of a planetary moon.
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param moon_id: Moon ID (SE_MOON_IO, SE_MOON_TITAN, etc.)
+   :type moon_id: int
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (position_tuple, return_flag)
+   :rtype: tuple
+
+   **Example:**
+
+   >>> register_moon_spk("jup365.bsp")
+   >>> pos, _ = calc_moon_position(2451545.0, NAIF_IO, SEFLG_SPEED)
+   >>> print(f"Io longitude: {pos[0]:.4f}")
+
+
+.. function:: get_moon_name(moon_id)
+
+   Get the name of a planetary moon.
+
+   :param moon_id: Moon ID
+   :type moon_id: int
+   :returns: Human-readable moon name
+   :rtype: str
+
+
+.. function:: is_planetary_moon(body_id)
+
+   Check if a body ID corresponds to a planetary moon.
+
+   :param body_id: Body ID to check
+   :type body_id: int
+   :returns: True if body is a planetary moon
+   :rtype: bool
+
+
+.. function:: get_moon_coverage(moon_id)
+
+   Get the date coverage for a registered moon.
+
+   :param moon_id: Moon ID
+   :type moon_id: int
+   :returns: Tuple of (start_jd, end_jd) Julian Days, or None
+   :rtype: tuple or None
+
+
+.. function:: close_moon_kernels()
+
+   Close all loaded moon SPK kernel files and release resources.
+
+
+Moon NAIF IDs
+~~~~~~~~~~~~~
+
+NAIF IDs for planetary moons, used with SPK kernels:
+
+**Jupiter's Galilean Moons:**
+
+.. data:: NAIF_IO
+   :value: 501
+
+   Jupiter I - Io, innermost Galilean moon
+
+.. data:: NAIF_EUROPA
+   :value: 502
+
+   Jupiter II - Europa, potential subsurface ocean
+
+.. data:: NAIF_GANYMEDE
+   :value: 503
+
+   Jupiter III - Ganymede, largest moon in solar system
+
+.. data:: NAIF_CALLISTO
+   :value: 504
+
+   Jupiter IV - Callisto, heavily cratered
+
+**Saturn's Major Moons:**
+
+.. data:: NAIF_TITAN
+   :value: 606
+
+   Saturn VI - Titan, largest Saturn moon with thick atmosphere
+
+.. data:: NAIF_ENCELADUS
+   :value: 602
+
+   Saturn II - Enceladus, active geysers
+
+.. data:: NAIF_RHEA
+   :value: 605
+
+   Saturn V - Rhea, second largest Saturn moon
+
+.. data:: NAIF_IAPETUS
+   :value: 608
+
+   Saturn VIII - Iapetus, two-toned coloring
+
+**Other Moons:**
+
+.. data:: NAIF_TRITON
+   :value: 801
+
+   Neptune I - Triton, retrograde captured object
+
+.. data:: NAIF_CHARON
+   :value: 901
+
+   Pluto I - Charon, Pluto's largest moon
+
+
+Elongation Helper Functions
+---------------------------
+
+Functions for calculating planetary elongation from the Sun.
+
+.. function:: get_elongation_from_sun(jd_ut, ipl, iflag=0)
+
+   Calculate elongation (angular distance) of a planet from the Sun.
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param ipl: Planet ID
+   :type ipl: int
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Elongation in degrees (0-180)
+   :rtype: float
+
+
+.. function:: get_signed_elongation(jd_ut, ipl, iflag=0)
+
+   Calculate signed elongation from Sun (east positive, west negative).
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param ipl: Planet ID
+   :type ipl: int
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Signed elongation in degrees (-180 to +180)
+   :rtype: float
+
+
+.. function:: is_morning_star(jd_ut, ipl, iflag=0)
+
+   Check if a planet is a morning star (rising before the Sun).
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param ipl: Planet ID (typically Mercury or Venus)
+   :type ipl: int
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: True if planet is a morning star
+   :rtype: bool
+
+
+.. function:: is_evening_star(jd_ut, ipl, iflag=0)
+
+   Check if a planet is an evening star (setting after the Sun).
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param ipl: Planet ID
+   :type ipl: int
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: True if planet is an evening star
+   :rtype: bool
+
+
+.. function:: get_elongation_type(jd_ut, ipl, iflag=0)
+
+   Get the elongation type classification for a planet.
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param ipl: Planet ID
+   :type ipl: int
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: String describing elongation ("morning star", "evening star", "conjunction", etc.)
+   :rtype: str
+
+
+Hypothetical Bodies (Hamburg School)
+------------------------------------
+
+The Hamburg School of astrology uses hypothetical trans-Neptunian planets
+in the Uranian system. These are calculated from Keplerian orbital elements.
+
+Uranian Planet Calculations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: calc_cupido(jd_ut, iflag=0)
+
+   Calculate Cupido position (first Uranian planet).
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (position_tuple, return_flag)
+   :rtype: tuple
+
+
+.. function:: calc_hades(jd_ut, iflag=0)
+
+   Calculate Hades position (second Uranian planet).
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (position_tuple, return_flag)
+   :rtype: tuple
+
+
+.. function:: calc_zeus(jd_ut, iflag=0)
+
+   Calculate Zeus position (third Uranian planet).
+
+
+.. function:: calc_kronos(jd_ut, iflag=0)
+
+   Calculate Kronos position (fourth Uranian planet).
+
+
+.. function:: calc_apollon(jd_ut, iflag=0)
+
+   Calculate Apollon position (fifth Uranian planet).
+
+
+.. function:: calc_admetos(jd_ut, iflag=0)
+
+   Calculate Admetos position (sixth Uranian planet).
+
+
+.. function:: calc_vulkanus(jd_ut, iflag=0)
+
+   Calculate Vulkanus position (seventh Uranian planet).
+
+
+.. function:: calc_poseidon(jd_ut, iflag=0)
+
+   Calculate Poseidon position (eighth Uranian planet).
+
+
+Other Hypothetical Bodies
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: calc_transpluto(jd_ut, iflag=0)
+
+   Calculate Transpluto (Isis) position.
+
+   A hypothetical trans-Plutonian planet used in some astrological systems.
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (position_tuple, return_flag)
+   :rtype: tuple
+
+
+.. function:: calc_vulcan(jd_ut, iflag=0)
+
+   Calculate Vulcan position (hypothetical intramercurial planet).
+
+
+.. function:: calc_waldemath(jd_ut, iflag=0)
+
+   Calculate Waldemath Moon position (hypothetical second moon of Earth).
+
+
+.. function:: calc_proserpina(jd_ut, iflag=0)
+
+   Calculate Proserpina position (hypothetical trans-Plutonian planet).
+
+
+.. function:: calc_planet_x_pickering(jd_ut, iflag=0)
+
+   Calculate Pickering's Planet X position (1919 prediction).
+
+
+.. function:: calc_white_moon_position(jd_ut, use_true_lilith=False)
+
+   Calculate White Moon (Selena) position.
+
+   White Moon is the point opposite to Black Moon Lilith (lunar apogee + 180°).
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param use_true_lilith: If True, use true Lilith; if False, use mean Lilith
+   :type use_true_lilith: bool
+   :returns: White Moon longitude in degrees
+   :rtype: float
+
+
+Generic Hypothetical Functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: calc_uranian_planet(jd_ut, planet_id, iflag=0)
+
+   Calculate position of any Uranian planet by ID.
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param planet_id: Uranian planet ID (SE_CUPIDO through SE_POSEIDON)
+   :type planet_id: int
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (position_tuple, return_flag)
+   :rtype: tuple
+
+
+.. function:: calc_hypothetical_position(jd_ut, elements, iflag=0)
+
+   Calculate position from Keplerian orbital elements.
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param elements: Dictionary of orbital elements (a, e, i, om, w, ma, epoch)
+   :type elements: dict
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (position_tuple, return_flag)
+   :rtype: tuple
+
+
+seorbel.txt Parser
+~~~~~~~~~~~~~~~~~~
+
+Functions for parsing Swiss Ephemeris orbital elements file.
+
+.. function:: parse_seorbel(filepath)
+
+   Parse a seorbel.txt format file.
+
+   :param filepath: Path to seorbel.txt file
+   :type filepath: str
+   :returns: List of SeorbelElements objects
+   :rtype: list
+
+
+.. function:: get_bundled_seorbel_path()
+
+   Get path to the bundled seorbel.txt file.
+
+   :returns: Path to seorbel.txt included with libephemeris
+   :rtype: str
+
+
+.. function:: load_bundled_seorbel()
+
+   Load and parse the bundled seorbel.txt file.
+
+   :returns: List of SeorbelElements objects
+   :rtype: list
+
+
+.. function:: get_seorbel_body_by_name(name)
+
+   Get orbital elements for a body by name.
+
+   :param name: Body name (e.g., "Cupido", "Transpluto")
+   :type name: str
+   :returns: SeorbelElements object or None
+   :rtype: SeorbelElements or None
+
+
+.. function:: calc_seorbel_position(jd_ut, elements, iflag=0)
+
+   Calculate position from SeorbelElements.
+
+   :param jd_ut: Julian Day in Universal Time
+   :type jd_ut: float
+   :param elements: SeorbelElements object
+   :type elements: SeorbelElements
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (position_tuple, return_flag)
+   :rtype: tuple
+
+
+Hypothetical Body Constants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. data:: URANIAN_KEPLERIAN_ELEMENTS
+
+   Dictionary of Keplerian elements for the 8 Uranian planets.
+
+.. data:: TRANSPLUTO_KEPLERIAN_ELEMENTS
+
+   Orbital elements for Transpluto (Isis).
+
+.. data:: VULCAN_ELEMENTS
+
+   Orbital elements for Vulcan (intramercurial planet).
+
+.. data:: WALDEMATH_ELEMENTS
+
+   Orbital elements for Waldemath Moon.
+
+.. data:: PICKERING_PLANET_X_ELEMENTS
+
+   Orbital elements for Pickering's 1919 Planet X prediction.
+
+
+Polar Latitude House Handling
+-----------------------------
+
+Special handling for house calculations at extreme latitudes where
+some house systems fail.
+
+.. function:: swe_houses_with_fallback(tjd_ut, lat, lon, hsys, fallback_hsys=ord('W'))
+
+   Calculate houses with automatic fallback for polar latitudes.
+
+   :param tjd_ut: Julian Day in Universal Time
+   :type tjd_ut: float
+   :param lat: Geographic latitude
+   :type lat: float
+   :param lon: Geographic longitude
+   :type lon: float
+   :param hsys: Primary house system code
+   :type hsys: int
+   :param fallback_hsys: Fallback system for polar latitudes (default: Whole Sign)
+   :type fallback_hsys: int
+   :returns: Tuple of (cusps, ascmc, actual_hsys)
+   :rtype: tuple
+
+
+.. function:: swe_houses_armc_with_fallback(armc, lat, eps, hsys, fallback_hsys=ord('W'))
+
+   Calculate houses from ARMC with fallback.
+
+   :param armc: ARMC (sidereal time in degrees)
+   :type armc: float
+   :param lat: Geographic latitude
+   :type lat: float
+   :param eps: Obliquity of the ecliptic
+   :type eps: float
+   :param hsys: Primary house system code
+   :type hsys: int
+   :param fallback_hsys: Fallback system
+   :type fallback_hsys: int
+   :returns: Tuple of (cusps, ascmc, actual_hsys)
+   :rtype: tuple
+
+
+.. function:: get_polar_latitude_threshold(hsys)
+
+   Get the latitude threshold beyond which a house system may fail.
+
+   :param hsys: House system code
+   :type hsys: int
+   :returns: Latitude threshold in degrees (or 90.0 if no limit)
+   :rtype: float
+
+   **Note:**
+
+   Time-based house systems (Placidus, Koch) fail at latitudes where
+   the Sun doesn't rise/set. Typical threshold is around 66.5° (Arctic Circle).
+
+
+PolarCircleError
+~~~~~~~~~~~~~~~~
+
+.. autoexception:: PolarCircleError
+
+   Exception raised when house calculation fails at polar latitudes.
+
+   This exception is raised when attempting to calculate houses using
+   a time-based system (Placidus, Koch) at latitudes where the system
+   cannot produce valid results.
+
+   **Example:**
+
+   >>> try:
+   ...     cusps, ascmc = swe_houses(jd, 85.0, 0, ord('P'))  # Placidus at 85°N
+   ... except PolarCircleError as e:
+   ...     print(f"Polar error: {e}")
+   ...     cusps, ascmc = swe_houses(jd, 85.0, 0, ord('W'))  # Use Whole Sign
+
+
+Eclipse Additional Functions
+----------------------------
+
+Additional eclipse calculation functions for detailed analysis.
+
+Lunar Eclipse Gamma
+~~~~~~~~~~~~~~~~~~~
+
+.. function:: lun_eclipse_gamma(jd, iflag=0)
+
+   Calculate gamma parameter for a lunar eclipse.
+
+   Gamma is the closest approach of the Moon's center to Earth's shadow axis,
+   measured in Earth radii.
+
+   :param jd: Julian Day of eclipse (near maximum)
+   :type jd: float
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Gamma value
+   :rtype: float
+
+
+Planetary Occultations
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: planet_occult_when_glob(jd_start, ipl, starname, iflag, ifltype)
+
+   Find when a planet occults a star (global search).
+
+   :param jd_start: Julian Day to start search
+   :type jd_start: float
+   :param ipl: Occulting planet ID
+   :type ipl: int
+   :param starname: Name of occulted star
+   :type starname: str
+   :param iflag: Calculation flags
+   :type iflag: int
+   :param ifltype: Occultation type filter
+   :type ifltype: int
+   :returns: Tuple of (return_flag, time_array)
+   :rtype: tuple
+
+
+.. function:: planet_occult_when_loc(jd_start, ipl, starname, iflag, lon, lat, alt)
+
+   Find when a planet occults a star at a specific location.
+
+   :param jd_start: Julian Day to start search
+   :type jd_start: float
+   :param ipl: Occulting planet ID
+   :type ipl: int
+   :param starname: Name of occulted star
+   :type starname: str
+   :param iflag: Calculation flags
+   :type iflag: int
+   :param lon: Geographic longitude
+   :type lon: float
+   :param lat: Geographic latitude
+   :type lat: float
+   :param alt: Altitude in meters
+   :type alt: float
+   :returns: Tuple of (return_flag, time_array, attr_array)
+   :rtype: tuple
+
+
+Eclipse Path Functions
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: calc_eclipse_path_width(jd, iflag=0)
+
+   Calculate the path width of a solar eclipse.
+
+   :param jd: Julian Day during eclipse
+   :type jd: float
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Path width in kilometers
+   :rtype: float
+
+
+.. function:: calc_eclipse_central_line(jd, iflag=0)
+
+   Calculate coordinates on the eclipse central line.
+
+   :param jd: Julian Day during eclipse
+   :type jd: float
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (longitude, latitude) in degrees
+   :rtype: tuple
+
+
+.. function:: calc_eclipse_northern_limit(jd, iflag=0)
+
+   Calculate coordinates of the eclipse northern limit.
+
+   :param jd: Julian Day during eclipse
+   :type jd: float
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (longitude, latitude) in degrees
+   :rtype: tuple
+
+
+.. function:: calc_eclipse_southern_limit(jd, iflag=0)
+
+   Calculate coordinates of the eclipse southern limit.
+
+   :param jd: Julian Day during eclipse
+   :type jd: float
+   :param iflag: Calculation flags
+   :type iflag: int
+   :returns: Tuple of (longitude, latitude) in degrees
+   :rtype: tuple
+
+
+Saros and Inex Series
+~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: get_saros_number(jd_eclipse, is_solar=True)
+
+   Get the Saros series number for an eclipse.
+
+   :param jd_eclipse: Julian Day of eclipse maximum
+   :type jd_eclipse: float
+   :param is_solar: True for solar eclipse, False for lunar
+   :type is_solar: bool
+   :returns: Saros series number
+   :rtype: int
+
+
+.. function:: get_inex_number(jd_eclipse, is_solar=True)
+
+   Get the Inex series number for an eclipse.
+
+   :param jd_eclipse: Julian Day of eclipse maximum
+   :type jd_eclipse: float
+   :param is_solar: True for solar eclipse, False for lunar
+   :type is_solar: bool
+   :returns: Inex series number
+   :rtype: int
+
+
+.. data:: SAROS_CYCLE_DAYS
+   :value: 6585.3213
+
+   Length of Saros cycle in days (~18 years, 11 days)
+
+.. data:: INEX_CYCLE_DAYS
+   :value: 10571.95
+
+   Length of Inex cycle in days (~29 years)
+
+
+Atmospheric Extinction
+----------------------
+
+Functions for modeling atmospheric extinction effects on celestial observations.
+
+Extinction Calculation
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: calc_airmass(altitude_deg)
+
+   Calculate airmass for a given altitude.
+
+   :param altitude_deg: Altitude above horizon in degrees
+   :type altitude_deg: float
+   :returns: Airmass value (1.0 at zenith)
+   :rtype: float
+
+
+.. function:: calc_extinction_coefficient(wavelength, pressure, temperature, humidity, height)
+
+   Calculate total atmospheric extinction coefficient.
+
+   :param wavelength: Wavelength in nanometers
+   :type wavelength: float
+   :param pressure: Atmospheric pressure in mbar
+   :type pressure: float
+   :param temperature: Temperature in Celsius
+   :type temperature: float
+   :param humidity: Relative humidity (0-1)
+   :type humidity: float
+   :param height: Observer elevation in meters
+   :type height: float
+   :returns: Extinction coefficient in magnitudes per airmass
+   :rtype: float
+
+
+.. function:: calc_extinction_magnitude(magnitude, airmass, extinction_coeff)
+
+   Calculate magnitude reduction due to atmospheric extinction.
+
+   :param magnitude: True magnitude
+   :type magnitude: float
+   :param airmass: Airmass value
+   :type airmass: float
+   :param extinction_coeff: Extinction coefficient
+   :type extinction_coeff: float
+   :returns: Apparent magnitude after extinction
+   :rtype: float
+
+
+.. function:: apparent_magnitude_with_extinction(true_mag, altitude_deg, extinction_coeff=0.21)
+
+   Calculate apparent magnitude including atmospheric extinction.
+
+   :param true_mag: True (above atmosphere) magnitude
+   :type true_mag: float
+   :param altitude_deg: Altitude above horizon in degrees
+   :type altitude_deg: float
+   :param extinction_coeff: Extinction coefficient (default 0.21 for V-band)
+   :type extinction_coeff: float
+   :returns: Apparent magnitude
+   :rtype: float
+
+
+Extinction Component Functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: calc_rayleigh_coefficient(wavelength, pressure, temperature, height)
+
+   Calculate Rayleigh scattering extinction coefficient.
+
+
+.. function:: calc_aerosol_coefficient(wavelength, pressure, temperature, humidity, height)
+
+   Calculate aerosol extinction coefficient.
+
+
+.. function:: calc_ozone_coefficient(wavelength)
+
+   Calculate ozone absorption coefficient.
+
+
+.. function:: calc_water_vapor_coefficient(wavelength, humidity)
+
+   Calculate water vapor absorption coefficient.
+
+
+Twilight Sky Brightness
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. function:: calc_twilight_sky_brightness(sun_altitude_deg, zenith_angle_deg, azimuth_from_sun_deg)
+
+   Calculate twilight sky brightness.
+
+   :param sun_altitude_deg: Sun altitude in degrees (negative during twilight)
+   :type sun_altitude_deg: float
+   :param zenith_angle_deg: Zenith angle of viewing direction
+   :type zenith_angle_deg: float
+   :param azimuth_from_sun_deg: Azimuth angle from Sun direction
+   :type azimuth_from_sun_deg: float
+   :returns: Sky brightness in magnitudes per square arcsecond
+   :rtype: float
+
+
+.. function:: get_twilight_phase(sun_altitude_deg)
+
+   Get twilight phase classification.
+
+   :param sun_altitude_deg: Sun altitude in degrees
+   :type sun_altitude_deg: float
+   :returns: Twilight phase string ("day", "civil", "nautical", "astronomical", "night")
+   :rtype: str
+
+
+.. function:: calc_limiting_magnitude_twilight(sun_altitude_deg)
+
+   Calculate naked-eye limiting magnitude during twilight.
+
+   :param sun_altitude_deg: Sun altitude in degrees
+   :type sun_altitude_deg: float
+   :returns: Limiting magnitude
+   :rtype: float
+
+
+Extinction Data Classes
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: ExtinctionCoefficients
+
+   Container for atmospheric extinction coefficients broken down by component.
+
+   Attributes:
+       rayleigh (float): Rayleigh scattering component
+       aerosol (float): Aerosol scattering component
+       ozone (float): Ozone absorption component
+       water (float): Water vapor absorption component
+       total (float): Total extinction coefficient
+
+
+.. autoclass:: TwilightSkyBrightness
+
+   Model for twilight sky brightness calculations.
+
+
+.. autoclass:: VisibilityResult
+
+   Result of visibility threshold calculation.
+
+   Attributes:
+       visible (bool): Whether object is visible
+       limiting_mag (float): Limiting magnitude at position
+       object_mag (float): Object's apparent magnitude
+       margin (float): Visibility margin (limiting_mag - object_mag)
+
+
+Visibility Threshold Constants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. data:: TWILIGHT_CIVIL_START
+   :value: -0.833
+
+   Sun altitude at civil twilight start (degrees)
+
+.. data:: TWILIGHT_CIVIL_END
+   :value: -6.0
+
+   Sun altitude at civil twilight end
+
+.. data:: TWILIGHT_NAUTICAL_END
+   :value: -12.0
+
+   Sun altitude at nautical twilight end
+
+.. data:: TWILIGHT_ASTRONOMICAL_END
+   :value: -18.0
+
+   Sun altitude at astronomical twilight end
+
+.. data:: DARK_SKY_BRIGHTNESS_V
+   :value: 21.5
+
+   Typical dark sky brightness in V-band (mag/arcsec²)
+
+.. data:: OBSERVER_SKILL_INEXPERIENCED
+   :value: 0
+
+.. data:: OBSERVER_SKILL_AVERAGE
+   :value: 1
+
+.. data:: OBSERVER_SKILL_EXPERIENCED
+   :value: 2
+
+.. data:: OBSERVER_SKILL_EXPERT
+   :value: 3
