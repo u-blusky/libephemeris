@@ -39,12 +39,18 @@ References:
 - Swiss Ephemeris API compatibility layer
 """
 
+from __future__ import annotations
+
 import math
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
 from skyfield.api import Star
 from skyfield.framelib import ecliptic_frame
 from skyfield.nutationlib import iau2000b_radians
 from dataclasses import dataclass
+
+if TYPE_CHECKING:
+    from .exceptions import EphemerisRangeError
+
 from .constants import (
     SE_SUN,
     SE_MOON,
@@ -138,6 +144,105 @@ _PLANET_NAMES = {
     SE_EARTH: "Earth",
     SE_ISIS: "Transpluto",
 }
+
+
+def _wrap_ephemeris_range_error(
+    skyfield_error: Exception,
+    jd: float,
+    body_id: int | None = None,
+) -> "EphemerisRangeError":
+    """
+    Wrap Skyfield's EphemerisRangeError with enhanced error details.
+
+    Creates a libephemeris.EphemerisRangeError with detailed information about:
+    - The requested Julian Day number
+    - The supported date range in both JD and calendar format
+    - The body being calculated (if known)
+    - The ephemeris file in use
+
+    Args:
+        skyfield_error: The original Skyfield EphemerisRangeError
+        jd: The Julian Day that was requested
+        body_id: The body ID being calculated (optional)
+
+    Returns:
+        EphemerisRangeError with enhanced error message
+    """
+    from .exceptions import EphemerisRangeError
+    from . import state
+
+    # Get ephemeris info
+    path, start_jd, end_jd, denum = state.get_current_file_data(0)
+
+    # Extract date strings from the original error message if available
+    original_msg = str(skyfield_error)
+    start_date = None
+    end_date = None
+
+    # Try to parse dates from "ephemeris segment only covers dates YYYY-MM-DD through YYYY-MM-DD"
+    import re
+
+    date_match = re.search(
+        r"covers dates (\d{4}-\d{2}-\d{2}) through (\d{4}-\d{2}-\d{2})", original_msg
+    )
+    if date_match:
+        start_date = date_match.group(1)
+        end_date = date_match.group(2)
+
+    # Convert requested JD to calendar date for the message
+    from .time_utils import swe_revjul
+
+    req_year, req_month, req_day, req_hour = swe_revjul(jd, 1)  # Gregorian calendar
+    req_date_str = f"{req_year}-{req_month:02d}-{req_day:02d}"
+
+    # Get body name if available
+    body_name = None
+    if body_id is not None:
+        body_name = get_planet_name(body_id)
+
+    # Get ephemeris filename
+    ephemeris_file = None
+    if path:
+        import os
+
+        ephemeris_file = os.path.basename(path)
+    elif denum:
+        ephemeris_file = f"de{denum}.bsp"
+
+    # Build enhanced error message
+    parts = []
+
+    if body_name and body_id is not None:
+        parts.append(f"Cannot calculate {body_name} (ID {body_id})")
+    else:
+        parts.append("Calculation failed")
+
+    parts.append(f"for JD {jd:.6f} ({req_date_str}):")
+    parts.append("date is outside ephemeris range.")
+
+    if start_jd and end_jd:
+        parts.append(f"\n  Supported range: JD {start_jd:.1f} to {end_jd:.1f}")
+        if start_date and end_date:
+            parts.append(f" ({start_date} to {end_date})")
+    elif start_date and end_date:
+        parts.append(f"\n  Supported range: {start_date} to {end_date}")
+
+    if ephemeris_file:
+        parts.append(f"\n  Ephemeris file: {ephemeris_file}")
+
+    message = " ".join(parts[:3]) + "".join(parts[3:])
+
+    return EphemerisRangeError(
+        message=message,
+        requested_jd=jd,
+        start_jd=start_jd if start_jd else None,
+        end_jd=end_jd if end_jd else None,
+        start_date=start_date,
+        end_date=end_date,
+        body_id=body_id,
+        body_name=body_name,
+        ephemeris_file=ephemeris_file,
+    )
 
 
 def get_planet_target(planets, target_name: str):
@@ -313,6 +418,9 @@ def swe_calc_ut(
             - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
             - Return flag: iflag value on success
 
+    Raises:
+        EphemerisRangeError: If the date is outside the ephemeris coverage
+
     Coordinate Output:
         - longitude: Ecliptic longitude in degrees (0-360)
         - latitude: Ecliptic latitude in degrees
@@ -329,9 +437,14 @@ def swe_calc_ut(
         >>> pos, retflag = swe_calc_ut(2451545.0, SE_MARS, SEFLG_SPEED)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
+
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
-    return _calc_body(t, ipl, iflag)
+    try:
+        return _calc_body(t, ipl, iflag)
+    except SkyfieldRangeError as e:
+        raise _wrap_ephemeris_range_error(e, tjd_ut, ipl) from e
 
 
 def swe_calc(
@@ -353,6 +466,9 @@ def swe_calc(
             - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
             - Return flag: iflag value on success
 
+    Raises:
+        EphemerisRangeError: If the date is outside the ephemeris coverage
+
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
         which varies from ~32 seconds (year 2000) to minutes (historical times).
@@ -362,9 +478,14 @@ def swe_calc(
         >>> pos, retflag = swe_calc(2451545.0, SE_JUPITER, SEFLG_SPEED)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
+
     ts = get_timescale()
     t = ts.tt_jd(tjd)
-    return _calc_body(t, ipl, iflag)
+    try:
+        return _calc_body(t, ipl, iflag)
+    except SkyfieldRangeError as e:
+        raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
 
 
 def swe_calc_pctr(
@@ -391,6 +512,9 @@ def swe_calc_pctr(
             - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
             - Return flag: iflag value on success
 
+    Raises:
+        EphemerisRangeError: If the date is outside the ephemeris coverage
+
     Note:
         - SEFLG_HELCTR and SEFLG_BARYCTR flags are ignored (observer is always iplctr)
         - SEFLG_TOPOCTR is ignored (no topocentric correction on other planets)
@@ -401,9 +525,14 @@ def swe_calc_pctr(
         >>> pos, retflag = swe_calc_pctr(2451545.0, SE_MOON, SE_MARS, SEFLG_SPEED)
         >>> print(f"Moon longitude from Mars: {pos[0]:.2f}°")
     """
+    from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
+
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
-    return _calc_body_pctr(t, ipl, iplctr, iflag)
+    try:
+        return _calc_body_pctr(t, ipl, iplctr, iflag)
+    except SkyfieldRangeError as e:
+        raise _wrap_ephemeris_range_error(e, tjd_ut, ipl) from e
 
 
 def _calc_body_pctr(

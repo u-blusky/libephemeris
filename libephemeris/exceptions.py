@@ -85,3 +85,75 @@ class PolarCircleError(Error):
             f"threshold={self.threshold}, obliquity={self.obliquity}, "
             f"house_system={self.house_system!r})"
         )
+
+
+class EphemerisRangeError(Error):
+    """Error raised when a calculation date is outside the ephemeris range.
+
+    This exception is raised when the requested Julian Day falls outside the
+    date range covered by the loaded ephemeris file (e.g., DE440 covers
+    1550-2650).
+
+    This exception provides detailed information about the supported date range
+    to help users understand why the calculation failed and what dates are valid.
+
+    Attributes:
+        requested_jd: The Julian Day that was requested
+        start_jd: The start of the supported Julian Day range
+        end_jd: The end of the supported Julian Day range
+        start_date: The start date in calendar format (YYYY-MM-DD)
+        end_date: The end date in calendar format (YYYY-MM-DD)
+        body_id: The body ID that was being calculated (if available)
+        body_name: Human-readable name of the body (if available)
+        ephemeris_file: The ephemeris file in use (if available)
+        message: Human-readable error message
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.calc_ut(5000000.0, ephem.SE_SUN, 0)  # Year ~8827 AD
+        ... except ephem.EphemerisRangeError as e:
+        ...     print(f"Date JD {e.requested_jd} is outside range")
+        ...     print(f"Supported: JD {e.start_jd} to {e.end_jd}")
+        ...     print(f"           ({e.start_date} to {e.end_date})")
+
+    See Also:
+        get_current_file_data: Returns information about the loaded ephemeris
+        set_ephemeris_file: Load a different ephemeris with different date range
+    """
+
+    def __init__(
+        self,
+        message: str,
+        requested_jd: float | None = None,
+        start_jd: float | None = None,
+        end_jd: float | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        body_id: int | None = None,
+        body_name: str | None = None,
+        ephemeris_file: str | None = None,
+    ):
+        super().__init__(message)
+        self.requested_jd = requested_jd
+        self.start_jd = start_jd
+        self.end_jd = end_jd
+        self.start_date = start_date
+        self.end_date = end_date
+        self.body_id = body_id
+        self.body_name = body_name
+        self.ephemeris_file = ephemeris_file
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"EphemerisRangeError({self.message!r}, "
+            f"requested_jd={self.requested_jd}, "
+            f"start_jd={self.start_jd}, end_jd={self.end_jd}, "
+            f"start_date={self.start_date!r}, end_date={self.end_date!r}, "
+            f"body_id={self.body_id}, body_name={self.body_name!r}, "
+            f"ephemeris_file={self.ephemeris_file!r})"
+        )

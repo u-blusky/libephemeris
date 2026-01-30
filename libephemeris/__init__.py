@@ -1,5 +1,5 @@
 from .constants import *
-from .exceptions import Error, PolarCircleError
+from .exceptions import Error, PolarCircleError, EphemerisRangeError
 from .time_utils import (
     swe_julday,
     swe_revjul,
@@ -530,6 +530,8 @@ __license__ = "LGPL-3.0"
 __all__ = [
     # Exceptions
     "Error",
+    "EphemerisRangeError",
+    "PolarCircleError",
     # Thread-safe Context API
     "EphemerisContext",
     # Time functions (both swe_ and non-prefixed aliases)
