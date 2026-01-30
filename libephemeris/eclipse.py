@@ -61,6 +61,200 @@ LUNAR_NODE_PERIOD = 6798.38  # Lunar node regression period in days
 ECLIPSE_LIMIT_SOLAR = 18.5  # Maximum elongation from node for solar eclipse (degrees)
 EARTH_RADIUS_KM = 6378.137  # Earth equatorial radius in km (WGS84)
 
+# Edge case thresholds for eclipse calculations
+# These constants define limits for shallow/near-miss eclipses
+SHALLOW_ECLIPSE_MAG_THRESHOLD = 0.01  # Minimum magnitude for reliable contact times
+NEAR_MISS_GAMMA_MARGIN = 0.02  # Margin from gamma limit for edge case handling
+MINIMUM_SEPARATION_FOR_LENS = 1e-10  # Minimum separation to avoid division by zero
+
+
+def _is_shallow_eclipse(magnitude: float) -> bool:
+    """
+    Check if an eclipse is very shallow (magnitude close to zero).
+
+    Very shallow eclipses have unreliable contact time calculations because
+    the penumbra barely grazes Earth or the Moon barely enters the shadow.
+
+    Args:
+        magnitude: Eclipse magnitude (0 to ~1.5 for solar, 0 to ~2 for lunar)
+
+    Returns:
+        True if the eclipse is considered shallow (magnitude < threshold)
+    """
+    return magnitude < SHALLOW_ECLIPSE_MAG_THRESHOLD
+
+
+def _is_near_miss_eclipse(gamma: float, gamma_limit: float = 1.55) -> bool:
+    """
+    Check if an eclipse is a near-miss (gamma very close to the eclipse limit).
+
+    Near-miss eclipses have gamma values very close to the limit where eclipses
+    cease to occur. These require special handling to avoid numerical instability.
+
+    Args:
+        gamma: Eclipse gamma parameter (distance of shadow axis from Earth center)
+        gamma_limit: Maximum gamma for any eclipse visibility (default 1.55)
+
+    Returns:
+        True if gamma is within NEAR_MISS_GAMMA_MARGIN of the limit
+    """
+    return abs(gamma) > (gamma_limit - NEAR_MISS_GAMMA_MARGIN)
+
+
+def _safe_acos(x: float) -> float:
+    """
+    Safe arccosine that clamps input to valid range [-1, 1].
+
+    Numerical errors can cause values slightly outside the valid range,
+    which would raise a domain error. This function clamps the input.
+
+    Args:
+        x: Input value (should be in [-1, 1])
+
+    Returns:
+        math.acos of the clamped value
+    """
+    return math.acos(max(-1.0, min(1.0, x)))
+
+
+def _safe_sqrt(x: float) -> float:
+    """
+    Safe square root that returns 0 for negative inputs.
+
+    Numerical errors can cause small negative values where zero is expected.
+    This function returns 0 for negative inputs instead of raising an error.
+
+    Args:
+        x: Input value (should be >= 0)
+
+    Returns:
+        math.sqrt of x if x >= 0, else 0.0
+    """
+    return math.sqrt(max(0.0, x))
+
+
+def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
+    """
+    Calculate eclipse obscuration with edge case handling.
+
+    Obscuration is the fraction of the Sun's area covered by the Moon.
+    This function handles edge cases like:
+    - Zero separation (total/annular eclipse)
+    - Separation equal to sum of radii (no eclipse)
+    - Very small separations that could cause numerical issues
+
+    Args:
+        r_sun: Sun's angular radius in degrees
+        r_moon: Moon's angular radius in degrees
+        d: Center-to-center separation in degrees
+
+    Returns:
+        Obscuration as a fraction (0 to 1)
+    """
+    # Handle edge case: no overlap
+    if d >= r_sun + r_moon:
+        return 0.0
+
+    # Handle edge case: one disk entirely within the other
+    if d <= abs(r_sun - r_moon):
+        if r_moon >= r_sun:
+            return 1.0
+        else:
+            return (r_moon / r_sun) ** 2
+
+    # Handle edge case: zero or near-zero separation
+    if d < MINIMUM_SEPARATION_FOR_LENS:
+        # At zero separation, use the smaller radius ratio
+        return min(1.0, (r_moon / r_sun) ** 2)
+
+    # Calculate lens-shaped intersection area
+    # d1 is distance from Sun center to intersection chord
+    # d2 is distance from Moon center to intersection chord
+    d1 = (d * d + r_sun * r_sun - r_moon * r_moon) / (2 * d)
+    d2 = d - d1
+
+    # Validate that the geometric configuration is valid
+    if abs(d1) > r_sun or abs(d2) > r_moon:
+        # This shouldn't happen if we passed earlier checks, but handle gracefully
+        return 0.0
+
+    # Calculate areas using lens formula with safe operations
+    area1 = r_sun * r_sun * _safe_acos(d1 / r_sun) - d1 * _safe_sqrt(
+        r_sun * r_sun - d1 * d1
+    )
+    area2 = r_moon * r_moon * _safe_acos(d2 / r_moon) - d2 * _safe_sqrt(
+        r_moon * r_moon - d2 * d2
+    )
+
+    intersection_area = area1 + area2
+    sun_area = math.pi * r_sun * r_sun
+
+    obscuration = intersection_area / sun_area
+    return max(0.0, min(1.0, obscuration))
+
+
+def _calculate_magnitude_safe(
+    gamma: float, moon_sun_ratio: float, gamma_limit_partial: float = 1.55
+) -> float:
+    """
+    Calculate eclipse magnitude with edge case handling.
+
+    Handles shallow partial eclipses where gamma is close to the eclipse limit.
+
+    Args:
+        gamma: Eclipse gamma parameter (shadow axis distance from Earth center)
+        moon_sun_ratio: Ratio of Moon's apparent diameter to Sun's
+        gamma_limit_partial: Maximum gamma for partial eclipse visibility
+
+    Returns:
+        Eclipse magnitude (0 to ~1.5), clamped to valid range
+    """
+    # For very shallow eclipses (gamma near limit), magnitude approaches 0
+    if _is_near_miss_eclipse(gamma, gamma_limit_partial):
+        # Use linear interpolation near the edge for smooth transition
+        remaining = gamma_limit_partial - abs(gamma)
+        if remaining <= 0:
+            return 0.0
+        # Magnitude decreases linearly as gamma approaches limit
+        magnitude = (remaining / NEAR_MISS_GAMMA_MARGIN) * SHALLOW_ECLIPSE_MAG_THRESHOLD
+        return max(0.0, min(1.5, magnitude * moon_sun_ratio))
+
+    # Standard magnitude calculation
+    if abs(gamma) >= gamma_limit_partial:
+        return 0.0
+
+    magnitude = 1.0 - abs(gamma) / gamma_limit_partial
+    magnitude = magnitude * moon_sun_ratio
+
+    return max(0.0, min(1.5, magnitude))
+
+
+def _validate_contact_time(
+    jd_contact: float, jd_max: float, max_offset_days: float = 0.25
+) -> float:
+    """
+    Validate a calculated contact time and return 0 if invalid.
+
+    Contact times should be within a reasonable range of the eclipse maximum.
+    This function checks if the contact time is valid.
+
+    Args:
+        jd_contact: Calculated contact time (Julian Day)
+        jd_max: Eclipse maximum time (Julian Day)
+        max_offset_days: Maximum allowed offset from maximum (default 6 hours)
+
+    Returns:
+        The contact time if valid, 0.0 if invalid
+    """
+    if jd_contact <= 0:
+        return 0.0
+
+    offset = abs(jd_contact - jd_max)
+    if offset > max_offset_days:
+        return 0.0
+
+    return jd_contact
+
 
 def _find_next_new_moon(jd_start: float) -> float:
     """
@@ -565,7 +759,10 @@ def _calculate_eclipse_type_and_magnitude(
     Determine eclipse type and magnitude at maximum eclipse.
 
     Uses geometric calculations based on Sun-Moon-Earth distances
-    and apparent angular sizes.
+    and apparent angular sizes. Includes edge case handling for:
+    - Very shallow partial eclipses (magnitude near 0)
+    - Near-miss eclipses (gamma close to eclipse limit)
+    - Grazing eclipses at extreme gamma values
 
     Args:
         jd: Julian Day of eclipse maximum (UT)
@@ -594,8 +791,11 @@ def _calculate_eclipse_type_and_magnitude(
     # Moon: mean radius 932.56" at mean distance (0.002569 AU)
     moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_dist)
 
-    # Ratio of apparent sizes
-    moon_sun_ratio = moon_angular_radius / sun_angular_radius
+    # Ratio of apparent sizes - handle edge case of very small Sun radius
+    if sun_angular_radius < 1e-10:
+        moon_sun_ratio = 1.0  # Fallback for numerical stability
+    else:
+        moon_sun_ratio = moon_angular_radius / sun_angular_radius
 
     # Calculate gamma - the perpendicular distance of Moon's shadow axis
     # from Earth's center, in Earth radii
@@ -634,11 +834,24 @@ def _calculate_eclipse_type_and_magnitude(
     GAMMA_LIMIT_PARTIAL = 1.55
     GAMMA_LIMIT_TOTAL = 0.997
 
+    # Edge case: gamma beyond eclipse limit
     if abs(gamma) > GAMMA_LIMIT_PARTIAL:
         # No eclipse
         return 0, 0.0, gamma, moon_sun_ratio
 
-    # There is some form of eclipse
+    # Edge case: near-miss eclipse (gamma very close to limit)
+    if _is_near_miss_eclipse(gamma, GAMMA_LIMIT_PARTIAL):
+        # Use safe magnitude calculation for smooth transition
+        eclipse_type = SE_ECL_PARTIAL
+        magnitude = _calculate_magnitude_safe(
+            gamma, moon_sun_ratio, GAMMA_LIMIT_PARTIAL
+        )
+        # Mark as grazing if magnitude is very small
+        if _is_shallow_eclipse(magnitude):
+            eclipse_type |= SE_ECL_GRAZING
+        return eclipse_type, magnitude, gamma, moon_sun_ratio
+
+    # Standard eclipse type and magnitude calculation
     if moon_sun_ratio >= 1.0:
         # Moon appears larger - can be total
         if abs(gamma) < GAMMA_LIMIT_TOTAL:
@@ -647,6 +860,9 @@ def _calculate_eclipse_type_and_magnitude(
         else:
             eclipse_type = SE_ECL_PARTIAL
             magnitude = 1.0 - abs(gamma) / GAMMA_LIMIT_PARTIAL
+            # Check for shallow partial eclipse
+            if _is_shallow_eclipse(magnitude):
+                eclipse_type |= SE_ECL_GRAZING
     else:
         # Moon appears smaller - can be annular
         if abs(gamma) < GAMMA_LIMIT_TOTAL:
@@ -659,6 +875,9 @@ def _calculate_eclipse_type_and_magnitude(
         else:
             eclipse_type = SE_ECL_PARTIAL
             magnitude = (1.0 - abs(gamma) / GAMMA_LIMIT_PARTIAL) * moon_sun_ratio
+            # Check for shallow partial eclipse
+            if _is_shallow_eclipse(magnitude):
+                eclipse_type |= SE_ECL_GRAZING
 
     # Ensure magnitude is in valid range
     magnitude = max(0.0, min(1.5, magnitude))
@@ -1200,42 +1419,19 @@ def _calculate_local_eclipse_phases(
     # Calculate eclipse magnitude
     # Magnitude = fraction of Sun's diameter covered by Moon
     overlap = sum_radii - min_separation
-    magnitude = overlap / sun_diameter
-    magnitude = max(0.0, min(magnitude, 1.0 + moon_diameter / sun_diameter))
+    # Edge case: handle very small sun_diameter (shouldn't happen but be safe)
+    if sun_diameter < MINIMUM_SEPARATION_FOR_LENS:
+        magnitude = 0.0
+    else:
+        magnitude = overlap / sun_diameter
+        magnitude = max(0.0, min(magnitude, 1.0 + moon_diameter / sun_diameter))
 
-    # Calculate obscuration (fraction of Sun's area covered)
-    # Using formula from Meeus
+    # Calculate obscuration using safe function that handles edge cases
     r_sun = sun_angular_radius
     r_moon = moon_angular_radius
     d = min_separation  # center-to-center separation
 
-    if d >= r_sun + r_moon:
-        obscuration = 0.0
-    elif d <= abs(r_sun - r_moon):
-        # One disk entirely within the other
-        if r_moon >= r_sun:
-            obscuration = 1.0
-        else:
-            obscuration = (r_moon / r_sun) ** 2
-    else:
-        # Partial overlap - use lens formula
-        # Area of intersection of two circles
-        d1 = (d * d + r_sun * r_sun - r_moon * r_moon) / (2 * d)
-        d2 = d - d1
-        if abs(d1) <= r_sun and abs(d2) <= r_moon:
-            area1 = r_sun * r_sun * math.acos(d1 / r_sun) - d1 * math.sqrt(
-                max(0, r_sun * r_sun - d1 * d1)
-            )
-            area2 = r_moon * r_moon * math.acos(d2 / r_moon) - d2 * math.sqrt(
-                max(0, r_moon * r_moon - d2 * d2)
-            )
-            intersection_area = area1 + area2
-            sun_area = math.pi * r_sun * r_sun
-            obscuration = intersection_area / sun_area
-        else:
-            obscuration = 0.0
-
-    obscuration = max(0.0, min(1.0, obscuration))
+    obscuration = _calculate_obscuration_safe(r_sun, r_moon, d)
 
     # Find contact times using bisection
     # First/fourth contact: separation = sum of radii
@@ -1244,9 +1440,32 @@ def _calculate_local_eclipse_phases(
     def _find_contact_time(
         jd_start: float, jd_end: float, target_sep: float, is_increasing: bool
     ) -> float:
-        """Find time when separation equals target, searching in given direction."""
+        """Find time when separation equals target, searching in given direction.
+
+        Includes edge case handling for shallow eclipses where contact may
+        not occur or search may fail to converge.
+        """
         jd_low = jd_start
         jd_high = jd_end
+
+        # Edge case: check if target separation is achievable in search range
+        sep_start = _get_sun_moon_separation(jd_start)
+        sep_end = _get_sun_moon_separation(jd_end)
+
+        # For decreasing search: sep should go from above to below target
+        # For increasing search: sep should go from below to above target
+        if is_increasing:
+            if sep_start > target_sep or sep_end < target_sep:
+                # Check if minimum separation in range is above target
+                sep_mid = _get_sun_moon_separation((jd_start + jd_end) / 2)
+                if min(sep_start, sep_end, sep_mid) > target_sep:
+                    return 0.0  # Contact not achievable
+        else:
+            if sep_start < target_sep or sep_end > target_sep:
+                # Check if minimum separation in range is above target
+                sep_mid = _get_sun_moon_separation((jd_start + jd_end) / 2)
+                if min(sep_start, sep_end, sep_mid) > target_sep:
+                    return 0.0  # Contact not achievable
 
         for _ in range(50):
             jd_mid = (jd_low + jd_high) / 2
@@ -1271,7 +1490,13 @@ def _calculate_local_eclipse_phases(
             if jd_high - jd_low < 1e-8:
                 break
 
-        return (jd_low + jd_high) / 2
+        result = (jd_low + jd_high) / 2
+        # Validate the result - for shallow eclipses, contact may not be precise
+        final_sep = _get_sun_moon_separation(result)
+        if abs(final_sep - target_sep) > 0.001:  # More than ~4 arcsec error
+            return 0.0  # Contact time not reliable
+
+        return result
 
     # Search range for contacts
     contact_search = 2.0 / 24.0  # 2 hours
@@ -3620,6 +3845,10 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     Determine lunar eclipse type and magnitude at maximum eclipse.
 
     Uses geometric calculations based on Earth's shadow cones at the Moon's distance.
+    Includes edge case handling for:
+    - Very shallow penumbral eclipses (penumbral magnitude near 0)
+    - Very shallow umbral eclipses (umbral magnitude near 0)
+    - Division by zero protection
 
     Args:
         jd: Julian Day of eclipse maximum (UT)
@@ -3679,8 +3908,12 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     moon_dist_km = moon_dist * 149597870.7
     sun_radius_km = (SUN_RADIUS_ARCSEC / 206265.0) * sun_dist_km
 
-    # Umbra cone semi-angle
-    umbra_cone_angle = math.atan((sun_radius_km - EARTH_RADIUS_KM) / sun_dist_km)
+    # Umbra cone semi-angle - protect against division by zero
+    denom = sun_dist_km
+    if abs(denom) < 1e-10:
+        umbra_cone_angle = 0.0
+    else:
+        umbra_cone_angle = math.atan((sun_radius_km - EARTH_RADIUS_KM) / denom)
     # Umbra radius at Moon distance
     umbra_radius_km = EARTH_RADIUS_KM - moon_dist_km * math.tan(umbra_cone_angle)
 
@@ -3694,9 +3927,17 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     moon_distance_from_axis = abs(moon_lat)
 
     # Gamma: Moon's distance from shadow axis in Earth radii
-    gamma = moon_lat / earth_semidiameter
+    # Edge case: protect against zero earth_semidiameter
+    if abs(earth_semidiameter) < 1e-10:
+        gamma = 0.0
+    else:
+        gamma = moon_lat / earth_semidiameter
 
     # Calculate eclipse magnitudes
+    # Edge case: protect against zero moon_semidiameter
+    if abs(moon_semidiameter) < 1e-10:
+        return 0, 0.0, 0.0, gamma, penumbra_radius, umbra_radius
+
     # Penumbral magnitude: how far Moon penetrates into penumbra
     penumbral_mag = (penumbra_radius + moon_semidiameter - moon_distance_from_axis) / (
         2 * moon_semidiameter
@@ -3710,15 +3951,38 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     # Determine eclipse type
     eclipse_type = 0
 
+    # Edge case: no eclipse (penumbral magnitude <= 0)
     if penumbral_mag <= 0:
         # No eclipse
         return 0, 0.0, 0.0, gamma, penumbra_radius, umbra_radius
+
+    # Edge case: shallow penumbral eclipse
+    if penumbral_mag > 0 and penumbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
+        # Very shallow penumbral eclipse - mark as grazing
+        eclipse_type = SE_ECL_PENUMBRAL | SE_ECL_GRAZING
+        penumbral_mag = max(0.0, min(1.0, penumbral_mag))
+        return eclipse_type, 0.0, penumbral_mag, gamma, penumbra_radius, umbra_radius
 
     if umbral_mag <= 0:
         # Penumbral only
         eclipse_type = SE_ECL_PENUMBRAL
         penumbral_mag = max(0.0, min(1.0, penumbral_mag))
         return eclipse_type, 0.0, penumbral_mag, gamma, penumbra_radius, umbra_radius
+
+    # Edge case: shallow umbral (partial) eclipse
+    if umbral_mag > 0 and umbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
+        # Very shallow partial umbral eclipse - mark as grazing
+        eclipse_type = SE_ECL_PARTIAL | SE_ECL_GRAZING
+        umbral_mag = max(0.0, min(1.0, umbral_mag))
+        penumbral_mag = max(0.0, min(2.0, penumbral_mag))
+        return (
+            eclipse_type,
+            umbral_mag,
+            penumbral_mag,
+            gamma,
+            penumbra_radius,
+            umbra_radius,
+        )
 
     if umbral_mag >= 1.0:
         # Total umbral eclipse
@@ -3854,20 +4118,36 @@ def _calculate_lunar_eclipse_phases(
     # Half-duration = sqrt(R² - y²) / speed where R is radius and y is impact parameter
 
     def calc_half_duration(radius: float) -> float:
-        """Calculate half-duration for given shadow radius."""
+        """Calculate half-duration for given shadow radius.
+
+        Includes edge case handling for shallow eclipses where
+        the Moon barely touches the shadow boundary.
+        """
         r_total = radius + moon_semidiameter
         if y >= r_total:
             return 0.0
-        # Calculate chord half-length
-        half_chord = math.sqrt(max(0, r_total * r_total - y * y))
+        # Calculate chord half-length using safe sqrt
+        chord_sq = r_total * r_total - y * y
+        # Edge case: very shallow eclipse where chord is nearly zero
+        if chord_sq < 1e-20:
+            return 0.0
+        half_chord = _safe_sqrt(chord_sq)
         return half_chord / relative_speed
 
     def calc_total_half_duration(radius: float) -> float:
-        """Calculate half-duration of total phase (Moon fully inside)."""
+        """Calculate half-duration of total phase (Moon fully inside).
+
+        Includes edge case handling for nearly-total eclipses where
+        the Moon barely fits inside the umbra.
+        """
         r_inner = radius - moon_semidiameter
         if r_inner <= 0 or y >= r_inner:
             return 0.0
-        half_chord = math.sqrt(max(0, r_inner * r_inner - y * y))
+        chord_sq = r_inner * r_inner - y * y
+        # Edge case: nearly-total eclipse where chord is nearly zero
+        if chord_sq < 1e-20:
+            return 0.0
+        half_chord = _safe_sqrt(chord_sq)
         return half_chord / relative_speed
 
     # Penumbral phase times
