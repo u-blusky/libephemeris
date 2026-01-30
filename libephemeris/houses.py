@@ -77,7 +77,7 @@ from .constants import SEFLG_SIDEREAL, SEFLG_SPEED
 from .state import get_timescale
 from .planets import swe_get_ayanamsa_ut
 from .cache import get_true_obliquity, get_cached_nutation
-from .exceptions import Error, PolarCircleError
+from .exceptions import Error, PolarCircleError, validate_coordinates
 
 
 def _is_polar_circle(lat: float, eps: float) -> bool:
@@ -545,9 +545,8 @@ def swe_houses(
         >>> asc, mc = ascmc[0], ascmc[1]
         >>> house_1_start = cusps[0]  # First house cusp
     """
-    # Validate latitude range (must be in [-90, 90])
-    if lat > 90.0 or lat < -90.0:
-        raise ValueError(f"swe_houses: latitude {lat} is out of valid range [-90, 90]")
+    # Validate latitude and longitude ranges
+    validate_coordinates(lat, lon, "swe_houses")
 
     # 1. Calculate Sidereal Time (ARMC)
     # ARMC = GMST + lon
@@ -1093,10 +1092,9 @@ def swe_houses_armc(
         >>> asc, mc = ascmc[0], ascmc[1]
     """
     # Validate latitude range (must be in [-90, 90])
-    if lat > 90.0 or lat < -90.0:
-        raise ValueError(
-            f"swe_houses_armc: latitude {lat} is out of valid range [-90, 90]"
-        )
+    from .exceptions import validate_latitude
+
+    validate_latitude(lat, "swe_houses_armc")
 
     # Normalize ARMC to 0-360
     armc_deg = armc % 360.0

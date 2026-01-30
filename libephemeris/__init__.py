@@ -1,5 +1,14 @@
 from .constants import *
-from .exceptions import Error, PolarCircleError, EphemerisRangeError, SPKNotFoundError
+from .exceptions import (
+    Error,
+    PolarCircleError,
+    EphemerisRangeError,
+    SPKNotFoundError,
+    CoordinateError,
+    validate_latitude,
+    validate_longitude,
+    validate_coordinates,
+)
 from .time_utils import (
     swe_julday,
     swe_revjul,
@@ -536,6 +545,11 @@ __all__ = [
     "EphemerisRangeError",
     "PolarCircleError",
     "SPKNotFoundError",
+    "CoordinateError",
+    # Coordinate validation
+    "validate_latitude",
+    "validate_longitude",
+    "validate_coordinates",
     # Thread-safe Context API
     "EphemerisContext",
     # Time functions (both swe_ and non-prefixed aliases)

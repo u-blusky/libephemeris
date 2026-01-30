@@ -163,7 +163,7 @@ class SPKNotFoundError(Error):
         lines.append("")
         lines.append("1. Download manually using libephemeris.download_spk():")
         if body_id:
-            lines.append(f"   >>> import libephemeris as eph")
+            lines.append("   >>> import libephemeris as eph")
             lines.append(f'   >>> eph.download_spk("{body_id}")')
         else:
             lines.append("   >>> import libephemeris as eph")
@@ -196,6 +196,140 @@ class SPKNotFoundError(Error):
             body_name=body_name,
             body_id=body_id,
         )
+
+
+class CoordinateError(Error):
+    """Error raised when geographic coordinates are invalid.
+
+    This exception is raised when latitude or longitude values are outside
+    their valid ranges:
+    - Latitude: must be in [-90, 90] degrees
+    - Longitude: must be in [-180, 180] degrees
+
+    Attributes:
+        message: Human-readable error message
+        coordinate_name: Name of the coordinate ("latitude" or "longitude")
+        value: The invalid coordinate value
+        min_value: Minimum allowed value for this coordinate
+        max_value: Maximum allowed value for this coordinate
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.set_topo(0.0, 91.0, 0.0)  # Invalid latitude
+        ... except ephem.CoordinateError as e:
+        ...     print(f"Invalid {e.coordinate_name}: {e.value}")
+        ...     print(f"Valid range: [{e.min_value}, {e.max_value}]")
+        Invalid latitude: 91.0
+        Valid range: [-90, 90]
+
+    See Also:
+        set_topo: Sets observer location (validates coordinates)
+        swe_houses: House calculation (validates latitude)
+    """
+
+    def __init__(
+        self,
+        message: str,
+        coordinate_name: str | None = None,
+        value: float | None = None,
+        min_value: float | None = None,
+        max_value: float | None = None,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.coordinate_name = coordinate_name
+        self.value = value
+        self.min_value = min_value
+        self.max_value = max_value
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"CoordinateError({self.message!r}, "
+            f"coordinate_name={self.coordinate_name!r}, value={self.value}, "
+            f"min_value={self.min_value}, max_value={self.max_value})"
+        )
+
+
+def validate_latitude(lat: float, func_name: str = "") -> None:
+    """Validate that latitude is within valid range [-90, 90].
+
+    Args:
+        lat: Geographic latitude in degrees
+        func_name: Optional function name for error message context
+
+    Raises:
+        CoordinateError: If latitude is outside [-90, 90] range
+
+    Example:
+        >>> validate_latitude(45.0)  # OK
+        >>> validate_latitude(91.0)  # Raises CoordinateError
+    """
+    if lat < -90.0 or lat > 90.0:
+        prefix = f"{func_name}: " if func_name else ""
+        message = (
+            f"{prefix}latitude {lat} is out of valid range. "
+            f"Latitude must be between -90 and 90 degrees."
+        )
+        raise CoordinateError(
+            message=message,
+            coordinate_name="latitude",
+            value=lat,
+            min_value=-90.0,
+            max_value=90.0,
+        )
+
+
+def validate_longitude(lon: float, func_name: str = "") -> None:
+    """Validate that longitude is within valid range [-180, 180].
+
+    Args:
+        lon: Geographic longitude in degrees
+        func_name: Optional function name for error message context
+
+    Raises:
+        CoordinateError: If longitude is outside [-180, 180] range
+
+    Example:
+        >>> validate_longitude(12.5)  # OK
+        >>> validate_longitude(200.0)  # Raises CoordinateError
+    """
+    if lon < -180.0 or lon > 180.0:
+        prefix = f"{func_name}: " if func_name else ""
+        message = (
+            f"{prefix}longitude {lon} is out of valid range. "
+            f"Longitude must be between -180 and 180 degrees."
+        )
+        raise CoordinateError(
+            message=message,
+            coordinate_name="longitude",
+            value=lon,
+            min_value=-180.0,
+            max_value=180.0,
+        )
+
+
+def validate_coordinates(lat: float, lon: float, func_name: str = "") -> None:
+    """Validate both latitude and longitude coordinates.
+
+    Args:
+        lat: Geographic latitude in degrees
+        lon: Geographic longitude in degrees
+        func_name: Optional function name for error message context
+
+    Raises:
+        CoordinateError: If latitude is outside [-90, 90] or
+                        longitude is outside [-180, 180]
+
+    Example:
+        >>> validate_coordinates(41.9, 12.5)  # OK (Rome)
+        >>> validate_coordinates(91.0, 0.0)  # Raises CoordinateError
+    """
+    validate_latitude(lat, func_name)
+    validate_longitude(lon, func_name)
 
 
 class EphemerisRangeError(Error):

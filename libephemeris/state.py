@@ -147,14 +147,26 @@ def set_topo(lon: float, lat: float, alt: float) -> None:
     Set observer's topocentric location for planet calculations.
 
     Args:
-        lon: Geographic longitude in degrees (East positive)
-        lat: Geographic latitude in degrees (North positive)
+        lon: Geographic longitude in degrees (East positive, range -180 to 180)
+        lat: Geographic latitude in degrees (North positive, range -90 to 90)
         alt: Elevation above sea level in meters
+
+    Raises:
+        CoordinateError: If latitude is outside [-90, 90] or
+                        longitude is outside [-180, 180]
 
     Note:
         Required for topocentric calculations (SEFLG_TOPOCTR),
         angles (Ascendant, MC), and Arabic parts.
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> ephem.set_topo(12.5, 41.9, 0)  # Rome
+        >>> ephem.set_topo(-74.0, 40.7, 10)  # New York
     """
+    from .exceptions import validate_coordinates
+
+    validate_coordinates(lat, lon, "set_topo")
     global _TOPO
     _TOPO = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
 

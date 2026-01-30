@@ -1,0 +1,285 @@
+"""Tests for geographic coordinate validation.
+
+This module tests the validation of latitude and longitude coordinates
+throughout the libephemeris library.
+"""
+
+import pytest
+import libephemeris as ephem
+from libephemeris.exceptions import (
+    CoordinateError,
+    validate_latitude,
+    validate_longitude,
+    validate_coordinates,
+)
+
+
+class TestCoordinateError:
+    """Tests for CoordinateError exception class."""
+
+    def test_coordinate_error_attributes(self):
+        """CoordinateError should store all relevant attributes."""
+        error = CoordinateError(
+            message="test message",
+            coordinate_name="latitude",
+            value=91.0,
+            min_value=-90.0,
+            max_value=90.0,
+        )
+        assert str(error) == "test message"
+        assert error.coordinate_name == "latitude"
+        assert error.value == 91.0
+        assert error.min_value == -90.0
+        assert error.max_value == 90.0
+
+    def test_coordinate_error_repr(self):
+        """CoordinateError should have useful repr."""
+        error = CoordinateError(
+            message="test",
+            coordinate_name="longitude",
+            value=200.0,
+            min_value=-180.0,
+            max_value=180.0,
+        )
+        repr_str = repr(error)
+        assert "CoordinateError" in repr_str
+        assert "longitude" in repr_str
+        assert "200.0" in repr_str
+
+    def test_coordinate_error_is_subclass_of_error(self):
+        """CoordinateError should be a subclass of libephemeris.Error."""
+        assert issubclass(CoordinateError, ephem.Error)
+
+
+class TestValidateLatitude:
+    """Tests for validate_latitude function."""
+
+    def test_valid_latitudes(self):
+        """Valid latitudes should not raise exceptions."""
+        valid_values = [0.0, 45.0, -45.0, 90.0, -90.0, 89.999, -89.999]
+        for lat in valid_values:
+            validate_latitude(lat)  # Should not raise
+
+    def test_invalid_latitude_too_high(self):
+        """Latitude above 90 should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_latitude(91.0)
+        error = exc_info.value
+        assert error.coordinate_name == "latitude"
+        assert error.value == 91.0
+        assert error.min_value == -90.0
+        assert error.max_value == 90.0
+        assert "91" in str(error)
+        assert "-90" in str(error) and "90" in str(error)
+
+    def test_invalid_latitude_too_low(self):
+        """Latitude below -90 should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_latitude(-91.0)
+        error = exc_info.value
+        assert error.coordinate_name == "latitude"
+        assert error.value == -91.0
+
+    def test_latitude_with_func_name(self):
+        """Error message should include function name when provided."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_latitude(100.0, "my_function")
+        assert "my_function" in str(exc_info.value)
+
+
+class TestValidateLongitude:
+    """Tests for validate_longitude function."""
+
+    def test_valid_longitudes(self):
+        """Valid longitudes should not raise exceptions."""
+        valid_values = [0.0, 90.0, -90.0, 180.0, -180.0, 179.999, -179.999]
+        for lon in valid_values:
+            validate_longitude(lon)  # Should not raise
+
+    def test_invalid_longitude_too_high(self):
+        """Longitude above 180 should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_longitude(181.0)
+        error = exc_info.value
+        assert error.coordinate_name == "longitude"
+        assert error.value == 181.0
+        assert error.min_value == -180.0
+        assert error.max_value == 180.0
+
+    def test_invalid_longitude_too_low(self):
+        """Longitude below -180 should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_longitude(-181.0)
+        error = exc_info.value
+        assert error.coordinate_name == "longitude"
+        assert error.value == -181.0
+
+    def test_longitude_with_func_name(self):
+        """Error message should include function name when provided."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_longitude(200.0, "test_func")
+        assert "test_func" in str(exc_info.value)
+
+
+class TestValidateCoordinates:
+    """Tests for validate_coordinates function."""
+
+    def test_valid_coordinates(self):
+        """Valid coordinate pairs should not raise exceptions."""
+        valid_pairs = [
+            (0.0, 0.0),
+            (41.9, 12.5),  # Rome
+            (-33.9, 18.4),  # Cape Town
+            (90.0, 180.0),  # Edge case
+            (-90.0, -180.0),  # Edge case
+        ]
+        for lat, lon in valid_pairs:
+            validate_coordinates(lat, lon)  # Should not raise
+
+    def test_invalid_latitude_in_coordinates(self):
+        """Invalid latitude should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_coordinates(100.0, 0.0)
+        assert exc_info.value.coordinate_name == "latitude"
+
+    def test_invalid_longitude_in_coordinates(self):
+        """Invalid longitude should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_coordinates(0.0, 200.0)
+        assert exc_info.value.coordinate_name == "longitude"
+
+    def test_latitude_checked_before_longitude(self):
+        """Latitude should be validated before longitude."""
+        # Both are invalid, but latitude error should be raised first
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_coordinates(100.0, 200.0)
+        assert exc_info.value.coordinate_name == "latitude"
+
+
+class TestSetTopoValidation:
+    """Tests for coordinate validation in set_topo()."""
+
+    def test_set_topo_valid_coordinates(self):
+        """set_topo with valid coordinates should work."""
+        # Rome
+        ephem.set_topo(12.5, 41.9, 0)  # Should not raise
+
+    def test_set_topo_invalid_latitude(self):
+        """set_topo with invalid latitude should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            ephem.set_topo(0.0, 91.0, 0)
+        error = exc_info.value
+        assert error.coordinate_name == "latitude"
+        assert "set_topo" in str(error)
+
+    def test_set_topo_invalid_longitude(self):
+        """set_topo with invalid longitude should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            ephem.set_topo(200.0, 45.0, 0)
+        error = exc_info.value
+        assert error.coordinate_name == "longitude"
+        assert "set_topo" in str(error)
+
+    def test_set_topo_boundary_values(self):
+        """set_topo should accept boundary values."""
+        ephem.set_topo(180.0, 90.0, 0)  # Should not raise
+        ephem.set_topo(-180.0, -90.0, 0)  # Should not raise
+
+
+class TestSweHousesValidation:
+    """Tests for coordinate validation in swe_houses()."""
+
+    def test_swe_houses_valid_coordinates(self):
+        """swe_houses with valid coordinates should work."""
+        jd = 2451545.0  # J2000
+        cusps, ascmc = ephem.swe_houses(jd, 41.9, 12.5, ord("P"))
+        assert len(cusps) == 12
+        assert len(ascmc) == 8
+
+    def test_swe_houses_invalid_latitude(self):
+        """swe_houses with invalid latitude should raise CoordinateError."""
+        jd = 2451545.0
+        with pytest.raises(CoordinateError) as exc_info:
+            ephem.swe_houses(jd, 91.0, 0.0, ord("P"))
+        error = exc_info.value
+        assert error.coordinate_name == "latitude"
+        assert "swe_houses" in str(error)
+
+    def test_swe_houses_invalid_longitude(self):
+        """swe_houses with invalid longitude should raise CoordinateError."""
+        jd = 2451545.0
+        with pytest.raises(CoordinateError) as exc_info:
+            ephem.swe_houses(jd, 45.0, 200.0, ord("P"))
+        error = exc_info.value
+        assert error.coordinate_name == "longitude"
+        assert "swe_houses" in str(error)
+
+
+class TestSweHousesArmcValidation:
+    """Tests for coordinate validation in swe_houses_armc()."""
+
+    def test_swe_houses_armc_valid_latitude(self):
+        """swe_houses_armc with valid latitude should work."""
+        armc = 45.0
+        lat = 41.9
+        eps = 23.44
+        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        assert len(cusps) == 12
+
+    def test_swe_houses_armc_invalid_latitude(self):
+        """swe_houses_armc with invalid latitude should raise CoordinateError."""
+        with pytest.raises(CoordinateError) as exc_info:
+            ephem.swe_houses_armc(45.0, 91.0, 23.44, ord("P"))
+        error = exc_info.value
+        assert error.coordinate_name == "latitude"
+        assert "swe_houses_armc" in str(error)
+
+
+class TestContextSetTopoValidation:
+    """Tests for coordinate validation in EphemerisContext.set_topo()."""
+
+    def test_context_set_topo_valid_coordinates(self):
+        """Context set_topo with valid coordinates should work."""
+        ctx = ephem.EphemerisContext()
+        ctx.set_topo(12.5, 41.9, 0)  # Should not raise
+        assert ctx.topo is not None
+
+    def test_context_set_topo_invalid_latitude(self):
+        """Context set_topo with invalid latitude should raise CoordinateError."""
+        ctx = ephem.EphemerisContext()
+        with pytest.raises(CoordinateError) as exc_info:
+            ctx.set_topo(0.0, 95.0, 0)
+        assert exc_info.value.coordinate_name == "latitude"
+
+    def test_context_set_topo_invalid_longitude(self):
+        """Context set_topo with invalid longitude should raise CoordinateError."""
+        ctx = ephem.EphemerisContext()
+        with pytest.raises(CoordinateError) as exc_info:
+            ctx.set_topo(185.0, 45.0, 0)
+        assert exc_info.value.coordinate_name == "longitude"
+
+
+class TestErrorMessageClarity:
+    """Tests for error message clarity and usefulness."""
+
+    def test_latitude_error_message_includes_value(self):
+        """Error message should include the invalid value."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_latitude(123.456)
+        assert "123.456" in str(exc_info.value)
+
+    def test_latitude_error_message_includes_range(self):
+        """Error message should include the valid range."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_latitude(100.0)
+        msg = str(exc_info.value)
+        assert "-90" in msg
+        assert "90" in msg
+
+    def test_longitude_error_message_includes_range(self):
+        """Error message should include the valid range."""
+        with pytest.raises(CoordinateError) as exc_info:
+            validate_longitude(200.0)
+        msg = str(exc_info.value)
+        assert "-180" in msg
+        assert "180" in msg

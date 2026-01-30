@@ -172,14 +172,25 @@ class EphemerisContext:
         Set observer's topocentric location for calculations.
 
         Args:
-            lon: Geographic longitude in degrees (East positive)
-            lat: Geographic latitude in degrees (North positive)
+            lon: Geographic longitude in degrees (East positive, range -180 to 180)
+            lat: Geographic latitude in degrees (North positive, range -90 to 90)
             alt: Elevation above sea level in meters
+
+        Raises:
+            CoordinateError: If latitude is outside [-90, 90] or
+                            longitude is outside [-180, 180]
 
         Note:
             Required for topocentric calculations (SEFLG_TOPOCTR),
             angles (Ascendant, MC), and Arabic parts.
+
+        Example:
+            >>> ctx = EphemerisContext()
+            >>> ctx.set_topo(12.5, 41.9, 0)  # Rome
         """
+        from .exceptions import validate_coordinates
+
+        validate_coordinates(lat, lon, "set_topo")
         self.topo = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
 
     def get_topo(self) -> Optional[Topos]:
