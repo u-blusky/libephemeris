@@ -536,25 +536,25 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] HANDLE POLAR EDGE CASES: Improve error handling and fallback behavior for house calculations at extreme latitudes (>80°).
 
-- [ ] VALIDATE INPUT COORDINATES: Add validation for geographic coordinates (lat -90 to 90, lon -180 to 180) with clear error messages.
+- [x] VALIDATE INPUT COORDINATES: Add validation for geographic coordinates (lat -90 to 90, lon -180 to 180) with clear error messages.
 
-- [ ] VALIDATE JULIAN DAY RANGE: Add validation that Julian Day is within supported ephemeris range before calculation.
+- [x] VALIDATE JULIAN DAY RANGE: Add validation that Julian Day is within supported ephemeris range before calculation.
 
-- [ ] HANDLE UNKNOWN BODY IDS: Provide clear error message when unknown body ID is requested.
+- [x] HANDLE UNKNOWN BODY IDS: Provide clear error message when unknown body ID is requested.
 
-- [ ] HANDLE RETROGRADE STATIONS: Ensure calculations remain stable when planet is near stationary point with near-zero velocity.
+- [x] HANDLE RETROGRADE STATIONS: Ensure calculations remain stable when planet is near stationary point with near-zero velocity.
 
-- [ ] HANDLE ECLIPSE EDGE CASES: Handle edge cases in eclipse calculations like very shallow partial eclipses.
+- [x] HANDLE ECLIPSE EDGE CASES: Handle edge cases in eclipse calculations like very shallow partial eclipses.
 
-- [ ] IMPROVE EXCEPTION HIERARCHY: Review and improve the exception classes in exceptions.py for better error categorization.
+- [x] IMPROVE EXCEPTION HIERARCHY: Review and improve the exception classes in exceptions.py for better error categorization.
 
 ---
 
 ## DEPENDENCIES TO EVALUATE
 
-- [ ] EVALUATE PYERFA INTEGRATION: Research the pyerfa library (pip install erfa) which provides Python bindings to IAU SOFA/ERFA routines, evaluate precision improvements from using erfa.nut00a(), erfa.pnm06a().
+- [x] EVALUATE PYERFA INTEGRATION: Research the pyerfa library (pip install erfa) which provides Python bindings to IAU SOFA/ERFA routines, evaluate precision improvements from using erfa.nut00a(), erfa.pnm06a().
 
-- [ ] DOCUMENT PYERFA BENEFITS: Document what precision improvements pyerfa would provide if integrated.
+- [x] DOCUMENT PYERFA BENEFITS: Document what precision improvements pyerfa would provide if integrated.
 
 - [ ] EVALUATE ASTROPY INTEGRATION: Research how astropy.coordinates and astropy.time could supplement calculations.
 
