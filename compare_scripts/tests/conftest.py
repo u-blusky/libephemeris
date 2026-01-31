@@ -1,14 +1,13 @@
 """
 pytest configuration and shared fixtures for LibEphemeris tests.
 
-This module provides test infrastructure for libephemeris standalone tests
-(no pyswisseph/swisseph dependency required).
-
-For comparison tests against pyswisseph, see compare_scripts/tests/conftest.py
+This provides comprehensive test infrastructure for verifying 1:1 compatibility
+with pyswisseph (Swiss Ephemeris).
 """
 
 import pytest
 import random
+import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
 
@@ -328,6 +327,119 @@ def relaxed_tolerances():
 
 
 # ============================================================================
+# COMPARISON HELPERS
+# ============================================================================
+
+
+@pytest.fixture
+def compare_with_swisseph():
+    """Helper function to compare libephemeris results with SwissEph."""
+
+    def _compare(jd, planet_id, flags=0, tolerance=0.001):
+        """
+        Compare planetary positions between implementations.
+
+        Returns:
+            (bool, dict): (passed, differences)
+        """
+        # Calculate with SwissEph
+        res_swe, _ = swe.calc_ut(jd, planet_id, flags)
+
+        # Calculate with libephemeris
+        res_py, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+
+        # Compare
+        diffs = {
+            "lon": abs(res_swe[0] - res_py[0]),
+            "lat": abs(res_swe[1] - res_py[1]),
+            "dist": abs(res_swe[2] - res_py[2]),
+        }
+
+        # Handle wrap-around for longitude
+        if diffs["lon"] > 180:
+            diffs["lon"] = 360 - diffs["lon"]
+
+        passed = all(d < tolerance for d in diffs.values())
+
+        return passed, diffs, {"swe": res_swe, "lib": res_py}
+
+    return _compare
+
+
+@pytest.fixture
+def compare_houses():
+    """Helper function to compare house calculations."""
+
+    def _compare(jd, lat, lon, hsys, tolerance=0.1):
+        """
+        Compare house cusps between implementations.
+
+        Returns:
+            (bool, dict): (passed, differences)
+        """
+        # Calculate with SwissEph
+        cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, hsys)
+
+        # Calculate with libephemeris
+        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+
+        # Compare cusps
+        cusp_diffs = []
+        for i in range(12):
+            diff = abs(cusps_swe[i + 1] - cusps_lib[i])
+            if diff > 180:
+                diff = 360 - diff
+            cusp_diffs.append(diff)
+
+        # Compare ASC and MC
+        asc_diff = abs(ascmc_swe[0] - ascmc_lib[0])
+        if asc_diff > 180:
+            asc_diff = 360 - asc_diff
+        mc_diff = abs(ascmc_swe[1] - ascmc_lib[1])
+        if mc_diff > 180:
+            mc_diff = 360 - mc_diff
+
+        passed = (
+            all(d < tolerance for d in cusp_diffs)
+            and asc_diff < tolerance
+            and mc_diff < tolerance
+        )
+
+        return passed, {
+            "cusps": cusp_diffs,
+            "asc": asc_diff,
+            "mc": mc_diff,
+            "max_cusp": max(cusp_diffs),
+        }
+
+    return _compare
+
+
+@pytest.fixture
+def compare_ayanamsa():
+    """Helper function to compare ayanamsa values."""
+
+    def _compare(jd, sid_mode, tolerance=0.06):
+        """
+        Compare ayanamsa values between implementations.
+        """
+        # Set mode in SwissEph
+        swe.set_sid_mode(sid_mode)
+        ayan_swe = swe.get_ayanamsa_ut(jd)
+
+        # Set mode in libephemeris
+        ephem.swe_set_sid_mode(sid_mode)
+        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+
+        diff = abs(ayan_swe - ayan_lib)
+        passed = diff < tolerance
+
+        return passed, {"swe": ayan_swe, "lib": ayan_lib, "diff": diff}
+
+    return _compare
+
+
+# ============================================================================
 # RANDOM DATA GENERATORS
 # ============================================================================
 
@@ -494,11 +606,16 @@ def reset_ephemeris_state():
     """Reset ephemeris state before each test."""
     # Reset to default sidereal mode
     ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    if hasattr(swe, "set_sid_mode"):
+        swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
 
     yield
 
     # Cleanup after test
+    # Reset again for next test
     ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    if hasattr(swe, "set_sid_mode"):
+        swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
 
 
 # ============================================================================
