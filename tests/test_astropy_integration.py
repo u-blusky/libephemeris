@@ -400,3 +400,109 @@ class TestErrorHandling:
         assert -90 <= b2 <= 90
         assert 0 <= l1 < 360 or abs(l1) < 0.001
         assert 0 <= l2 < 360 or abs(l2) < 0.001
+
+
+# =============================================================================
+# DOCUMENTATION VALIDATION TESTS
+# =============================================================================
+
+
+class TestDocumentationValidation:
+    """Tests that validate claims made in ASTROPY_BENEFITS.md documentation."""
+
+    def test_documented_time_scales_available(self):
+        """Verify all time scales documented in ASTROPY_BENEFITS.md are available."""
+        from libephemeris.astropy_integration import get_extended_time_scales
+
+        scales = get_extended_time_scales(2451545.0)
+
+        # Documented time scales: UTC, UT1, TAI, TT, TDB, TCG, TCB, GPS
+        documented_scales = ["utc", "ut1", "tai", "tt", "tdb", "tcg", "tcb", "gps"]
+        for scale in documented_scales:
+            assert scale in scales, f"Documented time scale '{scale}' not available"
+            assert isinstance(scales[scale], float)
+
+    def test_documented_galactic_conversion_works(self):
+        """Verify Galactic coordinate conversion documented in ASTROPY_BENEFITS.md works."""
+        from libephemeris.astropy_integration import icrs_to_galactic, galactic_to_icrs
+
+        # Documentation claims: Galactic coords not in Skyfield, available via astropy
+        ra, dec = 180.0, 45.0
+        gal_l, gal_b = icrs_to_galactic(ra, dec)
+
+        # Should return valid Galactic coordinates
+        assert 0 <= gal_l < 360 or abs(gal_l) < 0.001 or abs(gal_l - 360) < 0.001
+        assert -90 <= gal_b <= 90
+
+        # Roundtrip should work
+        ra_back, dec_back = galactic_to_icrs(gal_l, gal_b)
+        assert abs(ra_back - ra) < 0.001
+        assert abs(dec_back - dec) < 0.001
+
+    def test_documented_barycentric_correction_structure(self):
+        """Verify barycentric correction returns documented fields."""
+        from libephemeris.astropy_integration import get_barycentric_correction
+
+        result = get_barycentric_correction(
+            ra_deg=180.0,
+            dec_deg=45.0,
+            jd_utc=2451545.0,
+            lon_deg=0.0,
+            lat_deg=50.0,
+        )
+
+        # Documentation claims these specific fields
+        assert "bjd_tdb" in result, "Missing documented field 'bjd_tdb'"
+        assert "light_time_seconds" in result, (
+            "Missing documented field 'light_time_seconds'"
+        )
+        assert "rv_correction_km_s" in result, (
+            "Missing documented field 'rv_correction_km_s'"
+        )
+
+    def test_documented_geodetic_functions_exist(self):
+        """Verify geodetic functions documented in ASTROPY_BENEFITS.md exist."""
+        from libephemeris.astropy_integration import (
+            geodetic_to_geocentric,
+            geocentric_to_geodetic,
+        )
+
+        # Documentation claims WGS84 ellipsoid conversions
+        x, y, z = geodetic_to_geocentric(12.5, 41.9, 100.0)
+        assert isinstance(x, float)
+        assert isinstance(y, float)
+        assert isinstance(z, float)
+
+        # Should be able to convert back
+        lon, lat, h = geocentric_to_geodetic(x, y, z)
+        assert abs(lon - 12.5) < 0.001
+        assert abs(lat - 41.9) < 0.001
+        assert abs(h - 100.0) < 1.0
+
+    def test_documented_evaluation_function_keys(self):
+        """Verify evaluate_integration_potential returns documented keys."""
+        from libephemeris.astropy_integration import evaluate_integration_potential
+
+        result = evaluate_integration_potential()
+
+        # Documentation shows these specific keys
+        documented_keys = [
+            "astropy_available",
+            "time_features",
+            "coordinate_features",
+            "recommended_integrations",
+            "compatibility_notes",
+            "implementation_approach",
+        ]
+        for key in documented_keys:
+            assert key in result, f"Missing documented key '{key}'"
+
+    def test_time_string_parsing_works(self):
+        """Verify time string parsing documented in ASTROPY_BENEFITS.md works."""
+        from libephemeris.astropy_integration import parse_time_string
+
+        # Documentation shows parsing ISO format strings
+        jd = parse_time_string("2000-01-01T12:00:00")
+        assert isinstance(jd, float)
+        # Should be close to J2000.0
+        assert abs(jd - 2451545.0) < 0.01
