@@ -58,10 +58,17 @@ stars = [
     "astroquery>=0.4.0",
     "astropy>=5.0.0",
 ]
+# N-body integration for asteroid orbit propagation
+nbody = [
+    "rebound>=4.0.0",
+    "assist>=1.1.0",
+]
 # All optional features
 all = [
     "pyerfa>=2.0.0",
     "astroquery>=0.4.0",
+    "rebound>=4.0.0",
+    "assist>=1.1.0",
 ]
 dev = [
     "black>=25.1.0",

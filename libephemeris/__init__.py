@@ -418,6 +418,23 @@ from .hypothetical import (  # Hamburg School Uranian planets
     SE_PROSERPINA as SE_PROSERPINA_HYPO,  # Alias to avoid conflict with constants.py
     SE_PLANET_X_PICKERING as SE_PLANET_X_PICKERING_HYPO,  # Alias to avoid conflict with constants.py
 )
+
+# REBOUND/ASSIST n-body integration (optional dependency)
+# Lazy import to avoid requiring rebound/assist at module load time
+from .rebound_integration import (
+    ReboundIntegrator,
+    AssistEphemConfig,
+    PropagationResult,
+    check_rebound_available,
+    check_assist_available,
+    get_rebound_version,
+    get_assist_version,
+    propagate_orbit_rebound,
+    propagate_orbit_assist,
+    propagate_trajectory,
+    compare_with_keplerian,
+)
+
 from .planetary_moons import (  # Planetary moons (Galilean moons, Titan, etc.)
     register_moon_spk,
     unregister_moon_spk,
@@ -1005,4 +1022,16 @@ __all__ = [
     "MOON_NAIF_MAP",
     "MOON_NAMES",
     "MOON_PARENT_MAP",
+    # REBOUND/ASSIST n-body integration
+    "ReboundIntegrator",
+    "AssistEphemConfig",
+    "PropagationResult",
+    "check_rebound_available",
+    "check_assist_available",
+    "get_rebound_version",
+    "get_assist_version",
+    "propagate_orbit_rebound",
+    "propagate_orbit_assist",
+    "propagate_trajectory",
+    "compare_with_keplerian",
 ]
