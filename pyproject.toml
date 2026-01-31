@@ -40,7 +40,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "skyfield>=1.53",
+    "skyfield>=1.54",  # 1.54: deflectors= arg, 30% faster risings/settings, NumPy array Time subtraction
     "skyfield-data>=7.0.0",
 ]
 
