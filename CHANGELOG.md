@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-01-31
+
 ### Added
 
 #### Minor Bodies
@@ -48,11 +50,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NAIF ID constants for new bodies (NAIF_NESSUS, NAIF_ASBOLUS, NAIF_CHARIKLO, NAIF_GONGGONG)
 - SE_NESSUS, SE_ASBOLUS, SE_CHARIKLO, SE_GONGGONG body IDs
 
+#### Error Handling
+- Category-based exception hierarchy for better error handling
+- Proactive Julian Day range validation before calculation
+- Geographic coordinates validation (lat/lon)
+- Improved error handling for extreme latitudes (>80°) in house calculations
+- Graceful handling of missing SPK files with `SPKNotFoundError`
+- Clear error messages for unknown body IDs
+- Improved date range error messages with supported range details
+
+#### Retrograde & Eclipse Handling
+- Retrograde station handling with stable near-zero velocity calculations
+- Eclipse edge case handling for shallow partial eclipses
+
+#### Dependency Upgrades
+- Upgraded Skyfield to 1.54 for `deflectors=` arg and improved performance
+- Upgraded jplephem to 2.24 for NumPy compatibility
+
+#### Profiling
+- New profiling module for performance analysis
+
 ### Documentation
 
 - Comprehensive documentation for interpolated apogee (`docs/INTERPOLATED_APOGEE.md`)
 - True Lilith calculation method comparison (`docs/TRUE_LILITH_METHODS.md`)
 - Updated precision documentation with TNO validation results
+- Precision tuning guide (`docs/PRECISION_TUNING.md`)
+- Updated API reference with TAI, IERS, planetary moons, and other new features
+- Enhanced migration guide with lunar nodes/Lilith precision info
+- Documentation of optional dependencies (pyerfa, astroquery, astropy)
+- Usage examples demonstrating common use cases
+- Documented pyerfa, astropy, and REBOUND integration benefits
+
+### Changed
+
+- Converted compare scripts to pytest-style unit tests
+- Moved swisseph-dependent tests to `compare_scripts/tests/`
 
 ### Tests
 
@@ -64,6 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - True Node velocity tests
 - Download SPK script tests
 - Orbital elements update script tests
+- Comprehensive pyerfa precision evaluation tests
+- Comprehensive ayanamsha multi-date tests
 
 ## [0.2.0] - 2026-01-26
 
@@ -239,6 +274,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/g-battaglia/libephemeris/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/g-battaglia/libephemeris/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/g-battaglia/libephemeris/releases/tag/v0.1.0

@@ -83,7 +83,7 @@ uv pip install -e .
 ### Requirements
 
 -   Python **3.10+**
--   `skyfield>=1.53`
+-   `skyfield>=1.54`
 -   `skyfield-data>=7.0.0`
 -   A JPL ephemeris file (DE440 by default, downloaded automatically on first use if not present locally)
 
