@@ -490,3 +490,314 @@ class TestPrecisionImprovementEvaluation:
         # 2000A vs 06a should differ by up to ~0.1 mas for dates near J2000
         assert diff_2000a_to_06a_dpsi < 0.5
         assert diff_2000a_to_06a_deps < 0.5
+
+    @pytest.mark.skipif(not HAS_ERFA, reason="pyerfa not installed")
+    def test_precision_growth_over_time(self):
+        """
+        Evaluate how nutation model differences grow over time from J2000.
+
+        This test documents the error growth pattern to help users understand
+        when pyerfa's higher precision models become important.
+        """
+        from skyfield.nutationlib import iau2000a_radians, iau2000b_radians
+
+        from libephemeris.state import get_timescale
+
+        ts = get_timescale()
+
+        # Test at different time offsets from J2000
+        time_offsets_years = [0, 10, 50, 100, 200, 500]
+
+        def to_mas(rad):
+            return math.degrees(rad) * 3600 * 1000
+
+        print("\n=== Nutation Precision Growth Analysis ===")
+        print(
+            f"{'Years':>6} | {'2000B-2000A dpsi':>16} | {'2000A-06a dpsi':>14} | "
+            f"{'2000B-2000A deps':>16} | {'2000A-06a deps':>14}"
+        )
+        print("-" * 85)
+
+        for years in time_offsets_years:
+            jd_tt = J2000_JD + years * 365.25
+            t = ts.tt_jd(jd_tt)
+
+            dpsi_2000b, deps_2000b = iau2000b_radians(t)
+            dpsi_2000a, deps_2000a = iau2000a_radians(t)
+            dpsi_06a, deps_06a = get_erfa_nutation_nut06a(jd_tt)
+
+            diff_b_a_dpsi = abs(to_mas(dpsi_2000b) - to_mas(dpsi_2000a))
+            diff_a_06_dpsi = abs(to_mas(dpsi_2000a) - to_mas(dpsi_06a))
+            diff_b_a_deps = abs(to_mas(deps_2000b) - to_mas(deps_2000a))
+            diff_a_06_deps = abs(to_mas(deps_2000a) - to_mas(deps_06a))
+
+            print(
+                f"{years:>6} | {diff_b_a_dpsi:>16.4f} | {diff_a_06_dpsi:>14.4f} | "
+                f"{diff_b_a_deps:>16.4f} | {diff_a_06_deps:>14.4f}"
+            )
+
+            # Verify differences stay within expected bounds
+            # IAU 2000B vs 2000A difference grows with time from J2000
+            # Near J2000: < 1 mas; At 100 years: < 2 mas; At 500 years: can reach 20+ mas
+            # This reflects that IAU 2000B is a truncated model optimized for near-J2000
+            max_b_a_diff = 2.5 + 0.03 * years  # ~2.5 mas at J2000, grows with time
+            assert diff_b_a_dpsi < max_b_a_diff, (
+                f"2000B-2000A dpsi too large at {years} years"
+            )
+            assert diff_b_a_deps < max_b_a_diff, (
+                f"2000B-2000A deps too large at {years} years"
+            )
+
+            # IAU 2006 correction grows slowly with time from J2000
+            # Expected: ~0.001-0.01 mas near J2000, up to ~1 mas at 500 years
+            max_06_diff = 0.1 + 0.002 * years
+            assert diff_a_06_dpsi < max_06_diff, (
+                f"2000A-06a dpsi too large at {years} years"
+            )
+            assert diff_a_06_deps < max_06_diff, (
+                f"2000A-06a deps too large at {years} years"
+            )
+
+    @pytest.mark.skipif(not HAS_ERFA, reason="pyerfa not installed")
+    def test_pnm06a_vs_separate_rotations(self):
+        """
+        Compare pnm06a combined matrix vs applying bias, precession, nutation separately.
+
+        The combined matrix avoids cross-term errors that accumulate when rotations
+        are applied separately. This test quantifies that improvement.
+        """
+        import numpy as np
+
+        # Test at a distant date where differences are more pronounced
+        jd_tt = J2000_JD + 100 * 365.25  # 100 years from J2000
+
+        # Get the combined pnm06a matrix
+        rbpn_combined = get_erfa_pnm06a_matrix(jd_tt)
+
+        # Build separate matrices using ERFA
+        # Frame bias matrix
+        rb = erfa.bi00()  # Returns dx, dy, dpsi (frame bias parameters)
+
+        # For proper comparison, we need individual matrices
+        # Get precession angles - erfa.p06e returns 16 values
+        result = erfa.p06e(2451545.0, jd_tt - 2451545.0)
+        # result contains: eps0, psia, oma, bpa, bqa, pia, bpia, epsa, chia, za, zetaa, thetaa, pa, gam, phi, psi
+        # We need epsa (index 7) and the bias-precession matrix from erfa.bp06
+        epsa = result[7]
+
+        # Get the bias-precession matrix directly
+        rb_matrix, rp, rbp = erfa.bp06(2451545.0, jd_tt - 2451545.0)
+
+        # Get nutation matrix
+        dpsi, deps = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
+        epsa_new = erfa.obl06(2451545.0, jd_tt - 2451545.0)
+        rn = erfa.numat(epsa_new, dpsi, deps)
+
+        # Combined separately: R = Rn @ Rp @ Rb
+        # Note: rbp already contains bias-precession
+        rbpn_separate = rn @ rbp
+
+        # Compare the matrices
+        diff = np.abs(rbpn_combined - rbpn_separate)
+        max_diff = np.max(diff)
+
+        print("\n=== pnm06a vs Separate Rotations Comparison ===")
+        print(f"Date: J2000 + 100 years (JD {jd_tt})")
+        print(f"Maximum matrix element difference: {max_diff:.2e}")
+
+        # The difference should be very small (numerical precision)
+        # but demonstrates the consistency of pnm06a
+        assert max_diff < 1e-12, f"Matrix difference too large: {max_diff}"
+
+        # Check orthogonality of both matrices
+        for name, matrix in [
+            ("pnm06a", rbpn_combined),
+            ("separate", rbpn_separate),
+        ]:
+            identity = matrix @ matrix.T
+            orth_error = np.max(np.abs(identity - np.eye(3)))
+            assert orth_error < 1e-14, f"{name} orthogonality error: {orth_error}"
+
+    @pytest.mark.skipif(not HAS_ERFA, reason="pyerfa not installed")
+    def test_celestial_pole_position_precision(self):
+        """
+        Evaluate precision improvement by computing celestial pole position.
+
+        The CIP (Celestial Intermediate Pole) position is a practical measure
+        of nutation accuracy. Different models should give slightly different
+        pole positions, demonstrating real-world precision differences.
+        """
+        import numpy as np
+
+        from skyfield.nutationlib import iau2000a_radians
+
+        from libephemeris.state import get_timescale
+
+        ts = get_timescale()
+        jd_tt = J2000_JD + 20 * 365.25  # 20 years from J2000
+
+        # ICRS pole (z-axis)
+        pole_icrs = np.array([0.0, 0.0, 1.0])
+
+        # Using pnm06a (most accurate)
+        rbpn_06a = get_erfa_pnm06a_matrix(jd_tt)
+        pole_06a = rbpn_06a @ pole_icrs
+
+        # Using Skyfield's IAU 2000A nutation
+        # Build a simplified rotation using Skyfield nutation
+        t = ts.tt_jd(jd_tt)
+        dpsi_2000a, deps_2000a = iau2000a_radians(t)
+
+        # Get obliquity for rotation
+        eps = get_erfa_obliquity_iau2006(jd_tt)
+
+        # Build nutation rotation (simplified, without precession for comparison)
+        dpsi_06a, deps_06a = get_erfa_nutation_nut06a(jd_tt)
+
+        # Convert nutation angles to pole offset (in arcseconds)
+        # X = dpsi * sin(eps), Y = -deps
+        x_2000a_mas = math.degrees(dpsi_2000a * math.sin(eps)) * 3600 * 1000
+        y_2000a_mas = math.degrees(-deps_2000a) * 3600 * 1000
+
+        x_06a_mas = math.degrees(dpsi_06a * math.sin(eps)) * 3600 * 1000
+        y_06a_mas = math.degrees(-deps_06a) * 3600 * 1000
+
+        # Difference in pole position
+        dx_mas = abs(x_2000a_mas - x_06a_mas)
+        dy_mas = abs(y_2000a_mas - y_06a_mas)
+        pole_diff_mas = math.sqrt(dx_mas**2 + dy_mas**2)
+
+        print("\n=== Celestial Pole Position Precision ===")
+        print(f"Date: J2000 + 20 years (JD {jd_tt})")
+        print(
+            f"\nIAU 2000A pole offset (X, Y): ({x_2000a_mas:.4f}, {y_2000a_mas:.4f}) mas"
+        )
+        print(f"IAU 2006/2000A pole offset: ({x_06a_mas:.4f}, {y_06a_mas:.4f}) mas")
+        print(f"\nPole position difference: {pole_diff_mas:.4f} mas")
+        print(f"  dX: {dx_mas:.4f} mas")
+        print(f"  dY: {dy_mas:.4f} mas")
+
+        # The pole difference should be small (sub-milliarcsecond)
+        assert pole_diff_mas < 0.1, f"Pole difference too large: {pole_diff_mas} mas"
+
+    @pytest.mark.skipif(not HAS_ERFA, reason="pyerfa not installed")
+    def test_astrological_precision_context(self):
+        """
+        Evaluate pyerfa precision in the context of astrological calculations.
+
+        For astrology, position errors translate to timing errors for aspects
+        and house cusps. This test quantifies the practical impact.
+
+        Key insight: 1 arcsecond of error in Moon's position represents
+        approximately 2 seconds of time, since the Moon moves ~0.5"/second.
+        """
+        # Typical astrological precision requirements:
+        # - Natal chart: 1 arcminute (60") acceptable for most purposes
+        # - Precise event timing: 1 arcsecond (1") desirable
+        # - Research/high precision: 0.1 arcsecond (100 mas) desirable
+
+        from skyfield.nutationlib import iau2000a_radians, iau2000b_radians
+
+        from libephemeris.state import get_timescale
+
+        ts = get_timescale()
+
+        # Test current epoch (typical astrological use case)
+        jd_tt = 2460000.5  # Early 2023
+
+        t = ts.tt_jd(jd_tt)
+        dpsi_2000b, deps_2000b = iau2000b_radians(t)
+        dpsi_2000a, deps_2000a = iau2000a_radians(t)
+        dpsi_06a, deps_06a = get_erfa_nutation_nut06a(jd_tt)
+
+        def to_arcsec(rad):
+            return math.degrees(rad) * 3600
+
+        # Calculate impact on zodiacal longitude
+        # Nutation in longitude directly affects zodiacal positions
+        dpsi_2000b_as = to_arcsec(dpsi_2000b)
+        dpsi_2000a_as = to_arcsec(dpsi_2000a)
+        dpsi_06a_as = to_arcsec(dpsi_06a)
+
+        diff_b_a = abs(dpsi_2000b_as - dpsi_2000a_as)
+        diff_a_06 = abs(dpsi_2000a_as - dpsi_06a_as)
+
+        print("\n=== Astrological Precision Context ===")
+        print(f"Date: JD {jd_tt} (early 2023)")
+        print("\nNutation in longitude (dpsi):")
+        print(f'  IAU 2000B: {dpsi_2000b_as:.4f}"')
+        print(f'  IAU 2000A: {dpsi_2000a_as:.4f}"')
+        print(f'  IAU 2006/2000A: {dpsi_06a_as:.4f}"')
+        print("\nZodiacal longitude differences:")
+        print(f'  2000B vs 2000A: {diff_b_a * 1000:.4f} mas ({diff_b_a:.4f}")')
+        print(f'  2000A vs 2006/2000A: {diff_a_06 * 1000:.4f} mas ({diff_a_06:.4f}")')
+
+        # Moon timing impact (Moon moves ~0.5"/second)
+        moon_timing_b_a = diff_b_a / 0.5  # seconds
+        moon_timing_a_06 = diff_a_06 / 0.5  # seconds
+        print('\nMoon timing impact (Moon speed ~0.5"/s):')
+        print(f"  2000B vs 2000A: {moon_timing_b_a:.3f} seconds")
+        print(f"  2000A vs 2006/2000A: {moon_timing_a_06:.3f} seconds")
+
+        # Practical conclusion
+        print("\n=== Practical Recommendations ===")
+        if diff_a_06 < 0.001:  # < 1 mas = 0.001 arcseconds
+            print("IAU 2006/2000A provides sub-milliarcsecond improvement over 2000A.")
+            print("For typical astrological work, IAU 2000A is already sufficient.")
+            print("pyerfa's nut06a is recommended for:")
+            print("  - Research requiring highest precision")
+            print("  - Long-term ephemeris calculations")
+            print("  - Validation against official IERS data")
+
+        # Verify precision levels
+        assert diff_b_a < 1.0, "2000B should be accurate to ~1 arcsecond"
+        assert diff_a_06 < 0.01, "nut06a should improve by < 10 mas over 2000A"
+
+    @pytest.mark.skipif(not HAS_ERFA, reason="pyerfa not installed")
+    def test_obliquity_model_comparison(self):
+        """
+        Compare obliquity values from different models.
+
+        The mean obliquity of the ecliptic affects the transformation between
+        ecliptic and equatorial coordinates. Different models give slightly
+        different values.
+        """
+        # Test at various dates
+        test_dates = [
+            (J2000_JD, "J2000.0"),
+            (J2000_JD + 36525, "J2100.0"),
+            (J2000_JD - 36525, "J1900.0"),
+        ]
+
+        print("\n=== Obliquity Model Comparison ===")
+
+        for jd_tt, date_name in test_dates:
+            # IAU 2006 obliquity from ERFA
+            eps_iau2006 = get_erfa_obliquity_iau2006(jd_tt)
+
+            # Laskar 1986 formula (used as fallback in libephemeris)
+            T = (jd_tt - J2000_JD) / 36525.0
+            eps_laskar = math.radians(
+                23.439291111
+                - 0.013004166667 * T
+                - 1.638888889e-7 * T**2
+                + 5.036111111e-7 * T**3
+            )
+
+            # Difference in arcseconds
+            diff_as = abs(math.degrees(eps_iau2006 - eps_laskar)) * 3600
+
+            print(f"\n{date_name} (JD {jd_tt}):")
+            print(f"  IAU 2006: {math.degrees(eps_iau2006):.8f}°")
+            print(f"  Laskar 1986: {math.degrees(eps_laskar):.8f}°")
+            print(f'  Difference: {diff_as * 1000:.4f} mas ({diff_as:.6f}")')
+
+            # The difference should be reasonable for dates near J2000
+            # Note: The Laskar 1986 vs IAU 2006 difference at J2000 is ~42 mas
+            # which is a known offset between the two models
+            # The difference grows roughly linearly with time: ~0.2 mas per year from J2000
+            years_from_j2000 = abs((jd_tt - J2000_JD) / 365.25)
+            max_expected_mas = 50 + 0.25 * years_from_j2000  # Baseline ~42 mas + growth
+            assert diff_as * 1000 < max_expected_mas, (
+                f"Obliquity difference too large at {date_name}"
+            )
