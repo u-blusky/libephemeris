@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-01-31
+
+### Added
+
+#### Documentation
+- New "Why LibEphemeris is More Accurate" section in README explaining scientific precision
+- Detailed comparison table: NASA JPL DE440 vs Swiss Ephemeris
+- True Node calculation methodology explanation with mathematical foundation
+- Calibration script (`scripts/calibrate_true_node.py`) for True Node comparison
+
+### Changed
+
+#### True Node Documentation
+- Updated PRECISION.md with rigorous True Node methodology explanation
+- Added calibration results (500 random dates, 1900-2100): ~206 arcsec RMS difference
+- Documented why geometric method (h = r × v) is mathematically more rigorous
+- Added Swiss Ephemeris documentation quote confirming the approach
+
+#### Code Documentation
+- Enhanced `calc_true_lunar_node()` docstring with precision data
+- Added explanation of why libephemeris is mathematically more accurate
+- Updated precision figures based on actual calibration measurements
+
 ## [0.5.0] - 2026-01-31
 
 ### Changed
