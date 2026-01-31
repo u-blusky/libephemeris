@@ -7,6 +7,7 @@ These tests verify:
 - Fallback to Keplerian when SPK not available
 - Coverage checking
 - Error handling (SPKNotFoundError)
+- jplephem version compatibility
 
 Note: Integration tests that download actual SPK files from Horizons
 are skipped by default. Set LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1 to run them.
@@ -15,6 +16,9 @@ are skipped by default. Set LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1 to run them.
 import os
 import pytest
 from unittest.mock import patch, MagicMock
+from packaging import version
+
+import jplephem
 
 import libephemeris as eph
 from libephemeris import spk, state
@@ -29,6 +33,62 @@ from libephemeris.constants import (
     SEFLG_SPEED,
 )
 from libephemeris.exceptions import SPKNotFoundError
+
+
+class TestJplephemVersion:
+    """Test jplephem version requirements for optimal SPK reading performance."""
+
+    # Minimum required version for all features (from skyfield dependency)
+    MINIMUM_VERSION = "2.13"
+    # Recommended version with NumPy compatibility fixes
+    RECOMMENDED_VERSION = "2.24"
+
+    def test_jplephem_installed(self):
+        """Verify jplephem is installed."""
+        assert jplephem is not None
+        assert hasattr(jplephem, "__version__")
+
+    def test_jplephem_minimum_version(self):
+        """Verify jplephem meets minimum version requirement.
+
+        Version 2.13+ is required by skyfield for:
+        - OutOfRangeError with array attribute for date errors
+        - Essential SPK reading capabilities
+        """
+        installed = version.parse(jplephem.__version__)
+        minimum = version.parse(self.MINIMUM_VERSION)
+        assert installed >= minimum, (
+            f"jplephem {jplephem.__version__} is below minimum version "
+            f"{self.MINIMUM_VERSION} required for SPK support"
+        )
+
+    def test_jplephem_recommended_version(self):
+        """Verify jplephem meets recommended version for optimal performance.
+
+        Version 2.24+ includes:
+        - NumPy deprecation warning fixes (.shape -> .reshape())
+        - Better compatibility with modern NumPy versions
+        """
+        installed = version.parse(jplephem.__version__)
+        recommended = version.parse(self.RECOMMENDED_VERSION)
+        assert installed >= recommended, (
+            f"jplephem {jplephem.__version__} is below recommended version "
+            f"{self.RECOMMENDED_VERSION}. Consider upgrading for NumPy compatibility."
+        )
+
+    def test_jplephem_spk_module_available(self):
+        """Verify jplephem.spk module is available for SPK reading."""
+        from jplephem.spk import SPK
+
+        assert SPK is not None
+        # Verify SPK has essential methods
+        assert hasattr(SPK, "open")
+
+    def test_jplephem_daf_module_available(self):
+        """Verify jplephem.daf module is available for DAF file reading."""
+        from jplephem.daf import DAF
+
+        assert DAF is not None
 
 
 class TestNaifIdDeduction:

@@ -556,15 +556,15 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] DOCUMENT PYERFA BENEFITS: Document what precision improvements pyerfa would provide if integrated.
 
-- [ ] EVALUATE ASTROPY INTEGRATION: Research how astropy.coordinates and astropy.time could supplement calculations.
+- [x] EVALUATE ASTROPY INTEGRATION: Research how astropy.coordinates and astropy.time could supplement calculations.
 
-- [ ] DOCUMENT ASTROPY BENEFITS: Document what astropy provides that could improve libephemeris.
+- [x] DOCUMENT ASTROPY BENEFITS: Document what astropy provides that could improve libephemeris.
 
-- [ ] EVALUATE REBOUND FOR N-BODY: Research the REBOUND library (pip install rebound) for n-body gravitational integration, evaluate for asteroid orbit propagation.
+- [x] EVALUATE REBOUND FOR N-BODY: Research the REBOUND library (pip install rebound) for n-body gravitational integration, evaluate for asteroid orbit propagation.
 
-- [ ] DOCUMENT REBOUND BENEFITS: Document how REBOUND could improve asteroid precision.
+- [x] DOCUMENT REBOUND BENEFITS: Document how REBOUND could improve asteroid precision.
 
-- [ ] EVALUATE JPLEPHEM VERSION: Verify using latest jplephem version for optimal SPK reading performance.
+- [x] EVALUATE JPLEPHEM VERSION: Verify using latest jplephem version for optimal SPK reading performance.
 
 - [ ] EVALUATE SKYFIELD VERSION: Verify using latest Skyfield version and document any improvements from updates.
 
