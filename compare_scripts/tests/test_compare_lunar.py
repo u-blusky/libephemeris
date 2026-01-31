@@ -33,7 +33,7 @@ def angular_diff(val1: float, val2: float) -> float:
 # ============================================================================
 
 MEAN_NODE_TOL = 0.01  # degrees
-TRUE_NODE_TOL = 0.15  # degrees (relaxed due to calculation differences)
+TRUE_NODE_TOL = 0.15  # degrees (~540 arcsec, covers max observed ~510 arcsec)
 MEAN_LILITH_TOL = 0.1  # degrees
 TRUE_LILITH_TOL = 7.0  # degrees (very relaxed - known implementation differences)
 
