@@ -12,6 +12,8 @@ Constants are organized into logical groups for easy navigation.
 Values match Swiss Ephemeris v2.x for API compatibility.
 """
 
+from __future__ import annotations
+
 # =============================================================================
 # PLANET AND BODY IDENTIFIERS
 # =============================================================================
@@ -299,7 +301,7 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
 }
 
 
-def get_horizons_id(ipl: int) -> "str | None":
+def get_horizons_id(ipl: int) -> str | None:
     """
     Get the JPL Horizons target identifier for a libephemeris body ID.
 
@@ -320,7 +322,7 @@ def get_horizons_id(ipl: int) -> "str | None":
     return None
 
 
-def get_naif_id_from_ipl(ipl: int) -> "int | None":
+def get_naif_id_from_ipl(ipl: int) -> int | None:
     """
     Get the NAIF SPICE ID for a libephemeris body ID.
 
@@ -341,7 +343,7 @@ def get_naif_id_from_ipl(ipl: int) -> "int | None":
     return None
 
 
-def get_spk_body_info_from_map(ipl: int) -> "tuple[str, int] | None":
+def get_spk_body_info_from_map(ipl: int) -> tuple[str, int] | None:
     """
     Get both Horizons ID and NAIF ID for a libephemeris body.
 

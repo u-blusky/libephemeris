@@ -29,6 +29,8 @@ References:
     - Swiss Ephemeris documentation
 """
 
+from __future__ import annotations
+
 import math
 from typing import Sequence, Tuple, Union
 from .constants import (

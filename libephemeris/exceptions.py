@@ -35,6 +35,8 @@ This hierarchy allows users to catch broad categories of errors or specific ones
         ...
 """
 
+from __future__ import annotations
+
 
 class Error(Exception):
     """Swiss Ephemeris error.

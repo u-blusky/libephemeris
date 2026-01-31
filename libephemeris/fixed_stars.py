@@ -40,6 +40,8 @@ References:
 - Proper motion: Hipparcos/Tycho catalogs
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import List, Tuple
 

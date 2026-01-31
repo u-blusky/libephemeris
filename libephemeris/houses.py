@@ -70,6 +70,8 @@ References:
 - IERS Conventions 2003 (nutation models)
 """
 
+from __future__ import annotations
+
 import math
 from typing import List
 from .constants import *
