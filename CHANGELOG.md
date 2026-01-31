@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-31
+
+### Added
+
+#### Python 3.9 Support
+- Added Python 3.9 compatibility with `from __future__ import annotations`
+- Updated minimum Python version requirement from 3.10 to 3.9
+- Added Python 3.9 classifier in package metadata
+
 ## [0.3.0] - 2026-01-31
 
 ### Added
@@ -274,7 +283,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/g-battaglia/libephemeris/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/g-battaglia/libephemeris/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/g-battaglia/libephemeris/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/g-battaglia/libephemeris/releases/tag/v0.1.0
