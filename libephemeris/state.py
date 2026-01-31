@@ -257,8 +257,6 @@ def clear_angles_cache() -> None:
     global _ANGLES_CACHE
     _ANGLES_CACHE = {}
 
-    _ANGLES_CACHE = {}
-
 
 def set_ephe_path(path: Optional[str]) -> None:
     """
@@ -551,7 +549,7 @@ def get_library_path() -> str:
     Note:
         - If a custom ephemeris path was set via set_ephe_path(), that path
           is returned regardless of whether files actually exist there.
-        - Otherwise, returns the workspace root directory where de421.bsp
+        - Otherwise, returns the workspace root directory where de440.bsp
           and other data files are located by default.
 
     Example:

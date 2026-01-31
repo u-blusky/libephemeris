@@ -26,7 +26,7 @@ from .constants import (
     SE_VERTEX,
     SE_ANTIVERTEX,
 )
-from .houses import swe_houses
+from .houses import swe_houses_with_fallback
 
 
 def calc_angles(jd_ut: float, lat: float, lon: float) -> Dict[str, float]:
@@ -56,7 +56,7 @@ def calc_angles(jd_ut: float, lat: float, lon: float) -> Dict[str, float]:
         Angles are sensitive to observer location. Polar regions may
         have undefined values for some angles.
     """
-    _, ascmc = swe_houses(jd_ut, lat, lon, ord("P"))
+    _, ascmc, _, _ = swe_houses_with_fallback(jd_ut, lat, lon, ord("P"))
 
     return {
         "Ascendant": ascmc[0],

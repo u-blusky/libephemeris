@@ -37,7 +37,7 @@ _SHARED_LOADER: Optional[Loader] = None
 _SHARED_PLANETS: Optional[SpiceKernel] = None
 _SHARED_TS: Optional[Timescale] = None
 _SHARED_EPHE_PATH: Optional[str] = None
-_SHARED_EPHE_FILE: str = "de421.bsp"
+_SHARED_EPHE_FILE: str = "de440.bsp"
 _SHARED_LOCK = threading.RLock()
 
 
@@ -66,14 +66,14 @@ class EphemerisContext:
         and use their own contexts without interference.
     """
 
-    def __init__(self, ephe_path: Optional[str] = None, ephe_file: str = "de421.bsp"):
+    def __init__(self, ephe_path: Optional[str] = None, ephe_file: str = "de440.bsp"):
         """
         Initialize a new ephemeris context.
 
         Args:
             ephe_path: Optional path to directory containing ephemeris files.
                       If None, uses default workspace directory.
-            ephe_file: Ephemeris file to use (default: "de421.bsp")
+            ephe_file: Ephemeris file to use (default: "de440.bsp")
         """
         # Instance-specific state (NOT shared between contexts)
         self.topo: Optional[Topos] = None
@@ -93,7 +93,7 @@ class EphemerisContext:
         global _SHARED_EPHE_PATH, _SHARED_EPHE_FILE
         if ephe_path is not None:
             _SHARED_EPHE_PATH = ephe_path
-        if ephe_file != "de421.bsp":
+        if ephe_file != "de440.bsp":
             _SHARED_EPHE_FILE = ephe_file
 
     def get_loader(self) -> Loader:
@@ -137,7 +137,7 @@ class EphemerisContext:
         the same ephemeris data to save memory.
 
         Returns:
-            SpiceKernel: Loaded JPL ephemeris kernel (DE421 by default)
+            SpiceKernel: Loaded JPL ephemeris kernel (DE440 by default)
 
         Raises:
             FileNotFoundError: If ephemeris file cannot be found or downloaded
@@ -538,4 +538,4 @@ class EphemerisContext:
             _SHARED_PLANETS = None
             _SHARED_TS = None
             _SHARED_EPHE_PATH = None
-            _SHARED_EPHE_FILE = "de421.bsp"
+            _SHARED_EPHE_FILE = "de440.bsp"

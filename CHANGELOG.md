@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-01-31
+
+### Changed
+
+#### Default Ephemeris Upgrade
+- Upgraded default ephemeris from DE421 to DE440 (JPL's latest recommended ephemeris)
+- DE440 provides improved accuracy and extends coverage to 1550-2650
+
+#### Eclipse Calculation Improvements
+- Refactored `_calculate_eclipse_type_and_magnitude` to use proper Besselian elements
+- Now uses `_calc_gamma()`, `_calc_penumbra_limit()`, and `_calc_umbra_limit()` helper functions
+- Replaced ad-hoc gamma approximations with proper shadow geometry calculations
+- Added spherical trigonometry for accurate angular separation between Sun and Moon
+
+### Fixed
+
+- Fixed tuple unpacking mismatch in `calc_angles()` when calling `swe_houses_with_fallback()`
+- Fixed heliocentric and SSB-centered position calculations in `planets.py` to use direct vector computation instead of `observe().apparent()`
+- Removed duplicate `_ANGLES_CACHE = {}` line in `state.py`
+- Updated `calc_angles()` to use `swe_houses_with_fallback()` for better polar latitude handling
+
 ## [0.4.0] - 2026-01-31
 
 ### Added
@@ -283,7 +304,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/g-battaglia/libephemeris/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/g-battaglia/libephemeris/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/g-battaglia/libephemeris/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/g-battaglia/libephemeris/compare/v0.1.0...v0.2.0

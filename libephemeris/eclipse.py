@@ -784,8 +784,9 @@ def _calculate_eclipse_type_and_magnitude(
     sun_dist = sun_pos[2]
     moon_dist = moon_pos[2]
 
-    # Moon's ecliptic latitude (how far from the ecliptic)
-    moon_lat = moon_pos[1]
+    # Ecliptic coordinates for separation calculation
+    sun_lon, sun_lat = sun_pos[0], sun_pos[1]
+    moon_lon, moon_lat = moon_pos[0], moon_pos[1]
 
     # Angular radii (in degrees)
     # Sun: mean radius 959.63" at 1 AU
@@ -799,90 +800,75 @@ def _calculate_eclipse_type_and_magnitude(
     else:
         moon_sun_ratio = moon_angular_radius / sun_angular_radius
 
-    # Calculate gamma - the perpendicular distance of Moon's shadow axis
-    # from Earth's center, in Earth radii
-    # Approximation: gamma ≈ sin(moon_lat) * moon_dist / earth_radius
-    # Using more precise formula based on geometry
-    earth_radius_au = 4.2635e-5  # Earth radius in AU
+    # Calculate gamma using Besselian elements (shadow axis distance from Earth center)
+    gamma = _calc_gamma(jd)
 
-    # Convert latitude to radians
-    lat_rad = math.radians(moon_lat)
+    # Penumbral and umbral limits at maximum (Earth radii)
+    l1 = _calc_penumbra_limit(jd)
+    l2 = _calc_umbra_limit(jd)
 
-    # Distance of Moon from ecliptic plane
-    z_moon = moon_dist * math.sin(lat_rad)
+    gamma_limit_partial = 1.0 + l1
+    gamma_limit_central = max(0.0, 1.0 - abs(l2))
 
-    # Gamma (in Earth radii)
-    gamma = z_moon / earth_radius_au
+    # Angular separation between Sun and Moon centers (degrees)
+    def _angular_separation(
+        lon1: float, lat1: float, lon2: float, lat2: float
+    ) -> float:
+        lon1_rad = math.radians(lon1)
+        lat1_rad = math.radians(lat1)
+        lon2_rad = math.radians(lon2)
+        lat2_rad = math.radians(lat2)
+        dlon = lon2_rad - lon1_rad
+        cos_sep = math.sin(lat1_rad) * math.sin(lat2_rad) + math.cos(
+            lat1_rad
+        ) * math.cos(lat2_rad) * math.cos(dlon)
+        return math.degrees(_safe_acos(cos_sep))
 
-    # Penumbral cone semi-angle (reserved for future Besselian elements)
-    # f1 = (sun_angular_radius + moon_angular_radius) * moon_dist / earth_radius_au
-    # Umbral cone semi-angle
-    # f2 = (sun_angular_radius - moon_angular_radius) * moon_dist / earth_radius_au
+    separation = _angular_separation(sun_lon, sun_lat, moon_lon, moon_lat)
 
-    # Simplified gamma calculation based on Moon latitude
-    # For more precision, use Besselian elements
-    gamma = moon_lat * moon_dist * 57.2958  # Rough conversion to Earth radii
-    gamma /= 60.0  # Normalize
+    # Eclipse magnitude: fraction of Sun's diameter covered (can exceed 1.0 for total)
+    sum_radii = sun_angular_radius + moon_angular_radius
+    if separation >= sum_radii:
+        magnitude = 0.0
+    else:
+        magnitude = (sum_radii - separation) / (2.0 * sun_angular_radius)
+        magnitude = max(0.0, min(1.5, magnitude))
 
-    # More accurate gamma using geometry
-    # gamma = distance of shadow axis from Earth center / Earth equatorial radius
-    gamma = (moon_lat / 60.0) * (moon_dist / 0.002569) * 0.5  # Simplified
-
-    # Determine eclipse type based on gamma and ratio
+    # Determine eclipse type based on gamma and shadow limits
     eclipse_type = 0
-    magnitude = 0.0
-
-    # Maximum gamma for any eclipse
-    GAMMA_LIMIT_PARTIAL = 1.55
-    GAMMA_LIMIT_TOTAL = 0.997
 
     # Edge case: gamma beyond eclipse limit
-    if abs(gamma) > GAMMA_LIMIT_PARTIAL:
+    if abs(gamma) > gamma_limit_partial:
         # No eclipse
         return 0, 0.0, gamma, moon_sun_ratio
 
     # Edge case: near-miss eclipse (gamma very close to limit)
-    if _is_near_miss_eclipse(gamma, GAMMA_LIMIT_PARTIAL):
+    if _is_near_miss_eclipse(gamma, gamma_limit_partial):
         # Use safe magnitude calculation for smooth transition
         eclipse_type = SE_ECL_PARTIAL
         magnitude = _calculate_magnitude_safe(
-            gamma, moon_sun_ratio, GAMMA_LIMIT_PARTIAL
+            gamma, moon_sun_ratio, gamma_limit_partial
         )
         # Mark as grazing if magnitude is very small
         if _is_shallow_eclipse(magnitude):
             eclipse_type |= SE_ECL_GRAZING
         return eclipse_type, magnitude, gamma, moon_sun_ratio
 
-    # Standard eclipse type and magnitude calculation
-    if moon_sun_ratio >= 1.0:
-        # Moon appears larger - can be total
-        if abs(gamma) < GAMMA_LIMIT_TOTAL:
-            eclipse_type = SE_ECL_TOTAL | SE_ECL_CENTRAL
-            magnitude = 1.0 + (moon_sun_ratio - 1.0) * (1 - abs(gamma))
-        else:
-            eclipse_type = SE_ECL_PARTIAL
-            magnitude = 1.0 - abs(gamma) / GAMMA_LIMIT_PARTIAL
-            # Check for shallow partial eclipse
-            if _is_shallow_eclipse(magnitude):
-                eclipse_type |= SE_ECL_GRAZING
-    else:
-        # Moon appears smaller - can be annular
-        if abs(gamma) < GAMMA_LIMIT_TOTAL:
-            # Check for hybrid (annular-total)
-            if moon_sun_ratio > 0.99:
-                eclipse_type = SE_ECL_ANNULAR_TOTAL | SE_ECL_CENTRAL
-            else:
-                eclipse_type = SE_ECL_ANNULAR | SE_ECL_CENTRAL
-            magnitude = moon_sun_ratio
-        else:
-            eclipse_type = SE_ECL_PARTIAL
-            magnitude = (1.0 - abs(gamma) / GAMMA_LIMIT_PARTIAL) * moon_sun_ratio
-            # Check for shallow partial eclipse
-            if _is_shallow_eclipse(magnitude):
-                eclipse_type |= SE_ECL_GRAZING
+    eclipse_type = SE_ECL_PARTIAL
 
-    # Ensure magnitude is in valid range
-    magnitude = max(0.0, min(1.5, magnitude))
+    # Central eclipses possible when shadow axis passes within umbral/antumbral limit
+    if gamma_limit_central > 0.0 and abs(gamma) <= gamma_limit_central:
+        # Check for hybrid (annular-total)
+        if abs(l2) < 0.01 or 0.99 <= moon_sun_ratio <= 1.01:
+            eclipse_type = SE_ECL_ANNULAR_TOTAL | SE_ECL_CENTRAL
+        elif l2 < 0:
+            eclipse_type = SE_ECL_TOTAL | SE_ECL_CENTRAL
+        else:
+            eclipse_type = SE_ECL_ANNULAR | SE_ECL_CENTRAL
+
+    # Mark shallow grazing eclipses
+    if eclipse_type & SE_ECL_PARTIAL and _is_shallow_eclipse(magnitude):
+        eclipse_type |= SE_ECL_GRAZING
 
     return eclipse_type, magnitude, gamma, moon_sun_ratio
 

@@ -2,7 +2,7 @@
 Planetary position calculations for libephemeris.
 
 This is the core module providing Swiss Ephemeris-compatible planet calculations
-using NASA JPL DE421 ephemeris via Skyfield.
+using NASA JPL DE440 ephemeris via Skyfield.
 
 Supported Bodies:
 - Classical planets: Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto
@@ -29,7 +29,7 @@ Coordinate Systems:
 Precision Notes:
 - Nutation: Uses full IAU 2000B model (77 terms, ~0.1" precision)
 - Ayanamsa: Properly converts ET to UT using Delta T
-- Planet positions: JPL DE421 (accurate to ~0.001" for modern dates)
+- Planet positions: JPL DE440 (accurate to ~0.001" for modern dates)
 - Planets use NAIF planet center IDs (599, 699, etc.) for accurate positions
 - Ecliptic frame uses J2000.0 for performance (true date would add ~0.01" precision but 2x slower)
 
@@ -1162,12 +1162,14 @@ def _calc_body(
 
                 # Helper to get J2000 RA/Dec at t
                 def get_j2000_coord(t_):
-                    if iflag & SEFLG_TRUEPOS:
-                        p_ = target.at(t_).position.au - observer.at(t_).position.au
-                        v_ = (
-                            target.at(t_).velocity.au_per_d
-                            - observer.at(t_).velocity.au_per_d
-                        )
+                    from skyfield.positionlib import ICRF
+
+                    if (
+                        iflag & SEFLG_TRUEPOS
+                        or observer_is_ssb
+                        or (iflag & SEFLG_HELCTR)
+                    ):
+                        p_, v_ = get_vector(t_)
                         pos_ = ICRF(
                             p_,
                             v_,
@@ -1198,12 +1200,10 @@ def _calc_body(
 
             # Helper to get coord at time t_
             def get_coord(t_):
-                if iflag & SEFLG_TRUEPOS:
-                    p_ = target.at(t_).position.au - observer.at(t_).position.au
-                    v_ = (
-                        target.at(t_).velocity.au_per_d
-                        - observer.at(t_).velocity.au_per_d
-                    )
+                from skyfield.positionlib import ICRF
+
+                if iflag & SEFLG_TRUEPOS or observer_is_ssb or (iflag & SEFLG_HELCTR):
+                    p_, v_ = get_vector(t_)
                     pos_ = ICRF(
                         p_,
                         v_,
