@@ -566,7 +566,7 @@ This document contains detailed TODO items for improving libephemeris precision 
 
 - [x] EVALUATE JPLEPHEM VERSION: Verify using latest jplephem version for optimal SPK reading performance.
 
-- [ ] EVALUATE SKYFIELD VERSION: Verify using latest Skyfield version and document any improvements from updates.
+- [x] EVALUATE SKYFIELD VERSION: Verify using latest Skyfield version and document any improvements from updates.
 
 ---
 
