@@ -105,29 +105,214 @@ class TestCotrans:
         assert diff_lat < 1e-8, f"Roundtrip lat diff {diff_lat:.12f}° for {desc}"
 
 
+VELOCITY_VALUES = [
+    ((1.0, 0.0, 0.0), "Pure lon speed"),
+    ((0.0, 0.5, 0.0), "Pure lat speed"),
+    ((1.0, 0.1, 0.0), "Typical planet speed"),
+    ((0.5, -0.2, 0.0), "Mixed with negative lat speed"),
+    ((13.2, 0.0, 0.0), "High speed (Moon-like)"),
+    ((-0.5, 0.05, 0.0), "Retrograde motion"),
+]
+
+SPEED_TOL = 0.001  # degrees/day tolerance for velocity
+
+
 class TestCotransSp:
     """Compare cotrans_sp with velocity transformation."""
 
     @pytest.mark.comparison
-    @pytest.mark.parametrize("lon,lat,desc", TEST_COORDINATES[:4])
-    def test_cotrans_sp(self, lon, lat, desc):
-        """Test cotrans_sp with speed values."""
+    @pytest.mark.parametrize("lon,lat,desc", TEST_COORDINATES)
+    @pytest.mark.parametrize("eps,eps_desc", OBLIQUITY_VALUES)
+    @pytest.mark.parametrize("speed,speed_desc", VELOCITY_VALUES)
+    def test_cotrans_sp_ecl_to_eq(
+        self, lon, lat, desc, eps, eps_desc, speed, speed_desc
+    ):
+        """Test cotrans_sp ecliptic to equatorial with various speeds."""
+        coord = (lon, lat, 1.0)
+
+        # libephemeris uses separate coord and speed tuples
+        result_coord, result_speed = ephem.cotrans_sp(coord, speed, -eps)
+
+        # pyswisseph uses a 6-tuple (lon, lat, dist, lon_sp, lat_sp, dist_sp)
+        coords_6 = coord + speed
+        result_swe = swe.cotrans_sp(coords_6, -eps)
+
+        # Compare positions
+        diff_lon = angular_diff(result_swe[0], result_coord[0])
+        diff_lat = abs(result_swe[1] - result_coord[1])
+
+        assert diff_lon < ANGLE_TOL, (
+            f"cotrans_sp lon diff {diff_lon:.8f}° for {desc}, {eps_desc}, {speed_desc}"
+        )
+        assert diff_lat < ANGLE_TOL, (
+            f"cotrans_sp lat diff {diff_lat:.8f}° for {desc}, {eps_desc}, {speed_desc}"
+        )
+
+        # Compare velocities
+        diff_lon_speed = abs(result_swe[3] - result_speed[0])
+        diff_lat_speed = abs(result_swe[4] - result_speed[1])
+
+        assert diff_lon_speed < SPEED_TOL, (
+            f"cotrans_sp lon_speed diff {diff_lon_speed:.8f} for {desc}, {speed_desc}"
+        )
+        assert diff_lat_speed < SPEED_TOL, (
+            f"cotrans_sp lat_speed diff {diff_lat_speed:.8f} for {desc}, {speed_desc}"
+        )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("lon,lat,desc", TEST_COORDINATES)
+    @pytest.mark.parametrize("speed,speed_desc", VELOCITY_VALUES[:3])
+    def test_cotrans_sp_eq_to_ecl(self, lon, lat, desc, speed, speed_desc):
+        """Test cotrans_sp equatorial to ecliptic with various speeds."""
         eps = 23.4393
-        lon_speed, lat_speed = 1.0, 0.1
-        coords = (lon, lat, 1.0, lon_speed, lat_speed, 0.0)
+        coord = (lon, lat, 1.0)
 
-        result_swe = swe.cotrans_sp(coords, -eps)
-        result_py = ephem.cotrans_sp(coords, -eps)
+        # Positive obliquity for equatorial to ecliptic
+        result_coord, result_speed = ephem.cotrans_sp(coord, speed, eps)
 
-        diff_lon = angular_diff(result_swe[0], result_py[0])
-        diff_lat = abs(result_swe[1] - result_py[1])
-        diff_lon_speed = abs(result_swe[3] - result_py[3])
-        diff_lat_speed = abs(result_swe[4] - result_py[4])
+        coords_6 = coord + speed
+        result_swe = swe.cotrans_sp(coords_6, eps)
 
-        assert diff_lon < ANGLE_TOL, f"cotrans_sp lon diff {diff_lon:.8f}° for {desc}"
-        assert diff_lat < ANGLE_TOL, f"cotrans_sp lat diff {diff_lat:.8f}° for {desc}"
-        assert diff_lon_speed < 0.001, f"cotrans_sp lon_speed diff {diff_lon_speed:.8f}"
-        assert diff_lat_speed < 0.001, f"cotrans_sp lat_speed diff {diff_lat_speed:.8f}"
+        diff_lon = angular_diff(result_swe[0], result_coord[0])
+        diff_lat = abs(result_swe[1] - result_coord[1])
+
+        assert diff_lon < ANGLE_TOL, (
+            f"cotrans_sp eq->ecl lon diff {diff_lon:.8f}° for {desc}"
+        )
+        assert diff_lat < ANGLE_TOL, (
+            f"cotrans_sp eq->ecl lat diff {diff_lat:.8f}° for {desc}"
+        )
+
+        diff_lon_speed = abs(result_swe[3] - result_speed[0])
+        diff_lat_speed = abs(result_swe[4] - result_speed[1])
+
+        assert diff_lon_speed < SPEED_TOL, (
+            f"cotrans_sp eq->ecl lon_speed diff {diff_lon_speed:.8f} for {desc}"
+        )
+        assert diff_lat_speed < SPEED_TOL, (
+            f"cotrans_sp eq->ecl lat_speed diff {diff_lat_speed:.8f} for {desc}"
+        )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("lon,lat,desc", TEST_COORDINATES)
+    @pytest.mark.parametrize("speed,speed_desc", VELOCITY_VALUES[:4])
+    def test_cotrans_sp_roundtrip_velocity(self, lon, lat, desc, speed, speed_desc):
+        """Test cotrans_sp roundtrip preserves velocity coherence.
+
+        Velocity should be preserved when transforming:
+        ecliptic -> equatorial -> ecliptic
+        """
+        eps = 23.4393
+        coord = (lon, lat, 1.0)
+
+        # Ecliptic to equatorial
+        eq_coord, eq_speed = ephem.cotrans_sp(coord, speed, -eps)
+
+        # Equatorial back to ecliptic
+        result_coord, result_speed = ephem.cotrans_sp(eq_coord, eq_speed, eps)
+
+        # Position roundtrip
+        diff_lon = angular_diff(lon, result_coord[0])
+        diff_lat = abs(lat - result_coord[1])
+
+        assert diff_lon < 1e-8, (
+            f"Roundtrip lon diff {diff_lon:.12f}° for {desc}, {speed_desc}"
+        )
+        assert diff_lat < 1e-8, (
+            f"Roundtrip lat diff {diff_lat:.12f}° for {desc}, {speed_desc}"
+        )
+
+        # Velocity roundtrip - velocities should be recovered
+        diff_lon_speed = abs(speed[0] - result_speed[0])
+        diff_lat_speed = abs(speed[1] - result_speed[1])
+        diff_dist_speed = abs(speed[2] - result_speed[2])
+
+        assert diff_lon_speed < 1e-8, (
+            f"Roundtrip lon_speed diff {diff_lon_speed:.12f} for {desc}, {speed_desc}"
+        )
+        assert diff_lat_speed < 1e-8, (
+            f"Roundtrip lat_speed diff {diff_lat_speed:.12f} for {desc}, {speed_desc}"
+        )
+        assert diff_dist_speed < 1e-10, (
+            f"Roundtrip dist_speed diff {diff_dist_speed:.12f} for {desc}, {speed_desc}"
+        )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("lon,lat,desc", TEST_COORDINATES[:4])
+    def test_cotrans_sp_position_matches_cotrans(self, lon, lat, desc):
+        """Test that cotrans_sp position matches cotrans (velocity-free)."""
+        eps = 23.4393
+        coord = (lon, lat, 1.0)
+        speed = (1.0, 0.1, 0.0)
+
+        # Get position from cotrans_sp
+        result_coord, _ = ephem.cotrans_sp(coord, speed, -eps)
+
+        # Get position from cotrans
+        result_cotrans = ephem.cotrans(coord, -eps)
+
+        diff_lon = angular_diff(result_coord[0], result_cotrans[0])
+        diff_lat = abs(result_coord[1] - result_cotrans[1])
+
+        assert diff_lon < 1e-10, (
+            f"cotrans_sp/cotrans lon mismatch {diff_lon:.12f}° for {desc}"
+        )
+        assert diff_lat < 1e-10, (
+            f"cotrans_sp/cotrans lat mismatch {diff_lat:.12f}° for {desc}"
+        )
+
+    @pytest.mark.comparison
+    def test_cotrans_sp_zero_velocity(self):
+        """Test cotrans_sp with zero velocity returns zero velocity."""
+        eps = 23.4393
+        coord = (90.0, 23.0, 1.0)
+        speed = (0.0, 0.0, 0.0)
+
+        result_coord, result_speed = ephem.cotrans_sp(coord, speed, -eps)
+
+        # pyswisseph reference
+        coords_6 = coord + speed
+        result_swe = swe.cotrans_sp(coords_6, -eps)
+
+        # Transformed speed should be zero (or very close)
+        assert abs(result_speed[0]) < 1e-10, (
+            f"Zero input should give zero lon_speed, got {result_speed[0]}"
+        )
+        assert abs(result_speed[1]) < 1e-10, (
+            f"Zero input should give zero lat_speed, got {result_speed[1]}"
+        )
+        assert abs(result_speed[2]) < 1e-10, (
+            f"Zero input should give zero dist_speed, got {result_speed[2]}"
+        )
+
+        # Should match pyswisseph
+        assert abs(result_swe[3] - result_speed[0]) < 1e-10
+        assert abs(result_swe[4] - result_speed[1]) < 1e-10
+
+    @pytest.mark.comparison
+    def test_cotrans_sp_at_poles(self):
+        """Test cotrans_sp at ecliptic poles with velocity."""
+        eps = 23.4393
+        speed = (1.0, 0.1, 0.0)
+
+        # North ecliptic pole
+        coord_n = (0.0, 89.0, 1.0)  # Near pole to avoid singularity
+        result_n, speed_n = ephem.cotrans_sp(coord_n, speed, -eps)
+        swe_n = swe.cotrans_sp(coord_n + speed, -eps)
+
+        diff_lat = abs(result_n[1] - swe_n[1])
+        assert diff_lat < ANGLE_TOL, f"Pole lat diff {diff_lat:.10f}°"
+
+        diff_lat_speed = abs(speed_n[1] - swe_n[4])
+        assert diff_lat_speed < SPEED_TOL, f"Pole lat_speed diff {diff_lat_speed:.10f}"
+
+        # South ecliptic pole
+        coord_s = (0.0, -89.0, 1.0)
+        result_s, speed_s = ephem.cotrans_sp(coord_s, speed, -eps)
+        swe_s = swe.cotrans_sp(coord_s + speed, -eps)
+
+        diff_lat = abs(result_s[1] - swe_s[1])
+        assert diff_lat < ANGLE_TOL, f"S Pole lat diff {diff_lat:.10f}°"
 
 
 class TestAzalt:

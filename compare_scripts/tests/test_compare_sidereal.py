@@ -14,6 +14,7 @@ from libephemeris.constants import (
     SE_MARS,
     SE_JUPITER,
     SE_SATURN,
+    SE_SIDM_USER,
     SE_SIDM_FAGAN_BRADLEY,
     SE_SIDM_LAHIRI,
     SE_SIDM_DELUCE,
@@ -346,3 +347,154 @@ class TestJ2000Mode:
         assert ayan_1900 < 0, f"J2000 at 1900 should be negative, got {ayan_1900}"
         assert abs(ayan_2000) < 0.001, f"J2000 at 2000 should be ~0, got {ayan_2000}"
         assert ayan_2100 > 0, f"J2000 at 2100 should be positive, got {ayan_2100}"
+
+
+class TestUserDefinedAyanamsha:
+    """
+    Test SE_SIDM_USER (255) custom ayanamsha mode.
+
+    This mode allows users to define custom ayanamsha with t0 (reference time)
+    and ayan_t0 (ayanamsha value at reference time) parameters.
+    Many Vedic astrologers use custom ayanamsha values.
+    """
+
+    @pytest.mark.comparison
+    def test_user_ayanamsha_value_at_j2000(self):
+        """Test SE_SIDM_USER ayanamsha value matches pyswisseph at J2000."""
+        jd = 2451545.0  # J2000
+        t0 = jd
+        ayan_t0 = 23.5  # Custom ayanamsha value
+
+        # Set user-defined mode with same parameters
+        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+
+        ayan_swe = swe.get_ayanamsa_ut(jd)
+        ayan_py = ephem.swe_get_ayanamsa_ut(jd)
+
+        diff = abs(ayan_swe - ayan_py)
+
+        # At t0, both should return exactly ayan_t0
+        assert abs(ayan_py - ayan_t0) < 0.001, f"Expected {ayan_t0}, got {ayan_py}"
+        assert diff < STRICT_TOLERANCE, (
+            f"SE_SIDM_USER at J2000: diff {diff:.6f}° exceeds tolerance"
+        )
+
+    @pytest.mark.comparison
+    def test_user_ayanamsha_at_multiple_dates(self):
+        """Test SE_SIDM_USER ayanamsha matches pyswisseph across multiple dates."""
+        t0 = 2451545.0  # J2000
+        ayan_t0 = 23.5
+
+        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+
+        for jd, date_desc in TEST_DATES:
+            ayan_swe = swe.get_ayanamsa_ut(jd)
+            ayan_py = ephem.swe_get_ayanamsa_ut(jd)
+
+            diff = abs(ayan_swe - ayan_py)
+
+            assert diff < STRICT_TOLERANCE, (
+                f"SE_SIDM_USER at {date_desc}: diff {diff:.6f}° exceeds tolerance "
+                f"(swe={ayan_swe:.6f}, py={ayan_py:.6f})"
+            )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("planet_id,planet_name", TEST_PLANETS)
+    def test_user_sidereal_planet_positions(self, planet_id, planet_name):
+        """Test sidereal planetary positions with SE_SIDM_USER match pyswisseph."""
+        jd = 2451545.0  # J2000
+        t0 = jd
+        ayan_t0 = 23.5
+
+        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+
+        pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SIDEREAL)
+        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SIDEREAL)
+
+        diff_lon = angular_diff(pos_swe[0], pos_py[0])
+
+        assert diff_lon < STRICT_TOLERANCE, (
+            f"{planet_name} sidereal (SE_SIDM_USER): diff {diff_lon:.6f}° exceeds tolerance"
+        )
+
+    @pytest.mark.comparison
+    def test_changing_parameters_changes_results(self):
+        """Verify that changing t0/ayan_t0 parameters changes results."""
+        jd = 2451545.0  # J2000
+
+        # First set of parameters
+        t0_1 = jd
+        ayan_t0_1 = 23.5
+
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0_1, ayan_t0=ayan_t0_1)
+        ayan_1 = ephem.swe_get_ayanamsa_ut(jd)
+
+        # Second set with different ayan_t0
+        t0_2 = jd
+        ayan_t0_2 = 25.0
+
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0_2, ayan_t0=ayan_t0_2)
+        ayan_2 = ephem.swe_get_ayanamsa_ut(jd)
+
+        # Results should be different
+        diff = abs(ayan_1 - ayan_2)
+        assert diff > 1.0, (
+            f"Changing ayan_t0 should change result: got {ayan_1:.6f} vs {ayan_2:.6f}"
+        )
+
+        # Third set with different t0
+        t0_3 = 2415020.5  # J1900
+        ayan_t0_3 = 23.5
+
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0_3, ayan_t0=ayan_t0_3)
+        ayan_3 = ephem.swe_get_ayanamsa_ut(jd)
+
+        # Should differ from first (same ayan_t0 but different t0)
+        diff_t0 = abs(ayan_1 - ayan_3)
+        assert diff_t0 > 0.1, (
+            f"Changing t0 should change result: got {ayan_1:.6f} vs {ayan_3:.6f}"
+        )
+
+    @pytest.mark.comparison
+    def test_user_ayanamsha_different_reference_epochs(self):
+        """Test SE_SIDM_USER with different reference epochs matches pyswisseph."""
+        # Test with t0 at J1900
+        t0 = 2415020.5  # J1900
+        ayan_t0 = 22.5
+        jd = 2451545.0  # Test at J2000
+
+        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+
+        ayan_swe = swe.get_ayanamsa_ut(jd)
+        ayan_py = ephem.swe_get_ayanamsa_ut(jd)
+
+        diff = abs(ayan_swe - ayan_py)
+
+        assert diff < STRICT_TOLERANCE, (
+            f"SE_SIDM_USER with J1900 reference: diff {diff:.6f}° exceeds tolerance"
+        )
+
+    @pytest.mark.comparison
+    def test_user_sidereal_positions_at_future_date(self):
+        """Test SE_SIDM_USER sidereal positions at future date match pyswisseph."""
+        t0 = 2451545.0  # J2000
+        ayan_t0 = 23.5
+        jd = 2469807.5  # 2050-01-01
+
+        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+
+        for planet_id, planet_name in TEST_PLANETS[:2]:  # Sun and Moon
+            pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SIDEREAL)
+            pos_py, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SIDEREAL)
+
+            diff_lon = angular_diff(pos_swe[0], pos_py[0])
+
+            assert diff_lon < STRICT_TOLERANCE, (
+                f"{planet_name} sidereal (SE_SIDM_USER) at 2050: "
+                f"diff {diff_lon:.6f}° exceeds tolerance"
+            )

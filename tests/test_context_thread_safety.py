@@ -1038,3 +1038,416 @@ class TestEphemerisContextThreadSafety:
 
         assert not errors, f"Errors: {errors}"
         assert len(results) == 9
+
+
+# =============================================================================
+# TEST: EphemerisContext.close() Method
+# =============================================================================
+
+
+class TestEphemerisContextClose:
+    """
+    Tests for EphemerisContext.close() method.
+
+    These tests verify that:
+    1. close() properly resets shared resources to None
+    2. Calculations after close() reload resources correctly
+    3. close() is thread-safe in concurrent environments
+    4. The load-close-reload cycle works without memory leaks or stale state
+    """
+
+    def test_close_resets_shared_resources_to_none(self):
+        """
+        Verify that close() sets all shared resources to None.
+
+        After calling EphemerisContext.close(), the shared resources
+        (_SHARED_LOADER, _SHARED_PLANETS, _SHARED_TS) should all be None.
+
+        Note: ctx.calc_ut() uses state module's resources internally,
+        so we explicitly call ctx.get_planets() and ctx.get_timescale()
+        to load the context module's shared resources.
+        """
+        from libephemeris import context as ctx_module
+
+        # First, ensure resources are loaded by explicitly calling accessors
+        ctx = EphemerisContext()
+        _ = ctx.get_loader()
+        _ = ctx.get_planets()
+        _ = ctx.get_timescale()
+
+        # Verify resources are loaded
+        assert ctx_module._SHARED_LOADER is not None, "Loader should be loaded"
+        assert ctx_module._SHARED_PLANETS is not None, "Planets should be loaded"
+        assert ctx_module._SHARED_TS is not None, "Timescale should be loaded"
+
+        # Call close()
+        EphemerisContext.close()
+
+        # Verify all shared resources are now None
+        assert ctx_module._SHARED_LOADER is None, "Loader should be None after close()"
+        assert ctx_module._SHARED_PLANETS is None, (
+            "Planets should be None after close()"
+        )
+        assert ctx_module._SHARED_TS is None, "Timescale should be None after close()"
+        assert ctx_module._SHARED_EPHE_PATH is None, (
+            "Ephemeris path should be None after close()"
+        )
+
+    def test_calculation_after_close_reloads_resources(self):
+        """
+        Verify that accessing resources after close() properly reloads them.
+
+        This tests the full load-close-reload cycle to ensure no stale state.
+
+        Note: ctx.calc_ut() uses state module's resources internally,
+        so we explicitly call ctx.get_planets() and ctx.get_timescale()
+        to test the context module's shared resources.
+        """
+        from libephemeris import context as ctx_module
+
+        jd = 2451545.0
+
+        # Step 1: Load context resources explicitly
+        ctx = EphemerisContext()
+        _ = ctx.get_loader()
+        _ = ctx.get_planets()
+        _ = ctx.get_timescale()
+
+        # Capture resource identities before close
+        loader_before = ctx_module._SHARED_LOADER
+        planets_before = ctx_module._SHARED_PLANETS
+        ts_before = ctx_module._SHARED_TS
+
+        assert loader_before is not None
+        assert planets_before is not None
+        assert ts_before is not None
+
+        # Do calculation for comparison
+        pos_before, _ = ctx.calc_ut(jd, SE_SUN, 0)
+
+        # Step 2: Call close()
+        EphemerisContext.close()
+
+        # Verify resources are None
+        assert ctx_module._SHARED_LOADER is None
+        assert ctx_module._SHARED_PLANETS is None
+        assert ctx_module._SHARED_TS is None
+
+        # Step 3: Access resources again (should reload)
+        _ = ctx.get_loader()
+        _ = ctx.get_planets()
+        _ = ctx.get_timescale()
+
+        # Verify resources are reloaded (new instances)
+        loader_after = ctx_module._SHARED_LOADER
+        planets_after = ctx_module._SHARED_PLANETS
+        ts_after = ctx_module._SHARED_TS
+
+        assert loader_after is not None, "Loader should be reloaded"
+        assert planets_after is not None, "Planets should be reloaded"
+        assert ts_after is not None, "Timescale should be reloaded"
+
+        # New instances should be different objects (reloaded)
+        assert loader_after is not loader_before, "Loader should be new instance"
+        assert planets_after is not planets_before, "Planets should be new instance"
+        assert ts_after is not ts_before, "Timescale should be new instance"
+
+        # Do calculation after reload and verify same result
+        pos_after, _ = ctx.calc_ut(jd, SE_SUN, 0)
+
+        # Results should be identical (same calculation)
+        assert abs(pos_before[0] - pos_after[0]) < 1e-10, (
+            f"Results should be identical: {pos_before[0]} vs {pos_after[0]}"
+        )
+
+    def test_multiple_close_calls_are_safe(self):
+        """
+        Verify that multiple consecutive close() calls are safe.
+
+        Calling close() multiple times should not raise errors.
+        """
+        from libephemeris import context as ctx_module
+
+        # Load resources
+        ctx = EphemerisContext()
+        ctx.calc_ut(2451545.0, SE_SUN, 0)
+
+        # Call close() multiple times
+        EphemerisContext.close()
+        assert ctx_module._SHARED_PLANETS is None
+
+        EphemerisContext.close()  # Should not raise
+        assert ctx_module._SHARED_PLANETS is None
+
+        EphemerisContext.close()  # Should not raise
+        assert ctx_module._SHARED_PLANETS is None
+
+        # Can still do calculations after
+        pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
+        assert 0 <= pos[0] < 360
+
+    def test_close_does_not_affect_instance_state(self):
+        """
+        Verify that close() only resets shared resources, not instance state.
+
+        Instance-specific state (topo, sidereal_mode, angles_cache) should
+        be preserved after close().
+        """
+        from libephemeris import context as ctx_module
+
+        # Create context with specific settings
+        ctx = EphemerisContext()
+        ctx.set_sid_mode(SE_SIDM_LAHIRI)
+        ctx.set_topo(12.5, 41.9, 100)  # Rome
+
+        # Do a calculation to load shared resources
+        ctx.calc_ut(2451545.0, SE_SUN, 0)
+
+        # Call close()
+        EphemerisContext.close()
+
+        # Instance state should be preserved
+        assert ctx.sidereal_mode == SE_SIDM_LAHIRI, (
+            "Sidereal mode should be preserved after close()"
+        )
+        assert ctx.topo is not None, "Topo should be preserved after close()"
+        assert abs(ctx.topo.latitude.degrees - 41.9) < 0.001
+
+        # Verify shared resources are None
+        assert ctx_module._SHARED_LOADER is None
+        assert ctx_module._SHARED_PLANETS is None
+        assert ctx_module._SHARED_TS is None
+
+    def test_close_in_multithread_environment(self):
+        """
+        Test close() thread-safety in a multi-threaded environment.
+
+        Multiple threads calling close() and doing calculations concurrently
+        should not cause crashes or data corruption.
+        """
+        from libephemeris import context as ctx_module
+
+        jd = 2451545.0
+        num_threads = 12
+        num_iterations = 10
+        errors: list[str] = []
+        errors_lock = threading.Lock()
+
+        def worker(thread_id: int):
+            try:
+                for i in range(num_iterations):
+                    ctx = EphemerisContext()
+                    ctx.set_sid_mode(SE_SIDM_LAHIRI)
+
+                    # Do a calculation
+                    pos, _ = ctx.calc_ut(jd + i * 0.1, SE_SUN, 0)
+
+                    # Validate result
+                    if not (0 <= pos[0] < 360):
+                        with errors_lock:
+                            errors.append(
+                                f"Thread {thread_id}, iter {i}: invalid pos {pos[0]}"
+                            )
+                        return
+
+                    # Some threads call close() in the middle
+                    if thread_id % 3 == 0 and i == 5:
+                        EphemerisContext.close()
+
+            except Exception as e:
+                with errors_lock:
+                    errors.append(f"Thread {thread_id}: {e}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as ex:
+            futures = [ex.submit(worker, i) for i in range(num_threads)]
+            concurrent.futures.wait(futures)
+
+        assert not errors, f"Errors: {errors}"
+
+        # Cleanup for other tests
+        EphemerisContext.close()
+
+    def test_concurrent_close_and_calculation(self):
+        """
+        Stress test: concurrent close() calls interleaved with calculations.
+
+        This is the critical test for detecting race conditions between
+        close() and calculation operations.
+        """
+        from libephemeris import context as ctx_module
+
+        jd = 2451545.0
+        num_calc_threads = 10
+        num_close_threads = 3
+        num_iterations = 20
+        errors: list[str] = []
+        successful_calcs = [0]
+        errors_lock = threading.Lock()
+
+        def calc_worker(thread_id: int):
+            try:
+                for i in range(num_iterations):
+                    ctx = EphemerisContext()
+                    pos, _ = ctx.calc_ut(jd + i * 0.1, SE_MOON, 0)
+
+                    if not (0 <= pos[0] < 360):
+                        with errors_lock:
+                            errors.append(f"Calc thread {thread_id}: invalid {pos[0]}")
+                        return
+
+                    with errors_lock:
+                        successful_calcs[0] += 1
+
+            except Exception as e:
+                with errors_lock:
+                    errors.append(f"Calc thread {thread_id}: {e}")
+
+        def close_worker(thread_id: int):
+            try:
+                for i in range(num_iterations):
+                    time.sleep(0.001)  # Small delay to interleave with calcs
+                    EphemerisContext.close()
+            except Exception as e:
+                with errors_lock:
+                    errors.append(f"Close thread {thread_id}: {e}")
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=num_calc_threads + num_close_threads
+        ) as ex:
+            # Start calculation workers
+            calc_futures = [ex.submit(calc_worker, i) for i in range(num_calc_threads)]
+            # Start close workers
+            close_futures = [
+                ex.submit(close_worker, i) for i in range(num_close_threads)
+            ]
+
+            concurrent.futures.wait(calc_futures + close_futures)
+
+        assert not errors, f"Race condition errors: {errors}"
+
+        # At least some calculations should have succeeded
+        expected_min = num_calc_threads * num_iterations // 2
+        assert successful_calcs[0] >= expected_min, (
+            f"Expected at least {expected_min} successful calculations, "
+            f"got {successful_calcs[0]}"
+        )
+
+        # Cleanup
+        EphemerisContext.close()
+
+    def test_load_close_reload_cycle_consistency(self):
+        """
+        Verify the load-close-reload cycle produces consistent results.
+
+        Running the same calculation before close, after reload, and
+        in subsequent cycles should produce identical results.
+
+        Note: We explicitly call ctx.get_planets() to load the context
+        module's shared resources, since calc_ut uses state module.
+        """
+        from libephemeris import context as ctx_module
+
+        jd = 2451545.0
+        num_cycles = 5
+        results: list[float] = []
+
+        for cycle in range(num_cycles):
+            ctx = EphemerisContext()
+            # Explicitly load context's shared resources
+            _ = ctx.get_planets()
+
+            pos, _ = ctx.calc_ut(jd, SE_SUN, 0)
+            results.append(pos[0])
+
+            # Verify context resources are loaded
+            assert ctx_module._SHARED_PLANETS is not None
+
+            # Close resources
+            EphemerisContext.close()
+
+            # Verify resources are cleared
+            assert ctx_module._SHARED_PLANETS is None
+
+        # All results should be identical
+        reference = results[0]
+        for i, r in enumerate(results):
+            assert abs(r - reference) < 1e-10, (
+                f"Cycle {i}: {r} differs from reference {reference}"
+            )
+
+    def test_close_with_sidereal_calculations(self):
+        """
+        Test close() with sidereal mode calculations.
+
+        Verify that sidereal mode settings work correctly after close().
+        """
+        from libephemeris import context as ctx_module
+
+        jd = 2451545.0
+
+        # Calculate with Lahiri before close
+        ctx = EphemerisContext()
+        ctx.set_sid_mode(SE_SIDM_LAHIRI)
+        pos_lahiri_before, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+
+        # Close
+        EphemerisContext.close()
+
+        # Calculate with same settings after close
+        ctx2 = EphemerisContext()
+        ctx2.set_sid_mode(SE_SIDM_LAHIRI)
+        pos_lahiri_after, _ = ctx2.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+
+        # Results should be identical
+        assert abs(pos_lahiri_before[0] - pos_lahiri_after[0]) < 1e-10, (
+            f"Sidereal results differ: {pos_lahiri_before[0]} vs {pos_lahiri_after[0]}"
+        )
+
+        # Close and test with different ayanamsha
+        EphemerisContext.close()
+
+        ctx3 = EphemerisContext()
+        ctx3.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        pos_fagan, _ = ctx3.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+
+        # Different ayanamsha should give different results
+        assert abs(pos_lahiri_after[0] - pos_fagan[0]) > 0.1, (
+            "Different ayanamshas should produce different positions"
+        )
+
+        # Cleanup
+        EphemerisContext.close()
+
+    def test_close_with_house_calculations(self):
+        """
+        Test close() with house calculations.
+
+        Verify that house calculations work correctly after close().
+        """
+        from libephemeris import context as ctx_module
+
+        jd = 2451545.0
+
+        # Calculate houses before close
+        ctx = EphemerisContext()
+        cusps_before, ascmc_before = ctx.houses(jd, 41.9, 12.5, ord("P"))
+
+        # Close
+        EphemerisContext.close()
+
+        # Calculate houses after close
+        ctx2 = EphemerisContext()
+        cusps_after, ascmc_after = ctx2.houses(jd, 41.9, 12.5, ord("P"))
+
+        # Results should be identical
+        for i, (before, after) in enumerate(zip(cusps_before, cusps_after)):
+            assert abs(before - after) < 1e-10, (
+                f"House cusp {i} differs: {before} vs {after}"
+            )
+
+        assert abs(ascmc_before[0] - ascmc_after[0]) < 1e-10, (
+            f"Ascendant differs: {ascmc_before[0]} vs {ascmc_after[0]}"
+        )
+
+        # Cleanup
+        EphemerisContext.close()

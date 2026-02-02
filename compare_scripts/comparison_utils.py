@@ -296,22 +296,124 @@ RISE_SET_LOCATIONS = [
 ]
 
 # Famous fixed stars for testing
+# Extended list including Royal Stars, Behenian stars, Pleiades cluster,
+# Hyades cluster, zodiacal stars, and other astrologically significant stars.
+# Total: 103 stars matching all stars in libephemeris STAR_CATALOG
 FIXED_STARS = [
-    "Aldebaran",
-    "Regulus",
-    "Spica",
-    "Antares",
-    "Fomalhaut",
-    "Sirius",
-    "Vega",
-    "Altair",
-    "Betelgeuse",
-    "Rigel",
-    "Procyon",
-    "Pollux",
-    "Capella",
-    "Arcturus",
-    "Deneb",
+    # Royal Stars of Persia (Watchers)
+    "Aldebaran",  # Watcher of the East
+    "Regulus",  # Watcher of the North
+    "Antares",  # Watcher of the West
+    "Fomalhaut",  # Watcher of the South
+    # Behenian Stars (15 fixed stars used in medieval astrology)
+    "Algol",  # Beta Persei - "Demon Star"
+    "Alcyone",  # Eta Tauri - brightest Pleiad
+    "Sirius",  # Alpha Canis Majoris
+    "Procyon",  # Alpha Canis Minoris
+    "Regulus",  # Alpha Leonis (also Royal Star)
+    "Algorab",  # Delta Corvi
+    "Spica",  # Alpha Virginis
+    "Arcturus",  # Alpha Bootis
+    "Alphecca",  # Alpha Coronae Borealis
+    "Antares",  # Alpha Scorpii (also Royal Star)
+    "Vega",  # Alpha Lyrae
+    "Deneb Algedi",  # Delta Capricorni
+    "Altair",  # Alpha Aquilae
+    "Markab",  # Alpha Pegasi
+    "Scheat",  # Beta Pegasi
+    # First-magnitude stars and other bright stars
+    "Betelgeuse",  # Alpha Orionis
+    "Rigel",  # Beta Orionis
+    "Pollux",  # Beta Geminorum
+    "Capella",  # Alpha Aurigae
+    "Deneb",  # Alpha Cygni
+    "Castor",  # Alpha Geminorum
+    "Achernar",  # Alpha Eridani
+    "Canopus",  # Alpha Carinae
+    "Acrux",  # Alpha Crucis
+    "Mimosa",  # Beta Crucis
+    "Gacrux",  # Gamma Crucis
+    "Hadar",  # Beta Centauri
+    "Rigil Kentaurus",  # Alpha Centauri
+    "Shaula",  # Lambda Scorpii
+    "Bellatrix",  # Gamma Orionis
+    "Elnath",  # Beta Tauri
+    "Mira",  # Omicron Ceti
+    "Polaris",  # Alpha Ursae Minoris
+    # Orion's Belt stars
+    "Alnilam",  # Epsilon Orionis
+    "Alnitak",  # Zeta Orionis
+    "Mintaka",  # Delta Orionis
+    "Saiph",  # Kappa Orionis
+    "Meissa",  # Lambda Orionis
+    # Pleiades cluster (Seven Sisters)
+    "Asterope",  # 21 Tauri
+    "Celaeno",  # 16 Tauri
+    "Electra",  # 17 Tauri
+    "Maia",  # 20 Tauri
+    "Merope",  # 23 Tauri
+    "Taygeta",  # 19 Tauri
+    "Atlas",  # 27 Tauri
+    "Pleione",  # 28 Tauri
+    # Hyades cluster
+    "Prima Hyadum",  # Gamma Tauri
+    "Secunda Hyadum",  # Delta Tauri
+    "Theta Tauri",  # Theta Tauri
+    "Ain",  # Epsilon Tauri
+    # Ursa Major (Big Dipper) stars
+    "Alkaid",  # Eta Ursae Majoris
+    "Dubhe",  # Alpha Ursae Majoris
+    "Merak",  # Beta Ursae Majoris
+    "Alioth",  # Epsilon Ursae Majoris
+    "Mizar",  # Zeta Ursae Majoris
+    "Alcor",  # 80 Ursae Majoris
+    "Phecda",  # Gamma Ursae Majoris
+    "Megrez",  # Delta Ursae Majoris
+    # Zodiacal stars (one per sign approximately)
+    "Hamal",  # Alpha Arietis (Aries)
+    "Sheratan",  # Beta Arietis
+    "Mesarthim",  # Gamma Arietis
+    "Acubens",  # Alpha Cancri (Cancer)
+    "Tarf",  # Beta Cancri
+    "Asellus Borealis",  # Gamma Cancri
+    "Asellus Australis",  # Delta Cancri
+    "Algieba",  # Gamma Leonis
+    "Denebola",  # Beta Leonis
+    "Zosma",  # Delta Leonis
+    "Vindemiatrix",  # Epsilon Virginis
+    "Zubenelgenubi",  # Alpha Librae
+    "Zubeneschamali",  # Beta Librae
+    "Dschubba",  # Delta Scorpii
+    "Graffias",  # Beta Scorpii
+    "Lesath",  # Upsilon Scorpii
+    "Sargas",  # Theta Scorpii
+    "Kaus Australis",  # Epsilon Sagittarii
+    "Nunki",  # Sigma Sagittarii
+    "Kaus Media",  # Delta Sagittarii
+    "Kaus Borealis",  # Lambda Sagittarii
+    "Ascella",  # Zeta Sagittarii
+    "Algedi",  # Alpha Capricorni
+    "Dabih",  # Beta Capricorni
+    "Nashira",  # Gamma Capricorni
+    "Sadalsuud",  # Beta Aquarii
+    "Sadalmelik",  # Alpha Aquarii
+    "Skat",  # Delta Aquarii
+    "Eta Piscium",  # Eta Piscium
+    "Alrescha",  # Alpha Piscium
+    # Other notable stars
+    "Diphda",  # Beta Ceti
+    "Alphard",  # Alpha Hydrae
+    "Rasalhague",  # Alpha Ophiuchi
+    "Etamin",  # Gamma Draconis
+    "Kochab",  # Beta Ursae Minoris
+    "Unukalhai",  # Alpha Serpentis
+    # Southern Cross and Centaurus
+    "Delta Crucis",  # Delta Crucis
+    "Menkent",  # Theta Centauri
+    "Muhlifain",  # Gamma Centauri
+    "Epsilon Centauri",  # Epsilon Centauri
+    "Eta Centauri",  # Eta Centauri
+    "Zeta Centauri",  # Zeta Centauri
 ]
 
 

@@ -8,6 +8,8 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 
+from compare_scripts.comparison_utils import FIXED_STARS
+
 
 def angular_diff(val1: float, val2: float) -> float:
     """Calculate angular difference accounting for 360 wrap."""
@@ -29,23 +31,9 @@ VELOCITY_TOL = 0.0001  # degrees/day
 # TEST DATA
 # ============================================================================
 
-FAMOUS_STARS = [
-    "Aldebaran",
-    "Regulus",
-    "Spica",
-    "Antares",
-    "Fomalhaut",
-    "Sirius",
-    "Vega",
-    "Altair",
-    "Betelgeuse",
-    "Rigel",
-    "Procyon",
-    "Pollux",
-    "Capella",
-    "Arcturus",
-    "Deneb",
-]
+# Use the comprehensive list from comparison_utils (103 stars)
+# Remove duplicates while preserving order
+FAMOUS_STARS = list(dict.fromkeys(FIXED_STARS))
 
 TEST_DATES = [
     (2000, 1, 1, 12.0, "J2000"),
@@ -121,7 +109,12 @@ class TestSpecificStars:
         """Test Regulus position at J2000."""
         jd = 2451545.0
 
-        result_swe = swe.fixstar_ut("Regulus", jd, 0)
+        try:
+            result_swe = swe.fixstar_ut("Regulus", jd, 0)
+        except Exception as e:
+            pytest.skip(f"Regulus not available in pyswisseph: {e}")
+            return
+
         result_py = ephem.fixstar_ut("Regulus", jd, 0)
 
         diff = angular_diff(result_swe[0][0], result_py[0][0])
@@ -137,7 +130,12 @@ class TestSpecificStars:
         """Test Spica position at J2000."""
         jd = 2451545.0
 
-        result_swe = swe.fixstar_ut("Spica", jd, 0)
+        try:
+            result_swe = swe.fixstar_ut("Spica", jd, 0)
+        except Exception as e:
+            pytest.skip(f"Spica not available in pyswisseph: {e}")
+            return
+
         result_py = ephem.fixstar_ut("Spica", jd, 0)
 
         diff = angular_diff(result_swe[0][0], result_py[0][0])

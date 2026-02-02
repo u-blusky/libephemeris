@@ -21,6 +21,7 @@ from libephemeris.hypothetical import (
     load_bundled_seorbel,
     _parse_t_polynomial,
     _parse_epoch_or_equinox,
+    _parse_seorbel_line,
 )
 
 
@@ -720,3 +721,432 @@ class TestBundledSeorbel:
         else:
             # Skip comparison if original file doesn't exist
             pytest.skip("Original swisseph/ephe/seorbel.txt not found for comparison")
+
+
+class TestParseTPolynomialEdgeCases:
+    """Additional edge case tests for _parse_t_polynomial helper.
+
+    These tests cover various spacing patterns, format variations,
+    and edge cases that might occur in seorbel.txt files.
+    """
+
+    # Tests for various spacing patterns
+    def test_polynomial_extra_spaces(self):
+        """Test parsing polynomial with extra spaces around operators."""
+        poly = _parse_t_polynomial("252.8987988  +  707550.7341  *  T")
+        assert poly.constant == pytest.approx(252.8987988)
+        assert poly.linear == pytest.approx(707550.7341)
+
+    def test_polynomial_leading_trailing_spaces(self):
+        """Test parsing polynomial with leading and trailing spaces."""
+        poly = _parse_t_polynomial("   100.5 + 50.25 * T   ")
+        assert poly.constant == pytest.approx(100.5)
+        assert poly.linear == pytest.approx(50.25)
+
+    def test_polynomial_no_space_before_minus(self):
+        """Test parsing polynomial without space before minus."""
+        poly = _parse_t_polynomial("100.0- 50.0 * T")
+        assert poly.constant == pytest.approx(100.0)
+        assert poly.linear == pytest.approx(-50.0)
+
+    def test_polynomial_no_space_after_minus(self):
+        """Test parsing polynomial without space after minus."""
+        poly = _parse_t_polynomial("100.0 -50.0 * T")
+        assert poly.constant == pytest.approx(100.0)
+        assert poly.linear == pytest.approx(-50.0)
+
+    def test_polynomial_mixed_spacing_patterns(self):
+        """Test various mixed spacing patterns."""
+        test_cases = [
+            ("100.0+50.0*T", 100.0, 50.0),
+            ("100.0 +50.0*T", 100.0, 50.0),
+            ("100.0+ 50.0*T", 100.0, 50.0),
+            ("100.0 + 50.0*T", 100.0, 50.0),
+            ("100.0+50.0 *T", 100.0, 50.0),
+            ("100.0+50.0* T", 100.0, 50.0),
+            ("100.0+50.0 * T", 100.0, 50.0),
+        ]
+        for expr, expected_const, expected_linear in test_cases:
+            poly = _parse_t_polynomial(expr)
+            assert poly.constant == pytest.approx(expected_const), f"Failed for: {expr}"
+            assert poly.linear == pytest.approx(expected_linear), f"Failed for: {expr}"
+
+    def test_polynomial_negative_constant(self):
+        """Test polynomial with negative constant."""
+        poly = _parse_t_polynomial("-100.5 + 50.25 * T")
+        assert poly.constant == pytest.approx(-100.5)
+        assert poly.linear == pytest.approx(50.25)
+
+    def test_polynomial_both_negative(self):
+        """Test polynomial with negative constant and negative rate."""
+        poly = _parse_t_polynomial("-100.5 - 50.25 * T")
+        assert poly.constant == pytest.approx(-100.5)
+        assert poly.linear == pytest.approx(-50.25)
+
+    def test_polynomial_lowercase_t(self):
+        """Test that lowercase 't' is also accepted."""
+        poly = _parse_t_polynomial("100.0 + 50.0 * t")
+        assert poly.constant == pytest.approx(100.0)
+        assert poly.linear == pytest.approx(50.0)
+
+    def test_polynomial_integer_values(self):
+        """Test parsing polynomial with integer values (no decimal point)."""
+        poly = _parse_t_polynomial("100 + 50 * T")
+        assert poly.constant == pytest.approx(100.0)
+        assert poly.linear == pytest.approx(50.0)
+
+    def test_polynomial_zero_linear(self):
+        """Test parsing polynomial with zero linear term."""
+        poly = _parse_t_polynomial("100.5 + 0.0 * T")
+        assert poly.constant == pytest.approx(100.5)
+        assert poly.linear == pytest.approx(0.0)
+
+    def test_polynomial_very_large_values(self):
+        """Test parsing polynomial with very large values."""
+        poly = _parse_t_polynomial("999999.999 + 123456789.0 * T")
+        assert poly.constant == pytest.approx(999999.999)
+        assert poly.linear == pytest.approx(123456789.0)
+
+    def test_polynomial_very_small_values(self):
+        """Test parsing polynomial with very small (but non-zero) values."""
+        poly = _parse_t_polynomial("0.000001 + 0.000000001 * T")
+        assert poly.constant == pytest.approx(0.000001)
+        assert poly.linear == pytest.approx(0.000000001)
+
+    def test_polynomial_scientific_notation(self):
+        """Test that scientific notation in values is handled correctly."""
+        # Note: This may or may not be supported depending on implementation
+        # Testing to document behavior
+        try:
+            poly = _parse_t_polynomial("1.5e2")
+            assert poly.constant == pytest.approx(150.0)
+            assert poly.linear == 0.0
+        except ValueError:
+            pytest.skip("Scientific notation not supported")
+
+
+class TestParseTPolynomialErrors:
+    """Tests for error handling in _parse_t_polynomial."""
+
+    def test_invalid_expression_raises_error(self):
+        """Test that completely invalid expressions raise ValueError."""
+        with pytest.raises(ValueError):
+            _parse_t_polynomial("not a number")
+
+    def test_empty_string_raises_error(self):
+        """Test that empty string raises ValueError."""
+        with pytest.raises(ValueError):
+            _parse_t_polynomial("")
+
+    def test_whitespace_only_raises_error(self):
+        """Test that whitespace-only string raises ValueError."""
+        with pytest.raises(ValueError):
+            _parse_t_polynomial("   ")
+
+    def test_duplicate_operator_handled_gracefully(self):
+        """Test that duplicate operators are handled gracefully.
+
+        The parser is tolerant and handles edge cases like '++' by
+        treating it as a single '+'. This documents expected behavior.
+        """
+        poly = _parse_t_polynomial("100 ++ 50 * T")
+        assert poly.constant == pytest.approx(100.0)
+        assert poly.linear == pytest.approx(50.0)
+
+    def test_bare_t_term_handled_gracefully(self):
+        """Test that a bare T term (with implied coefficient) is handled.
+
+        The parser treats '+ * T' as having coefficient 1.0.
+        This documents expected behavior.
+        """
+        poly = _parse_t_polynomial("+ * T")
+        assert poly.constant == pytest.approx(0.0)
+        assert poly.linear == pytest.approx(1.0)
+
+
+class TestParseSeorbelLine:
+    """Direct tests for _parse_seorbel_line function."""
+
+    def test_parse_simple_line(self):
+        """Test parsing a simple valid line."""
+        line = "J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, TestPlanet"
+        elem = _parse_seorbel_line(line, 1)
+
+        assert elem is not None
+        assert elem.name == "TestPlanet"
+        assert elem.epoch_jd == 2451545.0  # J2000
+        assert elem.equinox_jd == 2451545.0
+        assert elem.semi_axis == 100.0
+        assert elem.eccentricity.constant == pytest.approx(0.1)
+        assert elem.arg_perihelion.constant == pytest.approx(45.0)
+        assert elem.asc_node.constant == pytest.approx(30.0)
+        assert elem.inclination.constant == pytest.approx(5.0)
+        assert elem.mean_anomaly.constant == pytest.approx(0.0)
+
+    def test_parse_line_with_t_polynomial(self):
+        """Test parsing a line with T-polynomial expressions."""
+        line = "J1900, JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 322.212069+1670.056*T, 47.787931-1670.056*T, 7.5, Vulcan"
+        elem = _parse_seorbel_line(line, 1)
+
+        assert elem is not None
+        assert elem.name == "Vulcan"
+        assert elem.epoch_jd == 2415020.0  # J1900
+        assert elem.equinox_is_jdate is True
+        assert elem.mean_anomaly.constant == pytest.approx(252.8987988)
+        assert elem.mean_anomaly.linear == pytest.approx(707550.7341)
+        assert elem.arg_perihelion.constant == pytest.approx(322.212069)
+        assert elem.arg_perihelion.linear == pytest.approx(1670.056)
+        assert elem.asc_node.constant == pytest.approx(47.787931)
+        assert elem.asc_node.linear == pytest.approx(-1670.056)
+
+    def test_parse_geocentric_body(self):
+        """Test parsing a geocentric body line."""
+        line = "J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo"
+        elem = _parse_seorbel_line(line, 1)
+
+        assert elem is not None
+        assert elem.name == "Waldemath"
+        assert elem.is_geocentric is True
+
+    def test_parse_line_with_inline_comment(self):
+        """Test parsing a line with inline comment."""
+        line = "J1900, J1900, 163.7409, 40.99837, 0.00460, 171.4333, 129.8325, 1.0833, Cupido   # 1"
+        elem = _parse_seorbel_line(line, 1)
+
+        assert elem is not None
+        assert elem.name == "Cupido"
+        assert elem.semi_axis == pytest.approx(40.99837)
+
+    def test_parse_line_numeric_epoch(self):
+        """Test parsing a line with numeric Julian Day epoch."""
+        line = "2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto"
+        elem = _parse_seorbel_line(line, 1)
+
+        assert elem is not None
+        assert elem.name == "Isis-Transpluto"
+        assert elem.epoch_jd == pytest.approx(2368547.66)
+        assert elem.equinox_jd == pytest.approx(2431456.5)
+
+    def test_line_number_tracking(self):
+        """Test that line number is tracked correctly."""
+        line = "J2000, J2000, 0.0, 50.0, 0.0, 0.0, 0.0, 0.0, TestBody"
+        elem = _parse_seorbel_line(line, 42)
+
+        assert elem is not None
+        assert elem.line_number == 42
+
+    def test_parse_line_b1950_epoch(self):
+        """Test parsing a line with B1950 epoch."""
+        line = "B1950, J2000, 0.0, 50.0, 0.0, 0.0, 0.0, 0.0, TestBody"
+        elem = _parse_seorbel_line(line, 1)
+
+        assert elem is not None
+        assert elem.epoch_jd == pytest.approx(2433282.42345905, abs=0.0001)
+
+    def test_parse_line_with_spaces_in_name(self):
+        """Test parsing a body with spaces in the name."""
+        line = "J2000, J2000, 0.0, 50.0, 0.0, 0.0, 0.0, 0.0, Selena/White Moon, geo"
+        elem = _parse_seorbel_line(line, 1)
+
+        assert elem is not None
+        assert elem.name == "Selena/White Moon"
+        assert elem.is_geocentric is True
+
+
+class TestParseSeorbelLineErrors:
+    """Tests for error handling in _parse_seorbel_line."""
+
+    def test_too_few_fields_raises_error(self):
+        """Test that lines with too few fields raise ValueError."""
+        line = "J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0"  # Only 7 fields
+        with pytest.raises(ValueError, match="Expected at least 9"):
+            _parse_seorbel_line(line, 1)
+
+    def test_invalid_epoch_raises_error(self):
+        """Test that invalid epoch raises ValueError."""
+        line = "INVALID_EPOCH, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, TestBody"
+        with pytest.raises(ValueError, match="Cannot parse epoch"):
+            _parse_seorbel_line(line, 1)
+
+    def test_jdate_as_epoch_raises_error(self):
+        """Test that JDATE as epoch raises ValueError (epoch cannot be JDATE)."""
+        line = "JDATE, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, TestBody"
+        with pytest.raises(ValueError, match="Epoch cannot be JDATE"):
+            _parse_seorbel_line(line, 1)
+
+    def test_invalid_semi_axis_raises_error(self):
+        """Test that invalid semi-major axis raises ValueError."""
+        line = "J2000, J2000, 0.0, not_a_number, 0.1, 45.0, 30.0, 5.0, TestBody"
+        with pytest.raises(ValueError, match="Cannot parse semi-major axis"):
+            _parse_seorbel_line(line, 1)
+
+    def test_invalid_mean_anomaly_raises_error(self):
+        """Test that invalid mean anomaly expression raises ValueError."""
+        line = "J2000, J2000, invalid_expr, 100.0, 0.1, 45.0, 30.0, 5.0, TestBody"
+        with pytest.raises(ValueError):
+            _parse_seorbel_line(line, 1)
+
+
+class TestParseSeorbelRobustness:
+    """Integration tests for parse_seorbel robustness with various formats."""
+
+    def test_parse_all_documented_formats(self):
+        """Test parsing a file with all documented seorbel.txt formats."""
+        content = """\
+# Test file with various documented formats
+
+# Standard format with J2000 epoch
+J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, StandardBody
+
+# J1900 epoch (common for Uranian planets)
+J1900, J1900, 163.7409, 40.99837, 0.00460, 171.4333, 129.8325, 1.0833, CupidoStyle
+
+# B1950 epoch
+B1950, J2000, 0.0, 50.0, 0.0, 0.0, 0.0, 0.0, B1950Body
+
+# JDATE equinox (date of the day)
+J2000, JDATE, 0.0, 60.0, 0.0, 0.0, 0.0, 0.0, JdateEquinox
+
+# Numeric epochs
+2451545.0, 2451545.0, 0.0, 70.0, 0.0, 0.0, 0.0, 0.0, NumericEpoch
+
+# T-polynomial mean anomaly with various spacing
+J1900, JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 0.0, 0.0, 7.5, TPolySpaced
+J1900, JDATE, 100.0+50.0*T, 0.13744, 0.019, 0.0, 0.0, 7.5, TPolyCompact
+J1900, JDATE, 100.0 - 50.0 * T, 0.13744, 0.019, 0.0, 0.0, 7.5, TPolyMinus
+
+# Multiple T-polynomials in one line
+J1900, JDATE, 252.0+707550.0*T, 0.13744, 0.019, 322.0+1670.0*T, 47.0-1670.0*T, 7.5, MultiPoly
+
+# Geocentric body
+J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, GeoBody, geo
+
+# Inline comment
+J2000, J2000, 0.0, 80.0, 0.0, 0.0, 0.0, 0.0, CommentBody # This is a comment
+
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(content)
+            f.flush()
+            filepath = f.name
+
+        try:
+            elements = parse_seorbel(filepath)
+
+            # Should have parsed all bodies
+            assert len(elements) == 11
+
+            # Verify key bodies were parsed correctly
+            names = [e.name for e in elements]
+            assert "StandardBody" in names
+            assert "CupidoStyle" in names
+            assert "B1950Body" in names
+            assert "JdateEquinox" in names
+            assert "NumericEpoch" in names
+            assert "TPolySpaced" in names
+            assert "TPolyCompact" in names
+            assert "TPolyMinus" in names
+            assert "MultiPoly" in names
+            assert "GeoBody" in names
+            assert "CommentBody" in names
+
+            # Verify T-polynomial parsing
+            tpoly_spaced = get_seorbel_body_by_name(elements, "TPolySpaced")
+            assert tpoly_spaced is not None, "TPolySpaced not found"
+            assert tpoly_spaced.mean_anomaly.constant == pytest.approx(252.8987988)
+            assert tpoly_spaced.mean_anomaly.linear == pytest.approx(707550.7341)
+
+            tpoly_compact = get_seorbel_body_by_name(elements, "TPolyCompact")
+            assert tpoly_compact is not None, "TPolyCompact not found"
+            assert tpoly_compact.mean_anomaly.constant == pytest.approx(100.0)
+            assert tpoly_compact.mean_anomaly.linear == pytest.approx(50.0)
+
+            tpoly_minus = get_seorbel_body_by_name(elements, "TPolyMinus")
+            assert tpoly_minus is not None, "TPolyMinus not found"
+            assert tpoly_minus.mean_anomaly.constant == pytest.approx(100.0)
+            assert tpoly_minus.mean_anomaly.linear == pytest.approx(-50.0)
+
+            multi_poly = get_seorbel_body_by_name(elements, "MultiPoly")
+            assert multi_poly is not None, "MultiPoly not found"
+            assert multi_poly.arg_perihelion.linear == pytest.approx(1670.0)
+            assert multi_poly.asc_node.linear == pytest.approx(-1670.0)
+
+            # Verify geocentric body
+            geo_body = get_seorbel_body_by_name(elements, "GeoBody")
+            assert geo_body is not None, "GeoBody not found"
+            assert geo_body.is_geocentric is True
+
+        finally:
+            Path(filepath).unlink()
+
+    def test_parse_whitespace_variations(self):
+        """Test parsing handles various whitespace patterns."""
+        content = """\
+# Different whitespace patterns
+J2000,J2000,0.0,100.0,0.1,45.0,30.0,5.0,NoSpaces
+J2000 , J2000 , 0.0 , 100.0 , 0.1 , 45.0 , 30.0 , 5.0 , ExtraSpaces
+J2000,  J2000,  0.0,  100.0,  0.1,  45.0,  30.0,  5.0,  TwoSpaces
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(content)
+            f.flush()
+            filepath = f.name
+
+        try:
+            elements = parse_seorbel(filepath)
+            assert len(elements) == 3
+
+            for elem in elements:
+                assert elem.semi_axis == pytest.approx(100.0)
+                assert elem.eccentricity.constant == pytest.approx(0.1)
+        finally:
+            Path(filepath).unlink()
+
+    def test_parse_malformed_file_with_error_context(self):
+        """Test that parsing errors include helpful context."""
+        content = """\
+J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, ValidBody
+J2000, J2000, invalid_value, 100.0, 0.1, 45.0, 30.0, 5.0, InvalidBody
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(content)
+            f.flush()
+            filepath = f.name
+
+        try:
+            with pytest.raises(ValueError, match="line 2"):
+                parse_seorbel(filepath)
+        finally:
+            Path(filepath).unlink()
+
+    def test_empty_file(self):
+        """Test parsing an empty file returns empty list."""
+        content = ""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(content)
+            f.flush()
+            filepath = f.name
+
+        try:
+            elements = parse_seorbel(filepath)
+            assert elements == []
+        finally:
+            Path(filepath).unlink()
+
+    def test_comments_only_file(self):
+        """Test parsing a file with only comments returns empty list."""
+        content = """\
+# This is a comment
+# Another comment
+   # Indented comment
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(content)
+            f.flush()
+            filepath = f.name
+
+        try:
+            elements = parse_seorbel(filepath)
+            assert elements == []
+        finally:
+            Path(filepath).unlink()

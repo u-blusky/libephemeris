@@ -649,6 +649,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit: mark test as a unit test")
     config.addinivalue_line("markers", "integration: mark test as an integration test")
     config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line(
+        "markers", "network: marks tests that require network access"
+    )
     config.addinivalue_line("markers", "precision: mark test as high-precision")
     config.addinivalue_line(
         "markers", "comparison: mark test as comparison with pyswisseph"

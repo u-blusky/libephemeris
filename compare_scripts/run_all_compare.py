@@ -20,8 +20,206 @@ import sys
 import os
 import subprocess
 import time
+import threading
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any, Callable
+
+# Try to import tqdm for progress bars
+try:
+    from tqdm import tqdm as tqdm_func
+
+    TQDM_AVAILABLE = True
+except ImportError:
+    tqdm_func: Any = None
+    TQDM_AVAILABLE = False
+
+
+@dataclass
+class ErrorInfo:
+    """Detailed information about a module error."""
+
+    category: str
+    message: str
+    suggestion: str
+    last_lines: List[str]
+
+
+# Error patterns for categorization: (pattern, category, suggestion)
+ERROR_PATTERNS: List[Tuple[str, str, str]] = [
+    (
+        "ModuleNotFoundError",
+        "import_error",
+        "Install missing module with: pip install <module_name>",
+    ),
+    (
+        "ImportError",
+        "import_error",
+        "Check module installation and PYTHONPATH configuration",
+    ),
+    (
+        "SyntaxError",
+        "syntax_error",
+        "Fix syntax error in the indicated file and line",
+    ),
+    (
+        "IndentationError",
+        "syntax_error",
+        "Fix indentation in the indicated file and line",
+    ),
+    (
+        "AssertionError",
+        "assertion_error",
+        "Check test assertions - expected values may differ from actual",
+    ),
+    (
+        "FileNotFoundError",
+        "file_error",
+        "Ensure required data files exist (check ephemeris files)",
+    ),
+    (
+        "PermissionError",
+        "file_error",
+        "Check file permissions for required data files",
+    ),
+    (
+        "TimeoutError",
+        "timeout_error",
+        "Module execution exceeded time limit - consider optimizing or increasing timeout",
+    ),
+    (
+        "TIMEOUT:",
+        "timeout_error",
+        "Module execution exceeded time limit - consider running with fewer tests",
+    ),
+    (
+        "MemoryError",
+        "resource_error",
+        "Not enough memory - try running with fewer concurrent tests",
+    ),
+    (
+        "RecursionError",
+        "resource_error",
+        "Infinite recursion detected - check for circular dependencies",
+    ),
+    (
+        "AttributeError",
+        "attribute_error",
+        "Object missing expected attribute - check API compatibility",
+    ),
+    (
+        "TypeError",
+        "type_error",
+        "Type mismatch in function call - check argument types",
+    ),
+    (
+        "ValueError",
+        "value_error",
+        "Invalid value passed to function - check input parameters",
+    ),
+    (
+        "KeyError",
+        "key_error",
+        "Dictionary key not found - check data structure",
+    ),
+    (
+        "ZeroDivisionError",
+        "math_error",
+        "Division by zero occurred - check calculations",
+    ),
+    (
+        "ConnectionError",
+        "network_error",
+        "Network connection failed - check internet connectivity",
+    ),
+]
+
+
+def analyze_error(output: str) -> Optional[ErrorInfo]:
+    """
+    Analyze module output to extract detailed error information.
+
+    Args:
+        output: The complete output from running a module
+
+    Returns:
+        ErrorInfo with category, message, suggestion, and last lines,
+        or None if no error detected
+    """
+    if not output:
+        return None
+
+    # Check if there's an error in the output
+    has_error = "ERROR" in output or "Traceback" in output or "TIMEOUT:" in output
+
+    if not has_error:
+        return None
+
+    # Get last 10 non-empty lines for context
+    lines = output.strip().split("\n")
+    non_empty_lines = [line for line in lines if line.strip()]
+    last_lines = non_empty_lines[-10:] if len(non_empty_lines) > 10 else non_empty_lines
+
+    # Try to categorize the error
+    category = "unknown_error"
+    suggestion = "Review the error output and module code for issues"
+    error_message = "Module failed to run"
+
+    # Check each error pattern
+    for pattern, cat, sugg in ERROR_PATTERNS:
+        if pattern in output:
+            category = cat
+            suggestion = sugg
+
+            # Try to extract the specific error message
+            for line in reversed(lines):
+                if pattern in line:
+                    error_message = line.strip()
+                    break
+            break
+
+    # Special handling for tracebacks - try to get the actual error line
+    if "Traceback" in output and error_message == "Module failed to run":
+        # Last non-empty line often contains the error
+        for line in reversed(lines):
+            stripped = line.strip()
+            if (
+                stripped
+                and not stripped.startswith("File ")
+                and "Traceback" not in stripped
+            ):
+                error_message = stripped
+                break
+
+    return ErrorInfo(
+        category=category,
+        message=error_message,
+        suggestion=suggestion,
+        last_lines=last_lines,
+    )
+
+
+def format_error_report(error_info: ErrorInfo) -> str:
+    """
+    Format error information for display.
+
+    Args:
+        error_info: The ErrorInfo object containing error details
+
+    Returns:
+        Formatted string with error details
+    """
+    lines = [
+        f"Error Type: {error_info.category.replace('_', ' ').title()}",
+        f"Message: {error_info.message}",
+        f"Suggestion: {error_info.suggestion}",
+        "",
+        "Last 10 lines of output:",
+        "-" * 40,
+    ]
+    lines.extend(f"  {line}" for line in error_info.last_lines)
+    lines.append("-" * 40)
+
+    return "\n".join(lines)
 
 
 @dataclass
@@ -33,6 +231,7 @@ class ModuleResult:
     total: int
     duration: float
     error: Optional[str] = None
+    error_info: Optional[ErrorInfo] = None
 
     @property
     def pass_rate(self) -> float:
@@ -82,9 +281,16 @@ COMPARISON_MODULES = [
 # ============================================================================
 
 
-def run_module(script_name: str, verbose: bool = False) -> Tuple[int, int, str]:
+def run_module(
+    script_name: str, verbose: bool = False, progress_interval: int = 30
+) -> Tuple[int, int, str]:
     """
-    Run a comparison module and extract results.
+    Run a comparison module and extract results with progress reporting.
+
+    Args:
+        script_name: Name of the script to run
+        verbose: Whether to pass --verbose flag
+        progress_interval: Seconds between progress reports (default 30)
 
     Returns:
         (passed, total, output)
@@ -93,15 +299,83 @@ def run_module(script_name: str, verbose: bool = False) -> Tuple[int, int, str]:
     if verbose:
         cmd.append("--verbose")
 
+    timeout = 300  # 5 minute timeout
+
     try:
-        result = subprocess.run(
+        # Use Popen for progress monitoring
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=300,  # 5 minute timeout
             env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
-        output = result.stdout + result.stderr
+
+        start_time = time.time()
+        last_progress_time = start_time
+        output_lines: List[str] = []
+        stderr_lines: List[str] = []
+
+        # Progress indicator state
+        progress_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        progress_idx = 0
+
+        # Thread to read stdout without blocking
+        def read_stdout():
+            if process.stdout:
+                for line in iter(process.stdout.readline, ""):
+                    output_lines.append(line)
+
+        def read_stderr():
+            if process.stderr:
+                for line in iter(process.stderr.readline, ""):
+                    stderr_lines.append(line)
+
+        stdout_thread = threading.Thread(target=read_stdout, daemon=True)
+        stderr_thread = threading.Thread(target=read_stderr, daemon=True)
+        stdout_thread.start()
+        stderr_thread.start()
+
+        # Poll with progress reporting
+        while process.poll() is None:
+            elapsed = time.time() - start_time
+
+            # Check timeout
+            if elapsed >= timeout:
+                process.kill()
+                stdout_thread.join(timeout=1)
+                stderr_thread.join(timeout=1)
+                return 0, 0, "TIMEOUT: Module exceeded 5 minute limit"
+
+            # Print progress every progress_interval seconds
+            current_time = time.time()
+            if current_time - last_progress_time >= progress_interval:
+                last_progress_time = current_time
+                elapsed_mins = int(elapsed // 60)
+                elapsed_secs = int(elapsed % 60)
+                remaining = timeout - elapsed
+                remaining_mins = int(remaining // 60)
+                remaining_secs = int(remaining % 60)
+
+                # Show spinner and progress info
+                spinner = progress_chars[progress_idx % len(progress_chars)]
+                progress_idx += 1
+
+                print(
+                    f"    {spinner} Running {script_name}... "
+                    f"[{elapsed_mins:02d}:{elapsed_secs:02d} elapsed, "
+                    f"{remaining_mins:02d}:{remaining_secs:02d} remaining]",
+                    flush=True,
+                )
+
+            # Small sleep to avoid busy-waiting
+            time.sleep(0.1)
+
+        # Wait for threads to finish
+        stdout_thread.join(timeout=2)
+        stderr_thread.join(timeout=2)
+
+        output = "".join(output_lines) + "".join(stderr_lines)
 
         # Parse output for pass/total counts
         # Look for "Passed:" and "Total tests:" in summary section
@@ -129,8 +403,6 @@ def run_module(script_name: str, verbose: bool = False) -> Tuple[int, int, str]:
 
         return passed, total, output
 
-    except subprocess.TimeoutExpired:
-        return 0, 0, "TIMEOUT: Module exceeded 5 minute limit"
     except Exception as e:
         return 0, 0, f"ERROR: {e}"
 
@@ -138,21 +410,39 @@ def run_module(script_name: str, verbose: bool = False) -> Tuple[int, int, str]:
 def run_all_modules(modules: List[Tuple], verbose: bool = False) -> List[ModuleResult]:
     """Run all specified modules and collect results."""
     results = []
+    total_modules = len(modules)
 
-    for name, script, desc, is_quick in modules:
+    # Create iterator with tqdm if available
+    if TQDM_AVAILABLE:
+        module_iter = tqdm_func(
+            enumerate(modules),
+            total=total_modules,
+            desc="Running modules",
+            unit="module",
+        )
+    else:
+        module_iter = enumerate(modules)
+
+    for idx, (name, script, desc, is_quick) in module_iter:
+        module_num = idx + 1
         print(f"\n{'=' * 60}")
-        print(f"Running: {name} ({desc})")
+        print(f"Running [{module_num}/{total_modules}]: {name} ({desc})")
         print(f"{'=' * 60}")
 
         start_time = time.time()
         passed, total, output = run_module(script, verbose)
         duration = time.time() - start_time
 
-        # Check for errors
+        # Check for errors with detailed analysis
         error = None
+        error_info = None
         if "ERROR" in output or "Traceback" in output:
             if passed == 0 and total == 0:
-                error = "Module failed to run"
+                error_info = analyze_error(output)
+                if error_info:
+                    error = error_info.message
+                else:
+                    error = "Module failed to run"
 
         result = ModuleResult(
             name=name,
@@ -160,6 +450,7 @@ def run_all_modules(modules: List[Tuple], verbose: bool = False) -> List[ModuleR
             total=total,
             duration=duration,
             error=error,
+            error_info=error_info,
         )
         results.append(result)
 
@@ -173,6 +464,10 @@ def run_all_modules(modules: List[Tuple], verbose: bool = False) -> List[ModuleR
             f"  Result: {result.passed}/{result.total} ({result.pass_rate:.1f}%) {status_char}"
         )
         print(f"  Time: {result.duration:.2f}s")
+
+        # Print detailed error information if available
+        if error_info:
+            print(f"\n  {format_error_report(error_info)}")
 
     return results
 
