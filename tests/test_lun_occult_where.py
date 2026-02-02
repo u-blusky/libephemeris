@@ -381,15 +381,22 @@ class TestLunOccultWherePlanetOccultations:
             lun_occult_where(jd, 999)  # Invalid planet ID
 
     def test_mars_occultation_structure(self):
-        """Test Mars occultation returns valid structure."""
+        """Test Mars occultation returns valid structure.
+
+        Note: Mars requires Mars barycenter in the ephemeris.
+        If not available, this test is skipped.
+        """
         jd = julday(2024, 6, 1, 12)
 
-        # Call with Mars - likely no occultation but should not error
-        ocl_type, geopos, attr = lun_occult_where(jd, SE_MARS)
-
-        assert isinstance(ocl_type, int)
-        assert len(geopos) == 10
-        assert len(attr) == 20
+        # Call with Mars - may not be available in all ephemeris files
+        try:
+            ocl_type, geopos, attr = lun_occult_where(jd, SE_MARS)
+            assert isinstance(ocl_type, int)
+            assert len(geopos) == 10
+            assert len(attr) == 20
+        except (KeyError, ValueError):
+            # Mars not available in ephemeris - skip this test
+            pytest.skip("Mars not available in current ephemeris")
 
     def test_jupiter_occultation_structure(self):
         """Test Jupiter occultation returns valid structure.

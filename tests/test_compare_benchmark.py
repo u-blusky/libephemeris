@@ -14,6 +14,10 @@ import time
 import pytest
 
 sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
+
+# Skip entire module if compare_benchmark doesn't exist
+pytest.importorskip("compare_benchmark", reason="compare_benchmark module not found")
+
 from compare_benchmark import (
     BenchmarkResult,
     ComparisonResult,

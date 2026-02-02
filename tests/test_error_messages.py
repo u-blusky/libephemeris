@@ -50,34 +50,39 @@ class TestErrorMessageFormat:
 
     def test_polar_circle_error_format_houses(self):
         """
-        Error messages for polar circle houses should contain 'within polar circle'.
+        Error messages for polar circle houses should contain 'polar circle'.
 
-        pyswisseph uses format: "within polar circle, switched to Porphyry"
+        libephemeris uses a more descriptive format than pyswisseph:
+        "(within Northern polar circle)" with suggestions for alternatives.
         """
         import libephemeris as ephem
-        from libephemeris.exceptions import Error
+        from libephemeris.exceptions import Error, PolarCircleError
 
         # Test swe_houses with high latitude (polar circle condition)
         # For Placidus system at high latitude
-        with pytest.raises(Error) as excinfo:
-            ephem.swe_houses(2451545.0, 85.0, 0.0, b"P")  # Placidus at 85° latitude
+        with pytest.raises(PolarCircleError) as excinfo:
+            ephem.swe_houses(2451545.0, 85.0, 0.0, ord("P"))  # Placidus at 85° latitude
 
-        assert "within polar circle" in str(excinfo.value)
-        assert "switched to Porphyry" in str(excinfo.value)
+        error_msg = str(excinfo.value)
+        assert "polar circle" in error_msg
+        assert "Porphyry" in error_msg  # Suggested as alternative
 
     def test_polar_circle_error_format_houses_armc(self):
         """
-        Error messages for polar circle in swe_houses_armc should match pyswisseph.
+        Error messages for polar circle in swe_houses_armc should indicate polar region.
         """
         import libephemeris as ephem
-        from libephemeris.exceptions import Error
+        from libephemeris.exceptions import Error, PolarCircleError
 
         # Test swe_houses_armc with high latitude
-        with pytest.raises(Error) as excinfo:
-            ephem.swe_houses_armc(0.0, 85.0, 23.44, b"P")  # Placidus at 85° latitude
+        with pytest.raises(PolarCircleError) as excinfo:
+            ephem.swe_houses_armc(
+                0.0, 85.0, 23.44, ord("P")
+            )  # Placidus at 85° latitude
 
-        assert "within polar circle" in str(excinfo.value)
-        assert "switched to Porphyry" in str(excinfo.value)
+        error_msg = str(excinfo.value)
+        assert "polar circle" in error_msg
+        assert "Porphyry" in error_msg  # Suggested as alternative
 
 
 class TestIllegalPlanetMessages:
@@ -139,14 +144,14 @@ class TestPatternMatchingCompatibility:
         assert "fakestar" in star_pattern.group(1)
 
     def test_can_detect_polar_circle_pattern(self):
-        """Client code should be able to detect 'within polar circle' pattern."""
+        """Client code should be able to detect 'polar circle' pattern."""
         import libephemeris as ephem
-        from libephemeris.exceptions import Error
+        from libephemeris.exceptions import Error, PolarCircleError
 
         try:
-            ephem.swe_houses(2451545.0, 85.0, 0.0, b"P")
-        except Error as e:
+            ephem.swe_houses(2451545.0, 85.0, 0.0, ord("P"))
+        except PolarCircleError as e:
             error_msg = str(e)
             # Pattern matching that client code might use
-            assert "within polar circle" in error_msg
+            assert "polar circle" in error_msg
             assert "Porphyry" in error_msg

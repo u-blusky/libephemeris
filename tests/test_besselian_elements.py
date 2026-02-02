@@ -164,9 +164,16 @@ class TestBesselianElementsFieldTypes:
         from libephemeris import BesselianElements
 
         for field in fields(BesselianElements):
-            assert field.type is float, (
-                f"Field {field.name} should be float, got {field.type}"
-            )
+            # With `from __future__ import annotations`, types may be strings
+            field_type = field.type
+            if isinstance(field_type, str):
+                assert field_type == "float", (
+                    f"Field {field.name} should be float, got {field_type}"
+                )
+            else:
+                assert field_type is float, (
+                    f"Field {field.name} should be float, got {field_type}"
+                )
 
 
 class TestBesselianElementsEquality:

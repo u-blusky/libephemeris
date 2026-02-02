@@ -166,21 +166,30 @@ class TestRiseTransTrueHorPlanets:
     """Tests for planet rise/set with custom horizon."""
 
     def test_mars_rise_with_horizon(self):
-        """Test Mars rise with elevated horizon."""
+        """Test Mars rise with elevated horizon.
+
+        Note: Mars requires Mars in the ephemeris.
+        If not available, this test is skipped.
+        """
         jd_start = julday(2024, 1, 15, 0)
         lat, lon = 40.7128, -74.0060  # New York
 
-        jd_rise_std, _ = rise_trans_true_hor(
-            jd_start, SE_MARS, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
-        )
+        try:
+            jd_rise_std, _ = rise_trans_true_hor(
+                jd_start, SE_MARS, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+            )
 
-        jd_rise_hor, flag = rise_trans_true_hor(
-            jd_start, SE_MARS, lat, lon, horizon_altitude=8.0, rsmi=SE_CALC_RISE
-        )
+            jd_rise_hor, flag = rise_trans_true_hor(
+                jd_start, SE_MARS, lat, lon, horizon_altitude=8.0, rsmi=SE_CALC_RISE
+            )
 
-        assert jd_rise_hor > jd_start
-        assert jd_rise_hor > jd_rise_std
-        assert flag == SE_CALC_RISE
+            assert jd_rise_hor > jd_start
+            assert jd_rise_hor > jd_rise_std
+            assert flag == SE_CALC_RISE
+        except KeyError as e:
+            if "mars" in str(e).lower():
+                pytest.skip("Mars not available in current ephemeris")
+            raise
 
 
 class TestRiseTransTrueHorCircumpolar:

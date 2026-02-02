@@ -71,18 +71,22 @@ class TestInvalidInputs:
 
     @pytest.mark.edge_case
     def test_latitude_over_90(self):
-        """Latitude > 90 should raise ValueError with clear message."""
+        """Latitude > 90 should raise CoordinateError with clear message."""
         jd = 2451545.0
 
-        with pytest.raises(ValueError, match="latitude 91.0 is out of valid range"):
+        with pytest.raises(
+            ephem.CoordinateError, match="latitude 91.0 is out of valid range"
+        ):
             ephem.swe_houses(jd, 91.0, 0.0, ord("P"))
 
     @pytest.mark.edge_case
     def test_latitude_under_minus_90(self):
-        """Latitude < -90 should raise ValueError with clear message."""
+        """Latitude < -90 should raise CoordinateError with clear message."""
         jd = 2451545.0
 
-        with pytest.raises(ValueError, match="latitude -91.0 is out of valid range"):
+        with pytest.raises(
+            ephem.CoordinateError, match="latitude -91.0 is out of valid range"
+        ):
             ephem.swe_houses(jd, -91.0, 0.0, ord("P"))
 
 

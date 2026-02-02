@@ -655,7 +655,10 @@ class TestEphemerisContextMemory:
         contexts = []
         for i in range(iterations):
             ctx = EphemerisContext()
-            ctx.set_topo(float(i % 180 - 90), float(i % 360 - 180), 0)
+            # Use valid coordinate ranges: lon [-180, 180], lat [-90, 90]
+            lon = float(i % 360 - 180)  # -180 to +179
+            lat = float(i % 180 - 90)  # -90 to +89
+            ctx.set_topo(lon, lat, 0)
             ctx.set_sid_mode(i % 43)  # Cycle through ayanamshas
 
             # Do some calculations

@@ -1018,11 +1018,11 @@ class TestEdgeCasesNearPoles:
 
     @pytest.mark.unit
     def test_latitude_exactly_90_raises_error(self):
-        """Latitude of exactly ±90 should raise ValueError."""
+        """Latitude of exactly ±90 should raise CoordinateError."""
         jd = 2451545.0
 
-        # 90 degrees should be at the limit
-        with pytest.raises(ValueError):
+        # 90.1 degrees should be out of range
+        with pytest.raises(ephem.CoordinateError):
             ephem.swe_houses(jd, 90.1, 0.0, ord("O"))
 
     @pytest.mark.unit
@@ -1044,7 +1044,8 @@ class TestEdgeCasesNearPoles:
         jd = 2451545.0
         lat = 85.0
 
-        for lon in [0.0, 90.0, 180.0, 270.0, -45.0, -120.0]:
+        # Use longitudes within valid range (-180 to 180)
+        for lon in [0.0, 90.0, 180.0, -90.0, -45.0, -120.0]:
             cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
                 jd, lat, lon, ord("O")
             )

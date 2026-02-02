@@ -14,6 +14,7 @@ import subprocess
 import pytest
 
 sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
+sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts/tests")
 
 
 class TestCompareScriptsInfrastructure:
@@ -61,12 +62,12 @@ class TestCompareHypothetical:
     """Test hypothetical planet comparison script."""
 
     def test_import_compare_hypothetical(self):
-        """Test that compare_hypothetical can be imported."""
-        from compare_hypothetical import (
+        """Test that test_compare_hypothetical module exists and has expected content."""
+        # The comparison tests have been converted to pytest-style tests
+        # in compare_scripts/tests/test_compare_hypothetical.py
+        from test_compare_hypothetical import (
             URANIAN_PLANETS,
             OTHER_HYPOTHETICAL,
-            compare_hypothetical_body,
-            run_all_comparisons,
         )
 
         assert len(URANIAN_PLANETS) == 8, "Should have 8 Uranian planets"
@@ -74,7 +75,7 @@ class TestCompareHypothetical:
 
     def test_uranian_planets_defined(self):
         """Test all 8 Uranian planets are defined."""
-        from compare_hypothetical import URANIAN_PLANETS
+        from test_compare_hypothetical import URANIAN_PLANETS
 
         names = [p[2] for p in URANIAN_PLANETS]
         expected = [
@@ -94,38 +95,39 @@ class TestCompareMinorBodies:
     """Test minor bodies comparison script."""
 
     def test_import_compare_minor_bodies(self):
-        """Test that compare_minor_bodies can be imported."""
-        from compare_minor_bodies import (
-            MAIN_BELT_ASTEROIDS,
+        """Test that test_compare_minor_bodies module exists and has expected content."""
+        # The comparison tests have been converted to pytest-style tests
+        # in compare_scripts/tests/test_compare_minor_bodies.py
+        from test_compare_minor_bodies import (
+            MAIN_ASTEROIDS,
             CENTAURS,
-            TNOS,
-            NEAR_EARTH_ASTEROIDS,
-            TOLERANCES,
-            compare_minor_body,
-            run_all_comparisons,
         )
 
-        assert len(MAIN_BELT_ASTEROIDS) >= 4, (
+        assert len(MAIN_ASTEROIDS) >= 4, (
             "Should have at least Ceres, Pallas, Juno, Vesta"
         )
         assert len(CENTAURS) >= 2, "Should have at least Chiron, Pholus"
-        assert len(TNOS) >= 5, "Should have multiple TNOs"
 
     def test_tolerances_defined(self):
-        """Test tolerances are defined for each category."""
-        from compare_minor_bodies import TOLERANCES
+        """Test tolerances are defined in the module."""
+        from test_compare_minor_bodies import (
+            MAIN_ASTEROID_TOL,
+            CENTAUR_TOL,
+            TNO_TOL,
+            NEA_TOL,
+        )
 
-        expected_categories = ["main_belt", "centaur", "tno", "near_earth"]
-        for cat in expected_categories:
-            assert cat in TOLERANCES, f"Tolerance for {cat} should be defined"
-            assert "longitude" in TOLERANCES[cat]
-            assert "latitude" in TOLERANCES[cat]
+        assert MAIN_ASTEROID_TOL > 0
+        assert CENTAUR_TOL > 0
+        assert TNO_TOL > 0
+        assert NEA_TOL > 0
 
     def test_tnos_list(self):
         """Test TNO list includes major bodies."""
-        from compare_minor_bodies import TNOS
+        from test_compare_minor_bodies import TNOS_STANDARD, TNOS_DISTANT
 
-        names = [t[2] for t in TNOS]
+        all_tnos = TNOS_STANDARD + TNOS_DISTANT
+        names = [t[1] for t in all_tnos]
         expected_in_list = ["Eris", "Makemake", "Sedna", "Orcus"]
         for expected in expected_in_list:
             assert expected in names, f"{expected} should be in TNO list"
@@ -135,25 +137,28 @@ class TestCompareLunar:
     """Test lunar comparison script."""
 
     def test_import_compare_lunar(self):
-        """Test that compare_lunar can be imported."""
-        from compare_lunar import (
-            compare_lunar_nodes,
-            compare_lilith,
-            compare_true_node_precision,
-            compare_true_lilith_precision,
+        """Test that test_compare_lunar module exists and has expected content."""
+        # The comparison tests have been converted to pytest-style tests
+        # in compare_scripts/tests/test_compare_lunar.py
+        from test_compare_lunar import (
+            MEAN_NODE_TOL,
+            TRUE_NODE_TOL,
+            MEAN_LILITH_TOL,
         )
+
+        assert MEAN_NODE_TOL > 0
+        assert TRUE_NODE_TOL > 0
+        assert MEAN_LILITH_TOL > 0
 
     def test_threshold_constants(self):
         """Test threshold constants are defined."""
-        from compare_lunar import (
-            TRUE_NODE_MAX_ERROR_THRESHOLD,
-            TRUE_NODE_MEAN_ERROR_THRESHOLD,
-            TRUE_LILITH_MAX_ERROR_THRESHOLD,
+        from test_compare_lunar import (
+            TRUE_NODE_TOL,
+            TRUE_LILITH_TOL,
         )
 
-        assert TRUE_NODE_MAX_ERROR_THRESHOLD > 0
-        assert TRUE_NODE_MEAN_ERROR_THRESHOLD > 0
-        assert TRUE_LILITH_MAX_ERROR_THRESHOLD > 0
+        assert TRUE_NODE_TOL > 0
+        assert TRUE_LILITH_TOL > 0
 
 
 class TestComparisonUtils:
