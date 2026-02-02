@@ -156,12 +156,10 @@ def cotrans_sp(
 def azalt(
     jd: float,
     calc_flag: int,
-    lat: float,
-    lon: float,
-    altitude: float,
-    pressure: float,
-    temperature: float,
-    coord: Tuple[float, float, float],
+    geopos: Tuple[float, float, float],
+    atpress: float,
+    attemp: float,
+    xin: Tuple[float, float, float],
 ) -> Tuple[float, float, float]:
     """
     Convert equatorial or ecliptic coordinates to horizontal (azimuth/altitude).
@@ -177,12 +175,13 @@ def azalt(
         calc_flag: Coordinate type flag:
             - SE_ECL2HOR (0): Input is ecliptic (longitude, latitude, distance)
             - SE_EQU2HOR (1): Input is equatorial (RA, Dec, distance)
-        lat: Geographic latitude of observer in degrees (North positive)
-        lon: Geographic longitude of observer in degrees (East positive)
-        altitude: Observer altitude above sea level in meters
-        pressure: Atmospheric pressure in mbar (hPa). Use 0 for no refraction.
-        temperature: Atmospheric temperature in Celsius
-        coord: Tuple of (longitude/RA, latitude/Dec, distance) in degrees
+        geopos: Tuple of (longitude, latitude, altitude):
+            - longitude: Geographic longitude of observer in degrees (East positive)
+            - latitude: Geographic latitude of observer in degrees (North positive)
+            - altitude: Observer altitude above sea level in meters
+        atpress: Atmospheric pressure in mbar (hPa). Use 0 for no refraction.
+        attemp: Atmospheric temperature in Celsius
+        xin: Tuple of (longitude/RA, latitude/Dec, distance) in degrees
 
     Returns:
         Tuple of (azimuth, true_altitude, apparent_altitude) where:
@@ -204,9 +203,18 @@ def azalt(
         >>> from libephemeris import azalt, SE_EQU2HOR, julday
         >>> jd = julday(2024, 6, 15, 12.0)
         >>> # RA=90°, Dec=23.5°, observer at lat=41.9°N, lon=12.5°E
-        >>> az, alt_true, alt_app = azalt(jd, SE_EQU2HOR, 41.9, 12.5, 0, 1013.25, 15, (90, 23.5, 1))
+        >>> geopos = (12.5, 41.9, 0)  # (lon, lat, altitude)
+        >>> az, alt_true, alt_app = azalt(jd, SE_EQU2HOR, geopos, 1013.25, 15, (90, 23.5, 1))
     """
-    from .time_utils import sidtime
+    # Extract geopos components
+    lon = geopos[0]
+    lat = geopos[1]
+    altitude = geopos[2]
+    pressure = atpress
+    temperature = attemp
+    coord = xin
+
+    from .time_utils import _sidtime_internal
     from skyfield.nutationlib import iau2000b_radians
     from .state import get_timescale
 
@@ -224,6 +232,7 @@ def azalt(
     t = ts.ut1_jd(jd)
     dpsi_rad, deps_rad = iau2000b_radians(t)
     deps_deg = math.degrees(deps_rad)
+    dpsi_deg = math.degrees(dpsi_rad)  # Nutation in longitude
     eps = eps0 + deps_deg  # True obliquity
 
     # Convert input coordinates to equatorial (RA, Dec) if ecliptic
@@ -245,9 +254,8 @@ def azalt(
         dec = coord[1]
 
     # Calculate Local Sidereal Time
-    # We need nutation for proper sidereal time, but for azalt we can use mean
-    nutation = 0.0  # Mean sidereal time approximation
-    lst_hours = sidtime(jd, lon, eps, nutation)
+    # Use apparent sidereal time (with nutation) for accuracy
+    lst_hours = _sidtime_internal(jd, lon, eps, dpsi_deg)
     lst_deg = lst_hours * 15.0  # Convert hours to degrees
 
     # Calculate Hour Angle
@@ -341,9 +349,7 @@ def azalt(
 def azalt_rev(
     jd: float,
     calc_flag: int,
-    lat: float,
-    lon: float,
-    altitude: float,
+    geopos: Tuple[float, float, float],
     azimuth: float,
     true_altitude: float,
 ) -> Tuple[float, float]:
@@ -365,11 +371,11 @@ def azalt_rev(
         calc_flag: Output coordinate type flag:
             - SE_HOR2EQU (1): Output is equatorial (RA, Dec)
             - SE_HOR2ECL (0): Output is ecliptic (longitude, latitude)
-        lat: Geographic latitude of observer in degrees (North positive)
-        lon: Geographic longitude of observer in degrees (East positive)
-        altitude: Observer altitude above sea level in meters
-        azimuth: Azimuth in degrees from South, westward
-                 (0=South, 90=West, 180=North, 270=East)
+        geopos: Tuple of (longitude, latitude, altitude):
+            - longitude: Geographic longitude of observer in degrees (East positive)
+            - latitude: Geographic latitude of observer in degrees (North positive)
+            - altitude: Observer altitude above sea level in meters
+        azimuth: Azimuth in degrees from South, westward (0 = South, 90 = West, etc.)
         true_altitude: True (geometric) altitude above horizon in degrees
 
     Returns:
@@ -381,9 +387,15 @@ def azalt_rev(
         >>> from libephemeris import azalt_rev, SE_HOR2EQU, julday
         >>> jd = julday(2024, 6, 15, 12.0)
         >>> # Object at azimuth 90° (West), altitude 45°, observer at Rome
-        >>> ra, dec = azalt_rev(jd, SE_HOR2EQU, 41.9, 12.5, 0, 90.0, 45.0)
+        >>> geopos = (12.5, 41.9, 0)  # (lon, lat, altitude)
+        >>> ra, dec = azalt_rev(jd, SE_HOR2EQU, geopos, 90.0, 45.0)
     """
-    from .time_utils import sidtime
+    # Extract geopos components
+    lon = geopos[0]
+    lat = geopos[1]
+    altitude = geopos[2]
+
+    from .time_utils import _sidtime_internal
     from skyfield.nutationlib import iau2000b_radians
     from .state import get_timescale
 
@@ -401,6 +413,7 @@ def azalt_rev(
     t = ts.ut1_jd(jd)
     dpsi_rad, deps_rad = iau2000b_radians(t)
     deps_deg = math.degrees(deps_rad)
+    dpsi_deg = math.degrees(dpsi_rad)  # Nutation in longitude
     eps = eps0 + deps_deg  # True obliquity
 
     # Convert to radians for calculation
@@ -446,8 +459,8 @@ def azalt_rev(
         ha = math.degrees(ha_rad)
 
     # Calculate Local Sidereal Time
-    nutation = 0.0  # Mean sidereal time approximation (same as azalt)
-    lst_hours = sidtime(jd, lon, eps, nutation)
+    # Use apparent sidereal time (with nutation) for accuracy
+    lst_hours = _sidtime_internal(jd, lon, eps, dpsi_deg)
     lst_deg = lst_hours * 15.0  # Convert hours to degrees
 
     # Calculate Right Ascension: RA = LST - H
@@ -559,7 +572,13 @@ def refrac(
 
     else:
         # SE_APP_TO_TRUE: Apparent altitude to true altitude (subtract refraction)
-        # We need to find what true altitude would give this apparent altitude
+        # This is the inverse of TRUE_TO_APP.
+        #
+        # We need to find true_alt such that: apparent_alt = true_alt + R(true_alt)
+        # where R(true_alt) is the refraction at true altitude.
+        #
+        # Use iterative approach: start with apparent alt, compute refraction,
+        # subtract to get true estimate, iterate until converged.
 
         # First, calculate the refraction at true altitude 0° (horizon)
         # This is the threshold below which APP_TO_TRUE returns input unchanged
@@ -567,26 +586,41 @@ def refrac(
         r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
         horizon_refraction = r_arcmin / 60.0 * correction
 
-        # If apparent altitude is at or below the horizon refraction threshold,
-        # return input unchanged (matching pyswisseph behavior)
-        if altitude <= horizon_refraction:
+        # If apparent altitude is at or below 0, return it unchanged
+        if altitude <= 0:
             return altitude
 
-        alt = altitude
+        # Initial estimate: true alt ≈ apparent alt - refrac(apparent alt)
+        true_alt = altitude
 
-        if alt > 15.0:
-            # Simple formula for high altitudes
-            z_rad = math.radians(90.0 - alt)
-            tan_z = math.tan(z_rad)
-            refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
-            refraction = refraction_arcsec / 3600.0 * correction
-        else:
-            # Bennett formula (using apparent altitude directly is a good approximation)
-            h = max(alt, 0.01)  # Avoid division issues
-            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
-            refraction = r_arcmin / 60.0 * correction
+        # Iterate to find true altitude
+        for _ in range(10):
+            # Calculate refraction at current estimate of true altitude
+            if true_alt > 15.0:
+                z_rad = math.radians(90.0 - true_alt)
+                tan_z = math.tan(z_rad)
+                refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
+                refraction = refraction_arcsec / 3600.0 * correction
+            elif true_alt > -2.0:
+                h = max(true_alt, 0.01)
+                r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+                refraction = r_arcmin / 60.0 * correction
+            else:
+                h = -2.0
+                r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+                refraction_at_minus2 = r_arcmin / 60.0 * correction
+                refraction = refraction_at_minus2 + (true_alt + 2.0) * 0.1
 
-        return altitude - refraction
+            # Update estimate: true_alt + refraction should equal apparent_alt
+            new_true_alt = altitude - refraction
+
+            # Check convergence
+            if abs(new_true_alt - true_alt) < 1e-10:
+                break
+
+            true_alt = new_true_alt
+
+        return true_alt
 
 
 def refrac_extended(

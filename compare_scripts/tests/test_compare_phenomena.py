@@ -280,7 +280,15 @@ class TestPhenomenaConsistency:
     def test_phenomena_physical_constraints(self, jd_standard, body_id, body_name):
         """Test that phenomena values satisfy physical constraints."""
         ret_py = pyephem.pheno_ut(jd_standard, body_id, SEFLG_SWIEPH)
-        attr = ret_py[1] if isinstance(ret_py, tuple) else ret_py
+        # libephemeris returns (attr_tuple, retflag), pyswisseph returns just attr_tuple
+        if (
+            isinstance(ret_py, tuple)
+            and len(ret_py) == 2
+            and isinstance(ret_py[0], tuple)
+        ):
+            attr = ret_py[0]  # libephemeris format: (attr, retflag)
+        else:
+            attr = ret_py  # pyswisseph format: just attr tuple
 
         phase_angle = attr[PHENO_PHASE_ANGLE]
         phase = attr[PHENO_PHASE]  # Illuminated fraction
@@ -298,7 +306,15 @@ class TestPhenomenaConsistency:
         """Test that inner planets have limited elongation."""
         for body_id, body_name in [(SE_MERCURY, "Mercury"), (SE_VENUS, "Venus")]:
             ret_py = pyephem.pheno_ut(jd_standard, body_id, SEFLG_SWIEPH)
-            attr = ret_py[1] if isinstance(ret_py, tuple) else ret_py
+            # libephemeris returns (attr_tuple, retflag), pyswisseph returns just attr_tuple
+            if (
+                isinstance(ret_py, tuple)
+                and len(ret_py) == 2
+                and isinstance(ret_py[0], tuple)
+            ):
+                attr = ret_py[0]  # libephemeris format
+            else:
+                attr = ret_py  # pyswisseph format
 
             elongation = attr[PHENO_ELONGATION]
 

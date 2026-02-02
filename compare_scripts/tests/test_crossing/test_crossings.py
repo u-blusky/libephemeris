@@ -108,7 +108,7 @@ class TestSubArcsecondPrecision:
     def test_mooncross_node_sub_arcsecond_precision(self):
         """Moon node crossing should achieve sub-arcsecond precision (0.05 arcsec)."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_cross, xlon, xlat = ephem.swe_mooncross_node_ut(jd_start, 0)
 
         # Check Moon latitude at crossing (should be ~0)
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
@@ -674,7 +674,7 @@ class TestMooncrossNodeBasic:
     def test_mooncross_node_basic(self):
         """Moon node crossing should return valid JD."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_cross, xlon, xlat = ephem.swe_mooncross_node_ut(jd_start, 0)
 
         assert jd_cross > jd_start
         # Should be within ~14 days (half the nodal month)
@@ -684,7 +684,7 @@ class TestMooncrossNodeBasic:
     def test_mooncross_node_latitude_near_zero(self):
         """Moon latitude should be near zero at node crossing."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_cross, xlon, xlat = ephem.swe_mooncross_node_ut(jd_start, 0)
 
         # Check Moon latitude at crossing
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
@@ -698,10 +698,10 @@ class TestMooncrossNodeBasic:
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
 
         # Find first node crossing
-        jd_first = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_first, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
 
         # Find second node crossing by starting just after first
-        jd_second = ephem.swe_mooncross_node_ut(jd_first + 0.5, 0)
+        jd_second, _, _ = ephem.swe_mooncross_node_ut(jd_first + 0.5, 0)
 
         # Should be roughly 13.6 days apart (half the nodal month)
         diff_days = jd_second - jd_first
@@ -713,12 +713,19 @@ class TestMooncrossNodeBasic:
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
 
         # Find first crossing
-        jd_first = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_first, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
         pos_first, _ = ephem.swe_calc_ut(jd_first, SE_MOON, SEFLG_SPEED)
 
         # Find second crossing
-        jd_second = ephem.swe_mooncross_node_ut(jd_first + 0.5, 0)
+        jd_second, _, _ = ephem.swe_mooncross_node_ut(jd_first + 0.5, 0)
         pos_second, _ = ephem.swe_calc_ut(jd_second, SE_MOON, SEFLG_SPEED)
+
+        # Latitude velocities should have opposite signs
+        # (one ascending, one descending)
+        assert pos_first[4] * pos_second[4] < 0, (
+            f"Consecutive crossings should alternate: "
+            f"v1={pos_first[4]}, v2={pos_second[4]}"
+        )
 
         # Latitude velocities should have opposite signs
         # (one ascending, one descending)
@@ -738,7 +745,7 @@ class TestMooncrossNodeTT:
         delta_t = ephem.swe_deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_cross_tt = ephem.swe_mooncross_node(jd_start_tt, 0)
+        jd_cross_tt, xlon, xlat = ephem.swe_mooncross_node(jd_start_tt, 0)
 
         assert jd_cross_tt > jd_start_tt
         # Should be within ~14 days
@@ -751,7 +758,7 @@ class TestMooncrossNodeTT:
         delta_t = ephem.swe_deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_cross_tt = ephem.swe_mooncross_node(jd_start_tt, 0)
+        jd_cross_tt, xlon, xlat = ephem.swe_mooncross_node(jd_start_tt, 0)
 
         # Check Moon latitude at crossing (using TT version of calc)
         pos, _ = ephem.swe_calc(jd_cross_tt, SE_MOON, 0)
@@ -767,10 +774,10 @@ class TestMooncrossNodeTT:
         jd_tt = jd_ut + delta_t
 
         # Get crossing time in UT
-        jd_cross_ut = ephem.swe_mooncross_node_ut(jd_ut, 0)
+        jd_cross_ut, _, _ = ephem.swe_mooncross_node_ut(jd_ut, 0)
 
         # Get crossing time in TT
-        jd_cross_tt = ephem.swe_mooncross_node(jd_tt, 0)
+        jd_cross_tt, _, _ = ephem.swe_mooncross_node(jd_tt, 0)
 
         # Convert UT result to TT for comparison
         delta_t_cross = ephem.swe_deltat(jd_cross_ut)
@@ -789,7 +796,7 @@ class TestMooncrossNodeVsPyswisseph:
         """Moon node crossing should match pyswisseph."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
 
-        jd_lib = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_lib, xlon_lib, xlat_lib = ephem.swe_mooncross_node_ut(jd_start, 0)
         # pyswisseph returns (jd_cross, xlon, xlat)
         result_swe = swe.mooncross_node_ut(jd_start, 0)
         jd_swe = result_swe[0]
@@ -805,7 +812,7 @@ class TestMooncrossNodeVsPyswisseph:
         delta_t = swe.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
-        jd_lib = ephem.swe_mooncross_node(jd_tt, 0)
+        jd_lib, xlon_lib, xlat_lib = ephem.swe_mooncross_node(jd_tt, 0)
         # pyswisseph returns (jd_cross, xlon, xlat)
         result_swe = swe.mooncross_node(jd_tt, 0)
         jd_swe = result_swe[0]
@@ -820,7 +827,7 @@ class TestMooncrossNodeVsPyswisseph:
         jd = ephem.swe_julday(2024, 1, 1, 0.0)
 
         for i in range(4):
-            jd_lib = ephem.swe_mooncross_node_ut(jd, 0)
+            jd_lib, _, _ = ephem.swe_mooncross_node_ut(jd, 0)
             # pyswisseph returns (jd_cross, xlon, xlat)
             result_swe = swe.mooncross_node_ut(jd, 0)
             jd_swe = result_swe[0]
@@ -1086,10 +1093,10 @@ class TestMooncrossNodeEclipseRelevance:
         # Find the nearest node crossing
         # Check both before and after
         jd_before = jd_eclipse - 7  # Week before
-        jd_cross_before = ephem.swe_mooncross_node_ut(jd_before, 0)
+        jd_cross_before, _, _ = ephem.swe_mooncross_node_ut(jd_before, 0)
 
         jd_after = jd_eclipse - 0.5
-        jd_cross_after = ephem.swe_mooncross_node_ut(jd_after, 0)
+        jd_cross_after, _, _ = ephem.swe_mooncross_node_ut(jd_after, 0)
 
         # The eclipse should be close to a node crossing (within a few days)
         diff_before = abs(jd_eclipse - jd_cross_before)
@@ -1318,11 +1325,11 @@ class TestMoonNodeEdgeCases:
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
 
         # First find a node crossing
-        jd_node = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_node, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
 
         # Now start very close to it (1 hour before) - tests edge case
         jd_near_node = jd_node - 1 / 24  # 1 hour before
-        jd_next = ephem.swe_mooncross_node_ut(jd_near_node, 0)
+        jd_next, _, _ = ephem.swe_mooncross_node_ut(jd_near_node, 0)
 
         # Should find the same node (or the next one if we're past it)
         pos, _ = ephem.swe_calc_ut(jd_next, SE_MOON, 0)
@@ -1337,7 +1344,7 @@ class TestMoonNodeEdgeCases:
 
         jd = jd_start
         for i in range(6):
-            jd_cross = ephem.swe_mooncross_node_ut(jd, 0)
+            jd_cross, _, _ = ephem.swe_mooncross_node_ut(jd, 0)
             crossings.append(jd_cross)
 
             # Verify latitude is near zero
@@ -1364,7 +1371,7 @@ class TestMoonNodeEdgeCases:
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
 
         # Find a node crossing
-        jd_node = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_node, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
 
         # Verify we got good convergence
         pos, _ = ephem.swe_calc_ut(jd_node, SE_MOON, SEFLG_SPEED)
@@ -1412,11 +1419,11 @@ class TestMoonNodeEdgeCases:
         jd_start_tt = jd_start_ut + delta_t
 
         # Find node crossing in TT
-        jd_node_tt = ephem.swe_mooncross_node(jd_start_tt, 0)
+        jd_node_tt, _, _ = ephem.swe_mooncross_node(jd_start_tt, 0)
 
         # Start very close to it (30 minutes before)
         jd_near = jd_node_tt - 0.5 / 24
-        jd_next_tt = ephem.swe_mooncross_node(jd_near, 0)
+        jd_next_tt, _, _ = ephem.swe_mooncross_node(jd_near, 0)
 
         # Verify convergence
         pos, _ = ephem.swe_calc(jd_next_tt, SE_MOON, 0)
@@ -1433,7 +1440,7 @@ class TestMoonNodeEdgeCases:
         """
         jd_start = ephem.swe_julday(year, 6, 15, 0.0)  # Mid-year
 
-        jd_node = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_node, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
 
         pos, _ = ephem.swe_calc_ut(jd_node, SE_MOON, 0)
         lat_arcsec = abs(pos[1]) * 3600.0

@@ -133,11 +133,13 @@ class TestMoonNodeCrossings:
     )
     def test_mooncross_node_ut(self, jd_start, node_type, node_name):
         """Test Moon crossing its nodes."""
-        # SwissEphemeris
-        jd_swe = swe.mooncross_node_ut(jd_start, node_type)
+        # SwissEphemeris - returns tuple (jd_cross, xlon, xlat)
+        result_swe = swe.mooncross_node_ut(jd_start, node_type)
+        jd_swe = result_swe[0]
 
-        # LibEphemeris
-        jd_py = ephem.mooncross_node_ut(jd_start, node_type)
+        # LibEphemeris - also returns tuple (jd_cross, xlon, xlat)
+        result_py = ephem.mooncross_node_ut(jd_start, node_type)
+        jd_py = result_py[0]
 
         diff_seconds = abs(jd_py - jd_swe) * 86400
 
@@ -152,10 +154,10 @@ class TestMoonNodeCrossings:
             jd = jd_start + i * 14  # ~2 weeks apart
 
             for node_type in [0, 1]:
-                jd_swe = swe.mooncross_node_ut(jd, node_type)
-                jd_py = ephem.mooncross_node_ut(jd, node_type)
+                result_swe = swe.mooncross_node_ut(jd, node_type)
+                result_py = ephem.mooncross_node_ut(jd, node_type)
 
-                diff_seconds = abs(jd_py - jd_swe) * 86400
+                diff_seconds = abs(result_py[0] - result_swe[0]) * 86400
                 assert diff_seconds < CrossingTolerance.MOON_NODE_SECONDS
 
 

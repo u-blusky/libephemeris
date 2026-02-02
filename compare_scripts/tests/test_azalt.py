@@ -3,6 +3,10 @@ Tests for the azalt coordinate transformation function.
 
 Tests verify that azalt correctly transforms equatorial/ecliptic coordinates
 to horizontal (azimuth/altitude) coordinates, matching pyswisseph's swe.azalt() behavior.
+
+pyswisseph signature: azalt(tjdut, flag, geopos, atpress, attemp, xin)
+  - geopos: (longitude, latitude, altitude_meters)
+  - xin: (lon/ra, lat/dec, distance)
 """
 
 import pytest
@@ -28,8 +32,9 @@ class TestAzaltBasic:
     def test_azalt_returns_tuple(self):
         """Test that azalt returns a tuple of three elements."""
         jd = ephem.julday(2024, 6, 15, 12.0)
+        geopos = (12.5, 41.9, 0)  # lon, lat, alt
         coord = (90.0, 23.5, 1.0)
-        result = ephem.azalt(jd, ephem.SE_EQU2HOR, 41.9, 12.5, 0, 1013.25, 15, coord)
+        result = ephem.azalt(jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -37,6 +42,7 @@ class TestAzaltBasic:
     def test_azalt_azimuth_in_range(self):
         """Test that azimuth is in [0, 360) range."""
         jd = ephem.julday(2024, 6, 15, 12.0)
+        geopos = (12.5, 41.9, 0)
         coords = [
             (0.0, 0.0, 1.0),
             (90.0, 45.0, 1.0),
@@ -46,16 +52,17 @@ class TestAzaltBasic:
 
         for coord in coords:
             az, alt_true, alt_app = ephem.azalt(
-                jd, ephem.SE_EQU2HOR, 41.9, 12.5, 0, 1013.25, 15, coord
+                jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord
             )
             assert 0.0 <= az < 360.0, f"Azimuth {az} out of range for coord {coord}"
 
     def test_azalt_altitude_in_range(self):
         """Test that altitude is in valid range (-90, 90)."""
         jd = ephem.julday(2024, 6, 15, 12.0)
+        geopos = (12.5, 41.9, 0)
         coord = (90.0, 23.5, 1.0)
         az, alt_true, alt_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, 41.9, 12.5, 0, 1013.25, 15, coord
+            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord
         )
 
         assert -90.0 <= alt_true <= 90.0
@@ -68,10 +75,11 @@ class TestAzaltNoRefraction:
     def test_no_refraction_when_pressure_zero(self):
         """Test that true and apparent altitude are equal when pressure is 0."""
         jd = ephem.julday(2024, 6, 15, 12.0)
+        geopos = (12.5, 41.9, 0)
         coord = (90.0, 30.0, 1.0)
 
         az, alt_true, alt_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, 41.9, 12.5, 0, 0.0, 15, coord
+            jd, ephem.SE_EQU2HOR, geopos, 0.0, 15, coord
         )
 
         assert abs(alt_true - alt_app) < 1e-10, (
@@ -85,10 +93,11 @@ class TestAzaltRefraction:
     def test_refraction_increases_apparent_altitude(self):
         """Test that refraction makes objects appear higher."""
         jd = ephem.julday(2024, 6, 15, 12.0)
+        geopos = (12.5, 41.9, 0)
         coord = (90.0, 30.0, 1.0)
 
         az, alt_true, alt_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, 41.9, 12.5, 0, 1013.25, 15, coord
+            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord
         )
 
         # Objects should appear higher due to refraction (for positive altitudes)
@@ -100,17 +109,17 @@ class TestAzaltRefraction:
     def test_refraction_larger_at_horizon(self):
         """Test that refraction is larger near the horizon."""
         jd = ephem.julday(2024, 6, 15, 6.0)  # Early morning for lower sun
-        lat, lon = 41.9, 12.5
+        geopos = (12.5, 41.9, 0)
 
         # Find two objects at different altitudes
         coord_low = (280.0, -10.0, 1.0)  # Near horizon
         coord_high = (90.0, 60.0, 1.0)  # Higher
 
         _, alt_low_true, alt_low_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, lat, lon, 0, 1013.25, 15, coord_low
+            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord_low
         )
         _, alt_high_true, alt_high_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, lat, lon, 0, 1013.25, 15, coord_high
+            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord_high
         )
 
         refraction_low = alt_low_app - alt_low_true
@@ -143,15 +152,11 @@ class TestAzaltVsSwisseph:
     def test_azalt_equatorial_matches_swisseph(self, coord, calc_flag):
         """Test equatorial to horizontal transformation matches pyswisseph."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        lat, lon = 41.9, 12.5
-        alt_m = 100.0
+        geopos = (12.5, 41.9, 100.0)  # lon, lat, alt_m
         pressure = 1013.25
         temp = 20.0
 
-        result_lib = ephem.azalt(jd, calc_flag, lat, lon, alt_m, pressure, temp, coord)
-
-        # pyswisseph uses geopos=(lon, lat, alt)
-        geopos = (lon, lat, alt_m)
+        result_lib = ephem.azalt(jd, calc_flag, geopos, pressure, temp, coord)
         result_swe = swe.azalt(jd, calc_flag, geopos, pressure, temp, coord)
 
         # Compare azimuth (handle wrap-around)
@@ -184,15 +189,12 @@ class TestAzaltVsSwisseph:
     def test_azalt_ecliptic_matches_swisseph(self, coord):
         """Test ecliptic to horizontal transformation matches pyswisseph."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        lat, lon = 41.9, 12.5
-        alt_m = 0.0
+        geopos = (12.5, 41.9, 0.0)  # lon, lat, alt_m
         pressure = 1013.25
         temp = 15.0
         calc_flag = ephem.SE_ECL2HOR  # Ecliptic to horizontal
 
-        result_lib = ephem.azalt(jd, calc_flag, lat, lon, alt_m, pressure, temp, coord)
-
-        geopos = (lon, lat, alt_m)
+        result_lib = ephem.azalt(jd, calc_flag, geopos, pressure, temp, coord)
         result_swe = swe.azalt(jd, calc_flag, geopos, pressure, temp, coord)
 
         # Compare azimuth (handle wrap-around)
@@ -226,10 +228,11 @@ class TestAzaltDifferentLocations:
     def test_azalt_various_locations(self, lat, lon):
         """Test azalt at various geographic locations."""
         jd = ephem.julday(2024, 6, 21, 12.0)  # Summer solstice noon
+        geopos = (lon, lat, 0)  # Note: pyswisseph order is (lon, lat, alt)
         coord = (90.0, 23.5, 1.0)  # Near summer solstice declination
 
         az, alt_true, alt_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, lat, lon, 0, 1013.25, 15, coord
+            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord
         )
 
         # Basic sanity checks
@@ -253,14 +256,12 @@ class TestAzaltNoRefractionVsSwisseph:
     def test_no_refraction_matches_swisseph(self, coord):
         """Test that no-refraction results match pyswisseph."""
         jd = ephem.julday(2024, 3, 20, 12.0)  # Equinox
-        lat, lon = 45.0, 0.0
+        geopos = (0.0, 45.0, 0)  # lon, lat, alt
         pressure = 0.0  # No refraction
         temp = 10.0
 
-        result_lib = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, lat, lon, 0, pressure, temp, coord
-        )
-        result_swe = swe.azalt(jd, 1, (lon, lat, 0), pressure, temp, coord)
+        result_lib = ephem.azalt(jd, ephem.SE_EQU2HOR, geopos, pressure, temp, coord)
+        result_swe = swe.azalt(jd, 1, geopos, pressure, temp, coord)
 
         # Without refraction in our library, true and apparent should be equal
         assert abs(result_lib[1] - result_lib[2]) < 1e-6

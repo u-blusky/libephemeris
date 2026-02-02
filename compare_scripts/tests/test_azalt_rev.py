@@ -4,6 +4,10 @@ Tests for the azalt_rev coordinate transformation function.
 Tests verify that azalt_rev correctly transforms horizontal (azimuth/altitude)
 coordinates to equatorial/ecliptic coordinates, matching pyswisseph's
 swe.azalt_rev() behavior.
+
+pyswisseph signature: azalt_rev(tjdut, flag, geopos, azimuth, true_altitude)
+  - geopos: (longitude, latitude, altitude_meters)
+  - Returns: (x1, x2) depending on flag
 """
 
 import pytest
@@ -29,7 +33,8 @@ class TestAzaltRevBasic:
     def test_azalt_rev_returns_tuple(self):
         """Test that azalt_rev returns a tuple of two elements."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        result = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, 41.9, 12.5, 0, 90.0, 45.0)
+        geopos = (12.5, 41.9, 0)  # lon, lat, alt
+        result = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, 90.0, 45.0)
 
         assert isinstance(result, tuple)
         assert len(result) == 2
@@ -37,25 +42,26 @@ class TestAzaltRevBasic:
     def test_azalt_rev_ra_in_range(self):
         """Test that RA is in [0, 360) range."""
         jd = ephem.julday(2024, 6, 15, 12.0)
+        geopos = (12.5, 41.9, 0)
         azimuths = [0.0, 90.0, 180.0, 270.0]
 
         for az in azimuths:
-            ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, 41.9, 12.5, 0, az, 30.0)
+            ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, az, 30.0)
             assert 0.0 <= ra < 360.0, f"RA {ra} out of range for azimuth {az}"
 
     def test_azalt_rev_dec_in_range(self):
         """Test that declination is in valid range (-90, 90)."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, 41.9, 12.5, 0, 90.0, 45.0)
+        geopos = (12.5, 41.9, 0)
+        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, 90.0, 45.0)
 
         assert -90.0 <= dec <= 90.0
 
     def test_azalt_rev_ecl_lon_in_range(self):
         """Test that ecliptic longitude is in [0, 360) range."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        ecl_lon, ecl_lat = ephem.azalt_rev(
-            jd, ephem.SE_HOR2ECL, 41.9, 12.5, 0, 90.0, 45.0
-        )
+        geopos = (12.5, 41.9, 0)
+        ecl_lon, ecl_lat = ephem.azalt_rev(jd, ephem.SE_HOR2ECL, geopos, 90.0, 45.0)
 
         assert 0.0 <= ecl_lon < 360.0
 
@@ -79,15 +85,9 @@ class TestAzaltRevVsSwisseph:
     def test_azalt_rev_equatorial_matches_swisseph(self, azimuth, altitude):
         """Test horizontal to equatorial transformation matches pyswisseph."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        lat, lon = 41.9, 12.5
-        alt_m = 100.0
+        geopos = (12.5, 41.9, 100.0)  # lon, lat, alt_m
 
-        result_lib = ephem.azalt_rev(
-            jd, ephem.SE_HOR2EQU, lat, lon, alt_m, azimuth, altitude
-        )
-
-        # pyswisseph uses geopos=(lon, lat, alt) and flag constants
-        geopos = (lon, lat, alt_m)
+        result_lib = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, azimuth, altitude)
         result_swe = swe.azalt_rev(jd, swe.HOR2EQU, geopos, azimuth, altitude)
 
         # Compare RA (handle wrap-around)
@@ -115,14 +115,9 @@ class TestAzaltRevVsSwisseph:
     def test_azalt_rev_ecliptic_matches_swisseph(self, azimuth, altitude):
         """Test horizontal to ecliptic transformation matches pyswisseph."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        lat, lon = 41.9, 12.5
-        alt_m = 0.0
+        geopos = (12.5, 41.9, 0.0)  # lon, lat, alt_m
 
-        result_lib = ephem.azalt_rev(
-            jd, ephem.SE_HOR2ECL, lat, lon, alt_m, azimuth, altitude
-        )
-
-        geopos = (lon, lat, alt_m)
+        result_lib = ephem.azalt_rev(jd, ephem.SE_HOR2ECL, geopos, azimuth, altitude)
         result_swe = swe.azalt_rev(jd, swe.HOR2ECL, geopos, azimuth, altitude)
 
         # Compare ecliptic longitude (handle wrap-around)
@@ -156,19 +151,14 @@ class TestAzaltRevRoundTrip:
     def test_azalt_azalt_rev_roundtrip(self, ra, dec):
         """Test roundtrip: equatorial -> horizontal -> equatorial."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        lat, lon = 41.9, 12.5
-        alt_m = 0.0
+        geopos = (12.5, 41.9, 0.0)  # lon, lat, alt
 
         # Convert equatorial to horizontal
         coord = (ra, dec, 1.0)
-        az, alt_true, _ = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, lat, lon, alt_m, 0.0, 15.0, coord
-        )
+        az, alt_true, _ = ephem.azalt(jd, ephem.SE_EQU2HOR, geopos, 0.0, 15.0, coord)
 
         # Convert back to equatorial
-        ra_back, dec_back = ephem.azalt_rev(
-            jd, ephem.SE_HOR2EQU, lat, lon, alt_m, az, alt_true
-        )
+        ra_back, dec_back = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, az, alt_true)
 
         # Compare RA (handle wrap-around)
         ra_diff = abs(ra - ra_back)
@@ -201,9 +191,10 @@ class TestAzaltRevDifferentLocations:
     def test_azalt_rev_various_locations(self, lat, lon):
         """Test azalt_rev at various geographic locations."""
         jd = ephem.julday(2024, 6, 21, 12.0)  # Summer solstice noon
+        geopos = (lon, lat, 0)  # Note: pyswisseph order is (lon, lat, alt)
         azimuth, altitude = 90.0, 45.0
 
-        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, lat, lon, 0, azimuth, altitude)
+        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, azimuth, altitude)
 
         # Basic sanity checks
         assert 0.0 <= ra < 360.0
@@ -216,21 +207,21 @@ class TestAzaltRevEdgeCases:
     def test_azalt_rev_zenith(self):
         """Test object at zenith (altitude = 90)."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        lat, lon = 41.9, 12.5
+        geopos = (12.5, 41.9, 0)
 
-        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, lat, lon, 0, 0.0, 90.0)
+        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, 0.0, 90.0)
 
         # At zenith, declination should approximately equal latitude
-        assert abs(dec - lat) < 0.1, (
-            f"At zenith, Dec ({dec:.4f}) should equal lat ({lat:.4f})"
+        assert abs(dec - 41.9) < 0.1, (
+            f"At zenith, Dec ({dec:.4f}) should equal lat ({41.9:.4f})"
         )
 
     def test_azalt_rev_horizon(self):
         """Test object at horizon (altitude = 0)."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        lat, lon = 41.9, 12.5
+        geopos = (12.5, 41.9, 0)
 
-        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, lat, lon, 0, 180.0, 0.0)
+        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, 180.0, 0.0)
 
         # Should return valid coordinates
         assert 0.0 <= ra < 360.0
@@ -239,10 +230,10 @@ class TestAzaltRevEdgeCases:
     def test_azalt_rev_below_horizon(self):
         """Test object below horizon (negative altitude)."""
         jd = ephem.julday(2024, 6, 15, 12.0)
-        lat, lon = 41.9, 12.5
+        geopos = (12.5, 41.9, 0)
 
         # Negative altitude (below horizon)
-        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, lat, lon, 0, 90.0, -10.0)
+        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, 90.0, -10.0)
 
         # Should still return valid coordinates
         assert 0.0 <= ra < 360.0
@@ -259,10 +250,10 @@ class TestAzaltRevDifferentTimes:
     def test_azalt_rev_different_hours(self, hour):
         """Test azalt_rev at different hours of the day."""
         jd = ephem.julday(2024, 6, 15, hour)
-        lat, lon = 41.9, 12.5
+        geopos = (12.5, 41.9, 0)
         azimuth, altitude = 90.0, 30.0
 
-        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, lat, lon, 0, azimuth, altitude)
+        ra, dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, azimuth, altitude)
 
         # RA should change with time (due to Earth's rotation)
         # Just verify valid output

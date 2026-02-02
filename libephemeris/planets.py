@@ -457,6 +457,11 @@ def swe_calc_ut(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
+    from .constants import SE_ECL_NUT
+
+    # Handle SE_ECL_NUT (-1) - returns nutation and obliquity
+    if ipl == SE_ECL_NUT:
+        return _calc_nutation_obliquity(tjd_ut, iflag)
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
@@ -739,6 +744,75 @@ def _calc_body_pctr(
             dp1 -= da
 
     return (p1, p2, p3, dp1, dp2, dp3), iflag
+
+
+def _calc_nutation_obliquity(
+    jd: float, iflag: int
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+    """
+    Calculate nutation and obliquity data for SE_ECL_NUT (-1).
+
+    This matches the pyswisseph return format for swe_calc_ut(jd, SE_ECL_NUT, 0).
+
+    Args:
+        jd: Julian Day in UT
+        iflag: Calculation flags (not used for nutation)
+
+    Returns:
+        Tuple containing:
+            - Data tuple: (true_obliquity, mean_obliquity, nutation_longitude, nutation_obliquity, 0, 0)
+            - Return flag
+    """
+    import math
+    from .state import get_timescale
+
+    ts = get_timescale()
+    t = ts.ut1_jd(jd)
+
+    # Calculate Julian centuries from J2000.0
+    T = (jd - 2451545.0) / 36525.0
+
+    # Mean obliquity of the ecliptic (IAU 2006)
+    # Lieske, J.H., et al. (1977) and IAU 2006 refined values
+    eps0_arcsec = (
+        84381.406
+        - 46.836769 * T
+        - 0.0001831 * T**2
+        + 0.00200340 * T**3
+        - 0.000000576 * T**4
+        - 0.0000000434 * T**5
+    )
+    mean_obliquity = eps0_arcsec / 3600.0  # Convert to degrees
+
+    # Nutation using simplified IAU 2000B model
+    # Mean longitude of the ascending node of the Moon
+    omega = math.radians(125.04452 - 1934.136261 * T + 0.0020708 * T**2 + T**3 / 450000)
+    # Mean longitude of the Sun
+    L = math.radians(280.4665 + 36000.7698 * T)
+    # Mean longitude of the Moon
+    Lp = math.radians(218.3165 + 481267.8813 * T)
+
+    # Nutation in longitude (simplified)
+    delta_psi = (
+        -17.20 * math.sin(omega)
+        - 1.32 * math.sin(2 * L)
+        - 0.23 * math.sin(2 * Lp)
+        + 0.21 * math.sin(2 * omega)
+    ) / 3600.0  # Convert arcsec to degrees
+
+    # Nutation in obliquity (simplified)
+    delta_eps = (
+        9.20 * math.cos(omega)
+        + 0.57 * math.cos(2 * L)
+        + 0.10 * math.cos(2 * Lp)
+        - 0.09 * math.cos(2 * omega)
+    ) / 3600.0  # Convert arcsec to degrees
+
+    # True obliquity = mean obliquity + nutation in obliquity
+    true_obliquity = mean_obliquity + delta_eps
+
+    # Return format: (true_obliquity, mean_obliquity, nutation_lon, nutation_obl, 0, 0)
+    return (true_obliquity, mean_obliquity, delta_psi, delta_eps, 0.0, 0.0), iflag
 
 
 def _calc_body(
@@ -1112,9 +1186,25 @@ def _calc_body(
     else:
         # Apparent position
         if observer_is_ssb or (iflag & SEFLG_HELCTR):
-            # For SSB or Heliocentric, use geometric (get_vector)
-            # This avoids issues with Skyfield's observe() returning km for SPICE kernels
+            # For SSB or Heliocentric, we need to apply light-time correction
+            # This matches pyswisseph behavior: position shows where object WAS
+            # when light left it to reach the observer (Sun for heliocentric)
+            import numpy as np
+
+            # Speed of light in AU/day
+            C_AU_PER_DAY = 173.1446326847
+
+            # Get initial geometric position
             p, v = get_vector(t)
+
+            # Iterative light-time correction (2-3 iterations is enough)
+            for _ in range(3):
+                dist = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
+                light_time = dist / C_AU_PER_DAY
+                ts_lt = get_timescale()
+                t_retarded = ts_lt.tdb_jd(t.tdb - light_time)
+                p, v = get_vector(t_retarded)
+
             from skyfield.positionlib import ICRF
 
             pos = ICRF(p, v, t=t, center=399)

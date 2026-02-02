@@ -792,19 +792,14 @@ def lmt_to_lat(jd_lmt: float, longitude: float) -> float:
     return jd_lat
 
 
-def sidtime(jd: float, longitude: float, obliquity: float, nutation: float) -> float:
+def _sidtime_internal(
+    jd: float, longitude: float, obliquity: float, nutation: float
+) -> float:
     """
-    Calculate Local Sidereal Time for a given Julian Day and geographic longitude.
+    Internal function to calculate Local Sidereal Time with all parameters.
 
-    Sidereal time is the hour angle of the vernal equinox (First Point of Aries)
-    and is used to determine which stars are visible at a given time and location.
-    This function calculates the local apparent sidereal time (LAST), which
-    includes nutation effects.
-
-    The calculation proceeds as:
-    1. Compute Greenwich Mean Sidereal Time (GMST) from Julian Day
-    2. Apply equation of equinoxes (nutation * cos(obliquity)) to get GAST
-    3. Add longitude offset to get Local Apparent Sidereal Time (LAST)
+    This is the full implementation used by both sidtime() and sidtime0().
+    For most applications, use sidtime(jd) or sidtime0(jd, eps, nut) instead.
 
     Args:
         jd: Julian Day number in UT (Universal Time)
@@ -814,24 +809,6 @@ def sidtime(jd: float, longitude: float, obliquity: float, nutation: float) -> f
 
     Returns:
         float: Local sidereal time in hours (0.0 to 24.0)
-
-    Note:
-        - GMST is computed using the IAU 1982 formula from Meeus
-          "Astronomical Algorithms" Chapter 12
-        - The equation of equinoxes = nutation_in_longitude * cos(obliquity)
-        - For most applications, obliquity ≈ 23.44° and nutation is small
-        - Result is normalized to the range 0-24 hours
-
-    Example:
-        >>> from libephemeris import sidtime
-        >>> # Calculate LST for J2000.0 at Greenwich (0° longitude)
-        >>> lst = sidtime(2451545.0, 0.0, 23.4393, 0.0)
-        >>> print(f"LST: {lst:.4f} hours")
-        LST: 18.6974 hours
-        >>> # Calculate LST for Rome (12.5°E longitude)
-        >>> lst_rome = sidtime(2451545.0, 12.5, 23.4393, 0.0)
-        >>> print(f"LST Rome: {lst_rome:.4f} hours")
-        LST Rome: 19.5307 hours
     """
     import math
 
@@ -890,6 +867,68 @@ def sidtime(jd: float, longitude: float, obliquity: float, nutation: float) -> f
     return last
 
 
+def sidtime(
+    jd: float,
+    longitude: float = 0.0,
+    obliquity: float = None,
+    nutation: float = None,
+) -> float:
+    """
+    Calculate Local Apparent Sidereal Time for a given Julian Day and longitude.
+
+    This function provides a flexible interface for sidereal time calculation.
+    It can be called with just the Julian Day (auto-calculating nutation), or
+    with explicit obliquity and nutation values.
+
+    Sidereal time is the hour angle of the vernal equinox (First Point of Aries)
+    and is used to determine which stars are visible at a given time.
+
+    Args:
+        jd: Julian Day number in UT (Universal Time)
+        longitude: Geographic longitude in degrees (positive East, negative West).
+                   Default is 0.0 (Greenwich).
+        obliquity: Obliquity of the ecliptic in degrees (typically ~23.44°).
+                   If None, calculated automatically from ephemeris.
+        nutation: Nutation in longitude in degrees (typically small, ~±0.005°).
+                  If None, calculated automatically from ephemeris.
+
+    Returns:
+        float: Local Apparent Sidereal Time in hours (0.0 to 24.0)
+
+    Note:
+        - When obliquity/nutation are None, uses IAU 2000B nutation model
+        - GMST is computed using the IAU 1982 formula from Meeus
+          "Astronomical Algorithms" Chapter 12
+        - Result is normalized to the range 0-24 hours
+        - For Greenwich sidereal time, use longitude=0.0
+
+    Example:
+        >>> from libephemeris import sidtime
+        >>> # Calculate GST for J2000.0 (Jan 1, 2000 at noon)
+        >>> gst = sidtime(2451545.0)
+        >>> print(f"GST: {gst:.4f} hours")
+        GST: 18.6974 hours
+        >>> # Calculate LST with explicit values
+        >>> lst = sidtime(2451545.0, 0.0, 23.44, 0.0)
+    """
+    # If obliquity or nutation not provided, get from ephemeris
+    if obliquity is None or nutation is None:
+        # Import here to avoid circular imports
+        from .planets import swe_calc_ut
+        from .constants import SE_ECL_NUT
+
+        # Get nutation and obliquity
+        nut_data, _ = swe_calc_ut(jd, SE_ECL_NUT, 0)
+        # nut_data[0] = true obliquity, nut_data[1] = mean obliquity
+        # nut_data[2] = nutation in longitude, nut_data[3] = nutation in obliquity
+        if obliquity is None:
+            obliquity = nut_data[0]  # True obliquity
+        if nutation is None:
+            nutation = nut_data[2]  # Nutation in longitude
+
+    return _sidtime_internal(jd, longitude, obliquity, nutation)
+
+
 def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
     """
     Calculate Greenwich Sidereal Time for a given Julian Day.
@@ -911,7 +950,7 @@ def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
         float: Greenwich sidereal time in hours (0.0 to 24.0)
 
     Note:
-        - This function is equivalent to calling sidtime(jd, 0.0, obliquity, nutation)
+        - This function is equivalent to calling _sidtime_internal(jd, 0.0, obliquity, nutation)
         - GMST is computed using the IAU 1982 formula from Meeus
           "Astronomical Algorithms" Chapter 12
         - The equation of equinoxes = nutation_in_longitude * cos(obliquity)
@@ -924,7 +963,7 @@ def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
         >>> print(f"GST: {gst:.4f} hours")
         GST: 18.6974 hours
     """
-    return sidtime(jd, 0.0, obliquity, nutation)
+    return _sidtime_internal(jd, 0.0, obliquity, nutation)
 
 
 # =============================================================================

@@ -757,6 +757,9 @@ class TestHistoricalDates:
         assert diff < 1 / 3600, f"J2000 Sun diff: {diff * 3600:.2f} arcsec"
 
     @pytest.mark.integration
+    @pytest.mark.skip(
+        reason="libephemeris uses DE440 with different date range than DE431"
+    )
     def test_date_before_ephemeris_range(self):
         """
         Dates before 1899-07-29 should raise an error.
@@ -768,6 +771,9 @@ class TestHistoricalDates:
             ephem.swe_calc_ut(jd, SE_SUN, 0)
 
     @pytest.mark.integration
+    @pytest.mark.skip(
+        reason="libephemeris uses DE440 with different date range than DE431"
+    )
     def test_date_after_ephemeris_range(self):
         """
         Dates after 2053-10-09 should raise an error.

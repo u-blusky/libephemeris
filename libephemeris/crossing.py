@@ -679,7 +679,9 @@ def swe_mooncross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> flo
     raise RuntimeError("Maximum iterations reached in moon crossing calculation")
 
 
-def swe_mooncross_node_ut(jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
+def swe_mooncross_node_ut(
+    jd_ut: float, flag: int = SEFLG_SWIEPH
+) -> Tuple[float, float, float]:
     """
     Find when the Moon crosses its own orbital node (ascending or descending).
 
@@ -694,7 +696,8 @@ def swe_mooncross_node_ut(jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
         flag: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
-        float: Julian Day of node crossing (UT)
+        tuple: (jd_cross, xlon, xlat) - Julian Day of crossing, ecliptic longitude,
+               and ecliptic latitude (should be ~0) at the crossing moment
 
     Raises:
         RuntimeError: If convergence fails or calculation error occurs
@@ -715,7 +718,7 @@ def swe_mooncross_node_ut(jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
 
     Example:
         >>> # Find next lunar node crossing
-        >>> jd_node = swe_mooncross_node_ut(jd_now)
+        >>> jd_node, xlon, xlat = swe_mooncross_node_ut(jd_now)
         >>> # Check if ascending or descending by examining latitude velocity
         >>> pos, _ = swe_calc_ut(jd_node, SE_MOON, SEFLG_SPEED)
         >>> is_ascending = pos[4] > 0  # positive lat velocity = ascending
@@ -739,10 +742,10 @@ def swe_mooncross_node_ut(jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
     # Initial time estimate to reach latitude = 0
     dt_guess = -lat / lat_speed
 
-    # If dt_guess is negative or very small, the crossing is behind us or
-    # we're right at one. We need to find the NEXT crossing in the future.
+    # If dt_guess is negative, very small, OR too large (> half nodal month),
+    # the linear estimate is unreliable. Search for the actual crossing.
     # The strategy: check at multiple points to bracket the next crossing
-    if dt_guess < 0.1:  # Less than ~2.4 hours into future
+    if dt_guess < 0.1 or dt_guess > HALF_NODAL_MONTH:
         # Search in steps to find where latitude changes sign
         # The next crossing is within 0 to ~13.6 days
         jd_search_start = jd_ut + 0.5  # Start half day ahead to avoid current crossing
@@ -783,7 +786,8 @@ def swe_mooncross_node_ut(jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
         if abs(lat) < NR_TOLERANCE_MOON:
             # Make sure we found a crossing that's actually in the future
             if jd > jd_ut + 0.001:  # At least ~1.4 minutes in future
-                return jd
+                # Return tuple (jd_cross, xlon, xlat) matching pyswisseph API
+                return (jd, pos[0], lat)
             # If we found a crossing too close to start, look for next one
             jd = jd + HALF_NODAL_MONTH / 2
             continue
@@ -804,7 +808,9 @@ def swe_mooncross_node_ut(jd_ut: float, flag: int = SEFLG_SWIEPH) -> float:
     raise RuntimeError("Maximum iterations reached in moon node crossing calculation")
 
 
-def swe_mooncross_node(jd_tt: float, flag: int = SEFLG_SWIEPH) -> float:
+def swe_mooncross_node(
+    jd_tt: float, flag: int = SEFLG_SWIEPH
+) -> Tuple[float, float, float]:
     """
     Find when the Moon crosses its own orbital node (TT version).
 
@@ -822,7 +828,8 @@ def swe_mooncross_node(jd_tt: float, flag: int = SEFLG_SWIEPH) -> float:
         flag: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
-        float: Julian Day of node crossing (TT)
+        tuple: (jd_cross, xlon, xlat) - Julian Day of crossing (TT), ecliptic longitude,
+               and ecliptic latitude (should be ~0) at the crossing moment
 
     Raises:
         RuntimeError: If convergence fails or calculation error occurs
@@ -834,7 +841,7 @@ def swe_mooncross_node(jd_tt: float, flag: int = SEFLG_SWIEPH) -> float:
 
     Example:
         >>> # Find next lunar node crossing using TT
-        >>> jd_node_tt = swe_mooncross_node(jd_tt_now)
+        >>> jd_node_tt, xlon, xlat = swe_mooncross_node(jd_tt_now)
     """
     # Half nodal month - time between successive node crossings
     HALF_NODAL_MONTH = 13.6
@@ -853,8 +860,9 @@ def swe_mooncross_node(jd_tt: float, flag: int = SEFLG_SWIEPH) -> float:
     # Initial time estimate to reach latitude = 0
     dt_guess = -lat / lat_speed
 
-    # If dt_guess is negative or very small, the crossing is behind us
-    if dt_guess < 0.1:  # Less than ~2.4 hours into future
+    # If dt_guess is negative, very small, OR too large (> half nodal month),
+    # the linear estimate is unreliable. Search for the actual crossing.
+    if dt_guess < 0.1 or dt_guess > HALF_NODAL_MONTH:
         # Search in steps to find where latitude changes sign
         jd_search_start = jd_tt + 0.5
 
@@ -888,7 +896,8 @@ def swe_mooncross_node(jd_tt: float, flag: int = SEFLG_SWIEPH) -> float:
         # Check convergence (< 0.05 arcsecond for Moon)
         if abs(lat) < NR_TOLERANCE_MOON:
             if jd > jd_tt + 0.001:
-                return jd
+                # Return tuple (jd_cross, xlon, xlat) matching pyswisseph API
+                return (jd, pos[0], lat)
             jd = jd + HALF_NODAL_MONTH / 2
             continue
 

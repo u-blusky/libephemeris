@@ -623,10 +623,10 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="beCen",
         hip_number=68702,
         data=StarData(
-            ra_j2000=211.670617,  # 14h 06m 40.9s
-            dec_j2000=-60.373035,  # -60° 22' 23"
-            pm_ra=-0.03366,  # -33.66 mas/yr
-            pm_dec=-0.02511,  # -25.11 mas/yr
+            ra_j2000=210.955856,  # 14h 03m 49.4s (ICRS from sefstars.txt)
+            dec_j2000=-60.373035,  # -60° 22' 22.9"
+            pm_ra=-0.00000924,  # -33.27 mas/yr converted to deg/yr
+            pm_dec=-0.00000643,  # -23.16 mas/yr converted to deg/yr
         ),
         magnitude=0.61,
     ),
@@ -1474,10 +1474,10 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="gaCnc",
         hip_number=43103,
         data=StarData(
-            ra_j2000=131.171248,  # 08h 44m 41.1s (Gamma Cancri)
-            dec_j2000=21.468501,  # +21° 28' 07"
-            pm_ra=-0.10759,  # -107.59 mas/yr
-            pm_dec=-0.04358,  # -43.58 mas/yr
+            ra_j2000=130.821451,  # 08h 43m 17.1s (Gamma Cancri, from sefstars.txt)
+            dec_j2000=21.468500,  # +21° 28' 06.6"
+            pm_ra=-0.0000287528,  # -103.51 mas/yr converted to deg/yr
+            pm_dec=-0.0000109667,  # -39.48 mas/yr converted to deg/yr
         ),
         magnitude=4.66,
     ),
@@ -1485,12 +1485,12 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         id=SE_ASELLUS_AUSTRALIS,
         name="Asellus Australis",
         nomenclature="deCnc",
-        hip_number=43834,
+        hip_number=42911,  # Corrected HIP number for Delta Cancri
         data=StarData(
-            ra_j2000=133.847504,  # 08h 55m 23.4s (Delta Cancri)
-            dec_j2000=18.154309,  # +18° 09' 15"
-            pm_ra=-0.01787,  # -17.87 mas/yr
-            pm_dec=-0.22920,  # -229.20 mas/yr
+            ra_j2000=131.171247,  # 08h 44m 41.1s (Delta Cancri, from sefstars.txt)
+            dec_j2000=18.154306,  # +18° 09' 15.5"
+            pm_ra=-0.0000049083,  # -17.67 mas/yr converted to deg/yr
+            pm_dec=-0.0000636833,  # -229.26 mas/yr converted to deg/yr
         ),
         magnitude=3.94,
     ),
@@ -1569,10 +1569,10 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="alCap",
         hip_number=100064,
         data=StarData(
-            ra_j2000=304.513566,  # 20h 18m 03.3s (Alpha2 Capricorni)
-            dec_j2000=-12.544852,  # -12° 32' 41"
-            pm_ra=0.06258,  # 62.58 mas/yr
-            pm_dec=0.00203,  # 2.03 mas/yr
+            ra_j2000=304.411958,  # 20h 17m 38.9s (Alpha1 Capricorni, from sefstars.txt)
+            dec_j2000=-12.508211,  # -12° 30' 29.6"
+            pm_ra=0.0000063833,  # 22.98 mas/yr converted to deg/yr
+            pm_dec=0.0000003556,  # 1.28 mas/yr converted to deg/yr
         ),
         magnitude=3.57,
     ),
@@ -1664,10 +1664,10 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="alPsc",
         hip_number=7097,
         data=StarData(
-            ra_j2000=22.870873,  # 01h 31m 29.0s (Alpha Piscium)
-            dec_j2000=2.763735,  # +02° 45' 49"
-            pm_ra=-0.01812,  # -18.12 mas/yr
-            pm_dec=-0.00786,  # -7.86 mas/yr
+            ra_j2000=30.511749,  # 02h 02m 02.8s (Alpha Piscium, from sefstars.txt)
+            dec_j2000=2.763761,  # +02° 45' 49.5"
+            pm_ra=0.0000090139,  # 32.45 mas/yr converted to deg/yr
+            pm_dec=0.0000000111,  # 0.04 mas/yr converted to deg/yr
         ),
         magnitude=3.82,
     ),

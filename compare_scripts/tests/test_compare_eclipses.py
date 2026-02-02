@@ -106,10 +106,12 @@ class TestEclipseAttributes:
         """Test solar eclipse attribute calculations."""
         # 2024 total solar eclipse
         jd = swe.julday(2024, 4, 8, 18.0)
-        geopos = (-99.0, 25.0, 0)  # Mexico path
+        geopos = (-99.0, 25.0, 0)  # Mexico path: (lon, lat, alt)
 
-        attr_swe = swe.sol_eclipse_how(jd, 0, geopos)
-        attr_py = ephem.sol_eclipse_how(jd, 0, geopos)
+        # pyswisseph signature: sol_eclipse_how(tjdut, geopos, flags)
+        attr_swe = swe.sol_eclipse_how(jd, geopos, 0)
+        # libephemeris signature: swe_sol_eclipse_how(tjd_ut, ifl, geopos)
+        attr_py = ephem.swe_sol_eclipse_how(jd, 0, geopos)
 
         # Compare obscuration/magnitude
         # attr[0] = fraction of solar diameter covered

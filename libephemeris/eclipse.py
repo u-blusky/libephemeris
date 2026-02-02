@@ -1142,7 +1142,7 @@ def sol_eclipse_when_glob(
     jd_start: float,
     flags: int = SEFLG_SWIEPH,
     eclipse_type: int = 0,
-) -> Tuple[Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Find the next global solar eclipse after a given date.
 
@@ -1160,9 +1160,9 @@ def sol_eclipse_when_glob(
             - 0: Any eclipse type (default)
 
     Returns:
-        Tuple containing:
-            - times: Tuple of 10 floats with eclipse phase times (JD UT),
-                     matching pyswisseph format:
+        Tuple containing (matching pyswisseph format):
+            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
+            - tret: Tuple of 10 floats with eclipse phase times (JD UT):
                 [0]: Time of maximum eclipse
                 [1]: Time of first contact (partial begins)
                 [2]: Time of second contact (central phase begins, or 0)
@@ -1173,7 +1173,6 @@ def sol_eclipse_when_glob(
                 [7]: Time when annular-total eclipse starts (or 0)
                 [8]: Time when annular-total eclipse ends (or 0)
                 [9]: Reserved (0)
-            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
 
     Raises:
         RuntimeError: If no eclipse found within search limit
@@ -1194,7 +1193,7 @@ def sol_eclipse_when_glob(
         >>> # Find next total solar eclipse after Jan 1, 2024
         >>> from libephemeris import julday, SE_ECL_TOTAL
         >>> jd = julday(2024, 1, 1, 0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd, eclipse_type=SE_ECL_TOTAL)
         >>> print(f"Total eclipse at JD {times[0]:.5f}")
 
     References:
@@ -1249,7 +1248,7 @@ def sol_eclipse_when_glob(
 
                     # Calculate phase times using high-precision Besselian method
                     times = _calculate_eclipse_phases(jd_max_refined, ecl_type)
-                    return times, ecl_type
+                    return ecl_type, times
 
         # Advance to next lunation
         jd = jd_new_moon + 25  # Skip ahead ~25 days to ensure we find next New Moon
@@ -2883,7 +2882,7 @@ def sol_eclipse_how(
     lon: float,
     altitude: float = 0.0,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a solar eclipse at a specific location and time.
 
@@ -2908,7 +2907,7 @@ def swe_sol_eclipse_how(
     tjd_ut: float,
     ifl: int,
     geopos: Sequence[float],
-) -> Tuple[Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a solar eclipse at a specific location and time.
 
@@ -3051,7 +3050,7 @@ def swe_sol_eclipse_how(
 
     # If Sun is below horizon, no visible eclipse (20 elements per pyswisseph spec)
     if sun_altitude < -1.0:  # Allow for refraction near horizon
-        return (
+        return 0, (
             0.0,
             0.0,
             0.0,
@@ -3072,7 +3071,7 @@ def swe_sol_eclipse_how(
             0.0,
             0.0,
             0.0,
-        ), 0
+        )
 
     # Calculate angular separation between Sun and Moon
     separation = sun_app.separation_from(moon_app).degrees
@@ -3095,7 +3094,7 @@ def swe_sol_eclipse_how(
     sum_radii = sun_angular_radius + moon_angular_radius
     if separation >= sum_radii:
         # No eclipse - Sun and Moon too far apart (20 elements per pyswisseph spec)
-        return (
+        return 0, (
             0.0,  # [0] magnitude
             ratio,  # [1] ratio
             0.0,  # [2] obscuration
@@ -3116,7 +3115,7 @@ def swe_sol_eclipse_how(
             0.0,  # [17] reserved
             0.0,  # [18] reserved
             0.0,  # [19] reserved
-        ), 0
+        )
 
     # Calculate eclipse magnitude
     # Magnitude = fraction of Sun's diameter covered by Moon
@@ -3237,7 +3236,7 @@ def swe_sol_eclipse_how(
         0.0,  # [19] reserved
     )
 
-    return attr, eclipse_type
+    return eclipse_type, attr
 
 
 def swe_sol_eclipse_how_details(
@@ -4181,7 +4180,7 @@ def lun_eclipse_when(
     jd_start: float,
     flags: int = SEFLG_SWIEPH,
     eclipse_type: int = 0,
-) -> Tuple[Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Find the next lunar eclipse after a given date.
 
@@ -4198,8 +4197,9 @@ def lun_eclipse_when(
             - 0: Any eclipse type (default)
 
     Returns:
-        Tuple containing:
-            - times: Tuple of 8 floats with eclipse phase times (JD UT):
+        Tuple containing (matching pyswisseph format):
+            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
+            - tret: Tuple of 8 floats with eclipse phase times (JD UT):
                 [0]: Time of maximum eclipse
                 [1]: Time of partial eclipse beginning (Moon enters umbra)
                 [2]: Time of total eclipse beginning (or 0 if not total)
@@ -4208,7 +4208,6 @@ def lun_eclipse_when(
                 [5]: Time of penumbral eclipse beginning
                 [6]: Time of penumbral eclipse ending
                 [7]: Reserved (0)
-            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
 
     Raises:
         RuntimeError: If no eclipse found within search limit
@@ -4228,7 +4227,7 @@ def lun_eclipse_when(
         >>> # Find next total lunar eclipse after Jan 1, 2024
         >>> from libephemeris import julday, SE_ECL_TOTAL
         >>> jd = julday(2024, 1, 1, 0)
-        >>> times, ecl_type = lun_eclipse_when(jd, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd, eclipse_type=SE_ECL_TOTAL)
         >>> print(f"Total lunar eclipse at JD {times[0]:.5f}")
 
     References:
@@ -4297,7 +4296,7 @@ def lun_eclipse_when(
                         penumbra_radius,
                         moon_lat_max,
                     )
-                    return times, ecl_type
+                    return ecl_type, times
 
         # Advance to next lunation
         jd = jd_full_moon + 25  # Skip ahead ~25 days to ensure we find next Full Moon

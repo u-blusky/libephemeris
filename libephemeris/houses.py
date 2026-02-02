@@ -73,7 +73,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import List
+from typing import List, Tuple, Union
 from .constants import *
 from .constants import SEFLG_SIDEREAL, SEFLG_SPEED
 from .state import get_timescale
@@ -1136,11 +1136,14 @@ def swe_houses_armc(
     if mc < 0:
         mc += 360.0
 
+    # Quadrant correction: MC should be in the same half of the ecliptic as ARMC
+    # ARMC in (90, 270] -> MC should be in (90, 270]
+    # ARMC in (270, 360] or [0, 90] -> MC should be in (270, 360] or [0, 90]
     if 90.0 < armc_active <= 270.0:
-        if mc < 90.0 or mc > 270.0:
+        if mc <= 90.0 or mc > 270.0:
             mc += 180.0
     elif armc_active > 270.0:
-        if mc < 270.0:
+        if mc <= 270.0:
             mc += 180.0
     elif armc_active <= 90.0:
         if mc > 90.0:
@@ -3504,8 +3507,8 @@ def house_pos(
     armc: float,
     lat: float,
     obliquity: float,
-    hsys: int,
-    lon: float,
+    hsys_or_objcoord: Union[int, bytes, str, Tuple[float, float]],
+    lon_or_hsys: Union[float, bytes, str] = None,
     lat_body: float = 0.0,
 ) -> float:
     """
@@ -3515,15 +3518,23 @@ def house_pos(
     and the decimal part indicates the position within the house
     (0.0 = start of cusp, 0.999... = end of house, just before next cusp).
 
-    This function is compatible with Swiss Ephemeris swe_house_pos().
+    This function supports two calling conventions:
+
+    1. Swiss Ephemeris compatible (5 args):
+       house_pos(armc, lat, obliquity, objcoord, hsys)
+       where objcoord is a tuple (lon, lat_body) and hsys is bytes/str
+
+    2. Extended signature (6 args):
+       house_pos(armc, lat, obliquity, hsys, lon, lat_body)
+       where hsys is int/bytes/str and lon/lat_body are separate floats
 
     Args:
         armc: Right Ascension of Medium Coeli (ARMC) in degrees (0-360)
         lat: Geographic latitude in degrees (positive North, negative South)
         obliquity: True obliquity of the ecliptic in degrees
-        hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
-        lon: Ecliptic longitude of the body in degrees (0-360)
-        lat_body: Ecliptic latitude of the body in degrees (default 0.0)
+        hsys_or_objcoord: Either house system (int/bytes/str) or objcoord tuple (lon, lat)
+        lon_or_hsys: Either body longitude (float) or house system (bytes/str)
+        lat_body: Ecliptic latitude of the body in degrees (only for 6-arg form)
 
     Returns:
         Decimal value where:
@@ -3531,13 +3542,36 @@ def house_pos(
             - Decimal part (0.0-0.999...): Position within house
 
     Example:
-        >>> # Sun at 15° Aries, Placidus houses, Rome
+        >>> # Sun at 15° Aries, Placidus houses, Rome (5-arg pyswisseph form)
+        >>> pos = house_pos(292.957, 41.9, 23.4393, (15.0, 0.0), b'P')
+        >>> # Or 6-arg extended form:
         >>> pos = house_pos(292.957, 41.9, 23.4393, ord('P'), 15.0, 0.0)
         >>> house = int(pos)  # House number (e.g., 10)
         >>> position = pos - house  # Position within house (e.g., 0.5 = halfway)
     """
+    # Detect which calling convention is used
+    if isinstance(hsys_or_objcoord, tuple):
+        # 5-arg pyswisseph form: (armc, lat, obliquity, objcoord, hsys)
+        objcoord = hsys_or_objcoord
+        hsys = lon_or_hsys if lon_or_hsys is not None else b"P"
+        lon = objcoord[0]
+        lat_body = objcoord[1] if len(objcoord) > 1 else 0.0
+    else:
+        # 6-arg form: (armc, lat, obliquity, hsys, lon, lat_body)
+        hsys = hsys_or_objcoord
+        lon = lon_or_hsys if lon_or_hsys is not None else 0.0
+        # lat_body already set from parameter
+
+    # Convert hsys to int if needed
+    if isinstance(hsys, bytes):
+        hsys_int = hsys[0]
+    elif isinstance(hsys, str):
+        hsys_int = ord(hsys[0])
+    else:
+        hsys_int = hsys
+
     # Get house cusps using swe_houses_armc
-    cusps, ascmc = swe_houses_armc(armc, lat, obliquity, hsys)
+    cusps, ascmc = swe_houses_armc(armc, lat, obliquity, hsys_int)
 
     # cusps is a 12-element tuple (houses 1-12, 0-indexed in tuple)
     # We need to find which house contains the given longitude
@@ -3587,14 +3621,22 @@ def swe_house_pos(
     armc: float,
     lat: float,
     obliquity: float,
-    hsys: int,
-    lon: float,
+    hsys_or_objcoord: Union[int, bytes, str, Tuple[float, float]],
+    lon_or_hsys: Union[float, bytes, str] = None,
     lat_body: float = 0.0,
 ) -> float:
     """
     Determine in which house a celestial body is located.
 
-    Swiss Ephemeris compatible function. This is an alias for house_pos().
+    This function supports two calling conventions:
+
+    1. Swiss Ephemeris compatible (5 args):
+       swe_house_pos(armc, lat, obliquity, objcoord, hsys)
+       where objcoord is a tuple (lon, lat_body) and hsys is bytes/str
+
+    2. Extended signature (6 args):
+       swe_house_pos(armc, lat, obliquity, hsys, lon, lat_body)
+       where hsys is int/bytes/str and lon/lat_body are separate floats
 
     Returns a decimal value where the integer part is the house number (1-12)
     and the decimal part indicates the position within the house.
@@ -3603,14 +3645,15 @@ def swe_house_pos(
         armc: Right Ascension of Medium Coeli (ARMC) in degrees
         lat: Geographic latitude in degrees
         obliquity: True obliquity of the ecliptic in degrees
-        hsys: House system identifier
-        lon: Ecliptic longitude of the body in degrees
-        lat_body: Ecliptic latitude of the body in degrees (default 0.0)
+        hsys_or_objcoord: Either house system (int/bytes/str) or objcoord tuple
+        lon_or_hsys: Either body longitude (float) or house system (bytes/str)
+        lat_body: Body's ecliptic latitude in degrees (only for 6-arg form)
 
     Returns:
         Decimal value: integer part = house number, decimal part = position within house
     """
-    return house_pos(armc, lat, obliquity, hsys, lon, lat_body)
+    # Delegate to house_pos which now supports both calling conventions
+    return house_pos(armc, lat, obliquity, hsys_or_objcoord, lon_or_hsys, lat_body)
 
 
 def gauquelin_sector(
