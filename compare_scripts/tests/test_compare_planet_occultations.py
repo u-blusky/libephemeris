@@ -274,38 +274,34 @@ class TestPlanetOccultFunctionSignatures:
     @pytest.mark.comparison
     def test_glob_accepts_all_parameters(self, jd_2024):
         """Test that glob function accepts all documented parameters."""
-        # This should not raise TypeError - may raise RuntimeError or ValueError
-        # depending on whether event is found or parameters are invalid
-        try:
-            # Use a known-invalid search to terminate quickly
+        # This should not raise TypeError - uses same planet to trigger
+        # quick validation error while verifying all parameters are accepted
+        with pytest.raises(ValueError, match="cannot be the same"):
             pyephem.planet_occult_when_glob(
                 jd_2024,  # tjdut
                 SE_VENUS,  # occulting_planet
-                0,  # occulted_planet (0 for star)
-                "Regulus",  # starname
+                SE_VENUS,  # occulted_planet (same = validation error)
+                "",  # starname
                 SEFLG_SWIEPH,  # flags
                 0,  # direction (forward)
             )
-        except (RuntimeError, ValueError):
-            # Expected - either no occultation found or quick termination
-            pass
 
     @pytest.mark.comparison
     def test_loc_accepts_all_parameters(self, jd_2024):
         """Test that loc function accepts all documented parameters."""
-        try:
+        # Uses same planet to trigger quick validation error
+        # while verifying all parameters are accepted
+        with pytest.raises(ValueError, match="cannot be the same"):
             pyephem.planet_occult_when_loc(
                 jd_2024,  # jd_start
                 SE_VENUS,  # occulting_planet
-                0,  # occulted_planet (0 for star)
-                "Regulus",  # star_name
+                SE_VENUS,  # occulted_planet (same = validation error)
+                "",  # star_name
                 40.7128,  # lat
                 -74.0060,  # lon
                 0,  # altitude
                 SEFLG_SWIEPH,  # flags
             )
-        except (RuntimeError, ValueError):
-            pass
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("planet_id,planet_name", OCCULTING_PLANETS)

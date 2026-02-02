@@ -1,0 +1,1 @@
+# Fixed stars tests package

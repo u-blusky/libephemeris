@@ -115,14 +115,25 @@ libephemeris = ["py.typed", "seorbel.txt"]
 format = "ruff format ."
 format-black = "black libephemeris tests"
 lint = "ruff check . --fix"
-test = "pytest"
-"test:progress" = "pytest --no-header -q"
-"test:fast" = "pytest -n auto"
-"test:unit" = "pytest tests/ -v"
-"test:compare" = "pytest compare_scripts/tests/ -v"
-"compare:fast" = "pytest compare_scripts/tests/ -n auto -m \"not slow\""
-"compare:quick" = "pytest compare_scripts/tests/ -v -m \"not slow\""
-coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"
+
+# Test commands - fast variants exclude @pytest.mark.slow tests
+test = "pytest -m \"not slow\""
+"test:full" = "pytest"
+"test:progress" = "pytest --no-header -q -m \"not slow\""
+"test:fast" = "pytest -n auto -m \"not slow\""
+
+# Unit tests (tests/ directory)
+"test:unit" = "pytest tests/ -v -m \"not slow\""
+"test:unit:full" = "pytest tests/ -v"
+"test:unit:fast" = "pytest tests/ -n auto -m \"not slow\""
+
+# Comparison tests (compare_scripts/tests/ directory)
+"test:compare" = "pytest compare_scripts/tests/ -v -m \"not slow\""
+"test:compare:full" = "pytest compare_scripts/tests/ -v"
+"test:compare:fast" = "pytest compare_scripts/tests/ -n auto -m \"not slow\""
+
+coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html -m \"not slow\""
+"coverage:full" = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"
 typecheck = "mypy libephemeris"
 pre-commit-install = "pre-commit install"
 pre-commit-run = "pre-commit run --all-files"
