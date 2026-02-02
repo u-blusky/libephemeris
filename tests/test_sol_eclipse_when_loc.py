@@ -40,7 +40,7 @@ class TestSweSwolEclipseWhenLocSignature:
         jd_start = julday(2024, 1, 1, 0)
         geopos = [-96.797, 32.7767, 0]  # Dallas
 
-        tret, attr, retflag = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
+        retflag, tret, attr = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
 
         # tret should be 7-element tuple
         assert len(tret) == 7
@@ -58,7 +58,7 @@ class TestSweSwolEclipseWhenLocSignature:
         jd_start = julday(2024, 1, 1, 0)
         geopos = [-96.797, 32.7767, 0]
 
-        tret, attr, retflag = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
+        retflag, tret, attr = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
         assert tret[0] > jd_start
 
     def test_accepts_geopos_as_tuple(self):
@@ -66,7 +66,7 @@ class TestSweSwolEclipseWhenLocSignature:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (-96.797, 32.7767, 0)
 
-        tret, attr, retflag = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
+        retflag, tret, attr = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
         assert tret[0] > jd_start
 
     def test_invalid_geopos_raises_error(self):
@@ -93,7 +93,7 @@ class TestSweSwolEclipseWhenLocDallasApril2024:
 
     def test_finds_april_2024_eclipse(self):
         """Test that function finds the April 8, 2024 eclipse."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -109,7 +109,7 @@ class TestSweSwolEclipseWhenLocDallasApril2024:
 
     def test_dallas_eclipse_is_total(self):
         """Test that Dallas sees a total eclipse."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -118,7 +118,7 @@ class TestSweSwolEclipseWhenLocDallasApril2024:
 
     def test_dallas_maximum_time_accuracy(self):
         """Test maximum time is within 0.001 days (~1.5 minutes) of expected."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -133,7 +133,7 @@ class TestSweSwolEclipseWhenLocDallasApril2024:
 
     def test_dallas_has_all_contacts(self):
         """Test that total eclipse has all four contacts."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -145,7 +145,7 @@ class TestSweSwolEclipseWhenLocDallasApril2024:
 
     def test_dallas_contacts_in_order(self):
         """Test that contact times are in chronological order."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -159,7 +159,7 @@ class TestSweSwolEclipseWhenLocDallasApril2024:
 
     def test_dallas_visibility_flags(self):
         """Test that visibility flags are set correctly."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -181,7 +181,7 @@ class TestSweSwolEclipseWhenLocNYCApril2024:
 
     def test_finds_april_2024_eclipse(self):
         """Test that function finds the April 8, 2024 eclipse from NYC."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_nyc
         )
 
@@ -193,7 +193,7 @@ class TestSweSwolEclipseWhenLocNYCApril2024:
 
     def test_nyc_eclipse_is_partial(self):
         """Test that NYC sees a partial eclipse."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_nyc
         )
 
@@ -203,7 +203,7 @@ class TestSweSwolEclipseWhenLocNYCApril2024:
 
     def test_nyc_obscuration_approximately_90_percent(self):
         """Test that NYC has approximately 90% obscuration."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_nyc
         )
 
@@ -214,7 +214,7 @@ class TestSweSwolEclipseWhenLocNYCApril2024:
 
     def test_nyc_has_no_totality_contacts(self):
         """Test that partial eclipse has no 2nd/3rd contacts."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_nyc
         )
 
@@ -233,7 +233,7 @@ class TestSweSwolEclipseWhenLocAttributes:
 
     def test_magnitude_is_reasonable(self):
         """Test that magnitude is in valid range."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -243,7 +243,7 @@ class TestSweSwolEclipseWhenLocAttributes:
 
     def test_ratio_is_reasonable(self):
         """Test that diameter ratio is in valid range."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -254,7 +254,7 @@ class TestSweSwolEclipseWhenLocAttributes:
 
     def test_obscuration_is_reasonable(self):
         """Test that obscuration is in valid range."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -264,7 +264,7 @@ class TestSweSwolEclipseWhenLocAttributes:
 
     def test_azimuth_is_reasonable(self):
         """Test that azimuth is in valid range."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -274,7 +274,7 @@ class TestSweSwolEclipseWhenLocAttributes:
 
     def test_altitude_is_positive_during_visible_eclipse(self):
         """Test that Sun altitude is positive for visible eclipse."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -284,7 +284,7 @@ class TestSweSwolEclipseWhenLocAttributes:
 
     def test_separation_is_small_at_maximum(self):
         """Test that Sun-Moon separation at maximum is small."""
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             self.jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -304,7 +304,7 @@ class TestSweSwolEclipseWhenLocEdgeCases:
         jd_start = julday(2024, 1, 1, 0)
 
         # Should still find an eclipse eventually
-        tret, attr, retflag = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
+        retflag, tret, attr = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
 
         # Should find something (may take years)
         assert tret[0] > jd_start
@@ -317,10 +317,10 @@ class TestSweSwolEclipseWhenLocEdgeCases:
         geopos_sea = [-96.797, 32.7767, 0]
         geopos_high = [-96.797, 32.7767, 5000]  # 5km altitude
 
-        tret_sea, attr_sea, _ = swe_sol_eclipse_when_loc(
+        _, tret_sea, attr_sea = swe_sol_eclipse_when_loc(
             jd_start, SEFLG_SWIEPH, geopos_sea
         )
-        tret_high, attr_high, _ = swe_sol_eclipse_when_loc(
+        _, tret_high, attr_high = swe_sol_eclipse_when_loc(
             jd_start, SEFLG_SWIEPH, geopos_high
         )
 
@@ -334,7 +334,7 @@ class TestSweSwolEclipseWhenLocEdgeCases:
         geopos = [139.6917, 35.6895, 0]
         jd_start = julday(2024, 1, 1, 0)
 
-        tret, attr, retflag = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
+        retflag, tret, attr = swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, geopos)
 
         # Should find an eclipse
         assert tret[0] > jd_start
@@ -350,7 +350,7 @@ class TestSweSwolEclipseWhenLocBackward:
         jd_start = julday(2024, 5, 1, 0)
         geopos = [-96.797, 32.7767, 0]  # Dallas
 
-        tret, attr, retflag = swe_sol_eclipse_when_loc(
+        retflag, tret, attr = swe_sol_eclipse_when_loc(
             jd_start, SEFLG_SWIEPH, geopos, backward=True
         )
 

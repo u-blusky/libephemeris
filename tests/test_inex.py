@@ -66,7 +66,7 @@ class TestSolarInexNumber:
         """Test that get_inex_number works with sol_eclipse_when_glob output."""
         # Find the April 2024 eclipse
         jd_start = swe_julday(2024, 3, 1, 0.0)
-        times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         inex = get_inex_number(jd_max, eclipse_type="solar")
@@ -127,7 +127,7 @@ class TestLunarInexNumber:
         """Test that get_inex_number works with lun_eclipse_when output."""
         # Find a lunar eclipse starting from 2022
         jd_start = swe_julday(2022, 4, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         inex = get_inex_number(jd_max, eclipse_type="lunar")
@@ -207,7 +207,7 @@ class TestInexMultipleEclipses:
         eclipses = []
         jd = jd_start
         for _ in range(3):
-            times, _ = sol_eclipse_when_glob(jd)
+            _, times = sol_eclipse_when_glob(jd)
             jd_max = times[0]
             inex = get_inex_number(jd_max, "solar")
             eclipses.append((jd_max, inex))
@@ -227,7 +227,7 @@ class TestInexMultipleEclipses:
         eclipses = []
         jd = jd_start
         for _ in range(3):
-            times, _ = lun_eclipse_when(jd)
+            _, times = lun_eclipse_when(jd)
             jd_max = times[0]
             inex = get_inex_number(jd_max, "lunar")
             eclipses.append((jd_max, inex))

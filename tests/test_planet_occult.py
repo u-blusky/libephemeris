@@ -197,13 +197,13 @@ class TestPlanetOccultReturnStructure:
         jd_start = julday(2000, 1, 1, 0)
 
         try:
-            times, attr, retflag = planet_occult_when_loc(
+            retflag, times, attr = planet_occult_when_loc(
                 jd_start, SE_VENUS, SE_MARS, "", 40.0, -74.0, 100.0, SEFLG_SWIEPH
             )
             # If we somehow found an event, verify structure
+            assert isinstance(retflag, int)
             assert len(times) == 10
             assert len(attr) == 20
-            assert isinstance(retflag, int)
         except RuntimeError as e:
             # Expected - no occultation found
             assert "No planetary occultation" in str(e)

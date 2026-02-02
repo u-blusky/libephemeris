@@ -258,7 +258,7 @@ class TestSolarEclipseEdgeCases:
         jd_start = julday(2024, 1, 1, 0)
 
         # Find any solar eclipse first
-        times, ecl_type = sol_eclipse_when_glob(jd_start)
+        ecl_type, times = sol_eclipse_when_glob(jd_start)
 
         # Should find an eclipse
         assert ecl_type != 0
@@ -269,7 +269,7 @@ class TestSolarEclipseEdgeCases:
         """Test eclipse when location is far from path."""
         # Find a solar eclipse
         jd_start = julday(2024, 1, 1, 0)
-        times_glob, _ = sol_eclipse_when_glob(jd_start)
+        _, times_glob = sol_eclipse_when_glob(jd_start)
 
         # Try a location far from any typical eclipse path
         # Antarctica, unlikely to see most eclipses
@@ -281,7 +281,7 @@ class TestSolarEclipseEdgeCases:
         )
 
         # Either no eclipse visible or very shallow
-        times, attrs, ecl_type = result
+        ecl_type, times, attrs = result
         # If eclipse visible, times[0] should be non-zero
         # If not visible, all times should be 0
         if times[0] > 0:
@@ -300,7 +300,7 @@ class TestLunarEclipseEdgeCases:
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
 
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
 
         # Should find a penumbral eclipse
         assert ecl_type & SE_ECL_PENUMBRAL
@@ -315,7 +315,7 @@ class TestLunarEclipseEdgeCases:
         # Find a partial lunar eclipse
         jd_start = julday(2021, 1, 1, 0)
 
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
 
         # Should find a partial eclipse
         assert ecl_type & SE_ECL_PARTIAL

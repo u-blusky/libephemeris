@@ -86,7 +86,7 @@ class TestGammaValues:
         """Test that total lunar eclipse has |gamma| < ~0.75 at maximum."""
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -100,7 +100,7 @@ class TestGammaValues:
         """Test that partial lunar eclipse has moderate gamma value."""
         # Find a partial lunar eclipse
         jd_start = julday(2023, 10, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -114,7 +114,7 @@ class TestGammaValues:
         """Test that penumbral-only eclipse has larger |gamma|."""
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -145,7 +145,7 @@ class TestGammaValues:
         for year in [2020, 2021, 2022, 2023, 2024]:
             jd_start = julday(year, 1, 1, 0)
             for _ in range(4):  # Check up to 4 eclipses per year
-                times, ecl_type = lun_eclipse_when(jd_start)
+                ecl_type, times = lun_eclipse_when(jd_start)
                 if times[0] > jd_start:
                     gamma = lun_eclipse_gamma(times[0])
                     gamma_values.append(gamma)
@@ -179,7 +179,7 @@ class TestGammaConsistency:
 
         # For a total eclipse, gamma should be smaller
         jd_start = julday(2022, 5, 1, 0)
-        times_total, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_total = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_total = times_total[0]
 
         gamma_total = lun_eclipse_gamma(jd_total)
@@ -187,7 +187,7 @@ class TestGammaConsistency:
 
         # For a partial eclipse, gamma should be larger
         jd_start = julday(2023, 10, 1, 0)
-        times_partial, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        _, times_partial = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
         jd_partial = times_partial[0]
 
         gamma_partial = lun_eclipse_gamma(jd_partial)
@@ -210,7 +210,7 @@ class TestGammaConsistency:
 
         # Find an eclipse and verify the relationship with Moon's latitude
         jd_start = julday(2022, 5, 1, 0)
-        times, _ = lun_eclipse_when(jd_start)
+        _, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -240,7 +240,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -257,7 +257,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2022, 11, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -274,7 +274,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2023, 10, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PARTIAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PARTIAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -292,7 +292,7 @@ class TestEdgeCases:
         """Test eclipse calculation for distant past."""
         # Find an eclipse in 1900
         jd_start = julday(1900, 1, 1, 0)
-        times, _ = lun_eclipse_when(jd_start)
+        _, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -305,7 +305,7 @@ class TestEdgeCases:
         """Test eclipse calculation for distant future."""
         # Find an eclipse in 2050
         jd_start = julday(2050, 1, 1, 0)
-        times, _ = lun_eclipse_when(jd_start)
+        _, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -318,7 +318,7 @@ class TestEdgeCases:
         """Test gamma calculation at various times during eclipse."""
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Calculate gamma at different phases
@@ -348,7 +348,7 @@ class TestDocumentation:
 
         # First find a lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start)
+        ecl_type, times = lun_eclipse_when(jd_start)
         jd_max = times[0]  # Time of maximum eclipse
 
         # Calculate gamma at maximum

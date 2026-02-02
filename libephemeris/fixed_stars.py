@@ -4001,7 +4001,7 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "ARKAB PRIOR": 95241,  # Beta1 Sagittarii
     "ARNEB": 25985,  # Alpha Leporis
     "ASCELLA": 93506,  # Zeta Sagittarii
-    "ASELLUS AUSTRALIS": 43834,  # Delta Cancri (consistent with STAR_CATALOG)
+    "ASELLUS AUSTRALIS": 42911,  # Delta Cancri (consistent with STAR_CATALOG)
     "ASELLUS BOREALIS": 43103,  # Gamma Cancri (consistent with STAR_CATALOG)
     "ASHLESHA": 43109,  # Epsilon Hydrae
     "ASPIDISKE": 45556,  # Iota Carinae

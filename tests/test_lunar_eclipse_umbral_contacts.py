@@ -84,7 +84,7 @@ class TestLunarEclipseUmbralContactsBasic:
     def test_u1_returns_float(self):
         """Test that U1 returns a float value."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -94,7 +94,7 @@ class TestLunarEclipseUmbralContactsBasic:
     def test_u2_returns_float(self):
         """Test that U2 returns a float value."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
@@ -104,7 +104,7 @@ class TestLunarEclipseUmbralContactsBasic:
     def test_u3_returns_float(self):
         """Test that U3 returns a float value."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_umbral_third_contact_u3(jd_max)
@@ -114,7 +114,7 @@ class TestLunarEclipseUmbralContactsBasic:
     def test_u4_returns_float(self):
         """Test that U4 returns a float value."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max)
@@ -124,7 +124,7 @@ class TestLunarEclipseUmbralContactsBasic:
     def test_u1_accepts_flags_parameter(self):
         """Test that U1 accepts optional flags parameter."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_umbral_first_contact_u1(jd_max, flags=SEFLG_SWIEPH)
@@ -135,7 +135,7 @@ class TestLunarEclipseUmbralContactsBasic:
     def test_u4_accepts_flags_parameter(self):
         """Test that U4 accepts optional flags parameter."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max, flags=SEFLG_SWIEPH)
@@ -150,7 +150,7 @@ class TestUmbralContactTimingOrder:
     def test_u1_before_maximum(self):
         """Test that U1 occurs before eclipse maximum."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -161,7 +161,7 @@ class TestUmbralContactTimingOrder:
     def test_u4_after_maximum(self):
         """Test that U4 occurs after eclipse maximum."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u4 = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max)
@@ -172,7 +172,7 @@ class TestUmbralContactTimingOrder:
     def test_u1_before_u4(self):
         """Test that U1 occurs before U4."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -183,7 +183,7 @@ class TestUmbralContactTimingOrder:
     def test_u2_after_u1_for_total_eclipse(self):
         """Test that U2 occurs after U1 for total eclipse."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -195,7 +195,7 @@ class TestUmbralContactTimingOrder:
     def test_u3_before_u4_for_total_eclipse(self):
         """Test that U3 occurs before U4 for total eclipse."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max)
@@ -207,7 +207,7 @@ class TestUmbralContactTimingOrder:
     def test_u2_before_u3_for_total_eclipse(self):
         """Test that U2 occurs before U3 for total eclipse."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
@@ -220,7 +220,7 @@ class TestUmbralContactTimingOrder:
     def test_u2_before_maximum_for_total_eclipse(self):
         """Test that U2 occurs before maximum for total eclipse."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
@@ -231,7 +231,7 @@ class TestUmbralContactTimingOrder:
     def test_u3_after_maximum_for_total_eclipse(self):
         """Test that U3 occurs after maximum for total eclipse."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max)
@@ -242,7 +242,7 @@ class TestUmbralContactTimingOrder:
     def test_full_contact_order_for_total_eclipse(self):
         """Test complete order: U1 < U2 < max < U3 < U4."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -271,7 +271,7 @@ class TestUmbralContactKnownEclipses:
         - U4 (Partial ends): 2022 Nov 08 at 12:48:50 UT
         """
         jd_start = julday(2022, 10, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Verify we found the right eclipse (November 8, 2022)
@@ -330,7 +330,7 @@ class TestUmbralContactKnownEclipses:
         - U4 (Partial ends): 2022 May 16 at 05:55:09 UT
         """
         jd_start = julday(2022, 4, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Verify we found the right eclipse (May 16, 2022)
@@ -385,7 +385,7 @@ class TestUmbralContactsPhysicalConstraints:
     def test_umbral_duration_reasonable(self):
         """Test that U1 to U4 duration is physically reasonable."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -403,7 +403,7 @@ class TestUmbralContactsPhysicalConstraints:
     def test_totality_duration_reasonable(self):
         """Test that U2 to U3 duration is physically reasonable for total eclipse."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
@@ -425,7 +425,7 @@ class TestUmbralContactsWithPartialEclipse:
     def test_partial_eclipse_has_u1_and_u4(self):
         """Test that partial eclipses have valid U1 and U4."""
         jd_start = julday(2023, 10, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -438,7 +438,7 @@ class TestUmbralContactsWithPartialEclipse:
     def test_partial_eclipse_no_u2_u3(self):
         """Test that partial eclipses do not have U2 and U3 (no totality)."""
         jd_start = julday(2023, 10, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
@@ -455,7 +455,7 @@ class TestUmbralContactsWithPenumbralEclipse:
     def test_penumbral_eclipse_no_umbral_contacts(self):
         """Test that penumbral-only eclipses have no umbral contacts."""
         jd_start = julday(2020, 1, 1, 0.0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         # Only test if we found a pure penumbral eclipse
@@ -482,7 +482,7 @@ class TestUmbralContactsMultipleEclipses:
 
         # Find 2 sequential total lunar eclipses
         for _ in range(2):
-            times, ecl_type = lun_eclipse_when(jd, eclipse_type=SE_ECL_TOTAL)
+            ecl_type, times = lun_eclipse_when(jd, eclipse_type=SE_ECL_TOTAL)
             jd_max = times[0]
 
             jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -520,7 +520,7 @@ class TestUmbralContactsWithLunEclipseWhen:
     def test_u1_matches_lun_eclipse_when_times1(self):
         """Test that U1 closely matches times[1] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # times[1] is partial eclipse beginning from lun_eclipse_when
@@ -540,7 +540,7 @@ class TestUmbralContactsWithLunEclipseWhen:
     def test_u4_matches_lun_eclipse_when_times4(self):
         """Test that U4 closely matches times[4] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # times[4] is partial eclipse ending from lun_eclipse_when
@@ -559,7 +559,7 @@ class TestUmbralContactsWithLunEclipseWhen:
     def test_u2_matches_lun_eclipse_when_times2(self):
         """Test that U2 closely matches times[2] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # times[2] is total eclipse beginning from lun_eclipse_when
@@ -578,7 +578,7 @@ class TestUmbralContactsWithLunEclipseWhen:
     def test_u3_matches_lun_eclipse_when_times3(self):
         """Test that U3 closely matches times[3] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # times[3] is total eclipse ending from lun_eclipse_when

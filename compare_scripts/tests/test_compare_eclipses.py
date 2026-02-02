@@ -175,8 +175,8 @@ class TestEclipseCentralLine:
 
         # Get central line coordinates from libephemeris
         lib_result = ephem.sol_eclipse_where(jd_max, 0)
-        lib_lon = lib_result[0][0]
-        lib_lat = lib_result[0][1]
+        lib_lon = lib_result[1][0]
+        lib_lat = lib_result[1][1]
 
         # Compare coordinates
         lon_diff = abs(swe_lon - lib_lon)
@@ -206,8 +206,8 @@ class TestEclipseCentralLine:
 
             # Get coordinates from libephemeris
             lib_result = ephem.sol_eclipse_where(jd, 0)
-            lib_lon = lib_result[0][0]
-            lib_lat = lib_result[0][1]
+            lib_lon = lib_result[1][0]
+            lib_lat = lib_result[1][1]
 
             # Only compare when eclipse is on Earth (non-zero coords from pyswisseph)
             if swe_lon != 0.0 or swe_lat != 0.0:
@@ -367,7 +367,7 @@ class TestEclipsePathLimits:
 
         # Get libephemeris results (includes limit coordinates)
         lib_result = ephem.sol_eclipse_where(jd, 0)
-        geopos = lib_result[0]
+        geopos = lib_result[1]
 
         # Central line
         central_lon, central_lat = geopos[0], geopos[1]
@@ -464,7 +464,7 @@ class TestEclipsePathWidth:
 
         # Get path width from sol_eclipse_where attr[3]
         lib_result = ephem.sol_eclipse_where(jd, 0)
-        width_attr = lib_result[1][3]
+        width_attr = lib_result[2][3]
 
         # They should be consistent (same function internally)
         assert abs(width_func - width_attr) < 1.0, (

@@ -40,7 +40,7 @@ class TestSweSolEclipseWhereSignature:
         # Use JD during April 8, 2024 eclipse maximum
         tjd_ut = 2460409.26  # ~18:18 UTC
 
-        geopos, attr, retflag = swe_sol_eclipse_where(tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(tjd_ut, SEFLG_SWIEPH)
 
         # geopos should be 10-element tuple per pyswisseph documentation
         assert len(geopos) == 10
@@ -57,7 +57,7 @@ class TestSweSolEclipseWhereSignature:
         """Test that legacy sol_eclipse_where function works."""
         tjd_ut = 2460409.26
 
-        geopos, attr, retflag = sol_eclipse_where(tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = sol_eclipse_where(tjd_ut, SEFLG_SWIEPH)
 
         # Should return same structure (10-element geopos, 20-element attr)
         assert len(geopos) == 10
@@ -80,7 +80,7 @@ class TestSweSolEclipseWhereApril2024:
 
     def test_finds_eclipse_location(self):
         """Test that function finds an eclipse location."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         # Should find an eclipse (non-zero return flag)
         assert retflag != 0
@@ -90,7 +90,7 @@ class TestSweSolEclipseWhereApril2024:
 
     def test_latitude_within_tolerance(self):
         """Test that latitude is within 0.5 degrees of expected."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         lat = geopos[1]
         # Allow 0.5 degree tolerance as specified in requirements
@@ -101,7 +101,7 @@ class TestSweSolEclipseWhereApril2024:
 
     def test_longitude_within_tolerance(self):
         """Test that longitude is within 0.5 degrees of expected."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         lon = geopos[0]
         # Allow 0.5 degree tolerance as specified in requirements
@@ -112,14 +112,14 @@ class TestSweSolEclipseWhereApril2024:
 
     def test_is_total_eclipse(self):
         """Test that eclipse is identified as total."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         # Should be total eclipse
         assert retflag & SE_ECL_TOTAL, f"Expected total eclipse, got flags: {retflag}"
 
     def test_is_central_eclipse(self):
         """Test that eclipse is identified as central."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         # Should be central eclipse
         assert retflag & SE_ECL_CENTRAL, (
@@ -128,7 +128,7 @@ class TestSweSolEclipseWhereApril2024:
 
     def test_attributes_are_valid(self):
         """Test that eclipse attributes are in valid ranges."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         magnitude = attr[0]
         ratio = attr[1]
@@ -179,7 +179,7 @@ class TestSweSolEclipseHowSignature:
         tjd_ut = 2460409.26
         dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
 
-        attr, retflag = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, dallas_geopos)
+        retflag, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, dallas_geopos)
 
         # attr should be at least 8-element tuple
         assert len(attr) == 20
@@ -193,7 +193,7 @@ class TestSweSolEclipseHowSignature:
         tjd_ut = 2460409.26
         geopos = [-96.797, 32.7767, 0]
 
-        attr, retflag = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
+        retflag, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
         assert isinstance(attr, tuple)
 
     def test_accepts_geopos_as_tuple(self):
@@ -201,7 +201,7 @@ class TestSweSolEclipseHowSignature:
         tjd_ut = 2460409.26
         geopos = (-96.797, 32.7767, 0)
 
-        attr, retflag = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
+        retflag, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
         assert isinstance(attr, tuple)
 
     def test_invalid_geopos_raises_error(self):
@@ -217,7 +217,7 @@ class TestSweSolEclipseHowSignature:
         tjd_ut = 2460409.26
 
         # Legacy signature: (jd, lat, lon, altitude, flags)
-        attr, retflag = sol_eclipse_how(tjd_ut, 32.7767, -96.797, 0, SEFLG_SWIEPH)
+        retflag, attr = sol_eclipse_how(tjd_ut, 32.7767, -96.797, 0, SEFLG_SWIEPH)
         assert len(attr) == 20
 
 
@@ -234,7 +234,7 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_finds_eclipse_at_dallas(self):
         """Test that function finds eclipse at Dallas."""
-        attr, retflag = swe_sol_eclipse_how(
+        retflag, attr = swe_sol_eclipse_how(
             self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -244,7 +244,7 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_dallas_eclipse_is_total(self):
         """Test that Dallas sees a total eclipse."""
-        attr, retflag = swe_sol_eclipse_how(
+        retflag, attr = swe_sol_eclipse_how(
             self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -253,7 +253,7 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_dallas_obscuration_is_total(self):
         """Test that obscuration at Dallas is ~100% (within 1%)."""
-        attr, retflag = swe_sol_eclipse_how(
+        retflag, attr = swe_sol_eclipse_how(
             self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -265,7 +265,7 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_dallas_attributes_are_valid(self):
         """Test that eclipse attributes at Dallas are in valid ranges."""
-        attr, retflag = swe_sol_eclipse_how(
+        retflag, attr = swe_sol_eclipse_how(
             self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -302,7 +302,7 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_refraction_included(self):
         """Test that apparent altitude differs from true altitude (refraction)."""
-        attr, retflag = swe_sol_eclipse_how(
+        retflag, attr = swe_sol_eclipse_how(
             self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
         )
 
@@ -329,7 +329,7 @@ class TestSweSolEclipseHowNYCApril2024:
 
     def test_finds_eclipse_at_nyc(self):
         """Test that function finds eclipse at NYC."""
-        attr, retflag = swe_sol_eclipse_how(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
+        retflag, attr = swe_sol_eclipse_how(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
 
         # Should find an eclipse
         assert retflag != 0
@@ -337,7 +337,7 @@ class TestSweSolEclipseHowNYCApril2024:
 
     def test_nyc_eclipse_is_partial(self):
         """Test that NYC sees a partial eclipse."""
-        attr, retflag = swe_sol_eclipse_how(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
+        retflag, attr = swe_sol_eclipse_how(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
 
         # Should be partial eclipse (not total)
         assert retflag & SE_ECL_PARTIAL, (
@@ -347,7 +347,7 @@ class TestSweSolEclipseHowNYCApril2024:
 
     def test_nyc_obscuration_is_partial(self):
         """Test that obscuration at NYC is partial (~80-95%)."""
-        attr, retflag = swe_sol_eclipse_how(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
+        retflag, attr = swe_sol_eclipse_how(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
 
         obscuration = attr[2]
         # NYC should have significant but partial obscuration
@@ -365,7 +365,7 @@ class TestSweSolEclipseHowNoEclipse:
         tjd_ut = julday(2024, 6, 15, 12.0)  # Random date
         geopos = [-96.797, 32.7767, 0]
 
-        attr, retflag = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
+        retflag, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
 
         # Should return 0 for no eclipse
         assert retflag == 0 or attr[0] == 0.0, (
@@ -387,7 +387,7 @@ class TestSweSolEclipseWhereTimeVariation:
 
         longitudes = []
         for tjd in times:
-            geopos, attr, retflag = swe_sol_eclipse_where(tjd, SEFLG_SWIEPH)
+            retflag, geopos, attr = swe_sol_eclipse_where(tjd, SEFLG_SWIEPH)
             if retflag != 0:
                 longitudes.append(geopos[0])
 
@@ -408,7 +408,7 @@ class TestSweSolEclipseWherePartialEclipse:
         # For the Apr 2024 eclipse, very early/late times have no central line
         tjd_ut = 2460409.15  # Early in eclipse, may be partial
 
-        geopos, attr, retflag = swe_sol_eclipse_where(tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(tjd_ut, SEFLG_SWIEPH)
 
         # Either no central eclipse (returns 0) or partial
         if retflag != 0:
@@ -425,7 +425,7 @@ class TestSweSolEclipseHowEdgeCases:
         # Same as Dallas but at 5000m altitude
         geopos_high = [-96.797, 32.7767, 5000]
 
-        attr, retflag = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos_high)
+        retflag, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos_high)
 
         # Should still find eclipse
         assert retflag != 0
@@ -436,7 +436,7 @@ class TestSweSolEclipseHowEdgeCases:
         # Sydney, Australia - far from eclipse path
         geopos_sydney = [151.2093, -33.8688, 0]
 
-        attr, retflag = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos_sydney)
+        retflag, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos_sydney)
 
         # May or may not see eclipse, but should not crash
         assert isinstance(retflag, int)
@@ -447,7 +447,7 @@ class TestSweSolEclipseHowEdgeCases:
         # Near North Pole
         geopos_arctic = [0, 85, 0]
 
-        attr, retflag = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos_arctic)
+        retflag, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos_arctic)
 
         # Should not crash
         assert isinstance(retflag, int)
@@ -468,7 +468,7 @@ class TestSweSolEclipseWhereLimits:
 
     def test_umbra_limits_are_calculated(self):
         """Test that umbra limit coordinates are returned for total eclipse."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         # For a total eclipse, umbra limits should be non-zero
         if retflag & SE_ECL_TOTAL:
@@ -486,7 +486,7 @@ class TestSweSolEclipseWhereLimits:
 
     def test_penumbra_limits_are_calculated(self):
         """Test that penumbra limit coordinates are returned for eclipse."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         # Penumbra limits should be non-zero during an eclipse
         if retflag != 0:
@@ -506,7 +506,7 @@ class TestSweSolEclipseWhereLimits:
 
     def test_northern_limit_north_of_central(self):
         """Test that northern umbra limit is north of central line."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         if retflag & SE_ECL_TOTAL:
             central_lat = geopos[1]
@@ -521,7 +521,7 @@ class TestSweSolEclipseWhereLimits:
 
     def test_southern_limit_south_of_central(self):
         """Test that southern umbra limit is south of central line."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         if retflag & SE_ECL_TOTAL:
             central_lat = geopos[1]
@@ -536,7 +536,7 @@ class TestSweSolEclipseWhereLimits:
 
     def test_penumbra_wider_than_umbra(self):
         """Test that penumbra limits are wider than umbra limits."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         if retflag & SE_ECL_TOTAL:
             umbra_n_lat = geopos[3]
@@ -562,7 +562,7 @@ class TestSweSolEclipseWhereLimits:
 
     def test_limits_have_valid_coordinates(self):
         """Test that limit coordinates are in valid ranges."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         if retflag != 0:
             for i in range(0, 10, 2):  # Check longitudes
@@ -577,7 +577,7 @@ class TestSweSolEclipseWhereLimits:
 
     def test_limits_reasonable_for_apr2024(self):
         """Test that limits are in reasonable geographic locations for Apr 2024."""
-        geopos, attr, retflag = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
+        retflag, geopos, attr = swe_sol_eclipse_where(self.tjd_ut, SEFLG_SWIEPH)
 
         if retflag & SE_ECL_TOTAL:
             # All points should be in the Americas region for this eclipse

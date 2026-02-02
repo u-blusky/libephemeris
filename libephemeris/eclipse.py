@@ -973,7 +973,7 @@ def sol_eclipse_max_time(
         >>> # Find precise global maximum time for April 8, 2024 eclipse
         >>> from libephemeris import julday, sol_eclipse_max_time, sol_eclipse_when_glob
         >>> jd_start = julday(2024, 3, 1, 0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start)
         >>> jd_max, gamma = sol_eclipse_max_time(times[0])
         >>> print(f"Maximum at JD {jd_max:.8f}, gamma = {gamma:.6f}")
 
@@ -1646,7 +1646,7 @@ def sol_eclipse_when_loc(
         >>> from libephemeris import julday, sol_eclipse_when_loc
         >>> jd = julday(2024, 1, 1, 0)
         >>> rome_lat, rome_lon = 41.9028, 12.4964
-        >>> times, attr, ecl_type = sol_eclipse_when_loc(jd, rome_lat, rome_lon)
+        >>> ecl_type, times, attr = sol_eclipse_when_loc(jd, rome_lat, rome_lon)
         >>> print(f"Eclipse maximum at JD {times[0]:.5f}")
         >>> print(f"Magnitude: {attr[0]:.3f}")
 
@@ -1668,7 +1668,7 @@ def sol_eclipse_when_loc(
     for _ in range(MAX_ECLIPSES):
         # Find next global eclipse
         try:
-            global_times, global_type = sol_eclipse_when_glob(jd, flags)
+            global_type, global_times = sol_eclipse_when_glob(jd, flags)
         except RuntimeError:
             raise RuntimeError(
                 f"No solar eclipse visible from lat={lat}, lon={lon} "
@@ -1753,7 +1753,7 @@ def sol_eclipse_when_loc(
                 0.0,  # [10] Reserved
             )
 
-            return times, attr, ecl_type
+            return ecl_type, times, attr
 
         # Eclipse not visible from this location, try next
         jd = jd_max_global + 25  # Skip ahead to find next eclipse
@@ -1832,7 +1832,7 @@ def swe_sol_eclipse_when_loc(
         >>> from libephemeris import swe_sol_eclipse_when_loc, julday, SEFLG_SWIEPH
         >>> jd = julday(2024, 1, 1, 0)
         >>> dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
-        >>> tret, attr, ecl_type = swe_sol_eclipse_when_loc(jd, SEFLG_SWIEPH, dallas_geopos)
+        >>> ecl_type, tret, attr = swe_sol_eclipse_when_loc(jd, SEFLG_SWIEPH, dallas_geopos)
         >>> print(f"Eclipse maximum at JD {tret[0]:.5f}")
         >>> print(f"Obscuration: {attr[2]:.3f}")
 
@@ -2101,9 +2101,9 @@ def swe_sol_eclipse_when_loc(
                 temp_jd = earlier_jd
                 while temp_jd < jd:
                     try:
-                        global_times, global_type = sol_eclipse_when_glob(temp_jd, ifl)
+                        global_type, global_times = sol_eclipse_when_glob(temp_jd, ifl)
                         if global_times[0] < jd:
-                            eclipses_found.append((global_times, global_type))
+                            eclipses_found.append((global_type, global_times))
                         temp_jd = global_times[0] + 25
                     except RuntimeError:
                         break
@@ -2111,9 +2111,9 @@ def swe_sol_eclipse_when_loc(
                     jd -= 400
                     continue
                 # Take the most recent eclipse before jd
-                global_times, global_type = eclipses_found[-1]
+                global_type, global_times = eclipses_found[-1]
             else:
-                global_times, global_type = sol_eclipse_when_glob(jd, ifl)
+                global_type, global_times = sol_eclipse_when_glob(jd, ifl)
         except RuntimeError:
             raise RuntimeError(
                 f"No solar eclipse visible from lon={lon}, lat={lat} "
@@ -2346,7 +2346,7 @@ def swe_sol_eclipse_when_loc(
             min_separation,  # [7] Angular distance of moon center from sun center
         )
 
-        return tret, attr, ecl_type
+        return ecl_type, tret, attr
 
     raise RuntimeError(
         f"No solar eclipse visible from lon={lon}, lat={lat} "
@@ -2377,7 +2377,7 @@ def sol_eclipse_where(
 def swe_sol_eclipse_where(
     tjd_ut: float,
     ifl: int,
-) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the geographic location where a solar eclipse is at maximum at a given time.
 
@@ -2391,6 +2391,8 @@ def swe_sol_eclipse_where(
 
     Returns:
         Tuple containing:
+            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
+                Returns 0 if no central eclipse at this time
             - geopos: Tuple of 10 floats with geographic position per pyswisseph:
                 [0]: Geographic longitude of central line (degrees, East positive)
                 [1]: Geographic latitude of central line (degrees, North positive)
@@ -2412,8 +2414,6 @@ def swe_sol_eclipse_where(
                 [6]: Apparent altitude with refraction (degrees)
                 [7]: Angular distance Moon center from Sun center (degrees)
                 [8-19]: Reserved for future use
-            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
-                Returns 0 if no central eclipse at this time
 
     Note:
         If the shadow axis misses the Earth (partial eclipse or no eclipse),
@@ -2430,7 +2430,7 @@ def swe_sol_eclipse_where(
         >>> # Find central line location during April 8, 2024 eclipse
         >>> from libephemeris import julday, swe_sol_eclipse_where, SEFLG_SWIEPH
         >>> jd = 2460409.26  # ~18:18 UTC during maximum
-        >>> geopos, attr, ecl_type = swe_sol_eclipse_where(jd, SEFLG_SWIEPH)
+        >>> ecl_type, geopos, attr = swe_sol_eclipse_where(jd, SEFLG_SWIEPH)
         >>> print(f"Central at lon={geopos[0]:.2f}, lat={geopos[1]:.2f}")
 
     References:
@@ -2626,6 +2626,7 @@ def swe_sol_eclipse_where(
     except Exception:
         # If calculation fails, return zeros (10-element geopos, 20-element attr)
         return (
+            0,
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             (
                 0.0,
@@ -2649,12 +2650,12 @@ def swe_sol_eclipse_where(
                 0.0,
                 0.0,
             ),
-            0,
         )
 
     # Determine eclipse type flags
     if magnitude <= 0:
         return (
+            0,
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             (
                 0.0,
@@ -2678,7 +2679,6 @@ def swe_sol_eclipse_where(
                 0.0,
                 0.0,
             ),
-            0,
         )
 
     eclipse_type = 0
@@ -2873,7 +2873,7 @@ def swe_sol_eclipse_where(
         0.0,  # [19] Reserved
     )
 
-    return geopos, attr, eclipse_type
+    return eclipse_type, geopos, attr
 
 
 def sol_eclipse_how(
@@ -2964,7 +2964,7 @@ def swe_sol_eclipse_how(
         >>> from libephemeris import swe_sol_eclipse_how, SEFLG_SWIEPH
         >>> jd = 2460409.26  # During eclipse maximum
         >>> dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
-        >>> attr, ecl_type = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, dallas_geopos)
+        >>> ecl_type, attr = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, dallas_geopos)
         >>> print(f"Obscuration: {attr[2]:.3f}")
 
     References:
@@ -3006,7 +3006,7 @@ def swe_sol_eclipse_how(
         moon_app = observer_at.at(t).observe(moon).apparent()
     except Exception:
         # If calculation fails, return zeros (20 elements per pyswisseph spec)
-        return (
+        return 0, (
             0.0,
             0.0,
             0.0,
@@ -3027,7 +3027,7 @@ def swe_sol_eclipse_how(
             0.0,
             0.0,
             0.0,
-        ), 0
+        )
 
     # Get Sun altitude and azimuth
     sun_alt, sun_az, _ = sun_app.altaz()
@@ -3494,7 +3494,7 @@ def swe_sol_eclipse_how_details(
         return (jd_low + jd_high) / 2
 
     # First, get basic eclipse info at the given time
-    attr, eclipse_type = swe_sol_eclipse_how(tjd_ut, ifl, geopos)
+    eclipse_type, attr = swe_sol_eclipse_how(tjd_ut, ifl, geopos)
 
     # Initialize result dictionary
     result = {
@@ -4376,7 +4376,7 @@ def lun_eclipse_when_loc(
         >>> from libephemeris import julday, lun_eclipse_when_loc
         >>> jd = julday(2024, 1, 1, 0)
         >>> rome_lat, rome_lon = 41.9028, 12.4964
-        >>> times, attr, ecl_type = lun_eclipse_when_loc(jd, rome_lat, rome_lon)
+        >>> ecl_type, times, attr = lun_eclipse_when_loc(jd, rome_lat, rome_lon)
         >>> print(f"Eclipse maximum at JD {times[0]:.5f}")
         >>> print(f"Moon altitude: {attr[4]:.1f}°")
 
@@ -4419,7 +4419,7 @@ def lun_eclipse_when_loc(
     for _ in range(MAX_ECLIPSES):
         # Find next global lunar eclipse
         try:
-            global_times, global_type = lun_eclipse_when(jd, flags)
+            global_type, global_times = lun_eclipse_when(jd, flags)
         except RuntimeError:
             raise RuntimeError(
                 f"No lunar eclipse visible from lat={lat}, lon={lon} "
@@ -4567,7 +4567,7 @@ def lun_eclipse_when_loc(
             0.0,  # [10] Reserved
         )
 
-        return times, attr, ecl_type
+        return ecl_type, times, attr
 
     raise RuntimeError(
         f"No lunar eclipse visible from lat={lat}, lon={lon} "
@@ -4585,7 +4585,7 @@ def lun_eclipse_how(
     lon: float,
     altitude: float = 0.0,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a lunar eclipse at a specific location and time.
 
@@ -4603,6 +4603,9 @@ def lun_eclipse_how(
 
     Returns:
         Tuple containing:
+            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
+                Returns 0 if no eclipse is occurring at this time
+                Includes SE_ECL_VISIBLE if Moon is above horizon
             - attr: Tuple of 11 floats with eclipse attributes:
                 [0]: Umbral eclipse magnitude (fraction of Moon's diameter in umbra)
                 [1]: Penumbral eclipse magnitude
@@ -4615,9 +4618,6 @@ def lun_eclipse_how(
                 [8]: Saros series number (0, not implemented)
                 [9]: Reserved (0)
                 [10]: Reserved (0)
-            - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
-                Returns 0 if no eclipse is occurring at this time
-                Includes SE_ECL_VISIBLE if Moon is above horizon
 
     Note:
         This function is intended for use when you already know an eclipse is
@@ -4641,7 +4641,7 @@ def lun_eclipse_how(
         >>> from libephemeris import julday, lun_eclipse_how
         >>> jd = julday(2022, 5, 16, 4.2)  # During May 2022 eclipse
         >>> rome_lat, rome_lon = 41.9028, 12.4964
-        >>> attr, ecl_type = lun_eclipse_how(jd, rome_lat, rome_lon)
+        >>> ecl_type, attr = lun_eclipse_how(jd, rome_lat, rome_lon)
         >>> print(f"Umbral magnitude: {attr[0]:.3f}")
         >>> print(f"Moon altitude: {attr[4]:.1f}°")
 
@@ -4675,7 +4675,7 @@ def lun_eclipse_how(
         moon_app = observer_at.at(t).observe(moon).apparent()
     except Exception:
         # If calculation fails, return zeros
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
+        return 0, (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     # Get Moon altitude and azimuth
     moon_alt, moon_az, _ = moon_app.altaz()
@@ -4706,7 +4706,7 @@ def lun_eclipse_how(
 
     if penumbral_mag <= 0 and umbral_mag <= 0:
         # No eclipse - Moon too far from Earth's shadow
-        return (
+        return 0, (
             0.0,  # umbral magnitude
             0.0,  # penumbral magnitude
             0.0,  # reserved
@@ -4718,7 +4718,7 @@ def lun_eclipse_how(
             0.0,  # Saros
             0.0,  # Reserved
             0.0,  # Reserved
-        ), 0
+        )
 
     # There is an eclipse - set type flags
     eclipse_type = ecl_type_flags
@@ -4743,14 +4743,14 @@ def lun_eclipse_how(
         0.0,  # [10] Reserved
     )
 
-    return attr, eclipse_type
+    return eclipse_type, attr
 
 
 def swe_lun_eclipse_how(
     tjd_ut: float,
     ifl: int,
     geopos: Sequence[float],
-) -> Tuple[Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate detailed circumstances of a lunar eclipse from a specific location.
 
@@ -4772,6 +4772,10 @@ def swe_lun_eclipse_how(
 
     Returns:
         Tuple containing:
+            - retflag: Eclipse type flags bitmask combined with visibility flags:
+                Returns eclipse type (SE_ECL_TOTAL, SE_ECL_PARTIAL, SE_ECL_PENUMBRAL)
+                combined with SE_ECL_VISIBLE (128) if Moon is above horizon.
+                Returns 0 if no eclipse is occurring at this time.
             - attr: Tuple of 11 floats with eclipse attributes:
                 [0]: Umbral eclipse magnitude (fraction of Moon diameter
                      covered by umbra; >1 means Moon fully in umbra)
@@ -4786,10 +4790,6 @@ def swe_lun_eclipse_how(
                      SE_ECL_PENUMBRAL, or 0)
                 [9]: Apparent diameter of Moon (degrees)
                 [10]: Apparent diameter of umbral shadow (degrees)
-            - retflag: Eclipse type flags bitmask combined with visibility flags:
-                Returns eclipse type (SE_ECL_TOTAL, SE_ECL_PARTIAL, SE_ECL_PENUMBRAL)
-                combined with SE_ECL_VISIBLE (128) if Moon is above horizon.
-                Returns 0 if no eclipse is occurring at this time.
 
     Note:
         This function is intended for use when you already know an eclipse is
@@ -4814,7 +4814,7 @@ def swe_lun_eclipse_how(
         >>> from libephemeris import swe_lun_eclipse_how, SEFLG_SWIEPH
         >>> jd = 2459892.4  # Maximum of Nov 8, 2022 total lunar eclipse
         >>> la_geopos = [-118.24, 34.05, 0]  # lon, lat, alt
-        >>> attr, ecl_type = swe_lun_eclipse_how(jd, SEFLG_SWIEPH, la_geopos)
+        >>> ecl_type, attr = swe_lun_eclipse_how(jd, SEFLG_SWIEPH, la_geopos)
         >>> print(f"Umbral magnitude: {attr[0]:.3f}")
         >>> print(f"Moon altitude: {attr[5]:.1f}°")
 
@@ -4856,7 +4856,7 @@ def swe_lun_eclipse_how(
         moon_app = observer_at.at(t).observe(moon).apparent()
     except Exception:
         # If calculation fails, return zeros
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), 0
+        return 0, (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     # Get Moon altitude and azimuth
     moon_alt, moon_az, _ = moon_app.altaz()
@@ -4915,7 +4915,7 @@ def swe_lun_eclipse_how(
 
     if penumbral_mag <= 0 and umbral_mag <= 0:
         # No eclipse - Moon too far from Earth's shadow
-        return (
+        return 0, (
             0.0,  # umbral magnitude
             0.0,  # penumbral magnitude
             0.0,  # reserved
@@ -4927,7 +4927,7 @@ def swe_lun_eclipse_how(
             0.0,  # eclipse type at moment
             moon_diameter,  # Moon diameter
             umbra_diameter,  # Umbra diameter
-        ), 0
+        )
 
     # There is an eclipse - set type flags
     eclipse_type = ecl_type_flags
@@ -4963,7 +4963,7 @@ def swe_lun_eclipse_how(
         umbra_diameter,  # [10] Apparent diameter of umbra
     )
 
-    return attr, eclipse_type
+    return eclipse_type, attr
 
 
 def lun_occult_when_glob(
@@ -5772,7 +5772,7 @@ def lun_occult_when_loc(
             0.0,  # [19] Reserved
         )
 
-        return times, attr, ecl_type
+        return ecl_type, times, attr
 
     target_desc = star_name if planet == 0 else f"planet {planet}"
     raise RuntimeError(
@@ -5876,7 +5876,7 @@ def swe_lun_occult_when_loc(
         star_name = ""
 
     # Call the internal implementation
-    times, attr, ecl_type = lun_occult_when_loc(
+    ecl_type, times, attr = lun_occult_when_loc(
         tjdut, planet, star_name, lat, lon, altitude, flags
     )
 
@@ -9806,7 +9806,7 @@ def calc_eclipse_first_contact_c1(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate first contact
         >>> jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -9896,7 +9896,7 @@ def calc_eclipse_second_contact_c2(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate second contact
         >>> jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -9998,7 +9998,7 @@ def calc_eclipse_third_contact_c3(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate third contact
         >>> jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -10095,7 +10095,7 @@ def calc_eclipse_fourth_contact_c4(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate fourth contact
         >>> jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
@@ -10328,7 +10328,7 @@ def calc_lunar_eclipse_penumbral_first_contact_p1(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate penumbral first contact
         >>> jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -10406,7 +10406,7 @@ def calc_lunar_eclipse_penumbral_fourth_contact_p4(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate penumbral fourth contact
         >>> jd_p4 = calc_lunar_eclipse_penumbral_fourth_contact_p4(jd_max)
@@ -10788,7 +10788,7 @@ def calc_lunar_eclipse_umbral_first_contact_u1(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate umbral first contact
         >>> jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -10867,7 +10867,7 @@ def calc_lunar_eclipse_umbral_second_contact_u2(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate umbral second contact (totality begins)
         >>> jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
@@ -10944,7 +10944,7 @@ def calc_lunar_eclipse_umbral_third_contact_u3(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate umbral third contact (totality ends)
         >>> jd_u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max)
@@ -11021,7 +11021,7 @@ def calc_lunar_eclipse_umbral_fourth_contact_u4(
         >>> from libephemeris import SE_ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate umbral fourth contact
         >>> jd_u4 = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max)
@@ -11097,7 +11097,7 @@ def calc_solar_eclipse_duration(
         >>> from libephemeris import calc_solar_eclipse_duration, SE_ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate duration of totality
         >>> duration = calc_solar_eclipse_duration(jd_max)
@@ -11188,7 +11188,7 @@ def calc_lunar_eclipse_total_duration(
         >>> from libephemeris import calc_lunar_eclipse_total_duration, SE_ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate duration of totality
         >>> duration = calc_lunar_eclipse_total_duration(jd_max)
@@ -11277,7 +11277,7 @@ def calc_lunar_eclipse_umbral_duration(
         >>> from libephemeris import calc_lunar_eclipse_umbral_duration, SE_ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate duration of umbral phase
         >>> duration = calc_lunar_eclipse_umbral_duration(jd_max)
@@ -11390,7 +11390,7 @@ def calc_eclipse_path_width(
         >>> from libephemeris import calc_eclipse_path_width
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate path width at eclipse maximum
         >>> width = calc_eclipse_path_width(jd_max)
@@ -11447,7 +11447,7 @@ def calc_eclipse_path_width(
         calc_lon = lon
     else:
         # Find central line location at this time using swe_sol_eclipse_where
-        geopos, attr, ecl_type = swe_sol_eclipse_where(jd, flags)
+        ecl_type, geopos, attr = swe_sol_eclipse_where(jd, flags)
         calc_lon = geopos[0]
         calc_lat = geopos[1]
 
@@ -11633,7 +11633,7 @@ def get_saros_number(
         >>> from libephemeris import julday, sol_eclipse_when_glob, get_saros_number
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 3, 1, 0.0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start)
         >>> jd_max = times[0]
         >>> saros = get_saros_number(jd_max, "solar")
         >>> print(f"Saros series: {saros}")  # Should print 139
@@ -11771,7 +11771,7 @@ def get_inex_number(
         >>> from libephemeris import julday, sol_eclipse_when_glob, get_inex_number
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 3, 1, 0.0)
-        >>> times, ecl_type = sol_eclipse_when_glob(jd_start)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start)
         >>> jd_max = times[0]
         >>> inex = get_inex_number(jd_max, "solar")
         >>> print(f"Inex series: {inex}")  # Should print 50
@@ -11876,7 +11876,7 @@ def calc_eclipse_central_line(
         >>> from libephemeris import julday, sol_eclipse_when_glob, calc_eclipse_central_line
         >>> # Find April 8, 2024 total solar eclipse
         >>> jd = julday(2024, 1, 1, 0.0)
-        >>> times_ecl, ecl_type = sol_eclipse_when_glob(jd)
+        >>> ecl_type, times_ecl = sol_eclipse_when_glob(jd)
         >>> jd_c1, jd_c4 = times_ecl[1], times_ecl[4]  # First and fourth contacts
         >>> # Calculate central line path
         >>> times, lats, lons = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=5.0)
@@ -12077,7 +12077,7 @@ def calc_eclipse_northern_limit(
         >>> from libephemeris import julday, sol_eclipse_when_glob, calc_eclipse_northern_limit
         >>> # Find April 8, 2024 total solar eclipse
         >>> jd = julday(2024, 1, 1, 0.0)
-        >>> times_ecl, ecl_type = sol_eclipse_when_glob(jd)
+        >>> ecl_type, times_ecl = sol_eclipse_when_glob(jd)
         >>> jd_c1, jd_c4 = times_ecl[1], times_ecl[4]  # First and fourth contacts
         >>> # Calculate northern limit path
         >>> times, lats, lons = calc_eclipse_northern_limit(jd_c1, jd_c4, step_minutes=5.0)
@@ -12269,7 +12269,7 @@ def calc_eclipse_southern_limit(
         >>> from libephemeris import julday, sol_eclipse_when_glob, calc_eclipse_southern_limit
         >>> # Find April 8, 2024 total solar eclipse
         >>> jd = julday(2024, 1, 1, 0.0)
-        >>> times_ecl, ecl_type = sol_eclipse_when_glob(jd)
+        >>> ecl_type, times_ecl = sol_eclipse_when_glob(jd)
         >>> jd_c1, jd_c4 = times_ecl[1], times_ecl[4]  # First and fourth contacts
         >>> # Calculate southern limit path
         >>> times, lats, lons = calc_eclipse_southern_limit(jd_c1, jd_c4, step_minutes=5.0)
@@ -12880,7 +12880,7 @@ def lun_eclipse_umbral_magnitude(
         >>> from libephemeris import julday, lun_eclipse_umbral_magnitude, lun_eclipse_when
         >>> # First find a lunar eclipse
         >>> jd_start = julday(2022, 5, 1, 0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start)
+        >>> ecl_type, times = lun_eclipse_when(jd_start)
         >>> jd_max = times[0]  # Time of maximum eclipse
         >>> # Calculate umbral magnitude at maximum
         >>> umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -12998,7 +12998,7 @@ def lun_eclipse_penumbral_magnitude(
         >>> from libephemeris import SE_ECL_PENUMBRAL
         >>> # First find a penumbral lunar eclipse
         >>> jd_start = julday(2020, 1, 1, 0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
         >>> jd_max = times[0]  # Time of maximum eclipse
         >>> # Calculate penumbral magnitude at maximum
         >>> penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -13121,7 +13121,7 @@ def lun_eclipse_gamma(
         >>> from libephemeris import julday, lun_eclipse_gamma, lun_eclipse_when
         >>> # First find a lunar eclipse
         >>> jd_start = julday(2022, 5, 1, 0)
-        >>> times, ecl_type = lun_eclipse_when(jd_start)
+        >>> ecl_type, times = lun_eclipse_when(jd_start)
         >>> jd_max = times[0]  # Time of maximum eclipse
         >>> # Calculate gamma at maximum
         >>> gamma = lun_eclipse_gamma(jd_max)
@@ -13656,7 +13656,7 @@ def planet_occult_when_loc(
         >>> from libephemeris import julday, planet_occult_when_loc, SE_VENUS
         >>> jd = julday(2020, 1, 1, 0)
         >>> rome_lat, rome_lon = 41.9028, 12.4964
-        >>> times, attr, ecl_type = planet_occult_when_loc(
+        >>> ecl_type, times, attr = planet_occult_when_loc(
         ...     jd, SE_VENUS, 0, "Regulus", rome_lat, rome_lon
         ... )
         >>> print(f"Occultation max at JD {times[0]:.5f}")
@@ -13906,7 +13906,7 @@ def planet_occult_when_loc(
                     0.0,  # [8-19] Reserved
                 )
 
-                return times, attr, retflags
+                return retflags, times, attr
 
             # Not visible from this location - continue search after this event
             current_jd = jd_end + 1.0 if jd_end > 0 else jd_max + 1.0

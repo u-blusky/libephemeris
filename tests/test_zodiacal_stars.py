@@ -69,7 +69,7 @@ ARIES_STARS = [
 # ======== CANCER CONSTELLATION STARS ========
 CANCER_STARS = [
     (SE_TARF, "Tarf", 42911, 3.52),  # Beta Cnc - brightest
-    (SE_ASELLUS_AUSTRALIS, "Asellus Australis", 43834, 3.94),  # Delta Cnc
+    (SE_ASELLUS_AUSTRALIS, "Asellus Australis", 42911, 3.94),  # Delta Cnc
     (SE_ACUBENS, "Acubens", 44066, 4.25),  # Alpha Cnc
     (SE_ASELLUS_BOREALIS, "Asellus Borealis", 43103, 4.66),  # Gamma Cnc
 ]

@@ -258,7 +258,7 @@ class TestConsistencyWithSweEclipseHow:
         geopos = [lon, lat, 0]
 
         obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
-        attr, _ = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
+        _, attr = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
 
         # Obscuration is attr[2] in swe_sol_eclipse_how
         assert abs(obscuration - attr[2]) < 0.01, (
@@ -276,7 +276,7 @@ class TestConsistencyWithSweEclipseHow:
 
         for jd in test_times:
             obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
-            attr, _ = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
+            _, attr = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
 
             assert abs(obscuration - attr[2]) < 0.01, (
                 f"At JD {jd}: obscuration {obscuration:.4f} differs from "

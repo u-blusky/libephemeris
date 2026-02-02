@@ -1594,9 +1594,7 @@ def vis_limit_mag(
             hor_result = azalt(
                 jd,
                 SE_ECL2HOR,
-                lat,
-                lon,
-                alt_m,
+                (lon, lat, alt_m),
                 pressure,
                 temperature,
                 (star_lon, star_lat, 1.0),

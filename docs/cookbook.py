@@ -742,11 +742,11 @@ def find_next_solar_eclipse(
     #   [6] = time of sunset during eclipse (if applicable)
     #   [7] = unused
     if eclipse_type:
-        times, ecl_flags = ephem.sol_eclipse_when_glob(
+        ecl_flags, times = ephem.sol_eclipse_when_glob(
             start_jd, flags=SEFLG_SWIEPH, eclipse_type=eclipse_type
         )
     else:
-        times, ecl_flags = ephem.sol_eclipse_when_glob(start_jd, flags=SEFLG_SWIEPH)
+        ecl_flags, times = ephem.sol_eclipse_when_glob(start_jd, flags=SEFLG_SWIEPH)
 
     # Interpret eclipse type
     if ecl_flags & SE_ECL_TOTAL:
@@ -809,8 +809,8 @@ def find_next_lunar_eclipse(
     """
     start_jd = ephem.swe_julday(start_year, start_month, start_day, 0.0)
 
-    # lun_eclipse_when returns (times, eclipse_type_flags)
-    times, ecl_flags = ephem.lun_eclipse_when(start_jd)
+    # lun_eclipse_when returns (eclipse_type_flags, times)
+    ecl_flags, times = ephem.lun_eclipse_when(start_jd)
 
     # Interpret eclipse type
     from libephemeris.constants import SE_ECL_PENUMBRAL
@@ -863,7 +863,7 @@ def find_eclipse_visibility(
         >>> print(f"Magnitude: {visibility['magnitude']:.3f}")
     """
     # Use sol_eclipse_how to get eclipse circumstances at location
-    attr, ecl_flags = ephem.sol_eclipse_how(
+    ecl_flags, attr = ephem.sol_eclipse_how(
         eclipse_jd, latitude, longitude, altitude=altitude
     )
 

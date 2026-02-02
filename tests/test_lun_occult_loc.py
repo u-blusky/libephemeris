@@ -330,32 +330,32 @@ class TestLunOccultWhenLocLegacy:
         jd_start = julday(2017, 1, 1, 0)
         lat, lon = 45.0, 10.0
 
-        times, attr, ocl_type = lun_occult_when_loc(jd_start, 0, "Regulus", lat, lon)
+        ocl_type, times, attr = lun_occult_when_loc(jd_start, 0, "Regulus", lat, lon)
 
         # Should find an occultation
         assert ocl_type != 0
         assert times[0] > jd_start
 
     def test_legacy_returns_correct_structure(self):
-        """Test that legacy function returns (times, attr, ocl_type) order."""
+        """Test that legacy function returns (ocl_type, times, attr) order."""
         jd_start = julday(2017, 1, 1, 0)
         lat, lon = 45.0, 10.0
 
-        times, attr, ocl_type = lun_occult_when_loc(jd_start, 0, "Regulus", lat, lon)
+        ocl_type, times, attr = lun_occult_when_loc(jd_start, 0, "Regulus", lat, lon)
 
-        # times is first
-        assert len(times) == 10
-        # attr is second
-        assert len(attr) == 20
-        # ocl_type is third (int)
+        # ocl_type is first (int)
         assert isinstance(ocl_type, int)
+        # times is second
+        assert len(times) == 10
+        # attr is third
+        assert len(attr) == 20
 
     def test_legacy_with_altitude(self):
         """Test that legacy function with altitude parameter works."""
         jd_start = julday(2017, 1, 1, 0)
         lat, lon, alt = 45.0, 10.0, 1000.0
 
-        times, attr, ocl_type = lun_occult_when_loc(
+        ocl_type, times, attr = lun_occult_when_loc(
             jd_start, 0, "Regulus", lat, lon, alt
         )
 

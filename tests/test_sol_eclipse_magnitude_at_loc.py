@@ -206,7 +206,7 @@ class TestConsistencyWithSweEclipseHow:
         geopos = [lon, lat, 0]
 
         magnitude = sol_eclipse_magnitude_at_loc(jd, lat, lon)
-        attr, _ = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
+        _, attr = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
 
         # Magnitudes should match closely
         assert abs(magnitude - attr[0]) < 0.01, (
@@ -223,7 +223,7 @@ class TestConsistencyWithSweEclipseHow:
 
         for jd in test_times:
             magnitude = sol_eclipse_magnitude_at_loc(jd, lat, lon)
-            attr, _ = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
+            _, attr = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
 
             assert abs(magnitude - attr[0]) < 0.01, (
                 f"At JD {jd}: magnitude {magnitude:.4f} differs from "

@@ -90,7 +90,7 @@ class TestPenumbralMagnitudeValues:
         """
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -106,7 +106,7 @@ class TestPenumbralMagnitudeValues:
 
         # Find a partial lunar eclipse
         jd_start = julday(2023, 10, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -121,7 +121,7 @@ class TestPenumbralMagnitudeValues:
         """Test that penumbral-only eclipse has positive penumbral magnitude."""
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -137,7 +137,7 @@ class TestPenumbralMagnitudeValues:
 
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -188,12 +188,12 @@ class TestPenumbralMagnitudeConsistency:
 
         # Find a lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start)
+        ecl_type, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         # Get magnitude from both functions
         penumbral_mag_direct = lun_eclipse_penumbral_magnitude(jd_max)
-        attr, _ = lun_eclipse_how(
+        _, attr = lun_eclipse_how(
             jd_max, 0.0, 0.0
         )  # Location doesn't affect lunar eclipse magnitude
         penumbral_mag_from_how = attr[1]  # attr[1] is penumbral magnitude
@@ -222,7 +222,7 @@ class TestPenumbralMagnitudeConsistency:
         # Find different types of lunar eclipses and test
         for eclipse_type in [SE_ECL_TOTAL, SE_ECL_PARTIAL, SE_ECL_PENUMBRAL]:
             jd_start = julday(2020, 1, 1, 0)
-            times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=eclipse_type)
+            ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=eclipse_type)
             jd_max = times[0]
 
             penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -245,7 +245,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2020, 1, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PENUMBRAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -264,7 +264,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -283,7 +283,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2023, 10, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PARTIAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PARTIAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -302,7 +302,7 @@ class TestEdgeCases:
         """Test eclipse calculation for distant past."""
         # Find an eclipse in 1900
         jd_start = julday(1900, 1, 1, 0)
-        times, _ = lun_eclipse_when(jd_start)
+        _, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -315,7 +315,7 @@ class TestEdgeCases:
         """Test eclipse calculation for distant future."""
         # Find an eclipse in 2050
         jd_start = julday(2050, 1, 1, 0)
-        times, _ = lun_eclipse_when(jd_start)
+        _, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -330,7 +330,7 @@ class TestEdgeCases:
 
         # Find a penumbral-only lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -350,7 +350,7 @@ class TestDocumentation:
 
         # First find a lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start)
+        ecl_type, times = lun_eclipse_when(jd_start)
         jd_max = times[0]  # Time of maximum eclipse
 
         # Calculate penumbral magnitude at maximum

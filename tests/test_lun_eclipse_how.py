@@ -31,7 +31,7 @@ class TestLunEclipseHow:
         jd_eclipse = julday(2022, 5, 16, 4.2)
         rome_lat, rome_lon = 41.9028, 12.4964
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, rome_lat, rome_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, rome_lat, rome_lon)
 
         # Should return 11-element attr tuple
         assert len(attr) == 11
@@ -47,7 +47,7 @@ class TestLunEclipseHow:
         # Use a location where Moon should be visible
         rio_lat, rio_lon = -22.9068, -43.1729
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, rio_lat, rio_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, rio_lat, rio_lon)
 
         # Umbral magnitude should be positive during eclipse
         assert attr[0] > 0
@@ -77,7 +77,7 @@ class TestLunEclipseHow:
         jd_no_eclipse = julday(2022, 6, 1, 12.0)
         london_lat, london_lon = 51.5074, -0.1278
 
-        attr, ecl_type = lun_eclipse_how(jd_no_eclipse, london_lat, london_lon)
+        ecl_type, attr = lun_eclipse_how(jd_no_eclipse, london_lat, london_lon)
 
         # Umbral and penumbral magnitudes should be zero
         assert attr[0] == 0.0
@@ -91,7 +91,7 @@ class TestLunEclipseHow:
         jd_eclipse = julday(2022, 5, 16, 4.2)
         tokyo_lat, tokyo_lon = 35.6762, 139.6503
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, tokyo_lat, tokyo_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, tokyo_lat, tokyo_lon)
 
         # Moon azimuth should be in valid range
         assert 0 <= attr[3] <= 360
@@ -110,8 +110,8 @@ class TestLunEclipseHow:
         new_york_lat, new_york_lon = 40.7128, -74.0060
         sydney_lat, sydney_lon = -33.8688, 151.2093
 
-        attr_ny, _ = lun_eclipse_how(jd_eclipse, new_york_lat, new_york_lon)
-        attr_syd, _ = lun_eclipse_how(jd_eclipse, sydney_lat, sydney_lon)
+        _, attr_ny = lun_eclipse_how(jd_eclipse, new_york_lat, new_york_lon)
+        _, attr_syd = lun_eclipse_how(jd_eclipse, sydney_lat, sydney_lon)
 
         # Moon altitudes should be different
         assert attr_ny[4] != attr_syd[4]
@@ -122,7 +122,7 @@ class TestLunEclipseHow:
         jd_eclipse = julday(2022, 5, 16, 4.2)
         rio_lat, rio_lon = -22.9068, -43.1729
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, rio_lat, rio_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, rio_lat, rio_lon)
 
         # Check if Moon is above horizon
         moon_alt = attr[4]
@@ -134,12 +134,12 @@ class TestLunEclipseHow:
         """Test that eclipse type is correctly detected."""
         # First find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, global_ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        global_ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Check circumstances at maximum
         rio_lat, rio_lon = -22.9068, -43.1729
-        attr, ecl_type = lun_eclipse_how(jd_max, rio_lat, rio_lon)
+        ecl_type, attr = lun_eclipse_how(jd_max, rio_lat, rio_lon)
 
         # Should detect the eclipse type
         assert ecl_type & (SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL)
@@ -150,7 +150,7 @@ class TestLunEclipseHow:
         denver_lat, denver_lon = 39.7392, -104.9903
         denver_altitude = 1609  # 1 mile high
 
-        attr, ecl_type = lun_eclipse_how(
+        ecl_type, attr = lun_eclipse_how(
             jd_eclipse, denver_lat, denver_lon, altitude=denver_altitude
         )
 
@@ -163,7 +163,7 @@ class TestLunEclipseHow:
         jd_eclipse = julday(2022, 5, 16, 4.2)
         berlin_lat, berlin_lon = 52.5200, 13.4050
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, berlin_lat, berlin_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, berlin_lat, berlin_lon)
 
         # Umbra diameter (attr[6]) should be positive
         assert attr[6] > 0
@@ -178,13 +178,13 @@ class TestLunEclipseHow:
         """Test that magnitudes are consistent with lun_eclipse_when values."""
         # Find a lunar eclipse
         jd_start = julday(2024, 1, 1, 0)
-        times, global_type = lun_eclipse_when(jd_start)
+        global_type, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         # Get circumstances at maximum
         # Use a location where eclipse should be visible
         london_lat, london_lon = 51.5074, -0.1278
-        attr, ecl_type = lun_eclipse_how(jd_max, london_lat, london_lon)
+        ecl_type, attr = lun_eclipse_how(jd_max, london_lat, london_lon)
 
         # At least one of umbral or penumbral magnitude should be positive
         assert attr[0] > 0 or attr[1] > 0
@@ -199,7 +199,7 @@ class TestSweLunEclipseHow:
         # geopos = [longitude, latitude, altitude]
         rome_geopos = [12.4964, 41.9028, 0]
 
-        attr, ecl_type = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, rome_geopos)
+        ecl_type, attr = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, rome_geopos)
 
         # Should return 11-element attr tuple
         assert len(attr) == 11
@@ -216,7 +216,7 @@ class TestSweLunEclipseHow:
         # Los Angeles: 34.05N, 118.24W
         la_geopos = [-118.24, 34.05, 0]
 
-        attr, ecl_type = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, la_geopos)
+        ecl_type, attr = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, la_geopos)
 
         # Moon should be visible from LA (totality visible)
         assert ecl_type & SE_ECL_VISIBLE
@@ -236,7 +236,7 @@ class TestSweLunEclipseHow:
         # London: 51.51N, 0.13W
         london_geopos = [-0.13, 51.51, 0]
 
-        attr, ecl_type = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, london_geopos)
+        ecl_type, attr = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, london_geopos)
 
         # Moon should be below or very low from London during this eclipse
         moon_altitude = attr[5]
@@ -252,7 +252,7 @@ class TestSweLunEclipseHow:
         # Tokyo: 35.68N, 139.69E
         tokyo_geopos = [139.69, 35.68, 0]
 
-        attr, ecl_type = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, tokyo_geopos)
+        ecl_type, attr = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, tokyo_geopos)
 
         # Moon should be visible from Tokyo
         assert ecl_type & SE_ECL_VISIBLE
@@ -265,7 +265,7 @@ class TestSweLunEclipseHow:
         jd_eclipse = julday(2022, 5, 16, 4.2)
         rome_geopos = [12.4964, 41.9028, 0]
 
-        attr, ecl_type = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, rome_geopos)
+        ecl_type, attr = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, rome_geopos)
 
         true_altitude = attr[5]
         apparent_altitude = attr[6]
@@ -280,7 +280,7 @@ class TestSweLunEclipseHow:
         jd_eclipse = julday(2022, 5, 16, 4.2)
         rio_geopos = [-43.1729, -22.9068, 0]
 
-        attr, ecl_type = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, rio_geopos)
+        ecl_type, attr = swe_lun_eclipse_how(jd_eclipse, SEFLG_SWIEPH, rio_geopos)
 
         # Center distance (attr[7]) should be reasonable
         # For total eclipse at maximum, this should be < 1
@@ -293,11 +293,11 @@ class TestSweLunEclipseHow:
         """Test that eclipse type at moment is returned."""
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, global_ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        global_ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         rio_geopos = [-43.1729, -22.9068, 0]
-        attr, ecl_type = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, rio_geopos)
+        ecl_type, attr = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, rio_geopos)
 
         # Eclipse type at moment (attr[8]) should indicate total
         eclipse_type_at_moment = int(attr[8])
@@ -314,13 +314,13 @@ class TestSweLunEclipseHow:
         # Rome: lon=12.4964, lat=41.9028
         # Test with correct order (longitude first)
         geopos_correct = [12.4964, 41.9028, 0]
-        attr_correct, ecl_type_correct = swe_lun_eclipse_how(
+        ecl_type_correct, attr_correct = swe_lun_eclipse_how(
             jd_eclipse, SEFLG_SWIEPH, geopos_correct
         )
 
         # Test with swapped coordinates
         geopos_swapped = [41.9028, 12.4964, 0]
-        attr_swapped, ecl_type_swapped = swe_lun_eclipse_how(
+        ecl_type_swapped, attr_swapped = swe_lun_eclipse_how(
             jd_eclipse, SEFLG_SWIEPH, geopos_swapped
         )
 
@@ -337,7 +337,7 @@ class TestLunEclipseHowEdgeCases:
         # Quito, Ecuador (nearly on the equator)
         quito_lat, quito_lon = -0.1807, -78.4678
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, quito_lat, quito_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, quito_lat, quito_lon)
 
         assert len(attr) == 11
         # Moon altitude should be in valid range
@@ -349,7 +349,7 @@ class TestLunEclipseHowEdgeCases:
         # Reykjavik, Iceland
         reykjavik_lat, reykjavik_lon = 64.1466, -21.9426
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, reykjavik_lat, reykjavik_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, reykjavik_lat, reykjavik_lon)
 
         assert len(attr) == 11
         # Moon altitude should be in valid range
@@ -361,7 +361,7 @@ class TestLunEclipseHowEdgeCases:
         # Melbourne, Australia
         melbourne_lat, melbourne_lon = -37.8136, 144.9631
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, melbourne_lat, melbourne_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, melbourne_lat, melbourne_lon)
 
         assert len(attr) == 11
         # Moon altitude should be in valid range
@@ -371,12 +371,12 @@ class TestLunEclipseHowEdgeCases:
         """Test circumstances during a partial lunar eclipse."""
         # Find a partial lunar eclipse
         jd_start = julday(2023, 10, 1, 0)
-        times, global_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        global_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         # Check circumstances
         london_lat, london_lon = 51.5074, -0.1278
-        attr, ecl_type = lun_eclipse_how(jd_max, london_lat, london_lon)
+        ecl_type, attr = lun_eclipse_how(jd_max, london_lat, london_lon)
 
         # Should have positive umbral magnitude (but less than 1 for partial)
         if attr[0] > 0:
@@ -386,12 +386,12 @@ class TestLunEclipseHowEdgeCases:
         """Test circumstances during a penumbral lunar eclipse."""
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        times, global_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        global_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         # Check circumstances
         paris_lat, paris_lon = 48.8566, 2.3522
-        attr, ecl_type = lun_eclipse_how(jd_max, paris_lat, paris_lon)
+        ecl_type, attr = lun_eclipse_how(jd_max, paris_lat, paris_lon)
 
         # Should have positive penumbral magnitude
         # Umbral magnitude should be zero or very small for penumbral-only
@@ -401,12 +401,12 @@ class TestLunEclipseHowEdgeCases:
         """Test eclipse circumstances in early 20th century."""
         # Find an eclipse in 1920
         jd_start = julday(1920, 1, 1, 0)
-        times, global_type = lun_eclipse_when(jd_start)
+        global_type, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         # Check circumstances
         london_lat, london_lon = 51.5074, -0.1278
-        attr, ecl_type = lun_eclipse_how(jd_max, london_lat, london_lon)
+        ecl_type, attr = lun_eclipse_how(jd_max, london_lat, london_lon)
 
         assert len(attr) == 11
         assert isinstance(ecl_type, int)
@@ -415,12 +415,12 @@ class TestLunEclipseHowEdgeCases:
         """Test eclipse circumstances in mid 21st century."""
         # Find an eclipse in 2050
         jd_start = julday(2050, 1, 1, 0)
-        times, global_type = lun_eclipse_when(jd_start)
+        global_type, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         # Check circumstances
         new_york_lat, new_york_lon = 40.7128, -74.0060
-        attr, ecl_type = lun_eclipse_how(jd_max, new_york_lat, new_york_lon)
+        ecl_type, attr = lun_eclipse_how(jd_max, new_york_lat, new_york_lon)
 
         assert len(attr) == 11
         assert isinstance(ecl_type, int)
@@ -431,7 +431,7 @@ class TestLunEclipseHowEdgeCases:
         # Fiji
         fiji_lat, fiji_lon = -18.1416, 178.4419
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, fiji_lat, fiji_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, fiji_lat, fiji_lon)
 
         assert len(attr) == 11
         # Moon azimuth should be in valid range
@@ -443,7 +443,7 @@ class TestLunEclipseHowEdgeCases:
         # Greenwich, UK
         greenwich_lat, greenwich_lon = 51.4772, 0.0
 
-        attr, ecl_type = lun_eclipse_how(jd_eclipse, greenwich_lat, greenwich_lon)
+        ecl_type, attr = lun_eclipse_how(jd_eclipse, greenwich_lat, greenwich_lon)
 
         assert len(attr) == 11
         assert isinstance(ecl_type, int)
@@ -452,7 +452,7 @@ class TestLunEclipseHowEdgeCases:
         """Test that SE_ECL_VISIBLE is not set when Moon is below horizon."""
         # Find an eclipse and test from a location where Moon is below horizon
         jd_start = julday(2022, 5, 1, 0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Test various locations - at least one should have Moon below horizon
@@ -464,7 +464,7 @@ class TestLunEclipseHowEdgeCases:
         ]
 
         for geopos in locations:
-            attr, ecl_type = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, geopos)
+            ecl_type, attr = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, geopos)
             moon_alt = attr[5]
 
             if moon_alt < -1.0:
@@ -494,12 +494,12 @@ class TestValidationRequirements:
         """
         # Find the actual eclipse maximum
         jd_start = julday(2022, 11, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         la_geopos = [-118.24, 34.05, 0]  # Los Angeles: lon, lat, alt
 
-        attr, retflag = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, la_geopos)
+        retflag, attr = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, la_geopos)
 
         # Moon should be visible
         assert retflag & SE_ECL_VISIBLE, "Moon should be visible from LA"
@@ -522,12 +522,12 @@ class TestValidationRequirements:
         """
         # Find the actual eclipse maximum
         jd_start = julday(2022, 11, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         london_geopos = [-0.13, 51.51, 0]  # London: lon, lat, alt
 
-        attr, retflag = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, london_geopos)
+        retflag, attr = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, london_geopos)
 
         # Moon should be below horizon at eclipse maximum in London
         # (Nov 8, 2022 ~11:00 UTC means Moon is setting/set in London)
@@ -549,12 +549,12 @@ class TestValidationRequirements:
         """
         # Find the actual eclipse maximum
         jd_start = julday(2022, 11, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         tokyo_geopos = [139.69, 35.68, 0]  # Tokyo: lon, lat, alt
 
-        attr, retflag = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, tokyo_geopos)
+        retflag, attr = swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, tokyo_geopos)
 
         # Moon should be visible from Tokyo
         assert retflag & SE_ECL_VISIBLE, "Moon should be visible from Tokyo"
@@ -575,7 +575,7 @@ class TestValidationRequirements:
         """
         # Find the actual eclipse maximum
         jd_start = julday(2022, 11, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Test with LA coordinates in correct order (longitude first)
@@ -583,10 +583,10 @@ class TestValidationRequirements:
         geopos_lon_first = [-118.24, 34.05, 0]  # Correct: lon, lat, alt
         geopos_lat_first = [34.05, -118.24, 0]  # Wrong: lat, lon, alt
 
-        attr_correct, retflag_correct = swe_lun_eclipse_how(
+        retflag_correct, attr_correct = swe_lun_eclipse_how(
             jd_max, SEFLG_SWIEPH, geopos_lon_first
         )
-        attr_wrong, retflag_wrong = swe_lun_eclipse_how(
+        retflag_wrong, attr_wrong = swe_lun_eclipse_how(
             jd_max, SEFLG_SWIEPH, geopos_lat_first
         )
 
@@ -626,7 +626,7 @@ class TestValidationRequirements:
         ]
 
         for geopos, name in test_locations:
-            attr, retflag = swe_lun_eclipse_how(jd, SEFLG_SWIEPH, geopos)
+            retflag, attr = swe_lun_eclipse_how(jd, SEFLG_SWIEPH, geopos)
             moon_alt = attr[5]
 
             if moon_alt < -1.0:
@@ -650,7 +650,7 @@ class TestValidationRequirements:
         jd = 2459892.4
         la_geopos = [-118.24, 34.05, 0]
 
-        attr, retflag = swe_lun_eclipse_how(jd, SEFLG_SWIEPH, la_geopos)
+        retflag, attr = swe_lun_eclipse_how(jd, SEFLG_SWIEPH, la_geopos)
 
         true_alt = attr[5]
         apparent_alt = attr[6]

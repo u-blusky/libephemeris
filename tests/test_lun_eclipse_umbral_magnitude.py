@@ -86,7 +86,7 @@ class TestUmbralMagnitudeValues:
         """Test that total lunar eclipse has umbral magnitude > 1.0 at maximum."""
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -100,7 +100,7 @@ class TestUmbralMagnitudeValues:
         """Test that partial lunar eclipse has 0 < umbral magnitude < 1.0."""
         # Find a partial lunar eclipse
         jd_start = julday(2023, 10, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -114,7 +114,7 @@ class TestUmbralMagnitudeValues:
         """Test that penumbral-only eclipse has umbral magnitude ~ 0."""
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -158,12 +158,12 @@ class TestUmbralMagnitudeConsistency:
 
         # Find a lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start)
+        ecl_type, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         # Get magnitude from both functions
         umbral_mag_direct = lun_eclipse_umbral_magnitude(jd_max)
-        attr, _ = lun_eclipse_how(
+        _, attr = lun_eclipse_how(
             jd_max, 0.0, 0.0
         )  # Location doesn't affect lunar eclipse magnitude
         umbral_mag_from_how = attr[0]
@@ -189,7 +189,7 @@ class TestUmbralMagnitudeConsistency:
         """Test that magnitude is highest at eclipse maximum."""
         # Find a lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # At maximum, magnitude should be the peak
@@ -211,7 +211,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -230,7 +230,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2022, 11, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -248,7 +248,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2023, 10, 1, 0)
-        times, _ = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PARTIAL)
+        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PARTIAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -264,7 +264,7 @@ class TestEdgeCases:
         """Test eclipse calculation for distant past."""
         # Find an eclipse in 1900
         jd_start = julday(1900, 1, 1, 0)
-        times, _ = lun_eclipse_when(jd_start)
+        _, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -277,7 +277,7 @@ class TestEdgeCases:
         """Test eclipse calculation for distant future."""
         # Find an eclipse in 2050
         jd_start = julday(2050, 1, 1, 0)
-        times, _ = lun_eclipse_when(jd_start)
+        _, times = lun_eclipse_when(jd_start)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -290,7 +290,7 @@ class TestEdgeCases:
         """Test magnitude at eclipse maximum for total eclipse."""
         # Find a total lunar eclipse with all phases
         jd_start = julday(2022, 5, 1, 0)
-        times, _ = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
 
         jd_max = times[0]
 
@@ -311,7 +311,7 @@ class TestDocumentation:
 
         # First find a lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        times, ecl_type = lun_eclipse_when(jd_start)
+        ecl_type, times = lun_eclipse_when(jd_start)
         jd_max = times[0]  # Time of maximum eclipse
 
         # Calculate umbral magnitude at maximum

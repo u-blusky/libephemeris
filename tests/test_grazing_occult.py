@@ -188,7 +188,7 @@ class TestGrazingOccultIntegration:
         rome_lat, rome_lon = 41.9028, 12.4964
 
         try:
-            times, attr, retflag = lun_occult_when_loc(
+            retflag, times, attr = lun_occult_when_loc(
                 jd_start, 0, "Regulus", rome_lat, rome_lon
             )
 

@@ -351,7 +351,7 @@ class TestSweSolEclipseHowDetailsConsistency:
         geopos = [-96.797, 32.7767, 0]
 
         details = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos)
-        attr, _ = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
+        _, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
 
         # Magnitudes should be close (might differ slightly due to different JD)
         assert abs(details["magnitude"] - attr[0]) < 0.1
@@ -362,7 +362,7 @@ class TestSweSolEclipseHowDetailsConsistency:
         geopos = [-96.797, 32.7767, 0]
 
         details = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos)
-        attr, _ = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
+        _, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
 
         # Obscurations should be close
         assert abs(details["obscuration"] - attr[2]) < 0.1
@@ -423,7 +423,7 @@ class TestSweSolEclipseHowDetailsContactTimes:
         """Test that contact times are close to swe_sol_eclipse_when_loc results."""
         # Get contact times from when_loc
         jd_start = julday(2024, 1, 1, 0)
-        tret, attr, ecl_type = swe_sol_eclipse_when_loc(
+        ecl_type, tret, attr = swe_sol_eclipse_when_loc(
             jd_start, SEFLG_SWIEPH, self.geopos_dallas
         )
 
