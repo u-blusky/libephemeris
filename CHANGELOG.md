@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-02-02
+
+### Changed
+
+#### Breaking: Eclipse Function Return Order
+All eclipse functions now return `(retflag, ...)` as the first element to match pyswisseph API conventions:
+
+- `sol_eclipse_when_glob`: returns `(int, tuple)` - retflag first
+- `sol_eclipse_where`: returns `(int, geopos, attr)` - retflag first
+- `sol_eclipse_how`: returns `(int, attr)` - retflag first
+- `sol_eclipse_when_loc`: returns `(int, times, attr)` - retflag first
+- `lun_eclipse_when`: returns `(int, tuple)` - retflag first
+- `lun_eclipse_how`: returns `(int, attr)` - retflag first
+- `lun_eclipse_when_loc`: returns `(int, times, attr)` - retflag first
+- `lun_occult_when_glob`: returns `(int, tuple)` - retflag first
+- `lun_occult_when_loc`: returns `(int, times, attr)` - retflag first
+
+**Migration**: Update unpacking from `times, attr, ecl_type = func()` to `ecl_type, times, attr = func()`
+
+### Fixed
+
+- Fixed `azalt()` call in heliacal.py (was passing 8 arguments instead of 6)
+- Fixed Asellus Australis HIP number from 43834 to 42911 in fixed_stars.py
+- Fixed early return statements in eclipse exception handlers to use correct tuple order
+
 ## [0.5.1] - 2026-01-31
 
 ### Added
