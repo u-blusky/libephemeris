@@ -146,6 +146,37 @@ _PLANET_NAMES = {
 }
 
 
+# Type alias for position result tuple
+PositionResult = Tuple[float, float, float, float, float, float]
+
+
+def _to_native_floats(values: tuple) -> PositionResult:
+    """Convert numpy float types to native Python floats.
+
+    Skyfield returns numpy.float64 values which can cause issues with:
+    - JSON serialization
+    - `is True` comparisons (speed < 0 returns np.bool_ instead of bool)
+    - Type checking in downstream code
+
+    This function ensures all values are native Python floats for
+    compatibility with pyswisseph behavior.
+
+    Args:
+        values: Tuple of 6 values (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+
+    Returns:
+        Tuple of 6 native Python floats
+    """
+    return (
+        float(values[0]),
+        float(values[1]),
+        float(values[2]),
+        float(values[3]),
+        float(values[4]),
+        float(values[5]),
+    )
+
+
 def _body_uses_jpl_ephemeris(ipl: int) -> bool:
     """Check if a body uses the JPL ephemeris for calculations.
 
@@ -743,7 +774,7 @@ def _calc_body_pctr(
             da = (ayanamsa_next - ayanamsa) / dt
             dp1 -= da
 
-    return (p1, p2, p3, dp1, dp2, dp3), iflag
+    return _to_native_floats((p1, p2, p3, dp1, dp2, dp3)), iflag
 
 
 def _calc_nutation_obliquity(
@@ -890,7 +921,7 @@ def _calc_body(
                     dlon -= 360.0 / dt
                 elif dlon < -18000:
                     dlon += 360.0 / dt
-            return (lon, 0.0, 0.0, dlon, 0.0, 0.0), iflag
+            return _to_native_floats((lon, 0.0, 0.0, dlon, 0.0, 0.0)), iflag
         else:  # SE_TRUE_NODE
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
             # Calculate velocity via numerical differentiation if requested
@@ -906,7 +937,7 @@ def _calc_body(
                     dlon -= 360.0 / dt
                 elif dlon < -18000:
                     dlon += 360.0 / dt
-            return (lon, lat, dist, dlon, dlat, ddist), iflag
+            return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # South nodes are 180° from north nodes
     if ipl in [-SE_MEAN_NODE, -SE_TRUE_NODE]:
@@ -927,7 +958,7 @@ def _calc_body(
         jd_tt = t.tt
         if ipl == SE_MEAN_APOG:
             lon = lunar.calc_mean_lilith(jd_tt)
-            return (lon, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+            return _to_native_floats((lon, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
         else:  # SE_OSCU_APOG
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
             # Calculate velocity via numerical differentiation if requested
@@ -943,7 +974,7 @@ def _calc_body(
                     dlon -= 360.0 / dt
                 elif dlon < -18000:
                     dlon += 360.0 / dt
-            return (lon, lat, dist, dlon, dlat, ddist), iflag
+            return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # Handle Interpolated Apogee/Perigee
     if ipl in [SE_INTP_APOG, SE_INTP_PERG]:
@@ -972,7 +1003,7 @@ def _calc_body(
                 dlon -= 360.0 / dt
             elif dlon < -18000:
                 dlon += 360.0 / dt
-        return (lon, lat, dist, dlon, dlat, ddist), iflag
+        return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # Handle Uranian planets (Hamburg School hypothetical bodies, IDs 40-47)
     if SE_CUPIDO <= ipl <= SE_POSEIDON:
@@ -1048,15 +1079,15 @@ def _calc_body(
             lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
             lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
 
-            return (lon, lat, r_geo, 0.0, 0.0, 0.0), iflag
+            return _to_native_floats((lon, lat, r_geo, 0.0, 0.0, 0.0)), iflag
         else:
-            return (lon_hel, lat_hel, r_hel, 0.0, 0.0, 0.0), iflag
+            return _to_native_floats((lon_hel, lat_hel, r_hel, 0.0, 0.0, 0.0)), iflag
 
     # Handle fixed stars
     if ipl in fixed_stars.FIXED_STARS:
         jd_tt = t.tt
         lon, lat, dist = fixed_stars.calc_fixed_star_position(ipl, jd_tt)
-        return (lon, lat, dist, 0.0, 0.0, 0.0), iflag
+        return _to_native_floats((lon, lat, dist, 0.0, 0.0, 0.0)), iflag
 
     # Handle astrological angles (requires observer location)
     if SE_ANGLE_OFFSET <= ipl < SE_ARABIC_OFFSET:
@@ -1108,7 +1139,7 @@ def _calc_body(
         else:
             lon = 0.0
 
-        return (lon, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+        return _to_native_floats((lon, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
 
     # Handle standard planets
     if ipl in _PLANET_MAP:
@@ -1402,7 +1433,7 @@ def _calc_body(
             da = (ayanamsa_next - ayanamsa) / dt
             dp1 -= da
 
-    return (p1, p2, p3, dp1, dp2, dp3), iflag
+    return _to_native_floats((p1, p2, p3, dp1, dp2, dp3)), iflag
 
 
 def _calc_body_with_context(
