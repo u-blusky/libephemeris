@@ -146,6 +146,96 @@ _PLANET_NAMES = {
 }
 
 
+class _CobCorrectedTarget:
+    """Wrapper that applies COB (Center of Body) correction to barycenter positions.
+
+    DE440 returns system barycenter positions for outer planets (Jupiter, Saturn,
+    Neptune, Pluto), but Swiss Ephemeris returns planet center positions. This
+    wrapper applies analytical moon theory corrections to convert barycenter to
+    center of body positions.
+
+    The wrapper implements the Skyfield VectorFunction protocol so it can be used
+    with observer.at(t).observe(target) seamlessly.
+    """
+
+    def __init__(self, barycenter, barycenter_name: str):
+        """Initialize with a barycenter target and its name.
+
+        Args:
+            barycenter: Skyfield VectorFunction (e.g., planets['jupiter barycenter'])
+            barycenter_name: Name like 'jupiter barycenter' for lookup in moon_theories
+        """
+        self._barycenter = barycenter
+        self._barycenter_name = barycenter_name
+        # Copy attributes needed by Skyfield
+        self.center = getattr(barycenter, "center", 0)
+        self.target = getattr(barycenter, "target", None)
+
+    def at(self, t):
+        """Return position at time t with COB correction applied.
+
+        Args:
+            t: Skyfield Time object
+
+        Returns:
+            Skyfield ICRF position with COB offset applied
+        """
+        import numpy as np
+        from skyfield.positionlib import ICRF
+
+        from .moon_theories import get_cob_offset
+
+        # Get barycenter position
+        bary_pos = self._barycenter.at(t)
+        pos_au = bary_pos.position.au
+        vel_au_per_d = bary_pos.velocity.au_per_d
+
+        # Apply COB correction
+        offset = get_cob_offset(self._barycenter_name, t)
+        corrected_pos = pos_au + np.array(offset)
+
+        # Return new ICRF position with corrected coordinates
+        return ICRF(
+            corrected_pos,
+            vel_au_per_d,
+            t=t,
+            center=self.center,
+        )
+
+    def __repr__(self):
+        return f"<CobCorrectedTarget {self._barycenter_name}>"
+
+    def _observe_from_bcrs(self, observer):
+        """Observe this target from an observer in BCRS coordinates.
+
+        This method is called by Skyfield's observe() function to compute
+        light-time corrected positions. We delegate to the barycenter's
+        implementation and then apply the COB correction.
+
+        Args:
+            observer: Skyfield Barycentric position of the observer
+
+        Returns:
+            Tuple of (position_au, velocity_au_per_d, time, light_time_days)
+        """
+        import numpy as np
+
+        from .moon_theories import get_cob_offset
+
+        # Get the raw observation from the barycenter
+        pos, vel, t, light_time = self._barycenter._observe_from_bcrs(observer)
+
+        # Apply COB correction at the retarded time
+        # (when light left the planet, not when it arrives)
+        ts = observer.t  # This is the observation time
+        # But we need the retarded time - Skyfield has already computed it internally
+        # The returned 't' should be the retarded time
+        offset = get_cob_offset(self._barycenter_name, t)
+        corrected_pos = pos + np.array(offset)
+
+        return corrected_pos, vel, t, light_time
+
+
 # Type alias for position result tuple
 PositionResult = Tuple[float, float, float, float, float, float]
 
@@ -1142,6 +1232,7 @@ def _calc_body(
         return _to_native_floats((lon, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
 
     # Handle standard planets
+    barycenter_name = None  # Track if we're using a barycenter (for COB correction)
     if ipl in _PLANET_MAP:
         target_name = _PLANET_MAP[ipl]
         # Try planet center first, fall back to barycenter if not available
@@ -1150,7 +1241,10 @@ def _calc_body(
         except KeyError:
             # Planet center not in ephemeris, try barycenter fallback
             if target_name in _PLANET_FALLBACK:
-                target = planets[_PLANET_FALLBACK[target_name]]
+                barycenter_name = _PLANET_FALLBACK[target_name]
+                target = planets[barycenter_name]
+                # Apply COB correction: wrap target in a corrected VectorFunction
+                target = _CobCorrectedTarget(target, barycenter_name)
             else:
                 raise
     else:

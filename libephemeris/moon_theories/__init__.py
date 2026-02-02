@@ -1,0 +1,56 @@
+"""
+Analytical theories for planetary moon positions.
+
+This module provides analytical ephemerides for planetary moons, used to
+calculate the offset between a planet's barycenter and its center of body (COB).
+
+Theories implemented:
+- Galilean moons (Io, Europa, Ganymede, Callisto): Lieske E5 / Meeus algorithm
+- Saturn moons (Mimas through Hyperion): TASS 1.7 (Vienne & Duriez)
+- Triton: Keplerian elements with J2 precession
+- Charon: Two-body Keplerian solution
+
+References:
+- Lieske, J.H. (1998) "Galilean satellite ephemerides E5", A&AS 129, 205
+- Vienne, A. & Duriez, L. (1995) "TASS1.6", A&A 297, 588-605
+- Jacobson, R.A. (2009) "The Orbits of the Neptunian Satellites"
+- Brozović, M. & Jacobson, R.A. (2024) "Pluto system orbits", AJ 167:256
+
+License: MIT (for TASS 1.7 port from Stellarium)
+         LGPL-3.0 (for Galilean theory adapted from PyMeeus)
+"""
+
+from .constants import (
+    # Planet GM values (km³/s²)
+    GM_JUPITER,
+    GM_SATURN,
+    GM_URANUS,
+    GM_NEPTUNE,
+    GM_PLUTO,
+    # Moon GM values (km³/s²)
+    GM_IO,
+    GM_EUROPA,
+    GM_GANYMEDE,
+    GM_CALLISTO,
+    GM_TITAN,
+    GM_TRITON,
+    GM_CHARON,
+    # Utility functions
+    get_cob_offset,
+)
+
+__all__ = [
+    "GM_JUPITER",
+    "GM_SATURN",
+    "GM_URANUS",
+    "GM_NEPTUNE",
+    "GM_PLUTO",
+    "GM_IO",
+    "GM_EUROPA",
+    "GM_GANYMEDE",
+    "GM_CALLISTO",
+    "GM_TITAN",
+    "GM_TRITON",
+    "GM_CHARON",
+    "get_cob_offset",
+]
