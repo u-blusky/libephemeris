@@ -1,0 +1,2 @@
+- DE440s.bsp / DE440.bsp -> More precision
+- Use Planet Center, not Planet Barycenter
