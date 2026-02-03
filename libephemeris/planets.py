@@ -1200,34 +1200,40 @@ def _calc_body(
         if ipl == SE_MEAN_NODE:
             lon = lunar.calc_mean_lunar_node(jd_tt)
             # Calculate velocity via central difference numerical differentiation
+            # Using ±0.5 days to capture any slow variations in the mean motion.
             dlon = 0.0
             if iflag & SEFLG_SPEED:
-                dt = 1.0 / 86400.0  # 1 second in days
+                dt = 0.5  # 0.5 days for consistency with other lunar velocity calcs
                 lon_prev = lunar.calc_mean_lunar_node(jd_tt - dt)
                 lon_next = lunar.calc_mean_lunar_node(jd_tt + dt)
-                dlon = (lon_next - lon_prev) / (2.0 * dt)
-                # Handle longitude wrap-around
-                if dlon > 9000:
-                    dlon -= 360.0 / (2.0 * dt)
-                elif dlon < -9000:
-                    dlon += 360.0 / (2.0 * dt)
+                # Handle longitude wrap-around before computing velocity
+                lon_diff = lon_next - lon_prev
+                if lon_diff > 180:
+                    lon_diff -= 360.0
+                elif lon_diff < -180:
+                    lon_diff += 360.0
+                dlon = lon_diff / (2.0 * dt)
             return _to_native_floats((lon, 0.0, 0.0, dlon, 0.0, 0.0)), iflag
         else:  # SE_TRUE_NODE
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
             # Calculate velocity via central difference numerical differentiation
+            # Using ±0.5 days to capture perturbation effects that a 1-second
+            # step would miss, ensuring velocity reflects the actual rate of
+            # change including all periodic terms from ELP2000-82B theory.
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & SEFLG_SPEED:
-                dt = 1.0 / 86400.0  # 1 second in days
+                dt = 0.5  # 0.5 days for perturbation-corrected velocity
                 lon_prev, lat_prev, dist_prev = lunar.calc_true_lunar_node(jd_tt - dt)
                 lon_next, lat_next, dist_next = lunar.calc_true_lunar_node(jd_tt + dt)
-                dlon = (lon_next - lon_prev) / (2.0 * dt)
+                # Handle longitude wrap-around before computing velocity
+                lon_diff = lon_next - lon_prev
+                if lon_diff > 180:
+                    lon_diff -= 360.0
+                elif lon_diff < -180:
+                    lon_diff += 360.0
+                dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
                 ddist = (dist_next - dist_prev) / (2.0 * dt)
-                # Handle longitude wrap-around
-                if dlon > 9000:
-                    dlon -= 360.0 / (2.0 * dt)
-                elif dlon < -9000:
-                    dlon += 360.0 / (2.0 * dt)
             return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # South nodes are 180° from north nodes
@@ -1249,23 +1255,43 @@ def _calc_body(
         jd_tt = t.tt
         if ipl == SE_MEAN_APOG:
             lon = lunar.calc_mean_lilith(jd_tt)
-            return _to_native_floats((lon, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
+            # Calculate velocity via central difference numerical differentiation
+            # Using ±0.5 days to capture perturbation effects that a 1-second
+            # step would miss, ensuring velocity reflects the actual rate of
+            # change including all periodic correction terms.
+            dlon = 0.0
+            if iflag & SEFLG_SPEED:
+                dt = 0.5  # 0.5 days for perturbation-corrected velocity
+                lon_prev = lunar.calc_mean_lilith(jd_tt - dt)
+                lon_next = lunar.calc_mean_lilith(jd_tt + dt)
+                # Handle longitude wrap-around before computing velocity
+                lon_diff = lon_next - lon_prev
+                if lon_diff > 180:
+                    lon_diff -= 360.0
+                elif lon_diff < -180:
+                    lon_diff += 360.0
+                dlon = lon_diff / (2.0 * dt)
+            return _to_native_floats((lon, 0.0, 0.0, dlon, 0.0, 0.0)), iflag
         else:  # SE_OSCU_APOG
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
             # Calculate velocity via central difference numerical differentiation
+            # Using ±0.5 days to capture perturbation effects that a 1-second
+            # step would miss, ensuring velocity reflects the actual rate of
+            # change including all periodic terms from orbital mechanics.
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & SEFLG_SPEED:
-                dt = 1.0 / 86400.0  # 1 second in days
+                dt = 0.5  # 0.5 days for perturbation-corrected velocity
                 lon_prev, lat_prev, dist_prev = lunar.calc_true_lilith(jd_tt - dt)
                 lon_next, lat_next, dist_next = lunar.calc_true_lilith(jd_tt + dt)
-                dlon = (lon_next - lon_prev) / (2.0 * dt)
+                # Handle longitude wrap-around before computing velocity
+                lon_diff = lon_next - lon_prev
+                if lon_diff > 180:
+                    lon_diff -= 360.0
+                elif lon_diff < -180:
+                    lon_diff += 360.0
+                dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
                 ddist = (dist_next - dist_prev) / (2.0 * dt)
-                # Handle longitude wrap-around
-                if dlon > 9000:
-                    dlon -= 360.0 / (2.0 * dt)
-                elif dlon < -9000:
-                    dlon += 360.0 / (2.0 * dt)
             return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # Handle Interpolated Apogee/Perigee
@@ -1276,9 +1302,12 @@ def _calc_body(
         else:  # SE_INTP_PERG
             lon, lat, dist = lunar.calc_interpolated_perigee(jd_tt)
         # Calculate velocity via central difference numerical differentiation
+        # Using ±0.5 days to capture perturbation effects that a 1-second
+        # step would miss, ensuring velocity reflects the actual rate of
+        # change including all periodic terms.
         dlon, dlat, ddist = 0.0, 0.0, 0.0
         if iflag & SEFLG_SPEED:
-            dt = 1.0 / 86400.0  # 1 second in days
+            dt = 0.5  # 0.5 days for perturbation-corrected velocity
             if ipl == SE_INTP_APOG:
                 lon_prev, lat_prev, dist_prev = lunar.calc_interpolated_apogee(
                     jd_tt - dt
@@ -1293,14 +1322,15 @@ def _calc_body(
                 lon_next, lat_next, dist_next = lunar.calc_interpolated_perigee(
                     jd_tt + dt
                 )
-            dlon = (lon_next - lon_prev) / (2.0 * dt)
+            # Handle longitude wrap-around before computing velocity
+            lon_diff = lon_next - lon_prev
+            if lon_diff > 180:
+                lon_diff -= 360.0
+            elif lon_diff < -180:
+                lon_diff += 360.0
+            dlon = lon_diff / (2.0 * dt)
             dlat = (lat_next - lat_prev) / (2.0 * dt)
             ddist = (dist_next - dist_prev) / (2.0 * dt)
-            # Handle longitude wrap-around
-            if dlon > 9000:
-                dlon -= 360.0 / (2.0 * dt)
-            elif dlon < -9000:
-                dlon += 360.0 / (2.0 * dt)
         return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # Handle Uranian planets (Hamburg School hypothetical bodies, IDs 40-47)

@@ -204,14 +204,19 @@ class TestMeanLilithVelocity:
     """Test Mean Lilith velocity calculations for comparison."""
 
     @pytest.mark.unit
-    def test_mean_lilith_velocity_is_zero(self):
-        """Mean Lilith currently returns zero velocity."""
+    def test_mean_lilith_velocity_is_nonzero(self):
+        """Mean Lilith velocity should now be calculated with SEFLG_SPEED."""
         jd = 2451545.0
         pos, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, SEFLG_SPEED)
 
-        # Mean Lilith velocity is not currently implemented
-        # This test documents the current behavior
-        assert pos[3] == 0.0, f"Mean Lilith velocity should be 0, got {pos[3]}"
+        # Mean Lilith velocity is now implemented using central difference
+        # The base apsidal precession is about 40.7 degrees/year = 0.111 deg/day
+        # but the Mean Lilith formula includes periodic corrections that cause
+        # the instantaneous velocity to vary
+        assert pos[3] != 0.0, "Mean Lilith velocity should be non-zero with SEFLG_SPEED"
+        assert 0.0 < pos[3] < 1.0, (
+            f"Mean Lilith velocity {pos[3]} deg/day outside expected range [0.0, 1.0]"
+        )
 
 
 class TestTrueLilithVelocityEdgeCases:
