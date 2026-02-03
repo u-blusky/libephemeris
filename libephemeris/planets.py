@@ -200,12 +200,14 @@ class _CobCorrectedTarget:
         offset = get_cob_offset(self._barycenter_name, t)
         corrected_pos = pos_au + np.array(offset)
 
-        # Compute velocity correction numerically
+        # Compute velocity correction using central difference
         dt = 1.0 / 86400.0  # 1 second in days
         ts = get_timescale()
+        t_prev = ts.tt_jd(t.tt - dt)
         t_next = ts.tt_jd(t.tt + dt)
+        offset_prev = get_cob_offset(self._barycenter_name, t_prev)
         offset_next = get_cob_offset(self._barycenter_name, t_next)
-        offset_vel = (np.array(offset_next) - np.array(offset)) / dt
+        offset_vel = (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
         corrected_vel = vel_au_per_d + offset_vel
 
         # Return new ICRF position with corrected coordinates
@@ -246,12 +248,14 @@ class _CobCorrectedTarget:
         offset = get_cob_offset(self._barycenter_name, t)
         corrected_pos = pos + np.array(offset)
 
-        # Compute velocity correction numerically
+        # Compute velocity correction using central difference
         dt = 1.0 / 86400.0  # 1 second in days
         ts = get_timescale()
+        t_prev = ts.tt_jd(t.tt - dt)
         t_next = ts.tt_jd(t.tt + dt)
+        offset_prev = get_cob_offset(self._barycenter_name, t_prev)
         offset_next = get_cob_offset(self._barycenter_name, t_next)
-        offset_vel = (np.array(offset_next) - np.array(offset)) / dt
+        offset_vel = (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
         corrected_vel = vel + offset_vel
 
         return corrected_pos, corrected_vel, t, light_time
@@ -320,12 +324,14 @@ class _SpkCenterTarget:
             offset = get_cob_offset(self._barycenter_name, t)
             corrected_pos = pos_au + np.array(offset)
 
-            # Compute velocity correction numerically
+            # Compute velocity correction using central difference
             dt = 1.0 / 86400.0  # 1 second in days
             ts = get_timescale()
+            t_prev = ts.tt_jd(t.tt - dt)
             t_next = ts.tt_jd(t.tt + dt)
+            offset_prev = get_cob_offset(self._barycenter_name, t_prev)
             offset_next = get_cob_offset(self._barycenter_name, t_next)
-            offset_vel = (np.array(offset_next) - np.array(offset)) / dt
+            offset_vel = (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
             corrected_vel = vel_au_per_d + offset_vel
 
         # Return new ICRF position with corrected coordinates
@@ -372,12 +378,14 @@ class _SpkCenterTarget:
             offset = get_cob_offset(self._barycenter_name, t)
             corrected_pos = pos + np.array(offset)
 
-            # Compute velocity correction numerically
+            # Compute velocity correction using central difference
             dt = 1.0 / 86400.0  # 1 second in days
             ts = get_timescale()
+            t_prev = ts.tt_jd(t.tt - dt)
             t_next = ts.tt_jd(t.tt + dt)
+            offset_prev = get_cob_offset(self._barycenter_name, t_prev)
             offset_next = get_cob_offset(self._barycenter_name, t_next)
-            offset_vel = (np.array(offset_next) - np.array(offset)) / dt
+            offset_vel = (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
             corrected_vel = vel + offset_vel
 
         return corrected_pos, corrected_vel, t, light_time
@@ -1011,30 +1019,36 @@ def _calc_body_pctr(
             p2 = lat_.degrees
             p3 = dist_.au
 
-    # Calculate speed using numerical differentiation if requested
+    # Calculate speed using central difference numerical differentiation if requested
+    # Central difference: f'(x) ≈ [f(x+h) - f(x-h)] / (2h) - error O(h²)
     dt = 1.0 / 86400.0  # 1 second timestep
 
     if iflag & SEFLG_SPEED:
         ts_inner = get_timescale()
+        t_prev = ts_inner.tt_jd(t.tt - dt)
         t_next = ts_inner.tt_jd(t.tt + dt)
 
-        # Get position at t + dt using the same method (without speed or sidereal)
+        # Get positions at t - dt and t + dt using the same method (without speed or sidereal)
         flags_no_speed_no_sidereal = (iflag & ~SEFLG_SPEED) & ~SEFLG_SIDEREAL
+        result_prev, _ = _calc_body_pctr(
+            t_prev, ipl, iplctr, flags_no_speed_no_sidereal
+        )
         result_next, _ = _calc_body_pctr(
             t_next, ipl, iplctr, flags_no_speed_no_sidereal
         )
+        p1_prev, p2_prev, p3_prev = result_prev[0], result_prev[1], result_prev[2]
         p1_next, p2_next, p3_next = result_next[0], result_next[1], result_next[2]
 
-        # Calculate derivatives
-        dp1 = (p1_next - p1) / dt
-        dp2 = (p2_next - p2) / dt
-        dp3 = (p3_next - p3) / dt
+        # Calculate derivatives using central difference
+        dp1 = (p1_next - p1_prev) / (2.0 * dt)
+        dp2 = (p2_next - p2_prev) / (2.0 * dt)
+        dp3 = (p3_next - p3_prev) / (2.0 * dt)
 
         # Handle longitude wrap-around
-        if dp1 > 18000:
-            dp1 -= 360.0 / dt
-        elif dp1 < -18000:
-            dp1 += 360.0 / dt
+        if dp1 > 9000:
+            dp1 -= 360.0 / (2.0 * dt)
+        elif dp1 < -9000:
+            dp1 += 360.0 / (2.0 * dt)
 
     # Apply sidereal offset if requested (ecliptic only)
     # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
@@ -1185,33 +1199,35 @@ def _calc_body(
         jd_tt = t.tt
         if ipl == SE_MEAN_NODE:
             lon = lunar.calc_mean_lunar_node(jd_tt)
-            # Calculate velocity via numerical differentiation if requested
+            # Calculate velocity via central difference numerical differentiation
             dlon = 0.0
             if iflag & SEFLG_SPEED:
                 dt = 1.0 / 86400.0  # 1 second in days
+                lon_prev = lunar.calc_mean_lunar_node(jd_tt - dt)
                 lon_next = lunar.calc_mean_lunar_node(jd_tt + dt)
-                dlon = (lon_next - lon) / dt
+                dlon = (lon_next - lon_prev) / (2.0 * dt)
                 # Handle longitude wrap-around
-                if dlon > 18000:
-                    dlon -= 360.0 / dt
-                elif dlon < -18000:
-                    dlon += 360.0 / dt
+                if dlon > 9000:
+                    dlon -= 360.0 / (2.0 * dt)
+                elif dlon < -9000:
+                    dlon += 360.0 / (2.0 * dt)
             return _to_native_floats((lon, 0.0, 0.0, dlon, 0.0, 0.0)), iflag
         else:  # SE_TRUE_NODE
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
-            # Calculate velocity via numerical differentiation if requested
+            # Calculate velocity via central difference numerical differentiation
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & SEFLG_SPEED:
                 dt = 1.0 / 86400.0  # 1 second in days
+                lon_prev, lat_prev, dist_prev = lunar.calc_true_lunar_node(jd_tt - dt)
                 lon_next, lat_next, dist_next = lunar.calc_true_lunar_node(jd_tt + dt)
-                dlon = (lon_next - lon) / dt
-                dlat = (lat_next - lat) / dt
-                ddist = (dist_next - dist) / dt
+                dlon = (lon_next - lon_prev) / (2.0 * dt)
+                dlat = (lat_next - lat_prev) / (2.0 * dt)
+                ddist = (dist_next - dist_prev) / (2.0 * dt)
                 # Handle longitude wrap-around
-                if dlon > 18000:
-                    dlon -= 360.0 / dt
-                elif dlon < -18000:
-                    dlon += 360.0 / dt
+                if dlon > 9000:
+                    dlon -= 360.0 / (2.0 * dt)
+                elif dlon < -9000:
+                    dlon += 360.0 / (2.0 * dt)
             return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # South nodes are 180° from north nodes
@@ -1236,19 +1252,20 @@ def _calc_body(
             return _to_native_floats((lon, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
         else:  # SE_OSCU_APOG
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
-            # Calculate velocity via numerical differentiation if requested
+            # Calculate velocity via central difference numerical differentiation
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & SEFLG_SPEED:
                 dt = 1.0 / 86400.0  # 1 second in days
+                lon_prev, lat_prev, dist_prev = lunar.calc_true_lilith(jd_tt - dt)
                 lon_next, lat_next, dist_next = lunar.calc_true_lilith(jd_tt + dt)
-                dlon = (lon_next - lon) / dt
-                dlat = (lat_next - lat) / dt
-                ddist = (dist_next - dist) / dt
+                dlon = (lon_next - lon_prev) / (2.0 * dt)
+                dlat = (lat_next - lat_prev) / (2.0 * dt)
+                ddist = (dist_next - dist_prev) / (2.0 * dt)
                 # Handle longitude wrap-around
-                if dlon > 18000:
-                    dlon -= 360.0 / dt
-                elif dlon < -18000:
-                    dlon += 360.0 / dt
+                if dlon > 9000:
+                    dlon -= 360.0 / (2.0 * dt)
+                elif dlon < -9000:
+                    dlon += 360.0 / (2.0 * dt)
             return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # Handle Interpolated Apogee/Perigee
@@ -1258,26 +1275,32 @@ def _calc_body(
             lon, lat, dist = lunar.calc_interpolated_apogee(jd_tt)
         else:  # SE_INTP_PERG
             lon, lat, dist = lunar.calc_interpolated_perigee(jd_tt)
-        # Calculate velocity via numerical differentiation if requested
+        # Calculate velocity via central difference numerical differentiation
         dlon, dlat, ddist = 0.0, 0.0, 0.0
         if iflag & SEFLG_SPEED:
             dt = 1.0 / 86400.0  # 1 second in days
             if ipl == SE_INTP_APOG:
+                lon_prev, lat_prev, dist_prev = lunar.calc_interpolated_apogee(
+                    jd_tt - dt
+                )
                 lon_next, lat_next, dist_next = lunar.calc_interpolated_apogee(
                     jd_tt + dt
                 )
             else:
+                lon_prev, lat_prev, dist_prev = lunar.calc_interpolated_perigee(
+                    jd_tt - dt
+                )
                 lon_next, lat_next, dist_next = lunar.calc_interpolated_perigee(
                     jd_tt + dt
                 )
-            dlon = (lon_next - lon) / dt
-            dlat = (lat_next - lat) / dt
-            ddist = (dist_next - dist) / dt
+            dlon = (lon_next - lon_prev) / (2.0 * dt)
+            dlat = (lat_next - lat_prev) / (2.0 * dt)
+            ddist = (dist_next - dist_prev) / (2.0 * dt)
             # Handle longitude wrap-around
-            if dlon > 18000:
-                dlon -= 360.0 / dt
-            elif dlon < -18000:
-                dlon += 360.0 / dt
+            if dlon > 9000:
+                dlon -= 360.0 / (2.0 * dt)
+            elif dlon < -9000:
+                dlon += 360.0 / (2.0 * dt)
         return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # Handle Uranian planets (Hamburg School hypothetical bodies, IDs 40-47)
@@ -1544,7 +1567,7 @@ def _calc_body(
             # Skyfield doesn't give RA/Dec rates directly.
             # We can use numerical differentiation if speed is requested.
             if iflag & SEFLG_SPEED:
-                # We need to calculate next position in J2000
+                # Calculate velocity using central difference for J2000
                 dt = 1.0 / 86400.0
                 ts_inner = get_timescale()  # Fix: get ts locally
 
@@ -1572,17 +1595,19 @@ def _calc_body(
                     ra_, dec_, dist_ = pos_.radec()
                     return ra_.hours * 15.0, dec_.degrees, dist_.au
 
+                # Central difference: get t-dt and t+dt
+                p1_prev, p2_prev, p3_prev = get_j2000_coord(ts_inner.tt_jd(t.tt - dt))
                 p1_next, p2_next, p3_next = get_j2000_coord(ts_inner.tt_jd(t.tt + dt))
-                dp1 = (p1_next - p1) / dt
-                dp2 = (p2_next - p2) / dt
-                dp3 = (p3_next - p3) / dt
-                if dp1 > 18000:
-                    dp1 -= 360 / dt
-                if dp1 < -18000:
-                    dp1 += 360 / dt
+                dp1 = (p1_next - p1_prev) / (2.0 * dt)
+                dp2 = (p2_next - p2_prev) / (2.0 * dt)
+                dp3 = (p3_next - p3_prev) / (2.0 * dt)
+                if dp1 > 9000:
+                    dp1 -= 360 / (2.0 * dt)
+                if dp1 < -9000:
+                    dp1 += 360 / (2.0 * dt)
         else:
             # True Equator of Date
-            # Numerical differentiation for speeds
+            # Central difference numerical differentiation for speeds
             # 1 second timestep provides good balance between accuracy and numerical stability
             dt = 1.0 / 86400.0  # 1 second in days
 
@@ -1614,15 +1639,17 @@ def _calc_body(
 
             if iflag & SEFLG_SPEED:
                 ts = get_timescale()
+                # Central difference: get t-dt and t+dt
+                p1_prev, p2_prev, p3_prev = get_coord(ts.tt_jd(t.tt - dt))
                 p1_next, p2_next, p3_next = get_coord(ts.tt_jd(t.tt + dt))
-                dp1 = (p1_next - p1) / dt
-                dp2 = (p2_next - p2) / dt
-                dp3 = (p3_next - p3) / dt
+                dp1 = (p1_next - p1_prev) / (2.0 * dt)
+                dp2 = (p2_next - p2_prev) / (2.0 * dt)
+                dp3 = (p3_next - p3_prev) / (2.0 * dt)
                 # Handle 360 wrap for RA
-                if dp1 > 18000:
-                    dp1 -= 360 / dt
-                if dp1 < -18000:
-                    dp1 += 360 / dt
+                if dp1 > 9000:
+                    dp1 -= 360 / (2.0 * dt)
+                if dp1 < -9000:
+                    dp1 += 360 / (2.0 * dt)
 
     else:
         # Ecliptic (Long/Lat)
@@ -1658,34 +1685,41 @@ def _calc_body(
             p2 = lat_.degrees
             p3 = dist_.au
 
-    # 4. Speed (Numerical Differentiation if requested)
-    dt = 1.0 / 86400.0  # 1 second in days
+    # 4. Speed (Central Difference Numerical Differentiation if requested)
+    # Using central differences: f'(x) ≈ [f(x+h) - f(x-h)] / (2h)
+    # This has error O(h²) compared to O(h) for forward differences,
+    # providing ~100x better precision for the same timestep.
+    dt = 1.0 / 86400.0  # 1 second in days (half-step for central diff)
     dp1, dp2, dp3 = 0.0, 0.0, 0.0
 
     if iflag & SEFLG_SPEED:
-        # Get position at t + dt
+        # Get positions at t - dt and t + dt for central difference
         ts_inner = get_timescale()
+        t_prev = ts_inner.tt_jd(t.tt - dt)
         t_next = ts_inner.tt_jd(t.tt + dt)
 
         # CRITICAL: Remove SIDEREAL flag from recursive call to ensure both positions
         # are in the same frame (tropical) before calculating velocity.
         # We'll apply sidereal conversion to the velocity afterwards.
         flags_no_speed_no_sidereal = (iflag & ~SEFLG_SPEED) & ~SEFLG_SIDEREAL
+        result_prev, _ = _calc_body(t_prev, ipl, flags_no_speed_no_sidereal)
         result_next, _ = _calc_body(t_next, ipl, flags_no_speed_no_sidereal)
+        p1_prev, p2_prev, p3_prev = result_prev[0], result_prev[1], result_prev[2]
         p1_next, p2_next, p3_next = result_next[0], result_next[1], result_next[2]
 
-        # Calculate derivatives (both positions are now tropical)
-        dp1 = (p1_next - p1) / dt
-        dp2 = (p2_next - p2) / dt
-        dp3 = (p3_next - p3) / dt
+        # Calculate derivatives using central difference formula
+        # dp/dt = (p(t+dt) - p(t-dt)) / (2*dt)
+        dp1 = (p1_next - p1_prev) / (2.0 * dt)
+        dp2 = (p2_next - p2_prev) / (2.0 * dt)
+        dp3 = (p3_next - p3_prev) / (2.0 * dt)
 
         # Handle longitude wrap-around for dp1
-        # 18000 = 180° / (1 second timestep) in degrees/day
-        # If velocity jumps by more than half a circle per second, it's a wrap-around
-        if dp1 > 18000:
-            dp1 -= 360.0 / dt
-        elif dp1 < -18000:
-            dp1 += 360.0 / dt
+        # 9000 = 180° / (2 second timestep) in degrees/day for central diff
+        # If velocity jumps by more than half a circle per 2 seconds, it's a wrap-around
+        if dp1 > 9000:
+            dp1 -= 360.0 / (2.0 * dt)
+        elif dp1 < -9000:
+            dp1 += 360.0 / (2.0 * dt)
 
     # 5. Sidereal Mode
     # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
