@@ -335,6 +335,8 @@ This sub-arcminute precision makes True Lilith suitable for all practical applic
 
 **Note on Interpolated Apogee/Perigee**: The interpolated apogee (SE_INTP_APOG) and perigee (SE_INTP_PERG) smooth out the spurious 30-degree oscillations in the osculating apsides using polynomial regression over a 56-day window. While Swiss Ephemeris uses an analytical method derived from Moshier's lunar theory, libephemeris uses least-squares fitting to achieve smoothing. The interpolated apogee oscillates ~5° from the mean (vs. 30° for osculating), making it significantly smoother. However, differences of 8-10° from Swiss Ephemeris persist due to the different underlying osculating calculations. See [INTERPOLATED_APOGEE.md](INTERPOLATED_APOGEE.md) for comprehensive documentation.
 
+> **NOTE**: Achieving <2° precision requires implementing Moshier's analytical apsidal computation method. The current polynomial regression approach cannot bridge this gap regardless of parameter tuning. See [TODO.md](../TODO.md) for implementation plan.
+
 ### Asteroids
 
 | Asteroid | Precision | Notes |

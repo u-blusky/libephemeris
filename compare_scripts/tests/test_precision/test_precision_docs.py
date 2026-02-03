@@ -517,3 +517,41 @@ class TestDocumentedLimitations:
         cusps_ws, ascmc_ws = ephem.swe_houses(jd, polar_lat, lon, ord("W"))
         assert len(cusps_ws) == 12
         assert 0 <= ascmc_ws[0] < 360
+
+
+class TestDocumentedInterpolatedApogeeWarning:
+    """Verify interpolated apogee precision limitation warning exists in docs."""
+
+    @pytest.mark.precision
+    def test_interpolated_apogee_precision_warning_exists(self):
+        """
+        Verify PRECISION.md contains explicit warning about interpolated apogee
+        precision limitation requiring Moshier's analytical method.
+        """
+        import pathlib
+
+        precision_doc = (
+            pathlib.Path(__file__).parent.parent.parent.parent / "docs" / "PRECISION.md"
+        )
+
+        assert precision_doc.exists(), "PRECISION.md not found"
+
+        content = precision_doc.read_text()
+
+        # Check that the warning note exists with key phrases
+        assert (
+            "Achieving <2° precision requires implementing Moshier's analytical"
+            in content
+        ), "Missing warning about Moshier's analytical method requirement"
+
+        assert "polynomial regression approach cannot bridge this gap" in content, (
+            "Missing note about polynomial regression limitation"
+        )
+
+        assert "regardless of parameter tuning" in content, (
+            "Missing note about parameter tuning ineffectiveness"
+        )
+
+        assert "TODO.md" in content and "implementation plan" in content, (
+            "Missing reference to TODO.md for implementation plan"
+        )
