@@ -109,20 +109,21 @@ LEAPSECONDS_URL = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif00
 # =============================================================================
 
 
-def _get_ssl_context() -> ssl.SSLContext:
+def _get_ssl_context(verify: bool = True) -> ssl.SSLContext:
     """
     Create an SSL context for HTTPS downloads.
 
     Some systems have SSL certificate issues with JPL servers.
-    This creates a permissive context as a fallback.
+    This creates either a verified or permissive context.
 
     Returns:
         SSL context for urllib
     """
     ctx = ssl.create_default_context()
-    # Try permissive mode for JPL servers (trusted source)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+    if not verify:
+        # Permissive mode for JPL servers (trusted source)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
     return ctx
 
 
@@ -131,7 +132,12 @@ def _get_ssl_context() -> ssl.SSLContext:
 # =============================================================================
 
 
-def download_file(url: str, dest_path: str, ssl_ctx: ssl.SSLContext) -> str:
+def download_file(
+    url: str,
+    dest_path: str,
+    ssl_ctx: ssl.SSLContext,
+    fallback_ctx: Optional[ssl.SSLContext] = None,
+) -> str:
     """
     Download a file from URL to destination path with progress reporting.
 
@@ -155,33 +161,70 @@ def download_file(url: str, dest_path: str, ssl_ctx: ssl.SSLContext) -> str:
         with urllib.request.urlopen(req, timeout=30, context=ssl_ctx) as response:
             total_size = int(response.headers.get("Content-Length", 0))
     except Exception:
-        total_size = 0
+        if fallback_ctx is None:
+            total_size = 0
+        else:
+            try:
+                req = urllib.request.Request(url, method="HEAD")
+                with urllib.request.urlopen(
+                    req, timeout=30, context=fallback_ctx
+                ) as response:
+                    total_size = int(response.headers.get("Content-Length", 0))
+                print("    Warning: SSL verification failed; using permissive mode")
+            except Exception:
+                total_size = 0
 
     # Download with progress
     downloaded = 0
     chunk_size = 1024 * 1024  # 1 MB chunks
 
-    with urllib.request.urlopen(url, timeout=300, context=ssl_ctx) as response:
-        with open(dest_path, "wb") as f:
-            while True:
-                chunk = response.read(chunk_size)
-                if not chunk:
-                    break
-                f.write(chunk)
-                downloaded += len(chunk)
-                if total_size > 0:
-                    pct = downloaded / total_size * 100
-                    print(
-                        f"\r    {pct:5.1f}% ({downloaded / 1024 / 1024:.1f} MB)", end=""
-                    )
-                else:
-                    print(f"\r    {downloaded / 1024 / 1024:.1f} MB", end="")
+    try:
+        with urllib.request.urlopen(url, timeout=300, context=ssl_ctx) as response:
+            with open(dest_path, "wb") as f:
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        pct = downloaded / total_size * 100
+                        print(
+                            f"\r    {pct:5.1f}% ({downloaded / 1024 / 1024:.1f} MB)",
+                            end="",
+                        )
+                    else:
+                        print(f"\r    {downloaded / 1024 / 1024:.1f} MB", end="")
+    except Exception:
+        if fallback_ctx is None:
+            raise
+        print("    Warning: SSL verification failed; using permissive mode")
+        with urllib.request.urlopen(url, timeout=300, context=fallback_ctx) as response:
+            with open(dest_path, "wb") as f:
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        pct = downloaded / total_size * 100
+                        print(
+                            f"\r    {pct:5.1f}% ({downloaded / 1024 / 1024:.1f} MB)",
+                            end="",
+                        )
+                    else:
+                        print(f"\r    {downloaded / 1024 / 1024:.1f} MB", end="")
 
     print(f"\r    100.0% ({downloaded / 1024 / 1024:.1f} MB) - Done")
     return dest_path
 
 
-def download_source_spks(cache_dir: str, ssl_ctx: ssl.SSLContext) -> Dict[str, str]:
+def download_source_spks(
+    cache_dir: str,
+    ssl_ctx: ssl.SSLContext,
+    fallback_ctx: Optional[ssl.SSLContext] = None,
+) -> Dict[str, str]:
     """
     Download all source SPK files to cache directory.
 
@@ -203,13 +246,17 @@ def download_source_spks(cache_dir: str, ssl_ctx: ssl.SSLContext) -> Dict[str, s
             print(f"  {filename}: Already cached")
             local_files[planet] = local_path
         else:
-            download_file(url, local_path, ssl_ctx)
+            download_file(url, local_path, ssl_ctx, fallback_ctx)
             local_files[planet] = local_path
 
     return local_files
 
 
-def download_leapseconds(cache_dir: str, ssl_ctx: ssl.SSLContext) -> str:
+def download_leapseconds(
+    cache_dir: str,
+    ssl_ctx: ssl.SSLContext,
+    fallback_ctx: Optional[ssl.SSLContext] = None,
+) -> str:
     """
     Download leap seconds kernel (required by SPICE).
 
@@ -225,7 +272,7 @@ def download_leapseconds(cache_dir: str, ssl_ctx: ssl.SSLContext) -> str:
 
     if not os.path.exists(local_path):
         print(f"  Downloading leap seconds kernel ({filename})...")
-        download_file(LEAPSECONDS_URL, local_path, ssl_ctx)
+        download_file(LEAPSECONDS_URL, local_path, ssl_ctx, fallback_ctx)
 
     return local_path
 
@@ -462,8 +509,9 @@ def main():
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create SSL context for downloads
-    ssl_ctx = _get_ssl_context()
+    # Create SSL contexts for downloads (verified first, permissive fallback)
+    ssl_ctx = _get_ssl_context(verify=True)
+    fallback_ctx = _get_ssl_context(verify=False)
 
     # Use a temporary directory for source files
     # These are large and we don't need to keep them
@@ -471,10 +519,10 @@ def main():
         print(f"Cache directory: {cache_dir}")
 
         # Download source SPK files
-        source_files = download_source_spks(cache_dir, ssl_ctx)
+        source_files = download_source_spks(cache_dir, ssl_ctx, fallback_ctx)
 
         # Download leap seconds kernel
-        leapseconds = download_leapseconds(cache_dir, ssl_ctx)
+        leapseconds = download_leapseconds(cache_dir, ssl_ctx, fallback_ctx)
 
         # Generate compact SPK
         result = generate_compact_spk(source_files, str(output_path), leapseconds)

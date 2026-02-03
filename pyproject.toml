@@ -109,7 +109,7 @@ build-backend = "setuptools.build_meta"
 packages = ["libephemeris"]
 
 [tool.setuptools.package-data]
-libephemeris = ["py.typed", "seorbel.txt"]
+libephemeris = ["py.typed", "seorbel.txt", "data/planet_centers.bsp"]
 
 [tool.poe.tasks]
 format = "ruff format ."
@@ -195,4 +195,3 @@ output = "coverage.xml"
 
 [tool.coverage.html]
 directory = "htmlcov"
-

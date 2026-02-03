@@ -43,6 +43,8 @@ from __future__ import annotations
 
 import math
 from typing import Tuple, TYPE_CHECKING
+from jplephem.exceptions import OutOfRangeError
+from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
 from skyfield.api import Star
 from skyfield.framelib import ecliptic_frame
 from skyfield.nutationlib import iau2000b_radians
@@ -50,6 +52,9 @@ from dataclasses import dataclass
 
 if TYPE_CHECKING:
     from .exceptions import EphemerisRangeError
+
+# Combined exception tuple for catching both jplephem and Skyfield range errors
+_RANGE_ERRORS = (OutOfRangeError, SkyfieldRangeError)
 
 from .constants import (
     SE_SUN,
@@ -184,6 +189,7 @@ class _CobCorrectedTarget:
         from skyfield.positionlib import ICRF
 
         from .moon_theories import get_cob_offset
+        from .state import get_timescale
 
         # Get barycenter position
         bary_pos = self._barycenter.at(t)
@@ -194,10 +200,18 @@ class _CobCorrectedTarget:
         offset = get_cob_offset(self._barycenter_name, t)
         corrected_pos = pos_au + np.array(offset)
 
+        # Compute velocity correction numerically
+        dt = 1.0 / 86400.0  # 1 second in days
+        ts = get_timescale()
+        t_next = ts.tt_jd(t.tt + dt)
+        offset_next = get_cob_offset(self._barycenter_name, t_next)
+        offset_vel = (np.array(offset_next) - np.array(offset)) / dt
+        corrected_vel = vel_au_per_d + offset_vel
+
         # Return new ICRF position with corrected coordinates
         return ICRF(
             corrected_pos,
-            vel_au_per_d,
+            corrected_vel,
             t=t,
             center=self.center,
         )
@@ -221,19 +235,26 @@ class _CobCorrectedTarget:
         import numpy as np
 
         from .moon_theories import get_cob_offset
+        from .state import get_timescale
 
         # Get the raw observation from the barycenter
         pos, vel, t, light_time = self._barycenter._observe_from_bcrs(observer)
 
         # Apply COB correction at the retarded time
         # (when light left the planet, not when it arrives)
-        ts = observer.t  # This is the observation time
-        # But we need the retarded time - Skyfield has already computed it internally
         # The returned 't' should be the retarded time
         offset = get_cob_offset(self._barycenter_name, t)
         corrected_pos = pos + np.array(offset)
 
-        return corrected_pos, vel, t, light_time
+        # Compute velocity correction numerically
+        dt = 1.0 / 86400.0  # 1 second in days
+        ts = get_timescale()
+        t_next = ts.tt_jd(t.tt + dt)
+        offset_next = get_cob_offset(self._barycenter_name, t_next)
+        offset_vel = (np.array(offset_next) - np.array(offset)) / dt
+        corrected_vel = vel + offset_vel
+
+        return corrected_pos, corrected_vel, t, light_time
 
 
 class _SpkCenterTarget:
@@ -247,7 +268,9 @@ class _SpkCenterTarget:
     with observer.at(t).observe(target) seamlessly.
     """
 
-    def __init__(self, barycenter, center_segment, planet_name: str):
+    def __init__(
+        self, barycenter, center_segment, planet_name: str, barycenter_name: str
+    ):
         """Initialize with a barycenter target and center segment.
 
         Args:
@@ -258,6 +281,7 @@ class _SpkCenterTarget:
         self._barycenter = barycenter
         self._center_segment = center_segment
         self._planet_name = planet_name
+        self._barycenter_name = barycenter_name
         # Copy attributes needed by Skyfield
         self.center = getattr(barycenter, "center", 0)
         self.target = getattr(barycenter, "target", None)
@@ -278,14 +302,31 @@ class _SpkCenterTarget:
         pos_au = bary_pos.position.au
         vel_au_per_d = bary_pos.velocity.au_per_d
 
-        # Get center offset from SPK segment (relative to barycenter)
-        center_offset = self._center_segment.at(t)
-        offset_au = center_offset.position.au
-        offset_vel = center_offset.velocity.au_per_d
+        try:
+            # Get center offset from SPK segment (relative to barycenter)
+            center_offset = self._center_segment.at(t)
+            offset_au = center_offset.position.au
+            offset_vel = center_offset.velocity.au_per_d
 
-        # Combine: barycenter + offset = center
-        corrected_pos = pos_au + offset_au
-        corrected_vel = vel_au_per_d + offset_vel
+            # Combine: barycenter + offset = center
+            corrected_pos = pos_au + offset_au
+            corrected_vel = vel_au_per_d + offset_vel
+        except _RANGE_ERRORS:
+            # If SPK segment is out of range, fall back to COB correction
+            import numpy as np
+            from .moon_theories import get_cob_offset
+            from .state import get_timescale
+
+            offset = get_cob_offset(self._barycenter_name, t)
+            corrected_pos = pos_au + np.array(offset)
+
+            # Compute velocity correction numerically
+            dt = 1.0 / 86400.0  # 1 second in days
+            ts = get_timescale()
+            t_next = ts.tt_jd(t.tt + dt)
+            offset_next = get_cob_offset(self._barycenter_name, t_next)
+            offset_vel = (np.array(offset_next) - np.array(offset)) / dt
+            corrected_vel = vel_au_per_d + offset_vel
 
         # Return new ICRF position with corrected coordinates
         return ICRF(
@@ -314,13 +355,30 @@ class _SpkCenterTarget:
         # Get the raw observation from the barycenter
         pos, vel, t, light_time = self._barycenter._observe_from_bcrs(observer)
 
-        # Apply center offset at the retarded time
-        center_offset = self._center_segment.at(t)
-        offset_au = center_offset.position.au
-        offset_vel = center_offset.velocity.au_per_d
+        try:
+            # Apply center offset at the retarded time
+            center_offset = self._center_segment.at(t)
+            offset_au = center_offset.position.au
+            offset_vel = center_offset.velocity.au_per_d
 
-        corrected_pos = pos + offset_au
-        corrected_vel = vel + offset_vel
+            corrected_pos = pos + offset_au
+            corrected_vel = vel + offset_vel
+        except _RANGE_ERRORS:
+            # If SPK segment is out of range, fall back to COB correction
+            import numpy as np
+            from .moon_theories import get_cob_offset
+            from .state import get_timescale
+
+            offset = get_cob_offset(self._barycenter_name, t)
+            corrected_pos = pos + np.array(offset)
+
+            # Compute velocity correction numerically
+            dt = 1.0 / 86400.0  # 1 second in days
+            ts = get_timescale()
+            t_next = ts.tt_jd(t.tt + dt)
+            offset_next = get_cob_offset(self._barycenter_name, t_next)
+            offset_vel = (np.array(offset_next) - np.array(offset)) / dt
+            corrected_vel = vel + offset_vel
 
         return corrected_pos, corrected_vel, t, light_time
 
@@ -520,16 +578,20 @@ def get_planet_target(planets, target_name: str):
             if barycenter_name:
                 try:
                     barycenter = planets[barycenter_name]
-                    return _SpkCenterTarget(barycenter, center_segment, target_name)
+                    return _SpkCenterTarget(
+                        barycenter, center_segment, target_name, barycenter_name
+                    )
                 except KeyError:
                     pass
 
-    # Standard path: try planet center, then barycenter
+    # Standard path: try planet center, then barycenter with COB correction
     try:
         return planets[target_name]
     except KeyError:
         if target_name in _PLANET_FALLBACK:
-            return planets[_PLANET_FALLBACK[target_name]]
+            barycenter_name = _PLANET_FALLBACK[target_name]
+            barycenter = planets[barycenter_name]
+            return _CobCorrectedTarget(barycenter, barycenter_name)
         raise
 
 
@@ -1355,21 +1417,9 @@ def _calc_body(
         return _to_native_floats((lon, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
 
     # Handle standard planets
-    barycenter_name = None  # Track if we're using a barycenter (for COB correction)
     if ipl in _PLANET_MAP:
         target_name = _PLANET_MAP[ipl]
-        # Try planet center first, fall back to barycenter if not available
-        try:
-            target = planets[target_name]
-        except KeyError:
-            # Planet center not in ephemeris, try barycenter fallback
-            if target_name in _PLANET_FALLBACK:
-                barycenter_name = _PLANET_FALLBACK[target_name]
-                target = planets[barycenter_name]
-                # Apply COB correction: wrap target in a corrected VectorFunction
-                target = _CobCorrectedTarget(target, barycenter_name)
-            else:
-                raise
+        target = get_planet_target(planets, target_name)
     else:
         # Unknown body - raise clear error instead of returning zeros
         from .exceptions import UnknownBodyError
