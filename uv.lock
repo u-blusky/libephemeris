@@ -1078,6 +1078,8 @@ dev = [
     { name = "pytest-sugar" },
     { name = "pytest-xdist" },
     { name = "ruff" },
+    { name = "spiceypy", version = "6.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "spiceypy", version = "8.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "twine" },
 ]
 docs = [
@@ -1134,6 +1136,7 @@ requires-dist = [
     { name = "skyfield-data", specifier = ">=7.0.0" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=2.0.0" },
+    { name = "spiceypy", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=5.0.0" },
 ]
 provides-extras = ["precision", "spk", "stars", "nbody", "all", "dev", "docs"]
@@ -2616,6 +2619,67 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/3b/44/6716b257b0aa6bfd51a1b31665d1c205fb12cb5ad56de752dfa15657de2f/sphinxcontrib_serializinghtml-2.0.0.tar.gz", hash = "sha256:e9d912827f872c029017a53f0ef2180b327c3f7fd23c87229f7a8e8b70031d4d", size = 16080, upload-time = "2024-07-29T01:10:09.332Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/52/a7/d2782e4e3f77c8450f727ba74a8f12756d5ba823d81b941f1b04da9d033a/sphinxcontrib_serializinghtml-2.0.0-py3-none-any.whl", hash = "sha256:6e2cb0eef194e10c27ec0023bfeb25badbbb5868244cf5bc5bdc04e4464bf331", size = 92072, upload-time = "2024-07-29T01:10:08.203Z" },
+]
+
+[[package]]
+name = "spiceypy"
+version = "6.0.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.10'",
+]
+dependencies = [
+    { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/77/21/fa389a42cf2ab1425ef91007e549b7a3e58fe49c6834e687743609fe1386/spiceypy-6.0.0.tar.gz", hash = "sha256:ac27096a12b795898c3a6d1fa1f12a7e4485f480acd2e59fbd3a986cb0ade2be", size = 291180, upload-time = "2023-08-31T21:37:30.468Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/97/ccab62d2c0f37c422c75144323aa084f03261740387f48d116904fcbc06b/spiceypy-6.0.0-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:70cda5b057d1b83dd8a4ecd9d4d2823b2f9c263b85fcdcc0df0370ca5b94c74f", size = 1455891, upload-time = "2023-08-31T21:37:21.85Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/d6/22ccd3631f55e4b2ccc610e988a6ae5f46fa14d7c28eee02a22ef618c6a5/spiceypy-6.0.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:20d70ce09e6efa78e9e3f2400c6ee85bd7065f19edf2d4ebce257c79eb43e534", size = 1351710, upload-time = "2023-08-31T21:37:23.889Z" },
+    { url = "https://files.pythonhosted.org/packages/56/68/e4b1c6c7c7f5483ef4667760afdcdf13e45bf10890074b704aa728c0474c/spiceypy-6.0.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:22b50777174c6ef61cdb57aac4f4003ab8de69a0c4b0b87f66881f0a9758e9a2", size = 1628204, upload-time = "2023-08-31T21:37:25.357Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/89/67f98fcfd5e8320a5e39b00d070e9f1ef32e4d9faa1c420b4c894d11b861/spiceypy-6.0.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a7da6cdb0eaa1e1a27a2198be58404262c0def0216ad62de7183223461e35aa0", size = 1665804, upload-time = "2023-08-31T21:37:27.203Z" },
+    { url = "https://files.pythonhosted.org/packages/90/88/ad0e920604097ff649672d5b69737e69373e91a5ab302ce9cce4b961215d/spiceypy-6.0.0-py3-none-win_amd64.whl", hash = "sha256:5737a4e19fb8030916b60d6280358d672330243d5aab6299954346a22c92ce58", size = 1427494, upload-time = "2023-08-31T21:37:28.645Z" },
+]
+
+[[package]]
+name = "spiceypy"
+version = "8.0.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version == '3.11.*'",
+    "python_full_version == '3.10.*'",
+]
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e2/bf/43d96db430ce57e47099adb24fc63d0247908ad5c37174723ea5d9202e5b/spiceypy-8.0.1.tar.gz", hash = "sha256:17cb369c613818dae1071e5f8eb6b8b2291330c5a74c7e2954ac86700de682fe", size = 622292, upload-time = "2026-01-08T03:20:16.027Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/f4/c6261f85cb440a3f0ee46f50afe34c4e49fb6bbdd97e7f3c5cef127fa910/spiceypy-8.0.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:9887cda72ca12db18eced9f9034d8e398eaf7a574b9982f39d964c4868284c02", size = 2113070, upload-time = "2026-01-08T03:19:34.299Z" },
+    { url = "https://files.pythonhosted.org/packages/28/a0/ade1d63a82a27b353a313b9095f49a5005ca16f9f6bd570ad959dfba1a8d/spiceypy-8.0.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:39c61d412d89210349da4d87394fdc3e9fa5dbe70a85c9c6472d50825640cb07", size = 1900870, upload-time = "2026-01-08T03:19:36.411Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/93/6f2de90f76dcfe8bb253066b86e9f13d4894f712853d3dde65d45fadf51a/spiceypy-8.0.1-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:87d71eaced0cf2e404a419f15c635eb9c92b65fdaa661e3da88274c2142c79d8", size = 2245417, upload-time = "2026-01-08T03:19:38.458Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/3a/7a0fe1382460d598a7c72ee74672b0ee51b54632a525b61d5a92c1720d35/spiceypy-8.0.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6a6171bf21197f5e63e09995ff149f32743dfb07e61ca3f163d72e6eb4bd4d3a", size = 2361098, upload-time = "2026-01-08T03:19:40.418Z" },
+    { url = "https://files.pythonhosted.org/packages/47/bc/d61b6558d4ba141cbea29fe81788190f2a0fc7efa56a40e086e735a102cd/spiceypy-8.0.1-cp310-cp310-win_amd64.whl", hash = "sha256:78bf534f96d666af44b9e1044765e6c2901189911bbade4f0a7128d8cc21475e", size = 2089645, upload-time = "2026-01-08T03:19:42.75Z" },
+    { url = "https://files.pythonhosted.org/packages/39/4e/e4e7aafca4df4bbfd41c9ae733cc3277ed6b644e60ae6f618c586b4ca513/spiceypy-8.0.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:b0f5c082a93747fcf4f392d74a4511335a65218414164be77d42718a7b838d39", size = 2095805, upload-time = "2026-01-08T03:19:44.192Z" },
+    { url = "https://files.pythonhosted.org/packages/71/f1/897e187fc5794fc6eeae9c76a04c1089cafb2f93475fae1b1b358a6df613/spiceypy-8.0.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:ba5e588fd76161ed4da19d0cd697b443f86f9a5d5568f1bacf01d63a4ca5ccaa", size = 1887742, upload-time = "2026-01-08T03:19:45.575Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/d1/5412a51bbe38afbe09988e17972984b2ab43cf9bcf1c60d9d3d308a40cf0/spiceypy-8.0.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:dfe0be6c7bc42701decbd05398fe71e1e528710030c5c9a40833c44ca5a0eba4", size = 2251180, upload-time = "2026-01-08T03:19:47.563Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/fb/c6e0a9e8c7cc3ab0e383e529b64c2c49f225a7d02b0e18372ed88ca2c043/spiceypy-8.0.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5b3f5d4d93345eab5570bb440972e3923b591dda468f1e6787b2c2e96173a5db", size = 2356731, upload-time = "2026-01-08T03:19:48.91Z" },
+    { url = "https://files.pythonhosted.org/packages/05/32/1557a2538413c493471f870677893b677b2a9b3295b8382a9058fe12e973/spiceypy-8.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:fde0c7643f559083d1d272bb018c74cf6b760714c9085064f706c19a32dd9fab", size = 2088454, upload-time = "2026-01-08T03:19:50.835Z" },
+    { url = "https://files.pythonhosted.org/packages/42/e8/53c8cac0087c5b34e2718944c4380603ca6e65b7c423f0b0788bfa58ea23/spiceypy-8.0.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:7f1c50f46b82153c21617fa76937ba26684f638f2e713e11412017dc2945c201", size = 2077509, upload-time = "2026-01-08T03:19:52.929Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/fe/10ab9b83c9e962e2782f8c152c1b05cf0c204b41b743328f6b5fdede8ade/spiceypy-8.0.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:51c0a81c0e5fe076d47a72a6164b6e260c0c488a42b4ba1b615ac028bc10d9b7", size = 1879476, upload-time = "2026-01-08T03:19:54.29Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/35/2131627a74ddaf87e1a0fae3a7d6b82e878af5ac9c9f28e5135dac24c179/spiceypy-8.0.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7933d5f261c96ead445d648491c529c9c947e56aa64639fa16705a5ecbf4abae", size = 2207748, upload-time = "2026-01-08T03:19:55.977Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/7d/ec9a0d81090d242834be584cb384a706ebe92ad192ac9cb013e5873bdd9f/spiceypy-8.0.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f6b8cab227b5969b81417d4bfc8d4ea7a3f7ebee3567a015803ee8b1aa2590d8", size = 2317877, upload-time = "2026-01-08T03:19:57.477Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/23/d2fae1425dd01f97dd79887d271748eb1941cdb3f52620c77ba84ec9670f/spiceypy-8.0.1-cp312-cp312-win_amd64.whl", hash = "sha256:21f894dbacbd9d2f386cfce6e429257ae5b13f19a9b642e07f202dcc2e2902e9", size = 2014241, upload-time = "2026-01-08T03:19:58.769Z" },
+    { url = "https://files.pythonhosted.org/packages/af/4a/dd064c765f91da83ba15ea41c11fc2ba61099cde419999b7e7cef8a1ed28/spiceypy-8.0.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:9a57f5a87bc95177e4fe25be84701ce37834605f27a7959064762b37e77506f3", size = 2077104, upload-time = "2026-01-08T03:20:00.716Z" },
+    { url = "https://files.pythonhosted.org/packages/56/7e/80b82438abb2d61079ef7537f3bc4d6d488eea71b95af87a766309f21962/spiceypy-8.0.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:c744deeadded50f5631fbb74c62835388cd29ef58a052c67f9121750f48d2f9a", size = 1878877, upload-time = "2026-01-08T03:20:02.654Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/31/9799105e1f32ff46cc61a31b8e1fbbc59787fd3093f170550ed6b133d422/spiceypy-8.0.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:97c94afef92933371f46a4a1bee3cc2b6dad7f1718cd8df99b7cdc61f572386b", size = 2205030, upload-time = "2026-01-08T03:20:04.261Z" },
+    { url = "https://files.pythonhosted.org/packages/91/c7/32c72b27ab6bbac2cfeb572f754c4691c74d78974ea2f5d53526d793f16a/spiceypy-8.0.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:446c546236ee1858447a0e5af0a02c613166e1970d60ecc940f88c3ad08f05c9", size = 2320253, upload-time = "2026-01-08T03:20:06.045Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/f7/dd72565b5f85efa55f77f811d82d839d57030e12d66520a1581aef411fff/spiceypy-8.0.1-cp313-cp313-win_amd64.whl", hash = "sha256:904ffafc1d35fc16b099900334bfbadba845f3e244da070194d73282122265e6", size = 2017536, upload-time = "2026-01-08T03:20:07.333Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/42/5e0c26494a05ba1811a58b3d9382f5d844ac503745fb3ffeb525274f6b00/spiceypy-8.0.1-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:2a22f95a929ac9f4dc1a68933abf5a4966f551120132f318217305c013c611bb", size = 2074350, upload-time = "2026-01-08T03:20:08.733Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/8f/9441cffd5efad37fc2c2fcbec59a3c3635c1ff9cfd7243750641b367097e/spiceypy-8.0.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:b5f5e8233f24e727132f0e4e42aa6aba60fe3590e0ad7bac82ea540d32c52500", size = 1879491, upload-time = "2026-01-08T03:20:10.663Z" },
+    { url = "https://files.pythonhosted.org/packages/88/85/db6248542c8b38981c98f4f1f5b2b9940f2281c263fbcd1290aee4cba8b8/spiceypy-8.0.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c6e6169c658ae4d6821b2bf096fefd8afe0b0c1ebd4c381b888539b1e7d5d745", size = 2212100, upload-time = "2026-01-08T03:20:12.103Z" },
+    { url = "https://files.pythonhosted.org/packages/73/22/74233e7641aed6ab71d27f9e0fc64fd27bc94e2e6cb4f304eac81cf092e1/spiceypy-8.0.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:85840b43b4dcbeb6d77c354b61ae41e6507b198205483c3a61f55b74c03eceda", size = 2324218, upload-time = "2026-01-08T03:20:13.471Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/c5/b7314263595e1a80ed599cde6d0ec881338d54d84edc56907ef4332f48cf/spiceypy-8.0.1-cp314-cp314-win_amd64.whl", hash = "sha256:fa6f232615c4120fb73cc9dd6820b5b72f898f4d2eb042d4ea51740674f81fb7", size = 2077452, upload-time = "2026-01-08T03:20:14.707Z" },
 ]
 
 [[package]]

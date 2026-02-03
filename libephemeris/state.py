@@ -37,6 +37,7 @@ _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
 _LOADER: Optional[Loader] = None  # Skyfield data loader
 _PLANETS: Optional[SpiceKernel] = None  # Loaded planetary ephemeris
+_PLANET_CENTERS: Optional[SpiceKernel] = None  # Planet center offsets (599, 699, etc.)
 _TS: Optional[Timescale] = None  # Timescale object
 _TOPO: Optional[Topos] = None  # Observer location
 _SIDEREAL_MODE: Optional[int] = None  # Active sidereal mode ID
@@ -140,6 +141,65 @@ def get_planets() -> SpiceKernel:
             # Download from internet
             _PLANETS = load(_EPHEMERIS_FILE)
     return _PLANETS
+
+
+def get_planet_centers() -> Optional[SpiceKernel]:
+    """
+    Get or load the planet centers SPK file (if available).
+
+    This file contains precise offsets from system barycenters to planet centers
+    for Jupiter (599), Saturn (699), Uranus (799), Neptune (899), and Pluto (999).
+
+    Returns:
+        SpiceKernel containing planet center segments, or None if not available.
+
+    Note:
+        The planet_centers.bsp file is generated using the
+        scripts/generate_planet_centers_spk.py script and provides <0.001 arcsec
+        precision for planet center positions.
+    """
+    global _PLANET_CENTERS
+    if _PLANET_CENTERS is None:
+        # Try to find planet_centers.bsp in the data directory
+        data_dir = os.path.join(os.path.dirname(__file__), "data")
+        centers_path = os.path.join(data_dir, "planet_centers.bsp")
+
+        if os.path.exists(centers_path):
+            load = get_loader()
+            try:
+                _PLANET_CENTERS = load(centers_path)
+            except Exception:
+                # If loading fails, return None (fall back to barycenter)
+                pass
+    return _PLANET_CENTERS
+
+
+def get_planet_center_segment(naif_id: int):
+    """
+    Get a planet center segment from the planet_centers.bsp file.
+
+    This returns a Skyfield segment that can be used with .at(t) to get
+    the position of the planet center relative to its system barycenter.
+
+    Args:
+        naif_id: NAIF ID of the planet center (599, 699, 799, 899, or 999)
+
+    Returns:
+        Skyfield ChebyshevPosition segment, or None if not available.
+
+    Example:
+        >>> seg = get_planet_center_segment(599)  # Jupiter center
+        >>> if seg:
+        ...     offset = seg.at(t)  # Position relative to Jupiter barycenter
+    """
+    centers = get_planet_centers()
+    if centers is None:
+        return None
+
+    for seg in centers.segments:
+        if seg.target == naif_id:
+            return seg
+    return None
 
 
 def set_topo(lon: float, lat: float, alt: float) -> None:
@@ -589,7 +649,7 @@ def close() -> None:
         >>> close()  # Close files and reset state
         >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # Reloads ephemeris
     """
-    global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _LOADER, _PLANETS, _TS
+    global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
     global _SPK_KERNELS, _SPK_BODY_MAP, _AUTO_SPK_DOWNLOAD
@@ -604,6 +664,13 @@ def close() -> None:
             # or may already be closed
             pass
 
+    # Close planet centers kernel if loaded
+    if _PLANET_CENTERS is not None:
+        try:
+            _PLANET_CENTERS.close()
+        except (AttributeError, Exception):
+            pass
+
     # Clear computation caches for hot path optimization
     from .cache import clear_caches
 
@@ -614,6 +681,7 @@ def close() -> None:
     _EPHEMERIS_FILE = "de440.bsp"
     _LOADER = None
     _PLANETS = None
+    _PLANET_CENTERS = None
     _TS = None
     _TOPO = None
     _SIDEREAL_MODE = None

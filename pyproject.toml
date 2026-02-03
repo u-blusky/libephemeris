@@ -84,6 +84,7 @@ dev = [
     "build>=1.0.0",
     "twine>=5.0.0",
     "pytest-sugar>=1.1.1",
+    "spiceypy>=6.0.0",  # For generating compact planet center SPK files
 ]
 docs = [
     "sphinx>=7.0.0",
@@ -130,6 +131,9 @@ test = "pytest -m \"not slow\""
 "test:compare" = "pytest compare_scripts/tests/ -v -m \"not slow\""
 "test:compare:full" = "pytest compare_scripts/tests/ -v"
 "test:compare:fast" = "pytest compare_scripts/tests/ -n auto -m \"not slow\""
+
+# SPK generation (requires spiceypy, downloads ~500MB temporarily)
+"generate-planet-centers-spk" = "python scripts/generate_planet_centers_spk.py"
 
 coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html -m \"not slow\""
 "coverage:full" = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"

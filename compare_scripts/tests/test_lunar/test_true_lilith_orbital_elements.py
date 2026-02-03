@@ -110,23 +110,31 @@ class TestOrbitalElementsVsEccentricityVector:
         assert abs(result["lat_diff"]) < 2.0  # degrees
         assert abs(result["e_diff"]) < 0.01  # unitless
 
-    def test_methods_differ_across_dates(self):
-        """Methods should show varying differences at different dates."""
+    def test_methods_are_identical_alias(self):
+        """Both methods should return identical results (one is an alias).
+
+        Note: calc_true_lilith_orbital_elements is now an alias for
+        calc_true_lilith, so they should always return identical results.
+        This test verifies the alias behavior is working correctly.
+        """
         test_dates = [
             2451545.0,  # J2000.0
             2455000.0,  # ~2009
             2460000.0,  # ~2023
         ]
 
-        diffs = []
         for jd in test_dates:
             result = compare_true_lilith_methods(jd)
-            diffs.append(result["lon_diff"])
-
-        # At least one date should show a difference
-        assert any(abs(d) > 0.01 for d in diffs), (
-            "Expected some difference between methods"
-        )
+            # Since orbital_elements is an alias, all differences should be zero
+            assert result["lon_diff"] == 0.0, (
+                f"Expected zero difference, got {result['lon_diff']}"
+            )
+            assert result["lat_diff"] == 0.0, (
+                f"Expected zero lat difference, got {result['lat_diff']}"
+            )
+            assert result["e_diff"] == 0.0, (
+                f"Expected zero e difference, got {result['e_diff']}"
+            )
 
 
 class TestOrbitalElementsConsistency:

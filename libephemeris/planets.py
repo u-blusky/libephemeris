@@ -236,6 +236,95 @@ class _CobCorrectedTarget:
         return corrected_pos, vel, t, light_time
 
 
+class _SpkCenterTarget:
+    """Wrapper that combines barycenter position with SPK-based center offset.
+
+    This class uses precise planet center segments from planet_centers.bsp to
+    compute the offset from system barycenter to planet center. This provides
+    higher precision (<0.001 arcsec) than the analytical COB corrections.
+
+    The wrapper implements the Skyfield VectorFunction protocol so it can be used
+    with observer.at(t).observe(target) seamlessly.
+    """
+
+    def __init__(self, barycenter, center_segment, planet_name: str):
+        """Initialize with a barycenter target and center segment.
+
+        Args:
+            barycenter: Skyfield VectorFunction (e.g., planets['jupiter barycenter'])
+            center_segment: Skyfield ChebyshevPosition segment from planet_centers.bsp
+            planet_name: Planet name for debugging (e.g., 'jupiter')
+        """
+        self._barycenter = barycenter
+        self._center_segment = center_segment
+        self._planet_name = planet_name
+        # Copy attributes needed by Skyfield
+        self.center = getattr(barycenter, "center", 0)
+        self.target = getattr(barycenter, "target", None)
+
+    def at(self, t):
+        """Return position at time t with SPK center offset applied.
+
+        Args:
+            t: Skyfield Time object
+
+        Returns:
+            Skyfield ICRF position with center offset applied
+        """
+        from skyfield.positionlib import ICRF
+
+        # Get barycenter position (from SSB)
+        bary_pos = self._barycenter.at(t)
+        pos_au = bary_pos.position.au
+        vel_au_per_d = bary_pos.velocity.au_per_d
+
+        # Get center offset from SPK segment (relative to barycenter)
+        center_offset = self._center_segment.at(t)
+        offset_au = center_offset.position.au
+        offset_vel = center_offset.velocity.au_per_d
+
+        # Combine: barycenter + offset = center
+        corrected_pos = pos_au + offset_au
+        corrected_vel = vel_au_per_d + offset_vel
+
+        # Return new ICRF position with corrected coordinates
+        return ICRF(
+            corrected_pos,
+            corrected_vel,
+            t=t,
+            center=self.center,
+        )
+
+    def __repr__(self):
+        return f"<SpkCenterTarget {self._planet_name}>"
+
+    def _observe_from_bcrs(self, observer):
+        """Observe this target from an observer in BCRS coordinates.
+
+        This method is called by Skyfield's observe() function to compute
+        light-time corrected positions. We delegate to the barycenter's
+        implementation and then apply the center offset.
+
+        Args:
+            observer: Skyfield Barycentric position of the observer
+
+        Returns:
+            Tuple of (position_au, velocity_au_per_d, time, light_time_days)
+        """
+        # Get the raw observation from the barycenter
+        pos, vel, t, light_time = self._barycenter._observe_from_bcrs(observer)
+
+        # Apply center offset at the retarded time
+        center_offset = self._center_segment.at(t)
+        offset_au = center_offset.position.au
+        offset_vel = center_offset.velocity.au_per_d
+
+        corrected_pos = pos + offset_au
+        corrected_vel = vel + offset_vel
+
+        return corrected_pos, corrected_vel, t, light_time
+
+
 # Type alias for position result tuple
 PositionResult = Tuple[float, float, float, float, float, float]
 
@@ -384,24 +473,58 @@ def _wrap_ephemeris_range_error(
     )
 
 
+# NAIF IDs for planet centers
+_PLANET_CENTER_NAIF_IDS = {
+    "jupiter": 599,
+    "saturn": 699,
+    "uranus": 799,
+    "neptune": 899,
+    "pluto": 999,
+}
+
+
 def get_planet_target(planets, target_name: str):
     """
     Get planet target from ephemeris with fallback to barycenter.
 
-    Tries to get the planet center first (e.g., 'jupiter' -> 599).
-    If not available in the ephemeris (e.g., DE421 only has barycenters for
-    outer planets), falls back to the system barycenter.
+    For outer planets (Jupiter, Saturn, Uranus, Neptune, Pluto), this function
+    first checks if planet_centers.bsp is available. If so, it returns a
+    _SpkCenterTarget that combines the barycenter position with the precise
+    SPK-based center offset.
+
+    If planet_centers.bsp is not available, it falls back to the barycenter
+    from the main ephemeris (or uses _CobCorrectedTarget for analytical COB
+    corrections if configured).
 
     Args:
         planets: Skyfield SpiceKernel ephemeris object
         target_name: Planet name from _PLANET_MAP (e.g., 'jupiter', 'saturn')
 
     Returns:
-        Skyfield planet object
+        Skyfield planet object (or wrapper with center offset)
 
     Raises:
         KeyError: If neither planet center nor barycenter found in ephemeris
     """
+    from .state import get_planet_center_segment
+
+    # For outer planets, try to use SPK-based planet centers
+    if target_name in _PLANET_CENTER_NAIF_IDS:
+        naif_id = _PLANET_CENTER_NAIF_IDS[target_name]
+        center_segment = get_planet_center_segment(naif_id)
+
+        if center_segment is not None:
+            # We have the planet center SPK segment
+            # Get the barycenter from the main ephemeris
+            barycenter_name = _PLANET_FALLBACK.get(target_name)
+            if barycenter_name:
+                try:
+                    barycenter = planets[barycenter_name]
+                    return _SpkCenterTarget(barycenter, center_segment, target_name)
+                except KeyError:
+                    pass
+
+    # Standard path: try planet center, then barycenter
     try:
         return planets[target_name]
     except KeyError:

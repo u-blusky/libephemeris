@@ -1,0 +1,250 @@
+# Planet Centers SPK Generation
+
+## Overview
+
+This document describes the process of generating a compact SPK (SPICE kernel) file
+containing planet center positions for the outer planets: Jupiter, Saturn, Uranus,
+Neptune, and Pluto.
+
+## Background: Barycenters vs Planet Centers
+
+### The Problem
+
+JPL's Development Ephemerides (DE421, DE440, etc.) provide positions for planetary
+system **barycenters** rather than planet **centers** for the outer planets. This
+is because these planets have significant moon systems whose combined mass affects
+the barycenter location.
+
+| NAIF ID | Body | Description |
+|---------|------|-------------|
+| 5 | Jupiter Barycenter | Center of mass of Jupiter system |
+| 6 | Saturn Barycenter | Center of mass of Saturn system |
+| 7 | Uranus Barycenter | Center of mass of Uranus system |
+| 8 | Neptune Barycenter | Center of mass of Neptune system |
+| 9 | Pluto Barycenter | Center of mass of Pluto-Charon system |
+| 599 | Jupiter | Center of Jupiter itself |
+| 699 | Saturn | Center of Saturn itself |
+| 799 | Uranus | Center of Uranus itself |
+| 899 | Neptune | Center of Neptune itself |
+| 999 | Pluto | Center of Pluto itself |
+
+### Barycenter Offsets
+
+The barycenter can be significantly offset from the planet center:
+
+| Planet | Typical Offset | Angular Size (from Earth) |
+|--------|----------------|--------------------------|
+| Jupiter | ~64 km | ~0.02 arcsec |
+| Saturn | ~281 km | ~0.03 arcsec |
+| Uranus | ~43 km | ~0.003 arcsec |
+| Neptune | ~74 km | ~0.01 arcsec |
+| Pluto | ~2131 km | ~0.15 arcsec |
+
+For high-precision work, these offsets matter.
+
+## Solutions
+
+### Current Approach: Analytical COB Correction
+
+libephemeris currently uses analytical moon theories to compute the Center of Body
+(COB) offset from the barycenter:
+
+- **Jupiter**: E5 theory (Galilean moons)
+- **Saturn**: TASS 1.7 (Titan-dominated)
+- **Neptune**: Triton Keplerian elements
+- **Pluto**: Charon two-body solution
+- **Uranus**: NOT IMPLEMENTED (returns 0)
+
+This approach requires no extra files but has limited precision (~0.02-0.15 arcsec).
+
+### New Approach: Compact SPK
+
+The new approach extracts planet center segments from JPL's satellite SPK files
+and creates a compact file containing only the planet centers. This provides
+maximum precision (<0.001 arcsec) with minimal file size (~5-10 MB).
+
+## SPK Generation Process
+
+### Prerequisites
+
+1. **spiceypy** >= 6.0.0 (Python wrapper for NAIF SPICE toolkit)
+2. **Internet connection** (to download source SPK files)
+3. **~500 MB temporary disk space** (source files are deleted after extraction)
+
+### Source Files
+
+The script downloads these satellite SPK files from JPL NAIF:
+
+| File | Planet | Size | URL |
+|------|--------|------|-----|
+| jup204.bsp | Jupiter | 89 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/jup204.bsp) |
+| sat319.bsp | Saturn | 52 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/sat319.bsp) |
+| ura083.bsp | Uranus | 80 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/ura083.bsp) |
+| nep050.bsp | Neptune | 201 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/nep050.bsp) |
+| plu017.bsp | Pluto | 19 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/plu017.bsp) |
+
+These are older, more compact versions of the satellite ephemerides. Newer versions
+(jup365.bsp, etc.) are much larger (500MB-1GB each) but offer higher precision
+for satellite positions, which we don't need for planet centers.
+
+### Running the Script
+
+```bash
+# Using poe task (recommended)
+poe generate-planet-centers-spk
+
+# Or directly
+python scripts/generate_planet_centers_spk.py
+```
+
+### Output
+
+The script generates:
+
+```
+libephemeris/data/planet_centers.bsp
+```
+
+This file contains 5 segments:
+
+| Center | Target | Description |
+|--------|--------|-------------|
+| 5 | 599 | Jupiter Barycenter → Jupiter Center |
+| 6 | 699 | Saturn Barycenter → Saturn Center |
+| 7 | 799 | Uranus Barycenter → Uranus Center |
+| 8 | 899 | Neptune Barycenter → Neptune Center |
+| 9 | 999 | Pluto Barycenter → Pluto Center |
+
+## Technical Details
+
+### SPK File Format
+
+The output file uses SPK Type 2 (Chebyshev polynomial) format, which is the same
+format used in DE ephemerides and satellite SPKs. This format stores polynomial
+coefficients that can be evaluated at any time within the segment's coverage.
+
+Type 2 SPK structure per segment:
+- Chebyshev polynomial coefficients for X, Y, Z position
+- Polynomial degree (typically 7-15)
+- Record interval (typically 1-8 days)
+- Time range (typically 1900-2100)
+
+### Chaining with DE Ephemerides
+
+Skyfield automatically chains SPK segments. When you load both DE421 and the
+planet centers SPK, Skyfield computes:
+
+```
+Earth → SSB → Jupiter Barycenter (from DE421)
+                    ↓
+             Jupiter Center (from planet_centers.bsp)
+```
+
+This chaining is transparent to the user.
+
+### Reference Frame
+
+All segments use the J2000 reference frame (ICRF), consistent with DE ephemerides.
+
+## Usage in libephemeris
+
+After generating the SPK file, libephemeris will automatically load it alongside
+the main ephemeris (DE421/DE440). The planet center positions will be used
+instead of barycenter + COB correction.
+
+### Automatic Loading
+
+```python
+import libephemeris as eph
+
+# planet_centers.bsp is loaded automatically if present
+# Jupiter now returns planet center, not barycenter
+pos, _ = eph.swe_calc_ut(jd, eph.SE_JUPITER, 0)
+```
+
+### Verifying Planet Centers
+
+```python
+from skyfield.api import load
+
+# Load both ephemerides
+planets = load('de421.bsp')
+centers = load('planet_centers.bsp')
+
+# Get Jupiter center via chaining
+ts = load.timescale()
+t = ts.utc(2025, 1, 1)
+
+earth = planets['earth']
+jupiter_bary = planets['jupiter barycenter']
+jupiter_center = centers['jupiter']
+
+# Position of Jupiter center from Earth
+astrometric = earth.at(t).observe(jupiter_bary + jupiter_center)
+ra, dec, distance = astrometric.radec()
+```
+
+## Coverage and Precision
+
+### Time Coverage
+
+The coverage depends on the source SPK files, typically:
+
+| Planet | Start | End |
+|--------|-------|-----|
+| Jupiter | ~1900 | ~2100 |
+| Saturn | ~1900 | ~2100 |
+| Uranus | ~1900 | ~2100 |
+| Neptune | ~1900 | ~2100 |
+| Pluto | ~1900 | ~2100 |
+
+### Precision
+
+The extracted segments maintain the full precision of the source files:
+- Position accuracy: sub-kilometer
+- From Earth: sub-arcsecond (typically <0.001 arcsec)
+
+## Troubleshooting
+
+### SSL Certificate Errors
+
+If you encounter SSL errors when downloading from JPL:
+
+```
+ssl.SSLError: certificate verify failed
+```
+
+The script will automatically fall back to unverified SSL for the trusted JPL
+servers. If this fails, you can manually download the source files.
+
+### spiceypy Not Found
+
+```
+ModuleNotFoundError: No module named 'spiceypy'
+```
+
+Install spiceypy:
+```bash
+pip install "spiceypy>=6.0.0"
+# or
+uv pip install "spiceypy>=6.0.0"
+```
+
+### Disk Space
+
+The script requires ~500 MB temporary space for downloading source files.
+These are automatically cleaned up after extraction.
+
+## References
+
+- [JPL NAIF Generic Kernels](https://naif.jpl.nasa.gov/naif/data_generic.html)
+- [SPK Required Reading](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/spk.html)
+- [Skyfield SPK Support](https://rhodesmill.org/skyfield/planets.html)
+- [SPICE Toolkit](https://naif.jpl.nasa.gov/naif/toolkit.html)
+
+## Changelog
+
+- **2024**: Initial implementation
+  - Created `generate_planet_centers_spk.py` script
+  - Added `poe generate-planet-centers-spk` task
+  - Documented in `docs/PLANET_CENTERS_SPK.md`
