@@ -102,7 +102,7 @@ LUNAR_POINT_TOLERANCE_DEG = {
     SE_MEAN_NODE: 0.01,  # High precision
     SE_TRUE_NODE: 2.0,  # Different oscillation model
     SE_MEAN_APOG: 0.2,  # Minor formula differences
-    SE_OSCU_APOG: 7.0,  # Different orbital model
+    SE_OSCU_APOG: 0.1,  # Eccentricity vector method (~235 arcsec max)
 }
 
 # From PRECISION.md - Julian Day tolerance

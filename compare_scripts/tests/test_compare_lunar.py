@@ -45,7 +45,7 @@ def angular_diff(val1: float, val2: float) -> float:
 MEAN_NODE_TOL = 0.01  # degrees
 TRUE_NODE_TOL = 0.15  # degrees (~540 arcsec, covers max observed ~510 arcsec)
 MEAN_LILITH_TOL = 0.1  # degrees
-TRUE_LILITH_TOL = 7.0  # degrees (very relaxed - known implementation differences)
+TRUE_LILITH_TOL = 0.1  # degrees (~360 arcsec, covers documented max ~235 arcsec)
 
 
 # ============================================================================
@@ -177,8 +177,8 @@ class TestTrueLilith:
         """
         Test True Lilith longitude.
 
-        Note: This has very relaxed tolerance due to known implementation
-        differences in osculating apogee calculation.
+        The eccentricity vector method achieves sub-arcminute precision
+        (~52 arcsec mean, ~235 arcsec max) against Swiss Ephemeris.
         """
         jd = swe.julday(year, month, day, hour)
 
@@ -214,12 +214,9 @@ class TestTrueLilith:
         max_error = max(errors)
         mean_error = sum(errors) / len(errors)
 
-        # Very relaxed thresholds for True Lilith
-        assert max_error < TRUE_LILITH_TOL, (
-            f"True Lilith max error {max_error:.2f}° exceeds tolerance"
-        )
-        assert mean_error < 5.0, (
-            f"True Lilith mean error {mean_error:.2f}° exceeds threshold"
+        # True Lilith achieves sub-arcminute precision
+        assert mean_error < 0.05, (
+            f"True Lilith mean error {mean_error:.4f}° exceeds threshold"
         )
 
 
@@ -272,7 +269,7 @@ class TestLilithLatitude:
     @pytest.mark.comparison
     @pytest.mark.parametrize("year,month,day,hour,desc", TEST_DATES[:3])
     def test_true_lilith_latitude(self, year, month, day, hour, desc):
-        """Test True Lilith latitude (very relaxed tolerance)."""
+        """Test True Lilith latitude."""
         jd = swe.julday(year, month, day, hour)
 
         pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
@@ -280,5 +277,5 @@ class TestLilithLatitude:
 
         diff_lat = abs(pos_swe[1] - pos_py[1])
 
-        # Very relaxed for True Lilith latitude
-        assert diff_lat < 5.0, f"True Lilith latitude diff {diff_lat:.2f}° at {desc}"
+        # Latitude tolerance is more relaxed than longitude
+        assert diff_lat < 1.0, f"True Lilith latitude diff {diff_lat:.2f}° at {desc}"
