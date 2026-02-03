@@ -940,22 +940,11 @@ def _calc_body_pctr(
     target_name = _PLANET_MAP[ipl]
     observer_name = _PLANET_MAP[iplctr]
 
-    # Try planet center first, fall back to barycenter if not available
-    try:
-        target = planets[target_name]
-    except KeyError:
-        if target_name in _PLANET_FALLBACK:
-            target = planets[_PLANET_FALLBACK[target_name]]
-        else:
-            raise
-
-    try:
-        observer = planets[observer_name]
-    except KeyError:
-        if observer_name in _PLANET_FALLBACK:
-            observer = planets[_PLANET_FALLBACK[observer_name]]
-        else:
-            raise
+    # Use get_planet_target() to get planet center (with COB correction) for gas giants
+    # This ensures we use planet center NAIF IDs (599, 699, 799, 899) rather than
+    # barycenter IDs (5, 6, 7, 8), providing sub-arcsecond accuracy matching Swiss Ephemeris
+    target = get_planet_target(planets, target_name)
+    observer = get_planet_target(planets, observer_name)
 
     # Helper function to get position vector at time t_
     def get_vector(t_):
