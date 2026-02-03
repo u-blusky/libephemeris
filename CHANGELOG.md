@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-02-03
+
+### Added
+
+#### Planet Center SPK Integration
+- Added `planet_centers.bsp` support for high-precision outer planet calculations
+- New SPK file provides planet center positions for Jupiter, Saturn, Uranus, Neptune, and Pluto (1989-2049)
+- Precision improved from ~0.1 arcsec (analytical COB) to <0.001 arcsec (SPK-based)
+- Automatic fallback to analytical Center-of-Body corrections when SPK is out of range
+
+#### CLI Tool
+- New `libephemeris` command-line interface:
+  - `libephemeris download-data` - Download optional precision data files (~25MB)
+  - `libephemeris status` - Show installed data file status
+  - `libephemeris --version` - Show version information
+- Progress bar during downloads (uses `rich` if available, otherwise simple ASCII progress)
+- Atomic downloads with SHA256 verification support
+
+#### New Modules
+- `libephemeris.download` - Data file download utilities with progress bar
+- `libephemeris.cli` - Command-line interface entry point
+
+### Changed
+
+- `_SpkCenterTarget` and `_CobCorrectedTarget` now compute velocity corrections for COB offsets
+- Exception handling catches both `jplephem.OutOfRangeError` and `skyfield.EphemerisRangeError`
+- Planet center SPK file moved from package data to optional download (reduces package size)
+
+### Fixed
+
+- Fixed velocity not being corrected in COB fallback paths (both `at()` and `_observe_from_bcrs()`)
+- Fixed exception type mismatch when planet_centers.bsp is out of range
+
 ## [0.6.0] - 2026-02-02
 
 ### Changed

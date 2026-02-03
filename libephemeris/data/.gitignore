@@ -1,0 +1,3 @@
+# Ignore downloaded data files (they are not part of the package)
+# Download with: libephemeris download-data
+*.bsp

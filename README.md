@@ -136,6 +136,16 @@ cd libephemeris
 uv pip install -e .
 ```
 
+### Optional: Download Precision Data
+
+For maximum precision on outer planet calculations (Jupiter, Saturn, Uranus, Neptune, Pluto), download the optional planet center data file:
+
+```bash
+libephemeris download-data
+```
+
+This downloads ~25MB of pre-computed planet center positions. Without this file, libephemeris uses analytical approximations which are still accurate to ~0.1 arcseconds.
+
 ### Requirements
 
 -   Python **3.9+**

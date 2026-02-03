@@ -1,6 +1,6 @@
 [project]
 name = "libephemeris"
-version = "0.6.0"
+version = "0.7.0"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -99,6 +99,9 @@ Repository = "https://github.com/g-battaglia/libephemeris"
 Issues = "https://github.com/g-battaglia/libephemeris/issues"
 Changelog = "https://github.com/g-battaglia/libephemeris/blob/main/CHANGELOG.md"
 
+[project.scripts]
+libephemeris = "libephemeris.cli:main"
+
 
 
 [build-system]
@@ -109,7 +112,7 @@ build-backend = "setuptools.build_meta"
 packages = ["libephemeris"]
 
 [tool.setuptools.package-data]
-libephemeris = ["py.typed", "seorbel.txt", "data/planet_centers.bsp"]
+libephemeris = ["py.typed", "seorbel.txt"]
 
 [tool.poe.tasks]
 format = "ruff format ."
