@@ -371,6 +371,14 @@ from .minor_bodies import (  # Generic asteroid lookup by number
     clear_asteroid_elements_cache,
     get_asteroid_number,
     clear_asteroid_name_cache,
+    # Automatic SPK download for major asteroids
+    auto_download_asteroid_spk,
+    is_spk_available_for_body,
+    ensure_major_asteroid_spk,
+    is_major_asteroid,
+    get_major_asteroid_info,
+    list_major_asteroids,
+    MAJOR_ASTEROID_SPK_INFO,
 )
 from .hypothetical import (  # Hamburg School Uranian planets
     calc_cupido,
@@ -981,6 +989,14 @@ __all__ = [
     "calc_asteroid_by_number",
     "fetch_orbital_elements_from_sbdb",
     "clear_asteroid_elements_cache",
+    # Automatic SPK download for major asteroids
+    "auto_download_asteroid_spk",
+    "is_spk_available_for_body",
+    "ensure_major_asteroid_spk",
+    "is_major_asteroid",
+    "get_major_asteroid_info",
+    "list_major_asteroids",
+    "MAJOR_ASTEROID_SPK_INFO",
     # Hypothetical bodies (Hamburg School Uranian planets)
     "calc_cupido",
     "calc_hades",

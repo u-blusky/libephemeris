@@ -1461,14 +1461,21 @@ def calc_minor_body_position(
 
 
 def calc_minor_body_heliocentric(
-    body_id: int, jd_tt: float
+    body_id: int, jd_tt: float, use_spk: bool = True
 ) -> Tuple[float, float, float]:
     """
     Calculate heliocentric ecliptic coordinates for a minor body.
 
+    This function automatically uses SPK kernels when available for major
+    asteroids (Ceres, Pallas, Juno, Vesta, Chiron), providing sub-arcsecond
+    precision. When SPK is not available, it falls back to Keplerian
+    calculations with secular perturbations (~10-30 arcsec precision).
+
     Args:
         body_id: Minor body identifier (SE_CHIRON, SE_ERIS, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
+        use_spk: If True (default), attempt to use SPK kernels for
+            high-precision positions. If False, always use Keplerian.
 
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
@@ -1484,13 +1491,41 @@ def calc_minor_body_heliocentric(
         subtract Earth's heliocentric position (see planets.py).
 
     Precision:
-        Asteroids (Ceres, etc.): ~1-3 arcminutes typical
-        TNOs (Eris, etc.): ~3-10 arcminutes typical
-        Errors increase with time from epoch (2023.0)
+        With SPK (major asteroids): Sub-arcsecond to arcsecond
+        Without SPK:
+            Asteroids (Ceres, etc.): ~10-30 arcseconds typical
+            TNOs (Eris, etc.): ~1-3 arcminutes typical
+        Errors increase with time from epoch
+
+    Example:
+        >>> from libephemeris.minor_bodies import calc_minor_body_heliocentric
+        >>> from libephemeris.constants import SE_CERES
+        >>> lon, lat, dist = calc_minor_body_heliocentric(SE_CERES, 2451545.0)
+        >>> print(f"Ceres: {lon:.4f}° lon, {lat:.4f}° lat, {dist:.4f} AU")
     """
     if body_id not in MINOR_BODY_ELEMENTS:
         raise ValueError(f"illegal planet number {body_id}.")
 
+    # Try to use SPK for high precision if available
+    if use_spk:
+        try:
+            from . import state
+            from .spk import calc_spk_body_position
+            from .constants import SEFLG_HELCTR
+
+            # Check if SPK is already registered for this body
+            if body_id in state._SPK_BODY_MAP:
+                ts = state.get_timescale()
+                t = ts.tt_jd(jd_tt)
+                result = calc_spk_body_position(t, body_id, SEFLG_HELCTR)
+                if result is not None:
+                    lon, lat, dist, _, _, _ = result
+                    return lon, lat, dist
+        except (ImportError, ValueError, KeyError):
+            # Fall through to Keplerian calculation
+            pass
+
+    # Fall back to Keplerian calculation
     elements = MINOR_BODY_ELEMENTS[body_id]
     x, y, z = calc_minor_body_position(elements, jd_tt)
 
@@ -1823,6 +1858,297 @@ def clear_asteroid_name_cache() -> int:
     count = len(_ASTEROID_NAME_CACHE)
     _ASTEROID_NAME_CACHE.clear()
     return count
+
+
+# =============================================================================
+# AUTOMATIC SPK DOWNLOAD FOR MAJOR ASTEROIDS
+# =============================================================================
+
+# Major asteroids with high-precision SPK kernels available from JPL Horizons
+# These are bodies where users benefit most from automatic SPK downloads:
+# - Keplerian elements give ~10-30 arcsec precision (good enough for many uses)
+# - SPK kernels give sub-arcsecond precision (required for precise timing)
+#
+# Bodies included:
+# - Main belt "Big Four": Ceres (1), Pallas (2), Juno (3), Vesta (4)
+# - Centaur Chiron (2060) - frequently used in astrology
+# Format: body_id -> (asteroid_number, horizons_id, naif_id, body_name)
+
+from .constants import (
+    SE_CERES,
+    SE_PALLAS,
+    SE_JUNO,
+    SE_VESTA,
+    SE_CHIRON,
+    NAIF_CERES,
+    NAIF_PALLAS,
+    NAIF_JUNO,
+    NAIF_VESTA,
+    NAIF_CHIRON,
+)
+
+MAJOR_ASTEROID_SPK_INFO: dict[int, tuple[int, str, int, str]] = {
+    SE_CERES: (1, "1", NAIF_CERES, "Ceres"),
+    SE_PALLAS: (2, "2", NAIF_PALLAS, "Pallas"),
+    SE_JUNO: (3, "3", NAIF_JUNO, "Juno"),
+    SE_VESTA: (4, "4", NAIF_VESTA, "Vesta"),
+    SE_CHIRON: (2060, "2060", NAIF_CHIRON, "Chiron"),
+}
+
+
+def is_major_asteroid(body_id: int) -> bool:
+    """
+    Check if a body ID is a major asteroid with SPK support.
+
+    Major asteroids are bodies where automatic SPK downloads are supported
+    to provide sub-arcsecond precision instead of the ~10-30 arcsecond
+    precision from Keplerian elements.
+
+    Args:
+        body_id: Minor body identifier (SE_CERES, SE_VESTA, etc.)
+
+    Returns:
+        bool: True if body is a major asteroid with SPK support
+
+    Example:
+        >>> from libephemeris.minor_bodies import is_major_asteroid
+        >>> from libephemeris.constants import SE_CERES, SE_ERIS
+        >>> is_major_asteroid(SE_CERES)
+        True
+        >>> is_major_asteroid(SE_ERIS)
+        False
+    """
+    return body_id in MAJOR_ASTEROID_SPK_INFO
+
+
+def get_major_asteroid_info(
+    body_id: int,
+) -> Optional[tuple[int, str, int, str]]:
+    """
+    Get SPK download information for a major asteroid.
+
+    Args:
+        body_id: Minor body identifier (SE_CERES, SE_VESTA, etc.)
+
+    Returns:
+        Tuple of (asteroid_number, horizons_id, naif_id, body_name) if
+        the body is a major asteroid with SPK support, None otherwise.
+
+    Example:
+        >>> from libephemeris.minor_bodies import get_major_asteroid_info
+        >>> from libephemeris.constants import SE_CERES
+        >>> info = get_major_asteroid_info(SE_CERES)
+        >>> if info:
+        ...     ast_num, horizons_id, naif_id, name = info
+        ...     print(f"{name}: asteroid #{ast_num}, NAIF ID {naif_id}")
+        Ceres: asteroid #1, NAIF ID 2000001
+    """
+    return MAJOR_ASTEROID_SPK_INFO.get(body_id)
+
+
+def auto_download_asteroid_spk(
+    body_id: int,
+    jd_start: Optional[float] = None,
+    jd_end: Optional[float] = None,
+    force: bool = False,
+) -> Optional[str]:
+    """
+    Automatically download SPK kernel for a major asteroid if not cached.
+
+    This function checks if an SPK file is already available for the given
+    major asteroid. If not, it downloads the SPK from JPL Horizons and
+    registers it for use by calc_ut() and related functions.
+
+    Supported major asteroids:
+        - Ceres (SE_CERES, asteroid 1)
+        - Pallas (SE_PALLAS, asteroid 2)
+        - Juno (SE_JUNO, asteroid 3)
+        - Vesta (SE_VESTA, asteroid 4)
+        - Chiron (SE_CHIRON, asteroid 2060)
+
+    Args:
+        body_id: Minor body identifier (SE_CERES, SE_VESTA, SE_CHIRON, etc.)
+        jd_start: Start Julian Day for SPK coverage. If None, uses 10 years
+            before current date.
+        jd_end: End Julian Day for SPK coverage. If None, uses 10 years
+            after current date.
+        force: If True, re-download even if SPK is already cached.
+
+    Returns:
+        str: Path to the SPK file if download successful or already cached.
+        None: If body is not a major asteroid, astroquery is not installed,
+              or download fails.
+
+    Raises:
+        No exceptions are raised; errors return None to allow graceful
+        fallback to Keplerian calculations.
+
+    Example:
+        >>> from libephemeris.minor_bodies import auto_download_asteroid_spk
+        >>> from libephemeris.constants import SE_CERES
+        >>> # Download SPK for Ceres (if astroquery is installed)
+        >>> spk_path = auto_download_asteroid_spk(SE_CERES)
+        >>> if spk_path:
+        ...     print(f"SPK downloaded: {spk_path}")
+        ... else:
+        ...     print("Using Keplerian fallback")
+
+    Note:
+        This function requires the `astroquery` package to be installed.
+        Install it with: pip install astroquery
+
+        The SPK file is cached locally and will be reused on subsequent
+        calls. Use force=True to re-download even if cached.
+
+    See Also:
+        is_spk_available_for_body: Check if SPK is already available
+        calc_minor_body_heliocentric: Uses SPK automatically when available
+    """
+    # Check if this is a major asteroid we support
+    if body_id not in MAJOR_ASTEROID_SPK_INFO:
+        return None
+
+    asteroid_number, horizons_id, naif_id, body_name = MAJOR_ASTEROID_SPK_INFO[body_id]
+
+    try:
+        from . import spk_auto
+        from . import state
+
+        # Check if astroquery is available
+        if not spk_auto._check_astroquery_available():
+            return None
+
+        # Check if SPK is already registered (and not forcing re-download)
+        if not force and body_id in state._SPK_BODY_MAP:
+            # Already registered, return the path (tuple is (spk_file, naif_id))
+            spk_file, _ = state._SPK_BODY_MAP[body_id]
+            return spk_file
+
+        # Determine date range for SPK
+        import time as time_module
+
+        # Current JD (approximate)
+        current_jd = 2440587.5 + (time_module.time() / 86400.0)
+
+        if jd_start is None:
+            jd_start = current_jd - 3652.5  # ~10 years before
+        if jd_end is None:
+            jd_end = current_jd + 3652.5  # ~10 years after
+
+        # Use auto_get_spk to download and register
+        spk_path = spk_auto.auto_get_spk(
+            body_id=horizons_id,
+            jd_start=jd_start,
+            jd_end=jd_end,
+            ipl=body_id,
+            naif_id=naif_id,
+        )
+
+        return spk_path
+
+    except ImportError:
+        # astroquery not available
+        return None
+    except Exception:
+        # Any other error - fail gracefully
+        return None
+
+
+def is_spk_available_for_body(body_id: int) -> bool:
+    """
+    Check if an SPK kernel is registered and available for a body.
+
+    This function checks if an SPK kernel has been downloaded and registered
+    for the given body, enabling high-precision calculations.
+
+    Args:
+        body_id: Minor body identifier (SE_CERES, SE_CHIRON, etc.)
+
+    Returns:
+        bool: True if SPK is registered and available for this body
+
+    Example:
+        >>> from libephemeris.minor_bodies import is_spk_available_for_body
+        >>> from libephemeris.constants import SE_CERES
+        >>> if is_spk_available_for_body(SE_CERES):
+        ...     print("Using high-precision SPK data")
+        ... else:
+        ...     print("Using Keplerian approximation")
+    """
+    try:
+        from . import state
+
+        return body_id in state._SPK_BODY_MAP
+    except ImportError:
+        return False
+
+
+def ensure_major_asteroid_spk(
+    body_id: int,
+    jd: Optional[float] = None,
+) -> bool:
+    """
+    Ensure SPK is available for a major asteroid, downloading if needed.
+
+    This is a convenience function that attempts to download the SPK for
+    a major asteroid if not already available. It is designed to be called
+    before position calculations to ensure best precision.
+
+    Args:
+        body_id: Minor body identifier (SE_CERES, SE_VESTA, etc.)
+        jd: Optional Julian Day to center the SPK coverage around.
+            If None, uses current date.
+
+    Returns:
+        bool: True if SPK is now available (either already was or download
+              succeeded), False otherwise.
+
+    Example:
+        >>> from libephemeris.minor_bodies import ensure_major_asteroid_spk
+        >>> from libephemeris.constants import SE_CERES
+        >>> # Ensure SPK is available for Ceres
+        >>> if ensure_major_asteroid_spk(SE_CERES):
+        ...     print("High-precision SPK available")
+        ... else:
+        ...     print("Will use Keplerian approximation")
+
+    Note:
+        This function is non-blocking and returns immediately if the SPK
+        is already available. The download only occurs on first call.
+    """
+    # First check if already available
+    if is_spk_available_for_body(body_id):
+        return True
+
+    # Try to download
+    if jd is not None:
+        jd_start = jd - 3652.5  # ~10 years before
+        jd_end = jd + 3652.5  # ~10 years after
+        spk_path = auto_download_asteroid_spk(body_id, jd_start, jd_end)
+    else:
+        spk_path = auto_download_asteroid_spk(body_id)
+
+    return spk_path is not None
+
+
+def list_major_asteroids() -> list[tuple[int, str]]:
+    """
+    List all major asteroids with automatic SPK download support.
+
+    Returns:
+        list: List of (body_id, name) tuples for all supported major asteroids.
+
+    Example:
+        >>> from libephemeris.minor_bodies import list_major_asteroids
+        >>> for body_id, name in list_major_asteroids():
+        ...     print(f"{name}: body_id={body_id}")
+        Ceres: body_id=17
+        Pallas: body_id=18
+        Juno: body_id=19
+        Vesta: body_id=20
+        Chiron: body_id=15
+    """
+    return [(body_id, info[3]) for body_id, info in MAJOR_ASTEROID_SPK_INFO.items()]
 
 
 def calc_asteroid_by_number(
