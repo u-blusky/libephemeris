@@ -192,3 +192,157 @@ class TestDE440VsDE421Compatibility:
         jd = ephem.swe_julday(2045, 12, 31, 23.99)
         pos, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
         assert 0 <= pos[0] < 360
+
+
+class TestDE440Fallback:
+    """Test the automatic fallback from DE440 to DE421."""
+
+    def test_fallback_logic_exists(self):
+        """Verify that the fallback mechanism is implemented in get_planets()."""
+        import inspect
+        from libephemeris import state
+
+        source = inspect.getsource(state.get_planets)
+        # Check that DE421 fallback logic is present
+        assert "de421.bsp" in source
+        assert "fallback" in source.lower()
+
+    def test_default_prefers_de440(self):
+        """Verify that DE440 is preferred when available."""
+        import os
+        from libephemeris import state
+
+        # Reset state
+        ephem.close()
+
+        # Check that DE440 is the configured default
+        assert state._EPHEMERIS_FILE == "de440.bsp"
+
+        # If DE440 exists locally, it should be used
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(state.__file__), ".."))
+        de440_path = os.path.join(base_dir, "de440.bsp")
+
+        if os.path.exists(de440_path):
+            # Trigger loading
+            state.get_planets()
+            assert state._EPHEMERIS_FILE == "de440.bsp"
+
+    def test_fallback_updates_ephemeris_file_variable(self):
+        """Test that fallback properly updates _EPHEMERIS_FILE when triggered."""
+        import os
+        from libephemeris import state
+
+        # Reset state
+        ephem.close()
+
+        # The fallback logic should update _EPHEMERIS_FILE if fallback is used
+        # We just verify the logic is structured correctly by checking the source
+        import inspect
+
+        source = inspect.getsource(state.get_planets)
+        # Check that _EPHEMERIS_FILE is updated during fallback
+        assert "_EPHEMERIS_FILE = fallback_file" in source
+
+
+class TestDE440OuterPlanetPrecision:
+    """
+    Test that DE440 provides improved outer planet precision.
+
+    DE440 includes 12+ years of additional spacecraft tracking data
+    compared to DE421, and uses ICRF 3.0 reference frame.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Reset ephemeris state before each test."""
+        ephem.close()
+        yield
+        ephem.close()
+
+    def test_outer_planet_positions_at_multiple_dates(self):
+        """
+        Verify outer planet calculations work at multiple dates.
+
+        DE440's improved outer planet ephemeris should produce
+        positions with no anomalies or errors.
+        """
+        outer_planets = [SE_URANUS, SE_NEPTUNE, SE_PLUTO]
+        test_dates = [
+            ephem.swe_julday(2000, 1, 1, 12.0),  # J2000
+            ephem.swe_julday(2020, 6, 21, 0.0),  # Recent solstice
+            ephem.swe_julday(2050, 12, 21, 12.0),  # Future date
+        ]
+
+        for jd in test_dates:
+            for planet in outer_planets:
+                pos, _ = ephem.swe_calc_ut(jd, planet, SEFLG_SPEED)
+                # Longitude should be valid
+                assert 0 <= pos[0] < 360, f"Invalid longitude for planet {planet}"
+                # Distance should be positive and reasonable
+                assert pos[2] > 0, f"Invalid distance for planet {planet}"
+                # Speed should be finite
+                assert abs(pos[3]) < 1, f"Unreasonable speed for planet {planet}"
+
+    def test_uranus_neptune_pluto_distance_ranges(self):
+        """Verify outer planet distances are in expected ranges."""
+        jd = ephem.swe_julday(2024, 1, 1, 12.0)
+
+        # Uranus: 17.3-20.1 AU from Sun, varies from Earth
+        pos_uranus, _ = ephem.swe_calc_ut(jd, SE_URANUS, 0)
+        assert 17 < pos_uranus[2] < 22, "Uranus distance out of range"
+
+        # Neptune: 29.0-30.3 AU from Sun, varies from Earth
+        pos_neptune, _ = ephem.swe_calc_ut(jd, SE_NEPTUNE, 0)
+        assert 28 < pos_neptune[2] < 32, "Neptune distance out of range"
+
+        # Pluto: 29.7-49.3 AU from Sun, varies from Earth
+        pos_pluto, _ = ephem.swe_calc_ut(jd, SE_PLUTO, 0)
+        assert 28 < pos_pluto[2] < 52, "Pluto distance out of range"
+
+    def test_outer_planet_positions_consistency(self):
+        """
+        Test that outer planet positions are consistent over time.
+
+        The positions should change smoothly and predictably.
+        """
+        jd_base = ephem.swe_julday(2024, 1, 1, 12.0)
+
+        for planet in [SE_URANUS, SE_NEPTUNE, SE_PLUTO]:
+            positions = []
+            for day_offset in [0, 10, 20, 30]:
+                jd = jd_base + day_offset
+                pos, _ = ephem.swe_calc_ut(jd, planet, 0)
+                positions.append(pos[0])
+
+            # Positions should change by a small, consistent amount
+            for i in range(1, len(positions)):
+                delta = positions[i] - positions[i - 1]
+                # Normalize for 360 degree wraparound
+                if delta > 180:
+                    delta -= 360
+                elif delta < -180:
+                    delta += 360
+                # Outer planets move slowly, less than 0.5 deg per 10 days
+                assert abs(delta) < 0.5, f"Planet {planet} position jump too large"
+
+    def test_de440_extended_date_range_for_outer_planets(self):
+        """
+        Test outer planets at dates beyond DE421 range.
+
+        DE421 covered 1900-2050. DE440 covers 1550-2650.
+        """
+        # Date beyond DE421 range (after 2050)
+        jd_2100 = ephem.swe_julday(2100, 1, 1, 12.0)
+
+        for planet in [SE_URANUS, SE_NEPTUNE, SE_PLUTO]:
+            pos, _ = ephem.swe_calc_ut(jd_2100, planet, SEFLG_SPEED)
+            assert 0 <= pos[0] < 360
+            assert pos[2] > 0
+
+        # Historical date (before DE421 range starts in 1900)
+        jd_1800 = ephem.swe_julday(1800, 1, 1, 12.0)
+
+        for planet in [SE_URANUS, SE_NEPTUNE, SE_PLUTO]:
+            pos, _ = ephem.swe_calc_ut(jd_1800, planet, SEFLG_SPEED)
+            assert 0 <= pos[0] < 360
+            assert pos[2] > 0

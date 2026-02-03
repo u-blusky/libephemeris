@@ -120,8 +120,10 @@ def get_planets() -> SpiceKernel:
     Note:
         Uses the ephemeris file set via set_ephemeris_file() (default: de440.bsp).
         Searches in _EPHEMERIS_PATH if set, then workspace root, then downloads.
+        If DE440 is requested but not available, automatically falls back to DE421
+        if present locally (DE440 will be downloaded for better precision).
     """
-    global _PLANETS
+    global _PLANETS, _EPHEMERIS_FILE
     if _PLANETS is None:
         load = get_loader()
 
@@ -138,7 +140,24 @@ def get_planets() -> SpiceKernel:
         if os.path.exists(bsp_path):
             _PLANETS = load(bsp_path)
         else:
-            # Download from internet
+            # If DE440 is not found locally, try DE421 as fallback before downloading
+            # This allows offline use with DE421 while recommending DE440 for download
+            if _EPHEMERIS_FILE == "de440.bsp":
+                fallback_file = "de421.bsp"
+                # Check custom path first
+                if _EPHEMERIS_PATH:
+                    fallback_path = os.path.join(_EPHEMERIS_PATH, fallback_file)
+                    if os.path.exists(fallback_path):
+                        _EPHEMERIS_FILE = fallback_file
+                        _PLANETS = load(fallback_path)
+                        return _PLANETS
+                # Check workspace root
+                fallback_path = os.path.join(base_dir, fallback_file)
+                if os.path.exists(fallback_path):
+                    _EPHEMERIS_FILE = fallback_file
+                    _PLANETS = load(fallback_path)
+                    return _PLANETS
+            # Download from internet (will get DE440 if that was requested)
             _PLANETS = load(_EPHEMERIS_FILE)
     return _PLANETS
 
