@@ -278,8 +278,8 @@ LibEphemeris uses different calculation models for some lunar points, resulting 
 | True Node | ~0.14° (~520 arcsec) | ~0.04° (~145 arcsec) | Geometric method (see below) |
 | Mean Lilith | ~0.12° (~430 arcsec) | ~0.07° (~250 arcsec) | Minor formula differences |
 | True Lilith | ~0.07° (~235 arcsec) | ~0.02° (~52 arcsec) | Eccentricity vector method (see below) |
-| Interpolated Apogee | ~8-10° | - | Smoothed osculating apogee (see below) |
-| Interpolated Perigee | ~10-15° | - | Smoothed osculating perigee (see below) |
+| Interpolated Apogee | ~1.1° | ~3.3° max | ELP2000-82B perturbation series |
+| Interpolated Perigee | ~2.3° | ~8° max | ELP2000-82B perturbation series (see below) |
 
 #### True Node: Why LibEphemeris is More Rigorous
 
@@ -339,16 +339,47 @@ This sub-arcminute precision makes True Lilith suitable for all practical applic
 
 ### Asteroids
 
+LibEphemeris supports two methods for calculating asteroid positions:
+
+#### Method 1: Keplerian (Default)
+
 | Asteroid | Precision | Notes |
 |----------|-----------|-------|
 | Chiron | ~1° | Keplerian approximation |
 | Pholus | ~1° | Keplerian approximation |
-| Ceres | ~1° | Keplerian approximation |
-| Pallas | ~1° | Keplerian approximation |
-| Juno | ~1° | Keplerian approximation |
-| Vesta | ~1° | Keplerian approximation |
+| Ceres | ~0.1° | Keplerian + secular perturbations |
+| Pallas | ~5° | High inclination causes larger errors |
+| Juno | ~0.1° | Keplerian + secular perturbations |
+| Vesta | ~0.1° | Keplerian + secular perturbations |
 
-**Note**: Asteroids use Keplerian (two-body) orbital propagation which does not account for planetary perturbations. Errors grow over time, especially for dates far from the orbital elements epoch (2023.0).
+**Note**: Keplerian (two-body) orbital propagation does not account for planetary perturbations. Errors grow over time, especially for dates far from the orbital elements epoch (2025.0).
+
+#### Method 2: SPK Kernels (High Precision)
+
+For sub-arcsecond precision, LibEphemeris supports JPL SPK ephemeris files:
+
+| Asteroid | SPK Precision | Notes |
+|----------|---------------|-------|
+| All bodies | < 1 arcsec | Matches JPL Horizons exactly |
+
+**Enabling SPK for asteroids:**
+
+```python
+import libephemeris as eph
+
+# Method 1: Download and register manually
+path = eph.download_spk("2060", "2000-01-01", "2100-01-01")  # Chiron
+eph.register_spk_body(eph.SE_CHIRON, path, eph.NAIF_CHIRON)
+
+# Method 2: Auto-download (requires astroquery)
+eph.set_auto_spk_download(True)
+
+# Method 3: Enable common bodies at once
+from libephemeris import spk_auto
+spk_auto.enable_common_bodies()  # Ceres, Pallas, Juno, Vesta, Chiron, Pholus
+```
+
+When SPK is enabled, `swe_calc_ut()` automatically uses SPK precision instead of Keplerian.
 
 ### Trans-Neptunian Objects (TNOs)
 

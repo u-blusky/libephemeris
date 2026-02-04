@@ -1,15 +1,25 @@
 """
-Pytest-style Orbital Elements Comparison Tests.
-
-Validates nod_aps_ut, get_orbital_elements, and orbit_max_min_true_distance
-calculations against pyswisseph.
+Compare orbital element calculations with pyswisseph.
 
 NOTE: Tests for nod_aps are marked as xfail because libephemeris uses a different
-methodology for calculating planetary nodes and apsides. The Swiss Ephemeris uses
-heliocentric osculating elements from JPL DE ephemerides, while libephemeris
-calculates geocentric orbital elements. This leads to significant differences,
-especially for inner planets (Mercury, Venus) where the heliocentric vs geocentric
-reference frame causes large angular differences.
+methodology for calculating planetary nodes and apsides.
+
+Key difference:
+- libephemeris: Uses heliocentric mean orbital elements from Standish (1992) JPL/IERS
+  tables. The ascending node longitude is the heliocentric Omega where the planet's
+  orbit crosses the ecliptic going north (as seen from the Sun).
+
+- Swiss Ephemeris: Appears to use a geocentric interpretation, returning the ecliptic
+  longitude where the planet appears to cross the ecliptic as seen from Earth.
+
+For outer planets (Jupiter, Saturn, etc.), the difference is small (<1°) because
+they are far from Earth. For inner planets (Mercury, Venus), the difference can be
+~250° because the heliocentric and geocentric orbital planes are oriented very
+differently relative to Earth.
+
+Both approaches are astronomically valid - they answer different questions:
+- Heliocentric: "Where does the orbit cross the ecliptic as seen from the Sun?"
+- Geocentric: "Where does the planet appear to cross the ecliptic from Earth?"
 """
 
 import pytest

@@ -1243,16 +1243,16 @@ def _calc_body(
     if ipl in [SE_MEAN_APOG, SE_OSCU_APOG]:
         jd_tt = t.tt
         if ipl == SE_MEAN_APOG:
-            lon = lunar.calc_mean_lilith(jd_tt)
+            lon, lat = lunar.calc_mean_lilith_with_latitude(jd_tt)
             # Calculate velocity via central difference numerical differentiation
             # Using ±0.5 days to capture perturbation effects that a 1-second
             # step would miss, ensuring velocity reflects the actual rate of
             # change including all periodic correction terms.
-            dlon = 0.0
+            dlon, dlat = 0.0, 0.0
             if iflag & SEFLG_SPEED:
                 dt = 0.5  # 0.5 days for perturbation-corrected velocity
-                lon_prev = lunar.calc_mean_lilith(jd_tt - dt)
-                lon_next = lunar.calc_mean_lilith(jd_tt + dt)
+                lon_prev, lat_prev = lunar.calc_mean_lilith_with_latitude(jd_tt - dt)
+                lon_next, lat_next = lunar.calc_mean_lilith_with_latitude(jd_tt + dt)
                 # Handle longitude wrap-around before computing velocity
                 lon_diff = lon_next - lon_prev
                 if lon_diff > 180:
@@ -1260,7 +1260,8 @@ def _calc_body(
                 elif lon_diff < -180:
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
-            return _to_native_floats((lon, 0.0, 0.0, dlon, 0.0, 0.0)), iflag
+                dlat = (lat_next - lat_prev) / (2.0 * dt)
+            return _to_native_floats((lon, lat, 0.0, dlon, dlat, 0.0)), iflag
         else:  # SE_OSCU_APOG
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
             # Calculate velocity via central difference numerical differentiation

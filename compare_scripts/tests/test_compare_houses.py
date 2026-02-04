@@ -65,7 +65,8 @@ HOUSE_SYSTEMS = [
 RELAXED_SYSTEMS = {
     "G": GAUQUELIN_TOL,  # Gauquelin: 36 sectors in pyswisseph vs 12 cusps in libephemeris
     "S": SRIPATI_TOL,  # Sripati: Not fully implemented
-    "U": 180.0,  # Krusinski: Uses Porphyry fallback
+    "U": 1.0,  # Krusinski: Fully implemented, ~1° precision
+    "Y": 1.0,  # APC: Fully implemented, ~1° precision
     "D": 30.0,  # Equal from MC: Different algorithm
     "I": 15.0,  # Sunshine/Makransky: Not fully implemented
     "L": 20.0,  # Pulhemus: Not fully implemented

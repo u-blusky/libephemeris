@@ -52,10 +52,6 @@ Polar Latitudes:
 - Automatic fallback to Porphyry when iteration fails
 - Equal/Whole Sign work at all latitudes
 
-Unimplemented Features (marked with FIXME):
-- Krusinski-Pisa: Uses Porphyry fallback
-- APC Houses: Uses Porphyry fallback
-
 Algorithm Sources:
 - Placidus: Time divisions of diurnal/nocturnal arcs
 - Regiomontanus: Equator trisection projected to ecliptic
