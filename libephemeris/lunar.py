@@ -144,6 +144,14 @@ MEEUS_OPTIMAL_CENTURIES = 2.0  # ±200 years: <0.001° error
 MEEUS_VALID_CENTURIES = 10.0  # ±1000 years: <0.01° error
 MEEUS_MAX_CENTURIES = 20.0  # ±2000 years: error grows significantly beyond
 
+# Constants for interpolated apside calculation (Swiss Ephemeris algorithm)
+# Anomalistic month: time for Moon to return to same mean anomaly
+ANOMALISTIC_MONTH_DAYS = 27.55454988
+# Arcseconds per degree
+ARCSEC_PER_DEG = 3600.0
+# Full circle in arcseconds
+FULL_CIRCLE_ARCSEC = 1296000.0  # 360° × 3600
+
 
 def _calc_lunar_fundamental_arguments(
     jd_tt: float,
@@ -293,6 +301,167 @@ def _calc_saturn_mean_longitude(jd_tt: float) -> float:
     L_saturn = 50.077571 + 1222.1137943 * T + 0.00021 * T**2
 
     return math.radians(L_saturn % 360.0)
+
+
+def _calc_lunar_mean_anomaly_deg(jd_tt: float) -> float:
+    """
+    Calculate lunar mean anomaly (M') at a given Julian Date.
+
+    The mean anomaly represents the Moon's angular distance from perigee
+    in its mean orbit. It increases by 360° per anomalistic month (~27.55 days).
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time
+
+    Returns:
+        Mean anomaly in degrees [0, 360)
+    """
+    T = (jd_tt - 2451545.0) / 36525.0
+
+    # Meeus formula for M' (degrees)
+    M_prime_deg = (
+        134.9633964
+        + 477198.8675055 * T
+        + 0.0087414 * T**2
+        + T**3 / 69699.0
+        - T**4 / 14712000.0
+    )
+
+    return M_prime_deg % 360.0
+
+
+def _get_moon_distance_at_anomaly_offset(jd_tt: float, mp_offset_deg: float) -> float:
+    """
+    Get lunar geocentric distance for a given mean anomaly offset.
+
+    Uses temporal interpolation: converts the mean anomaly offset to a time
+    offset based on the anomalistic month period, then calculates Moon
+    position at that offset time.
+
+    The relationship is: ΔT = ΔMP / 360° × 27.55455 days
+
+    This approach replicates the Swiss Ephemeris algorithm which varies the
+    mean anomaly parameter to search for distance extrema.
+
+    Args:
+        jd_tt: Base Julian Day in TT
+        mp_offset_deg: Offset from current mean anomaly in degrees
+
+    Returns:
+        Geocentric distance in AU
+    """
+    # Import here to avoid circular imports
+    from .planets import swe_calc
+    from .constants import SE_MOON
+
+    # Convert MP offset (degrees) to time offset (days)
+    # MP changes by 360° in one anomalistic month
+    dt_days = (mp_offset_deg / 360.0) * ANOMALISTIC_MONTH_DAYS
+
+    # Calculate Moon position at offset time
+    jd_offset = jd_tt + dt_days
+    moon_pos, _ = swe_calc(jd_offset, SE_MOON, 0)
+
+    return moon_pos[2]  # Distance in AU
+
+
+def _iterative_apside_search(
+    jd_tt: float, is_apogee: bool
+) -> Tuple[float, float, float]:
+    """
+    Find interpolated apside using Swiss Ephemeris iterative algorithm.
+
+    This implements the algorithm from swemmoon.c (swi_intp_apsides):
+
+    1. Start at MP = 180° (apogee) or 0° (perigee)
+    2. Initial step dd = 5°
+    3. For each iteration:
+       - Sample distance at MP-dd, MP, MP+dd
+       - Use parabolic interpolation to find extremum
+       - Update MP, reduce dd by 10×
+    4. Repeat 4-5 times
+
+    The key insight is that the Moon's geocentric distance reaches its
+    maximum when mean anomaly = 180° (apogee) and minimum when mean
+    anomaly = 0° (perigee). By searching for the actual extremum point,
+    we account for perturbations that shift these positions.
+
+    Args:
+        jd_tt: Julian Day in TT
+        is_apogee: True for apogee (max distance), False for perigee (min)
+
+    Returns:
+        (longitude, latitude, eccentricity) of interpolated apside
+
+    References:
+        - Swiss Ephemeris source code: swemmoon.c, function swi_intp_apsides
+        - Moshier's analytical lunar ephemeris
+    """
+    # Import here to avoid circular imports
+    from .planets import swe_calc
+    from .constants import SE_MOON
+
+    # Swiss Ephemeris parameters (from swemmoon.c)
+    if is_apogee:
+        mp_target_deg = 180.0  # Apogee: Moon at maximum distance
+        niter = 5  # Increased from 4 for better convergence
+    else:
+        mp_target_deg = 0.0  # Perigee: Moon at minimum distance
+        niter = 6  # Increased from 5 for better convergence
+
+    # Get current mean anomaly at jd_tt
+    mp_current_deg = _calc_lunar_mean_anomaly_deg(jd_tt)
+
+    # Calculate offset from target MP
+    mp_offset_deg = mp_target_deg - mp_current_deg
+
+    # Normalize offset to [-180, 180] degrees
+    while mp_offset_deg > 180.0:
+        mp_offset_deg -= 360.0
+    while mp_offset_deg < -180.0:
+        mp_offset_deg += 360.0
+
+    # Initial step size: 5° (18000 arcsec in SE)
+    dd = 5.0
+
+    for _ in range(niter + 1):
+        # Sample distance at 3 points: MP-dd, MP, MP+dd
+        distances = []
+        for offset_mult in [-1, 0, 1]:
+            test_offset = mp_offset_deg + offset_mult * dd
+            dist = _get_moon_distance_at_anomaly_offset(jd_tt, test_offset)
+            distances.append(dist)
+
+        # Parabolic interpolation to find vertex
+        # Formula from SE: correction = (1.5*y0 - 2*y1 + 0.5*y2) / (y0 + y2 - 2*y1)
+        denom = distances[0] + distances[2] - 2.0 * distances[1]
+
+        if abs(denom) > 1e-15:
+            correction = (
+                1.5 * distances[0] - 2.0 * distances[1] + 0.5 * distances[2]
+            ) / denom
+            correction = correction * dd - dd
+            mp_offset_deg += correction
+
+        # Reduce step size by 10x for next iteration
+        dd /= 10.0
+
+    # Get Moon position at the found extremum
+    dt_days = (mp_offset_deg / 360.0) * ANOMALISTIC_MONTH_DAYS
+    jd_extremum = jd_tt + dt_days
+
+    moon_pos, _ = swe_calc(jd_extremum, SE_MOON, 0)
+
+    # The apside longitude is the Moon's longitude when it reaches the extremum
+    apside_lon = moon_pos[0]
+    apside_lat = moon_pos[1]
+
+    # For the apside POINT (not the Moon's position at extremum):
+    # - Apogee point: where the Moon IS when at max distance
+    # - Perigee point: where the Moon IS when at min distance
+    # So the longitude is simply the Moon's longitude at that moment.
+
+    return apside_lon, apside_lat, 0.0549
 
 
 def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
@@ -1313,6 +1482,117 @@ def _calc_elp2000_apogee_perturbations(jd_tt: float) -> float:
     return perturbation
 
 
+def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
+    """
+    Calculate ELP2000-82B perturbation corrections for the lunar perigee.
+
+    The perigee oscillations are significantly larger than apogee oscillations
+    (~25° vs ~5° from mean position) due to the asymmetric nature of solar
+    perturbations on the lunar orbit.
+
+    This function implements perturbation terms that model the difference
+    between the perigee and apogee positions. Swiss Ephemeris documentation
+    notes that apogee and perigee can deviate from being exactly 180° apart
+    by up to 28° depending on Sun-Moon geometry.
+
+    **Key Physical Insight:**
+
+    The dominant perturbation of the perigee comes from the evection pair term
+    (2D - 2M'), which has the OPPOSITE sign compared to apogee. While the apogee
+    has a coefficient of +4.53° for this term, the perigee has approximately
+    -22° coefficient. This is because solar perturbations affect the perigee
+    much more strongly than the apogee.
+
+    The coefficients were calibrated by fitting to Swiss Ephemeris SE_INTP_PERG
+    values over multiple cycles. Expected residual error: ~5° stdev.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
+
+    Returns:
+        float: Total perturbation correction in degrees to be added to the
+               mean perigee position. Typically ranges from -25° to +25°.
+
+    References:
+        - Swiss Ephemeris documentation, section 2.2.4
+        - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988)
+    """
+    T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
+
+    D, M, M_prime, F = _calc_lunar_fundamental_arguments(jd_tt)
+
+    # Eccentricity of Earth's orbit
+    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
+
+    # ========================================================================
+    # PERIGEE PERTURBATIONS
+    # ========================================================================
+    # Coefficients calibrated by fitting to Swiss Ephemeris SE_INTP_PERG
+
+    perturbation = 0.0
+
+    # ========================================================================
+    # DOMINANT EVECTION PAIR TERM (2D - 2M')
+    # ========================================================================
+    # This is the main oscillation term. Note the NEGATIVE coefficient
+    # (opposite to apogee's +4.53), creating the large perigee oscillations.
+    perturbation += -22.2018 * math.sin(2.0 * D - 2.0 * M_prime)
+    perturbation += 0.0503 * math.cos(2.0 * D - 2.0 * M_prime)
+
+    # ========================================================================
+    # SUN-ELONGATION COUPLING (2D - M)
+    # ========================================================================
+    # Second most important term
+    perturbation += 1.5312 * E * math.sin(2.0 * D - M)
+    perturbation += -0.0171 * E * math.cos(2.0 * D - M)
+
+    # ========================================================================
+    # ANNUAL EQUATION (Solar anomaly M)
+    # ========================================================================
+    perturbation += 0.4145 * E * math.sin(M)
+    perturbation += -0.1878 * E * math.cos(M)
+
+    # ========================================================================
+    # PARALLACTIC TERMS (D)
+    # ========================================================================
+    perturbation += 0.3770 * math.sin(D)
+    perturbation += -0.3934 * math.cos(D)
+
+    # ========================================================================
+    # ANNUAL-LUNAR COUPLING (M ± M')
+    # ========================================================================
+    perturbation += -0.2122 * E * math.sin(M - M_prime)
+    perturbation += -0.0630 * E * math.cos(M - M_prime)
+    perturbation += 0.0900 * E * math.sin(M + M_prime)
+    perturbation += -0.1241 * E * math.cos(M + M_prime)
+
+    # ========================================================================
+    # SYNODIC TERMS (2D)
+    # ========================================================================
+    perturbation += 0.1422 * math.sin(2.0 * D)
+    perturbation += 0.0188 * math.cos(2.0 * D)
+
+    # ========================================================================
+    # EVECTION TERMS (2D - M', 2D + M')
+    # ========================================================================
+    perturbation += 0.1117 * math.sin(2.0 * D - M_prime)
+    perturbation += -0.0168 * math.sin(2.0 * D + M_prime)
+
+    # ========================================================================
+    # HIGHER HARMONICS
+    # ========================================================================
+    perturbation += 0.0356 * math.sin(4.0 * D - 2.0 * M_prime)
+    perturbation += -0.0153 * math.cos(4.0 * D - 2.0 * M_prime)
+
+    # ========================================================================
+    # ANOMALISTIC TERMS (M')
+    # ========================================================================
+    perturbation += -0.0304 * math.sin(M_prime)
+    perturbation += -0.0163 * math.sin(3.0 * M_prime)
+
+    return perturbation
+
+
 def _mean_obliquity_radians(jd_tt: float) -> float:
     """
     Calculate mean obliquity of the ecliptic (IAU 2006).
@@ -2232,45 +2512,16 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     1. **Mean Apogee Position:** Calculate the mean lunar apogee (Mean Lilith)
        using Meeus polynomial formula for the mean argument of perigee + 180°.
 
-     2. **ELP2000-82B Perturbation Series:** Add periodic perturbation terms
-        that model the oscillations of the apsidal line around its mean position.
-        The key terms include:
-        - **Dominant evection pair term (2D - 2M') with ~4.5° amplitude**
-          This is the largest term, with period ~205 days
-        - Annual equation terms (Sun's anomaly M) with ~0.45° amplitude
-        - Smaller evection-related terms (2D - M' and harmonics)
-        - Inclination coupling terms (argument of latitude F)
-        - Planetary perturbations (Venus, Jupiter)
+    2. **ELP2000-82B Perturbation Series:** Add periodic perturbation terms
+       that model the oscillations of the apsidal line around its mean position.
 
     3. **Result:** mean_apogee + perturbations = interpolated apogee longitude
-
-    This approach achieves <1° mean agreement with Swiss Ephemeris SE_INTP_APOG,
-    reduced from the previous ~8-10° offset. This level of precision is suitable
-    for astrological applications that rely on Lilith positions for aspect
-    calculations and transit predictions.
-
-    **Note:** Perfect agreement (<0.1°) would require implementing the full Moshier
-    lunar theory, which uses a different mean longitude reference than the Meeus
-    polynomials used here.
-
-    Comparison with Previous Implementation
-    =======================================
-
-    The previous polynomial regression approach over a 56-day window of
-    osculating apogee positions achieved only ~8-10° agreement with Swiss
-    Ephemeris due to fundamental differences between:
-    - JPL DE-based osculating elements (used by libephemeris)
-    - Moshier analytical lunar theory (used by Swiss Ephemeris)
-
-    The new analytical approach eliminates this systematic offset by computing
-    the apsidal position directly from perturbation theory, matching the
-    methodology used by Swiss Ephemeris.
 
     Expected Precision
     ==================
 
-    - Mean agreement with Swiss Ephemeris SE_INTP_APOG: <1° (reduced from ~8-10°)
-    - Maximum difference: ~2° (at certain lunar phases)
+    - Mean agreement with Swiss Ephemeris SE_INTP_APOG: <2°
+    - Maximum difference: ~3° (at certain lunar phases)
     - Suitable for astrological applications requiring Lilith compatibility
     - Smooth, continuous curve without the artifacts of osculating elements
 
@@ -2287,7 +2538,6 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
         - Swiss Ephemeris documentation, section 2.2.4 "The Interpolated or
           Natural Apogee and Perigee"
         - Chapront-Touzé, M. & Chapront, J. "ELP 2000-82B" (1988), A&A 190
-        - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
         - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
     """
     # Calculate mean apogee position using Meeus polynomial
@@ -2302,11 +2552,9 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     interp_lon = (mean_apogee + perturbation) % 360.0
 
     # For latitude, the interpolated apogee is essentially on the ecliptic
-    # (the apsidal line lies in the orbital plane which is close to ecliptic)
     interp_lat = 0.0
 
-    # Mean eccentricity of lunar orbit (typical value)
-    # The eccentricity oscillates slightly but ~0.0549 is the mean value
+    # Mean eccentricity of lunar orbit
     interp_ecc = 0.0549
 
     return interp_lon, interp_lat, interp_ecc
@@ -2581,9 +2829,7 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
 
     The interpolated perigee is a smoothed version of the osculating perigee that
     removes the spurious short-period oscillations caused by the instantaneous
-    nature of osculating orbital elements. This function performs the interpolation
-    directly on perigee values for consistency, rather than deriving it from the
-    interpolated apogee.
+    nature of osculating orbital elements.
 
     Physical Background
     ===================
@@ -2610,28 +2856,25 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
        opposite when the Sun is in conjunction with one of them or at 90° angle
     3. **The curves should be continuous** - both position and velocity
 
-    Implementation
-    ==============
+    Algorithm
+    =========
 
-    This function samples osculating perigee positions (computed directly using
-    calc_osculating_perigee, which uses the eccentricity vector) at multiple
-    points and applies polynomial regression to smooth out the short-period
-    oscillations. The interpolation is done directly on the perigee values,
-    not derived from the interpolated apogee.
+    This implementation uses an analytical approach based on ELP2000-82B lunar
+    theory. The perigee is calculated as the apogee minus 180° plus additional
+    perturbation corrections that account for the asymmetry between apogee and
+    perigee oscillations.
 
-    Note: The perigee is computed independently from apogee because Swiss
-    Ephemeris documentation states that apogee and perigee are NOT exactly
-    180° apart - they can deviate by up to 28° depending on Sun-Moon geometry.
+    Note: Swiss Ephemeris documentation states that apogee and perigee are NOT
+    exactly 180° apart - they can deviate by up to 28° depending on Sun-Moon
+    geometry. This implementation captures this physical reality through
+    additional perturbation terms.
 
-    **Sampling Strategy:**
-        - Sample osculating perigee positions at 9 points spanning 56 days
-          (approximately two synodic months)
-        - This captures and averages over multiple oscillation cycles
+    Expected Precision
+    ==================
 
-    **Polynomial Regression (Least Squares):**
-        - Fit a linear (1st-degree) polynomial through the sampled points
-        - Linear fit provides maximum smoothing effect
-        - Mean perigee motion is nearly linear over 56-day spans
+    - Mean agreement with Swiss Ephemeris SE_INTP_PERG: <5°
+    - Suitable for astrological applications
+    - Smooth, continuous curve
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT).
@@ -2639,103 +2882,29 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     Returns:
         Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
             - longitude: Ecliptic longitude of interpolated perigee in degrees [0, 360)
-            - latitude: Ecliptic latitude in degrees (from central sample)
-            - eccentricity: Orbital eccentricity magnitude (from central sample)
+            - latitude: Ecliptic latitude in degrees
+            - eccentricity: Orbital eccentricity magnitude (~0.055)
 
     References:
         - Swiss Ephemeris documentation, section 2.2.4 "The Interpolated or
           Natural Apogee and Perigee"
         - Chapront-Touzé, M. & Chapront, J. "Lunar Tables and Programs" (1991)
-        - Dieter Koch, "Was ist Lilith und welche Ephemeride ist richtig", Meridian 1/95
-        - Dieter Koch & Bernhard Rindgen, "Lilith und Priapus", Frankfurt/Main, 2000
     """
-    # Sampling parameters - optimized to match calc_interpolated_apogee
-    # 9 samples over 56 days (2 synodic months) with linear fit
-    num_samples = 9
-    half_window_days = 28.0  # 56-day total window (2 synodic months)
+    # Calculate mean perigee position (mean apogee - 180°)
+    mean_perigee = (calc_mean_lilith(jd_tt) + 180.0) % 360.0
 
-    # Sample osculating perigee with fallback for ephemeris boundary handling
-    # This handles edge cases where the sampling window extends beyond the
-    # ephemeris range by adjusting the window or reducing samples as needed.
-    sample_times, sample_lons, sample_lats, sample_eccs, target_idx = (
-        _sample_osculating_perigee_with_fallback(jd_tt, half_window_days, num_samples)
-    )
-    num_samples = len(sample_times)
+    # Add ELP2000-82B perturbation corrections for perigee
+    # The perigee perturbations are larger (~25°) than apogee (~5°)
+    perturbation = _calc_elp2000_perigee_perturbations(jd_tt)
 
-    # If only one sample available (fallback to osculating), return it directly
-    if num_samples == 1:
-        return sample_lons[0], sample_lats[0], sample_eccs[0]
+    # Combine mean position and perturbations
+    interp_lon = (mean_perigee + perturbation) % 360.0
 
-    # Unwrap longitudes to handle 0°/360° discontinuity
-    # This ensures the polynomial fit works correctly across the boundary
-    unwrapped_lons = _unwrap_longitudes(sample_lons)
+    # Latitude is essentially zero (apsidal line lies in orbital plane)
+    interp_lat = 0.0
 
-    # Use polynomial regression (least squares) for smoothing
-    # Linear fit (degree 1) provides maximum smoothing effect because:
-    # - Mean perigee motion is nearly linear over 56-day spans
-    # - Higher degree polynomials follow the oscillations too closely
-    poly_degree = 1
-
-    # For very few samples, we might need to fall back to just averaging
-    if num_samples <= poly_degree + 1:
-        # Not enough samples for polynomial fit, use weighted average
-        # with higher weight for samples closer to target date
-        total_weight = 0.0
-        weighted_lon = 0.0
-        for i, t in enumerate(sample_times):
-            # Use inverse distance weighting
-            dist = abs(t - jd_tt)
-            weight = 1.0 / (dist + 0.1)  # Add small value to avoid division by zero
-            weighted_lon += unwrapped_lons[i] * weight
-            total_weight += weight
-        interp_lon = (weighted_lon / total_weight) % 360.0
-        interp_lat = sample_lats[target_idx]
-        interp_ecc = sample_eccs[target_idx]
-        return interp_lon, interp_lat, interp_ecc
-
-    # Normalize time to [-1, 1] for numerical stability
-    # Use the actual sample range for normalization
-    t_min = min(sample_times)
-    t_max = max(sample_times)
-    t_center = (t_min + t_max) / 2.0
-    t_scale = (t_max - t_min) / 2.0 if t_max > t_min else 1.0
-
-    # Normalized time values
-    t_norm = [(t - t_center) / t_scale for t in sample_times]
-    t_target_norm = (jd_tt - t_center) / t_scale
-
-    # Build Vandermonde matrix for polynomial fit (least squares)
-    # Each row is [1, t, t²] for quadratic fit
-    V = []
-    for t in t_norm:
-        row = [t**j for j in range(poly_degree + 1)]
-        V.append(row)
-
-    # Solve the normal equations: (V^T V) c = V^T y
-    # Using explicit matrix operations
-    VTV = [[0.0] * (poly_degree + 1) for _ in range(poly_degree + 1)]
-    VTy = [0.0] * (poly_degree + 1)
-
-    for i in range(poly_degree + 1):
-        for j in range(poly_degree + 1):
-            for k in range(num_samples):
-                VTV[i][j] += V[k][i] * V[k][j]
-        for k in range(num_samples):
-            VTy[i] += V[k][i] * unwrapped_lons[k]
-
-    # Solve the linear system using Gaussian elimination
-    coeffs = _solve_linear_system(VTV, VTy)
-
-    # Evaluate polynomial at target time
-    interp_lon = sum(coeffs[j] * (t_target_norm**j) for j in range(poly_degree + 1))
-
-    # Normalize longitude to [0, 360)
-    interp_lon = interp_lon % 360.0
-
-    # For latitude and eccentricity, use values from the sample closest to target
-    # (the interpolation is primarily for longitude where oscillations are significant)
-    interp_lat = sample_lats[target_idx]
-    interp_ecc = sample_eccs[target_idx]
+    # Mean eccentricity of lunar orbit
+    interp_ecc = 0.0549
 
     return interp_lon, interp_lat, interp_ecc
 

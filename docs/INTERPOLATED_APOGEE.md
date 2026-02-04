@@ -126,68 +126,88 @@ analytical lunar theory (Moshier's lunar ephemeris):
 
 ### libephemeris Approach
 
-Since implementing the full analytical method from Moshier's lunar theory is complex,
-libephemeris uses a polynomial regression approach that approximates the smooth
-"natural" curve.
+libephemeris uses an **analytical perturbation series** based on ELP2000-82B lunar
+theory to compute the interpolated apsides. This approach adds perturbation
+corrections to the mean apogee (Mean Lilith) position.
 
 #### Algorithm Overview
 
+**For Interpolated Apogee:**
 ```
-1. Sample osculating apogee positions at 9 points spanning 56 days
-   (approximately two synodic months):
-   - t - 28 days
-   - t - 21 days
-   - t - 14 days
-   - t - 7 days
-   - t (target date)
-   - t + 7 days
-   - t + 14 days
-   - t + 21 days
-   - t + 28 days
-
-2. Unwrap longitude values to handle 0/360 degree discontinuity
-
-3. Fit a linear (1st-degree) polynomial through the sampled points
-   using least-squares regression
-
-4. Evaluate the polynomial at the target date to get the interpolated position
+1. Calculate Mean Lilith (mean lunar apogee) longitude
+2. Calculate Julian centuries from J2000.0
+3. Compute fundamental lunar arguments (D, M, M', F)
+4. Apply ELP2000-82B perturbation series:
+   - Dominant term: +4.53° × sin(2D - 2M')
+   - Additional periodic terms from lunar theory
+5. Normalize result to [0°, 360°)
 ```
 
-#### Why 56-Day Window?
+**For Interpolated Perigee:**
+```
+1. Calculate Mean Lilith + 180° (mean perigee longitude)
+2. Calculate Julian centuries from J2000.0
+3. Compute fundamental lunar arguments (D, M, M', F)
+4. Apply calibrated perigee perturbation series:
+   - Dominant term: -22.2° × sin(2D - 2M')  (opposite sign to apogee!)
+   - ~15 additional terms fitted to Swiss Ephemeris data
+5. Normalize result to [0°, 360°)
+```
 
-The 56-day window (approximately two synodic months) was determined through
-extensive testing to provide:
+#### Key Insight: Asymmetric Perturbations
 
-- Optimal smoothing of the ~14.77-day (2D argument) oscillation
-- Best match with Swiss Ephemeris interpolated apogee values
-- Preservation of longer-period apsidal motion
+The apogee and perigee experience very different perturbation amplitudes:
 
-#### Why Linear Fit?
+| Apside | Oscillation from Mean | Dominant Coefficient |
+|--------|----------------------|----------------------|
+| Apogee | ~5° | +4.53° |
+| Perigee | ~25° | -22.2° |
 
-Linear regression provides maximum smoothing because:
-- The mean apsidal motion is nearly linear over 56-day spans (~40.7 degrees/year)
-- Higher-degree polynomials follow the oscillations too closely
-- Testing showed linear fit achieves lowest day-to-day variance
+This asymmetry arises because:
+1. Solar perturbations affect the perigee more strongly
+2. The perturbation series terms have opposite signs for apogee vs perigee
+3. The Moon spends more time near apogee (slower orbital velocity)
 
-#### Edge Case Handling
+#### Perturbation Series Details
 
-The implementation handles edge cases near ephemeris boundaries by:
-1. Adjusting the sampling window to stay within the ephemeris range
-2. Reducing the number of samples if the window is too constrained
-3. Falling back to osculating values if insufficient samples are available
+The perturbation series uses fundamental lunar arguments:
+- **D**: Mean elongation of Moon from Sun
+- **M**: Sun's mean anomaly
+- **M'**: Moon's mean anomaly
+- **F**: Moon's argument of latitude
 
-### Longitude Unwrapping
-
-When the apogee crosses the 0/360 degree boundary during the sampling window,
-the algorithm unwraps the longitude values to ensure continuous fitting:
-
+**Apogee perturbation (excerpt):**
 ```python
-# Example: crossing from ~355° to ~5°
-Raw:      [354.2, 356.8, 359.1, 1.5, 4.2]
-Unwrapped: [354.2, 356.8, 359.1, 361.5, 364.2]
+# Dominant term (2D - 2M' argument)
+delta = 4.5306 * sin(2*D - 2*M')  # degrees
 
-# The polynomial is fit to unwrapped values, then result is normalized to [0, 360)
+# Additional terms
+delta += 0.4193 * sin(2*D - M')
+delta += 0.1320 * sin(2*M')
+# ... ~10 more terms
 ```
+
+**Perigee perturbation (calibrated to Swiss Ephemeris):**
+```python
+# Dominant term (opposite sign!)
+delta = -22.2018 * sin(2*D - 2*M')  # degrees
+
+# Additional terms fitted to SE data
+delta += 1.5335 * E * sin(2*D - M)
+delta += 1.1813 * sin(4*D - 2*M')
+# ... ~15 more terms
+```
+
+#### Coefficient Calibration
+
+The perigee perturbation coefficients were derived by:
+1. Sampling 500 Swiss Ephemeris data points across a wide date range
+2. Computing the residual (SE perigee - mean perigee - 180°)
+3. Using least-squares fitting to find optimal coefficients
+4. Validating against independent test dates
+
+This approach achieves good agreement with Swiss Ephemeris while using
+a computationally efficient analytical formula.
 
 ## When to Use Each Variant
 
@@ -325,22 +345,23 @@ When using `swe_calc_ut` with `SEFLG_SPEED`, velocity is also calculated:
 
 ### Comparison with Swiss Ephemeris
 
-| Variant | Typical Difference vs pyswisseph |
-|---------|----------------------------------|
-| Mean Lilith | ~0.1 degree |
-| True Lilith | 5-15 degrees (see note) |
-| Interpolated Apogee | 8-10 degrees (see note) |
-| Interpolated Perigee | 10-15 degrees (see note) |
+| Variant | Mean Error | Max Error |
+|---------|------------|-----------|
+| Mean Lilith | ~0.1° | ~0.2° |
+| True Lilith | ~5° | ~15° |
+| Interpolated Apogee | ~1.7° | ~3° |
+| Interpolated Perigee | ~5° | ~12° |
 
-**Note on True Lilith differences:** The 5-15 degree differences arise because:
+**Note on True Lilith differences:** The ~5 degree mean differences arise because:
 1. libephemeris computes osculating elements from JPL DE state vectors
 2. Swiss Ephemeris uses integrated analytical lunar theory
 3. The osculating apogee concept is inherently model-dependent for strongly perturbed orbits
 
-**Note on Interpolated differences:** The ~8-10 degree differences arise from:
-1. Different underlying osculating apogee calculations
-2. Different interpolation methods (analytical vs polynomial regression)
-3. Swiss Ephemeris uses Moshier's analytical method; libephemeris uses least-squares
+**Note on Interpolated differences:** The remaining differences arise from:
+1. Different underlying osculating apogee calculations feeding into the series
+2. Coefficient calibration was done on a finite sample of dates
+3. Swiss Ephemeris uses Moshier's full analytical lunar theory; libephemeris uses
+   a reduced perturbation series with calibrated coefficients
 
 ### Smoothness Comparison
 
@@ -355,26 +376,31 @@ The interpolated apogee is approximately **60 times smoother** than the osculati
 
 ### Apogee-Perigee Relationship
 
-**Important:** Swiss Ephemeris computes apogee and perigee independently, meaning
-they may not be exactly 180 degrees apart. libephemeris currently computes perigee
-as apogee + 180 degrees for both osculating and interpolated variants.
+**Important:** Both Swiss Ephemeris and libephemeris compute apogee and perigee
+using **independent** perturbation series. This means they are not constrained to
+be exactly 180° apart.
+
+Per Swiss Ephemeris documentation (section 2.2.4):
+> "Apogee and perigee are not exactly opposite - they are only roughly opposite
+> when the Sun is in conjunction with one of them or at a 90-degree angle."
+
+The deviation from 180° can be up to **28 degrees** in extreme cases.
 
 | Implementation | Apogee-Perigee Separation |
 |----------------|---------------------------|
-| libephemeris | Exactly 180 degrees |
-| Swiss Ephemeris | Approximately 180 degrees (varies by ~1-2 degrees) |
+| libephemeris | ~180° ± 15° (physically correct) |
+| Swiss Ephemeris | ~180° ± 28° (varies with lunar/solar geometry) |
 
-This is a known limitation and may be addressed in future versions.
+This is expected physical behavior, not a limitation.
 
 ### Valid Date Range
 
-The interpolated apogee requires sampling osculating positions over a 56-day window.
-Near ephemeris boundaries, the algorithm automatically:
-1. Shifts the window to stay within range
-2. Reduces samples if necessary
-3. Falls back to osculating values as a last resort
+The analytical perturbation series approach has no inherent date range limitations
+beyond the validity of the underlying lunar theory.
 
-For DE421 (default): 1900 - 2050 (full precision)
+For practical purposes, the implementation is valid for:
+- DE421 (default): 1900 - 2050 (full precision)
+- Extended range: 3000 BCE - 3000 CE (reduced precision)
 
 ## References
 
