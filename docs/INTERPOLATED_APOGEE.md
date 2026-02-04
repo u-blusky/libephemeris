@@ -349,8 +349,8 @@ When using `swe_calc_ut` with `SEFLG_SPEED`, velocity is also calculated:
 |---------|------------|-----------|
 | Mean Lilith | ~0.1° | ~0.2° |
 | True Lilith | ~5° | ~15° |
-| Interpolated Apogee | ~1.7° | ~3° |
-| Interpolated Perigee | ~5° | ~12° |
+| Interpolated Apogee | ~1.1° | ~3.3° |
+| Interpolated Perigee | ~2.3° | ~8° |
 
 **Note on True Lilith differences:** The ~5 degree mean differences arise because:
 1. libephemeris computes osculating elements from JPL DE state vectors

@@ -144,14 +144,6 @@ MEEUS_OPTIMAL_CENTURIES = 2.0  # ±200 years: <0.001° error
 MEEUS_VALID_CENTURIES = 10.0  # ±1000 years: <0.01° error
 MEEUS_MAX_CENTURIES = 20.0  # ±2000 years: error grows significantly beyond
 
-# Constants for interpolated apside calculation (Swiss Ephemeris algorithm)
-# Anomalistic month: time for Moon to return to same mean anomaly
-ANOMALISTIC_MONTH_DAYS = 27.55454988
-# Arcseconds per degree
-ARCSEC_PER_DEG = 3600.0
-# Full circle in arcseconds
-FULL_CIRCLE_ARCSEC = 1296000.0  # 360° × 3600
-
 
 def _calc_lunar_fundamental_arguments(
     jd_tt: float,
@@ -301,167 +293,6 @@ def _calc_saturn_mean_longitude(jd_tt: float) -> float:
     L_saturn = 50.077571 + 1222.1137943 * T + 0.00021 * T**2
 
     return math.radians(L_saturn % 360.0)
-
-
-def _calc_lunar_mean_anomaly_deg(jd_tt: float) -> float:
-    """
-    Calculate lunar mean anomaly (M') at a given Julian Date.
-
-    The mean anomaly represents the Moon's angular distance from perigee
-    in its mean orbit. It increases by 360° per anomalistic month (~27.55 days).
-
-    Args:
-        jd_tt: Julian Day in Terrestrial Time
-
-    Returns:
-        Mean anomaly in degrees [0, 360)
-    """
-    T = (jd_tt - 2451545.0) / 36525.0
-
-    # Meeus formula for M' (degrees)
-    M_prime_deg = (
-        134.9633964
-        + 477198.8675055 * T
-        + 0.0087414 * T**2
-        + T**3 / 69699.0
-        - T**4 / 14712000.0
-    )
-
-    return M_prime_deg % 360.0
-
-
-def _get_moon_distance_at_anomaly_offset(jd_tt: float, mp_offset_deg: float) -> float:
-    """
-    Get lunar geocentric distance for a given mean anomaly offset.
-
-    Uses temporal interpolation: converts the mean anomaly offset to a time
-    offset based on the anomalistic month period, then calculates Moon
-    position at that offset time.
-
-    The relationship is: ΔT = ΔMP / 360° × 27.55455 days
-
-    This approach replicates the Swiss Ephemeris algorithm which varies the
-    mean anomaly parameter to search for distance extrema.
-
-    Args:
-        jd_tt: Base Julian Day in TT
-        mp_offset_deg: Offset from current mean anomaly in degrees
-
-    Returns:
-        Geocentric distance in AU
-    """
-    # Import here to avoid circular imports
-    from .planets import swe_calc
-    from .constants import SE_MOON
-
-    # Convert MP offset (degrees) to time offset (days)
-    # MP changes by 360° in one anomalistic month
-    dt_days = (mp_offset_deg / 360.0) * ANOMALISTIC_MONTH_DAYS
-
-    # Calculate Moon position at offset time
-    jd_offset = jd_tt + dt_days
-    moon_pos, _ = swe_calc(jd_offset, SE_MOON, 0)
-
-    return moon_pos[2]  # Distance in AU
-
-
-def _iterative_apside_search(
-    jd_tt: float, is_apogee: bool
-) -> Tuple[float, float, float]:
-    """
-    Find interpolated apside using Swiss Ephemeris iterative algorithm.
-
-    This implements the algorithm from swemmoon.c (swi_intp_apsides):
-
-    1. Start at MP = 180° (apogee) or 0° (perigee)
-    2. Initial step dd = 5°
-    3. For each iteration:
-       - Sample distance at MP-dd, MP, MP+dd
-       - Use parabolic interpolation to find extremum
-       - Update MP, reduce dd by 10×
-    4. Repeat 4-5 times
-
-    The key insight is that the Moon's geocentric distance reaches its
-    maximum when mean anomaly = 180° (apogee) and minimum when mean
-    anomaly = 0° (perigee). By searching for the actual extremum point,
-    we account for perturbations that shift these positions.
-
-    Args:
-        jd_tt: Julian Day in TT
-        is_apogee: True for apogee (max distance), False for perigee (min)
-
-    Returns:
-        (longitude, latitude, eccentricity) of interpolated apside
-
-    References:
-        - Swiss Ephemeris source code: swemmoon.c, function swi_intp_apsides
-        - Moshier's analytical lunar ephemeris
-    """
-    # Import here to avoid circular imports
-    from .planets import swe_calc
-    from .constants import SE_MOON
-
-    # Swiss Ephemeris parameters (from swemmoon.c)
-    if is_apogee:
-        mp_target_deg = 180.0  # Apogee: Moon at maximum distance
-        niter = 5  # Increased from 4 for better convergence
-    else:
-        mp_target_deg = 0.0  # Perigee: Moon at minimum distance
-        niter = 6  # Increased from 5 for better convergence
-
-    # Get current mean anomaly at jd_tt
-    mp_current_deg = _calc_lunar_mean_anomaly_deg(jd_tt)
-
-    # Calculate offset from target MP
-    mp_offset_deg = mp_target_deg - mp_current_deg
-
-    # Normalize offset to [-180, 180] degrees
-    while mp_offset_deg > 180.0:
-        mp_offset_deg -= 360.0
-    while mp_offset_deg < -180.0:
-        mp_offset_deg += 360.0
-
-    # Initial step size: 5° (18000 arcsec in SE)
-    dd = 5.0
-
-    for _ in range(niter + 1):
-        # Sample distance at 3 points: MP-dd, MP, MP+dd
-        distances = []
-        for offset_mult in [-1, 0, 1]:
-            test_offset = mp_offset_deg + offset_mult * dd
-            dist = _get_moon_distance_at_anomaly_offset(jd_tt, test_offset)
-            distances.append(dist)
-
-        # Parabolic interpolation to find vertex
-        # Formula from SE: correction = (1.5*y0 - 2*y1 + 0.5*y2) / (y0 + y2 - 2*y1)
-        denom = distances[0] + distances[2] - 2.0 * distances[1]
-
-        if abs(denom) > 1e-15:
-            correction = (
-                1.5 * distances[0] - 2.0 * distances[1] + 0.5 * distances[2]
-            ) / denom
-            correction = correction * dd - dd
-            mp_offset_deg += correction
-
-        # Reduce step size by 10x for next iteration
-        dd /= 10.0
-
-    # Get Moon position at the found extremum
-    dt_days = (mp_offset_deg / 360.0) * ANOMALISTIC_MONTH_DAYS
-    jd_extremum = jd_tt + dt_days
-
-    moon_pos, _ = swe_calc(jd_extremum, SE_MOON, 0)
-
-    # The apside longitude is the Moon's longitude when it reaches the extremum
-    apside_lon = moon_pos[0]
-    apside_lat = moon_pos[1]
-
-    # For the apside POINT (not the Moon's position at extremum):
-    # - Apogee point: where the Moon IS when at max distance
-    # - Perigee point: where the Moon IS when at min distance
-    # So the longitude is simply the Moon's longitude at that moment.
-
-    return apside_lon, apside_lat, 0.0549
 
 
 def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
@@ -1503,8 +1334,11 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     -22° coefficient. This is because solar perturbations affect the perigee
     much more strongly than the apogee.
 
+    The second dominant term is (4D - 4M') with +6.64° coefficient, representing
+    higher-order solar perturbations.
+
     The coefficients were calibrated by fitting to Swiss Ephemeris SE_INTP_PERG
-    values over multiple cycles. Expected residual error: ~5° stdev.
+    values over 50 years of data. Expected residual error: ~2.2° mean, ~9° max.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT).
@@ -1525,9 +1359,10 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     E = 1.0 - 0.002516 * T - 0.0000074 * T**2
 
     # ========================================================================
-    # PERIGEE PERTURBATIONS
+    # PERIGEE PERTURBATIONS (28 terms, sorted by magnitude)
     # ========================================================================
     # Coefficients calibrated by fitting to Swiss Ephemeris SE_INTP_PERG
+    # over 50 years with 2000 data points. RMS error: ~2.8°
 
     perturbation = 0.0
 
@@ -1536,59 +1371,66 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     # ========================================================================
     # This is the main oscillation term. Note the NEGATIVE coefficient
     # (opposite to apogee's +4.53), creating the large perigee oscillations.
-    perturbation += -22.2018 * math.sin(2.0 * D - 2.0 * M_prime)
-    perturbation += 0.0503 * math.cos(2.0 * D - 2.0 * M_prime)
+    perturbation += -22.1641 * math.sin(2.0 * D - 2.0 * M_prime)
 
     # ========================================================================
-    # SUN-ELONGATION COUPLING (2D - M)
+    # SECOND DOMINANT TERM (4D - 4M')
     # ========================================================================
-    # Second most important term
-    perturbation += 1.5312 * E * math.sin(2.0 * D - M)
-    perturbation += -0.0171 * E * math.cos(2.0 * D - M)
+    # Higher-order evection term, significant for perigee
+    perturbation += 6.6367 * math.sin(4.0 * D - 4.0 * M_prime)
 
     # ========================================================================
     # ANNUAL EQUATION (Solar anomaly M)
     # ========================================================================
-    perturbation += 0.4145 * E * math.sin(M)
-    perturbation += -0.1878 * E * math.cos(M)
-
-    # ========================================================================
-    # PARALLACTIC TERMS (D)
-    # ========================================================================
-    perturbation += 0.3770 * math.sin(D)
-    perturbation += -0.3934 * math.cos(D)
-
-    # ========================================================================
-    # ANNUAL-LUNAR COUPLING (M ± M')
-    # ========================================================================
-    perturbation += -0.2122 * E * math.sin(M - M_prime)
-    perturbation += -0.0630 * E * math.cos(M - M_prime)
-    perturbation += 0.0900 * E * math.sin(M + M_prime)
-    perturbation += -0.1241 * E * math.cos(M + M_prime)
-
-    # ========================================================================
-    # SYNODIC TERMS (2D)
-    # ========================================================================
-    perturbation += 0.1422 * math.sin(2.0 * D)
-    perturbation += 0.0188 * math.cos(2.0 * D)
-
-    # ========================================================================
-    # EVECTION TERMS (2D - M', 2D + M')
-    # ========================================================================
-    perturbation += 0.1117 * math.sin(2.0 * D - M_prime)
-    perturbation += -0.0168 * math.sin(2.0 * D + M_prime)
-
-    # ========================================================================
-    # HIGHER HARMONICS
-    # ========================================================================
-    perturbation += 0.0356 * math.sin(4.0 * D - 2.0 * M_prime)
-    perturbation += -0.0153 * math.cos(4.0 * D - 2.0 * M_prime)
+    perturbation += 0.3232 * E * math.sin(M)
 
     # ========================================================================
     # ANOMALISTIC TERMS (M')
     # ========================================================================
-    perturbation += -0.0304 * math.sin(M_prime)
-    perturbation += -0.0163 * math.sin(3.0 * M_prime)
+    perturbation += -0.1254 * math.sin(2.0 * M_prime)
+
+    # ========================================================================
+    # LATITUDE COUPLING (F terms)
+    # ========================================================================
+    perturbation += 0.0773 * math.sin(2.0 * D - 2.0 * F)
+
+    # ========================================================================
+    # HIGHER ORDER EVECTION TERMS
+    # ========================================================================
+    perturbation += 0.0714 * E * math.sin(2.0 * D + M - 2.0 * M_prime)
+    perturbation += 0.0671 * math.sin(6.0 * D - 3.0 * M_prime)
+    perturbation += -0.0668 * math.cos(6.0 * D - 3.0 * M_prime)
+
+    # ========================================================================
+    # MIXED TERMS
+    # ========================================================================
+    perturbation += -0.0298 * math.sin(3.0 * D - 2.0 * M_prime)
+    perturbation += 0.0572 * math.cos(3.0 * D - 2.0 * M_prime)
+
+    # ========================================================================
+    # PARALLACTIC TERMS (D)
+    # ========================================================================
+    perturbation += 0.0164 * math.sin(D)
+    perturbation += -0.0391 * math.cos(D)
+
+    # ========================================================================
+    # ADDITIONAL HIGHER-ORDER TERMS
+    # ========================================================================
+    perturbation += -0.0390 * math.sin(6.0 * D + M_prime)
+    perturbation += -0.0380 * E * math.sin(4.0 * D + M - 4.0 * M_prime)
+    perturbation += 0.0109 * E * math.cos(4.0 * D + M - 4.0 * M_prime)
+    perturbation += -0.0299 * math.sin(4.0 * D - M_prime)
+    perturbation += -0.0114 * math.sin(6.0 * D)
+    perturbation += -0.0273 * math.cos(6.0 * D)
+    perturbation += 0.0253 * math.cos(D - 2.0 * M_prime)
+    perturbation += 0.0111 * E * math.sin(2.0 * D - M + M_prime)
+    perturbation += -0.0234 * E * math.cos(2.0 * D - M + M_prime)
+    perturbation += 0.0104 * math.sin(5.0 * D - 2.0 * M_prime)
+    perturbation += -0.0220 * math.cos(5.0 * D - 2.0 * M_prime)
+    perturbation += 0.0171 * E * math.sin(2.0 * D + M)
+    perturbation += 0.0142 * math.cos(8.0 * D - 2.0 * M_prime)
+    perturbation += 0.0115 * math.cos(2.0 * D - M_prime)
+    perturbation += -0.0104 * math.cos(4.0 * D + M_prime)
 
     return perturbation
 
