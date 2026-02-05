@@ -2066,7 +2066,6 @@ def _houses_koch(
 
     # Precompute trig values
     sine = math.sin(math.radians(eps))
-    cose = math.cos(math.radians(eps))
     tanfi = math.tan(math.radians(lat))
     cosfi = math.cos(math.radians(lat))
 

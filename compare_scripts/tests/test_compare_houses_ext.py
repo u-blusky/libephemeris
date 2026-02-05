@@ -33,9 +33,10 @@ class HouseExtTolerance:
 
     CUSP_DEGREES = 0.002  # House cusp (relaxed for Koch precision at certain angles)
     # house_pos with Placidus/Regiomontanus is now precise with body latitude.
-    # Campanus coordinate transformation still has issues (~0.5 error).
-    POSITION = 0.02  # House position for P, K, R
-    POSITION_CAMPANUS = 0.7  # Campanus has coordinate transform issues
+    # Koch and Campanus have coordinate transformation issues in house_pos.
+    POSITION = 0.02  # House position for P, R
+    POSITION_KOCH = 0.25  # Koch has minor coordinate transform issues (~0.2° max)
+    POSITION_CAMPANUS = 0.7  # Campanus has coordinate transform issues (~0.5° max)
     SECTOR = 0.1  # Gauquelin sector
 
 
@@ -223,12 +224,12 @@ class TestHousePos:
         diff = abs(hp_swe - hp_py)
 
         # Use different tolerance for systems with coordinate transform issues
-        if hsys in ("C", "K"):
+        if hsys == "C":
             tolerance = HouseExtTolerance.POSITION_CAMPANUS
+        elif hsys == "K":
+            tolerance = HouseExtTolerance.POSITION_KOCH
         else:
             tolerance = HouseExtTolerance.POSITION
-
-        assert diff < tolerance, f"{body_name} in {hsys}: house pos diff {diff}"
 
         assert diff < tolerance, f"{body_name} in {hsys}: house pos diff {diff}"
 
