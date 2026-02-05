@@ -825,8 +825,10 @@ def swe_houses(
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
 
-    # Return 12-element cusps array (pyswisseph compatible: no padding at index 0)
-    # cusps[1:13] contains houses 1-12
+    # Return cusps array (pyswisseph compatible: no padding at index 0)
+    # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses
+    if hsys_char == "G":
+        return tuple(cusps[1:37]), tuple(ascmc)
     return tuple(cusps[1:13]), tuple(ascmc)
 
 
@@ -1355,8 +1357,10 @@ def swe_houses_armc(
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
 
-    # Return 12-element cusps array (pyswisseph compatible: no padding at index 0)
-    # cusps[1:13] contains houses 1-12
+    # Return cusps array (pyswisseph compatible: no padding at index 0)
+    # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses
+    if hsys_char == "G":
+        return tuple(cusps[1:37]), tuple(ascmc)
     return tuple(cusps[1:13]), tuple(ascmc)
 
 
@@ -3075,44 +3079,33 @@ def _houses_gauquelin(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
-    Gauquelin 36-Sector house system, *high precision* implementation that differs
-    from Swiss Ephemeris.
+    Gauquelin 36-Sector house system.
 
-    Divides celestial sphere into 36 sectors based on semi-diurnal/nocturnal arcs.
-    This implementation surpasses Swiss Ephemeris which uses approximations.
+    Divides celestial sphere into 36 sectors using Placidus-like divisions.
+    This implementation follows Swiss Ephemeris swehouse.c algorithm.
 
-    Algorithm:
-    - Divide diurnal arc (above horizon) into 18 equal time sectors
-    - Divide nocturnal arc (below horizon) into 18 equal time sectors
-    - Map 36 sectors to 12 houses (each house = 3 sectors, use middle as cusp)
+    Algorithm (from Swiss Ephemeris):
+    - Calculate ascensional difference: a = asin(tan(lat) * tan(eps))
+    - For sectors 2-9 (fourth/second quarter):
+        - ih2 = 10 - ih
+        - fh1 = atan(sin(a * ih2 / 9) / tan(eps))
+        - rectasc = (90/9) * ih2 + armc
+        - Iterate to find pole height and cusp longitude
+    - Sectors 20-27 are opposites of 2-9
+    - For sectors 29-36 (first/third quarter):
+        - ih2 = ih - 28
+        - Similar calculation with rectasc = 180 - ih2 * 90/9 + armc
+    - Sectors 11-18 are opposites of 29-36
+    - Cardinal sectors: 1=Asc, 10=MC, 19=Desc, 28=IC
 
-    Sector numbering:
+    Sector numbering (clockwise from Ascendant):
     - Sector 1: Rising (Ascendant)
     - Sector 10: Upper culmination (MC)
     - Sector 19: Setting (Descendant)
     - Sector 28: Lower culmination (IC)
 
-    Mathematical Formulas:
-        Arc calculation:
-            arc_diurnal = (RA_Desc - RA_Asc) mod 360°
-            arc_nocturnal = 360° - arc_diurnal
-
-        Sector RA positions (1-36):
-            For sectors 1-18 (diurnal):
-                RA_sector = RA_Asc + (sector-1)/18 × arc_diurnal
-
-            For sectors 19-36 (nocturnal):
-                RA_sector = RA_Desc + (sector-19)/18 × arc_nocturnal
-
-        House cusp mapping (middle sector of each triplet):
-            House n cusp = sector (3n-1) longitude
-
-        RA to ecliptic:
-            λ = atan2(sin(RA), cos(RA)·cos(ε))
-
     Polar Limitation:
-        Fails within polar circle (|φ| >= 90° - ε) due to undefined
-        diurnal/nocturnal arcs.
+        Fails within polar circle (|φ| >= 90° - ε).
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -3122,66 +3115,149 @@ def _houses_gauquelin(
         mc: Midheaven longitude in degrees
 
     Returns:
-        List of 13 house cusp longitudes
+        List of 37 sector longitudes (index 0 unused, 1-36 are sectors)
     """
-    cusps = [0.0] * 13
+    VERY_SMALL = 1e-10
+    VERY_SMALL_ITER = 1e-8
+    niter_max = 100
 
-    # Within polar circle, use Porphyry fallback
+    cusps = [0.0] * 37  # Index 0 unused, 1-36 are sectors
+
+    # Within polar circle, use Porphyry-like fallback (equal division)
     if abs(lat) >= 90.0 - eps:
-        return _houses_porphyry(asc, mc)
+        # Fallback: divide into 36 equal sectors from Asc
+        for i in range(1, 37):
+            cusps[i] = (asc - (i - 1) * 10.0) % 360.0
+        return cusps
 
-    # Calculate RAs for key points
-    ra_asc = _ecliptic_to_ra_simple(asc, eps)
-    ra_mc = armc
-    ra_desc = (ra_asc + 180.0) % 360.0
-    ra_ic = (ra_mc + 180.0) % 360.0
+    # Precompute trig values
+    sine = math.sin(math.radians(eps))
+    cose = math.cos(math.radians(eps))
+    tane = math.tan(math.radians(eps))
+    tanfi = math.tan(math.radians(lat))
+    th = armc
 
-    # Normalize RA differences to handle wrapping
-    def ra_diff_normalized(ra1, ra2):
-        """Calculate normalized RA difference (ra2 - ra1)."""
-        diff = (ra2 - ra1 + 540.0) % 360.0 - 180.0
-        if diff < 0:
-            diff += 360.0
-        return diff
+    # a = asin(tan(lat) * tan(eps))
+    a_arg = tanfi * tane
+    if abs(a_arg) > 1.0:
+        a_arg = 1.0 if a_arg > 0 else -1.0
+    a = math.degrees(math.asin(a_arg))
 
-    # Calculate semi-diurnal arc (Asc -> MC -> Desc)
-    arc_diurnal = ra_diff_normalized(ra_asc, ra_desc)
+    # Fourth/Second quarter: sectors 2-9
+    for ih in range(2, 10):
+        ih2 = 10 - ih
+        fh1 = math.degrees(math.atan(math.sin(math.radians(a * ih2 / 9.0)) / tane))
+        rectasc = ((90.0 / 9.0) * ih2 + th) % 360.0
 
-    # Calculate semi-nocturnal arc (Desc -> IC -> Asc)
-    arc_nocturnal = 360.0 - arc_diurnal
+        # Initial cusp estimate using Asc1
+        cusp_init = _calc_ascendant(rectasc, eps, lat, fh1)
+        # tant = tand(asind(sine * sind(cusp_init))) - declination of cusp point
+        dec_cusp = math.asin(sine * math.sin(math.radians(cusp_init)))
+        tant = math.tan(dec_cusp)
 
-    # Divide each arc into 18 equal time divisions
-    # Sectors 1-18: diurnal (above horizon)
-    # Sectors 19-36: nocturnal (below horizon)
-
-    sectors_ra = [0.0] * 37  # Index 1-36
-
-    # Calculate RA for each of 36 sectors
-    for i in range(1, 37):
-        if i <= 18:
-            # Diurnal sectors: interpolate from Asc (sector 1) to Desc (sector 19)
-            # Sector 1 = Asc, Sector 10 = MC, Sector 19 = Desc
-            factor = (i - 1) / 18.0
-            sectors_ra[i] = (ra_asc + factor * arc_diurnal) % 360.0
+        if abs(tant) < VERY_SMALL:
+            cusps[ih] = rectasc
         else:
-            # Nocturnal sectors: interpolate from Desc (sector 19) to Asc (sector 37=1)
-            # Sector 19 = Desc, Sector 28 = IC, Sector 37 = Asc (wraps to 1)
-            factor = (i - 19) / 18.0
-            sectors_ra[i] = (ra_desc + factor * arc_nocturnal) % 360.0
+            # Pole height: f = atand(sind(asind(tanfi * tant) * ih2 / 9) / tant)
+            f_arg = tanfi * tant
+            if abs(f_arg) > 1.0:
+                f_arg = 1.0 if f_arg > 0 else -1.0
+            angle_deg = math.degrees(math.asin(f_arg))
+            f = math.degrees(
+                math.atan(math.sin(math.radians(angle_deg * ih2 / 9.0)) / tant)
+            )
+            cusps[ih] = _calc_ascendant(rectasc, eps, lat, f)
 
-    # Convert RA to ecliptic longitude for each sector
-    sectors_lon = [0.0] * 37
-    for i in range(1, 37):
-        sectors_lon[i] = _ra_to_ecliptic_simple(sectors_ra[i], eps)
+            # Iterate for convergence
+            cuspsv = 0.0
+            for i in range(1, niter_max + 1):
+                sin_cusp = math.sin(math.radians(cusps[ih]))
+                dec_cusp_new = math.asin(sine * sin_cusp)
+                tant_new = math.tan(dec_cusp_new)
 
-    # Map 36 sectors to 12 houses
-    # Each house = 3 consecutive sectors, use middle sector as cusp
-    # House 1 = sectors 1-3 (cusp at sector 2)
-    # House 2 = sectors 4-6 (cusp at sector 5)
-    # etc.
-    for house in range(1, 13):
-        middle_sector = (house - 1) * 3 + 2  # Middle of each triplet
-        cusps[house] = sectors_lon[middle_sector]
+                if abs(tant_new) < VERY_SMALL:
+                    cusps[ih] = rectasc
+                    break
+
+                f_arg = tanfi * tant_new
+                if abs(f_arg) > 1.0:
+                    f_arg = 1.0 if f_arg > 0 else -1.0
+                angle_deg = math.degrees(math.asin(f_arg))
+                f = math.degrees(
+                    math.atan(math.sin(math.radians(angle_deg * ih2 / 9.0)) / tant_new)
+                )
+                cusps[ih] = _calc_ascendant(rectasc, eps, lat, f)
+
+                if i > 1:
+                    diff = abs(cusps[ih] - cuspsv)
+                    if diff > 180:
+                        diff = 360 - diff
+                    if diff < VERY_SMALL_ITER:
+                        break
+                cuspsv = cusps[ih]
+
+        # Opposite sector
+        cusps[ih + 18] = (cusps[ih] + 180.0) % 360.0
+
+    # First/Third quarter: sectors 29-36
+    for ih in range(29, 37):
+        ih2 = ih - 28
+        fh1 = math.degrees(math.atan(math.sin(math.radians(a * ih2 / 9.0)) / tane))
+        rectasc = (180.0 - ih2 * 90.0 / 9.0 + th) % 360.0
+
+        cusp_init = _calc_ascendant(rectasc, eps, lat, fh1)
+        # tant = tand(asind(sine * sind(cusp_init))) - declination of cusp point
+        dec_cusp = math.asin(sine * math.sin(math.radians(cusp_init)))
+        tant = math.tan(dec_cusp)
+
+        if abs(tant) < VERY_SMALL:
+            cusps[ih] = rectasc
+        else:
+            # Pole height: f = atand(sind(asind(tanfi * tant) * ih2 / 9) / tant)
+            f_arg = tanfi * tant
+            if abs(f_arg) > 1.0:
+                f_arg = 1.0 if f_arg > 0 else -1.0
+            angle_deg = math.degrees(math.asin(f_arg))
+            f = math.degrees(
+                math.atan(math.sin(math.radians(angle_deg * ih2 / 9.0)) / tant)
+            )
+            cusps[ih] = _calc_ascendant(rectasc, eps, lat, f)
+
+            cuspsv = 0.0
+            for i in range(1, niter_max + 1):
+                sin_cusp = math.sin(math.radians(cusps[ih]))
+                dec_cusp_new = math.asin(sine * sin_cusp)
+                tant_new = math.tan(dec_cusp_new)
+
+                if abs(tant_new) < VERY_SMALL:
+                    cusps[ih] = rectasc
+                    break
+
+                f_arg = tanfi * tant_new
+                if abs(f_arg) > 1.0:
+                    f_arg = 1.0 if f_arg > 0 else -1.0
+                angle_deg = math.degrees(math.asin(f_arg))
+                f = math.degrees(
+                    math.atan(math.sin(math.radians(angle_deg * ih2 / 9.0)) / tant_new)
+                )
+                cusps[ih] = _calc_ascendant(rectasc, eps, lat, f)
+
+                if i > 1:
+                    diff = abs(cusps[ih] - cuspsv)
+                    if diff > 180:
+                        diff = 360 - diff
+                    if diff < VERY_SMALL_ITER:
+                        break
+                cuspsv = cusps[ih]
+
+        # Opposite sector
+        cusps[ih - 18] = (cusps[ih] + 180.0) % 360.0
+
+    # Cardinal sectors
+    cusps[1] = asc
+    cusps[10] = mc
+    cusps[19] = (asc + 180.0) % 360.0
+    cusps[28] = (mc + 180.0) % 360.0
 
     return cusps
 

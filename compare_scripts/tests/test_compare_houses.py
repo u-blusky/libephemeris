@@ -17,7 +17,7 @@ import libephemeris as ephem
 
 HOUSE_CUSP_TOL = 0.001  # degrees (~3.6 arcsec)
 ASCMC_TOL = 0.001  # degrees (~3.6 arcsec) - all ASCMC values match precisely
-GAUQUELIN_TOL = 180.0  # Gauquelin uses 36 sectors, not 12 houses
+GAUQUELIN_TOL = 0.001  # Gauquelin 36 sectors - now matches Swiss Ephemeris
 
 
 def angular_diff(val1: float, val2: float) -> float:
@@ -62,7 +62,7 @@ HOUSE_SYSTEMS = [
 # Systems with relaxed tolerances
 # These systems are not fully implemented or have different calculation methods
 RELAXED_SYSTEMS = {
-    "G": GAUQUELIN_TOL,  # Gauquelin: 36 sectors in pyswisseph vs 12 cusps in libephemeris
+    "G": GAUQUELIN_TOL,  # Gauquelin: 36 sectors (matches Swiss Ephemeris)
     "I": 0.001,  # Sunshine/Makransky: Implemented with Treindl algorithm, ~0.0002° precision
     # Koch: max ~1 arcsec at high latitudes (~0.0003°)
     "K": 0.001,

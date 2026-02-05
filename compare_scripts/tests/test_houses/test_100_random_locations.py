@@ -42,7 +42,7 @@ ALL_HOUSE_SYSTEMS = [
     ("X", "Meridian", 0.1),
     ("V", "Vehlow", 0.1),
     ("H", "Horizontal", 1.0),
-    ("G", "Gauquelin", 180.0),  # 36 sectors vs 12 cusps - ASC/MC only
+    ("G", "Gauquelin", 0.01),  # 36 sectors - matches Swiss Ephemeris
     ("U", "Krusinski", 1.0),
     ("F", "Carter", 0.1),
     ("Y", "APC", 1.0),
@@ -50,10 +50,11 @@ ALL_HOUSE_SYSTEMS = [
 ]
 
 # Systems that have different cusp structure (skip cusp comparison)
-SPECIAL_CUSP_SYSTEMS = {"G"}  # Gauquelin has 36 sectors, not 12 cusps
+SPECIAL_CUSP_SYSTEMS = set()  # Gauquelin now returns 36 sectors like Swiss Ephemeris
 
 # Systems that may not have exact 180° opposite houses (skip opposite test)
-SKIP_OPPOSITE_TEST_SYSTEMS = {"Y", "G"}  # APC, Gauquelin have different structure
+# Gauquelin has 36 sectors where 1-19, 2-20, etc. are opposites (not 1-7, 2-8)
+SKIP_OPPOSITE_TEST_SYSTEMS = {"Y", "G"}  # APC and Gauquelin have different structure
 
 # Systems that fail at polar latitudes (|lat| > ~66.5°)
 POLAR_FAIL_SYSTEMS = {"P", "K", "G"}
@@ -296,7 +297,9 @@ class TestHouseSystemsStatistics:
                     asc_diffs.append(angular_diff(ascmc_lib[0], ascmc_swe[0]))
                     mc_diffs.append(angular_diff(ascmc_lib[1], ascmc_swe[1]))
 
-                    for j in range(12):
+                    # Compare all cusps (12 for most systems, 36 for Gauquelin)
+                    num_cusps = min(len(cusps_lib), len(cusps_swe))
+                    for j in range(num_cusps):
                         cusp_diffs.append(angular_diff(cusps_lib[j], cusps_swe[j]))
 
                 except (PolarCircleError, swe.Error):

@@ -71,7 +71,7 @@ HOUSE_SYSTEMS = ["P", "K", "R", "C", "E", "W", "M", "B"]
 
 # Systems with relaxed tolerances
 RELAXED_TOLERANCE_SYSTEMS = {
-    "G": 180.0,  # Gauquelin uses 36 sectors
+    "G": 0.001,  # Gauquelin 36 sectors - now matches Swiss Ephemeris
 }
 
 SIDEREAL_MODES = [
