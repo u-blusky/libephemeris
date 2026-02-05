@@ -15,8 +15,8 @@ import libephemeris as ephem
 # TOLERANCES
 # ============================================================================
 
-HOUSE_CUSP_TOL = 0.001  # degrees
-ASCMC_TOL = 1.0  # degrees (relaxed for co-ascendants, etc.)
+HOUSE_CUSP_TOL = 0.001  # degrees (~3.6 arcsec)
+ASCMC_TOL = 0.001  # degrees (~3.6 arcsec) - all ASCMC values match precisely
 GAUQUELIN_TOL = 180.0  # Gauquelin uses 36 sectors, not 12 houses
 
 
@@ -64,9 +64,8 @@ HOUSE_SYSTEMS = [
 RELAXED_SYSTEMS = {
     "G": GAUQUELIN_TOL,  # Gauquelin: 36 sectors in pyswisseph vs 12 cusps in libephemeris
     "I": 0.001,  # Sunshine/Makransky: Implemented with Treindl algorithm, ~0.0002° precision
-    # Koch has minor precision differences at high latitudes (>50°)
-    # due to OA interval handling. Max error ~0.1° at extreme latitudes.
-    "K": 0.15,
+    # Koch: max ~1 arcsec at high latitudes (~0.0003°)
+    "K": 0.001,
     # Placidus and Regiomontanus have minor precision differences at high latitudes
     "P": 0.002,
     "R": 0.002,

@@ -2018,36 +2018,19 @@ def _houses_koch(
     """
     Koch (Birthplace/GOH) house system.
 
-    Trisects the Oblique Ascension between major angles. Also known as the
-    Birthplace system or GOH (Geburtsort-Häusersystem). Similar to Placidus
-    but uses Oblique Ascension divisions instead of time-based divisions.
+    The Koch system (Geburtsort-Häusersystem = Birthplace House System) was
+    developed by Walter Koch. It divides houses based on the ascensional
+    difference of the MC's declination.
 
-    Algorithm:
-        1. Calculate Oblique Ascension (OA = RA - AD) for MC, Asc, IC
-        2. Divide OA intervals into thirds between angles
-        3. Iteratively solve for ecliptic longitude at each OA value
-        4. Calculate opposite houses by adding 180°
-
-    Mathematical Formulas:
-        Oblique Ascension: OA = RA - AD
-        where AD = arcsin(tan(φ) · tan(δ))
-
-        Quadrant MC→Asc (houses 11, 12):
-            OA₁₁ = OA_MC + (OA_Asc - OA_MC)/3
-            OA₁₂ = OA_MC + 2·(OA_Asc - OA_MC)/3
-
-        Quadrant Asc→IC (houses 2, 3):
-            OA₂ = OA_Asc + (OA_IC - OA_Asc)/3
-            OA₃ = OA_Asc + 2·(OA_IC - OA_Asc)/3
-
-        Iterative solution for target OA (threshold 1e-7°):
-            1. RA = target_OA (initial guess)
-            2. tan(δ) = sin(RA) · tan(ε)
-            3. AD = arcsin(tan(φ) · tan(δ))
-            4. RA_new = target_OA + AD
-            5. Repeat until |RA_new - RA| < 1e-7°
-
-        RA to ecliptic: λ = atan2(sin(RA), cos(RA) · cos(ε))
+    Algorithm (from Swiss Ephemeris swehouse.c):
+        1. Calculate sin(A) = sin(MC) * sin(eps) / cos(lat)
+        2. Calculate c = atan(tan(lat) / cos(A))
+        3. Calculate ad3 = asin(sin(c) * sin(A)) / 3
+        4. Calculate cusps using Asc1():
+           - cusp[11] = Asc1(ARMC + 30 - 2*ad3, lat, sine, cose)
+           - cusp[12] = Asc1(ARMC + 60 - ad3, lat, sine, cose)
+           - cusp[2]  = Asc1(ARMC + 120 + ad3, lat, sine, cose)
+           - cusp[3]  = Asc1(ARMC + 150 + 2*ad3, lat, sine, cose)
 
     Note: Polar latitude handling
         Koch is undefined at latitudes > ~66° where some ecliptic points never
@@ -2067,114 +2050,64 @@ def _houses_koch(
     Returns:
         List of 13 house cusp longitudes
     """
-
     cusps = [0.0] * 13
     cusps[1] = asc
     cusps[10] = mc
     cusps[7] = (asc + 180) % 360.0
     cusps[4] = (mc + 180) % 360.0
 
-    rad_lat = math.radians(lat)
-    rad_eps = math.radians(eps)
-
-    def get_oa(lon):
-        rad_lon = math.radians(lon)
-        # RA
-        y = math.sin(rad_lon) * math.cos(rad_eps)
-        x = math.cos(rad_lon)
-        ra = math.degrees(math.atan2(y, x))
-
-        # Dec
-        sin_dec = math.sin(rad_lon) * math.sin(rad_eps)
-        # Clamp for safety
-        if sin_dec > 1.0:
-            sin_dec = 1.0
-        if sin_dec < -1.0:
-            sin_dec = -1.0
-
-        # AD
-        tan_dec = math.tan(math.asin(sin_dec))
-        prod = math.tan(rad_lat) * tan_dec
-        if abs(prod) > 1.0:
-            return None  # Circumpolar
-        ad = math.degrees(math.asin(prod))
-
-        oa = (ra - ad) % 360.0
-        return oa
-
-    oa_mc = get_oa(mc)
-    oa_asc = get_oa(asc)
-    oa_ic = get_oa(cusps[4])
-
-    if oa_mc is None or oa_asc is None or oa_ic is None:
+    # Check for polar circle - Koch undefined at |lat| >= 90 - eps
+    if abs(lat) >= 90 - eps:
         return _houses_porphyry(asc, mc)
 
-    # Solve for cusp given target OA
-    def solve_cusp(target_oa):
-        # Initial guess: RA = target_oa
-        ra = target_oa
+    # Precompute trig values
+    sine = math.sin(math.radians(eps))
+    cose = math.cos(math.radians(eps))
+    tanfi = math.tan(math.radians(lat))
+    cosfi = math.cos(math.radians(lat))
 
-        for _ in range(10):
-            sin_ra = math.sin(math.radians(ra))
-            tan_dec = sin_ra * math.tan(rad_eps)
+    # sina = sin(MC) * sin(eps) / cos(lat)
+    sina = math.sin(math.radians(mc)) * sine / cosfi
 
-            prod = math.tan(rad_lat) * tan_dec
-            if abs(prod) > 1.0:
-                return None
+    # Clamp for safety
+    if sina > 1.0:
+        sina = 1.0
+    if sina < -1.0:
+        sina = -1.0
 
-            ad = math.degrees(math.asin(prod))
+    # cosa = sqrt(1 - sina^2), always > 0
+    cosa = math.sqrt(1.0 - sina * sina)
 
-            # OA = RA - AD
-            # RA = OA + AD
-            new_ra = (target_oa + ad) % 360.0
+    # c = atan(tan(lat) / cos(A))
+    if cosa < 1e-10:
+        # Edge case: cos(A) ~ 0
+        c = 90.0 if tanfi >= 0 else -90.0
+    else:
+        c = math.degrees(math.atan(tanfi / cosa))
 
-            diff = abs(new_ra - ra)
-            if diff > 180:
-                diff = 360 - diff
-            ra = new_ra
-            # Convergence threshold: 1e-7° = 0.00036 arcsec (improved from 0.36 arcsec)
-            if diff < 1e-7:
-                break
+    # ad3 = asin(sin(c) * sin(A)) / 3
+    sinc = math.sin(math.radians(c))
+    ad3_arg = sinc * sina
+    if ad3_arg > 1.0:
+        ad3_arg = 1.0
+    if ad3_arg < -1.0:
+        ad3_arg = -1.0
+    ad3 = math.degrees(math.asin(ad3_arg)) / 3.0
 
-        # RA to Lon
-        y = math.sin(math.radians(ra))
-        x = math.cos(math.radians(ra)) * math.cos(rad_eps)
-        lon = math.degrees(math.atan2(y, x))
-        return lon % 360.0
+    # Calculate cusps using Asc1
+    # th = ARMC (the Right Ascension of Medium Coeli)
+    th = armc
 
-    # Sector 1: MC to Asc (Houses 11, 12)
-    # Calculate diff
-    diff = (oa_asc - oa_mc) % 360.0
-    step = diff / 3.0
+    cusps[11] = _calc_ascendant(th + 30 - 2 * ad3, eps, lat, lat)
+    cusps[12] = _calc_ascendant(th + 60 - ad3, eps, lat, lat)
+    cusps[2] = _calc_ascendant(th + 120 + ad3, eps, lat, lat)
+    cusps[3] = _calc_ascendant(th + 150 + 2 * ad3, eps, lat, lat)
 
-    oa_11 = (oa_mc + step) % 360.0
-    oa_12 = (oa_mc + 2 * step) % 360.0
-
-    c11 = solve_cusp(oa_11)
-    c12 = solve_cusp(oa_12)
-
-    # Sector 2: Asc to IC (Houses 2, 3)
-    diff = (oa_ic - oa_asc) % 360.0
-    step = diff / 3.0
-
-    oa_2 = (oa_asc + step) % 360.0
-    oa_3 = (oa_asc + 2 * step) % 360.0
-
-    c2 = solve_cusp(oa_2)
-    c3 = solve_cusp(oa_3)
-
-    if c11 is None or c12 is None or c2 is None or c3 is None:
-        return _houses_porphyry(asc, mc)
-
-    cusps[11] = c11
-    cusps[12] = c12
-    cusps[2] = c2
-    cusps[3] = c3
-
-    cusps[5] = (c11 + 180) % 360.0
-    cusps[6] = (c12 + 180) % 360.0
-    cusps[8] = (c2 + 180) % 360.0
-    cusps[9] = (c3 + 180) % 360.0
+    # Opposite houses
+    cusps[5] = (cusps[11] + 180) % 360.0
+    cusps[6] = (cusps[12] + 180) % 360.0
+    cusps[8] = (cusps[2] + 180) % 360.0
+    cusps[9] = (cusps[3] + 180) % 360.0
 
     return cusps
 
@@ -4068,6 +4001,9 @@ def house_pos(
         >>> house = int(pos)  # House number (e.g., 10)
         >>> position = pos - house  # Position within house (e.g., 0.5 = halfway)
     """
+    VERY_SMALL = 1e-10
+    MILLIARCSEC = 1.0 / 3600000.0  # Add small offset to avoid edge cases
+
     # Detect which calling convention is used
     if isinstance(hsys_or_objcoord, tuple):
         # 5-arg pyswisseph form: (armc, lat, obliquity, objcoord, hsys)
@@ -4081,59 +4017,239 @@ def house_pos(
         lon = lon_or_hsys if lon_or_hsys is not None else 0.0
         # lat_body already set from parameter
 
-    # Convert hsys to int if needed
+    # Convert hsys to char
     if isinstance(hsys, bytes):
+        hsys_char = chr(hsys[0])
         hsys_int = hsys[0]
     elif isinstance(hsys, str):
+        hsys_char = hsys[0]
         hsys_int = ord(hsys[0])
     else:
+        hsys_char = chr(hsys)
         hsys_int = hsys
 
-    # Get house cusps using swe_houses_armc
+    # Normalize inputs
+    lon = lon % 360.0
+    eps = obliquity
+    geolat = lat
+
+    # Convert ecliptic coordinates to equatorial (like Swiss Ephemeris swe_cotrans)
+    # This is crucial for proper house position when body has non-zero latitude
+    lon_rad = math.radians(lon)
+    lat_body_rad = math.radians(lat_body)
+    eps_rad = math.radians(eps)
+
+    # Ecliptic to equatorial transformation
+    # RA: tan(RA) = (sin(lon)*cos(eps) - tan(lat)*sin(eps)) / cos(lon)
+    # Dec: sin(Dec) = sin(lat)*cos(eps) + cos(lat)*sin(lon)*sin(eps)
+    sin_lon = math.sin(lon_rad)
+    cos_lon = math.cos(lon_rad)
+    sin_lat = math.sin(lat_body_rad)
+    cos_lat = math.cos(lat_body_rad)
+    sin_eps = math.sin(eps_rad)
+    cos_eps = math.cos(eps_rad)
+
+    # Right Ascension
+    y_ra = sin_lon * cos_eps - math.tan(lat_body_rad) * sin_eps
+    x_ra = cos_lon
+    ra = math.degrees(math.atan2(y_ra, x_ra)) % 360.0
+
+    # Declination
+    sin_dec = sin_lat * cos_eps + cos_lat * sin_lon * sin_eps
+    if sin_dec > 1.0:
+        sin_dec = 1.0
+    if sin_dec < -1.0:
+        sin_dec = -1.0
+    de = math.degrees(math.asin(sin_dec))
+
+    # Meridian distance from ARMC
+    mdd = (ra - armc) % 360.0
+    if mdd >= 180:
+        mdd -= 360.0
+    mdn = (mdd + 180.0) % 360.0
+    if mdn >= 180:
+        mdn -= 360.0
+
+    # Handle different house systems
+    if hsys_char == "P" or hsys_char == "G":
+        # Placidus / Gauquelin - use declination-based method
+        # Check circumpolar condition
+        if 90.0 - abs(de) <= abs(geolat):
+            # Circumpolar - use Otto Ludwig procedure
+            if de * geolat < 0:
+                xp0 = (90.0 + mdn / 2.0) % 360.0
+            else:
+                xp0 = (270.0 + mdd / 2.0) % 360.0
+        else:
+            # Normal case
+            sinad = math.tan(math.radians(de)) * math.tan(math.radians(geolat))
+            if abs(sinad) > 1.0:
+                sinad = 1.0 if sinad > 0 else -1.0
+            ad = math.degrees(math.asin(sinad))
+            a = sinad + math.cos(math.radians(mdd))
+            is_above_hor = a >= 0
+
+            sad = 90.0 + ad  # Semi-diurnal arc
+            san = 90.0 - ad  # Semi-nocturnal arc
+
+            if is_above_hor:
+                xp0 = (mdd / sad + 3.0) * 90.0
+            else:
+                xp0 = (mdn / san + 1.0) * 90.0
+
+            # Add small offset for cusp precision
+            xp0 = (xp0 + MILLIARCSEC) % 360.0
+
+        if hsys_char == "G":
+            # Gauquelin sectors are clockwise
+            xp0 = 360.0 - xp0
+            hpos = xp0 / 10.0 + 1.0
+        else:
+            hpos = xp0 / 30.0 + 1.0
+
+        return hpos
+
+    elif hsys_char == "R":
+        # Regiomontanus - uses declination
+        if abs(mdd) < VERY_SMALL:
+            xp0 = 270.0
+        elif 180.0 - abs(mdd) < VERY_SMALL:
+            xp0 = 90.0
+        else:
+            if 90.0 - abs(geolat) < VERY_SMALL:
+                geolat = 90.0 - VERY_SMALL if geolat > 0 else -90.0 + VERY_SMALL
+            if 90.0 - abs(de) < VERY_SMALL:
+                de = 90.0 - VERY_SMALL if de > 0 else -90.0 + VERY_SMALL
+
+            a = math.tan(math.radians(geolat)) * math.tan(math.radians(de)) + math.cos(
+                math.radians(mdd)
+            )
+            xp0 = math.degrees(math.atan(-a / math.sin(math.radians(mdd))))
+            if mdd < 0:
+                xp0 += 180.0
+            xp0 = (xp0 + MILLIARCSEC) % 360.0
+
+        hpos = xp0 / 30.0 + 1.0
+        return hpos
+
+    elif hsys_char == "C":
+        # Campanus - transform to prime vertical
+        # swe_cotrans rotates around the x-axis by the given angle
+        # xeq[0] = mdd - 90, xeq[1] = de (declination)
+        xeq0 = (mdd - 90.0) % 360.0
+        xeq1 = de
+
+        # swe_cotrans(xeq, xp, -geolat) - rotation around x-axis
+        xeq0_rad = math.radians(xeq0)
+        xeq1_rad = math.radians(xeq1)
+        rot_angle = math.radians(-geolat)
+
+        # Standard spherical rotation around x-axis:
+        # x' = x
+        # y' = y*cos(a) - z*sin(a)
+        # z' = y*sin(a) + z*cos(a)
+        # In spherical: lon' = atan2(y', x'), lat' = asin(z'/r)
+        cos_xeq0 = math.cos(xeq0_rad)
+        sin_xeq0 = math.sin(xeq0_rad)
+        cos_xeq1 = math.cos(xeq1_rad)
+        sin_xeq1 = math.sin(xeq1_rad)
+        cos_rot = math.cos(rot_angle)
+        sin_rot = math.sin(rot_angle)
+
+        # Convert to Cartesian
+        x = cos_xeq1 * cos_xeq0
+        y = cos_xeq1 * sin_xeq0
+        z = sin_xeq1
+
+        # Rotate around x-axis
+        x_new = x
+        y_new = y * cos_rot - z * sin_rot
+        z_new = y * sin_rot + z * cos_rot
+
+        # Convert back to spherical
+        xp0 = math.degrees(math.atan2(y_new, x_new))
+        xp0 = (xp0 + MILLIARCSEC) % 360.0
+        hpos = xp0 / 30.0 + 1.0
+        return hpos
+
+    elif hsys_char in ["E", "A", "W", "V", "D", "N"]:
+        # Equal-based systems - simple longitude-based calculation
+        asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
+        mc = _armc_to_mc(armc, eps)
+
+        if hsys_char == "D":
+            xp0 = (lon - mc - 90.0) % 360.0
+        elif hsys_char == "V":
+            xp0 = (lon - asc + 15.0) % 360.0
+        elif hsys_char == "W":
+            xp0 = (lon - asc + (asc % 30.0)) % 360.0
+        elif hsys_char == "N":
+            xp0 = lon
+        else:
+            xp0 = (lon - asc) % 360.0
+
+        xp0 = (xp0 + MILLIARCSEC) % 360.0
+        hpos = xp0 / 30.0 + 1.0
+        return hpos
+
+    elif hsys_char == "X":
+        # Meridian (axial rotation)
+        hpos = ((mdd - 90.0) % 360.0) / 30.0 + 1.0
+        return hpos
+
+    elif hsys_char == "M":
+        # Morinus
+        a = lon
+        if abs(a - 90.0) > VERY_SMALL and abs(a - 270.0) > VERY_SMALL:
+            tant = math.tan(math.radians(a))
+            hpos_deg = math.degrees(math.atan(tant / cos_eps))
+            if a > 90.0 and a <= 270.0:
+                hpos_deg = (hpos_deg + 180.0) % 360.0
+        else:
+            hpos_deg = 90.0 if abs(a - 90.0) <= VERY_SMALL else 270.0
+        hpos_deg = (hpos_deg - armc - 90.0) % 360.0
+        hpos = hpos_deg / 30.0 + 1.0
+        return hpos
+
+    # Default fallback: use cusp-based method
     cusps, ascmc = swe_houses_armc(armc, lat, obliquity, hsys_int)
 
-    # cusps is a 12-element tuple (houses 1-12, 0-indexed in tuple)
-    # We need to find which house contains the given longitude
-
-    # Normalize the body longitude
-    lon = lon % 360.0
-
-    # For bodies with non-zero ecliptic latitude, we need to project
-    # their position onto the ecliptic for most house systems.
-    # The latitude affects house position only for certain systems (Gauquelin sector).
-    # For standard systems, we use the ecliptic longitude directly.
-
     # Find the house containing this longitude
-    # Houses go in order of increasing longitude (with wrap-around at 360°)
     for i in range(12):
         cusp_start = cusps[i]
         cusp_end = cusps[(i + 1) % 12]
 
-        # Calculate angular difference from start cusp to body
         diff_to_body = (lon - cusp_start + 360.0) % 360.0
-
-        # Calculate angular size of this house
         house_size = (cusp_end - cusp_start + 360.0) % 360.0
 
-        # Handle the case where house size is 0 (extremely rare edge case)
         if house_size < 0.0001:
-            house_size = 30.0  # Default to 30° if cusps are identical
+            house_size = 30.0
 
-        # Check if body is within this house
-        if diff_to_body < house_size or (
-            house_size > 180 and diff_to_body < house_size
-        ):
-            # Body is in house i+1 (houses are 1-indexed)
+        if diff_to_body < house_size:
             house_num = i + 1
-            # Calculate fractional position within house
             fraction = diff_to_body / house_size
-            # Clamp fraction to [0, 1) to avoid rounding issues
             fraction = max(0.0, min(fraction, 0.9999999999))
             return float(house_num) + fraction
 
-    # Fallback (should never reach here with valid input)
-    # Return house 1 with the body at the start
     return 1.0
+
+
+def _armc_to_mc(armc: float, eps: float) -> float:
+    """Convert ARMC to MC longitude."""
+    mc_rad = math.atan2(math.tan(math.radians(armc)), math.cos(math.radians(eps)))
+    mc = math.degrees(mc_rad)
+    if mc < 0:
+        mc += 360.0
+    if 90.0 < armc <= 270.0:
+        if mc < 90.0 or mc > 270.0:
+            mc += 180.0
+    elif armc > 270.0:
+        if mc < 270.0:
+            mc += 180.0
+    elif armc <= 90.0:
+        if mc > 90.0:
+            mc += 180.0
+    return mc % 360.0
 
 
 def swe_house_pos(
