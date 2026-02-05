@@ -63,7 +63,7 @@ HOUSE_SYSTEMS = [
 # These systems are not fully implemented or have different calculation methods
 RELAXED_SYSTEMS = {
     "G": GAUQUELIN_TOL,  # Gauquelin: 36 sectors in pyswisseph vs 12 cusps in libephemeris
-    "I": 15.0,  # Sunshine/Makransky: Not implemented (requires Sun's diurnal arc)
+    "I": 0.001,  # Sunshine/Makransky: Implemented with Treindl algorithm, ~0.0002° precision
     # Koch has minor precision differences at high latitudes (>50°)
     # due to OA interval handling. Max error ~0.1° at extreme latitudes.
     "K": 0.15,

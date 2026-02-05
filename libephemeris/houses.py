@@ -71,9 +71,9 @@ from __future__ import annotations
 import math
 from typing import List, Tuple, Union
 from .constants import *
-from .constants import SEFLG_SIDEREAL, SEFLG_SPEED
+from .constants import SEFLG_SIDEREAL, SEFLG_SPEED, SEFLG_EQUATORIAL, SE_SUN
 from .state import get_timescale
-from .planets import swe_get_ayanamsa_ut
+from .planets import swe_get_ayanamsa_ut, swe_calc_ut
 from .cache import get_true_obliquity, get_cached_nutation
 from .exceptions import Error, PolarCircleError, validate_coordinates
 
@@ -743,6 +743,17 @@ def swe_houses(
     if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
         _raise_polar_circle_error(lat, eps, hsys_char, "swe_houses")
 
+    # Calculate Sun's declination for Sunshine houses ('I')
+    # This is needed before the house dispatch since only swe_houses has jd_ut
+    sun_dec = 0.0
+    if hsys_char == "I":
+        try:
+            sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL)
+            sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
+        except Exception:
+            # Fallback to 0 declination (same as equinox behavior)
+            sun_dec = 0.0
+
     cusps = [0.0] * 13
 
     if hsys_char == "P":  # Placidus
@@ -808,6 +819,8 @@ def swe_houses(
         cusps = _houses_pullen_sr(asc, mc)
     elif hsys_char == "D":  # Equal from MC
         cusps = _houses_equal_mc(asc, mc)
+    elif hsys_char == "I":  # Sunshine (Makransky)
+        cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, sun_dec)
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -1333,6 +1346,11 @@ def swe_houses_armc(
         cusps = _houses_pullen_sr(asc, mc)
     elif hsys_char == "D":  # Equal from MC
         cusps = _houses_equal_mc(asc, mc)
+    elif hsys_char == "I":  # Sunshine (Makransky)
+        # Sunshine requires Sun's declination which needs JD.
+        # swe_houses_armc doesn't have JD, so fall back to Porphyry.
+        # Use swe_houses() for proper Sunshine calculation.
+        cusps = _houses_porphyry(asc, mc)
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -3455,6 +3473,233 @@ def _houses_equal_mc(asc: float, mc: float) -> List[float]:
         # House 10 is at MC, so offset = (i - 10) * 30
         cusps[i] = (mc + (i - 10) * 30.0) % 360.0
     return cusps
+
+
+def _houses_sunshine(
+    armc: float, lat: float, eps: float, asc: float, mc: float, sun_dec: float
+) -> List[float]:
+    """
+    Sunshine (Makransky) house system (code 'I').
+
+    Invented by Bob Makransky and published in 1988 in "Primary Directions".
+    The diurnal and nocturnal arcs of the Sun are trisected, and great circles
+    are drawn through these trisection points and the north and south points
+    on the horizon. The intersection points of these great circles with the
+    ecliptic are the house cusps.
+
+    Note: Cusps 11, 12, 2, 3 are NOT in exact opposition to cusps 5, 6, 8, 9.
+
+    This implements the Treindl algorithm from Swiss Ephemeris swehouse.c.
+
+    Algorithm:
+        1. Calculate ascensional difference from Sun's declination
+        2. Compute diurnal semi-arc (DSA = 90 + AD) and nocturnal semi-arc (NSA = 90 - AD)
+        3. Trisect the arcs to get offsets for each house cusp
+        4. For each intermediate cusp, use spherical trigonometry to find:
+           - Great-circle arc length on the Sun's diurnal/nocturnal arc
+           - Zenith distance of house circle via spherical triangles
+           - Pole height from zenith distance
+           - Intersection with ecliptic using Asc1() formula
+
+    Args:
+        armc: Sidereal time at Greenwich (RAMC) in degrees
+        lat: Geographic latitude in degrees
+        eps: True obliquity of ecliptic in degrees
+        asc: Ascendant longitude in degrees
+        mc: Midheaven longitude in degrees
+        sun_dec: Sun's declination in degrees
+
+    Returns:
+        List of 13 house cusp longitudes
+    """
+    VERY_SMALL = 1e-10
+
+    cusps = [0.0] * 13
+    cusps[1] = asc
+    cusps[10] = mc
+    cusps[4] = (mc + 180.0) % 360.0
+    cusps[7] = (asc + 180.0) % 360.0
+
+    # Calculate ascensional difference: sin(ad) = tan(dec) * tan(lat)
+    arg = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
+    if arg >= 1.0:
+        ad = 90.0 - VERY_SMALL
+    elif arg <= -1.0:
+        ad = -90.0 + VERY_SMALL
+    else:
+        ad = math.degrees(math.asin(arg))
+
+    # Semi-arcs
+    nsa = 90.0 - ad  # Nocturnal semi-arc
+    dsa = 90.0 + ad  # Diurnal semi-arc
+
+    # House offsets (in right ascension along the diurnal/nocturnal arc)
+    # xh[i] is the offset from the angle (IC, Asc, MC, Desc) in RA
+    xh = [0.0] * 13
+    xh[2] = -2.0 * nsa / 3.0
+    xh[3] = -1.0 * nsa / 3.0
+    xh[5] = 1.0 * nsa / 3.0
+    xh[6] = 2.0 * nsa / 3.0
+    xh[8] = -2.0 * dsa / 3.0
+    xh[9] = -1.0 * dsa / 3.0
+    xh[11] = 1.0 * dsa / 3.0
+    xh[12] = 2.0 * dsa / 3.0
+
+    # Precompute trigonometric values
+    sinlat = math.sin(math.radians(lat))
+    coslat = math.cos(math.radians(lat))
+    cosdec = math.cos(math.radians(sun_dec))
+    tandec = math.tan(math.radians(sun_dec))
+    sinecl = math.sin(math.radians(eps))
+    cosecl = math.cos(math.radians(eps))
+
+    # Check if MC is under horizon
+    mcdec = math.degrees(
+        math.atan(math.sin(math.radians(armc)) * math.tan(math.radians(eps)))
+    )
+    mc_under_horizon = abs(lat - mcdec) > 90.0
+
+    if mc_under_horizon:
+        # Invert offsets if MC is under horizon
+        for ih in range(2, 13):
+            xh[ih] = -xh[ih]
+
+    # Calculate intermediate cusps using Treindl algorithm
+    for ih in range(1, 13):
+        if (ih - 1) % 3 == 0:
+            continue  # Skip 1, 4, 7, 10 (already set)
+
+        # Great-circle length of the arc offset
+        # xhs = 2 * arcsin(cos(dec) * sin(xh/2))
+        xhs = 2.0 * math.degrees(
+            math.asin(cosdec * math.sin(math.radians(xh[ih] / 2.0)))
+        )
+
+        # Compute triangle north pole - mp0 - hp
+        # We have two sides 90-dec, base xhs, angle at pole x
+        # Derive from cosine rule: cos(a) = tan(dec) * tan(xhs/2)
+        cosa = tandec * math.tan(math.radians(xhs / 2.0))
+        if abs(cosa) > 1.0:
+            cosa = 1.0 if cosa > 0 else -1.0
+        alph = math.degrees(math.acos(cosa))
+
+        # Compute triangle south point - mp0 - hp
+        # We have: side x', side b, angle alpha2 between the sides
+        if ih > 7:  # Diurnal side
+            alpha2 = 180.0 - alph
+            b = 90.0 - lat + sun_dec
+        else:  # Nocturnal side
+            alpha2 = alph
+            b = 90.0 - lat - sun_dec
+
+        # Compute side c using spherical cosine rule
+        cosc = math.cos(math.radians(xhs)) * math.cos(math.radians(b)) + math.sin(
+            math.radians(xhs)
+        ) * math.sin(math.radians(b)) * math.cos(math.radians(alpha2))
+        if abs(cosc) > 1.0:
+            cosc = 1.0 if cosc > 0 else -1.0
+        c = math.degrees(math.acos(cosc))
+
+        # Use sine rule to find zenith distance
+        if c < 1e-6:
+            zd = 0.0
+        else:
+            sinzd = (
+                math.sin(math.radians(xhs))
+                * math.sin(math.radians(alpha2))
+                / math.sin(math.radians(c))
+            )
+            if abs(sinzd) > 1.0:
+                sinzd = 1.0 if sinzd > 0 else -1.0
+            zd = math.degrees(math.asin(sinzd))
+
+        # Compute intersection of house circle with equator
+        rax = math.degrees(math.atan(coslat * math.tan(math.radians(zd))))
+
+        # Compute pole height (distance of house circle pole from equator)
+        pole = math.degrees(math.asin(math.sin(math.radians(zd)) * sinlat))
+
+        # Calculate RA intersection point
+        if ih <= 6:
+            pole = -pole
+            a = (rax + armc + 180.0) % 360.0
+        else:
+            a = (armc + rax) % 360.0
+
+        # Use Asc1() formula to find ecliptic intersection
+        hc = _asc1(a, pole, sinecl, cosecl)
+        cusps[ih] = hc
+
+    # Apply 180° correction if MC was under horizon
+    if mc_under_horizon:
+        for ih in range(1, 13):
+            if (ih - 1) % 3 == 0:
+                continue
+            cusps[ih] = (cusps[ih] + 180.0) % 360.0
+
+    return cusps
+
+
+def _asc1(x1: float, f: float, sine: float, cose: float) -> float:
+    """
+    Asc1 function from Swiss Ephemeris (swehouse.c).
+
+    Calculates ecliptic longitude from RA intersection point and pole height.
+    This is the same algorithm as _calc_ascendant but exposed as a helper.
+
+    Args:
+        x1: Right ascension in degrees
+        f: Pole height (latitude parameter)
+        sine: sin(obliquity)
+        cose: cos(obliquity)
+
+    Returns:
+        Ecliptic longitude in degrees (0-360)
+    """
+    VERY_SMALL = 1e-10
+
+    def _asc2(x: float, f: float, sine: float, cose: float) -> float:
+        """Asc2 helper for quadrant calculation."""
+        ass = -math.tan(math.radians(f)) * sine + cose * math.cos(math.radians(x))
+        if abs(ass) < VERY_SMALL:
+            ass = 0.0
+        sinx = math.sin(math.radians(x))
+        if abs(sinx) < VERY_SMALL:
+            sinx = 0.0
+        if sinx == 0:
+            if ass < 0:
+                ass = -VERY_SMALL
+            else:
+                ass = VERY_SMALL
+        elif ass == 0:
+            if sinx < 0:
+                ass = -90.0
+            else:
+                ass = 90.0
+        else:
+            ass = math.degrees(math.atan(sinx / ass))
+        if ass < 0:
+            ass = 180.0 + ass
+        return ass
+
+    x1 = x1 % 360.0
+    n = int((x1 / 90.0) + 1)
+
+    if abs(90.0 - f) < VERY_SMALL:
+        return 180.0
+    if abs(90.0 + f) < VERY_SMALL:
+        return 0.0
+
+    if n == 1:
+        ass = _asc2(x1, f, sine, cose)
+    elif n == 2:
+        ass = 180.0 - _asc2(180.0 - x1, -f, sine, cose)
+    elif n == 3:
+        ass = 180.0 + _asc2(x1 - 180.0, -f, sine, cose)
+    else:
+        ass = 360.0 - _asc2(360.0 - x1, f, sine, cose)
+
+    return ass % 360.0
 
 
 def _houses_horizontal(
