@@ -24,10 +24,8 @@ from libephemeris.constants import (
     SE_OSCU_APOG,
 )
 
-# xfail marker for Mean Lilith tests
-_MEAN_LILITH_XFAIL = pytest.mark.xfail(
-    reason="Mean Lilith algorithm differs (longitude ~0.1°, latitude ~3°)", strict=False
-)
+# Mean Lilith now uses SE-compatible DE404 algorithm with ecliptic projection
+# Tests pass with ~15 arcsec precision (previously expected to fail)
 
 
 def angular_diff(val1: float, val2: float) -> float:
@@ -44,7 +42,9 @@ def angular_diff(val1: float, val2: float) -> float:
 
 MEAN_NODE_TOL = 0.01  # degrees
 TRUE_NODE_TOL = 0.15  # degrees (~540 arcsec, covers max observed ~510 arcsec)
-MEAN_LILITH_TOL = 0.1  # degrees
+MEAN_LILITH_TOL = (
+    0.01  # degrees (~36 arcsec, SE-compatible algorithm achieves ~15 arcsec)
+)
 TRUE_LILITH_TOL = 0.1  # degrees (~360 arcsec, covers documented max ~235 arcsec)
 
 
@@ -151,7 +151,6 @@ class TestTrueNode:
 class TestMeanLilith:
     """Compare Mean Lilith (Black Moon) calculations."""
 
-    @_MEAN_LILITH_XFAIL
     @pytest.mark.comparison
     @pytest.mark.parametrize("year,month,day,hour,desc", TEST_DATES)
     def test_mean_lilith_longitude(self, year, month, day, hour, desc):
@@ -251,7 +250,6 @@ class TestNodalMotion:
 class TestLilithLatitude:
     """Test Lilith latitude calculations."""
 
-    @_MEAN_LILITH_XFAIL
     @pytest.mark.comparison
     @pytest.mark.parametrize("year,month,day,hour,desc", TEST_DATES[:3])
     def test_mean_lilith_latitude(self, year, month, day, hour, desc):

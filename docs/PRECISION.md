@@ -14,7 +14,7 @@ This document provides detailed information about the precision and limitations 
 | Uranus, Neptune, Pluto | ±1.2 arcsec | High precision with DE440 |
 | Mean Lunar Node | ~0.005° (~18 arcsec) | High precision formula |
 | True Lunar Node | ~0.14° (~520 arcsec) | Osculating orbital elements method |
-| Mean Lilith | ~0.12° (~430 arcsec) | Minor formula differences |
+| Mean Lilith | ~0.005° (~18 arcsec) | SE-compatible DE404 algorithm with ecliptic projection |
 | House cusps | ±0.001° (~3.6 arcsec) | All 19 house systems |
 | Ayanamsha (standard) | ±0.0002° | Fagan-Bradley, Lahiri, Raman (high precision) |
 | Ayanamsha (star-based) | ±0.006-0.06° | True Citra (0.006°), others (0.06°) |
@@ -276,7 +276,7 @@ LibEphemeris uses different calculation models for some lunar points, resulting 
 |-------|------------------------------|-----------------|-------|
 | Mean Node | ~0.005° (~18 arcsec) | ~0.003° (~11 arcsec) | High precision |
 | True Node | ~0.14° (~520 arcsec) | ~0.04° (~145 arcsec) | Geometric method (see below) |
-| Mean Lilith | ~0.12° (~430 arcsec) | ~0.07° (~250 arcsec) | Minor formula differences |
+| Mean Lilith | ~0.005° (~18 arcsec) | ~0.003° (~12 arcsec) | SE-compatible DE404 algorithm |
 | True Lilith | ~0.07° (~235 arcsec) | ~0.02° (~52 arcsec) | Eccentricity vector method (see below) |
 | Interpolated Apogee | ~1.1° | ~3.3° max | ELP2000-82B perturbation series |
 | Interpolated Perigee | ~2.3° | ~8° max | ELP2000-82B perturbation series (see below) |

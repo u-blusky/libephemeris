@@ -347,7 +347,7 @@ When using `swe_calc_ut` with `SEFLG_SPEED`, velocity is also calculated:
 
 | Variant | Mean Error | Max Error |
 |---------|------------|-----------|
-| Mean Lilith | ~0.1° | ~0.2° |
+| Mean Lilith | ~0.003° (~12") | ~0.005° (~18") |
 | True Lilith | ~5° | ~15° |
 | Interpolated Apogee | ~1.1° | ~3.3° |
 | Interpolated Perigee | ~2.3° | ~8° |

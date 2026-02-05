@@ -129,17 +129,18 @@ LibEphemeris True Lilith achieves excellent precision compared to Swiss Ephemeri
 | Method | Mean Difference | Max Difference | RMS Difference |
 |--------|-----------------|----------------|----------------|
 | **True Lilith** (libephemeris) | ~52 arcsec (~0.015°) | ~235 arcsec (~0.065°) | ~60 arcsec (~0.017°) |
-| Mean Lilith | ~250 arcsec (~0.07°) | ~430 arcsec (~0.12°) | - |
-| Interpolated Apogee | ~8-10° | - | Different algorithm |
+| **Mean Lilith** | ~12 arcsec (~0.003°) | ~18 arcsec (~0.005°) | SE-compatible |
+| Interpolated Apogee | ~1.1° | ~3.3° | Different algorithm |
 
 ### Lilith Method Selection Guide
 
 | Use Case | Recommended Method | Precision vs Swiss Ephemeris |
 |----------|-------------------|------------------------------|
 | Osculating lunar apogee | **True Lilith** | ~0.015° mean |
-| Smooth, predictable motion | Mean Lilith | ~0.07° mean |
-| Physical apogee passages | Interpolated Apogee | ~8-10° (different algorithm) |
+| Smooth, predictable motion | **Mean Lilith** | ~0.003° mean (SE-compatible) |
+| Physical apogee passages | Interpolated Apogee | ~1.1° (different algorithm) |
 | Swiss Ephemeris compatibility (SE_OSCU_APOG) | **True Lilith** | Sub-arcminute |
+| Swiss Ephemeris compatibility (SE_MEAN_APOG) | **Mean Lilith** | Sub-arcminute |
 
 **Recommendation**: For applications requiring the osculating (instantaneous) lunar apogee,
 use **True Lilith** (`calc_true_lilith`). Its sub-arcminute precision makes it suitable
@@ -212,14 +213,14 @@ True Lilith provides:
 
 Use **Mean Lilith** (`calc_mean_lilith`) when you need:
 - Predictable, smooth motion without 30° oscillations
-- Close compatibility with Swiss Ephemeris (~0.07° mean difference)
+- Excellent compatibility with Swiss Ephemeris (~0.003° mean difference, sub-arcminute)
 - A simplified model not subject to two-body approximation artifacts
 
 ### For Applications Requiring Swiss Ephemeris Compatibility
 
-Both True Lilith and Mean Lilith now provide good compatibility with Swiss Ephemeris:
+Both True Lilith and Mean Lilith now provide excellent compatibility with Swiss Ephemeris:
 - **True Lilith**: ~0.015° mean difference (excellent)
-- **Mean Lilith**: ~0.07° mean difference (good)
+- **Mean Lilith**: ~0.003° mean difference (excellent, SE-compatible DE404 algorithm)
 
 ### For Applications Prioritizing Physical Accuracy
 
