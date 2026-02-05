@@ -800,6 +800,12 @@ def swe_houses(
         cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
     elif hsys_char == "G":  # Gauquelin
         cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "S":  # Sripati
+        cusps = _houses_sripati(asc, mc)
+    elif hsys_char == "L":  # Pullen SD (Sinusoidal Delta / Neo-Porphyry)
+        cusps = _houses_pullen_sd(asc, mc)
+    elif hsys_char == "Q":  # Pullen SR (Sinusoidal Ratio)
+        cusps = _houses_pullen_sr(asc, mc)
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -1317,6 +1323,12 @@ def swe_houses_armc(
         cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
     elif hsys_char == "G":  # Gauquelin
         cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
+    elif hsys_char == "S":  # Sripati
+        cusps = _houses_sripati(asc, mc)
+    elif hsys_char == "L":  # Pullen SD (Sinusoidal Delta / Neo-Porphyry)
+        cusps = _houses_pullen_sd(asc, mc)
+    elif hsys_char == "Q":  # Pullen SR (Sinusoidal Ratio)
+        cusps = _houses_pullen_sr(asc, mc)
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -1618,6 +1630,12 @@ def swe_house_name(hsys: int) -> str:
         "H": "Horizontal",
         "F": "Carter",
         "S": "Sripati",
+        "L": "Pullen SD",
+        "Q": "Pullen SR",
+        "N": "Natural Gradient",
+        "Y": "APC",
+        "D": "Equal (MC)",
+        "I": "Sunshine",
     }
     return names.get(hsys_char, "Unknown")
 
@@ -2452,6 +2470,250 @@ def _houses_porphyry(asc: float, mc: float) -> List[float]:
     cusps[6] = (cusps[12] + 180) % 360.0
     cusps[8] = (cusps[2] + 180) % 360.0
     cusps[9] = (cusps[3] + 180) % 360.0
+
+    return cusps
+
+
+def _houses_sripati(asc: float, mc: float) -> List[float]:
+    """
+    Sripati house system (traditional Indian method).
+
+    Creates house cusps at the midpoints of Porphyry house cusps. Each Sripati
+    cusp is the midpoint between the previous and current Porphyry cusp.
+
+    Algorithm (from Swiss Ephemeris documentation):
+        1. Calculate Porphyry house cusps
+        2. For each house i, the Sripati cusp is:
+           H'[i] = (H[i-1] + H[i]) / 2  (midpoint on the ecliptic circle)
+
+    Mathematical Formula:
+        λ'ᵢ = λᵢ₋₁ + ((λᵢ - λᵢ₋₁) mod 360°) / 2
+
+    This effectively shifts the house boundaries so that the "core" of each
+    Porphyry house becomes the cusp, making the Porphyry cusp the center of
+    each Sripati house.
+
+    Properties:
+        - Works at all latitudes (inherits Porphyry's polar stability)
+        - Used in traditional Indian astrology (Jyotish)
+        - Computationally simple (no trigonometry beyond Porphyry)
+
+    Args:
+        asc: Ascendant longitude in degrees
+        mc: Midheaven longitude in degrees
+
+    Returns:
+        List of 13 house cusp longitudes (index 0 unused, 1-12 are house cusps)
+    """
+    # Get Porphyry cusps as base
+    porphyry = _houses_porphyry(asc, mc)
+
+    cusps = [0.0] * 13
+    for i in range(1, 13):
+        prev_i = 12 if i == 1 else i - 1
+        # Calculate midpoint between previous and current Porphyry cusp
+        # Handle wrap-around at 360 degrees
+        diff = (porphyry[i] - porphyry[prev_i]) % 360.0
+        cusps[i] = (porphyry[prev_i] + diff / 2.0) % 360.0
+
+    return cusps
+
+
+def _houses_pullen_sd(asc: float, mc: float) -> List[float]:
+    """
+    Pullen SD (Sinusoidal Delta) house system, also known as Neo-Porphyry.
+
+    Invented by Walter Pullen in 1994. Like Porphyry, based on ecliptic quadrant
+    divisions, but fits house widths to a sine wave pattern rather than equal
+    trisection.
+
+    Algorithm (from Swiss Ephemeris documentation):
+        - Ideal house size = 30°
+        - For each quadrant, compute deviation d = quadrant_size - 90°
+        - Middle house of quadrant (2nd, 5th, 8th, 11th) gets d/2 added to 30°
+        - Side houses each get d/4 added to 30°
+        - If middle house size would be negative, set to 0
+
+    House width pattern for quadrant:
+        x+n, x, x+n  where x = 30 and n = d/4
+        Middle house = x + 2n = 30 + d/2
+
+    Properties:
+        - Works at all latitudes (based on ecliptic only)
+        - Houses in larger quadrants are larger
+        - Middle house absorbs most of the size variation
+
+    Args:
+        asc: Ascendant longitude in degrees
+        mc: Midheaven longitude in degrees
+
+    Returns:
+        List of 13 house cusp longitudes (index 0 unused, 1-12 are house cusps)
+    """
+    cusps = [0.0] * 13
+    cusps[1] = asc
+    cusps[10] = mc
+    cusps[7] = (asc + 180) % 360.0
+    cusps[4] = (mc + 180) % 360.0
+
+    # Calculate quadrant sizes
+    # Quadrant 1: MC to Asc (houses 11, 12)
+    q1 = (asc - mc) % 360.0
+    # Quadrant 2: Asc to IC (houses 2, 3)
+    ic = cusps[4]
+    q2 = (ic - asc) % 360.0
+    # Quadrant 3: IC to Desc (houses 5, 6)
+    desc = cusps[7]
+    q3 = (desc - ic) % 360.0
+    # Quadrant 4: Desc to MC (houses 8, 9)
+    q4 = (mc - desc) % 360.0
+
+    def calc_house_sizes(quadrant_size: float) -> tuple:
+        """Calculate house sizes for a quadrant using sinusoidal delta."""
+        d = quadrant_size - 90.0  # deviation from ideal 90°
+        # Middle house gets d/2 added to 30°
+        middle = 30.0 + d / 2.0
+        # If middle would be negative, set to 0 and redistribute
+        if middle < 0:
+            middle = 0.0
+            # Remaining space divided between side houses
+            side = quadrant_size / 2.0
+        else:
+            # Side houses each get d/4 added to 30°
+            side = 30.0 + d / 4.0
+        return (side, middle, side)
+
+    # Quadrant 1: MC to Asc (houses 11, 12, then Asc)
+    sizes1 = calc_house_sizes(q1)
+    cusps[11] = (mc + sizes1[0]) % 360.0
+    cusps[12] = (cusps[11] + sizes1[1]) % 360.0
+
+    # Quadrant 2: Asc to IC (houses 2, 3, then IC)
+    sizes2 = calc_house_sizes(q2)
+    cusps[2] = (asc + sizes2[0]) % 360.0
+    cusps[3] = (cusps[2] + sizes2[1]) % 360.0
+
+    # Quadrant 3: IC to Desc (houses 5, 6, then Desc)
+    sizes3 = calc_house_sizes(q3)
+    cusps[5] = (ic + sizes3[0]) % 360.0
+    cusps[6] = (cusps[5] + sizes3[1]) % 360.0
+
+    # Quadrant 4: Desc to MC (houses 8, 9, then MC)
+    sizes4 = calc_house_sizes(q4)
+    cusps[8] = (desc + sizes4[0]) % 360.0
+    cusps[9] = (cusps[8] + sizes4[1]) % 360.0
+
+    return cusps
+
+
+def _houses_pullen_sr(asc: float, mc: float) -> List[float]:
+    """
+    Pullen SR (Sinusoidal Ratio) house system.
+
+    Proposed by Walter Pullen in 2016 as an improvement over Pullen SD. Uses
+    ratio multipliers instead of additive offsets, avoiding negative house
+    sizes for small quadrants.
+
+    Algorithm (from Swiss Ephemeris documentation):
+        For quadrant size q:
+        - Small quadrant houses: rx, x, rx  (sizes sum to q)
+        - Large quadrant houses: r³x, r⁴x, r³x  (sizes sum to 180-q)
+
+        Solving: rx + x + rx = q  →  x(2r + 1) = q
+                 r³x + r⁴x + r³x = 180 - q  →  x·r³(2 + r) = 180 - q
+
+        Dividing: r³(2 + r) / (2r + 1) = (180 - q) / q
+        This is solved numerically for r.
+
+    Properties:
+        - Works at all latitudes
+        - No negative house sizes even for extreme quadrants
+        - More elegant mathematical formulation
+
+    Args:
+        asc: Ascendant longitude in degrees
+        mc: Midheaven longitude in degrees
+
+    Returns:
+        List of 13 house cusp longitudes (index 0 unused, 1-12 are house cusps)
+    """
+    cusps = [0.0] * 13
+    cusps[1] = asc
+    cusps[10] = mc
+    cusps[7] = (asc + 180) % 360.0
+    cusps[4] = (mc + 180) % 360.0
+
+    # Calculate quadrant sizes
+    q1 = (asc - mc) % 360.0  # MC to Asc
+    ic = cusps[4]
+    q2 = (ic - asc) % 360.0  # Asc to IC
+    desc = cusps[7]
+    q3 = (desc - ic) % 360.0  # IC to Desc
+    q4 = (mc - desc) % 360.0  # Desc to MC
+
+    def calc_house_sizes_ratio(quadrant_size: float) -> tuple:
+        """Calculate house sizes using sinusoidal ratio method."""
+        q = quadrant_size
+        q_opp = 180.0 - q  # opposite quadrant
+
+        if abs(q - 90.0) < 0.0001:
+            # Quadrant is exactly 90°, r = 1, equal houses of 30°
+            return (30.0, 30.0, 30.0)
+
+        # Target ratio: r³(2 + r) / (2r + 1) = q_opp / q
+        target = q_opp / q if q > 0.0001 else 1000.0
+
+        # Solve for r using Newton-Raphson
+        # f(r) = r³(2 + r) / (2r + 1) - target = 0
+        r = 1.0  # initial guess
+        for _ in range(20):  # max iterations
+            numerator = r * r * r * (2.0 + r)
+            denominator = 2.0 * r + 1.0
+            f = numerator / denominator - target
+
+            # Derivative: d/dr[r³(2+r)/(2r+1)]
+            # Using quotient rule
+            dn = 3.0 * r * r * (2.0 + r) + r * r * r  # derivative of numerator
+            dd = 2.0  # derivative of denominator
+            df = (dn * denominator - numerator * dd) / (denominator * denominator)
+
+            if abs(df) < 1e-12:
+                break
+            r_new = r - f / df
+            if r_new < 0.01:
+                r_new = 0.01  # keep r positive
+            if abs(r_new - r) < 1e-10:
+                break
+            r = r_new
+
+        # Calculate x from: x(2r + 1) = q
+        x = q / (2.0 * r + 1.0) if (2.0 * r + 1.0) > 0.0001 else q / 3.0
+
+        # House sizes: rx, x, rx
+        side = r * x
+        middle = x
+
+        return (side, middle, side)
+
+    # Quadrant 1: MC to Asc (houses 11, 12)
+    sizes1 = calc_house_sizes_ratio(q1)
+    cusps[11] = (mc + sizes1[0]) % 360.0
+    cusps[12] = (cusps[11] + sizes1[1]) % 360.0
+
+    # Quadrant 2: Asc to IC (houses 2, 3)
+    sizes2 = calc_house_sizes_ratio(q2)
+    cusps[2] = (asc + sizes2[0]) % 360.0
+    cusps[3] = (cusps[2] + sizes2[1]) % 360.0
+
+    # Quadrant 3: IC to Desc (houses 5, 6)
+    sizes3 = calc_house_sizes_ratio(q3)
+    cusps[5] = (ic + sizes3[0]) % 360.0
+    cusps[6] = (cusps[5] + sizes3[1]) % 360.0
+
+    # Quadrant 4: Desc to MC (houses 8, 9)
+    sizes4 = calc_house_sizes_ratio(q4)
+    cusps[8] = (desc + sizes4[0]) % 360.0
+    cusps[9] = (cusps[8] + sizes4[1]) % 360.0
 
     return cusps
 

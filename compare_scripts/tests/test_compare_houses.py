@@ -18,7 +18,6 @@ import libephemeris as ephem
 HOUSE_CUSP_TOL = 0.001  # degrees
 ASCMC_TOL = 1.0  # degrees (relaxed for co-ascendants, etc.)
 GAUQUELIN_TOL = 180.0  # Gauquelin uses 36 sectors, not 12 houses
-SRIPATI_TOL = 60.0  # Sripati not fully implemented
 
 
 def angular_diff(val1: float, val2: float) -> float:
@@ -53,24 +52,21 @@ HOUSE_SYSTEMS = [
     ("N", "Natural Gradient"),
     ("Y", "APC Houses"),
     ("D", "Equal from MC"),
-    ("L", "Pulhemus"),
+    ("L", "Pullen SD"),
     ("S", "Sripati"),
     ("G", "Gauquelin"),
     ("I", "Sunshine/Makransky"),
-    ("Q", "Carter Poli-Equatorial (full)"),
+    ("Q", "Pullen SR"),
 ]
 
 # Systems with relaxed tolerances
 # These systems are not fully implemented or have different calculation methods
 RELAXED_SYSTEMS = {
     "G": GAUQUELIN_TOL,  # Gauquelin: 36 sectors in pyswisseph vs 12 cusps in libephemeris
-    "S": SRIPATI_TOL,  # Sripati: Not fully implemented
     "U": 1.0,  # Krusinski: Fully implemented, ~1° precision
     "Y": 1.0,  # APC: Fully implemented, ~1° precision
     "D": 30.0,  # Equal from MC: Different algorithm
     "I": 15.0,  # Sunshine/Makransky: Not fully implemented
-    "L": 20.0,  # Pulhemus: Not fully implemented
-    "Q": 20.0,  # Carter Poli-Equatorial (full): Not fully implemented
     # Koch has minor precision differences at high latitudes (>50°)
     # due to OA interval handling. Max error ~0.1° at extreme latitudes.
     "K": 0.15,
