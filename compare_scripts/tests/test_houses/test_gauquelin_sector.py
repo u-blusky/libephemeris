@@ -408,8 +408,8 @@ class TestGauquelinHousesFunction:
     """Test the _houses_gauquelin internal function for 36-sector division."""
 
     @pytest.mark.unit
-    def test_houses_gauquelin_returns_13_cusps(self):
-        """_houses_gauquelin should return 13 elements (index 0 unused, 1-12)."""
+    def test_houses_gauquelin_returns_37_sectors(self):
+        """_houses_gauquelin should return 37 elements (index 0 unused, 1-36 sectors)."""
         armc = 180.0
         lat = 48.85
         eps = 23.44
@@ -418,21 +418,17 @@ class TestGauquelinHousesFunction:
 
         cusps = _houses_gauquelin(armc, lat, eps, asc, mc)
 
-        assert len(cusps) == 13
-        # Cusps 1-12 should all be valid degrees
-        for i in range(1, 13):
-            assert 0.0 <= cusps[i] < 360.0, f"Cusp {i} invalid: {cusps[i]}"
+        assert len(cusps) == 37
+        # Sectors 1-36 should all be valid degrees
+        for i in range(1, 37):
+            assert 0.0 <= cusps[i] < 360.0, f"Sector {i} invalid: {cusps[i]}"
 
     @pytest.mark.unit
     def test_houses_gauquelin_maps_36_sectors_to_12_houses(self):
-        """Verify 36 sectors map to 12 houses (3 sectors per house)."""
-        # The implementation comment says:
-        # "Each house = 3 consecutive sectors, use middle sector as cusp"
-        # House 1 = sectors 1-3 (cusp at sector 2)
-        # House 2 = sectors 4-6 (cusp at sector 5)
-        # etc.
-
-        # This means 36 sectors / 3 = 12 houses
+        """Verify 36 sectors are returned with proper structure."""
+        # Gauquelin has 36 sectors, not 12 houses
+        # Sectors 1 and 19 are opposite (Asc/Desc)
+        # Sectors 10 and 28 are opposite (MC/IC)
 
         armc = 180.0
         lat = 45.0
@@ -442,17 +438,19 @@ class TestGauquelinHousesFunction:
 
         cusps = _houses_gauquelin(armc, lat, eps, asc, mc)
 
-        # All 12 houses should have distinct cusps
-        unique_cusps = set(round(c, 1) for c in cusps[1:13])
-        # Some cusps might be close but should generally be distinct
-        assert len(unique_cusps) >= 6, (
-            f"Expected more distinct cusps, got {unique_cusps}"
-        )
+        # Should have 37 elements (index 0 unused)
+        assert len(cusps) == 37
+
+        # Cardinal sectors should be at Asc, MC, Desc, IC
+        assert abs(cusps[1] - asc) < 0.01  # Sector 1 = Asc
+        assert abs(cusps[10] - mc) < 0.01  # Sector 10 = MC
+        assert abs(cusps[19] - (asc + 180) % 360) < 0.01  # Sector 19 = Desc
+        assert abs(cusps[28] - (mc + 180) % 360) < 0.01  # Sector 28 = IC
 
     @pytest.mark.unit
     def test_houses_gauquelin_polar_fallback(self):
-        """At polar latitudes, should fall back to Porphyry."""
-        # Within polar circle (|lat| >= 90 - eps), use Porphyry
+        """At polar latitudes, should fall back to equal division of 36 sectors."""
+        # Within polar circle (|lat| >= 90 - eps), use equal division
         armc = 180.0
         lat = 70.0  # Polar latitude
         eps = 23.44  # |70| + 23.44 > 90, so it's within polar circle
@@ -461,9 +459,9 @@ class TestGauquelinHousesFunction:
 
         cusps = _houses_gauquelin(armc, lat, eps, asc, mc)
 
-        # Should return valid cusps (Porphyry fallback)
-        assert len(cusps) == 13
-        for i in range(1, 13):
+        # Should return 37 elements (index 0 unused, 1-36 sectors)
+        assert len(cusps) == 37
+        for i in range(1, 37):
             assert 0.0 <= cusps[i] < 360.0
 
     @pytest.mark.unit
