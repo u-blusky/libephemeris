@@ -806,6 +806,8 @@ def swe_houses(
         cusps = _houses_pullen_sd(asc, mc)
     elif hsys_char == "Q":  # Pullen SR (Sinusoidal Ratio)
         cusps = _houses_pullen_sr(asc, mc)
+    elif hsys_char == "D":  # Equal from MC
+        cusps = _houses_equal_mc(asc, mc)
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -1329,6 +1331,8 @@ def swe_houses_armc(
         cusps = _houses_pullen_sd(asc, mc)
     elif hsys_char == "Q":  # Pullen SR (Sinusoidal Ratio)
         cusps = _houses_pullen_sr(asc, mc)
+    elif hsys_char == "D":  # Equal from MC
+        cusps = _houses_equal_mc(asc, mc)
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -3420,24 +3424,36 @@ def _houses_krusinski(
 
 def _houses_equal_mc(asc: float, mc: float) -> List[float]:
     """
-    Equal houses from MC (Axial Rotation system).
+    Equal houses from MC (code 'D').
 
-    This is the Equal house system variant where the MC is placed at the 10th house cusp,
-    but the Ascendant determines the starting point for the equal 30° divisions.
-    In practice, this produces the same cusps as Equal (Ascendant) since both
-    use the true Ascendant as the basis for equal divisions.
+    All houses are exactly 30° each, with the MC as the 10th house cusp.
+    Unlike Equal from Ascendant, the Ascendant is NOT a house cusp in this system.
+
+    Algorithm:
+        H10 = MC
+        H11 = MC + 30°
+        H12 = MC + 60°
+        H1 = MC + 90° (= MC - 270°)
+        ... and so on
+
+    Properties:
+        - Works at all latitudes
+        - MC is exactly on the 10th house cusp
+        - Ascendant does NOT coincide with the 1st house cusp (stored in ascmc)
 
     Args:
-        asc: Ascendant longitude in degrees (true calculated Ascendant)
+        asc: Ascendant longitude in degrees (unused, kept for API compatibility)
         mc: Midheaven longitude in degrees
 
     Returns:
         List of 13 house cusp longitudes
     """
     cusps = [0.0] * 13
-    # Use the true Ascendant (not an approximation)
+    # H10 = MC, then each house is 30° apart
+    # H1 = MC - 270° = MC + 90°
     for i in range(1, 13):
-        cusps[i] = (asc + (i - 1) * 30.0) % 360.0
+        # House 10 is at MC, so offset = (i - 10) * 30
+        cusps[i] = (mc + (i - 10) * 30.0) % 360.0
     return cusps
 
 
