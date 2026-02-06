@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-02-06
+
+### Added
+
+#### House Systems
+- New house systems: Sripati (`'O'`), Pullen Sinusoidal Delta (`'L'`), Pullen Sinusoidal Ratio (`'Q'`), and Sunshine/Makransky (`'I'`)
+- Gauquelin methods 2-5 now use actual rise/set times via `rise_trans()` for precise sector positions
+- Gauquelin sectors expanded from 12 to 36 (matching Swiss Ephemeris)
+
+#### Lunar Calculations
+- SE-compatible Mean Lilith algorithm using DE404 polynomial coefficients
+- ELP2000-82B perturbation series for interpolated apogee (0.10° mean error, 0.36° max vs SE)
+- Independent ELP2000-82B perturbation series for interpolated perigee (0.46° mean error, 2.6° max vs SE)
+
+### Changed
+
+#### Precision Improvements
+- **Interpolated Apogee**: 6x precision improvement (0.60° -> 0.10° mean error vs Swiss Ephemeris)
+- **Interpolated Perigee**: 4.6x precision improvement (2.11° -> 0.46° mean error vs Swiss Ephemeris)
+- **Nutation**: Upgraded from simplified 4-term model to full IAU 2000A (1365 terms) via Skyfield, improving from ~1 arcsec to sub-milliarcsecond precision
+- **Fixed star velocities**: Upgraded from forward differences O(h) to central differences O(h²), ~100x better numerical precision
+- **Campanus house_pos**: Fixed coordinate transformation, precision improved from 0.7° to 0.02° tolerance
+
+#### API Changes
+- `swe_gauquelin_sector()` now matches Swiss Ephemeris signature: `(tjdut, body, method, geopos, atpress, attemp, flags)`
+- Gauquelin methods 0-1 now use `house_pos()` with `'G'` system for exact SE compatibility
+
+### Fixed
+
+- Fixed Equal from MC (`'D'`) house system algorithm
+- Fixed Campanus `house_pos` meridian distance sign convention (uses SE's `cotrans` rotation formula)
+- Fixed Koch `house_pos` precision (~0.2° max remaining)
+- Fixed Mean Lilith latitude assertion (non-zero due to lunar orbital inclination ~5.145°)
+- Fixed type annotations in `houses.py` (`numpy.float64` -> `float`, `Optional[Union[...]]`)
+- Fixed "possibly unbound" variable in Placidus RA iteration
+
+### Documentation
+
+- Updated `PRECISION.md` with current interpolated apogee/perigee precision values
+- Updated `TODO_HOUSES.md` with completed house system improvements
+
 ## [0.7.0] - 2026-02-03
 
 ### Added
@@ -385,7 +426,10 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/g-battaglia/libephemeris/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/g-battaglia/libephemeris/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/g-battaglia/libephemeris/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/g-battaglia/libephemeris/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/g-battaglia/libephemeris/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/g-battaglia/libephemeris/compare/v0.3.0...v0.4.0
