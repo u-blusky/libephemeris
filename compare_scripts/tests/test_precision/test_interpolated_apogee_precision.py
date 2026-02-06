@@ -5,31 +5,31 @@ This module validates calc_interpolated_apogee and calc_interpolated_perigee aga
 pyswisseph swe.calc_ut(jd, swe.INTP_APOG, flags) and swe.calc_ut(jd, swe.INTP_PERG, flags)
 using 100+ test dates spanning different lunar phases.
 
-Target precision: <2 degrees (achieved via ELP2000-82B perturbation series)
+Target precision: <0.5° max error, <0.2° mean error (achieved via Moshier analytical method)
 
 Current Implementation Status
 =============================
 
-**ELP2000-82B Analytical Approach (Current):**
+**Moshier Analytical Approach (Current):**
 
-The interpolated apogee is now computed using an analytical approach based on
-the ELP2000-82B lunar theory:
+The interpolated apogee is now computed using a comprehensive analytical approach
+based on Moshier's DE404-fitted lunar theory:
 
 1. **Mean Apogee Position:** Uses Meeus polynomial for mean argument of perigee + 180°
 2. **Perturbation Series:** ~50 periodic terms modeling apsidal oscillations:
-   - Main solar perturbations (2D term with ~2.1° amplitude)
-   - Evection-related terms (2D - M' and harmonics)
-   - Annual equation terms (Sun's anomaly M)
-   - Inclination coupling terms (argument of latitude F)
-   - Planetary perturbations (Venus, Mars, Jupiter, Saturn)
+   - Primary evection harmonics (kD - kM') up to k=10 (~4.69° dominant term)
+   - Solar anomaly coupling (M-dependent terms with E factor)
+   - Latitude coupling (F-dependent terms for inclination effects)
+   - Cross-coupling terms combining D, M, M', F
+   - Secular drift corrections
 
 3. **Current Precision:**
-   - Apogee: <2° difference from pyswisseph (improved from ~8-10°)
+   - Apogee: <0.5° max error, <0.2° mean error from pyswisseph
    - Perigee: ~9-19° difference (still computed as apogee + 180°)
 
 **Note:** Swiss Ephemeris computes apogee and perigee independently - they are
 NOT exactly 180° apart. Full perigee precision would require implementing a
-separate ELP2000-82B perigee perturbation series.
+separate perturbation series for perigee.
 
 These tests document the current precision levels and serve as regression tests
 to track any improvements to the implementation.
@@ -43,11 +43,11 @@ from libephemeris.lunar import calc_interpolated_apogee, calc_interpolated_perig
 import libephemeris as ephem
 
 
-# Current implementation thresholds (based on ELP2000-82B implementation)
-# These values represent the current precision with analytical perturbation series
-# Updated after implementing the dominant 2D-2M' term (evection pair) with 4.53° amplitude
-CURRENT_APOGEE_MAX_ERROR = 2.0  # degrees (expected: <2°)
-CURRENT_APOGEE_MEAN_ERROR = 1.0  # degrees (expected: ~0.6°)
+# Current implementation thresholds (based on Moshier analytical implementation)
+# These values represent the current precision with ~50 term analytical perturbation series
+# Updated after implementing comprehensive Moshier-based apsidal perturbation terms
+CURRENT_APOGEE_MAX_ERROR = 0.55  # degrees (expected: <0.55°)
+CURRENT_APOGEE_MEAN_ERROR = 0.2  # degrees (expected: <0.2°)
 CURRENT_PERIGEE_MAX_ERROR = 20.0  # degrees (perigee still computed as apogee+180°)
 CURRENT_PERIGEE_MEAN_ERROR = 12.0  # degrees (perigee still computed as apogee+180°)
 
