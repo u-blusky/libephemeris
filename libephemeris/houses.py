@@ -69,7 +69,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 from .constants import *
 from .constants import SEFLG_SIDEREAL, SEFLG_SPEED, SEFLG_EQUATORIAL, SE_SUN
 from .state import get_timescale
@@ -557,7 +557,7 @@ def swe_houses(
     # equinox affected by nutation, providing ~0.015 arcsec precision in final cusps.
     # Skyfield GAST precision: ~0.001 seconds of time = ~0.015 arcsec in RA
     # Reference: Skyfield documentation, IAU SOFA standards (iau2000b nutation model)
-    gast = t.gast  # in hours
+    gast = float(t.gast)  # in hours (convert numpy.float64 to Python float)
     armc_deg = (gast * 15.0 + lon) % 360.0
 
     # True Obliquity of Ecliptic - uses cached nutation calculation
@@ -1743,6 +1743,7 @@ def _houses_placidus(
         # For 3: offset = 150
 
         ra = (armc + offset_deg) % 360.0
+        new_ra = ra  # Initialize for type safety
 
         # Iterate to convergence (typically 5-7 iterations, max 10 for safety)
         for _ in range(10):
@@ -1971,6 +1972,10 @@ def _houses_placidus(
             elif offset_deg == 150:  # House 3
                 h_deg = 1.0 * (90.0 - ad_deg) / 3.0
                 new_ra = (armc + 180.0 - h_deg) % 360.0
+
+            else:
+                # Should never reach here - all valid offsets are handled above
+                new_ra = ra  # Fallback to prevent unbound variable error
 
             # Update RA
             diff = abs(new_ra - ra)
@@ -4035,7 +4040,7 @@ def house_pos(
     lat: float,
     obliquity: float,
     hsys_or_objcoord: Union[int, bytes, str, Tuple[float, float]],
-    lon_or_hsys: Union[float, bytes, str] = None,
+    lon_or_hsys: Optional[Union[float, bytes, str]] = None,
     lat_body: float = 0.0,
 ) -> float:
     """
@@ -4209,40 +4214,46 @@ def house_pos(
 
     elif hsys_char == "C":
         # Campanus - transform to prime vertical
-        # swe_cotrans rotates around the x-axis by the given angle
-        # xeq[0] = mdd - 90, xeq[1] = de (declination)
-        xeq0 = (mdd - 90.0) % 360.0
+        # The Campanus system divides the prime vertical into 12 equal 30° arcs.
+        # For house_pos, we need to find the position of a body on the prime vertical.
+        #
+        # The transformation follows the Swiss Ephemeris swe_cotrans approach:
+        # 1. Input: (-mdd - 90, de) where mdd = meridian distance, de = declination
+        # 2. Apply SE's cotrans rotation by -geolat
+        # 3. Extract the resulting longitude as the prime vertical position
+        # Note: mdd = ra - armc in this function (opposite of SE's convention)
+        # so we use mdd - 90 instead of -mdd - 90
+
+        xeq0 = mdd - 90.0
         xeq1 = de
 
-        # swe_cotrans(xeq, xp, -geolat) - rotation around x-axis
+        # SE's swe_cotrans rotation formula (around x-axis with SE's sign convention):
+        # x2[0] = x[0]
+        # x2[1] = x[1] * cos(eps) + x[2] * sin(eps)
+        # x2[2] = -x[1] * sin(eps) + x[2] * cos(eps)
         xeq0_rad = math.radians(xeq0)
         xeq1_rad = math.radians(xeq1)
-        rot_angle = math.radians(-geolat)
+        rot_angle = math.radians(-geolat)  # SE uses -geolat
 
-        # Standard spherical rotation around x-axis:
-        # x' = x
-        # y' = y*cos(a) - z*sin(a)
-        # z' = y*sin(a) + z*cos(a)
-        # In spherical: lon' = atan2(y', x'), lat' = asin(z'/r)
+        cos_eps = math.cos(rot_angle)
+        sin_eps = math.sin(rot_angle)
         cos_xeq0 = math.cos(xeq0_rad)
         sin_xeq0 = math.sin(xeq0_rad)
         cos_xeq1 = math.cos(xeq1_rad)
         sin_xeq1 = math.sin(xeq1_rad)
-        cos_rot = math.cos(rot_angle)
-        sin_rot = math.sin(rot_angle)
 
         # Convert to Cartesian
-        x = cos_xeq1 * cos_xeq0
-        y = cos_xeq1 * sin_xeq0
-        z = sin_xeq1
+        x0 = cos_xeq1 * cos_xeq0
+        x1 = cos_xeq1 * sin_xeq0
+        x2 = sin_xeq1
 
-        # Rotate around x-axis
-        x_new = x
-        y_new = y * cos_rot - z * sin_rot
-        z_new = y * sin_rot + z * cos_rot
+        # SE's rotation around x-axis
+        x2_0 = x0
+        x2_1 = x1 * cos_eps + x2 * sin_eps
+        x2_2 = -x1 * sin_eps + x2 * cos_eps
 
-        # Convert back to spherical
-        xp0 = math.degrees(math.atan2(y_new, x_new))
+        # Convert back to spherical (longitude only needed)
+        xp0 = math.degrees(math.atan2(x2_1, x2_0))
         xp0 = (xp0 + MILLIARCSEC) % 360.0
         hpos = xp0 / 30.0 + 1.0
         return hpos
@@ -4332,7 +4343,7 @@ def swe_house_pos(
     lat: float,
     obliquity: float,
     hsys_or_objcoord: Union[int, bytes, str, Tuple[float, float]],
-    lon_or_hsys: Union[float, bytes, str] = None,
+    lon_or_hsys: Optional[Union[float, bytes, str]] = None,
     lat_body: float = 0.0,
 ) -> float:
     """
@@ -4364,6 +4375,203 @@ def swe_house_pos(
     """
     # Delegate to house_pos which now supports both calling conventions
     return house_pos(armc, lat, obliquity, hsys_or_objcoord, lon_or_hsys, lat_body)
+
+
+def _gauquelin_sector_from_rise_set(
+    jd: float,
+    planet: int,
+    lat: float,
+    lon: float,
+    altitude: float,
+    pressure: float,
+    temperature: float,
+    flags: int,
+    method: int,
+) -> float:
+    """
+    Calculate Gauquelin sector using actual rise/set times.
+
+    This implements methods 2-5 which use real rise/set event times
+    rather than the hour angle approximation.
+
+    Args:
+        jd: Julian Day in UT
+        planet: Planet ID
+        lat, lon: Observer location
+        altitude, pressure, temperature: Atmospheric parameters
+        flags: Calculation flags
+        method: 2=disc center no refraction, 3=disc center with refraction,
+                4=disc edge no refraction, 5=disc edge with refraction
+
+    Returns:
+        Sector position in range [1, 37)
+    """
+    from .eclipse import rise_trans
+    from .constants import (
+        SE_CALC_RISE,
+        SE_CALC_SET,
+        SE_BIT_DISC_CENTER,
+        SE_BIT_NO_REFRACTION,
+    )
+
+    def fallback() -> float:
+        """Fall back to method 0 (hour angle approximation)."""
+        return gauquelin_sector(
+            jd, planet, lat, lon, altitude, pressure, temperature, flags, 0
+        )
+
+    # Determine rise_trans flags based on method
+    rsmi_flags = 0
+    if method in (2, 3):  # Disc center
+        rsmi_flags |= SE_BIT_DISC_CENTER
+    # Methods 4, 5 use disc edge (upper limb) which is the default
+
+    if method in (2, 4):  # No refraction
+        rsmi_flags |= SE_BIT_NO_REFRACTION
+    # Methods 3, 5 include refraction (default when flag not set)
+
+    # Strategy: Find the next rise and next set after jd, then find the
+    # previous rise and set by searching ~1.5 days before those.
+    # Compare which previous event is more recent to determine if
+    # planet is above or below horizon.
+
+    try:
+        # Find next rise after jd
+        jd_next_rise, retflag = rise_trans(
+            jd,
+            planet,
+            lat,
+            lon,
+            altitude,
+            pressure,
+            temperature,
+            flags,
+            SE_CALC_RISE | rsmi_flags,
+        )
+        if retflag == -2:
+            return fallback()  # Circumpolar
+
+        # Find next set after jd
+        jd_next_set, retflag = rise_trans(
+            jd,
+            planet,
+            lat,
+            lon,
+            altitude,
+            pressure,
+            temperature,
+            flags,
+            SE_CALC_SET | rsmi_flags,
+        )
+        if retflag == -2:
+            return fallback()  # Circumpolar
+
+        # Find previous rise before jd by searching before the next rise
+        # (planets rise roughly once per day, so ~1.5 days before next rise
+        # should find the previous rise)
+        jd_prev_rise, retflag = rise_trans(
+            jd_next_rise - 1.5,
+            planet,
+            lat,
+            lon,
+            altitude,
+            pressure,
+            temperature,
+            flags,
+            SE_CALC_RISE | rsmi_flags,
+        )
+        if retflag == -2:
+            return fallback()
+        # Verify this rise is actually before jd
+        if jd_prev_rise >= jd:
+            # Try searching earlier
+            jd_prev_rise, retflag = rise_trans(
+                jd_next_rise - 2.5,
+                planet,
+                lat,
+                lon,
+                altitude,
+                pressure,
+                temperature,
+                flags,
+                SE_CALC_RISE | rsmi_flags,
+            )
+            if retflag == -2 or jd_prev_rise >= jd:
+                return fallback()
+
+        # Find previous set before jd by searching before the next set
+        jd_prev_set, retflag = rise_trans(
+            jd_next_set - 1.5,
+            planet,
+            lat,
+            lon,
+            altitude,
+            pressure,
+            temperature,
+            flags,
+            SE_CALC_SET | rsmi_flags,
+        )
+        if retflag == -2:
+            return fallback()
+        # Verify this set is actually before jd
+        if jd_prev_set >= jd:
+            # Try searching earlier
+            jd_prev_set, retflag = rise_trans(
+                jd_next_set - 2.5,
+                planet,
+                lat,
+                lon,
+                altitude,
+                pressure,
+                temperature,
+                flags,
+                SE_CALC_SET | rsmi_flags,
+            )
+            if retflag == -2 or jd_prev_set >= jd:
+                return fallback()
+
+    except Exception:
+        return fallback()
+
+    # Determine if planet is above or below horizon:
+    # If the most recent event before jd was a rise, planet is above horizon.
+    # If the most recent event before jd was a set, planet is below horizon.
+    if jd_prev_rise > jd_prev_set:
+        # Planet rose more recently than it set -> above horizon (sectors 1-18)
+        # Diurnal arc runs from jd_prev_rise to jd_next_set
+        diurnal_arc = jd_next_set - jd_prev_rise
+        if diurnal_arc <= 0:
+            return fallback()
+
+        elapsed = jd - jd_prev_rise
+        fraction = elapsed / diurnal_arc
+        # Clamp fraction to [0, 1] for safety
+        fraction = max(0.0, min(1.0, fraction))
+
+        # Sector 1 is at rise, sector 10 is at MC, sector 18+ is near set
+        sector = 1.0 + fraction * 18.0
+    else:
+        # Planet set more recently than it rose -> below horizon (sectors 19-36)
+        # Nocturnal arc runs from jd_prev_set to jd_next_rise
+        nocturnal_arc = jd_next_rise - jd_prev_set
+        if nocturnal_arc <= 0:
+            return fallback()
+
+        elapsed = jd - jd_prev_set
+        fraction = elapsed / nocturnal_arc
+        # Clamp fraction to [0, 1] for safety
+        fraction = max(0.0, min(1.0, fraction))
+
+        # Sector 19 is at set, sector 28 is at IC, sector 36 is near next rise
+        sector = 19.0 + fraction * 18.0
+
+    # Normalize to range [1, 37)
+    if sector >= 37.0:
+        sector -= 36.0
+    elif sector < 1.0:
+        sector += 36.0
+
+    return sector
 
 
 def gauquelin_sector(
@@ -4412,71 +4620,37 @@ def gauquelin_sector(
         Integer part is sector number (1-36), decimal part is position within sector.
 
     Note:
-        Methods 2-5 are currently approximated using method 0 (with latitude).
-        For precise rise/set calculations, specialized algorithms would be needed.
+        Methods 2-5 use actual rise/set times calculated via rise_trans().
+        These methods may be slower than methods 0-1 but provide more
+        accurate sector positions based on real rise/set events.
+
+        For circumpolar objects (that never rise or set at the given
+        latitude), methods 2-5 fall back to method 0.
 
     Example:
         >>> sector = gauquelin_sector(2451545.0, SE_MARS, 48.85, 2.35)
         >>> print(f"Mars is in sector {int(sector)}")
     """
+    # Methods 2-5: Use actual rise/set times
+    if method in (2, 3, 4, 5):
+        return _gauquelin_sector_from_rise_set(
+            jd, planet, lat, lon, altitude, pressure, temperature, flags, method
+        )
+
+    # Methods 0-1: Use house_pos with Gauquelin house system ('G')
+    # This matches Swiss Ephemeris behavior exactly
     from .planets import swe_calc_ut
     from .cache import get_true_obliquity
 
     ts = get_timescale()
     t = ts.ut1_jd(jd)
 
-    # Calculate obliquity of ecliptic (uses cached nutation calculation)
+    # Calculate obliquity of ecliptic
     eps = get_true_obliquity(t.tt)
 
     # Calculate ARMC (sidereal time at location)
-    gast = t.gast  # in hours
+    gast = float(t.gast)  # in hours
     armc_deg = (gast * 15.0 + lon) % 360.0
-
-    # Calculate Ascendant and MC
-    mc_rad = math.atan2(math.tan(math.radians(armc_deg)), math.cos(math.radians(eps)))
-    mc = math.degrees(mc_rad)
-    if mc < 0:
-        mc += 360.0
-
-    if 90.0 < armc_deg <= 270.0:
-        if mc < 90.0 or mc > 270.0:
-            mc += 180.0
-    elif armc_deg > 270.0:
-        if mc < 270.0:
-            mc += 180.0
-    elif armc_deg <= 90.0:
-        if mc > 90.0:
-            mc += 180.0
-
-    mc = mc % 360.0
-
-    # Calculate Ascendant
-    num = math.cos(math.radians(armc_deg))
-    den = -(
-        math.sin(math.radians(armc_deg)) * math.cos(math.radians(eps))
-        + math.tan(math.radians(lat)) * math.sin(math.radians(eps))
-    )
-    asc_rad = math.atan2(num, den)
-    asc = math.degrees(asc_rad) % 360.0
-
-    # Ensure Ascendant is on the Eastern Horizon
-    asc_r = math.radians(asc)
-    eps_r = math.radians(eps)
-
-    # RA
-    y = math.cos(eps_r) * math.sin(asc_r)
-    x = math.cos(asc_r)
-    ra_r = math.atan2(y, x)
-    ra = math.degrees(ra_r) % 360.0
-
-    # Dec
-    dec_r = math.asin(math.sin(eps_r) * math.sin(asc_r))
-
-    # Hour Angle
-    h_deg = (armc_deg - ra + 360.0) % 360.0
-
-    if 0.0 < h_deg < 180.0:
-        asc = (asc + 180.0) % 360.0
 
     # Get planet position
     pos, retflag = swe_calc_ut(jd, planet, flags | SEFLG_SPEED)
@@ -4487,148 +4661,66 @@ def gauquelin_sector(
     if method == 1:
         planet_lat = 0.0
 
-    # Calculate planet's RA and declination
-    # Convert ecliptic (lon, lat) to equatorial (RA, Dec)
-    lon_rad = math.radians(planet_lon)
-    lat_rad_planet = math.radians(planet_lat)
-    eps_rad = math.radians(eps)
-
-    # Conversion formulas for ecliptic to equatorial
-    sin_dec = math.sin(lat_rad_planet) * math.cos(eps_rad) + math.cos(
-        lat_rad_planet
-    ) * math.sin(eps_rad) * math.sin(lon_rad)
-    dec_planet_rad = math.asin(sin_dec)
-
-    y_ra = math.sin(lon_rad) * math.cos(eps_rad) - math.tan(lat_rad_planet) * math.sin(
-        eps_rad
-    )
-    x_ra = math.cos(lon_rad)
-    ra_planet = math.degrees(math.atan2(y_ra, x_ra)) % 360.0
-
-    # Calculate hour angle of the planet
-    # H = ARMC - RA (hour angle increases westward)
-    h_planet = (armc_deg - ra_planet + 360.0) % 360.0
-
-    # Calculate the semi-diurnal arc for this planet's declination
-    # This accounts for the actual time the planet spends above/below horizon
-    lat_rad = math.radians(lat)
-    tan_product = math.tan(lat_rad) * math.tan(dec_planet_rad)
-
-    # Check for circumpolar or never-rising conditions
-    if tan_product >= 1.0:
-        # Planet is always above horizon (circumpolar)
-        # All 36 sectors are diurnal
-        h_rise = 0.0
-        h_set = 360.0
-        semi_diurnal_arc = 180.0
-    elif tan_product <= -1.0:
-        # Planet never rises (always below horizon)
-        # All 36 sectors are nocturnal
-        h_rise = 180.0
-        h_set = 180.0
-        semi_diurnal_arc = 0.0
-    else:
-        # Normal case: calculate rising/setting hour angles
-        # cos(H) = -tan(lat) * tan(dec)
-        cos_h = -tan_product
-        h_half = math.degrees(math.acos(cos_h))
-        # Rising occurs at H = 360 - h_half, Setting at H = h_half
-        h_rise = (360.0 - h_half) % 360.0  # Hour angle at rising (east)
-        h_set = h_half  # Hour angle at setting (west)
-        semi_diurnal_arc = h_half  # Half the arc above horizon
-
-    # Gauquelin sectors:
-    # - Sector 1: Rising (Asc, H = h_rise)
-    # - Sector 10: Culminating (MC, H = 0)
-    # - Sector 19: Setting (Desc, H = h_set)
-    # - Sector 28: Anti-culminating (IC, H = 180)
-    #
-    # Above horizon: H goes from h_rise -> 0 -> h_set (sectors 1-18)
-    # Below horizon: H goes from h_set -> 180 -> h_rise (sectors 19-36)
-
-    # Normalize hour angle to check which half of the sky
-    # Above horizon when H is between h_rise (going through 0) and h_set
-    if h_rise > h_set:
-        # Normal case: h_rise is near 360, h_set is positive
-        is_above = h_planet >= h_rise or h_planet <= h_set
-    else:
-        # Edge case (shouldn't happen in normal circumstances)
-        is_above = h_planet >= h_rise and h_planet <= h_set
-
-    if is_above:
-        # Planet is above horizon (sectors 1-18)
-        # H goes from h_rise -> 0 (first half) -> h_set (second half)
-        # Total arc is 2 * semi_diurnal_arc
-        total_diurnal = 2.0 * semi_diurnal_arc if semi_diurnal_arc > 0 else 360.0
-
-        # Calculate position in diurnal arc
-        # From h_rise towards 0 towards h_set
-        if h_planet >= h_rise:
-            # First half: from h_rise towards 0
-            position = (h_rise - h_planet + 360.0) % 360.0
-            if position > 180:
-                position = 360.0 - h_planet
-        else:
-            # Could be first half (near 0) or second half (towards h_set)
-            position = (360.0 - h_rise + h_planet) % 360.0
-
-        # Normalize to fraction of diurnal arc
-        if total_diurnal > 0:
-            fraction = position / total_diurnal
-        else:
-            fraction = 0.5
-
-        sector = 1.0 + fraction * 18.0
-    else:
-        # Planet is below horizon (sectors 19-36)
-        # H goes from h_set -> 180 -> h_rise
-        total_nocturnal = (
-            360.0 - 2.0 * semi_diurnal_arc if semi_diurnal_arc < 180 else 360.0
-        )
-
-        # Calculate position in nocturnal arc
-        if h_planet > h_set and h_planet <= 180.0:
-            position = h_planet - h_set
-        elif h_planet > 180.0 and h_planet < h_rise:
-            position = h_planet - h_set
-        else:
-            position = (h_planet - h_set + 360.0) % 360.0
-
-        # Normalize to fraction of nocturnal arc
-        if total_nocturnal > 0:
-            fraction = position / total_nocturnal
-        else:
-            fraction = 0.5
-
-        sector = 19.0 + fraction * 18.0
-
-    # Normalize to range [1, 37)
-    if sector >= 37.0:
-        sector -= 36.0
-    if sector < 1.0:
-        sector += 36.0
+    # Use house_pos with 'G' (Gauquelin sectors) to get the sector position
+    # house_pos returns values in [1, 37) for Gauquelin
+    sector = house_pos(armc_deg, lat, eps, (planet_lon, planet_lat), "G")
 
     return sector
 
 
 def swe_gauquelin_sector(
-    jd: float,
-    planet: int,
-    lat: float,
-    lon: float,
-    altitude: float = 0.0,
-    pressure: float = 1013.25,
-    temperature: float = 15.0,
+    tjdut: float,
+    body: int,
+    method: int,
+    geopos: tuple[float, float, float],
+    atpress: float = 0.0,
+    attemp: float = 0.0,
     flags: int = 0,
-    method: int = 0,
 ) -> float:
     """
     Calculate the Gauquelin sector (1-36) in which a planet is located.
 
-    Swiss Ephemeris compatible function. This is an alias for gauquelin_sector().
+    Swiss Ephemeris compatible function signature.
 
-    See gauquelin_sector() for detailed documentation.
+    Args:
+        tjdut: Julian Day number in Universal Time (UT)
+        body: Planet number (SE_SUN, SE_MOON, etc.)
+        method: Calculation method:
+            - 0: with latitude
+            - 1: without latitude
+            - 2: from rising/setting times of disc center of planet
+            - 3: from rising/setting times of disc center, incl. refraction
+            - 4: from rising/setting times of disk edge of planet
+            - 5: from rising/setting times of disk edge, incl. refraction
+        geopos: Tuple of (longitude, latitude, altitude):
+            - longitude: geographic longitude in degrees (eastern positive)
+            - latitude: geographic latitude in degrees (northern positive)
+            - altitude: geographic altitude in meters above sea level
+        atpress: Atmospheric pressure in mbar (if 0, default 1013.25 is used)
+        attemp: Atmospheric temperature in degrees Celsius (if 0, default 15 is used)
+        flags: Bit flags for ephemeris (SEFLG_SWIEPH, etc.)
+
+    Returns:
+        Sector position as float in range [1, 37).
+        Integer part is sector number (1-36), decimal part is position within sector.
+
+    Note:
+        This function matches the Swiss Ephemeris swe_gauquelin_sector() signature.
+        Sectors are numbered clockwise from the Ascendant:
+        - Sector 1: Rising (Ascendant)
+        - Sector 10: Upper culmination (MC)
+        - Sector 19: Setting (Descendant)
+        - Sector 28: Lower culmination (IC)
+
+    Example:
+        >>> geopos = (2.35, 48.85, 0.0)  # Paris: (lon, lat, alt)
+        >>> sector = swe_gauquelin_sector(2451545.0, SE_MARS, 0, geopos)
     """
+    lon, lat, altitude = geopos
+    # Use defaults if 0 is passed (matching Swiss Ephemeris behavior)
+    pressure = atpress if atpress != 0.0 else 1013.25
+    temperature = attemp if attemp != 0.0 else 15.0
+
     return gauquelin_sector(
-        jd, planet, lat, lon, altitude, pressure, temperature, flags, method
+        tjdut, body, lat, lon, altitude, pressure, temperature, flags, method
     )

@@ -66,7 +66,9 @@ class TestGauquelinSectorBasic:
         lon = 2.35
 
         result1 = ephem.gauquelin_sector(jd, SE_MARS, lat, lon)
-        result2 = ephem.swe_gauquelin_sector(jd, SE_MARS, lat, lon)
+        # swe_gauquelin_sector uses SE-compatible signature: (jd, body, method, geopos)
+        geopos = (lon, lat, 0.0)
+        result2 = ephem.swe_gauquelin_sector(jd, SE_MARS, 0, geopos)
 
         assert result1 == result2
 

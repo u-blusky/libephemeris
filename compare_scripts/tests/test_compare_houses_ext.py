@@ -32,11 +32,11 @@ class HouseExtTolerance:
     """Tolerance thresholds for extended house comparisons."""
 
     CUSP_DEGREES = 0.002  # House cusp (relaxed for Koch precision at certain angles)
-    # house_pos with Placidus/Regiomontanus is now precise with body latitude.
-    # Koch and Campanus have coordinate transformation issues in house_pos.
-    POSITION = 0.02  # House position for P, R
+    # house_pos with Placidus/Regiomontanus/Campanus is now precise with body latitude.
+    # Koch has minor coordinate transformation issues in house_pos.
+    POSITION = 0.02  # House position for P, R, C
     POSITION_KOCH = 0.25  # Koch has minor coordinate transform issues (~0.2° max)
-    POSITION_CAMPANUS = 0.7  # Campanus has coordinate transform issues (~0.5° max)
+    POSITION_CAMPANUS = 0.02  # Campanus now matches Swiss Ephemeris precisely
     SECTOR = 0.1  # Gauquelin sector
 
 
