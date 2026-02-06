@@ -1075,6 +1075,87 @@ def get_iers_delta_t_enabled() -> bool:
 
 
 # =============================================================================
+# STRICT PRECISION MODE
+# =============================================================================
+
+# Global state for strict precision mode
+_STRICT_PRECISION: Optional[bool] = None
+
+# Environment variable name
+_STRICT_PRECISION_ENV_VAR = "LIBEPHEMERIS_STRICT_PRECISION"
+
+
+def set_strict_precision(enabled: Optional[bool]) -> None:
+    """Enable or disable strict precision mode for major asteroids.
+
+    When strict precision mode is enabled (the default), libephemeris will
+    raise SPKRequiredError when calculating positions for major asteroids
+    (Ceres, Pallas, Juno, Vesta, Chiron) without an SPK kernel registered.
+
+    These bodies have strongly perturbed orbits that cannot be accurately
+    modeled with Keplerian elements. The fallback Keplerian calculation can
+    have errors of 1-10 degrees, which is unacceptable for most applications.
+
+    Args:
+        enabled: True to enable strict mode, False to disable,
+                 None to reset to default (check environment variable).
+
+    Example:
+        >>> import libephemeris as eph
+        >>> eph.set_strict_precision(True)  # Require SPK for major asteroids
+        >>> eph.set_strict_precision(False)  # Allow Keplerian fallback
+        >>> eph.set_strict_precision(None)  # Reset to default/env var
+
+    See Also:
+        get_strict_precision: Get current strict precision setting
+        set_auto_spk_download: Enable automatic SPK downloading
+        download_and_register_spk: Manually download and register SPK
+    """
+    global _STRICT_PRECISION
+    _STRICT_PRECISION = enabled
+
+
+def get_strict_precision() -> bool:
+    """Get whether strict precision mode is enabled.
+
+    In strict precision mode, SPK kernels are required for major asteroids
+    (Ceres, Pallas, Juno, Vesta, Chiron). Without SPK, SPKRequiredError is
+    raised instead of falling back to imprecise Keplerian calculations.
+
+    Returns:
+        True if strict precision mode is enabled, False otherwise.
+
+    Note:
+        - If set_strict_precision() was called with an explicit value, returns that.
+        - Otherwise, checks the LIBEPHEMERIS_STRICT_PRECISION environment variable.
+        - If the environment variable is not set, returns True (enabled by default).
+        - Set LIBEPHEMERIS_STRICT_PRECISION=0 to disable strict mode via env var.
+
+    Example:
+        >>> from libephemeris import get_strict_precision
+        >>> get_strict_precision()  # Default is True
+        True
+        >>> import os
+        >>> os.environ['LIBEPHEMERIS_STRICT_PRECISION'] = '0'
+        >>> get_strict_precision()  # Now disabled via env var
+        False
+    """
+    # If explicitly set via function, use that value
+    if _STRICT_PRECISION is not None:
+        return _STRICT_PRECISION
+
+    # Otherwise check environment variable
+    env_value = os.environ.get(_STRICT_PRECISION_ENV_VAR, "").lower().strip()
+
+    # If env var explicitly disables, return False
+    if env_value in ("0", "false", "no", "off", "disabled"):
+        return False
+
+    # Default to True (strict mode enabled)
+    return True
+
+
+# =============================================================================
 # SPK KERNEL MANAGEMENT
 # =============================================================================
 

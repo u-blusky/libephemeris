@@ -14,6 +14,27 @@ from libephemeris.constants import *
 
 
 # ============================================================================
+# GLOBAL SETUP - Disable strict precision for test suite
+# ============================================================================
+# By default, strict precision mode is enabled which requires SPK kernels for
+# major asteroids (Chiron, Ceres, etc.). Most tests are designed to test the
+# Keplerian fallback behavior, so we disable strict mode globally.
+# Tests that specifically test strict mode should enable it explicitly.
+
+
+@pytest.fixture(autouse=True)
+def disable_strict_precision_for_tests():
+    """Disable strict precision mode for all tests by default."""
+    # Save current state
+    original = ephem.get_strict_precision()
+    # Disable strict mode for tests
+    ephem.set_strict_precision(False)
+    yield
+    # Restore original state
+    ephem.set_strict_precision(original if original else None)
+
+
+# ============================================================================
 # TEST DATA FIXTURES
 # ============================================================================
 

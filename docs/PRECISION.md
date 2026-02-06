@@ -343,14 +343,14 @@ LibEphemeris supports two methods for calculating asteroid positions:
 
 | Asteroid | Precision | Notes |
 |----------|-----------|-------|
-| Chiron | ~1° | Keplerian approximation |
+| Chiron | <1 arcsec | Requires SPK (strict mode) |
 | Pholus | ~1° | Keplerian approximation |
-| Ceres | ~0.1° | Keplerian + secular perturbations |
-| Pallas | ~5° | High inclination causes larger errors |
-| Juno | ~0.1° | Keplerian + secular perturbations |
-| Vesta | ~0.1° | Keplerian + secular perturbations |
+| Ceres | <1 arcsec | Requires SPK (strict mode) |
+| Pallas | <1 arcsec | Requires SPK (strict mode) |
+| Juno | <1 arcsec | Requires SPK (strict mode) |
+| Vesta | <1 arcsec | Requires SPK (strict mode) |
 
-**Note**: Keplerian (two-body) orbital propagation does not account for planetary perturbations. Errors grow over time, especially for dates far from the orbital elements epoch (2025.0).
+**Note**: Major asteroids (Chiron, Ceres, Pallas, Juno, Vesta) require SPK kernels in strict precision mode (the default). If strict mode is disabled, these bodies fall back to Keplerian approximation with errors of 1-10 degrees.
 
 #### Method 2: SPK Kernels (High Precision)
 
@@ -378,6 +378,34 @@ spk_auto.enable_common_bodies()  # Ceres, Pallas, Juno, Vesta, Chiron, Pholus
 ```
 
 When SPK is enabled, `swe_calc_ut()` automatically uses SPK precision instead of Keplerian.
+
+#### Strict Precision Mode (Default)
+
+By default, LibEphemeris operates in **strict precision mode**, which requires SPK kernels for major asteroids (Chiron, Ceres, Pallas, Juno, Vesta). This prevents accidentally using the low-precision Keplerian fallback for these bodies, which can have errors of 1-10 degrees.
+
+```python
+import libephemeris as eph
+
+# Default: strict mode is enabled
+eph.get_strict_precision()  # Returns True
+
+# Attempting to calculate Chiron without SPK raises SPKRequiredError
+try:
+    eph.calc_ut(jd, eph.SE_CHIRON, 0)
+except eph.SPKRequiredError as e:
+    print(f"SPK required: {e.body_name}")
+
+# Option 1: Enable auto-download (recommended)
+eph.set_auto_spk_download(True)
+
+# Option 2: Disable strict mode (not recommended - allows 1-10° errors)
+eph.set_strict_precision(False)
+
+# Option 3: Use environment variable
+# LIBEPHEMERIS_STRICT_PRECISION=0 python myapp.py
+```
+
+**Why strict mode?** Centaurs like Chiron have strongly perturbed orbits between Saturn and Uranus. Simple Keplerian propagation ignores planetary gravitational effects, resulting in position errors that can exceed 10 degrees over long time spans. Strict mode ensures you always get sub-arcsecond precision for these critical bodies.
 
 ### Trans-Neptunian Objects (TNOs)
 

@@ -11,6 +11,7 @@ from .exceptions import (
     UnknownBodyError,
     StarNotFoundError,
     SPKNotFoundError,
+    SPKRequiredError,
     # Category: Calculation errors
     CalculationError,
     PolarCircleError,
@@ -117,6 +118,9 @@ from .state import (
     # IERS Delta T configuration
     set_iers_delta_t_enabled,
     get_iers_delta_t_enabled,
+    # Strict precision mode
+    set_strict_precision,
+    get_strict_precision,
 )
 from .iers_data import (
     # IERS data download functions
@@ -590,6 +594,7 @@ __all__ = [
     "UnknownBodyError",
     "StarNotFoundError",
     "SPKNotFoundError",
+    "SPKRequiredError",
     # Exceptions - Calculation Category
     "CalculationError",
     "PolarCircleError",
@@ -959,6 +964,9 @@ __all__ = [
     # IERS Delta T configuration
     "set_iers_delta_t_enabled",
     "get_iers_delta_t_enabled",
+    # Strict precision mode
+    "set_strict_precision",
+    "get_strict_precision",
     # IERS data download functions
     "download_iers_finals",
     "download_leap_seconds",

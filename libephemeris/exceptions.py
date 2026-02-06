@@ -421,6 +421,92 @@ class SPKNotFoundError(DataNotFoundError):
         )
 
 
+class SPKRequiredError(DataNotFoundError):
+    """Error raised when SPK is required for precision but not available.
+
+    This exception is raised in strict precision mode when calculating
+    positions for major asteroids (Ceres, Pallas, Juno, Vesta, Chiron)
+    without an SPK kernel registered. These bodies require SPK data for
+    accurate calculations; the Keplerian fallback can have errors of
+    several degrees.
+
+    Attributes:
+        body_id: The libephemeris body ID (SE_CHIRON, SE_CERES, etc.)
+        body_name: Human-readable name of the body
+        message: Human-readable error message with instructions
+
+    Example:
+        >>> import libephemeris as eph
+        >>> eph.set_strict_precision(True)  # Enable strict mode
+        >>> try:
+        ...     eph.calc_ut(jd, eph.SE_CHIRON, 0)  # No SPK registered
+        ... except eph.SPKRequiredError as e:
+        ...     print(f"SPK required for {e.body_name}")
+        ...     # Either register SPK or disable strict mode
+
+    See Also:
+        set_strict_precision: Enable/disable strict precision mode
+        download_and_register_spk: Download and register SPK for a body
+        set_auto_spk_download: Enable automatic SPK downloading
+    """
+
+    def __init__(
+        self,
+        message: str,
+        body_id: int | None = None,
+        body_name: str | None = None,
+    ):
+        super().__init__(message)
+        self.body_id = body_id
+        self.body_name = body_name
+        self.message = message
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"SPKRequiredError({self.message!r}, "
+            f"body_id={self.body_id}, body_name={self.body_name!r})"
+        )
+
+    @classmethod
+    def for_body(
+        cls,
+        body_id: int,
+        body_name: str,
+        horizons_id: str,
+    ) -> "SPKRequiredError":
+        """Create an SPKRequiredError with helpful instructions.
+
+        Args:
+            body_id: libephemeris body ID (SE_CHIRON, etc.)
+            body_name: Human-readable body name
+            horizons_id: JPL Horizons identifier for downloading
+
+        Returns:
+            SPKRequiredError with formatted instructions
+        """
+        lines = [
+            f"SPK kernel required for {body_name} (strict precision mode is enabled).",
+            "",
+            "The Keplerian fallback for this body can have errors of 1-10 degrees.",
+            "For accurate calculations, you must either:",
+            "",
+            "1. Download and register SPK:",
+            f'   >>> eph.download_and_register_spk("{horizons_id}", eph.SE_{body_name.upper()}, '
+            f'"1900-01-01", "2100-01-01")',
+            "",
+            "2. Enable automatic SPK download:",
+            "   >>> eph.set_auto_spk_download(True)",
+            "",
+            "3. Disable strict precision mode (not recommended):",
+            "   >>> eph.set_strict_precision(False)",
+        ]
+        message = "\n".join(lines)
+        return cls(message=message, body_id=body_id, body_name=body_name)
+
+
 # =============================================================================
 # CATEGORY: CALCULATION ERRORS
 # =============================================================================

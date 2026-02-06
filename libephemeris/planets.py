@@ -1356,7 +1356,8 @@ def _calc_body(
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
         # Try SPK kernel first (high precision)
         from . import spk
-        from .state import get_auto_spk_download
+        from .state import get_auto_spk_download, get_strict_precision
+        from .exceptions import SPKRequiredError
 
         spk_result = spk.calc_spk_body_position(t, ipl, iflag)
         if spk_result is not None:
@@ -1369,8 +1370,15 @@ def _calc_body(
                 if spk_result is not None:
                     return spk_result, iflag
             except Exception:
-                # If auto-download fails, silently fall back to Keplerian
+                # If auto-download fails, continue to strict precision check
                 pass
+
+        # For major asteroids in strict precision mode, require SPK
+        if get_strict_precision() and minor_bodies.is_major_asteroid(ipl):
+            info = minor_bodies.get_major_asteroid_info(ipl)
+            if info is not None:
+                _, horizons_id, _, body_name = info
+                raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
 
         # Fallback to Keplerian approximation
         jd_tt = t.tt
