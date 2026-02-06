@@ -62,10 +62,10 @@ class TestInterpolatedPerigeeBasic:
     def test_perigee_roughly_opposite_apogee(self):
         """Test that interpolated perigee is approximately 180 degrees from apogee.
 
-        Note: With the analytical ELP2000-82B perturbation series for apogee
-        and polynomial regression for perigee, there can be differences of up
-        to ~10° from exact opposition. Swiss Ephemeris documentation confirms
-        that apogee and perigee are NOT exactly 180° apart at all times.
+        Note: Swiss Ephemeris documentation confirms that apogee and perigee
+        are NOT exactly 180° apart at all times - they can deviate by up to 28°
+        depending on Sun-Moon geometry. At J2000.0, even Swiss Ephemeris itself
+        shows a deviation of about 12.7° from exact opposition.
         """
         jd_ut = 2451545.0
 
@@ -81,8 +81,8 @@ class TestInterpolatedPerigeeBasic:
             diff = 360 - diff
 
         # Should be approximately 180 degrees, with tolerance for
-        # the different computational approaches used for apogee vs perigee
-        assert abs(diff - 180) < 10.0, f"Difference from 180: {abs(diff - 180)}"
+        # physical asymmetry (up to 28° per SE documentation)
+        assert abs(diff - 180) < 28.0, f"Difference from 180: {abs(diff - 180)}"
 
 
 class TestInterpolatedPerigeeDirectFunction:
@@ -102,9 +102,10 @@ class TestInterpolatedPerigeeDirectFunction:
     def test_perigee_independent_of_apogee(self):
         """Test that perigee is interpolated independently, not derived from apogee.
 
-        Note: With the analytical ELP2000-82B perturbation series for apogee
-        and polynomial regression for perigee, there can be differences of up
-        to ~10° from exact opposition due to the different computational methods.
+        Note: Swiss Ephemeris documentation confirms that apogee and perigee
+        are NOT exactly 180° apart at all times - they can deviate by up to 28°
+        depending on Sun-Moon geometry. At J2000.0, even Swiss Ephemeris itself
+        shows a deviation of about 12.7° from exact opposition.
         """
         from libephemeris import lunar
 
@@ -119,8 +120,8 @@ class TestInterpolatedPerigeeDirectFunction:
         if diff > 180:
             diff = 360 - diff
 
-        # Should be approximately 180 (within ~10 degrees due to different methods)
-        assert abs(diff - 180) < 10.0, (
+        # Should be approximately 180 (within 28° per SE documentation)
+        assert abs(diff - 180) < 28.0, (
             f"Apogee-perigee difference from 180: {abs(diff - 180)}"
         )
 

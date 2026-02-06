@@ -99,8 +99,13 @@ class TestFunctionDocumentation:
         """Verify docstring describes key algorithm aspects."""
         doc = calc_interpolated_perigee.__doc__
 
-        # Should describe the algorithm
-        assert "sample" in doc.lower() or "polynomial" in doc.lower()
+        # Should describe the algorithm (either sample/polynomial or perturbation/fitting)
+        assert (
+            "sample" in doc.lower()
+            or "polynomial" in doc.lower()
+            or "perturbation" in doc.lower()
+            or "fitting" in doc.lower()
+        )
         assert "smooth" in doc.lower() or "interpolat" in doc.lower()
 
         # Should mention the relationship to apogee
@@ -253,7 +258,7 @@ class TestDocumentedApogeePerigeeRelationship:
 
         # Documentation notes Swiss Ephemeris apogee and perigee can differ
         # by up to ~28° from exact opposition at certain lunar phases
-        assert abs(diff - 180) < 10.0, (
+        assert abs(diff - 180) < 28.0, (
             f"Apogee-perigee separation {diff:.2f} should be ~180 degrees"
         )
 

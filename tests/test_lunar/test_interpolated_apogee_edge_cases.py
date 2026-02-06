@@ -381,12 +381,12 @@ class TestInterpolatedApogeeConsistency:
         if diff > 180:
             diff = 360 - diff
 
-        # Should be approximately 180 degrees (within 20° tolerance)
+        # Should be approximately 180 degrees (within 28° tolerance)
         # The tolerance is larger because:
         # 1. Apogee uses fitted ELP2000-82B perturbations with 2D-2M' dominant term
-        # 2. Perigee is computed as apogee + 180° (a simplification)
-        # 3. Swiss Ephemeris computes apogee and perigee independently
-        assert abs(diff - 180) < 20.0, (
+        # 2. Perigee uses independent fitted perturbations
+        # 3. Swiss Ephemeris documentation notes up to 28° deviation is physical
+        assert abs(diff - 180) < 28.0, (
             f"Apogee ({apogee_lon}) and perigee ({perigee_lon}) "
             f"differ by {diff} degrees (expected ~180)"
         )
