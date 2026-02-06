@@ -94,7 +94,11 @@ class TestLilith:
         """Test Mean Lilith at J2000."""
         lilith, _ = ephem.swe_calc_ut(standard_jd, SE_MEAN_APOG, 0)
         assert 0 <= lilith[0] < 360
-        assert lilith[1] == 0.0  # Mean Lilith has 0 latitude
+        # Mean Lilith has non-zero latitude because it lies in the lunar orbital
+        # plane which is inclined ~5.145° to the ecliptic. The latitude varies
+        # sinusoidally as the apogee moves relative to the ascending node.
+        # Swiss Ephemeris returns the same: lat ~3.4° at J2000.
+        assert abs(lilith[1]) < 6.0  # Should be within lunar orbital inclination
 
     def test_mean_lilith_vs_swisseph(self, standard_jd):
         """Compare Mean Lilith with SwissEph."""

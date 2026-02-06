@@ -593,14 +593,10 @@ class TestInterpolatedApogeePerigeeRelationship:
         print("  roughly opposite when the Sun is in conjunction with one of")
         print("  them or at 90° angle.'")
 
-        # LibEphemeris: perigee = apogee + 180°, so any deviation comes from
-        # the apogee perturbation series creating oscillations. The improved
-        # ELP2000-82B series with 2D-2M' term creates up to ~9° oscillations
-        # in apogee position, which appear as deviations here.
-        # Note: This is expected behavior - the perturbation series matches
-        # Swiss Ephemeris apogee well, but perigee is independently computed
-        # by Swiss Ephemeris, not as apogee + 180°.
-        assert max(lib_diffs) < 15.0, (
+        # LibEphemeris now uses independent ELP2000-82B perturbation series for
+        # apogee and perigee, matching Swiss Ephemeris behavior. According to SE
+        # documentation, the deviation can be up to 28° depending on Sun-Moon geometry.
+        assert max(lib_diffs) < 30.0, (
             f"LibEphemeris apogee-perigee deviation exceeded expected range, "
             f"max deviation is {max(lib_diffs):.6f}°"
         )

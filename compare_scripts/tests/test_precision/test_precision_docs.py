@@ -525,8 +525,8 @@ class TestDocumentedInterpolatedApogeeWarning:
     @pytest.mark.precision
     def test_interpolated_apogee_precision_warning_exists(self):
         """
-        Verify PRECISION.md contains explicit warning about interpolated apogee
-        precision limitation requiring Moshier's analytical method.
+        Verify PRECISION.md contains documentation about interpolated apogee/perigee
+        precision and the ELP2000-82B perturbation series implementation.
         """
         import pathlib
 
@@ -538,20 +538,17 @@ class TestDocumentedInterpolatedApogeeWarning:
 
         content = precision_doc.read_text()
 
-        # Check that the warning note exists with key phrases
-        assert (
-            "Achieving <2° precision requires implementing Moshier's analytical"
-            in content
-        ), "Missing warning about Moshier's analytical method requirement"
-
-        assert "polynomial regression approach cannot bridge this gap" in content, (
-            "Missing note about polynomial regression limitation"
+        # Check that the documentation mentions the ELP2000-82B implementation
+        assert "ELP2000-82B perturbation series" in content, (
+            "Missing documentation about ELP2000-82B perturbation series"
         )
 
-        assert "regardless of parameter tuning" in content, (
-            "Missing note about parameter tuning ineffectiveness"
+        # Check that interpolated apogee precision is documented
+        assert "Interpolated Apogee" in content, (
+            "Missing interpolated apogee documentation"
         )
 
-        assert "TODO.md" in content and "implementation plan" in content, (
-            "Missing reference to TODO.md for implementation plan"
+        # Check that interpolated perigee precision is documented
+        assert "Interpolated Perigee" in content, (
+            "Missing interpolated perigee documentation"
         )

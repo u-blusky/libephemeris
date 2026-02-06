@@ -270,10 +270,10 @@ class TestInterpolatedApogeeConsistency:
             # "Apogee and perigee are not exactly opposite - they are only roughly
             # opposite when the Sun is in conjunction with one of them or at 90° angle."
             # The deviation can be up to 28° depending on Sun-Moon geometry.
-            # Even Swiss Ephemeris INTP_APOG and INTP_PERG show ~13° deviation at J2000.
-            # We allow 20° tolerance to account for this physical reality and our
-            # independent perturbation series for apogee and perigee.
-            assert abs(diff - 180) < 20, (
+            # LibEphemeris now computes apogee and perigee with independent ELP2000-82B
+            # perturbation series, matching Swiss Ephemeris behavior where they can
+            # deviate from 180° by up to 28°.
+            assert abs(diff - 180) < 30, (
                 f"At JD {jd}: apogee-perigee difference {diff}° not close to 180°"
             )
 

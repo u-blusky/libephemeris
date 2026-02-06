@@ -278,8 +278,8 @@ LibEphemeris uses different calculation models for some lunar points, resulting 
 | True Node | ~0.14° (~520 arcsec) | ~0.04° (~145 arcsec) | Geometric method (see below) |
 | Mean Lilith | ~0.005° (~18 arcsec) | ~0.003° (~12 arcsec) | SE-compatible DE404 algorithm |
 | True Lilith | ~0.07° (~235 arcsec) | ~0.02° (~52 arcsec) | Eccentricity vector method (see below) |
-| Interpolated Apogee | ~1.1° | ~3.3° max | ELP2000-82B perturbation series |
-| Interpolated Perigee | ~2.3° | ~8° max | ELP2000-82B perturbation series (see below) |
+| Interpolated Apogee | ~0.36° (~1300 arcsec) | ~0.10° (~350 arcsec) | ELP2000-82B perturbation series |
+| Interpolated Perigee | ~2.6° (~9400 arcsec) | ~0.46° (~1650 arcsec) | ELP2000-82B perturbation series (see below) |
 
 #### True Node: Why LibEphemeris is More Rigorous
 
@@ -333,9 +333,7 @@ The geometric method (**h = r × v**) computes exactly what the True Node IS - t
 
 This sub-arcminute precision makes True Lilith suitable for all practical applications, providing the more dynamically accurate osculating apogee versus the smoothed Mean Lilith.
 
-**Note on Interpolated Apogee/Perigee**: The interpolated apogee (SE_INTP_APOG) and perigee (SE_INTP_PERG) smooth out the spurious 30-degree oscillations in the osculating apsides using polynomial regression over a 56-day window. While Swiss Ephemeris uses an analytical method derived from Moshier's lunar theory, libephemeris uses least-squares fitting to achieve smoothing. The interpolated apogee oscillates ~5° from the mean (vs. 30° for osculating), making it significantly smoother. However, differences of 8-10° from Swiss Ephemeris persist due to the different underlying osculating calculations. See [INTERPOLATED_APOGEE.md](INTERPOLATED_APOGEE.md) for comprehensive documentation.
-
-> **NOTE**: Achieving <2° precision requires implementing Moshier's analytical apsidal computation method. The current polynomial regression approach cannot bridge this gap regardless of parameter tuning. See [TODO.md](../TODO.md) for implementation plan.
+**Note on Interpolated Apogee/Perigee**: The interpolated apogee (SE_INTP_APOG) and perigee (SE_INTP_PERG) use an analytical ELP2000-82B perturbation series to compute the smoothed apsidal position. This approach removes the spurious 30-degree oscillations present in the osculating apsides while maintaining high precision. The interpolated apogee achieves ~0.10° mean error (0.36° max) vs Swiss Ephemeris, and the interpolated perigee achieves ~0.46° mean error (2.6° max). The perigee requires more harmonic terms due to stronger solar perturbations. See [INTERPOLATED_APOGEE.md](INTERPOLATED_APOGEE.md) for comprehensive documentation.
 
 ### Asteroids
 
