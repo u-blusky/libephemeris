@@ -120,14 +120,15 @@ class TestUranianPlanetKeplerianElements:
     @pytest.mark.parametrize(
         "planet_id,planet_name,expected_a,period_years",
         [
+            # Semi-major axes from Swiss Ephemeris seorbel.txt
             (SE_CUPIDO, "Cupido", 40.99837, 262.5),
             (SE_HADES, "Hades", 50.66744, 360.7),
             (SE_ZEUS, "Zeus", 59.21436, 455.9),
             (SE_KRONOS, "Kronos", 64.81690, 522.0),
-            (SE_APOLLON, "Apollon", 70.361180, 590.0),
-            (SE_ADMETOS, "Admetos", 73.736396, 633.0),
-            (SE_VULKANUS, "Vulkanus", 77.445895, 681.7),
-            (SE_POSEIDON, "Poseidon", 83.666307, 765.3),
+            (SE_APOLLON, "Apollon", 70.29949, 590.0),  # Corrected from seorbel.txt
+            (SE_ADMETOS, "Admetos", 73.62765, 633.0),  # Corrected from seorbel.txt
+            (SE_VULKANUS, "Vulkanus", 77.25568, 681.7),  # Corrected from seorbel.txt
+            (SE_POSEIDON, "Poseidon", 83.66907, 765.3),  # Corrected from seorbel.txt
         ],
     )
     def test_semi_major_axis_plausible(
@@ -154,9 +155,7 @@ class TestUranianPlanetKeplerianElements:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_CUPIDO, "Cupido"),
-            (SE_ZEUS, "Zeus"),
-            (SE_KRONOS, "Kronos"),
+            # Only planets with e=0 in seorbel.txt (Apollon through Poseidon)
             (SE_APOLLON, "Apollon"),
             (SE_ADMETOS, "Admetos"),
             (SE_VULKANUS, "Vulkanus"),
@@ -189,6 +188,37 @@ class TestUranianPlanetKeplerianElements:
         assert elements.i == pytest.approx(1.05, rel=0.01), "Hades inclination mismatch"
         assert elements.omega != 0.0, "Hades omega should be non-zero"
         assert elements.Omega != 0.0, "Hades Omega should be non-zero"
+
+    @pytest.mark.unit
+    def test_cupido_small_eccentricity(self):
+        """Cupido has small eccentricity (e=0.0046) from seorbel.txt."""
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+
+        # Cupido has small non-zero eccentricity from seorbel.txt
+        assert elements.e == pytest.approx(0.00460, rel=1e-2), (
+            "Cupido eccentricity mismatch"
+        )
+        assert elements.i == pytest.approx(1.0833, rel=0.01), (
+            "Cupido inclination mismatch"
+        )
+        assert elements.omega != 0.0, "Cupido omega should be non-zero"
+        assert elements.Omega != 0.0, "Cupido Omega should be non-zero"
+
+    @pytest.mark.unit
+    def test_zeus_kronos_small_eccentricity(self):
+        """Zeus and Kronos have small eccentricities from seorbel.txt."""
+        # Zeus
+        zeus_elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ZEUS]
+        assert zeus_elements.e == pytest.approx(0.00120, rel=0.1), (
+            "Zeus eccentricity mismatch"
+        )
+        assert zeus_elements.omega != 0.0, "Zeus omega should be non-zero"
+
+        # Kronos
+        kronos_elements = URANIAN_KEPLERIAN_ELEMENTS[SE_KRONOS]
+        assert kronos_elements.e == pytest.approx(0.00305, rel=0.1), (
+            "Kronos eccentricity mismatch"
+        )
 
 
 class TestUranianPlanetPositionsJ2000:

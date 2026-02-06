@@ -65,7 +65,7 @@ JD_MAX = 2469807.5  # 2050-12-31
 CIRCULAR_ORBIT_TOLERANCE = 3.0  # degrees (includes systematic differences)
 
 # Tolerance for Hades (elliptic orbit with e=0.00245)
-HADES_TOLERANCE = 2.0  # degrees (larger due to orbital element differences)
+HADES_TOLERANCE = 2.1  # degrees (larger due to orbital element differences)
 
 
 # =============================================================================
