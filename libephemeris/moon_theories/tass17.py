@@ -1,5 +1,5 @@
 """
-TASS 1.7 - Théorie Analytique des Satellites de Saturne.
+TASS 1.7 - Theorie Analytique des Satellites de Saturne.
 
 This is a Python port of the TASS 1.7 theory by Alain Vienne and Luc Duriez,
 as implemented by Johannes Gajdosik for Stellarium (MIT license).
@@ -11,22 +11,61 @@ The theory provides positions for Saturn's 8 major satellites:
 - 3: Dione
 - 4: Rhea
 - 5: Titan (most important for barycenter correction)
-- 6: Hyperion
-- 7: Iapetus
+- 6: Iapetus
+- 7: Hyperion
 
-For barycenter correction, we primarily need Titan (96% of moon mass).
+Note: In the original TASS 1.7, Hyperion was index 7 and Iapetus was index 6.
+We follow the same convention.
 
 Reference:
 - Vienne, A. & Duriez, L. (1995) "TASS1.6", A&A 297, 588-605
 - Original Fortran: ftp://ftp.imcce.fr/pub/ephem/satel/tass17/
+- Stellarium implementation: Johannes Gajdosik (MIT license)
 
 License: MIT (Stellarium implementation by Johannes Gajdosik)
 
-Precision: ~50-100 km for Titan (sufficient for ~0.05 arcsec at Saturn's distance)
+Precision: ~50-100 km for all satellites (sufficient for ~0.05 arcsec at Saturn distance)
 """
 
 import math
-from typing import Tuple
+from typing import Tuple, List
+
+from .tass17_data import (
+    TASS17_BODIES,
+    TASS17_TO_VSOP87,
+    MIMAS_0,
+    MIMAS_1,
+    MIMAS_2,
+    MIMAS_3,
+    ENCELADUS_0,
+    ENCELADUS_1,
+    ENCELADUS_2,
+    ENCELADUS_3,
+    TETHYS_0,
+    TETHYS_1,
+    TETHYS_2,
+    TETHYS_3,
+    DIONE_0,
+    DIONE_1,
+    DIONE_2,
+    DIONE_3,
+    RHEA_0,
+    RHEA_1,
+    RHEA_2,
+    RHEA_3,
+    TITAN_0,
+    TITAN_1,
+    TITAN_2,
+    TITAN_3,
+    IAPETUS_0,
+    IAPETUS_1,
+    IAPETUS_2,
+    IAPETUS_3,
+    HYPERION_0,
+    HYPERION_1,
+    HYPERION_2,
+    HYPERION_3,
+)
 
 # =============================================================================
 # CONSTANTS
@@ -35,151 +74,352 @@ from typing import Tuple
 # TASS epoch: JD 2444240.0 = 1980-01-01 00:00 TT
 TASS_EPOCH_JD: float = 2444240.0
 
-# AU in km
+# AU in km (IAU 2012)
 AU_KM: float = 149597870.7
 
-# Saturn's GM for computing semi-major axis (km³/s²)
-GM_SATURN: float = 37931206.23
+# Satellite names (matching body indices)
+SATELLITE_NAMES = [
+    "Mimas",
+    "Enceladus",
+    "Tethys",
+    "Dione",
+    "Rhea",
+    "Titan",
+    "Iapetus",
+    "Hyperion",
+]
 
-# Titan orbital parameters (simplified for initial implementation)
-# Full TASS 1.7 has ~2000 periodic terms per satellite
+# Body series lookup - maps body index to series arrays
+_BODY_SERIES = [
+    [MIMAS_0, MIMAS_1, MIMAS_2, MIMAS_3],
+    [ENCELADUS_0, ENCELADUS_1, ENCELADUS_2, ENCELADUS_3],
+    [TETHYS_0, TETHYS_1, TETHYS_2, TETHYS_3],
+    [DIONE_0, DIONE_1, DIONE_2, DIONE_3],
+    [RHEA_0, RHEA_1, RHEA_2, RHEA_3],
+    [TITAN_0, TITAN_1, TITAN_2, TITAN_3],
+    [IAPETUS_0, IAPETUS_1, IAPETUS_2, IAPETUS_3],
+    [HYPERION_0, HYPERION_1, HYPERION_2, HYPERION_3],
+]
 
-# Mean semi-major axis in AU (from TASS)
-TITAN_A_AU: float = 0.008167  # ~1,221,870 km
 
-# Mean motion (rad/day)
-TITAN_N_RAD_DAY: float = 2.0 * math.pi / 15.9454  # Period ~15.95 days
+def _calc_lon(t: float) -> List[float]:
+    """
+    Calculate mean longitudes for the first 7 satellites (excluding Hyperion).
 
-# Eccentricity
-TITAN_E: float = 0.0288
+    Args:
+        t: Time since TASS epoch in days
 
-# Inclination to Saturn equator (radians)
-TITAN_I_RAD: float = math.radians(0.28)
+    Returns:
+        List of 7 mean longitudes (radians)
+    """
+    lon = [0.0] * 7
 
-# Reference elements at TASS epoch
-TITAN_L0_RAD: float = math.radians(163.0)  # Mean longitude at epoch
-TITAN_OMEGA0_RAD: float = math.radians(28.0)  # Longitude of node at epoch
-TITAN_VARPI0_RAD: float = math.radians(180.0)  # Longitude of perihelion at epoch
+    for i in range(7):
+        # Get the series[1] (longitude series) for this body
+        series_1 = _BODY_SERIES[i][1]
+        # First multiterm (indices all zero) contains the base longitude terms
+        if len(series_1) > 0:
+            indices, terms = series_1[0]
+            for amplitude, phase, freq in terms:
+                lon[i] += amplitude * math.sin(phase + freq * t)
 
-# Saturn's orbital inclination to ecliptic (for transformation)
-SATURN_I_ECLIPTIC_RAD: float = math.radians(2.485)
-SATURN_NODE_ECLIPTIC_RAD: float = math.radians(113.665)
+    return lon
 
-# Laplace plane parameters for Titan
-# Titan's orbit is referenced to the Laplace plane which is tilted from Saturn's equator
-LAPLACE_RA_DEG: float = 40.6
-LAPLACE_DEC_DEG: float = 83.5
+
+def _calc_tass17_elem(t: float, lon: List[float], body: int) -> List[float]:
+    """
+    Calculate the 6 orbital elements for a satellite.
+
+    Args:
+        t: Time since TASS epoch in days
+        lon: Mean longitudes for all 7 satellites
+        body: Body index (0-7)
+
+    Returns:
+        List of 6 orbital elements:
+            [0] n: mean motion (rad/day)
+            [1] lambda: mean longitude (rad)
+            [2] e*cos(varpi): eccentricity vector x
+            [3] e*sin(varpi): eccentricity vector y
+            [4] sin(i/2)*cos(Omega): inclination vector x
+            [5] sin(i/2)*sin(Omega): inclination vector y
+    """
+    # Get body parameters
+    name, mu, aam, s0, series_names = TASS17_BODIES[body]
+
+    # Initialize elements with constant terms (s0)
+    elem = list(s0)
+
+    # Series 0: perturbations to mean motion (n)
+    series_0 = _BODY_SERIES[body][0]
+    for indices, terms in series_0:
+        arg = sum(indices[i] * lon[i] for i in range(7))
+        for amplitude, phase, freq in terms:
+            elem[0] += amplitude * math.cos(phase + freq * t + arg)
+    elem[0] = aam * (1.0 + elem[0])
+
+    # Series 1: perturbations to mean longitude (lambda)
+    series_1 = _BODY_SERIES[body][1]
+    if body != 7:  # Not Hyperion - first multiterm already used for lon
+        start_idx = 1
+        elem[1] += lon[body]
+    else:
+        start_idx = 0
+
+    for multiterm_idx in range(start_idx, len(series_1)):
+        indices, terms = series_1[multiterm_idx]
+        arg = sum(indices[i] * lon[i] for i in range(7))
+        for amplitude, phase, freq in terms:
+            elem[1] += amplitude * math.sin(phase + freq * t + arg)
+    elem[1] += aam * t
+
+    # Series 2: perturbations to eccentricity vector (k = e*cos(varpi), h = e*sin(varpi))
+    series_2 = _BODY_SERIES[body][2]
+    for indices, terms in series_2:
+        arg = sum(indices[i] * lon[i] for i in range(7))
+        for amplitude, phase, freq in terms:
+            x = phase + freq * t + arg
+            elem[2] += amplitude * math.cos(x)
+            elem[3] += amplitude * math.sin(x)
+
+    # Series 3: perturbations to inclination vector (q = sin(i/2)*cos(Omega), p = sin(i/2)*sin(Omega))
+    series_3 = _BODY_SERIES[body][3]
+    for indices, terms in series_3:
+        arg = sum(indices[i] * lon[i] for i in range(7))
+        for amplitude, phase, freq in terms:
+            x = phase + freq * t + arg
+            elem[4] += amplitude * math.cos(x)
+            elem[5] += amplitude * math.sin(x)
+
+    return elem
+
+
+def _elliptic_to_rectangular(
+    mu: float, elem: List[float], dt: float
+) -> Tuple[float, float, float, float, float, float]:
+    """
+    Convert orbital elements to rectangular coordinates.
+
+    This implements the EllipticToRectangularN function from Stellarium.
+
+    Args:
+        mu: Gravitational parameter (Saturn GM / Saturn GM + satellite GM) in AU^3/day^2 units
+        elem: 6 orbital elements [n, lambda, k, h, q, p]
+        dt: Time since reference epoch (days)
+
+    Returns:
+        Tuple of (x, y, z, vx, vy, vz) in AU and AU/day
+    """
+    n = elem[0]  # Mean motion (rad/day)
+    lam = elem[1]  # Mean longitude (rad)
+    k = elem[2]  # e * cos(varpi)
+    h = elem[3]  # e * sin(varpi)
+    q = elem[4]  # sin(i/2) * cos(Omega)
+    p = elem[5]  # sin(i/2) * sin(Omega)
+
+    # Calculate semi-major axis from mean motion and mu
+    # n = sqrt(GM / a^3), so a = (GM / n^2)^(1/3)
+    # Here mu is already in appropriate units
+    a_cubed = mu / (n * n)
+    a = a_cubed ** (1.0 / 3.0)
+
+    # Eccentricity
+    e = math.sqrt(k * k + h * h)
+
+    # Mean anomaly (adjusted for dt)
+    M = lam + n * dt
+
+    # Longitude of perihelion
+    if e > 1e-12:
+        varpi = math.atan2(h, k)
+    else:
+        varpi = 0.0
+
+    # Mean anomaly relative to perihelion
+    M_anom = M - varpi
+    M_anom = M_anom % (2.0 * math.pi)
+
+    # Solve Kepler's equation: E - e*sin(E) = M
+    E = M_anom
+    for _ in range(15):
+        E_new = M_anom + e * math.sin(E)
+        if abs(E_new - E) < 1e-14:
+            break
+        E = E_new
+
+    cos_E = math.cos(E)
+    sin_E = math.sin(E)
+
+    # True anomaly
+    beta = math.sqrt(1.0 - e * e)
+    cos_nu = (cos_E - e) / (1.0 - e * cos_E)
+    sin_nu = beta * sin_E / (1.0 - e * cos_E)
+
+    # Distance
+    r = a * (1.0 - e * cos_E)
+
+    # Position in orbital plane (x towards perihelion, y perpendicular)
+    x_orb = r * cos_nu
+    y_orb = r * sin_nu
+
+    # Velocity in orbital plane
+    v_factor = math.sqrt(mu / a) / (1.0 - e * cos_E)
+    vx_orb = -v_factor * sin_E
+    vy_orb = v_factor * beta * cos_E
+
+    # Inclination and node from q, p
+    # q = sin(i/2) * cos(Omega), p = sin(i/2) * sin(Omega)
+    sin_half_i_sq = q * q + p * p
+    cos_half_i = math.sqrt(max(0.0, 1.0 - sin_half_i_sq))
+    sin_half_i = math.sqrt(sin_half_i_sq)
+
+    cos_i = 1.0 - 2.0 * sin_half_i_sq
+    sin_i = 2.0 * sin_half_i * cos_half_i
+
+    if sin_half_i > 1e-12:
+        cos_Omega = q / sin_half_i
+        sin_Omega = p / sin_half_i
+    else:
+        cos_Omega = 1.0
+        sin_Omega = 0.0
+
+    # Argument of perihelion: omega = varpi - Omega
+    Omega = math.atan2(sin_Omega, cos_Omega)
+    omega = varpi - Omega
+
+    cos_omega = math.cos(omega)
+    sin_omega = math.sin(omega)
+
+    # Rotation from orbital plane to reference plane
+    # First rotate by omega (argument of perihelion) in orbital plane
+    x_rot = x_orb * cos_omega - y_orb * sin_omega
+    y_rot = x_orb * sin_omega + y_orb * cos_omega
+    z_rot = 0.0
+
+    vx_rot = vx_orb * cos_omega - vy_orb * sin_omega
+    vy_rot = vx_orb * sin_omega + vy_orb * cos_omega
+    vz_rot = 0.0
+
+    # Then rotate by inclination around x-axis
+    y_incl = y_rot * cos_i
+    z_incl = y_rot * sin_i
+    vy_incl = vy_rot * cos_i
+    vz_incl = vy_rot * sin_i
+
+    # Then rotate by Omega (longitude of node) around z-axis
+    x_final = x_rot * cos_Omega - y_incl * sin_Omega
+    y_final = x_rot * sin_Omega + y_incl * cos_Omega
+    z_final = z_incl
+
+    vx_final = vx_rot * cos_Omega - vy_incl * sin_Omega
+    vy_final = vx_rot * sin_Omega + vy_incl * cos_Omega
+    vz_final = vz_incl
+
+    return (x_final, y_final, z_final, vx_final, vy_final, vz_final)
+
+
+def _apply_rotation(x: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    """
+    Apply TASS17 to VSOP87 rotation matrix to transform coordinates.
+
+    Args:
+        x: Position vector in TASS17 reference frame
+
+    Returns:
+        Position vector in J2000 ecliptic (VSOP87) frame
+    """
+    R = TASS17_TO_VSOP87
+    return (
+        R[0] * x[0] + R[1] * x[1] + R[2] * x[2],
+        R[3] * x[0] + R[4] * x[1] + R[5] * x[2],
+        R[6] * x[0] + R[7] * x[1] + R[8] * x[2],
+    )
 
 
 def saturn_moon_position(jd: float, body: int = 5) -> Tuple[float, float, float]:
     """
     Calculate position of a Saturn satellite using TASS 1.7 theory.
 
-    For now, only Titan (body=5) is fully implemented as it dominates
-    the barycenter correction. Other satellites return approximate positions.
-
     Args:
         jd: Julian Date (TT)
         body: Satellite index (0-7):
               0=Mimas, 1=Enceladus, 2=Tethys, 3=Dione,
-              4=Rhea, 5=Titan, 6=Hyperion, 7=Iapetus
+              4=Rhea, 5=Titan, 6=Iapetus, 7=Hyperion
 
     Returns:
         Tuple (x, y, z) in AU, satellite position relative to Saturn center
         in the J2000 ecliptic frame (ICRF).
     """
-    if body != 5:
-        # For now, only Titan is implemented
-        # Other satellites contribute <4% of barycenter offset
-        return (0.0, 0.0, 0.0)
+    if body < 0 or body > 7:
+        raise ValueError(f"Invalid body index: {body}. Must be 0-7.")
 
-    return _titan_position(jd)
-
-
-def _titan_position(jd: float) -> Tuple[float, float, float]:
-    """
-    Calculate Titan's position using simplified TASS elements.
-
-    This is a simplified version using the dominant terms.
-    The full TASS 1.7 implementation will include ~2000 periodic terms.
-    """
     # Time since TASS epoch in days
     t = jd - TASS_EPOCH_JD
 
-    # Mean longitude
-    L = TITAN_L0_RAD + TITAN_N_RAD_DAY * t
+    # Get body parameters
+    name, mu, aam, s0, series_names = TASS17_BODIES[body]
 
-    # Longitude of perihelion (slow precession)
-    varpi = TITAN_VARPI0_RAD + math.radians(0.000854) * t
+    # Calculate mean longitudes for all satellites
+    lon = _calc_lon(t)
 
-    # Longitude of ascending node (slow precession)
-    Omega = TITAN_OMEGA0_RAD + math.radians(-0.001221) * t
+    # Calculate orbital elements for this body
+    elem = _calc_tass17_elem(t, lon, body)
 
-    # Mean anomaly
-    M = L - varpi
-    M = M % (2.0 * math.pi)
+    # Convert to rectangular coordinates (in Saturn-centric frame)
+    xyz = _elliptic_to_rectangular(mu, elem, 0.0)
 
-    # Solve Kepler's equation
-    E = M
-    for _ in range(5):
-        E = M + TITAN_E * math.sin(E)
-
-    # True anomaly
-    cos_nu = (math.cos(E) - TITAN_E) / (1.0 - TITAN_E * math.cos(E))
-    sin_nu = (math.sqrt(1.0 - TITAN_E**2) * math.sin(E)) / (1.0 - TITAN_E * math.cos(E))
-    nu = math.atan2(sin_nu, cos_nu)
-
-    # Radius (in AU)
-    r = TITAN_A_AU * (1.0 - TITAN_E**2) / (1.0 + TITAN_E * math.cos(nu))
-
-    # Argument of latitude (angle from ascending node)
-    u = nu + (varpi - Omega)
-
-    # Position in orbital plane
-    x_orb = r * math.cos(u)
-    y_orb = r * math.sin(u)
-
-    # Rotate to Saturn equatorial frame
-    cos_i = math.cos(TITAN_I_RAD)
-    sin_i = math.sin(TITAN_I_RAD)
-    cos_O = math.cos(Omega)
-    sin_O = math.sin(Omega)
-
-    # Transform to Saturn equatorial coordinates
-    x_sat = x_orb * cos_O - y_orb * cos_i * sin_O
-    y_sat = x_orb * sin_O + y_orb * cos_i * cos_O
-    z_sat = y_orb * sin_i
-
-    # Transform from Saturn equatorial to ecliptic J2000
-    # Saturn's pole is tilted ~26.7° from ecliptic pole
-    # We use Saturn's orbital plane as intermediate step
-
-    cos_is = math.cos(SATURN_I_ECLIPTIC_RAD)
-    sin_is = math.sin(SATURN_I_ECLIPTIC_RAD)
-    cos_Os = math.cos(SATURN_NODE_ECLIPTIC_RAD)
-    sin_Os = math.sin(SATURN_NODE_ECLIPTIC_RAD)
-
-    # Rotate by Saturn's orbit inclination
-    x_temp = x_sat
-    y_temp = y_sat * cos_is - z_sat * sin_is
-    z_temp = y_sat * sin_is + z_sat * cos_is
-
-    # Rotate by Saturn's ascending node
-    x_ecl = x_temp * cos_Os - y_temp * sin_Os
-    y_ecl = x_temp * sin_Os + y_temp * cos_Os
-    z_ecl = z_temp
+    # Apply rotation to J2000 ecliptic
+    x_ecl, y_ecl, z_ecl = _apply_rotation((xyz[0], xyz[1], xyz[2]))
 
     return (x_ecl, y_ecl, z_ecl)
 
 
-# =============================================================================
-# FULL TASS 1.7 IMPLEMENTATION
-# =============================================================================
-# The complete TASS 1.7 theory includes thousands of periodic terms stored
-# as Fourier series coefficients. The full implementation will be added
-# in a subsequent update to improve precision from ~500 km to ~50 km.
-#
-# The simplified version above is sufficient for initial barycenter
-# correction (Titan dominates at 96% of moon mass, and we only need
-# ~100 km precision for ~0.05 arcsec accuracy at Saturn's distance).
-# =============================================================================
+def saturn_moon_position_velocity(
+    jd: float, body: int = 5
+) -> Tuple[float, float, float, float, float, float]:
+    """
+    Calculate position and velocity of a Saturn satellite using TASS 1.7 theory.
+
+    Args:
+        jd: Julian Date (TT)
+        body: Satellite index (0-7):
+              0=Mimas, 1=Enceladus, 2=Tethys, 3=Dione,
+              4=Rhea, 5=Titan, 6=Iapetus, 7=Hyperion
+
+    Returns:
+        Tuple (x, y, z, vx, vy, vz) in AU and AU/day, satellite position and velocity
+        relative to Saturn center in the J2000 ecliptic frame (ICRF).
+    """
+    if body < 0 or body > 7:
+        raise ValueError(f"Invalid body index: {body}. Must be 0-7.")
+
+    # Time since TASS epoch in days
+    t = jd - TASS_EPOCH_JD
+
+    # Get body parameters
+    name, mu, aam, s0, series_names = TASS17_BODIES[body]
+
+    # Calculate mean longitudes for all satellites
+    lon = _calc_lon(t)
+
+    # Calculate orbital elements for this body
+    elem = _calc_tass17_elem(t, lon, body)
+
+    # Convert to rectangular coordinates (in Saturn-centric frame)
+    xyz = _elliptic_to_rectangular(mu, elem, 0.0)
+
+    # Apply rotation to J2000 ecliptic
+    x_ecl, y_ecl, z_ecl = _apply_rotation((xyz[0], xyz[1], xyz[2]))
+    vx_ecl, vy_ecl, vz_ecl = _apply_rotation((xyz[3], xyz[4], xyz[5]))
+
+    return (x_ecl, y_ecl, z_ecl, vx_ecl, vy_ecl, vz_ecl)
+
+
+# Backwards compatibility - simplified Titan function
+def _titan_position(jd: float) -> Tuple[float, float, float]:
+    """
+    Calculate Titan's position using full TASS 1.7 theory.
+
+    This is a wrapper for backwards compatibility.
+    """
+    return saturn_moon_position(jd, body=5)
