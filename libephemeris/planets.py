@@ -1063,6 +1063,10 @@ def _calc_nutation_obliquity(
 
     This matches the pyswisseph return format for swe_calc_ut(jd, SE_ECL_NUT, 0).
 
+    Uses the full IAU 2000A nutation model (1365 terms) via Skyfield for
+    sub-milliarcsecond precision, compared to ~1 arcsec with the 4-term
+    simplified model.
+
     Args:
         jd: Julian Day in UT
         iflag: Calculation flags (not used for nutation)
@@ -1093,29 +1097,35 @@ def _calc_nutation_obliquity(
     )
     mean_obliquity = eps0_arcsec / 3600.0  # Convert to degrees
 
-    # Nutation using simplified IAU 2000B model
-    # Mean longitude of the ascending node of the Moon
-    omega = math.radians(125.04452 - 1934.136261 * T + 0.0020708 * T**2 + T**3 / 450000)
-    # Mean longitude of the Sun
-    L = math.radians(280.4665 + 36000.7698 * T)
-    # Mean longitude of the Moon
-    Lp = math.radians(218.3165 + 481267.8813 * T)
+    # Use full IAU 2000A nutation model (1365 terms) for sub-milliarcsecond precision
+    # This provides ~0.1 mas accuracy compared to ~1 arcsec for the 4-term model
+    try:
+        from skyfield.nutationlib import iau2000a_radians
 
-    # Nutation in longitude (simplified)
-    delta_psi = (
-        -17.20 * math.sin(omega)
-        - 1.32 * math.sin(2 * L)
-        - 0.23 * math.sin(2 * Lp)
-        + 0.21 * math.sin(2 * omega)
-    ) / 3600.0  # Convert arcsec to degrees
+        dpsi_rad, deps_rad = iau2000a_radians(t)
+        delta_psi = math.degrees(dpsi_rad)
+        delta_eps = math.degrees(deps_rad)
+    except ImportError:
+        # Fallback to simplified 4-term model if Skyfield unavailable
+        omega = math.radians(
+            125.04452 - 1934.136261 * T + 0.0020708 * T**2 + T**3 / 450000
+        )
+        L = math.radians(280.4665 + 36000.7698 * T)
+        Lp = math.radians(218.3165 + 481267.8813 * T)
 
-    # Nutation in obliquity (simplified)
-    delta_eps = (
-        9.20 * math.cos(omega)
-        + 0.57 * math.cos(2 * L)
-        + 0.10 * math.cos(2 * Lp)
-        - 0.09 * math.cos(2 * omega)
-    ) / 3600.0  # Convert arcsec to degrees
+        delta_psi = (
+            -17.20 * math.sin(omega)
+            - 1.32 * math.sin(2 * L)
+            - 0.23 * math.sin(2 * Lp)
+            + 0.21 * math.sin(2 * omega)
+        ) / 3600.0
+
+        delta_eps = (
+            9.20 * math.cos(omega)
+            + 0.57 * math.cos(2 * L)
+            + 0.10 * math.cos(2 * Lp)
+            - 0.09 * math.cos(2 * omega)
+        ) / 3600.0
 
     # True obliquity = mean obliquity + nutation in obliquity
     true_obliquity = mean_obliquity + delta_eps

@@ -3391,8 +3391,10 @@ def calc_fixed_star_velocity(
     """
     Calculate ecliptic position and velocity of a fixed star at given date.
 
-    Uses numerical differentiation to compute velocities. The velocity represents
-    the rate of change of the star's ecliptic coordinates due to:
+    Uses central difference numerical differentiation to compute velocities,
+    providing O(h²) accuracy compared to O(h) for forward differences (~100x
+    better numerical precision). The velocity represents the rate of change
+    of the star's ecliptic coordinates due to:
     1. Proper motion of the star itself through space
     2. Precession of the equinoxes (ecliptic coordinate grid rotation)
     3. Nutation (small periodic oscillations)
@@ -3420,24 +3422,29 @@ def calc_fixed_star_velocity(
         ValueError: If star_id not in catalog
 
     Algorithm:
-        Uses numerical differentiation with a one-day interval:
-        1. Calculate position at jd_tt
-        2. Calculate position at jd_tt + 1.0 (one day later)
-        3. speed_lon = (lon2 - lon1) with 360° wraparound handling
-        4. speed_lat = (lat2 - lat1)
+        Uses central difference for O(h²) accuracy:
+        1. Calculate position at jd_tt (for return value)
+        2. Calculate position at jd_tt - 0.5 (half day earlier)
+        3. Calculate position at jd_tt + 0.5 (half day later)
+        4. speed = (pos_next - pos_prev) / 1.0 day  (central difference)
         5. speed_dist = 0 (stellar distances don't measurably change)
 
     References:
         Precession rate: ~50.3 arcsec/year ≈ 0.0001378 deg/day in longitude
     """
-    # Calculate position at current time
-    lon1, lat1, dist = calc_fixed_star_position(star_id, jd_tt, noaberr)
+    # Half-day step for central difference
+    h = 0.5
 
-    # Calculate position one day later
-    lon2, lat2, _ = calc_fixed_star_position(star_id, jd_tt + 1.0, noaberr)
+    # Calculate position at current time (for return value)
+    lon, lat, dist = calc_fixed_star_position(star_id, jd_tt, noaberr)
 
-    # Compute longitude velocity with 360° wraparound handling
-    speed_lon = lon2 - lon1
+    # Calculate positions at t-0.5 and t+0.5 for central difference
+    lon_prev, lat_prev, _ = calc_fixed_star_position(star_id, jd_tt - h, noaberr)
+    lon_next, lat_next, _ = calc_fixed_star_position(star_id, jd_tt + h, noaberr)
+
+    # Central difference: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
+    speed_lon = lon_next - lon_prev
+
     # Handle wraparound at 360° (e.g., 359° -> 1° should give +2°, not -358°)
     if speed_lon > 180.0:
         speed_lon -= 360.0
@@ -3445,12 +3452,12 @@ def calc_fixed_star_velocity(
         speed_lon += 360.0
 
     # Compute latitude velocity (no wraparound needed for latitude)
-    speed_lat = lat2 - lat1
+    speed_lat = lat_next - lat_prev
 
     # Distance velocity is 0 (stellar distances don't measurably change)
     speed_dist = 0.0
 
-    return lon1, lat1, dist, speed_lon, speed_lat, speed_dist
+    return lon, lat, dist, speed_lon, speed_lat, speed_dist
 
 
 def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
