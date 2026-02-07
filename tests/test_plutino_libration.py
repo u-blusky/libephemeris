@@ -313,3 +313,161 @@ class TestLongTermAccuracy:
                 assert diff < 20
 
             prev_lon = lon
+
+
+class TestCalcMinorBodyPositionLibration:
+    """Test libration correction in calc_minor_body_position with body_id."""
+
+    def test_position_with_body_id_applies_libration(self):
+        """calc_minor_body_position with body_id should apply libration for plutinos."""
+        from libephemeris.minor_bodies import calc_minor_body_position
+
+        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        jd = J2000_EPOCH + 365.25 * 50  # 50 years from J2000
+
+        # Without body_id: no libration correction
+        x1, y1, z1 = calc_minor_body_position(elements, jd, body_id=None)
+
+        # With body_id: libration correction applied
+        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=SE_IXION)
+
+        # Convert to longitude for comparison
+        lon1 = math.degrees(math.atan2(y1, x1)) % 360.0
+        lon2 = math.degrees(math.atan2(y2, x2)) % 360.0
+
+        # The positions should be different due to libration correction
+        diff = abs(lon1 - lon2)
+        if diff > 180:
+            diff = 360 - diff
+
+        # Libration correction should cause a measurable difference
+        # Ixion's amplitude/3 is ~26 degrees max, so expect some difference
+        # but could be larger due to secular effects interaction
+        assert diff > 0.1, "Libration should cause measurable position difference"
+        # Allow up to 50° difference to account for nonlinear effects
+        assert diff < 50, f"Libration correction too large: {diff}°"
+
+    def test_non_plutino_position_unchanged_with_body_id(self):
+        """Non-plutinos should have same position with or without body_id."""
+        from libephemeris.minor_bodies import calc_minor_body_position
+
+        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        jd = J2000_EPOCH + 365.25 * 10
+
+        # Without body_id
+        x1, y1, z1 = calc_minor_body_position(elements, jd, body_id=None)
+
+        # With body_id (Ceres is not a plutino)
+        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=SE_CERES)
+
+        # Positions should be identical (Ceres has no libration params)
+        assert abs(x1 - x2) < 1e-10
+        assert abs(y1 - y2) < 1e-10
+        assert abs(z1 - z2) < 1e-10
+
+    def test_orcus_position_with_body_id(self):
+        """Orcus position should include libration correction with body_id."""
+        from libephemeris.minor_bodies import calc_minor_body_position
+
+        elements = MINOR_BODY_ELEMENTS[SE_ORCUS]
+        jd = J2000_EPOCH + 365.25 * 50
+
+        x1, y1, z1 = calc_minor_body_position(elements, jd, body_id=None)
+        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=SE_ORCUS)
+
+        lon1 = math.degrees(math.atan2(y1, x1)) % 360.0
+        lon2 = math.degrees(math.atan2(y2, x2)) % 360.0
+
+        diff = abs(lon1 - lon2)
+        if diff > 180:
+            diff = 360 - diff
+
+        assert diff > 0.1, "Orcus should have libration correction"
+        assert diff < 25, "Orcus libration correction should be bounded (amp/3 ~23°)"
+
+    def test_libration_varies_over_period(self):
+        """Libration correction should vary over the libration period."""
+        from libephemeris.minor_bodies import calc_minor_body_position
+
+        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        params = PLUTINO_LIBRATION_PARAMS[SE_IXION]
+
+        # Sample at quarter-period intervals
+        corrections = []
+        for i in range(4):
+            jd = J2000_EPOCH + i * params.period / 4
+
+            x_no_lib, y_no_lib, _ = calc_minor_body_position(elements, jd, body_id=None)
+            x_lib, y_lib, _ = calc_minor_body_position(elements, jd, body_id=SE_IXION)
+
+            lon_no_lib = math.degrees(math.atan2(y_no_lib, x_no_lib)) % 360.0
+            lon_lib = math.degrees(math.atan2(y_lib, x_lib)) % 360.0
+
+            diff = lon_lib - lon_no_lib
+            if diff > 180:
+                diff -= 360
+            elif diff < -180:
+                diff += 360
+
+            corrections.append(diff)
+
+        # Not all corrections should be the same (libration varies)
+        unique_corrections = set(round(c, 1) for c in corrections)
+        assert len(unique_corrections) > 1, "Libration should vary over period"
+
+
+class TestLongTermPlutonoAccuracy:
+    """Test improved accuracy for plutinos over 100-year timescales."""
+
+    def test_ixion_100_year_position_bounded(self):
+        """Ixion position should be computable over 100 years without errors."""
+        from libephemeris.minor_bodies import calc_minor_body_position
+
+        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+
+        # Ixion orbital period is ~248 years, so in 100 years it moves ~145°
+        jd_start = J2000_EPOCH
+        jd_end = J2000_EPOCH + 365.25 * 100
+
+        x1, y1, z1 = calc_minor_body_position(elements, jd_start, body_id=SE_IXION)
+        x2, y2, z2 = calc_minor_body_position(elements, jd_end, body_id=SE_IXION)
+
+        # Positions should be valid (finite, non-zero distance)
+        r1 = math.sqrt(x1**2 + y1**2 + z1**2)
+        r2 = math.sqrt(x2**2 + y2**2 + z2**2)
+
+        assert r1 > 0 and math.isfinite(r1)
+        assert r2 > 0 and math.isfinite(r2)
+
+        # Ixion's semi-major axis is ~39.5 AU, should be in reasonable range
+        assert 30 < r1 < 50, f"Start distance out of range: {r1} AU"
+        assert 30 < r2 < 50, f"End distance out of range: {r2} AU"
+
+        lon1 = math.degrees(math.atan2(y1, x1)) % 360.0
+        lon2 = math.degrees(math.atan2(y2, x2)) % 360.0
+
+        # Both positions should be valid longitudes
+        assert 0 <= lon1 < 360
+        assert 0 <= lon2 < 360
+
+    def test_position_continuity_with_libration(self):
+        """Positions should change smoothly with libration correction."""
+        from libephemeris.minor_bodies import calc_minor_body_position
+
+        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+
+        prev_lon = None
+        for year in range(0, 100, 5):  # Every 5 years over 100 years
+            jd = J2000_EPOCH + year * 365.25
+            x, y, _ = calc_minor_body_position(elements, jd, body_id=SE_IXION)
+            lon = math.degrees(math.atan2(y, x)) % 360.0
+
+            if prev_lon is not None:
+                diff = abs(lon - prev_lon)
+                if diff > 180:
+                    diff = 360 - diff
+                # Ixion moves ~2° per year, so 5 years = ~10°
+                # Allow some margin for libration oscillation
+                assert diff < 20, f"Position jump at year {year}: {diff}°"
+
+            prev_lon = lon

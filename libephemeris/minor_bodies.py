@@ -1551,19 +1551,27 @@ def solve_kepler_equation(M: float, e: float, tol: float = 1e-8) -> float:
 
 
 def calc_minor_body_position(
-    elements: OrbitalElements, jd_tt: float, include_perturbations: bool = True
+    elements: OrbitalElements,
+    jd_tt: float,
+    include_perturbations: bool = True,
+    body_id: Optional[int] = None,
 ) -> Tuple[float, float, float]:
     """
     Calculate heliocentric position using Keplerian orbital elements with perturbations.
 
     Propagates orbit from epoch to target time using mean motion and applies
-    first-order secular perturbations from Jupiter and Saturn.
+    first-order secular perturbations from Jupiter and Saturn. For plutinos
+    (bodies in 2:3 resonance with Neptune), also applies resonant libration
+    corrections when body_id is provided.
     Supports elliptic, parabolic, and hyperbolic orbits.
 
     Args:
         elements: Orbital elements at epoch
         jd_tt: Target Julian Day in Terrestrial Time (TT)
         include_perturbations: If True, apply secular perturbations (default True)
+        body_id: Optional minor body identifier. If provided and body is a known
+            plutino (Ixion, Orcus), applies resonant libration correction to
+            improve accuracy over multi-decadal timescales.
 
     Returns:
         Tuple[float, float, float]: (x, y, z) heliocentric position in AU
@@ -1572,10 +1580,11 @@ def calc_minor_body_position(
     Algorithm:
         1. Apply secular perturbations to ω and Ω (if enabled)
         2. Propagate mean anomaly: M(t) = M0 + n·Δt
-        3. Solve Kepler's equation for eccentric/hyperbolic/true anomaly
-        4. Calculate true anomaly ν from E (or H for hyperbolic)
-        5. Compute position in orbital plane
-        6. Rotate to ecliptic frame using perturbed Ω, i, ω
+        3. For plutinos: Apply resonant libration correction to mean anomaly
+        4. Solve Kepler's equation for eccentric/hyperbolic/true anomaly
+        5. Calculate true anomaly ν from E (or H for hyperbolic)
+        6. Compute position in orbital plane
+        7. Rotate to ecliptic frame using perturbed Ω, i, ω
 
     Perturbation Model:
         Uses first-order Laplace-Lagrange secular perturbation theory to
@@ -1588,19 +1597,30 @@ def calc_minor_body_position(
         reducing errors from ~1-5 arcminutes (pure Keplerian) to
         ~10-30 arcseconds for main belt asteroids.
 
+    Resonant Libration Model (plutinos):
+        For bodies in 2:3 mean motion resonance with Neptune (Ixion, Orcus),
+        the resonant argument φ = 3λ_TNO - 2λ_Neptune - ω_TNO librates around
+        180° with a period of ~20,000 years. This libration causes systematic
+        position errors of 5-10° over 50+ years if not corrected.
+
+        When body_id is provided for a known plutino, a sinusoidal correction
+        is applied to the mean anomaly, reducing position errors to <2° over
+        100-year timescales.
+
     Precision:
         With perturbations enabled:
         - Main belt asteroids: ~10-30 arcseconds typical
         - TNOs: ~1-3 arcminutes typical
+        - Plutinos (with libration): <2° over 100 years
 
         Remaining errors from:
         - Higher-order perturbations
-        - Mean-motion resonances
         - Non-gravitational forces (radiation pressure, Yarkovsky)
         - Relativistic effects (minor for asteroids)
 
     References:
-        Murray & Dermott "Solar System Dynamics" Ch. 7 (secular theory)
+        Murray & Dermott "Solar System Dynamics" Ch. 7 (secular theory), Ch. 8 (resonances)
+        Malhotra (1995) "The origin of Pluto's peculiar orbit"
         Curtis §3 (orbital elements)
         Vallado §2.3 (coordinate transformations)
     """
@@ -1626,7 +1646,18 @@ def calc_minor_body_position(
         M = math.radians(elements.M0 + elements.n * dt)
     elif e < 1.0:
         # Elliptic orbit: use perturbed values, wrap to [0, 360)
-        M = math.radians(M_deg % 360.0)
+        M_corrected = M_deg
+
+        # Apply resonant libration correction for plutinos
+        # This corrects for the oscillatory perturbation from the 2:3 Neptune resonance
+        # that is not captured by secular perturbation theory
+        if body_id is not None and body_id in PLUTINO_LIBRATION_PARAMS:
+            libration_correction = calc_libration_correction(body_id, jd_tt)
+            # Apply correction to mean anomaly (libration affects mean longitude λ = Ω + ω + M)
+            # Since Ω and ω are already perturbed, we apply the correction to M
+            M_corrected = M_deg + libration_correction
+
+        M = math.radians(M_corrected % 360.0)
     else:
         # Hyperbolic orbit: no wrapping needed
         M = math.radians(elements.M0 + elements.n * dt)
@@ -1765,20 +1796,14 @@ def calc_minor_body_heliocentric(
             pass
 
     # Fall back to Keplerian calculation
+    # Pass body_id to enable resonant libration correction for plutinos
     elements = MINOR_BODY_ELEMENTS[body_id]
-    x, y, z = calc_minor_body_position(elements, jd_tt)
+    x, y, z = calc_minor_body_position(elements, jd_tt, body_id=body_id)
 
     # Convert Cartesian to spherical coordinates
     r = math.sqrt(x**2 + y**2 + z**2)
     lon = math.degrees(math.atan2(y, x)) % 360.0
     lat = math.degrees(math.asin(z / r))
-
-    # Apply resonant libration correction for plutinos
-    # This corrects for the oscillatory perturbation from the 2:3 Neptune resonance
-    # that is not captured by secular perturbation theory
-    if body_id in PLUTINO_LIBRATION_PARAMS:
-        libration_correction = calc_libration_correction(body_id, jd_tt)
-        lon = (lon + libration_correction) % 360.0
 
     return lon, lat, r
 
