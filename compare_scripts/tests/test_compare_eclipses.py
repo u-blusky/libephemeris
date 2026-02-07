@@ -224,16 +224,11 @@ class TestEclipseCentralLine:
             jd += step_hours / 24.0
 
     @pytest.mark.comparison
-    @pytest.mark.xfail(
-        reason="calc_eclipse_central_line uses different algorithm than sol_eclipse_where - known discrepancy"
-    )
     def test_calc_eclipse_central_line_function(self):
         """Test calc_eclipse_central_line produces consistent results with sol_eclipse_where.
 
-        Note: This test compares libephemeris internal functions against each other
-        for consistency. There is a known discrepancy between the Besselian elements
-        algorithm used in calc_eclipse_central_line and the iterative algorithm used
-        in sol_eclipse_where. This test is marked as xfail until the discrepancy is resolved.
+        This test verifies that calc_eclipse_central_line and sol_eclipse_where return
+        consistent coordinates, as both now use the same underlying algorithm.
         """
         # April 8, 2024 total solar eclipse - central eclipse time window
         jd_start = swe.julday(
@@ -250,11 +245,11 @@ class TestEclipseCentralLine:
         for i, jd in enumerate(times):
             # Get libephemeris central line at this time
             lib_result = ephem.sol_eclipse_where(jd, 0)
-            lib_lon = lib_result[0][0]
-            lib_lat = lib_result[0][1]
+            lib_lon = lib_result[1][0]
+            lib_lat = lib_result[1][1]
 
-            # calc_eclipse_central_line uses a different algorithm (Besselian elements)
-            # Allow a larger tolerance for algorithmic differences
+            # calc_eclipse_central_line now uses sol_eclipse_where internally,
+            # so results should be nearly identical (within floating point precision)
             lon_diff = abs(lib_lon - lons[i])
             lat_diff = abs(lib_lat - lats[i])
 
@@ -262,33 +257,8 @@ class TestEclipseCentralLine:
             if lon_diff > 180:
                 lon_diff = 360 - lon_diff
 
-            # Use wider tolerance for internal consistency check
-            internal_tol = 1.0  # 1 degree tolerance for different algorithms
-            assert lon_diff < internal_tol, (
-                f"calc_eclipse_central_line at JD {jd}: lon diff {lon_diff:.4f}° exceeds tolerance"
-            )
-            assert lat_diff < internal_tol, (
-                f"calc_eclipse_central_line at JD {jd}: lat diff {lat_diff:.4f}° exceeds tolerance"
-            )
-
-        # Compare each point with libephemeris sol_eclipse_where
-        for i, jd in enumerate(times):
-            # Get libephemeris central line at this time
-            lib_result = ephem.sol_eclipse_where(jd, 0)
-            lib_lon = lib_result[0][0]
-            lib_lat = lib_result[0][1]
-
-            # calc_eclipse_central_line uses a different algorithm (Besselian elements)
-            # Allow a larger tolerance for algorithmic differences
-            lon_diff = abs(lib_lon - lons[i])
-            lat_diff = abs(lib_lat - lats[i])
-
-            # Handle longitude wrap-around
-            if lon_diff > 180:
-                lon_diff = 360 - lon_diff
-
-            # Use wider tolerance for internal consistency check
-            internal_tol = 1.0  # 1 degree tolerance for different algorithms
+            # Use tight tolerance since both functions now use same algorithm
+            internal_tol = 0.01  # 0.01 degree tolerance for floating point precision
             assert lon_diff < internal_tol, (
                 f"calc_eclipse_central_line at JD {jd}: lon diff {lon_diff:.4f}° exceeds tolerance"
             )
