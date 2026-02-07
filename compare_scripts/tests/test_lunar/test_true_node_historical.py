@@ -354,7 +354,6 @@ class TestTrueNodeAtHistoricalEclipses:
             f"Pre-modern eclipse max error {max_error:.4f} exceeds {PRE_MODERN_MAX_ERROR}"
         )
 
-    @pytest.mark.xfail(reason="Historical eclipse errors slightly exceed tolerance")
     def test_early_modern_eclipse_dates(self, progress_reporter):
         """Test True Node at early modern eclipse dates (1500-1800 CE)."""
         errors = []
@@ -403,7 +402,6 @@ class TestTrueNodeAtHistoricalEclipses:
             f"Early modern eclipse max error {max_error:.4f} exceeds {EARLY_MODERN_MAX_ERROR}"
         )
 
-    @pytest.mark.xfail(reason="Historical eclipse errors slightly exceed tolerance")
     def test_nineteenth_century_eclipse_dates(self, progress_reporter):
         """Test True Node at 19th century eclipse dates (1800-1900 CE)."""
         errors = []
