@@ -335,6 +335,81 @@ This sub-arcminute precision makes True Lilith suitable for all practical applic
 
 **Note on Interpolated Apogee/Perigee**: The interpolated apogee (SE_INTP_APOG) and perigee (SE_INTP_PERG) use an analytical ELP2000-82B perturbation series to compute the smoothed apsidal position. This approach removes the spurious 30-degree oscillations present in the osculating apsides while maintaining high precision. The interpolated apogee achieves ~0.10° mean error (0.36° max) vs Swiss Ephemeris, and the interpolated perigee achieves ~0.46° mean error (2.6° max). The perigee requires more harmonic terms due to stronger solar perturbations. See [INTERPOLATED_APOGEE.md](INTERPOLATED_APOGEE.md) for comprehensive documentation.
 
+### Planetary Nodes and Apsides (nod_aps)
+
+> **Important Methodological Difference**
+>
+> LibEphemeris uses a fundamentally different approach than Swiss Ephemeris for
+> calculating planetary nodes and apsides. This is an intentional design choice,
+> not a bug.
+
+#### The Difference
+
+| Approach | Library | Definition |
+|----------|---------|------------|
+| **Heliocentric** | LibEphemeris | Where the planet's orbit crosses the ecliptic as seen from the Sun |
+| **Geocentric** | Swiss Ephemeris | Where the planet appears to cross the ecliptic as seen from Earth |
+
+#### Impact by Planet Type
+
+| Planet Type | Typical Difference | Examples |
+|-------------|-------------------|----------|
+| **Inner planets** | Up to ~250° | Mercury, Venus |
+| **Outer planets** | <1° | Mars, Jupiter, Saturn, Uranus, Neptune, Pluto |
+
+For outer planets, both approaches give nearly identical results because the
+heliocentric/geocentric distinction diminishes with distance from the Sun.
+
+For inner planets (Mercury and Venus), the difference can be dramatic (~250°)
+because these planets orbit inside Earth's orbit, making the heliocentric and
+geocentric orbital planes oriented very differently relative to Earth.
+
+#### Which Interpretation is Correct?
+
+**Both are astronomically valid** - they answer different questions:
+
+- **Heliocentric (LibEphemeris)**: The true orbital node where the planet's
+  heliocentric orbit intersects the ecliptic plane. This is the standard
+  astronomical definition used in celestial mechanics.
+
+- **Geocentric (Swiss Ephemeris)**: The apparent position where the planet
+  appears to cross the ecliptic from Earth's perspective. This may be preferred
+  in astrological traditions that emphasize Earth-centered observation.
+
+#### Technical Details
+
+LibEphemeris uses mean orbital elements from Standish (1992) JPL/IERS tables:
+
+- Semi-major axis, eccentricity, inclination
+- Mean longitude, longitude of perihelion, longitude of ascending node
+- Time derivatives for secular evolution
+
+These elements are given as polynomial expansions in time from J2000.0, providing
+the mean (averaged over perturbations) orbital parameters.
+
+#### Warning for Inner Planets
+
+When calculating nodes/apsides for Mercury or Venus, LibEphemeris issues a
+`HeliocentricNodApsWarning` to alert users about this methodological difference:
+
+```python
+import warnings
+import libephemeris as eph
+
+# Suppress the warning if you understand the difference
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", eph.HeliocentricNodApsWarning)
+    nasc, ndsc, peri, aphe = eph.nod_aps_ut(jd, eph.SE_MERCURY, 0, eph.SE_NODBIT_MEAN)
+```
+
+#### Recommendations
+
+| Use Case | Recommendation |
+|----------|---------------|
+| Celestial mechanics, orbital analysis | Use LibEphemeris (heliocentric) |
+| Traditional geocentric astrology | Consider Swiss Ephemeris (geocentric) |
+| Outer planets (Mars+) | Either library (results are similar) |
+
 ### Asteroids
 
 LibEphemeris supports two methods for calculating asteroid positions:

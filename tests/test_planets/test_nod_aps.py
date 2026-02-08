@@ -298,3 +298,135 @@ class TestNodApsAliases:
         """nod_aps should be available."""
         result = ephem.nod_aps(2451545.0, SE_MARS, SE_NODBIT_MEAN)
         assert len(result) == 4
+
+
+class TestNodApsMethodologyWarning:
+    """Test the HeliocentricNodApsWarning for inner planets."""
+
+    @pytest.mark.unit
+    def test_warning_issued_for_mercury(self):
+        """Mercury should trigger HeliocentricNodApsWarning."""
+        import warnings
+
+        jd = 2451545.0
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ephem.nod_aps_ut(jd, SE_MERCURY, 0, SE_NODBIT_MEAN)
+
+            # Check that a warning was issued
+            assert len(w) >= 1
+            assert any(
+                issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+                for warning in w
+            )
+
+    @pytest.mark.unit
+    def test_warning_issued_for_venus(self):
+        """Venus should trigger HeliocentricNodApsWarning."""
+        import warnings
+
+        jd = 2451545.0
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ephem.nod_aps_ut(jd, SE_VENUS, 0, SE_NODBIT_MEAN)
+
+            assert len(w) >= 1
+            assert any(
+                issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+                for warning in w
+            )
+
+    @pytest.mark.unit
+    def test_no_warning_for_mars(self):
+        """Mars should not trigger HeliocentricNodApsWarning."""
+        import warnings
+
+        jd = 2451545.0
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
+
+            # No HeliocentricNodApsWarning should be issued for outer planets
+            helio_warnings = [
+                warning
+                for warning in w
+                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            ]
+            assert len(helio_warnings) == 0
+
+    @pytest.mark.unit
+    def test_no_warning_for_jupiter(self):
+        """Jupiter should not trigger HeliocentricNodApsWarning."""
+        import warnings
+
+        jd = 2451545.0
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ephem.nod_aps_ut(jd, SE_JUPITER, 0, SE_NODBIT_MEAN)
+
+            helio_warnings = [
+                warning
+                for warning in w
+                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            ]
+            assert len(helio_warnings) == 0
+
+    @pytest.mark.unit
+    def test_warning_can_be_suppressed(self):
+        """HeliocentricNodApsWarning should be suppressible."""
+        import warnings
+
+        jd = 2451545.0
+        with warnings.catch_warnings(record=True) as w:
+            warnings.filterwarnings("ignore", category=ephem.HeliocentricNodApsWarning)
+            ephem.nod_aps_ut(jd, SE_MERCURY, 0, SE_NODBIT_MEAN)
+
+            # No HeliocentricNodApsWarning should be recorded when filtered
+            helio_warnings = [
+                warning
+                for warning in w
+                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            ]
+            assert len(helio_warnings) == 0
+
+    @pytest.mark.unit
+    def test_warning_message_contains_planet_name(self):
+        """Warning message should contain the planet name."""
+        import warnings
+
+        jd = 2451545.0
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ephem.nod_aps_ut(jd, SE_MERCURY, 0, SE_NODBIT_MEAN)
+
+            helio_warnings = [
+                warning
+                for warning in w
+                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            ]
+            assert len(helio_warnings) == 1
+            assert "Mercury" in str(helio_warnings[0].message)
+
+    @pytest.mark.unit
+    def test_warning_message_mentions_precision_doc(self):
+        """Warning message should reference PRECISION.md."""
+        import warnings
+
+        jd = 2451545.0
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ephem.nod_aps_ut(jd, SE_VENUS, 0, SE_NODBIT_MEAN)
+
+            helio_warnings = [
+                warning
+                for warning in w
+                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            ]
+            assert len(helio_warnings) == 1
+            assert "PRECISION.md" in str(helio_warnings[0].message)
+
+    @pytest.mark.unit
+    def test_warning_class_is_exported(self):
+        """HeliocentricNodApsWarning should be exported from libephemeris."""
+        assert hasattr(ephem, "HeliocentricNodApsWarning")
+        assert issubclass(ephem.HeliocentricNodApsWarning, UserWarning)

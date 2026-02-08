@@ -42,6 +42,7 @@ References:
 from __future__ import annotations
 
 import math
+import warnings
 from typing import Tuple, TYPE_CHECKING
 from jplephem.exceptions import OutOfRangeError
 from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
@@ -3047,11 +3048,58 @@ def swe_nod_aps(
     return _calc_nod_aps(t, ipl, iflag, method)
 
 
+class HeliocentricNodApsWarning(UserWarning):
+    """Warning for heliocentric nod_aps methodology differences.
+
+    This warning is issued when calculating nodes and apsides for inner planets
+    (Mercury, Venus) because LibEphemeris uses heliocentric mean orbital elements
+    while Swiss Ephemeris uses a geocentric interpretation, causing large apparent
+    differences (up to 250 degrees).
+
+    Both approaches are astronomically valid and answer different questions:
+    - Heliocentric: Where does the orbit cross the ecliptic as seen from the Sun?
+    - Geocentric: Where does the planet appear to cross the ecliptic from Earth?
+
+    For astrological use, check which interpretation matches your tradition.
+    """
+
+    pass
+
+
 def _calc_nod_aps(
     t, ipl: int, iflag: int, method: int
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
     """
-    Internal function to calculate orbital nodes and apsides.
+    Calculate orbital nodes and apsides using heliocentric mean orbital elements.
+
+    .. warning:: Methodological Difference from Swiss Ephemeris
+
+        This function uses **heliocentric mean orbital elements** from Standish
+        (1992) JPL/IERS tables. This is a fundamentally different approach from
+        Swiss Ephemeris, which uses a **geocentric interpretation**.
+
+        **Impact for inner planets (Mercury, Venus):**
+        Differences can be up to ~250 degrees because the heliocentric and
+        geocentric orbital planes are oriented very differently relative to Earth.
+
+        **Impact for outer planets (Mars, Jupiter, Saturn, etc.):**
+        Differences are small (<1 degree) because the heliocentric/geocentric
+        distinction diminishes with distance from the Sun.
+
+        **Which is "correct"?**
+        Both approaches are astronomically valid - they answer different questions:
+
+        - **Heliocentric (LibEphemeris)**: "Where does the planet's orbit cross
+          the ecliptic plane as seen from the Sun?" This gives the true orbital
+          node of the planet in its heliocentric orbit.
+
+        - **Geocentric (Swiss Ephemeris)**: "Where does the planet appear to
+          cross the ecliptic as seen from Earth?" This is the apparent crossing
+          point from Earth's perspective.
+
+        For outer planets, both approaches give similar results. For inner planets,
+        the geocentric interpretation is more commonly used in astrological
+        traditions that focus on Earth-centered observations.
 
     Uses mean orbital elements from JPL/IERS tables (Standish, 1992) to compute
     the positions of orbital nodes and apsides. The mean elements are given as
@@ -3062,12 +3110,22 @@ def _calc_nod_aps(
 
     Args:
         t: Skyfield Time object
-        ipl: Planet ID
+        ipl: Planet ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
         iflag: Calculation flags
-        method: Node/apse calculation method
+        method: Node/apse calculation method (SE_NODBIT_MEAN or SE_NODBIT_OSCU)
 
     Returns:
         Tuple of (ascending_node, descending_node, perihelion, aphelion)
+        Each element is a PosTuple: (longitude, latitude, distance, dlon, dlat, ddist)
+
+    See Also:
+        - PRECISION.md: "Planetary Nodes and Apsides" section for full documentation
+        - swe_nod_aps(): Public API wrapper for Ephemeris Time
+        - swe_nod_aps_ut(): Public API wrapper for Universal Time
+
+    References:
+        - Standish, E.M. (1992). "Keplerian Elements for Approximate Positions
+          of the Major Planets". JPL/IERS.
     """
     # Zero position for unsupported bodies
     zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -3079,6 +3137,18 @@ def _calc_nod_aps(
     # Sun and Earth don't have orbital nodes/apsides in heliocentric sense
     if ipl in [SE_SUN, SE_EARTH]:
         return (zero_pos, zero_pos, zero_pos, zero_pos)
+
+    # Warn for inner planets about methodological differences with Swiss Ephemeris
+    if ipl in [SE_MERCURY, SE_VENUS]:
+        planet_name = _PLANET_NAMES.get(ipl, f"Planet {ipl}")
+        warnings.warn(
+            f"nod_aps for {planet_name}: LibEphemeris uses heliocentric mean orbital "
+            f"elements (Standish 1992) while Swiss Ephemeris uses geocentric "
+            f"interpretation. This can cause differences up to ~250 degrees for inner "
+            f"planets. Both approaches are valid - see PRECISION.md for details.",
+            HeliocentricNodApsWarning,
+            stacklevel=3,  # Point to caller of swe_nod_aps/swe_nod_aps_ut
+        )
 
     # Mean orbital elements at J2000.0 and their rates per Julian century
     # From "Keplerian Elements for Approximate Positions of the Major Planets"

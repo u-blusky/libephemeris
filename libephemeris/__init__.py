@@ -69,6 +69,7 @@ from .planets import (
     swe_pheno,
     swe_pheno_ut,
     get_planet_name,
+    HeliocentricNodApsWarning,
     # Elongation helper functions
     get_elongation_from_sun,
     get_signed_elongation,
@@ -649,6 +650,7 @@ __all__ = [
     "nod_aps",
     "swe_nod_aps_ut",
     "nod_aps_ut",
+    "HeliocentricNodApsWarning",
     "swe_get_orbital_elements",
     "get_orbital_elements",
     "swe_get_orbital_elements_ut",
