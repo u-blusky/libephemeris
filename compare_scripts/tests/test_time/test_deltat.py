@@ -249,16 +249,19 @@ class TestDeltatEx:
         assert serr_jpleph == ""
 
     @pytest.mark.unit
-    def test_deltat_ex_moseph_warning(self):
-        """SEFLG_MOSEPH should return a warning message."""
+    def test_deltat_ex_moseph_uses_same_delta_t(self):
+        """SEFLG_MOSEPH uses the same Delta T calculation (no warning)."""
         jd = 2451545.0  # J2000
         dt, serr = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
-        assert "SEFLG_MOSEPH" in serr
-        assert "not supported" in serr
+        # No warning - Moshier uses the same Skyfield Delta T model
+        assert serr == ""
         # Should still return a valid Delta T value
         assert isinstance(dt, float)
         dt_seconds = dt * 86400
         assert 60 < dt_seconds < 70
+        # Value should match the standard function
+        dt_standard = ephem.swe_deltat(jd)
+        assert dt == dt_standard
 
     @pytest.mark.unit
     def test_deltat_ex_no_flag(self):

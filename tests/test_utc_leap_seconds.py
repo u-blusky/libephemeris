@@ -382,18 +382,22 @@ class TestDeltaTWithIersData:
         assert err_swieph == ""
         assert err_jpleph == ""
 
-    def test_deltat_ex_moseph_warning(self):
-        """Verify Moshier ephemeris gives warning but still returns valid Delta T."""
+    def test_deltat_ex_moseph_uses_same_delta_t(self):
+        """Verify Moshier ephemeris uses the same Delta T calculation (no warning)."""
         jd = 2451545.0
 
         dt, err = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
 
-        # Should have a warning message
-        assert "MOSEPH" in err or "not supported" in err.lower()
+        # No warning - Moshier uses the same Skyfield Delta T model
+        assert err == ""
 
-        # But still return a valid Delta T value
+        # Should return a valid Delta T value matching other ephemeris modes
         dt_seconds = dt * 86400
         assert 60 < dt_seconds < 70
+
+        # Verify it matches the standard function
+        dt_standard = ephem.swe_deltat(jd)
+        assert dt == dt_standard
 
 
 class TestLeapSecondEdgeCases:

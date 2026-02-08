@@ -210,7 +210,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
         ephe_flag: Ephemeris selection flag:
             - SEFLG_SWIEPH (2): Use Swiss Ephemeris/Skyfield (default)
             - SEFLG_JPLEPH (1): Use JPL ephemeris
-            - SEFLG_MOSEPH (4): Use Moshier ephemeris (not supported)
+            - SEFLG_MOSEPH (4): Use Moshier semi-analytical ephemeris (same Delta T)
 
     Returns:
         tuple: (delta_t, serr) where:
@@ -236,8 +236,9 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
         Since libephemeris uses Skyfield which internally uses JPL data,
         SEFLG_SWIEPH and SEFLG_JPLEPH produce identical results.
 
-        SEFLG_MOSEPH is not supported and will return the default Delta T
-        with a warning message.
+        SEFLG_MOSEPH uses the same Skyfield Delta T model and returns the
+        default Delta T value (Moshier mode only affects position calculations,
+        not time conversions).
 
         If a user-defined Delta T has been set via set_delta_t_userdef(),
         that value will be returned instead of the computed value.
@@ -264,11 +265,10 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
     # Check for valid ephemeris flags
     ephe_selection = ephe_flag & (SEFLG_JPLEPH | SEFLG_SWIEPH | SEFLG_MOSEPH)
 
-    if ephe_selection == SEFLG_MOSEPH:
-        # Moshier ephemeris is not supported, return default with warning
-        serr = "Warning: SEFLG_MOSEPH not supported, using default Delta T"
+    # All ephemeris modes use the same Skyfield Delta T model
+    # SEFLG_MOSEPH only affects position calculations, not Delta T
     # SEFLG_SWIEPH and SEFLG_JPLEPH both use Skyfield/JPL internally
-    # so no warning is needed for those
+    _ = ephe_selection  # Explicitly unused: all modes use same Delta T
 
     # Check for IERS Delta T if enabled
     if get_iers_delta_t_enabled():
