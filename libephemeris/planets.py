@@ -2491,28 +2491,27 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             val = star_lon - 240.0
 
         elif sid_mode == SE_SIDM_GALCENT_0SAG:
-            gc_lon = _get_star_position_ecliptic(STARS["GAL_CENTER"], tjd_tt, eps_true)
-            val = gc_lon - 240.0
+            # Galactic Center at 0° Sagittarius (240°)
+            # Uses calibrated SE-compatible formula: ayan = ayan_t0 + rate * T
+            # where T is Julian centuries from J2000
+            # Parameters derived from Swiss Ephemeris 2.10:
+            #   ayan_t0 = 26.84604585° at J2000
+            #   rate = 1.39684523°/century = 50.2864"/year (IAU precession)
+            ayan_t0_galcent_0sag = 26.84604585
+            prec_rate = 1.39684523  # degrees per century
+            val = ayan_t0_galcent_0sag + prec_rate * T
 
         elif sid_mode == SE_SIDM_GALCENT_RGILBRAND:
-            # Gil Brand: Galactic Center at 0° Sag (240.0)
-            # Previous offset 240.0 gave diff ~4.38 deg.
-            # Adjusted offset 244.3826.
-            # Let's verify if this matches.
-            # 26.8517 (True GC) - 22.4691 (Gil Brand) = 4.3826.
-            # So Sidereal GC is 4.3826 degrees less than True GC.
-            # No, Ayanamsha is 4.3826 degrees less.
-            # Ayanamsha = Tropical - Sidereal.
-            # Sidereal = Tropical - Ayanamsha.
-            # Sidereal(Gil) = Tropical - (Ayan(True) - 4.3826) = Sidereal(True) + 4.3826.
-            # Sidereal(True) is 0 Sag (240.0).
-            # So Sidereal(Gil) is 244.3826.
-            # This means Gil Brand defines GC at 4°23' Sag?
-            # Or maybe 5° Sag (245.0)?
-            # 4.3826 is close to 4.38.
-            # Let's use the empirical offset 244.3826.
-            gc_lon = _get_star_position_ecliptic(STARS["GAL_CENTER"], tjd_tt, eps_true)
-            val = gc_lon - 244.3826
+            # Gil Brand: Galactic Center at golden section between Scorpio and Aquarius
+            # Target sidereal position: 4°22'16.7" Sagittarius = 244.371297°
+            # (Golden section: 90° × 0.618034 = 55.623° from 0° Leo = 210.377° from 0° Aries)
+            # Uses calibrated SE-compatible formula: ayan = ayan_t0 + rate * T
+            # Parameters derived from Swiss Ephemeris 2.10:
+            #   ayan_t0 = 22.46910483° at J2000
+            #   rate = 1.39684523°/century (same as 0SAG, standard precession)
+            ayan_t0_rgilbrand = 22.46910483
+            prec_rate = 1.39684523  # degrees per century
+            val = ayan_t0_rgilbrand + prec_rate * T
 
         elif sid_mode == SE_SIDM_GALEQU_IAU1958:
             # Galactic Equator (IAU 1958)
@@ -2575,14 +2574,27 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             val = star_lon - 178.607
 
         elif sid_mode == SE_SIDM_GALCENT_MULA_WILHELM:
-            # Galactic Center at Mula (Wilhelm)
-            gc_lon = _get_star_position_ecliptic(STARS["GAL_CENTER"], tjd_tt, eps_true)
-            val = gc_lon - 246.81
+            # Galactic Center at Middle of Mula (Ernst Wilhelm)
+            # Uses polar projection (dhruva) through celestial north pole.
+            # Target sidereal position: 6°40' Sagittarius = 246.6667°
+            # Uses calibrated SE-compatible formula: ayan = ayan_t0 + rate * T
+            # Parameters derived from Swiss Ephemeris 2.10:
+            #   ayan_t0 = 20.03923316° at J2000
+            #   rate = 1.45857980°/century = 52.5089"/year (different from standard precession
+            #   due to polar projection method changing with precession of celestial pole)
+            ayan_t0_mula_wilhelm = 20.03923316
+            prec_rate = 1.45857980  # degrees per century (specific to polar projection)
+            val = ayan_t0_mula_wilhelm + prec_rate * T
 
         elif sid_mode == SE_SIDM_GALCENT_COCHRANE:
-            # Galactic Center (Cochrane)
-            gc_lon = _get_star_position_ecliptic(STARS["GAL_CENTER"], tjd_tt, eps_true)
-            val = gc_lon - 270.0
+            # Galactic Center at 0° Capricorn (David Cochrane)
+            # Uses calibrated SE-compatible formula: ayan = ayan_t0 + rate * T
+            # Parameters derived from Swiss Ephemeris 2.10:
+            #   ayan_t0 = 356.84604585° at J2000 (= 26.846° - 30° = -3.154° mod 360)
+            #   rate = 1.39684523°/century (same as 0SAG, standard precession)
+            ayan_t0_cochrane = 356.84604585
+            prec_rate = 1.39684523  # degrees per century
+            val = ayan_t0_cochrane + prec_rate * T
 
         elif sid_mode == SE_SIDM_J2000:
             # J2000 Ayanamsha

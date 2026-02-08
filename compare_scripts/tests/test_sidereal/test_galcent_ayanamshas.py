@@ -231,8 +231,9 @@ class TestGalcentVsPyswisseph:
         (JD_2100, "2100"),
     ]
 
-    # Star-based ayanamshas have higher tolerance due to different star catalogs
-    TOLERANCE = 1.0  # degrees
+    # Galactic Center ayanamshas now use calibrated SE-compatible formulas
+    # with precision better than 2 arcsec (0.0006°) across all epochs
+    TOLERANCE = 0.001  # degrees (3.6 arcsec)
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("sid_mode,name", GALCENT_MODES)

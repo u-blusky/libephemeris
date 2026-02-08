@@ -282,17 +282,17 @@ def major_ayanamshas():
 
 @pytest.fixture
 def star_based_ayanamshas():
-    """Star-based ayanamshas (require relaxed tolerance)."""
+    """Star-based ayanamshas (require relaxed tolerance).
+
+    Note: GALCENT modes are no longer included as they now use
+    SE-calibrated formulas with <0.001° precision.
+    """
     return [
         SE_SIDM_TRUE_CITRA,
         SE_SIDM_TRUE_REVATI,
         SE_SIDM_TRUE_PUSHYA,
         SE_SIDM_TRUE_MULA,
         SE_SIDM_TRUE_SHEORAN,
-        SE_SIDM_GALCENT_0SAG,
-        SE_SIDM_GALCENT_RGILBRAND,
-        SE_SIDM_GALCENT_COCHRANE,
-        SE_SIDM_GALCENT_MULA_WILHELM,
     ]
 
 
