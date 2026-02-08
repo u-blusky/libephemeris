@@ -400,6 +400,206 @@ class TestSpkDownloadIntegration:
 # =============================================================================
 
 
+class TestDownloadSpkProgressBar:
+    """Test progress bar functionality for SPK downloads."""
+
+    def test_progress_bar_shows_for_large_files_on_tty(
+        self, tmp_path, capture_libephemeris_logs
+    ):
+        """Progress bar should show for files > 1MB when stderr is tty."""
+        mock_json_response = {
+            "spk_file_id": "test_id",
+            "spk": "https://ssd.jpl.nasa.gov/test.bsp",
+        }
+
+        # Create a mock headers object
+        mock_headers = MagicMock()
+        mock_headers.get = MagicMock(
+            side_effect=lambda key: "2097152" if key == "Content-Length" else None
+        )  # 2MB
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            # First call returns JSON with SPK URL
+            mock_response1 = MagicMock()
+            mock_response1.read.return_value = json.dumps(mock_json_response).encode()
+            mock_response1.__enter__ = MagicMock(return_value=mock_response1)
+            mock_response1.__exit__ = MagicMock(return_value=False)
+
+            # Second call returns SPK binary data in chunks (2MB)
+            mock_response2 = MagicMock()
+            mock_response2.headers = mock_headers
+            # Return 2MB of data in 64KB chunks
+            chunk_size = 64 * 1024
+            total_chunks = 2 * 1024 * 1024 // chunk_size
+            chunk_data = [b"\x00" * chunk_size] * total_chunks + [b""]
+            mock_response2.read = MagicMock(side_effect=chunk_data)
+            mock_response2.__enter__ = MagicMock(return_value=mock_response2)
+            mock_response2.__exit__ = MagicMock(return_value=False)
+
+            mock_urlopen.side_effect = [mock_response1, mock_response2]
+
+            # Mock stderr.isatty() to return True
+            with patch("sys.stderr") as mock_stderr:
+                mock_stderr.isatty.return_value = True
+                mock_stderr.write = MagicMock()
+                mock_stderr.flush = MagicMock()
+
+                with patch("libephemeris.spk.SimpleProgressBar") as mock_progress_class:
+                    mock_progress = MagicMock()
+                    mock_progress_class.return_value = mock_progress
+
+                    path = eph.download_spk(
+                        body="2060",
+                        start="2020-01-01",
+                        end="2025-01-01",
+                        path=str(tmp_path),
+                    )
+
+                    # Verify progress bar was created for file > 1MB
+                    mock_progress_class.assert_called_once()
+                    call_kwargs = mock_progress_class.call_args.kwargs
+                    assert call_kwargs["total"] == 2097152
+                    assert "[libephemeris]" in call_kwargs["description"]
+
+                    # Verify update was called
+                    assert mock_progress.update.call_count > 0
+
+                    # Verify close was called
+                    mock_progress.close.assert_called_once()
+
+    def test_no_progress_bar_for_small_files(self, tmp_path, capture_libephemeris_logs):
+        """Progress bar should NOT show for files < 1MB."""
+        mock_json_response = {
+            "spk_file_id": "test_id",
+            "spk": "https://ssd.jpl.nasa.gov/test.bsp",
+        }
+
+        # Create a mock headers object for 500KB file
+        mock_headers = MagicMock()
+        mock_headers.get = MagicMock(
+            side_effect=lambda key: "524288" if key == "Content-Length" else None
+        )  # 500KB
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response1 = MagicMock()
+            mock_response1.read.return_value = json.dumps(mock_json_response).encode()
+            mock_response1.__enter__ = MagicMock(return_value=mock_response1)
+            mock_response1.__exit__ = MagicMock(return_value=False)
+
+            mock_response2 = MagicMock()
+            mock_response2.headers = mock_headers
+            # Return 500KB of data in one chunk plus empty
+            mock_response2.read = MagicMock(side_effect=[b"\x00" * 524288, b""])
+            mock_response2.__enter__ = MagicMock(return_value=mock_response2)
+            mock_response2.__exit__ = MagicMock(return_value=False)
+
+            mock_urlopen.side_effect = [mock_response1, mock_response2]
+
+            with patch("sys.stderr") as mock_stderr:
+                mock_stderr.isatty.return_value = True
+
+                with patch("libephemeris.spk.SimpleProgressBar") as mock_progress_class:
+                    path = eph.download_spk(
+                        body="2060",
+                        start="2020-01-01",
+                        end="2025-01-01",
+                        path=str(tmp_path),
+                    )
+
+                    # Verify progress bar was NOT created for file < 1MB
+                    mock_progress_class.assert_not_called()
+
+    def test_no_progress_bar_when_not_tty(self, tmp_path, capture_libephemeris_logs):
+        """Progress bar should NOT show when stderr is not a tty (pipe/file)."""
+        mock_json_response = {
+            "spk_file_id": "test_id",
+            "spk": "https://ssd.jpl.nasa.gov/test.bsp",
+        }
+
+        # Create a mock headers object for 2MB file
+        mock_headers = MagicMock()
+        mock_headers.get = MagicMock(
+            side_effect=lambda key: "2097152" if key == "Content-Length" else None
+        )
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response1 = MagicMock()
+            mock_response1.read.return_value = json.dumps(mock_json_response).encode()
+            mock_response1.__enter__ = MagicMock(return_value=mock_response1)
+            mock_response1.__exit__ = MagicMock(return_value=False)
+
+            mock_response2 = MagicMock()
+            mock_response2.headers = mock_headers
+            chunk_size = 64 * 1024
+            total_chunks = 2 * 1024 * 1024 // chunk_size
+            mock_response2.read = MagicMock(
+                side_effect=[b"\x00" * chunk_size] * total_chunks + [b""]
+            )
+            mock_response2.__enter__ = MagicMock(return_value=mock_response2)
+            mock_response2.__exit__ = MagicMock(return_value=False)
+
+            mock_urlopen.side_effect = [mock_response1, mock_response2]
+
+            # Mock stderr.isatty() to return False (simulating pipe/file)
+            with patch("sys.stderr") as mock_stderr:
+                mock_stderr.isatty.return_value = False
+
+                with patch("libephemeris.spk.SimpleProgressBar") as mock_progress_class:
+                    path = eph.download_spk(
+                        body="2060",
+                        start="2020-01-01",
+                        end="2025-01-01",
+                        path=str(tmp_path),
+                    )
+
+                    # Verify progress bar was NOT created when not tty
+                    mock_progress_class.assert_not_called()
+
+    def test_no_progress_bar_when_content_length_unknown(
+        self, tmp_path, capture_libephemeris_logs
+    ):
+        """Progress bar should NOT show when Content-Length header is missing."""
+        mock_json_response = {
+            "spk_file_id": "test_id",
+            "spk": "https://ssd.jpl.nasa.gov/test.bsp",
+        }
+
+        # Create a mock headers object with no Content-Length
+        mock_headers = MagicMock()
+        mock_headers.get = MagicMock(return_value=None)
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response1 = MagicMock()
+            mock_response1.read.return_value = json.dumps(mock_json_response).encode()
+            mock_response1.__enter__ = MagicMock(return_value=mock_response1)
+            mock_response1.__exit__ = MagicMock(return_value=False)
+
+            mock_response2 = MagicMock()
+            mock_response2.headers = mock_headers
+            # Return 2MB of data even though Content-Length is unknown
+            mock_response2.read = MagicMock(
+                side_effect=[b"\x00" * (2 * 1024 * 1024), b""]
+            )
+            mock_response2.__enter__ = MagicMock(return_value=mock_response2)
+            mock_response2.__exit__ = MagicMock(return_value=False)
+
+            mock_urlopen.side_effect = [mock_response1, mock_response2]
+
+            with patch("sys.stderr") as mock_stderr:
+                mock_stderr.isatty.return_value = True
+
+                with patch("libephemeris.spk.SimpleProgressBar") as mock_progress_class:
+                    path = eph.download_spk(
+                        body="2060",
+                        start="2020-01-01",
+                        end="2025-01-01",
+                        path=str(tmp_path),
+                    )
+
+                    # Verify progress bar was NOT created when Content-Length unknown
+                    mock_progress_class.assert_not_called()
+
+
 @pytest.fixture
 def capture_libephemeris_logs():
     """Fixture to capture logs from libephemeris logger.

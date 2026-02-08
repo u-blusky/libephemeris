@@ -31,6 +31,7 @@ import json
 import math
 import os
 import re
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -38,9 +39,13 @@ from typing import Optional, Union
 
 from skyfield.framelib import ecliptic_frame
 
+from .download import SimpleProgressBar
 from .exceptions import SPKNotFoundError
 from .logging_config import format_file_size, get_logger
 from .state import get_library_path, get_loader, get_timescale
+
+# Threshold for showing progress bar (1 MB)
+_PROGRESS_THRESHOLD_BYTES = 1 * 1024 * 1024
 
 
 # =============================================================================
@@ -339,7 +344,39 @@ def download_spk(
             spk_req.add_header("User-Agent", "libephemeris/0.1")
 
             with urllib.request.urlopen(spk_req, timeout=timeout) as spk_response:
-                spk_data = spk_response.read()
+                content_length = spk_response.headers.get("Content-Length")
+                total_size = int(content_length) if content_length else 0
+
+                # Show progress bar for large files (>1MB) when stderr is a tty
+                show_progress = (
+                    total_size > _PROGRESS_THRESHOLD_BYTES and sys.stderr.isatty()
+                )
+
+                if show_progress:
+                    progress = SimpleProgressBar(
+                        total=total_size,
+                        description="[libephemeris] Downloading",
+                        file=sys.stderr,
+                    )
+                else:
+                    progress = None
+
+                # Read in chunks for progress updates
+                chunks = []
+                chunk_size = 64 * 1024  # 64KB chunks
+
+                while True:
+                    chunk = spk_response.read(chunk_size)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    if progress:
+                        progress.update(len(chunk))
+
+                if progress:
+                    progress.close()
+
+                spk_data = b"".join(chunks)
 
             # Write to file
             with open(filepath, "wb") as f:
