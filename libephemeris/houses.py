@@ -743,10 +743,10 @@ def swe_houses(
     if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
         _raise_polar_circle_error(lat, eps, hsys_char, "swe_houses")
 
-    # Calculate Sun's declination for Sunshine houses ('I')
+    # Calculate Sun's declination for Sunshine houses ('I' or 'i')
     # This is needed before the house dispatch since only swe_houses has jd_ut
     sun_dec = 0.0
-    if hsys_char == "I":
+    if hsys_char in ("I", "i"):
         try:
             sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
@@ -819,7 +819,7 @@ def swe_houses(
         cusps = _houses_pullen_sr(asc, mc)
     elif hsys_char == "D":  # Equal from MC
         cusps = _houses_equal_mc(asc, mc)
-    elif hsys_char == "I":  # Sunshine (Makransky)
+    elif hsys_char in ("I", "i"):  # Sunshine (Makransky)
         cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, sun_dec)
     else:
         # Default to Placidus
@@ -1348,7 +1348,7 @@ def swe_houses_armc(
         cusps = _houses_pullen_sr(asc, mc)
     elif hsys_char == "D":  # Equal from MC
         cusps = _houses_equal_mc(asc, mc)
-    elif hsys_char == "I":  # Sunshine (Makransky)
+    elif hsys_char in ("I", "i"):  # Sunshine (Makransky)
         # Sunshine requires Sun's declination which needs JD.
         # swe_houses_armc doesn't have JD, so fall back to Porphyry.
         # Use swe_houses() for proper Sunshine calculation.
@@ -1465,6 +1465,9 @@ def swe_houses_ex(
     Similar to swe_houses() but applies ayanamsa correction when SEFLG_SIDEREAL
     flag is set, converting tropical positions to sidereal.
 
+    For Ascendant-based house systems (Whole Sign, Equal, Vehlow), the cusps
+    are recalculated using the sidereal Ascendant to ensure proper sign alignment.
+
     Args:
         tjdut: Julian Day in Universal Time (UT1)
         lat: Geographic latitude in degrees
@@ -1486,12 +1489,40 @@ def swe_houses_ex(
 
     if flags & SEFLG_SIDEREAL:
         ayanamsa = swe_get_ayanamsa_ut(tjdut)
-        # cusps is now 12 elements (houses 1-12), apply ayanamsa to all
-        cusps = tuple([(c - ayanamsa) % 360.0 for c in cusps])
+
+        # First compute sidereal angles
         ascmc_list = list(ascmc)
-        ascmc_list[0] = (ascmc_list[0] - ayanamsa) % 360.0  # Asc
-        ascmc_list[1] = (ascmc_list[1] - ayanamsa) % 360.0  # MC
+        sid_asc = (ascmc_list[0] - ayanamsa) % 360.0
+        sid_mc = (ascmc_list[1] - ayanamsa) % 360.0
+        ascmc_list[0] = sid_asc
+        ascmc_list[1] = sid_mc
         ascmc = tuple(ascmc_list)
+
+        # Normalize hsys to a character for comparison
+        if isinstance(hsys, int):
+            hsys_char = chr(hsys)
+        elif isinstance(hsys, bytes):
+            hsys_char = hsys.decode("utf-8")
+        else:
+            hsys_char = str(hsys)
+
+        # For Ascendant-based house systems, recalculate using sidereal Ascendant
+        # Whole Sign (W), Equal (A/E), Vehlow (V)
+        if hsys_char == "W":
+            # Whole Sign: each house is 0° of consecutive signs from Asc sign
+            # cusps[0] = House 1, cusps[1] = House 2, etc.
+            start = math.floor(sid_asc / 30.0) * 30.0
+            cusps = tuple([(start + i * 30.0) % 360.0 for i in range(12)])
+        elif hsys_char in ("A", "E"):
+            # Equal: 30° divisions starting from sidereal Asc
+            cusps = tuple([(sid_asc + i * 30.0) % 360.0 for i in range(12)])
+        elif hsys_char == "V":
+            # Vehlow Equal: sidereal Asc at middle of 1st house
+            start = (sid_asc - 15.0) % 360.0
+            cusps = tuple([(start + i * 30.0) % 360.0 for i in range(12)])
+        else:
+            # For other systems, just subtract ayanamsa from tropical cusps
+            cusps = tuple([(c - ayanamsa) % 360.0 for c in cusps])
 
     return cusps, ascmc
 
@@ -1662,6 +1693,7 @@ def swe_house_name(hsys: int) -> str:
         "Y": "APC",
         "D": "Equal (MC)",
         "I": "Sunshine",
+        "i": "Sunshine (alt)",
     }
     return names.get(hsys_char, "Unknown")
 
