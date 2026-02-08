@@ -71,7 +71,15 @@ from __future__ import annotations
 import math
 from typing import List, Optional, Tuple, Union, overload
 from .constants import *
-from .constants import SEFLG_SIDEREAL, SEFLG_SPEED, SEFLG_EQUATORIAL, SE_SUN
+from .constants import (
+    SEFLG_SIDEREAL,
+    SEFLG_SPEED,
+    SEFLG_EQUATORIAL,
+    SE_SUN,
+    SEFLG_JPLEPH,
+    SEFLG_SWIEPH,
+    SEFLG_MOSEPH,
+)
 from .state import get_timescale
 from .planets import swe_get_ayanamsa_ut, swe_calc_ut
 from .cache import get_true_obliquity, get_cached_nutation
@@ -512,7 +520,7 @@ def _calc_ascendant(
 
 
 def swe_houses(
-    tjdut: float, lat: float, lon: float, hsys: int
+    tjdut: float, lat: float, lon: float, hsys: int, iflag: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
     Calculate astrological house cusps and angles for a given time and location.
@@ -525,6 +533,9 @@ def swe_houses(
         lat: Geographic latitude in degrees (positive North, negative South)
         lon: Geographic longitude in degrees (positive East, negative West)
         hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
+        iflag: Calculation flags (optional, default 0). Use SEFLG_MOSEPH for extended
+               date range (-3000 to +3000 CE). The ephemeris flag is propagated to
+               internal calculations (e.g., Sun position for Sunshine houses).
 
     Returns:
         Tuple containing:
@@ -748,7 +759,11 @@ def swe_houses(
     sun_dec = 0.0
     if hsys_char in ("I", "i"):
         try:
-            sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL)
+            # Propagate ephemeris flag (SEFLG_MOSEPH, SEFLG_SWIEPH, etc.) to swe_calc_ut
+            # so that houses are calculated consistently with user's chosen ephemeris.
+            # Extract ephemeris flags: SEFLG_JPLEPH=1, SEFLG_SWIEPH=2, SEFLG_MOSEPH=4
+            eph_flags = iflag & (SEFLG_JPLEPH | SEFLG_SWIEPH | SEFLG_MOSEPH)
+            sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
         except Exception:
             # Fallback to 0 declination (same as equinox behavior)
@@ -1473,7 +1488,9 @@ def swe_houses_ex(
         lat: Geographic latitude in degrees
         lon: Geographic longitude in degrees
         hsys: House system identifier (int or bytes)
-        flags: Calculation flags bitmask (e.g., SEFLG_SIDEREAL)
+        flags: Calculation flags bitmask (e.g., SEFLG_SIDEREAL, SEFLG_MOSEPH).
+               Use SEFLG_MOSEPH for extended date range (-3000 to +3000 CE).
+               The ephemeris flag is propagated to all internal calculations.
 
     Returns:
         Tuple containing:
@@ -1485,7 +1502,8 @@ def swe_houses_ex(
         >>> swe_set_sid_mode(SE_SIDM_LAHIRI)
         >>> cusps, ascmc = swe_houses_ex(2451545.0, 51.5, -0.12, ord('P'), SEFLG_SIDEREAL)
     """
-    cusps, ascmc = swe_houses(tjdut, lat, lon, hsys)
+    # Propagate flags to swe_houses() so ephemeris flags (SEFLG_MOSEPH etc.) are used
+    cusps, ascmc = swe_houses(tjdut, lat, lon, hsys, flags)
 
     if flags & SEFLG_SIDEREAL:
         ayanamsa = swe_get_ayanamsa_ut(tjdut)
@@ -1527,7 +1545,9 @@ def swe_houses_ex(
             # using the sidereal Ascendant and MC.
             try:
                 # Get Sun's declination (geometric, not affected by sidereal)
-                sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL)
+                # Propagate ephemeris flags (SEFLG_MOSEPH etc.) to swe_calc_ut
+                eph_flags = flags & (SEFLG_JPLEPH | SEFLG_SWIEPH | SEFLG_MOSEPH)
+                sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
                 sun_dec = sun_pos[1]
             except Exception:
                 sun_dec = 0.0
