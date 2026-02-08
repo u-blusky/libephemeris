@@ -391,3 +391,117 @@ class TestExportsFromMain:
         """MAJOR_ASTEROID_SPK_INFO should be exported."""
         assert hasattr(eph, "MAJOR_ASTEROID_SPK_INFO")
         assert isinstance(eph.MAJOR_ASTEROID_SPK_INFO, dict)
+
+
+class TestEnsureMajorAsteroidSpkLogging:
+    """Test logging behavior in ensure_major_asteroid_spk()."""
+
+    @pytest.fixture(autouse=True)
+    def clear_spk_state(self):
+        """Clear SPK state before and after each test."""
+        orig_map = dict(state._SPK_BODY_MAP)
+        state._SPK_BODY_MAP.clear()
+        yield
+        state._SPK_BODY_MAP.clear()
+        state._SPK_BODY_MAP.update(orig_map)
+
+    @pytest.fixture
+    def enable_propagation(self):
+        """Enable log propagation and DEBUG level temporarily so caplog captures logs."""
+        import logging
+
+        from libephemeris.logging_config import get_logger
+
+        # Ensure logger is configured by calling get_logger()
+        logger = get_logger()
+
+        original_propagate = logger.propagate
+        original_level = logger.level
+        original_handler_levels = [h.level for h in logger.handlers]
+
+        logger.propagate = True
+        logger.setLevel(logging.DEBUG)
+        for handler in logger.handlers:
+            handler.setLevel(logging.DEBUG)
+
+        yield
+
+        logger.propagate = original_propagate
+        logger.setLevel(original_level)
+        for handler, level in zip(logger.handlers, original_handler_levels):
+            handler.setLevel(level)
+
+    def test_logs_debug_when_checking_availability(self, caplog, enable_propagation):
+        """Should log DEBUG message when checking SPK availability."""
+        import logging
+
+        with caplog.at_level(logging.DEBUG, logger="libephemeris"):
+            state._SPK_BODY_MAP[SE_CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
+            ensure_major_asteroid_spk(SE_CERES)
+
+        # Check that checking message was logged
+        assert any(
+            "Checking SPK availability for body" in record.message
+            and "Ceres" in record.message
+            for record in caplog.records
+        )
+
+    def test_logs_debug_when_already_cached(self, caplog, enable_propagation):
+        """Should log DEBUG message when SPK is already cached."""
+        import logging
+
+        with caplog.at_level(logging.DEBUG, logger="libephemeris"):
+            state._SPK_BODY_MAP[SE_CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
+            ensure_major_asteroid_spk(SE_CERES)
+
+        # Check that cache hit message was logged at DEBUG level
+        cache_records = [
+            record
+            for record in caplog.records
+            if "already cached" in record.message and "Ceres" in record.message
+        ]
+        assert len(cache_records) >= 1
+        assert cache_records[0].levelno == logging.DEBUG
+
+    @patch("libephemeris.minor_bodies.auto_download_asteroid_spk")
+    def test_logs_info_when_downloading(
+        self, mock_download, caplog, enable_propagation
+    ):
+        """Should log INFO message when download is needed."""
+        import logging
+
+        mock_download.return_value = "/path/to/ceres.bsp"
+
+        with caplog.at_level(logging.DEBUG, logger="libephemeris"):
+            ensure_major_asteroid_spk(SE_CERES)
+
+        # Check that download message was logged at INFO level
+        download_records = [
+            record
+            for record in caplog.records
+            if "not cached, downloading" in record.message and "Ceres" in record.message
+        ]
+        assert len(download_records) >= 1
+        assert download_records[0].levelno == logging.INFO
+
+    @patch("libephemeris.minor_bodies.auto_download_asteroid_spk")
+    def test_logs_body_name_not_just_id(
+        self, mock_download, caplog, enable_propagation
+    ):
+        """Log messages should include body name (e.g., 'Chiron'), not just ID."""
+        import logging
+
+        mock_download.return_value = "/path/to/chiron.bsp"
+
+        with caplog.at_level(logging.DEBUG, logger="libephemeris"):
+            ensure_major_asteroid_spk(SE_CHIRON)
+
+        # All log messages mentioning this body should include the name
+        relevant_records = [
+            record
+            for record in caplog.records
+            if "Chiron" in record.message or str(SE_CHIRON) in record.message
+        ]
+        assert len(relevant_records) >= 1
+        # Ensure "Chiron" appears (not just the numeric ID)
+        assert any("Chiron" in record.message for record in relevant_records)

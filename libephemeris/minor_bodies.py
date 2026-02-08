@@ -41,6 +41,7 @@ Algorithm: Keplerian mechanics with Laplace-Lagrange secular perturbations + res
 import math
 from dataclasses import dataclass
 from typing import Tuple, Optional, NamedTuple
+from .logging_config import get_logger
 from .constants import (
     SE_CHIRON,
     SE_PHOLUS,
@@ -2387,11 +2388,21 @@ def ensure_major_asteroid_spk(
         This function is non-blocking and returns immediately if the SPK
         is already available. The download only occurs on first call.
     """
+    logger = get_logger()
+
+    # Get body name for logging (fall back to body_id if not a major asteroid)
+    body_info = MAJOR_ASTEROID_SPK_INFO.get(body_id)
+    body_name = body_info[3] if body_info else str(body_id)
+
+    logger.debug("Checking SPK availability for body %d (%s)", body_id, body_name)
+
     # First check if already available
     if is_spk_available_for_body(body_id):
+        logger.debug("SPK for %s (body %d) already cached", body_name, body_id)
         return True
 
     # Try to download
+    logger.info("SPK for %s not cached, downloading...", body_name)
     if jd is not None:
         jd_start = jd - 3652.5  # ~10 years before
         jd_end = jd + 3652.5  # ~10 years after
