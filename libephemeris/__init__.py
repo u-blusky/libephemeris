@@ -5,6 +5,7 @@ from .logging_config import (
     disable_logging,
     enable_logging,
     format_file_size,
+    LIBEPHEMERIS_LOG_LEVEL_ENV,
 )
 from .exceptions import (
     # Base error class (pyswisseph compatible)

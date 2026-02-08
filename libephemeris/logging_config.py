@@ -14,29 +14,70 @@ Usage:
 The logger outputs to stderr with the format:
     [libephemeris] INFO: Downloading DE440 ephemeris (114 MB)...
 
-By default:
-    - INFO level for download-related messages (visible to users)
-    - WARNING level for other messages
+Log Level Configuration:
+    The log level can be configured via the LIBEPHEMERIS_LOG_LEVEL environment
+    variable. Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL.
+    Default is WARNING for quiet production operation.
 
-Users can configure the logging level:
-    import logging
-    logging.getLogger("libephemeris").setLevel(logging.DEBUG)
+    Examples:
+        LIBEPHEMERIS_LOG_LEVEL=DEBUG pytest -s    # Show all debug messages
+        LIBEPHEMERIS_LOG_LEVEL=INFO python app.py # Show download progress
+        LIBEPHEMERIS_LOG_LEVEL=ERROR              # Only errors
 
-Or disable logging entirely:
-    logging.getLogger("libephemeris").setLevel(logging.CRITICAL + 1)
+    Programmatic configuration:
+        import logging
+        logging.getLogger("libephemeris").setLevel(logging.DEBUG)
+
+    Or disable logging entirely:
+        logging.getLogger("libephemeris").setLevel(logging.CRITICAL + 1)
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from typing import Optional
 
 # Module-level logger name
 LOGGER_NAME = "libephemeris"
 
-# Default logging level
-DEFAULT_LEVEL = logging.INFO
+# Environment variable name for log level configuration
+LIBEPHEMERIS_LOG_LEVEL_ENV = "LIBEPHEMERIS_LOG_LEVEL"
+
+# Valid log level names
+_VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
+
+
+def _get_log_level_from_env() -> int:
+    """Get log level from environment variable.
+
+    Reads the LIBEPHEMERIS_LOG_LEVEL environment variable and returns
+    the corresponding logging level. Falls back to WARNING if the
+    variable is not set or has an invalid value.
+
+    Returns:
+        int: The logging level (e.g., logging.DEBUG, logging.WARNING).
+
+    Example:
+        >>> os.environ["LIBEPHEMERIS_LOG_LEVEL"] = "DEBUG"
+        >>> _get_log_level_from_env()
+        10  # logging.DEBUG
+    """
+    env_level = os.environ.get(LIBEPHEMERIS_LOG_LEVEL_ENV, "").upper().strip()
+
+    if not env_level:
+        return logging.WARNING  # Default for production quietness
+
+    if env_level in _VALID_LOG_LEVELS:
+        return getattr(logging, env_level)
+
+    # Invalid value, fall back to WARNING
+    return logging.WARNING
+
+
+# Default logging level (from env var or WARNING)
+DEFAULT_LEVEL = _get_log_level_from_env()
 
 # Flag to track if the logger has been configured
 _logger_configured = False
