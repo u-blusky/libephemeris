@@ -33,6 +33,8 @@ import urllib.error
 from typing import Optional, Union
 from dataclasses import dataclass
 
+from .logging_config import get_logger
+
 # =============================================================================
 # MODULE CONFIGURATION
 # =============================================================================
@@ -311,6 +313,7 @@ def download_iers_finals(force: bool = False) -> str:
     Raises:
         ConnectionError: If download fails from all sources
     """
+    logger = get_logger()
     cache_path = _get_finals_cache_path()
 
     # Check if we need to download
@@ -320,13 +323,18 @@ def download_iers_finals(force: bool = False) -> str:
         if file_age_days < DEFAULT_MAX_AGE_DAYS:
             return cache_path
 
+    logger.info("Downloading IERS finals2000A.data...")
+
     # Try primary source first
     with _IERS_LOCK:
         if _download_file(IERS_FINALS_URL, cache_path):
+            logger.info("IERS finals2000A.data download complete")
             return cache_path
 
         # Try backup source
+        logger.info("Primary source failed, trying backup...")
         if _download_file(IERS_FINALS_URL_BACKUP, cache_path):
+            logger.info("IERS finals2000A.data download complete")
             return cache_path
 
     raise ConnectionError(
@@ -351,6 +359,7 @@ def download_leap_seconds(force: bool = False) -> str:
     Raises:
         ConnectionError: If download fails from all sources
     """
+    logger = get_logger()
     cache_path = _get_leap_seconds_cache_path()
 
     # Check if we need to download
@@ -360,13 +369,18 @@ def download_leap_seconds(force: bool = False) -> str:
         if file_age_days < DEFAULT_MAX_AGE_DAYS:
             return cache_path
 
+    logger.info("Downloading IERS leap seconds data...")
+
     # Try primary source first
     with _IERS_LOCK:
         if _download_file(IERS_LEAP_SECONDS_URL, cache_path):
+            logger.info("Leap seconds data download complete")
             return cache_path
 
         # Try backup source
+        logger.info("Primary source failed, trying backup...")
         if _download_file(IERS_LEAP_SECONDS_URL_BACKUP, cache_path):
+            logger.info("Leap seconds data download complete")
             return cache_path
 
     raise ConnectionError(
@@ -399,6 +413,7 @@ def download_delta_t_data(force: bool = False) -> str:
         This data is essential for high-precision calculations for recent
         dates (1973-present).
     """
+    logger = get_logger()
     cache_path = _get_delta_t_cache_path()
 
     # Check if we need to download
@@ -408,13 +423,18 @@ def download_delta_t_data(force: bool = False) -> str:
         if file_age_days < DEFAULT_MAX_AGE_DAYS:
             return cache_path
 
+    logger.info("Downloading IERS Delta T data...")
+
     # Try primary source first
     with _IERS_LOCK:
         if _download_file(IERS_DELTA_T_URL, cache_path):
+            logger.info("IERS Delta T data download complete")
             return cache_path
 
         # Try backup source (note: different format, will need different parsing)
+        logger.info("Primary source failed, trying backup...")
         if _download_file(IERS_DELTA_T_URL_BACKUP, cache_path):
+            logger.info("IERS Delta T data download complete")
             return cache_path
 
     raise ConnectionError(

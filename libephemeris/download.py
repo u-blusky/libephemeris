@@ -27,6 +27,8 @@ import urllib.request
 from pathlib import Path
 from typing import Callable, Optional
 
+from .logging_config import get_logger
+
 # GitHub Releases URL for data files
 # The release tag "data-v1" can be updated when new data files are generated
 GITHUB_RELEASES_BASE = (
@@ -192,6 +194,8 @@ def download_file(
         urllib.error.URLError: If download fails
         ValueError: If hash verification fails
     """
+    logger = get_logger()
+
     # Use a temporary file for atomic download
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".download")
@@ -203,8 +207,14 @@ def download_file(
             headers={"User-Agent": "libephemeris-download/1.0"},
         )
 
+        logger.info("Downloading %s...", description)
+
         with urllib.request.urlopen(req, timeout=30) as response:
             total_size = int(response.headers.get("Content-Length", 0))
+
+            if total_size > 0:
+                size_mb = total_size / (1024 * 1024)
+                logger.info("File size: %.1f MB", size_mb)
 
             # Setup progress bar
             if show_progress and total_size > 0:
@@ -240,6 +250,7 @@ def download_file(
 
         # Atomic move to final destination
         os.replace(temp_path, dest_path)
+        logger.info("Download complete: %s", dest_path.name)
         return True
 
     except Exception:

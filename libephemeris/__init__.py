@@ -1,4 +1,11 @@
 from .constants import *
+from .logging_config import (
+    get_logger,
+    set_log_level,
+    disable_logging,
+    enable_logging,
+    format_file_size,
+)
 from .exceptions import (
     # Base error class (pyswisseph compatible)
     Error,
@@ -604,6 +611,12 @@ __author__ = "Giacomo Battaglia"
 __license__ = "LGPL-3.0"
 
 __all__ = [
+    # Logging configuration
+    "get_logger",
+    "set_log_level",
+    "disable_logging",
+    "enable_logging",
+    "format_file_size",
     # Exceptions - Base
     "Error",
     # Exceptions - Input Validation Category
@@ -1095,4 +1108,11 @@ __all__ = [
     "propagate_orbit_assist",
     "propagate_trajectory",
     "compare_with_keplerian",
+    # Ephemeris selection flags (from constants.py)
+    "SEFLG_JPLEPH",
+    "SEFLG_SWIEPH",
+    "SEFLG_MOSEPH",
+    "FLG_JPLEPH",
+    "FLG_SWIEPH",
+    "FLG_MOSEPH",
 ]

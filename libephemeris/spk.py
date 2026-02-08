@@ -39,6 +39,7 @@ from typing import Optional, Union
 from skyfield.framelib import ecliptic_frame
 
 from .exceptions import SPKNotFoundError
+from .logging_config import get_logger
 from .state import get_library_path, get_loader, get_timescale
 
 
@@ -291,6 +292,9 @@ def download_spk(
     if os.path.exists(filepath) and not overwrite:
         return filepath
 
+    logger = get_logger()
+    logger.info("Downloading SPK ephemeris for %s (%s to %s)...", body, start, end)
+
     # Build request URL
     url = _build_horizons_url(body, start, end, center)
 
@@ -333,6 +337,8 @@ def download_spk(
             with open(filepath, "wb") as f:
                 f.write(spk_data)
 
+            size_kb = len(spk_data) / 1024
+            logger.info("SPK download complete: %s (%.1f KB)", filename, size_kb)
             return filepath
 
         except urllib.error.HTTPError as e:

@@ -34,6 +34,7 @@ import os
 import threading
 from typing import Optional, Union
 
+from .logging_config import get_logger
 from .state import get_library_path
 
 
@@ -287,6 +288,8 @@ def _download_spk_astroquery(
         ImportError: If astroquery is not installed
         ValueError: If body not found or download fails
     """
+    logger = get_logger()
+
     try:
         from astroquery.jplhorizons import Horizons
     except ImportError as e:
@@ -295,6 +298,10 @@ def _download_spk_astroquery(
             "Install it with: pip install astroquery"
         ) from e
 
+    logger.info(
+        "Downloading SPK for %s (%s to %s) via astroquery...", body_id, start, end
+    )
+
     # Create Horizons query object
     obj = Horizons(id=body_id, location=location, epochs={"start": start, "stop": end})
 
@@ -302,6 +309,7 @@ def _download_spk_astroquery(
         # Download SPK file
         # Note: This uses Horizons' SPK file generation capability
         obj.download_spk(output_path)
+        logger.info("SPK download complete: %s", os.path.basename(output_path))
         return output_path
     except Exception as e:
         raise ValueError(

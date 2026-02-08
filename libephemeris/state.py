@@ -21,6 +21,8 @@ from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
 
+from .logging_config import get_logger
+
 # =============================================================================
 # GLOBAL STATE VARIABLES
 # =============================================================================
@@ -124,6 +126,7 @@ def get_planets() -> SpiceKernel:
         if present locally (DE440 will be downloaded for better precision).
     """
     global _PLANETS, _EPHEMERIS_FILE
+    logger = get_logger()
     if _PLANETS is None:
         load = get_loader()
 
@@ -158,7 +161,9 @@ def get_planets() -> SpiceKernel:
                     _PLANETS = load(fallback_path)
                     return _PLANETS
             # Download from internet (will get DE440 if that was requested)
+            logger.info("Downloading %s ephemeris (~114 MB)...", _EPHEMERIS_FILE)
             _PLANETS = load(_EPHEMERIS_FILE)
+            logger.info("Ephemeris download complete: %s", _EPHEMERIS_FILE)
     return _PLANETS
 
 
