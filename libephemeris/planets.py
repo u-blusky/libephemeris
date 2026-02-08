@@ -4044,10 +4044,11 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
 # For Mercury, Venus, Mars, Jupiter, Saturn we use Mallama 2018 formulas
 # (implemented directly in _calc_planet_magnitude)
 _PLANET_MAG_PARAMS = {
-    # Mercury, Venus, Mars, Jupiter, Saturn use Mallama 2018 formulas
+    # Mercury, Venus, Mars, Jupiter, Saturn, Pluto use Mallama 2018 formulas
+    # (implemented directly in _calc_planet_magnitude)
     SE_URANUS: (-7.19, 0.002, 0.0, 0.0),  # Uranus
     SE_NEPTUNE: (-6.87, 0.0, 0.0, 0.0),  # Neptune: nearly constant
-    SE_PLUTO: (-1.00, 0.041, 0.0, 0.0),  # Pluto (approximate)
+    # Pluto uses dedicated Mallama 2018 formula below
 }
 
 # J2000 epoch for Saturn ring calculations
@@ -4508,6 +4509,20 @@ def _calc_planet_magnitude(
             -8.914 - 1.825 * sin_B + 0.026 * a - 0.378 * sin_B * math.exp(-2.25 * a)
         )
         magnitude += dist_factor
+        return magnitude
+
+    # Pluto - Mallama & Hilton 2018 formula
+    # From "Computing Apparent Planetary Magnitudes for The Astronomical Almanac"
+    # V(1,0) = -1.024 ± 0.003 mag (absolute magnitude at r=d=1 AU, α=0°)
+    # Phase coefficient β = 0.0362 ± 0.0004 mag/degree
+    # Formula: V = V(1,0) + 5*log10(r*d) + β*α
+    # Note: Pluto also has a rotational light curve amplitude of ~±0.15 mag
+    # with period 6.3872 days, but this requires sub-observer longitude data.
+    if ipl == SE_PLUTO:
+        V0 = -1.024  # Absolute magnitude V(1,0)
+        beta = 0.0362  # Phase coefficient in mag/degree
+        phase_correction = beta * a  # Linear phase correction
+        magnitude = V0 + dist_factor + phase_correction
         return magnitude
 
     # Outer planets using simplified formula
