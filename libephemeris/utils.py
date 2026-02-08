@@ -910,10 +910,10 @@ def difdeg2n(p1: float, p2: float) -> float:
         >>> difdeg2n(10, 350)
         20.0
         >>> difdeg2n(180, 0)
-        180.0
+        -180.0
     """
     diff = (p1 - p2) % 360.0
-    if diff > 180.0:
+    if diff >= 180.0:
         diff -= 360.0
     return diff
 
