@@ -1580,7 +1580,29 @@ def _mean_obliquity_radians(jd_tt: float) -> float:
 
 
 class MeeusPolynomialWarning(UserWarning):
-    """Warning issued when Meeus polynomial is used outside its optimal range."""
+    """Warning issued when Meeus polynomial is used outside its optimal range.
+
+    Severity levels based on distance from J2000.0:
+        - Beyond ±200 years (MEEUS_OPTIMAL_CENTURIES): precision degrades from <0.001° to ~0.01°
+        - Beyond ±1000 years (MEEUS_VALID_CENTURIES): error may be 0.1-1°
+        - Beyond ±2000 years (MEEUS_MAX_CENTURIES): raises MeeusRangeError exception
+    """
+
+    pass
+
+
+class MeeusRangeError(ValueError):
+    """Exception raised when date is beyond the valid range for Meeus polynomials.
+
+    The Meeus polynomial approximations are valid for approximately ±2000 years
+    from J2000.0 (years 0-4000 CE). Beyond this range, errors grow rapidly and
+    results should not be trusted.
+
+    For dates beyond ±2000 years, consider:
+        - Using numerical integration of the full lunar theory
+        - Consulting specialized historical astronomy software
+        - Accepting that precision requirements cannot be met
+    """
 
     pass
 
@@ -1598,25 +1620,29 @@ def calc_mean_lunar_node(jd_tt: float) -> float:
         float: Ecliptic longitude of mean ascending node in degrees (0-360)
 
     Raises:
-        MeeusPolynomialWarning: When date is outside the optimal validity range.
+        MeeusRangeError: When date is beyond ±2000 years from J2000
+            (before 0 CE or after 4000 CE). Error would exceed 1° and
+            results are unreliable.
+        MeeusPolynomialWarning: When date is outside the optimal validity range
+            (beyond ±200 years) or recommended range (beyond ±1000 years).
 
     Precision:
         The Meeus polynomial is optimized for dates near J2000.0 (year 2000):
 
         - Within ±200 years (1800-2200): excellent precision, <0.001° error
         - Within ±1000 years (1000-3000): good precision, ~0.01° error
-        - Beyond ±2000 years (before 0 CE or after 4000 CE): error grows
-          significantly as higher-order polynomial terms become dominant
+        - Within ±2000 years (0-4000 CE): acceptable, error 0.1-1°
+        - Beyond ±2000 years: raises MeeusRangeError (error > 1°)
 
-        The polynomial coefficients are truncated at T⁴, which limits
-        accuracy for distant dates. The T⁴ term contributes ~0.01° per
-        millennium⁴, causing the error to grow approximately as T⁴.
+        The polynomial coefficients are truncated at T^4, which limits
+        accuracy for distant dates. The T^4 term contributes ~0.01° per
+        millennium^4, causing the error to grow approximately as T^4.
 
     Note:
         The mean node is a smoothed average that ignores short-period perturbations.
         For instantaneous precision, use calc_true_lunar_node() instead.
 
-        Formula: Ω = 125.0445479° - 1934.1362891°T + 0.0020754°T² + T³/467441 - T⁴/60616000
+        Formula: Omega = 125.0445479° - 1934.1362891°T + 0.0020754°T² + T³/467441 - T^4/60616000
         where T = Julian centuries since J2000.0
 
         For dates far from J2000, numerical integration of the full lunar theory
@@ -1629,24 +1655,32 @@ def calc_mean_lunar_node(jd_tt: float) -> float:
     """
     T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
 
-    # Check validity range and issue warning for dates outside optimal range
+    # Check validity range and issue warning/exception for dates outside optimal range
     abs_T = abs(T)
     if abs_T > MEEUS_MAX_CENTURIES:
         approx_year = 2000 + T * 100
-        warnings.warn(
+        raise MeeusRangeError(
             f"Date (approx. year {approx_year:.0f}) is outside the valid range "
             f"for the Meeus polynomial (years 0-4000 CE). "
-            f"Error may exceed 1°. Consider using true node calculation or "
-            f"numerical integration for distant dates.",
-            MeeusPolynomialWarning,
-            stacklevel=2,
+            f"Error would exceed 1° and results are unreliable. "
+            f"For dates beyond ±2000 years from J2000, consider using "
+            f"numerical integration of the full lunar theory."
         )
     elif abs_T > MEEUS_VALID_CENTURIES:
         approx_year = 2000 + T * 100
         warnings.warn(
-            f"Date (approx. year {approx_year:.0f}) is outside the optimal range "
+            f"Date (approx. year {approx_year:.0f}) is outside the recommended range "
             f"for the Meeus polynomial (years 1000-3000 CE). "
             f"Error may be 0.1-1°.",
+            MeeusPolynomialWarning,
+            stacklevel=2,
+        )
+    elif abs_T > MEEUS_OPTIMAL_CENTURIES:
+        approx_year = 2000 + T * 100
+        warnings.warn(
+            f"Date (approx. year {approx_year:.0f}) is outside the optimal range "
+            f"for the Meeus polynomial (years 1800-2200 CE). "
+            f"Precision degrades from <0.001° to ~0.01°.",
             MeeusPolynomialWarning,
             stacklevel=2,
         )
@@ -1850,12 +1884,19 @@ def calc_mean_lilith(jd_tt: float) -> float:
         float: Ecliptic longitude of mean lunar apogee in degrees (0-360)
 
     Raises:
-        MeeusPolynomialWarning: When date is outside the optimal validity range.
+        MeeusRangeError: When date is beyond ±2000 years from J2000
+            (before 0 CE or after 4000 CE). Error would exceed 1° and
+            results are unreliable.
+        MeeusPolynomialWarning: When date is outside the optimal validity range
+            (beyond ±200 years) or recommended range (beyond ±1000 years).
 
     Precision:
+        The polynomial approximations are optimized for dates near J2000.0:
+
         - Within ±200 years (1800-2200): <0.01° (<36 arcsec) vs Swiss Ephemeris
         - Within ±1000 years (1000-3000): <0.02° (<72 arcsec) error
-        - Beyond ±2000 years: uses correction tables, error may increase
+        - Within ±2000 years (0-4000 CE): error 0.1-0.5°
+        - Beyond ±2000 years: raises MeeusRangeError (error > 1°)
 
     Note:
         Mean Lilith is the time-averaged apogee, ignoring short-period variations.
@@ -1875,23 +1916,32 @@ def calc_mean_lilith(jd_tt: float) -> float:
     T2 = T * T
     fracT = T % 1.0  # Fractional part for precision
 
-    # Check validity range and issue warning for dates outside optimal range
+    # Check validity range and issue warning/exception for dates outside optimal range
     abs_T = abs(T)
     if abs_T > MEEUS_MAX_CENTURIES:
         approx_year = 2000 + T * 100
-        warnings.warn(
+        raise MeeusRangeError(
             f"Date (approx. year {approx_year:.0f}) is outside the valid range "
             f"for mean Lilith calculation (years 0-4000 CE). "
-            f"Error may exceed 1°.",
-            MeeusPolynomialWarning,
-            stacklevel=2,
+            f"Error would exceed 1° and results are unreliable. "
+            f"For dates beyond ±2000 years from J2000, consider using "
+            f"numerical integration of the full lunar theory."
         )
     elif abs_T > MEEUS_VALID_CENTURIES:
         approx_year = 2000 + T * 100
         warnings.warn(
-            f"Date (approx. year {approx_year:.0f}) is outside the optimal range "
+            f"Date (approx. year {approx_year:.0f}) is outside the recommended range "
             f"for mean Lilith calculation (years 1000-3000 CE). "
             f"Error may be 0.1-0.5°.",
+            MeeusPolynomialWarning,
+            stacklevel=2,
+        )
+    elif abs_T > MEEUS_OPTIMAL_CENTURIES:
+        approx_year = 2000 + T * 100
+        warnings.warn(
+            f"Date (approx. year {approx_year:.0f}) is outside the optimal range "
+            f"for mean Lilith calculation (years 1800-2200 CE). "
+            f"Precision degrades from <0.01° to ~0.02°.",
             MeeusPolynomialWarning,
             stacklevel=2,
         )

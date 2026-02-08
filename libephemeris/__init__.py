@@ -159,6 +159,24 @@ from .crossing import (
     swe_helio_cross_ut,
     swe_helio_cross,
 )
+from .lunar import (
+    # Meeus polynomial validity warnings/errors
+    MeeusPolynomialWarning,
+    MeeusRangeError,
+    # Mean lunar functions
+    calc_mean_lunar_node,
+    calc_mean_lilith,
+    calc_mean_lilith_with_latitude,
+    # True lunar functions
+    calc_true_lunar_node,
+    calc_true_lilith,
+    calc_interpolated_apogee,
+    calc_interpolated_perigee,
+    # Validity range constants
+    MEEUS_OPTIMAL_CENTURIES,
+    MEEUS_VALID_CENTURIES,
+    MEEUS_MAX_CENTURIES,
+)
 from .eclipse import (
     BesselianElements,
     sol_eclipse_max_time,
@@ -603,6 +621,21 @@ __all__ = [
     "ConvergenceError",
     # Exceptions - Configuration Category
     "ConfigurationError",
+    # Lunar calculation warnings/errors
+    "MeeusPolynomialWarning",
+    "MeeusRangeError",
+    # Lunar node and apogee functions
+    "calc_mean_lunar_node",
+    "calc_mean_lilith",
+    "calc_mean_lilith_with_latitude",
+    "calc_true_lunar_node",
+    "calc_true_lilith",
+    "calc_interpolated_apogee",
+    "calc_interpolated_perigee",
+    # Meeus validity range constants
+    "MEEUS_OPTIMAL_CENTURIES",
+    "MEEUS_VALID_CENTURIES",
+    "MEEUS_MAX_CENTURIES",
     # Coordinate validation
     "validate_latitude",
     "validate_longitude",
