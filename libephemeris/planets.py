@@ -1656,16 +1656,14 @@ def _calc_body(
 
     # 2. Identify Observer
     observer_topo = get_topo()
-    observer_is_ssb = False
 
     if iflag & SEFLG_HELCTR:
         # Heliocentric
         observer = planets["sun"]
     elif iflag & SEFLG_BARYCTR:
-        # Barycentric (Solar System Barycenter)
-        # We treat SSB as the origin (0,0,0)
-        observer_is_ssb = True
-        observer = None
+        # Barycentric - Swiss Ephemeris returns the same coordinates as heliocentric
+        # (position relative to Sun, not SSB). This is for compatibility.
+        observer = planets["sun"]
     elif (iflag & SEFLG_TOPOCTR) and observer_topo:
         earth = planets["earth"]
         observer = earth + observer_topo
@@ -1680,14 +1678,9 @@ def _calc_body(
         tgt_pos = target.at(t_).position.au
         tgt_vel = target.at(t_).velocity.au_per_d
 
-        if observer_is_ssb:
-            # Observer is SSB (0,0,0)
-            obs_pos = 0.0
-            obs_vel = 0.0
-        else:
-            # Observer relative to SSB
-            obs_pos = observer.at(t_).position.au
-            obs_vel = observer.at(t_).velocity.au_per_d
+        # Observer relative to SSB
+        obs_pos = observer.at(t_).position.au
+        obs_vel = observer.at(t_).velocity.au_per_d
 
         p_ = tgt_pos - obs_pos
         v_ = tgt_vel - obs_vel
@@ -1701,7 +1694,7 @@ def _calc_body(
         pos = ICRF(p, v, t=t, center=observer_topo if (iflag & SEFLG_TOPOCTR) else 399)
     else:
         # Apparent position
-        if observer_is_ssb or (iflag & SEFLG_HELCTR):
+        if (iflag & SEFLG_HELCTR) or (iflag & SEFLG_BARYCTR):
             # For SSB or Heliocentric, we need to apply light-time correction
             # This matches pyswisseph behavior: position shows where object WAS
             # when light left it to reach the observer (Sun for heliocentric)
@@ -1772,7 +1765,7 @@ def _calc_body(
 
                     if (
                         iflag & SEFLG_TRUEPOS
-                        or observer_is_ssb
+                        or (iflag & SEFLG_BARYCTR)
                         or (iflag & SEFLG_HELCTR)
                     ):
                         p_, v_ = get_vector(t_)
@@ -1810,7 +1803,11 @@ def _calc_body(
             def get_coord(t_):
                 from skyfield.positionlib import ICRF
 
-                if iflag & SEFLG_TRUEPOS or observer_is_ssb or (iflag & SEFLG_HELCTR):
+                if (
+                    iflag & SEFLG_TRUEPOS
+                    or (iflag & SEFLG_BARYCTR)
+                    or (iflag & SEFLG_HELCTR)
+                ):
                     p_, v_ = get_vector(t_)
                     pos_ = ICRF(
                         p_,
