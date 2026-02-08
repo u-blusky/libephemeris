@@ -2,9 +2,9 @@
 Tests for SEFLG_MOSEPH routing gate in swe_calc_ut() and swe_calc().
 
 This module tests the routing behavior when SEFLG_MOSEPH flag is passed:
-- SEFLG_MOSEPH should route to the Moshier ephemeris system (currently stub)
+- SEFLG_MOSEPH should route to the Moshier ephemeris system
 - Moshier range validation should work independently from JPL range validation
-- NotImplementedError should be raised when Moshier is requested (stub behavior)
+- Moshier provides extended date range (-3000 to +3000 CE) via semi-analytical algorithms
 """
 
 import pytest
@@ -109,24 +109,29 @@ class TestSweCalcUtMoshierRouting:
     """Test SEFLG_MOSEPH routing in swe_calc_ut()."""
 
     def test_moseph_flag_routes_to_moshier(self):
-        """swe_calc_ut with SEFLG_MOSEPH should route to Moshier (raises NotImplementedError)."""
+        """swe_calc_ut with SEFLG_MOSEPH should route to Moshier and return valid results."""
         jd = 2451545.0  # J2000.0
 
-        with pytest.raises(NotImplementedError) as exc_info:
-            eph.swe_calc_ut(jd, SE_SUN, SEFLG_MOSEPH)
+        # Moshier is now implemented - should return valid position
+        pos, flag = eph.swe_calc_ut(jd, SE_SUN, SEFLG_MOSEPH)
 
-        # Check the error message indicates Moshier is not implemented
-        assert "Moshier" in str(exc_info.value)
-        assert "SEFLG_MOSEPH" in str(exc_info.value)
+        # Check we got valid results
+        assert len(pos) == 6  # lon, lat, dist, speed_lon, speed_lat, speed_dist
+        assert 0 <= pos[0] < 360  # Valid longitude
+        assert -90 <= pos[1] <= 90  # Valid latitude
+        assert pos[2] > 0  # Positive distance
 
     def test_moseph_with_speed_flag(self):
-        """SEFLG_MOSEPH combined with SEFLG_SPEED should also route to Moshier."""
+        """SEFLG_MOSEPH combined with SEFLG_SPEED should return velocities."""
         jd = 2451545.0
 
-        with pytest.raises(NotImplementedError) as exc_info:
-            eph.swe_calc_ut(jd, SE_MARS, SEFLG_MOSEPH | SEFLG_SPEED)
+        pos, flag = eph.swe_calc_ut(jd, SE_MARS, SEFLG_MOSEPH | SEFLG_SPEED)
 
-        assert "Moshier" in str(exc_info.value)
+        # Should return valid position with velocities
+        assert len(pos) == 6
+        assert 0 <= pos[0] < 360  # Valid longitude
+        # Mars typically moves ~0.3-0.8 deg/day in longitude
+        assert abs(pos[3]) < 2.0  # Reasonable speed
 
     def test_moseph_range_validation_different_from_jpl(self):
         """SEFLG_MOSEPH should use Moshier range validation, not JPL range."""
@@ -134,9 +139,10 @@ class TestSweCalcUtMoshierRouting:
         # JD 2000000.0 is ~764 CE - outside DE440 (1550-2650) but inside Moshier (-3000 to +3000)
         jd_outside_jpl = 2000000.0
 
-        # With SEFLG_MOSEPH, should route to Moshier (NotImplementedError, not EphemerisRangeError)
-        with pytest.raises(NotImplementedError):
-            eph.swe_calc_ut(jd_outside_jpl, SE_SUN, SEFLG_MOSEPH)
+        # With SEFLG_MOSEPH, should work (Moshier covers this date)
+        pos, flag = eph.swe_calc_ut(jd_outside_jpl, SE_SUN, SEFLG_MOSEPH)
+        assert len(pos) == 6
+        assert 0 <= pos[0] < 360  # Valid longitude
 
     def test_moseph_outside_moshier_range_raises_ephemeris_range_error(self):
         """SEFLG_MOSEPH with date outside Moshier range should raise EphemerisRangeError."""
@@ -170,13 +176,14 @@ class TestSweCalcMoshierRouting:
     """Test SEFLG_MOSEPH routing in swe_calc() (TT time)."""
 
     def test_moseph_flag_routes_to_moshier(self):
-        """swe_calc with SEFLG_MOSEPH should route to Moshier (raises NotImplementedError)."""
+        """swe_calc with SEFLG_MOSEPH should route to Moshier and return valid results."""
         jd = 2451545.0  # J2000.0
 
-        with pytest.raises(NotImplementedError) as exc_info:
-            eph.swe_calc(jd, SE_MOON, SEFLG_MOSEPH)
+        # Moshier is now implemented - should return valid position
+        pos, flag = eph.swe_calc(jd, SE_MOON, SEFLG_MOSEPH)
 
-        assert "Moshier" in str(exc_info.value)
+        assert len(pos) == 6
+        assert 0 <= pos[0] < 360  # Valid longitude
 
     def test_moseph_range_validation_in_swe_calc(self):
         """swe_calc should also validate Moshier range when SEFLG_MOSEPH is set."""
@@ -209,7 +216,7 @@ class TestMoshierVsJplRanges:
         assert abs(pos[0]) < 360  # Valid longitude
 
     def test_date_outside_jpl_but_in_moshier_routes_to_moshier(self):
-        """Date outside JPL but inside Moshier should route correctly with SEFLG_MOSEPH."""
+        """Date outside JPL but inside Moshier should work with SEFLG_MOSEPH."""
         # ~500 CE - outside JPL (1550-2650) but inside Moshier (-3000 to +3000)
         jd = 1903682.5
 
@@ -217,9 +224,10 @@ class TestMoshierVsJplRanges:
         with pytest.raises(EphemerisRangeError):
             eph.swe_calc_ut(jd, SE_SUN, 0)
 
-        # With SEFLG_MOSEPH, should route to Moshier (NotImplementedError for now)
-        with pytest.raises(NotImplementedError):
-            eph.swe_calc_ut(jd, SE_SUN, SEFLG_MOSEPH)
+        # With SEFLG_MOSEPH, should work and return valid results
+        pos, flag = eph.swe_calc_ut(jd, SE_SUN, SEFLG_MOSEPH)
+        assert len(pos) == 6
+        assert 0 <= pos[0] < 360  # Valid longitude
 
 
 class TestMoshierFlagConstants:
