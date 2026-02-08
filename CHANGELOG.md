@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Heliacal Events
+- Complete Schaefer (1990) atmospheric visibility model for heliacal event calculations
+- Rayleigh + aerosol + ozone atmospheric extinction model
+- Twilight and moonlight sky brightness calculations
+- Ptolemaic visibility thresholds (arcus visionis) for planets and stars
+- Limiting visual magnitude calculation for naked-eye observation
+
+#### Saturn Satellite System (TASS 1.7)
+- Complete TASS 1.7 implementation for all 8 major Saturn satellites
+- Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Hyperion, Iapetus
+- ~2000 periodic terms per satellite for sub-arcsecond precision
+- Validated against JPL Horizons ephemerides
+
+#### Photometric Models
+- Hapke photometric model for Moon magnitude with opposition surge correction
+- Accurate Pluto magnitude formula from Mallama (2018) with phase corrections
+
+#### Lunar Calculations
+- Moshier analytical method for interpolated apogee (~50 harmonic terms)
+- Higher-order terms (T^4, T^5) for improved True Node historical accuracy
+- Precision warnings for dates outside Meeus optimal range (±200 years)
+
+#### Nutation Model
+- `get_nutation_model()` function to check active nutation model
+- `NutationFallbackWarning` when using simplified 4-term model
+
+#### Minor Bodies
+- Resonant libration correction for plutinos (Ixion, Orcus, Pluto) in mean motion resonance
+
+### Changed
+
+#### Precision Improvements
+- **Interpolated Apogee**: 11x precision improvement (1.1° -> 0.10° mean error) via Moshier method
+- **Interpolated Perigee**: 5x precision improvement (2.3° -> 0.46° mean error) via extended ELP2000-82B series
+- **True Revati/Pushya/Mula ayanamsha**: 10x precision improvement (0.06° -> <0.006°)
+- **Galactic Center ayanamshas**: 60x precision improvement (0.06° -> <0.001°)
+- **Sunrise/sunset timing**: 4x precision improvement (120s -> <30s tolerance)
+- **Lunar occultation timing**: 5x precision improvement (300s -> <60s tolerance)
+- **Uranian planets**: Aligned with Swiss Ephemeris seorbel.txt source
+
+#### API Improvements
+- Added overload signatures to `house_pos()` for type safety
+- `heliacal_ut()` and `vis_limit_mag()` now use Schaefer model for SE compatibility
+
+### Fixed
+
+- J2000 ayanamsha sign convention for pre-J2000 dates (negative before 2000, positive after)
+- Eclipse search reliability with bidirectional mode (no longer skips nearby eclipses)
+- Hybrid eclipse detection using proper Besselian elements
+- Eclipse central line algorithm unified with `sol_eclipse_where()`
+- Arabic Parts day/night calculation using 3D solar altitude for extreme latitudes
+- Fixed star latitude velocity sign aligned with Swiss Ephemeris convention
+- Uranian planet elements aligned with Swiss Ephemeris seorbel.txt
+
+### Documentation
+
+- Documented heliocentric methodology difference from Swiss Ephemeris in nod_aps
+- Updated precision values in PRECISION.md for all improved calculations
+
 ## [0.8.0] - 2026-02-06
 
 ### Added

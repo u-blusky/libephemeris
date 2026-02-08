@@ -17,7 +17,7 @@ This document provides detailed information about the precision and limitations 
 | Mean Lilith | ~0.005° (~18 arcsec) | SE-compatible DE404 algorithm with ecliptic projection |
 | House cusps | ±0.001° (~3.6 arcsec) | All 19 house systems |
 | Ayanamsha (standard) | ±0.0002° | Fagan-Bradley, Lahiri, Raman (high precision) |
-| Ayanamsha (star-based) | ±0.006-0.06° | True Citra (0.006°), others (0.06°) |
+| Ayanamsha (star-based) | ±0.001-0.006° | True Citra/Revati/Pushya/Mula (0.006°), GALCENT (0.001°) |
 | Sun crossings (ingress) | ±0.001 arcsec | Sub-milliarcsecond precision |
 | Moon crossings | ±0.05 arcsec | Sub-arcsecond precision |
 | Planet crossings | ±0.1 arcsec | Sub-arcsecond precision |
@@ -171,14 +171,14 @@ Star-based ayanamshas have slightly higher tolerance due to differences in:
 | Ayanamsha | Max Difference |
 |-----------|---------------|
 | True Citra | <0.006° |
-| True Revati | <0.06° |
-| True Pushya | <0.06° |
-| True Mula | <0.06° |
-| True Sheoran | <0.06° |
-| Galactic Center 0 Sag | <0.06° |
-| Galactic Center Rgilbrand | <0.06° |
-| Galactic Center Cochrane | <0.06° |
-| Galactic Center Mula Wilhelm | <0.06° |
+| True Revati | <0.006° |
+| True Pushya | <0.006° |
+| True Mula | <0.006° |
+| True Sheoran | <0.006° |
+| Galactic Center 0 Sag | <0.001° |
+| Galactic Center Rgilbrand | <0.001° |
+| Galactic Center Cochrane | <0.001° |
+| Galactic Center Mula Wilhelm | <0.001° |
 
 **Note on True Citra**: Uses high-precision Hipparcos coordinates for Spica
 (HIP 65474) with full proper motion correction including parallax and radial
@@ -278,8 +278,8 @@ LibEphemeris uses different calculation models for some lunar points, resulting 
 | True Node | ~0.14° (~520 arcsec) | ~0.04° (~145 arcsec) | Geometric method (see below) |
 | Mean Lilith | ~0.005° (~18 arcsec) | ~0.003° (~12 arcsec) | SE-compatible DE404 algorithm |
 | True Lilith | ~0.07° (~235 arcsec) | ~0.02° (~52 arcsec) | Eccentricity vector method (see below) |
-| Interpolated Apogee | ~0.36° (~1300 arcsec) | ~0.10° (~350 arcsec) | ELP2000-82B perturbation series |
-| Interpolated Perigee | ~2.6° (~9400 arcsec) | ~0.46° (~1650 arcsec) | ELP2000-82B perturbation series (see below) |
+| Interpolated Apogee | ~0.36° (~1300 arcsec) | ~0.10° (~350 arcsec) | Moshier analytical method (~50 terms) |
+| Interpolated Perigee | ~2.6° (~9400 arcsec) | ~0.46° (~1650 arcsec) | ELP2000-82B perturbation series |
 
 #### True Node: Why LibEphemeris is More Rigorous
 
@@ -686,10 +686,10 @@ assert info['model'] == 'IAU2000A', "Full precision nutation not available"
 ### Implemented Features
 
 | Function | Precision |
-|----------|-----------| 
+|----------|-----------|
 | Solar eclipse timing | < 10 seconds |
 | Lunar eclipse timing | < 10 seconds |
-| Occultation timing | ~1-2 minutes |
+| Occultation timing | < 60 seconds |
 | Eclipse magnitude | ~0.01 |
 
 ### High-Precision Eclipse Timing
@@ -716,6 +716,114 @@ The following return 0 or placeholder values:
 - Saros series number
 - Inex number
 - Sunrise/sunset on central line for solar eclipses
+
+---
+
+## Rise, Set, and Transit Times
+
+### Timing Precision
+
+| Event | Precision |
+|-------|-----------|
+| Sunrise/Sunset | < 30 seconds |
+| Moonrise/Moonset | < 30 seconds |
+| Planet rise/set | < 30 seconds |
+| Meridian transit | < 30 seconds |
+
+The `rise_trans()` function uses the Bennett (1982) atmospheric refraction formula
+and proper semidiameter corrections to achieve timing within 30 seconds of Swiss
+Ephemeris for most locations.
+
+### Limitations
+
+- Polar latitudes (>66.5°) may have extended periods with no rise/set events
+- Atmospheric conditions (pressure, temperature) affect actual observed times
+
+---
+
+## Heliacal Events
+
+LibEphemeris implements the Schaefer (1990) atmospheric visibility model for
+calculating heliacal rising and setting events.
+
+### Timing Precision
+
+| Event | Precision |
+|-------|-----------|
+| Heliacal rising (planets) | < 1 day |
+| Heliacal setting (planets) | < 1 day |
+| Heliacal rising (stars) | < 1 day |
+| Evening/morning star events | < 1 day |
+
+### Atmospheric Model Components
+
+The Schaefer model includes:
+
+1. **Atmospheric Extinction**: Rayleigh scattering + aerosol + ozone absorption
+2. **Sky Brightness**: Twilight gradient + moonlight contribution + airglow
+3. **Ptolemaic Thresholds**: Arcus visionis values for different body types
+4. **Limiting Magnitude**: Naked-eye visibility calculation based on observer
+   and atmospheric conditions
+
+### Configuration
+
+Heliacal calculations can be customized with:
+
+```python
+import libephemeris as eph
+
+# Atmospheric conditions
+atmo = (
+    1013.25,  # Pressure (mbar)
+    15.0,     # Temperature (°C)
+    50.0,     # Relative humidity (%)
+    0.0,      # Meteorological range (km), 0 = default
+)
+
+# Observer conditions
+obs = (
+    36.0,     # Observer age (years)
+    1.0,      # Snellen ratio (1.0 = normal vision)
+    1.0,      # Observation type (1 = optical, 2 = binocular)
+    0.0,      # Telescope magnification (0 = naked eye)
+)
+
+# Calculate heliacal rising of Sirius
+result = eph.heliacal_ut(jd, geopos, atmo, obs, "Sirius", eph.SE_HELIACAL_RISING, 0)
+```
+
+---
+
+## Photometric Calculations
+
+### Magnitude Precision
+
+| Body | Precision | Model |
+|------|-----------|-------|
+| Moon | ±0.1 mag | Hapke photometric model with opposition surge |
+| Pluto | ±0.2 mag | Mallama (2018) formula with phase corrections |
+| Planets | ±0.1 mag | IAU standard formulas |
+
+### Moon Magnitude (Hapke Model)
+
+The Moon magnitude calculation uses the Hapke (1963) photometric model, which
+accounts for:
+
+- Non-linear brightness variation with phase angle
+- Opposition surge effect near Full Moon
+- Lunar libration effects (minor)
+
+This provides significantly better accuracy than the simplified linear phase
+formula, particularly for phases near Full Moon where the opposition surge
+causes a brightness increase of ~0.4 magnitudes.
+
+### Pluto Magnitude (Mallama 2018)
+
+Pluto magnitude uses the Mallama (2018) formula which includes:
+
+- Phase-dependent brightness variation
+- Distance corrections for heliocentric and geocentric distance
+- Calibration against modern photometric observations
 
 ---
 
@@ -758,9 +866,9 @@ Ephemeris files are shared across all `EphemerisContext` instances for memory ef
 ### Use With Caution
 
 - Polar latitude locations (>66.5°) - use Equal or Whole Sign houses
-- Star-based ayanamshas - expect ±0.006° for True Citra, ±0.06° for others
-- Asteroid/TNO positions - Keplerian approximation only
-- True Node calculations - ~0.14° precision vs Swiss Ephemeris
+- Star-based ayanamshas - expect ±0.006° for True Citra/Revati/Pushya/Mula, ±0.001° for GALCENT
+- Asteroid/TNO positions - Keplerian approximation only (use SPK for high precision)
+- True Node calculations - ~0.14° precision vs Swiss Ephemeris (methodological difference)
 - Very old historical dates (before 1550 with DE440)
 
 ### Not Suitable For

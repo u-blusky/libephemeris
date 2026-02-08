@@ -107,6 +107,9 @@ See [PRECISION.md](docs/PRECISION.md) for detailed precision tables.
 -   **House systems (19)**: Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Polich/Page (Topocentric), Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural Gradient, and more.
 -   **Sidereal zodiac (43 ayanamshas)**: Fagan/Bradley, Lahiri, Raman, Krishnamurti, star-based and historical variants.
 -   **Extended points**: Lunar nodes, Lilith (mean and true), interpolated apogee/perigee, major asteroids (Chiron, Pholus, Ceres, Pallas, Juno, Vesta), centaurs (Nessus, Asbolus, Chariklo), TNOs (Orcus, Ixion, Haumea, Quaoar, Makemake, Gonggong, Eris, Sedna), major fixed stars and Arabic parts.
+-   **Saturn satellite system**: Complete TASS 1.7 implementation for all 8 major satellites (Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Hyperion, Iapetus) with sub-arcsecond precision.
+-   **Heliacal events**: Schaefer (1990) atmospheric visibility model for heliacal rising/setting calculations with Ptolemaic visibility thresholds.
+-   **Photometric calculations**: Hapke model for Moon magnitude, Mallama (2018) formula for Pluto, IAU standard formulas for planets.
 -   **High-precision minor bodies via SPK**: Download SPK kernels from JPL Horizons for arcsecond-level precision on asteroids and TNOs.
 -   **Event finding**: Sun/Moon longitude crossings (e.g. ingress), with additional events planned (eclipses, etc.).
 -   **Thread safety**: Optional thread-safe `EphemerisContext` API for concurrent calculations.
@@ -573,6 +576,10 @@ libephemeris/
 │   ├── houses.py         # House systems
 │   ├── lunar.py          # Nodes and Lilith
 │   ├── minor_bodies.py   # Asteroids and TNOs (Keplerian)
+│   ├── hypothetical.py   # Uranian planets (Hamburg School)
+│   ├── heliacal.py       # Heliacal events (Schaefer model)
+│   ├── schaefer.py       # Atmospheric visibility model
+│   ├── eclipse.py        # Solar/lunar eclipses and occultations
 │   ├── spk.py            # SPK kernel support for high-precision minor bodies
 │   ├── fixed_stars.py    # Fixed stars and points
 │   ├── crossing.py       # Longitude crossing events

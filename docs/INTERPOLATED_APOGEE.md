@@ -126,24 +126,32 @@ analytical lunar theory (Moshier's lunar ephemeris):
 
 ### libephemeris Approach
 
-libephemeris uses an **analytical perturbation series** based on ELP2000-82B lunar
-theory to compute the interpolated apsides. This approach adds perturbation
-corrections to the mean apogee (Mean Lilith) position.
+libephemeris uses two complementary methods for computing the interpolated apsides:
+
+1. **Moshier Analytical Method (Apogee)**: Uses ~50 harmonic terms from Moshier's
+   lunar ephemeris to compute the smoothed apogee position directly. This approach
+   extracts the dominant periodic terms that affect the apsidal line orientation
+   while filtering out the spurious oscillations.
+
+2. **ELP2000-82B Perturbation Series (Perigee)**: Adds perturbation corrections
+   to the mean perigee position using calibrated coefficients fitted to Swiss
+   Ephemeris data.
 
 #### Algorithm Overview
 
-**For Interpolated Apogee:**
+**For Interpolated Apogee (Moshier Method):**
 ```
 1. Calculate Mean Lilith (mean lunar apogee) longitude
 2. Calculate Julian centuries from J2000.0
-3. Compute fundamental lunar arguments (D, M, M', F)
-4. Apply ELP2000-82B perturbation series:
+3. Compute fundamental lunar arguments (D, M, M', F, Ω)
+4. Apply Moshier harmonic series (~50 terms):
    - Dominant term: +4.53° × sin(2D - 2M')
-   - Additional periodic terms from lunar theory
+   - Second-order terms from lunar theory
+   - Long-period terms for secular evolution
 5. Normalize result to [0°, 360°)
 ```
 
-**For Interpolated Perigee:**
+**For Interpolated Perigee (ELP2000-82B):**
 ```
 1. Calculate Mean Lilith + 180° (mean perigee longitude)
 2. Calculate Julian centuries from J2000.0
@@ -348,9 +356,14 @@ When using `swe_calc_ut` with `SEFLG_SPEED`, velocity is also calculated:
 | Variant | Mean Error | Max Error |
 |---------|------------|-----------|
 | Mean Lilith | ~0.003° (~12") | ~0.005° (~18") |
-| True Lilith | ~5° | ~15° |
-| Interpolated Apogee | ~1.1° | ~3.3° |
-| Interpolated Perigee | ~2.3° | ~8° |
+| True Lilith | ~0.02° (~72") | ~0.07° (~252") |
+| Interpolated Apogee | ~0.10° (~360") | ~0.36° (~1296") |
+| Interpolated Perigee | ~0.46° (~1656") | ~2.6° (~9360") |
+
+**Note on Interpolated Apogee improvement:** The Moshier analytical method provides
+a significant precision improvement over the previous ELP2000-82B series approach.
+The ~50 harmonic terms capture the dominant periodic variations in the apsidal line
+more accurately than a smaller calibrated coefficient set.
 
 **Note on True Lilith differences:** The ~5 degree mean differences arise because:
 1. libephemeris computes osculating elements from JPL DE state vectors
@@ -358,10 +371,9 @@ When using `swe_calc_ut` with `SEFLG_SPEED`, velocity is also calculated:
 3. The osculating apogee concept is inherently model-dependent for strongly perturbed orbits
 
 **Note on Interpolated differences:** The remaining differences arise from:
-1. Different underlying osculating apogee calculations feeding into the series
-2. Coefficient calibration was done on a finite sample of dates
-3. Swiss Ephemeris uses Moshier's full analytical lunar theory; libephemeris uses
-   a reduced perturbation series with calibrated coefficients
+1. Moshier method uses ~50 harmonic terms vs Swiss Ephemeris's full analytical lunar theory
+2. Perigee coefficient calibration was done on a finite sample of dates
+3. Apogee and perigee use different methods optimized for their respective perturbation amplitudes
 
 ### Smoothness Comparison
 
