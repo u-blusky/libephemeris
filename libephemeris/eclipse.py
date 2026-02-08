@@ -6703,48 +6703,75 @@ def rise_trans(
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
 
-    # Determine horizon altitude based on flags
-    # Standard refraction at horizon is about 34 arcminutes
-    if rsmi & SE_BIT_NO_REFRACTION:
-        refraction = 0.0
-    else:
-        # Simple refraction model (more accurate would use pressure/temperature)
-        # Standard refraction at horizon: ~34 arcminutes = 0.5667 degrees
-        refraction = 0.5667
-
     # Determine the altitude threshold for rise/set
     if rsmi & SE_BIT_CIVIL_TWILIGHT:
         horizon_alt = -6.0
-        refraction = 0.0  # Twilight uses geometric position
+        use_refraction = False  # Twilight uses geometric position
     elif rsmi & SE_BIT_NAUTIC_TWILIGHT:
         horizon_alt = -12.0
-        refraction = 0.0
+        use_refraction = False
     elif rsmi & SE_BIT_ASTRO_TWILIGHT:
         horizon_alt = -18.0
-        refraction = 0.0
+        use_refraction = False
     else:
         horizon_alt = 0.0
+        use_refraction = not (rsmi & SE_BIT_NO_REFRACTION)
+
+    # Calculate horizon refraction matching Swiss Ephemeris standard
+    # SE uses 34 arcminutes (0.5667°) as the standard horizon refraction
+    # This is the conventional value for sunrise/sunset calculations
+    # (Bennett formula gives ~29' but SE uses the traditional 34')
+    if use_refraction:
+        # Standard horizon refraction: 34 arcminutes = 0.5667 degrees
+        # Apply pressure and temperature correction (standard: 1010 mbar, 10°C = 283K)
+        base_refraction = 34.0 / 60.0  # degrees
+        pressure_factor = pressure / 1010.0
+        temperature_factor = 283.0 / (273.0 + temperature)
+        correction_factor = pressure_factor * temperature_factor
+        refraction = base_refraction * correction_factor
+    else:
+        refraction = 0.0
+
+    # Calculate semi-diameter dynamically based on body distance
+    # Swiss Ephemeris calculates actual angular size at observation time
+    # We need to compute this at an initial estimate time
+    def _get_semi_diameter(jd: float, body: int) -> float:
+        """Calculate semi-diameter of Sun or Moon at given JD in degrees."""
+        if body == SE_SUN:
+            # Sun's mean semi-diameter at 1 AU is 959.63 arcsec (15.9939')
+            # Actual SD = mean_SD * (1 AU / distance)
+            t = ts.ut1_jd(jd)
+            sun_pos = earth.at(t).observe(eph["sun"])
+            distance_au = sun_pos.distance().au
+            # Mean semi-diameter at 1 AU
+            mean_sd_arcsec = 959.63
+            actual_sd_arcsec = mean_sd_arcsec / distance_au
+            return actual_sd_arcsec / 3600.0  # Convert to degrees
+        elif body == SE_MOON:
+            # Moon's mean semi-diameter at mean distance (384400 km) is 932.56 arcsec
+            # Moon radius = 1737.4 km
+            t = ts.ut1_jd(jd)
+            moon_pos = earth.at(t).observe(eph["moon"])
+            distance_km = moon_pos.distance().km
+            # Angular radius = atan(radius / distance) ≈ radius / distance (radians)
+            moon_radius_km = 1737.4
+            sd_rad = math.atan(moon_radius_km / distance_km)
+            return math.degrees(sd_rad)
+        else:
+            return 0.0
+
+    # Initial semi-diameter estimate (will be refined during iteration)
+    initial_sd = _get_semi_diameter(jd_start, planet)
 
     # Account for disc semi-diameter
-    # Sun: ~16 arcmin, Moon: ~16 arcmin (varies)
     if rsmi & SE_BIT_DISC_CENTER:
         disc_correction = 0.0
     elif rsmi & SE_BIT_DISC_BOTTOM:
         # Lower limb: add semi-diameter (rises later, sets earlier)
-        if planet == SE_SUN:
-            disc_correction = 16.0 / 60.0  # degrees
-        elif planet == SE_MOON:
-            disc_correction = 16.0 / 60.0
-        else:
-            disc_correction = 0.0
+        disc_correction = initial_sd
     else:
         # Default: upper limb (subtract semi-diameter)
-        if planet == SE_SUN:
-            disc_correction = -16.0 / 60.0  # degrees
-        elif planet == SE_MOON:
-            disc_correction = -16.0 / 60.0
-        else:
-            disc_correction = 0.0
+        disc_correction = -initial_sd
 
     # Effective horizon altitude (negative means below geometric horizon)
     target_altitude = horizon_alt - refraction + disc_correction
@@ -6971,11 +6998,15 @@ def _calculate_rise_set(
     assert jd_cross_end is not None
 
     # Bisection to narrow down the crossing
-    for _ in range(30):
+    # Swiss Ephemeris uses tighter tolerance for better precision
+    # 0.0001° ≈ 0.36 arcsec ≈ 0.02 seconds of time
+    for _ in range(50):  # More iterations for tighter convergence
         jd_mid = (jd_cross_start + jd_cross_end) / 2
         alt_mid, _ = _get_body_altaz(jd_mid)
 
-        if abs(alt_mid - target_altitude) < 0.001:  # ~3.6 arcsec
+        if (
+            abs(alt_mid - target_altitude) < 0.0001
+        ):  # ~0.36 arcsec (improved from 0.001°)
             return jd_mid, rsmi & 0x0F
 
         if event_type == SE_CALC_RISE:
