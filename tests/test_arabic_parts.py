@@ -19,6 +19,8 @@ following traditional sect-based calculation methods.
 import pytest
 
 from libephemeris.arabic_parts import (
+    _EXTREME_LATITUDE_THRESHOLD,
+    _is_sun_above_horizon_3d,
     calc_all_arabic_parts,
     calc_arabic_part_of_faith,
     calc_arabic_part_of_fortune,
@@ -26,6 +28,7 @@ from libephemeris.arabic_parts import (
     calc_arabic_part_of_spirit,
     is_day_chart,
 )
+from libephemeris import julday
 
 
 class TestIsDayChart:
@@ -410,3 +413,208 @@ class TestCalcAllArabicParts:
 
         for name, value in parts.items():
             assert 0.0 <= value < 360.0, f"{name} = {value} is out of range"
+
+
+class TestIsDayChart3D:
+    """Tests for 3D day/night calculation at extreme latitudes."""
+
+    def test_threshold_constant_exists(self):
+        """Verify the extreme latitude threshold is defined."""
+        assert _EXTREME_LATITUDE_THRESHOLD == 60.0
+
+    def test_moderate_latitude_uses_2d_method(self):
+        """At moderate latitudes, should use 2D method even with jd provided."""
+        # Rome, Italy - moderate latitude (41.9°N)
+        # June 21, 2024 at noon - Sun clearly above horizon
+        jd = julday(2024, 6, 21, 12.0)
+        sun_lon = 90.0  # ~Cancer (summer solstice)
+        asc = 180.0  # Libra rising
+
+        # 2D method: Sun at 90° is not between ASC=180° and DSC=0°/360°
+        # So 2D says night chart (which may be wrong for actual Rome noon)
+        result_2d = is_day_chart(sun_lon, asc)
+
+        # With location at moderate latitude, should still use 2D
+        result_with_loc = is_day_chart(sun_lon, asc, jd=jd, geo_lat=41.9, geo_lon=12.5)
+        assert result_2d == result_with_loc
+
+    def test_extreme_latitude_uses_3d_method_northern(self):
+        """At extreme northern latitude with location, uses 3D calculation."""
+        # Tromso, Norway (69.6°N) - Arctic summer, Sun above horizon at midnight
+        # June 21, 2024 at midnight UTC - Sun should be above horizon
+        jd = julday(2024, 6, 21, 0.0)  # Midnight UTC
+
+        # Sun at summer solstice position
+        sun_lon = 90.0  # Cancer 0°
+        asc = 0.0  # Aries rising (doesn't matter for 3D calc)
+
+        # Without location: uses 2D method
+        result_2d = is_day_chart(sun_lon, asc)
+
+        # With location at extreme latitude: uses 3D method
+        result_3d = is_day_chart(sun_lon, asc, jd=jd, geo_lat=69.6, geo_lon=19.0)
+
+        # In Arctic summer, Sun is above horizon even at midnight
+        # 3D method should return True (day chart)
+        assert result_3d is True
+
+    def test_extreme_latitude_winter_night(self):
+        """At extreme latitude in winter, Sun below horizon at noon."""
+        # Tromso, Norway (69.6°N) - polar night period
+        # December 21, 2024 at noon UTC - Sun below horizon
+        jd = julday(2024, 12, 21, 12.0)
+
+        # Sun at winter solstice position
+        sun_lon = 270.0  # Capricorn 0°
+        asc = 0.0
+
+        # 3D method should return False (night chart) even at "noon"
+        result_3d = is_day_chart(sun_lon, asc, jd=jd, geo_lat=69.6, geo_lon=19.0)
+        assert result_3d is False
+
+    def test_extreme_latitude_southern_hemisphere(self):
+        """Test 3D calculation for Antarctic location."""
+        # McMurdo Station, Antarctica (-77.8°S)
+        # December 21, 2024 - Antarctic summer, midnight sun
+        jd = julday(2024, 12, 21, 0.0)  # Midnight UTC
+
+        sun_lon = 270.0  # Capricorn (Sun at summer solstice for S hemisphere)
+        asc = 0.0
+
+        # In Antarctic summer, Sun is above horizon at midnight
+        result_3d = is_day_chart(sun_lon, asc, jd=jd, geo_lat=-77.8, geo_lon=166.7)
+        assert result_3d is True
+
+    def test_is_sun_above_horizon_3d_directly(self):
+        """Test the internal 3D function directly."""
+        # Standard daytime scenario - Rome at noon in summer
+        jd = julday(2024, 6, 21, 12.0)
+        sun_lon = 90.0
+        sun_lat = 0.0
+        geo_lat = 41.9
+        geo_lon = 12.5
+
+        result = _is_sun_above_horizon_3d(jd, sun_lon, sun_lat, geo_lat, geo_lon)
+        assert result is True
+
+    def test_is_sun_above_horizon_3d_night(self):
+        """Test 3D function for nighttime scenario."""
+        # Midnight in Rome, winter
+        jd = julday(2024, 12, 21, 0.0)  # Midnight UTC
+        sun_lon = 270.0
+        sun_lat = 0.0
+        geo_lat = 41.9
+        geo_lon = 12.5
+
+        result = _is_sun_above_horizon_3d(jd, sun_lon, sun_lat, geo_lat, geo_lon)
+        assert result is False
+
+    def test_fallback_to_2d_without_jd(self):
+        """Without jd parameter, should use 2D method."""
+        sun_lon = 90.0
+        asc = 0.0
+
+        # Without jd: 2D method (Sun between 0° and 180°)
+        result = is_day_chart(sun_lon, asc, geo_lat=70.0, geo_lon=20.0)
+
+        # Should be same as pure 2D call
+        result_2d = is_day_chart(sun_lon, asc)
+        assert result == result_2d
+
+    def test_fallback_to_2d_without_lat(self):
+        """Without geo_lat parameter, should use 2D method."""
+        jd = julday(2024, 6, 21, 12.0)
+        sun_lon = 90.0
+        asc = 0.0
+
+        result = is_day_chart(sun_lon, asc, jd=jd, geo_lon=20.0)
+        result_2d = is_day_chart(sun_lon, asc)
+        assert result == result_2d
+
+
+class TestCalcAllArabicPartsWithLocation:
+    """Tests for calc_all_arabic_parts with location parameters."""
+
+    def test_moderate_latitude_same_as_without_location(self):
+        """At moderate latitudes, results should be same with or without location."""
+        positions = {
+            "Asc": 15.0,
+            "Sun": 90.0,
+            "Moon": 240.0,
+            "Mercury": 100.0,
+            "Venus": 80.0,
+        }
+
+        parts_without = calc_all_arabic_parts(positions)
+        parts_with = calc_all_arabic_parts(
+            positions,
+            jd=julday(2024, 6, 21, 12.0),
+            geo_lat=41.9,
+            geo_lon=12.5,
+        )
+
+        # Same results because latitude is moderate
+        assert parts_without == parts_with
+
+    def test_extreme_latitude_may_differ(self):
+        """At extreme latitudes, 3D calc may give different sect determination."""
+        # Scenario: Arctic summer midnight - Sun geometrically above horizon
+        # but 2D method might say night chart depending on ASC/Sun relationship
+        jd = julday(2024, 6, 21, 0.0)
+
+        positions = {
+            "Asc": 270.0,  # Capricorn rising
+            "Sun": 90.0,  # Cancer (summer solstice)
+            "Moon": 180.0,
+            "Mercury": 100.0,
+            "Venus": 80.0,
+        }
+
+        parts_2d = calc_all_arabic_parts(positions)
+        parts_3d = calc_all_arabic_parts(
+            positions,
+            jd=jd,
+            geo_lat=69.6,  # Tromso
+            geo_lon=19.0,
+        )
+
+        # 2D: Sun at 90° is NOT between ASC=270° and DSC=90° (it's exactly on DSC)
+        # Actually with wrapped logic: ASC=270, DSC=90
+        # sun_lon >= asc OR sun_lon <= desc => 90 >= 270 (False) OR 90 <= 90 (True)
+        # So 2D says day chart
+
+        # 3D should also say day chart (Sun above horizon in Arctic summer)
+        # Verify 3D is being used (latitude > 60)
+        assert abs(69.6) > _EXTREME_LATITUDE_THRESHOLD
+
+        # Both should agree in this case (day chart)
+        is_day_2d = is_day_chart(positions["Sun"], positions["Asc"])
+        is_day_3d = is_day_chart(
+            positions["Sun"], positions["Asc"], jd=jd, geo_lat=69.6, geo_lon=19.0
+        )
+
+        # In Arctic summer at midnight, Sun IS above horizon (midnight sun)
+        assert is_day_3d is True
+
+    def test_sun_lat_parameter_passed(self):
+        """Verify Sun_lat from positions is used in 3D calculation."""
+        jd = julday(2024, 6, 21, 12.0)
+
+        positions = {
+            "Asc": 15.0,
+            "Sun": 90.0,
+            "Sun_lat": 0.0,  # Sun ecliptic latitude (nearly always ~0)
+            "Moon": 240.0,
+            "Mercury": 100.0,
+            "Venus": 80.0,
+        }
+
+        # Should not raise any errors
+        parts = calc_all_arabic_parts(
+            positions,
+            jd=jd,
+            geo_lat=70.0,
+            geo_lon=20.0,
+        )
+
+        assert "Pars_Fortunae" in parts

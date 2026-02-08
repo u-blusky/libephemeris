@@ -21,7 +21,56 @@ Supported Parts:
 - Part of Faith (Pars Fidei): Belief, religion, trust
 """
 
-from typing import Dict
+from typing import Dict, Optional
+
+# Latitude threshold above which 3D horizontal calculation is used
+# for more accurate day/night determination. At latitudes beyond this,
+# the ecliptic-horizon geometry becomes complex enough that 2D longitude
+# comparison can give wrong results.
+_EXTREME_LATITUDE_THRESHOLD = 60.0
+
+
+def _is_sun_above_horizon_3d(
+    jd: float,
+    sun_lon: float,
+    sun_lat: float,
+    geo_lat: float,
+    geo_lon: float,
+) -> bool:
+    """
+    Determine if Sun is above horizon using 3D horizontal coordinates.
+
+    Uses coordinate transformation from ecliptic to horizontal system
+    to calculate Sun's true altitude above the local horizon.
+
+    Args:
+        jd: Julian Day in Universal Time
+        sun_lon: Sun ecliptic longitude in degrees
+        sun_lat: Sun ecliptic latitude in degrees (typically ~0)
+        geo_lat: Observer geographic latitude in degrees (North positive)
+        geo_lon: Observer geographic longitude in degrees (East positive)
+
+    Returns:
+        bool: True if Sun altitude >= 0 (above or on horizon)
+    """
+    from .utils import azalt, SE_ECL2HOR
+
+    # geopos: (longitude, latitude, altitude_meters)
+    geopos = (geo_lon, geo_lat, 0.0)
+
+    # No atmospheric refraction for geometric calculation
+    # (refraction would slightly raise apparent position)
+    atpress = 0.0
+    attemp = 0.0
+
+    # xin: (ecliptic_lon, ecliptic_lat, distance)
+    # Distance doesn't affect altitude calculation, use 1.0 AU
+    xin = (sun_lon, sun_lat, 1.0)
+
+    # azalt returns (azimuth, true_altitude, apparent_altitude)
+    _, true_altitude, _ = azalt(jd, SE_ECL2HOR, geopos, atpress, attemp, xin)
+
+    return true_altitude >= 0.0
 
 
 def calc_arabic_part_of_fortune(
@@ -142,7 +191,15 @@ def calc_arabic_part_of_faith(asc: float, mercury: float, moon: float) -> float:
     return (asc + mercury - moon) % 360.0
 
 
-def is_day_chart(sun_lon: float, asc: float) -> bool:
+def is_day_chart(
+    sun_lon: float,
+    asc: float,
+    *,
+    jd: Optional[float] = None,
+    geo_lat: Optional[float] = None,
+    geo_lon: Optional[float] = None,
+    sun_lat: float = 0.0,
+) -> bool:
     """
     Determine if chart is diurnal (day) or nocturnal (night) based on sect.
 
@@ -151,23 +208,42 @@ def is_day_chart(sun_lon: float, asc: float) -> bool:
     Args:
         sun_lon: Sun ecliptic longitude in degrees (0-360)
         asc: Ascendant ecliptic longitude in degrees (0-360)
+        jd: Julian Day in UT (optional, enables 3D calculation)
+        geo_lat: Observer geographic latitude in degrees (optional)
+        geo_lon: Observer geographic longitude in degrees (optional)
+        sun_lat: Sun ecliptic latitude in degrees (default 0.0)
 
     Returns:
         bool: True if day chart (Sun above horizon), False if night chart
 
     Algorithm:
-        The horizon runs from Ascendant (east) to Descendant (west).
-        Points between ASC and DSC (going counter-clockwise through MC)
-        are above the horizon. This is the zodiacal arc from ASC to ASC+180°.
+        For moderate latitudes (|lat| <= 60°) or when location is not provided,
+        uses the traditional 2D method based on ecliptic longitude comparison.
+
+        For extreme latitudes (|lat| > 60°), uses 3D horizontal coordinate
+        calculation to accurately determine Sun's altitude above the local
+        horizon. This accounts for the complex geometry where the ecliptic
+        and horizon planes intersect at steep angles.
 
     Note:
-        This is a simplified 2D calculation using ecliptic longitude only.
-        It assumes the horizon plane intersects the ecliptic at ASC/DSC.
+        At extreme latitudes (polar/subpolar regions), the 2D ecliptic method
+        can give incorrect results because the horizon-ecliptic geometry
+        differs significantly from the simplified model. The 3D method uses
+        actual coordinate transformation to determine if Sun is above horizon.
 
-        For extreme latitudes or precise calculations, use 3D horizon
-        coordinates (altitude/azimuth). This method is traditional and
-        sufficient for most astrological purposes.
+        To enable 3D calculation, provide jd, geo_lat, and geo_lon parameters.
+        If any of these are missing, the traditional 2D method is used.
     """
+    # Use 3D calculation at extreme latitudes if location provided
+    if (
+        jd is not None
+        and geo_lat is not None
+        and geo_lon is not None
+        and abs(geo_lat) > _EXTREME_LATITUDE_THRESHOLD
+    ):
+        return _is_sun_above_horizon_3d(jd, sun_lon, sun_lat, geo_lat, geo_lon)
+
+    # Traditional 2D calculation using ecliptic longitude
     desc = (asc + 180.0) % 360.0
 
     # Check if Sun is in upper hemisphere (ASC to DSC counter-clockwise)
@@ -180,14 +256,24 @@ def is_day_chart(sun_lon: float, asc: float) -> bool:
         return sun_lon >= asc or sun_lon <= desc
 
 
-def calc_all_arabic_parts(positions: Dict[str, float]) -> Dict[str, float]:
+def calc_all_arabic_parts(
+    positions: Dict[str, float],
+    *,
+    jd: Optional[float] = None,
+    geo_lat: Optional[float] = None,
+    geo_lon: Optional[float] = None,
+) -> Dict[str, float]:
     """
     Calculate all standard Arabic parts from a position dictionary.
 
     Args:
         positions: Dictionary of celestial positions in ecliptic longitude degrees.
                   Required keys: 'Asc', 'Sun', 'Moon', 'Mercury', 'Venus'
+                  Optional key: 'Sun_lat' for Sun ecliptic latitude (default 0.0)
                   All values should be in range 0-360 degrees.
+        jd: Julian Day in UT (optional, enables 3D day/night calculation)
+        geo_lat: Observer geographic latitude in degrees (optional)
+        geo_lon: Observer geographic longitude in degrees (optional)
 
     Returns:
         Dict[str, float]: Dictionary mapping part names to longitudes:
@@ -208,14 +294,21 @@ def calc_all_arabic_parts(positions: Dict[str, float]) -> Dict[str, float]:
     Note:
         Missing keys will default to 0.0. Ensure all required positions
         are present for accurate results.
+
+        For accurate day/night determination at extreme latitudes (|lat| > 60°),
+        provide jd, geo_lat, and geo_lon parameters. This enables 3D horizontal
+        coordinate calculation instead of the simplified 2D ecliptic method.
     """
     asc = positions.get("Asc", 0.0)
     sun = positions.get("Sun", 0.0)
+    sun_lat = positions.get("Sun_lat", 0.0)
     moon = positions.get("Moon", 0.0)
     mercury = positions.get("Mercury", 0.0)
     venus = positions.get("Venus", 0.0)
 
-    is_diurnal = is_day_chart(sun, asc)
+    is_diurnal = is_day_chart(
+        sun, asc, jd=jd, geo_lat=geo_lat, geo_lon=geo_lon, sun_lat=sun_lat
+    )
 
     return {
         "Pars_Fortunae": calc_arabic_part_of_fortune(asc, sun, moon, is_diurnal),
