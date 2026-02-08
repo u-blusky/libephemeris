@@ -1520,6 +1520,26 @@ def swe_houses_ex(
             # Vehlow Equal: sidereal Asc at middle of 1st house
             start = (sid_asc - 15.0) % 360.0
             cusps = tuple([(start + i * 30.0) % 360.0 for i in range(12)])
+        elif hsys_char in ("I", "i"):
+            # Sunshine (Makransky): Recalculate using sidereal Asc/MC
+            # The Sun's declination and ARMC are geometric (not zodiacal),
+            # so they remain unchanged. We need to recalculate the cusps
+            # using the sidereal Ascendant and MC.
+            try:
+                # Get Sun's declination (geometric, not affected by sidereal)
+                sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL)
+                sun_dec = sun_pos[1]
+            except Exception:
+                sun_dec = 0.0
+            # Get obliquity for Sunshine calculation
+            ts = get_timescale()
+            t = ts.ut1_jd(tjdut)
+            eps = get_true_obliquity(t.tt)
+            # ARMC is geometric, not zodiacal (from original ascmc)
+            armc = ascmc[2]
+            # Recalculate Sunshine cusps with sidereal Asc and MC
+            sunshine_cusps = _houses_sunshine(armc, lat, eps, sid_asc, sid_mc, sun_dec)
+            cusps = tuple(sunshine_cusps[1:13])
         else:
             # For other systems, just subtract ayanamsa from tropical cusps
             cusps = tuple([(c - ayanamsa) % 360.0 for c in cusps])
