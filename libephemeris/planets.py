@@ -2543,37 +2543,50 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     # Ayanamsa values at J2000 and precession rates
     # Format: (ayanamsa_at_J2000, precession_rate_per_century)
     # These are the reference values used by Swiss Ephemeris
+    #
+    # Precession model: Swiss Ephemeris uses IAU 2006 precession which has a
+    # time-dependent rate. The formula is approximately:
+    #   precession_arcsec = 5028.796273 * T + 1.105608 * T^2
+    # where T is Julian centuries from J2000. The linear rate 5028.796273"/century
+    # corresponds to ~50.288"/year = ~1.39689°/century.
+    #
+    # Note: The quadratic term (1.1"/century²) is applied separately below.
+    PREC_RATE = 5028.796273  # arcsec/century (linear term)
+    PREC_RATE_QUAD = 1.105608  # arcsec/century² (quadratic term)
 
     ayanamsha_data = {
         # Values at J2000.0 (JD 2451545.0) from Swiss Ephemeris
-        # Precession rate ~5027 arcsec/century (~1.4°/century)
-        SE_SIDM_FAGAN_BRADLEY: (24.740300, 5027.8),  # Fagan/Bradley
-        SE_SIDM_LAHIRI: (23.857092, 5027.8),  # Lahiri
-        SE_SIDM_DELUCE: (27.815753, 5027.8),  # De Luce
-        SE_SIDM_RAMAN: (22.410791, 5027.8),  # Raman
-        SE_SIDM_USHASHASHI: (20.057541, 5027.8),  # Ushashashi
-        SE_SIDM_KRISHNAMURTI: (23.760240, 5027.8),  # Krishnamurti
-        SE_SIDM_DJWHAL_KHUL: (28.359679, 5027.8),  # Djwhal Khul
-        SE_SIDM_YUKTESHWAR: (22.478803, 5027.8),  # Yukteshwar
-        SE_SIDM_JN_BHASIN: (22.762137, 5027.8),  # JN Bhasin
-        SE_SIDM_BABYL_KUGLER1: (23.533640, 5027.8),  # Babylonian (Kugler 1)
-        SE_SIDM_BABYL_KUGLER2: (24.933640, 5027.8),  # Babylonian (Kugler 2)
-        SE_SIDM_BABYL_KUGLER3: (25.783640, 5027.8),  # Babylonian (Kugler 3)
-        SE_SIDM_BABYL_HUBER: (24.733640, 5027.8),  # Babylonian (Huber)
-        SE_SIDM_BABYL_ETPSC: (24.522528, 5027.8),  # Babylonian (ETPSC)
-        SE_SIDM_ALDEBARAN_15TAU: (24.758924, 5027.8),  # Aldebaran at 15 Tau
-        SE_SIDM_HIPPARCHOS: (20.247788, 5027.8),  # Hipparchos
-        SE_SIDM_SASSANIAN: (19.992959, 5027.8),  # Sassanian
+        # Precession rate uses IAU 2006 model (~5028.8 arcsec/century at J2000)
+        SE_SIDM_FAGAN_BRADLEY: (24.740300, PREC_RATE),  # Fagan/Bradley
+        SE_SIDM_LAHIRI: (23.857092, PREC_RATE),  # Lahiri
+        SE_SIDM_DELUCE: (27.815753, PREC_RATE),  # De Luce
+        SE_SIDM_RAMAN: (22.410791, PREC_RATE),  # Raman
+        SE_SIDM_USHASHASHI: (20.057541, PREC_RATE),  # Ushashashi
+        SE_SIDM_KRISHNAMURTI: (23.760240, PREC_RATE),  # Krishnamurti
+        SE_SIDM_DJWHAL_KHUL: (28.359679, PREC_RATE),  # Djwhal Khul
+        SE_SIDM_YUKTESHWAR: (22.478803, PREC_RATE),  # Yukteshwar
+        SE_SIDM_JN_BHASIN: (22.762137, PREC_RATE),  # JN Bhasin
+        SE_SIDM_BABYL_KUGLER1: (23.533640, PREC_RATE),  # Babylonian (Kugler 1)
+        SE_SIDM_BABYL_KUGLER2: (24.933640, PREC_RATE),  # Babylonian (Kugler 2)
+        SE_SIDM_BABYL_KUGLER3: (25.783640, PREC_RATE),  # Babylonian (Kugler 3)
+        SE_SIDM_BABYL_HUBER: (24.733640, PREC_RATE),  # Babylonian (Huber)
+        SE_SIDM_BABYL_ETPSC: (24.522528, PREC_RATE),  # Babylonian (ETPSC)
+        SE_SIDM_ALDEBARAN_15TAU: (24.758924, PREC_RATE),  # Aldebaran at 15 Tau
+        SE_SIDM_HIPPARCHOS: (20.247788, PREC_RATE),  # Hipparchos
+        SE_SIDM_SASSANIAN: (19.992959, PREC_RATE),  # Sassanian
         SE_SIDM_GALCENT_0SAG: (0.0, 0.0),  # Galactic Center at 0 Sag (calculated)
         SE_SIDM_J2000: (0.0, 0.0),  # J2000 (no ayanamsa)
-        SE_SIDM_J1900: (1.396581, 5027.8),  # J1900
-        SE_SIDM_B1950: (0.698370, 5027.8),  # B1950
-        SE_SIDM_SURYASIDDHANTA: (20.895059, 5027.8),  # Suryasiddhanta
-        SE_SIDM_SURYASIDDHANTA_MSUN: (20.680425, 5027.8),  # Suryasiddhanta (mean Sun)
-        SE_SIDM_ARYABHATA: (20.895060, 5027.8),  # Aryabhata
-        SE_SIDM_ARYABHATA_MSUN: (20.657427, 5027.8),  # Aryabhata (mean Sun)
-        SE_SIDM_SS_REVATI: (20.103388, 5027.8),  # SS Revati
-        SE_SIDM_SS_CITRA: (23.005763, 5027.8),  # SS Citra
+        SE_SIDM_J1900: (1.396581, PREC_RATE),  # J1900
+        SE_SIDM_B1950: (0.698370, PREC_RATE),  # B1950
+        SE_SIDM_SURYASIDDHANTA: (20.895059, PREC_RATE),  # Suryasiddhanta
+        SE_SIDM_SURYASIDDHANTA_MSUN: (
+            20.680425,
+            PREC_RATE,
+        ),  # Suryasiddhanta (mean Sun)
+        SE_SIDM_ARYABHATA: (20.895060, PREC_RATE),  # Aryabhata
+        SE_SIDM_ARYABHATA_MSUN: (20.657427, PREC_RATE),  # Aryabhata (mean Sun)
+        SE_SIDM_SS_REVATI: (20.103388, PREC_RATE),  # SS Revati
+        SE_SIDM_SS_CITRA: (23.005763, PREC_RATE),  # SS Citra
         SE_SIDM_TRUE_CITRA: (0.0, 0.0),  # True Citra (calculated)
         SE_SIDM_TRUE_REVATI: (0.0, 0.0),  # True Revati (calculated)
         SE_SIDM_TRUE_PUSHYA: (0.0, 0.0),  # True Pushya (calculated)
@@ -2593,11 +2606,11 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             0.0,
             0.0,
         ),  # Galactic Center at Mula (Wilhelm, calculated)
-        SE_SIDM_ARYABHATA_522: (20.575847, 5027.8),  # Aryabhata 522
-        SE_SIDM_BABYL_BRITTON: (24.615753, 5027.8),  # Babylonian (Britton)
+        SE_SIDM_ARYABHATA_522: (20.575847, PREC_RATE),  # Aryabhata 522
+        SE_SIDM_BABYL_BRITTON: (24.615753, PREC_RATE),  # Babylonian (Britton)
         SE_SIDM_TRUE_SHEORAN: (0.0, 0.0),  # True Sheoran (calculated)
         SE_SIDM_GALCENT_COCHRANE: (0.0, 0.0),  # Galactic Center (Cochrane, calculated)
-        SE_SIDM_GALEQU_FIORENZA: (25.000019, 5027.8),  # Galactic Equator (Fiorenza)
+        SE_SIDM_GALEQU_FIORENZA: (25.000019, PREC_RATE),  # Galactic Equator (Fiorenza)
         SE_SIDM_VALENS_MOON: (0.0, 0.0),  # Valens (Moon, calculated)
     }
 
@@ -2810,11 +2823,20 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
     aya_j2000, precession = ayanamsha_data[sid_mode]
 
-    # Calculate Mean Ayanamsa
-    # Ayanamsa = Ayanamsa0 + Rate * T
+    # Calculate Mean Ayanamsa using IAU 2006 precession model
+    # Formula: Ayanamsa = Ayanamsa0 + linear_rate * T + quadratic_rate * T^2
+    # where T is Julian centuries from J2000.
+    #
+    # The linear rate is 5028.796273"/century and quadratic is 1.105608"/century^2.
+    # This matches Swiss Ephemeris which uses IAU 2006 precession.
+    #
     # Note: get_ayanamsa_ut() returns MEAN ayanamsha (without nutation).
     # For sidereal planet positions, use _get_true_ayanamsa() which includes nutation.
-    ayanamsa = aya_j2000 + (precession * T) / 3600.0
+    if precession > 0:
+        # Apply quadratic term only for formula-based ayanamshas
+        ayanamsa = aya_j2000 + (precession * T + PREC_RATE_QUAD * T * T) / 3600.0
+    else:
+        ayanamsa = aya_j2000
 
     return ayanamsa % 360.0
 
