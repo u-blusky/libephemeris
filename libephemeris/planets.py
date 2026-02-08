@@ -2586,7 +2586,13 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
         elif sid_mode == SE_SIDM_J2000:
             # J2000 Ayanamsha
+            # This represents precession from J2000.0 epoch and should be:
+            # - Negative before J2000.0 (backward precession)
+            # - Zero at J2000.0
+            # - Positive after J2000.0 (forward precession)
+            # Return raw value without modulo normalization to preserve sign
             val = (5028.796195 * T + 1.1054348 * T**2) / 3600.0
+            return val
 
         elif sid_mode == SE_SIDM_VALENS_MOON:
             # Valens Moon

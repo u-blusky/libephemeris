@@ -334,7 +334,6 @@ class TestJ2000Mode:
         assert abs(ayan_py) < 0.0001, f"PY J2000 at J2000 = {ayan_py}, expected 0"
 
     @pytest.mark.comparison
-    @pytest.mark.xfail(reason="J2000 ayanamsha sign convention differs at 1900")
     def test_j2000_changes_over_time(self):
         """J2000 ayanamsha should change from the J2000 epoch."""
         swe.set_sid_mode(SE_SIDM_J2000)
