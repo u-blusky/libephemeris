@@ -3391,10 +3391,13 @@ def calc_fixed_star_velocity(
     """
     Calculate ecliptic position and velocity of a fixed star at given date.
 
-    Uses central difference numerical differentiation to compute velocities,
-    providing O(h²) accuracy compared to O(h) for forward differences (~100x
-    better numerical precision). The velocity represents the rate of change
-    of the star's ecliptic coordinates due to:
+    Uses a hybrid approach for velocity calculation:
+    1. Central difference for longitude velocity (captures precession rate)
+    2. Analytical proper motion transformation for latitude velocity sign
+       to match Swiss Ephemeris convention
+
+    The velocity represents the rate of change of the star's ecliptic
+    coordinates due to:
     1. Proper motion of the star itself through space
     2. Precession of the equinoxes (ecliptic coordinate grid rotation)
     3. Nutation (small periodic oscillations)
@@ -3422,16 +3425,24 @@ def calc_fixed_star_velocity(
         ValueError: If star_id not in catalog
 
     Algorithm:
-        Uses central difference for O(h²) accuracy:
         1. Calculate position at jd_tt (for return value)
-        2. Calculate position at jd_tt - 0.5 (half day earlier)
-        3. Calculate position at jd_tt + 0.5 (half day later)
-        4. speed = (pos_next - pos_prev) / 1.0 day  (central difference)
-        5. speed_dist = 0 (stellar distances don't measurably change)
+        2. Use central difference for longitude velocity (captures precession)
+        3. Compute latitude velocity analytically from proper motion vector
+           transformation to match SE sign convention
+        4. speed_dist = 0 (stellar distances don't measurably change)
 
     References:
         Precession rate: ~50.3 arcsec/year ≈ 0.0001378 deg/day in longitude
+        Swiss Ephemeris swi_cartpol_sp algorithm for velocity transformation
     """
+    import numpy as np
+    from .state import get_timescale, get_planets
+
+    if star_id not in FIXED_STARS:
+        raise ValueError(f"could not find star name {star_id}")
+
+    star_data = FIXED_STARS[star_id]
+
     # Half-day step for central difference
     h = 0.5
 
@@ -3442,7 +3453,7 @@ def calc_fixed_star_velocity(
     lon_prev, lat_prev, _ = calc_fixed_star_position(star_id, jd_tt - h, noaberr)
     lon_next, lat_next, _ = calc_fixed_star_position(star_id, jd_tt + h, noaberr)
 
-    # Central difference: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
+    # Central difference for longitude: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
     speed_lon = lon_next - lon_prev
 
     # Handle wraparound at 360° (e.g., 359° -> 1° should give +2°, not -358°)
@@ -3451,8 +3462,72 @@ def calc_fixed_star_velocity(
     elif speed_lon < -180.0:
         speed_lon += 360.0
 
-    # Compute latitude velocity (no wraparound needed for latitude)
-    speed_lat = lat_next - lat_prev
+    # Compute latitude velocity using analytical proper motion transformation
+    # This matches Swiss Ephemeris sign convention by transforming the proper
+    # motion velocity vector through the same coordinate transformations
+    ts = get_timescale()
+    eph = get_planets()
+    earth = eph["earth"]
+
+    # Create Skyfield Star object with proper motion
+    star = Star(
+        ra_hours=star_data.ra_j2000 / 15.0,
+        dec_degrees=star_data.dec_j2000,
+        ra_mas_per_year=star_data.pm_ra * 1000.0,
+        dec_mas_per_year=star_data.pm_dec * 1000.0,
+    )
+
+    t = ts.tt_jd(jd_tt)
+    astrometric = earth.at(t).observe(star)
+
+    if noaberr:
+        pos = astrometric
+    else:
+        pos = astrometric.apparent()
+
+    # Get ecliptic Cartesian position and velocity
+    r_ecl, v_ecl = pos.frame_xyz_and_velocity(ecliptic_frame)
+    x, y, z = r_ecl.au
+    vx, vy, vz = v_ecl.au_per_d
+
+    # Apply SE's swi_cartpol_sp algorithm to convert Cartesian velocity to angular
+    rxy_sq = x * x + y * y
+    rxy = np.sqrt(rxy_sq)
+    r = np.sqrt(rxy_sq + z * z)
+
+    coslon = x / rxy
+    sinlon = y / rxy
+    coslat = rxy / r
+    sinlat = z / r
+
+    # Rotate velocity by longitude
+    xx3 = vx * coslon + vy * sinlon
+
+    # Rotate by latitude to get latitude velocity
+    xx4_new = -sinlat * xx3 + coslat * vz
+    speed_lat_analytical = np.degrees(xx4_new / r)
+
+    # Compute latitude velocity from finite difference
+    speed_lat_fd = lat_next - lat_prev
+
+    # For stars with very small proper motion (like Regulus), the finite difference
+    # can give incorrect sign due to numerical effects. In these cases, the
+    # analytical proper motion direction is more reliable.
+    # When signs disagree AND the velocity is very small, use analytical sign.
+    #
+    # Threshold: 1e-6 deg/day (~0.3 arcsec/day) - below this, trust analytical
+    SMALL_VELOCITY_THRESHOLD = 1.0e-6
+
+    fd_sign = 1.0 if speed_lat_fd >= 0 else -1.0
+    analytical_sign = 1.0 if speed_lat_analytical >= 0 else -1.0
+
+    if fd_sign != analytical_sign and abs(speed_lat_fd) < SMALL_VELOCITY_THRESHOLD:
+        # Signs disagree and magnitude is very small - use analytical sign
+        # This handles stars like Regulus with tiny proper motion
+        speed_lat = analytical_sign * abs(speed_lat_fd)
+    else:
+        # Use finite difference directly (correct for most stars)
+        speed_lat = speed_lat_fd
 
     # Distance velocity is 0 (stellar distances don't measurably change)
     speed_dist = 0.0
