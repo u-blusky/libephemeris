@@ -1796,9 +1796,16 @@ def _houses_placidus(
 
         ra = (armc + offset_deg) % 360.0
         new_ra = ra  # Initialize for type safety
+        prev_diff = float("inf")  # Track convergence/divergence
+        converged = False
+
+        # Convergence threshold: 1e-7° = 0.00036 arcsec (matches Swiss Ephemeris)
+        CONVERGENCE_THRESHOLD = 1e-7
+        # Maximum iterations - if not converged by then, likely diverging
+        MAX_ITERATIONS = 50
 
         # Iterate to convergence (typically 15-20 iterations needed for 1e-7° threshold)
-        for _ in range(25):
+        for iteration in range(MAX_ITERATIONS):
             # Calculate declination for point at this RA on ecliptic
             # Using spherical astronomy formula: tan(dec) = sin(RA) * tan(eps)
 
@@ -2034,9 +2041,23 @@ def _houses_placidus(
             if diff > 180:
                 diff = 360 - diff
             ra = new_ra
-            # Convergence threshold: 1e-7° = 0.00036 arcsec (improved from 0.36 arcsec)
-            if diff < 1e-7:
+
+            # Check for convergence
+            if diff < CONVERGENCE_THRESHOLD:
+                converged = True
                 break
+
+            # Check for divergence: if diff is increasing, iteration is unstable
+            # Allow some oscillation (diff can increase slightly) but detect runaway
+            if iteration > 5 and diff > prev_diff * 1.5:
+                # Diverging - this happens near polar latitudes
+                return None
+
+            prev_diff = diff
+
+        # If we exhausted iterations without converging, return None for fallback
+        if not converged:
+            return None
 
         # Converged RA. Find Ecliptic Longitude.
         # tan(lon) = tan(ra) / cos(eps)
