@@ -290,3 +290,136 @@ class TestLoggerNameConstant:
         from libephemeris.logging_config import LOGGER_NAME
 
         assert LOGGER_NAME == "libephemeris"
+
+
+class TestGetPlanetsLogging:
+    """Tests for logging in get_planets() function."""
+
+    def test_logs_info_when_loading_cached_ephemeris(self, caplog, tmp_path):
+        """get_planets should log INFO when loading cached ephemeris."""
+        import libephemeris.state as state
+        from libephemeris.logging_config import get_logger, LOGGER_NAME
+        from unittest.mock import MagicMock, patch
+
+        # Create a fake ephemeris file
+        fake_bsp = tmp_path / "de440.bsp"
+        fake_bsp.touch()
+
+        # Reset state
+        state._PLANETS = None
+        state._EPHEMERIS_FILE = "de440.bsp"
+        original_path = state._EPHEMERIS_PATH
+        state._EPHEMERIS_PATH = str(tmp_path)
+
+        # Mock the loader to avoid actually loading the file
+        mock_kernel = MagicMock()
+        mock_loader = MagicMock(return_value=mock_kernel)
+
+        # Get the logger and temporarily set propagate=True for caplog to capture
+        logger = get_logger()
+        original_propagate = logger.propagate
+        logger.propagate = True
+
+        try:
+            with patch.object(state, "get_loader", return_value=mock_loader):
+                with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+                    state.get_planets()
+
+            # Check INFO log for "Ephemeris loaded"
+            info_messages = [
+                r.message for r in caplog.records if r.levelno == logging.INFO
+            ]
+            assert any("Ephemeris loaded:" in msg for msg in info_messages)
+
+            # Check DEBUG log for "Using cached ephemeris"
+            debug_messages = [
+                r.message for r in caplog.records if r.levelno == logging.DEBUG
+            ]
+            assert any("Using cached ephemeris:" in msg for msg in debug_messages)
+        finally:
+            # Restore state
+            logger.propagate = original_propagate
+            state._EPHEMERIS_PATH = original_path
+            state._PLANETS = None
+
+    def test_logs_info_when_downloading_ephemeris(self, caplog):
+        """get_planets should log INFO when downloading ephemeris."""
+        import libephemeris.state as state
+        from libephemeris.logging_config import get_logger, LOGGER_NAME
+        from unittest.mock import MagicMock, patch
+
+        # Reset state
+        state._PLANETS = None
+        state._EPHEMERIS_FILE = "de440.bsp"
+        original_path = state._EPHEMERIS_PATH
+        state._EPHEMERIS_PATH = None
+
+        # Mock the loader to simulate download
+        mock_kernel = MagicMock()
+        mock_loader = MagicMock(return_value=mock_kernel)
+
+        # Get the logger and temporarily set propagate=True for caplog to capture
+        logger = get_logger()
+        original_propagate = logger.propagate
+
+        try:
+            logger.propagate = True
+            with patch.object(state, "get_loader", return_value=mock_loader):
+                # Mock os.path.exists to return False for all paths (force download path)
+                with patch("os.path.exists", return_value=False):
+                    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+                        state.get_planets()
+
+            # Check that download message was logged
+            info_messages = [
+                r.message for r in caplog.records if r.levelno == logging.INFO
+            ]
+            assert any("Downloading JPL ephemeris" in msg for msg in info_messages)
+            assert any("Ephemeris loaded:" in msg for msg in info_messages)
+        finally:
+            # Restore state
+            logger.propagate = original_propagate
+            state._EPHEMERIS_PATH = original_path
+            state._PLANETS = None
+
+    def test_log_message_format_matches_expected(self, caplog):
+        """Log messages should match the expected format for user visibility."""
+        import libephemeris.state as state
+        from libephemeris.logging_config import get_logger, LOGGER_NAME
+        from unittest.mock import MagicMock, patch
+
+        # Reset state
+        state._PLANETS = None
+        state._EPHEMERIS_FILE = "de440.bsp"
+        original_path = state._EPHEMERIS_PATH
+        state._EPHEMERIS_PATH = None
+
+        # Mock the loader
+        mock_kernel = MagicMock()
+        mock_loader = MagicMock(return_value=mock_kernel)
+
+        # Get the logger and temporarily set propagate=True for caplog to capture
+        logger = get_logger()
+        original_propagate = logger.propagate
+
+        try:
+            logger.propagate = True
+            with patch.object(state, "get_loader", return_value=mock_loader):
+                # Mock os.path.exists to return False (force download path)
+                with patch("os.path.exists", return_value=False):
+                    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+                        state.get_planets()
+
+            # Verify the download message format
+            download_msgs = [
+                r.message
+                for r in caplog.records
+                if "Downloading JPL ephemeris" in r.message
+            ]
+            assert len(download_msgs) >= 1
+            assert "de440.bsp" in download_msgs[0]
+        finally:
+            # Restore state
+            logger.propagate = original_propagate
+            state._EPHEMERIS_PATH = original_path
+            state._PLANETS = None

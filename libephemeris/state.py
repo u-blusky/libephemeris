@@ -134,14 +134,18 @@ def get_planets() -> SpiceKernel:
         if _EPHEMERIS_PATH:
             bsp_path = os.path.join(_EPHEMERIS_PATH, _EPHEMERIS_FILE)
             if os.path.exists(bsp_path):
+                logger.debug("Using cached ephemeris: %s", bsp_path)
                 _PLANETS = load(bsp_path)
+                logger.info("Ephemeris loaded: %s", bsp_path)
                 return _PLANETS
 
         # Try workspace root
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         bsp_path = os.path.join(base_dir, _EPHEMERIS_FILE)
         if os.path.exists(bsp_path):
+            logger.debug("Using cached ephemeris: %s", bsp_path)
             _PLANETS = load(bsp_path)
+            logger.info("Ephemeris loaded: %s", bsp_path)
         else:
             # If DE440 is not found locally, try DE421 as fallback before downloading
             # This allows offline use with DE421 while recommending DE440 for download
@@ -151,19 +155,27 @@ def get_planets() -> SpiceKernel:
                 if _EPHEMERIS_PATH:
                     fallback_path = os.path.join(_EPHEMERIS_PATH, fallback_file)
                     if os.path.exists(fallback_path):
+                        logger.debug(
+                            "Using cached fallback ephemeris: %s", fallback_path
+                        )
                         _EPHEMERIS_FILE = fallback_file
                         _PLANETS = load(fallback_path)
+                        logger.info("Ephemeris loaded: %s", fallback_path)
                         return _PLANETS
                 # Check workspace root
                 fallback_path = os.path.join(base_dir, fallback_file)
                 if os.path.exists(fallback_path):
+                    logger.debug("Using cached fallback ephemeris: %s", fallback_path)
                     _EPHEMERIS_FILE = fallback_file
                     _PLANETS = load(fallback_path)
+                    logger.info("Ephemeris loaded: %s", fallback_path)
                     return _PLANETS
             # Download from internet (will get DE440 if that was requested)
-            logger.info("Downloading %s ephemeris (~114 MB)...", _EPHEMERIS_FILE)
+            logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
             _PLANETS = load(_EPHEMERIS_FILE)
-            logger.info("Ephemeris download complete: %s", _EPHEMERIS_FILE)
+            # Get the path where Skyfield downloaded the file
+            downloaded_path = os.path.join(base_dir, _EPHEMERIS_FILE)
+            logger.info("Ephemeris loaded: %s", downloaded_path)
     return _PLANETS
 
 
