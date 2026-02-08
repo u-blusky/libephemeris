@@ -2360,14 +2360,18 @@ def ensure_major_asteroid_spk(
     jd: Optional[float] = None,
 ) -> bool:
     """
-    Ensure SPK is available for a major asteroid, downloading if needed.
+    Ensure SPK is available for a minor body, downloading if needed.
 
     This is a convenience function that attempts to download the SPK for
-    a major asteroid if not already available. It is designed to be called
+    a minor body if not already available. It is designed to be called
     before position calculations to ensure best precision.
 
+    Supports all bodies in REQUIRED_SPK_BODIES (major asteroids, centaurs,
+    dwarf planets) and any body in SPK_BODY_NAME_MAP.
+
     Args:
-        body_id: Minor body identifier (SE_CERES, SE_VESTA, etc.)
+        body_id: Minor body identifier (SE_CERES, SE_VESTA, SE_CHIRON,
+            SE_PHOLUS, SE_NESSUS, SE_ERIS, etc.)
         jd: Optional Julian Day to center the SPK coverage around.
             If None, uses current date.
 
@@ -2377,22 +2381,36 @@ def ensure_major_asteroid_spk(
 
     Example:
         >>> from libephemeris.minor_bodies import ensure_major_asteroid_spk
-        >>> from libephemeris.constants import SE_CERES
+        >>> from libephemeris.constants import SE_CERES, REQUIRED_SPK_BODIES
         >>> # Ensure SPK is available for Ceres
         >>> if ensure_major_asteroid_spk(SE_CERES):
         ...     print("High-precision SPK available")
         ... else:
         ...     print("Will use Keplerian approximation")
+        >>> # Download all required SPK bodies
+        >>> for body in REQUIRED_SPK_BODIES:
+        ...     ensure_major_asteroid_spk(body)
 
     Note:
         This function is non-blocking and returns immediately if the SPK
         is already available. The download only occurs on first call.
     """
+    from .constants import SPK_BODY_NAME_MAP
+
     logger = get_logger()
 
-    # Get body name for logging (fall back to body_id if not a major asteroid)
+    # Get body name for logging
     body_info = MAJOR_ASTEROID_SPK_INFO.get(body_id)
-    body_name = body_info[3] if body_info else str(body_id)
+    if body_info:
+        body_name = body_info[3]
+    elif body_id in SPK_BODY_NAME_MAP:
+        # Try to get name from MINOR_BODY_ELEMENTS for non-major asteroids
+        if body_id in MINOR_BODY_ELEMENTS:
+            body_name = MINOR_BODY_ELEMENTS[body_id].name
+        else:
+            body_name = str(body_id)
+    else:
+        body_name = str(body_id)
 
     logger.debug("Checking SPK availability for body %d (%s)", body_id, body_name)
 
@@ -2401,7 +2419,7 @@ def ensure_major_asteroid_spk(
         logger.debug("SPK for %s (body %d) already cached", body_name, body_id)
         return True
 
-    # Try to download
+    # Try to download using major asteroid mechanism first
     logger.info("SPK for %s not cached, downloading...", body_name)
     if jd is not None:
         jd_start = jd - 3652.5  # ~10 years before
@@ -2410,7 +2428,54 @@ def ensure_major_asteroid_spk(
     else:
         spk_path = auto_download_asteroid_spk(body_id)
 
-    return spk_path is not None
+    if spk_path is not None:
+        return True
+
+    # If not a major asteroid, try the generic SPK download mechanism
+    # for bodies in SPK_BODY_NAME_MAP (e.g., SE_PHOLUS, SE_NESSUS, SE_ERIS)
+    if body_id not in MAJOR_ASTEROID_SPK_INFO and body_id in SPK_BODY_NAME_MAP:
+        try:
+            from . import spk_auto
+            from . import state
+
+            # Check if astroquery is available
+            if not spk_auto._check_astroquery_available():
+                logger.debug("astroquery not available for SPK download")
+                return False
+
+            horizons_id, naif_id = SPK_BODY_NAME_MAP[body_id]
+
+            # Determine date range for SPK
+            import time as time_module
+
+            current_jd = 2440587.5 + (time_module.time() / 86400.0)
+
+            if jd is not None:
+                jd_start = jd - 3652.5  # ~10 years before
+                jd_end = jd + 3652.5  # ~10 years after
+            else:
+                jd_start = current_jd - 3652.5
+                jd_end = current_jd + 3652.5
+
+            # Use auto_get_spk to download and register
+            spk_path = spk_auto.auto_get_spk(
+                body_id=horizons_id,
+                jd_start=jd_start,
+                jd_end=jd_end,
+                ipl=body_id,
+                naif_id=naif_id,
+            )
+
+            if spk_path is not None:
+                logger.info("SPK for %s downloaded successfully", body_name)
+                return True
+
+        except ImportError:
+            logger.debug("SPK download dependencies not available")
+        except Exception as e:
+            logger.debug("SPK download failed: %s", str(e))
+
+    return False
 
 
 def list_major_asteroids() -> list[tuple[int, str]]:

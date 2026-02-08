@@ -1012,6 +1012,8 @@ __all__ = [
     "get_horizons_id",
     "get_naif_id_from_ipl",
     "get_spk_body_info_from_map",
+    # Required SPK bodies for high-precision calculations
+    "REQUIRED_SPK_BODIES",
     # IERS Delta T configuration
     "set_iers_delta_t_enabled",
     "get_iers_delta_t_enabled",

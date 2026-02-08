@@ -363,6 +363,39 @@ def get_spk_body_info_from_map(ipl: int) -> tuple[str, int] | None:
 
 
 # =============================================================================
+# REQUIRED SPK BODIES FOR HIGH-PRECISION CALCULATIONS
+# =============================================================================
+# Set of body IDs that require SPK kernels for high-precision ephemeris
+# calculations. These bodies benefit significantly from SPK data:
+#
+# - Main belt asteroids (Ceres, Pallas, Juno, Vesta): Keplerian elements give
+#   ~10-30 arcsec precision, SPK gives sub-arcsecond precision
+# - Centaurs (Chiron, Pholus, Nessus): Highly perturbed orbits need SPK for
+#   accurate positions over multi-decade timescales
+# - Dwarf planets (Eris): Distant TNOs require SPK for research-grade precision
+#
+# Usage:
+#     for body in REQUIRED_SPK_BODIES:
+#         eph.ensure_major_asteroid_spk(body)
+#
+# Note: All bodies listed here are in SPK_BODY_NAME_MAP and can be downloaded
+# via auto_download_asteroid_spk() or download_and_register_spk().
+
+REQUIRED_SPK_BODIES: frozenset[int] = frozenset(
+    {
+        SE_CHIRON,  # 2060 Chiron - Centaur, frequently used in astrology
+        SE_CERES,  # 1 Ceres - Dwarf planet, largest main belt asteroid
+        SE_PALLAS,  # 2 Pallas - Second largest main belt asteroid
+        SE_JUNO,  # 3 Juno - Main belt asteroid
+        SE_VESTA,  # 4 Vesta - Second most massive main belt asteroid
+        SE_PHOLUS,  # 5145 Pholus - Centaur with highly eccentric orbit
+        SE_NESSUS,  # 7066 Nessus - Centaur, astrologically significant
+        SE_ERIS,  # 136199 Eris - Largest known dwarf planet
+    }
+)
+
+
+# =============================================================================
 # VIRTUAL POINTS AND CALCULATED POSITIONS
 # =============================================================================
 
@@ -523,10 +556,12 @@ SE_PARS_FIDEI: int = SE_ARABIC_OFFSET + 4  # Part of Faith
 # =============================================================================
 # CALCULATION FLAGS
 # =============================================================================
-# Ephemeris selection (currently only SWIEPH/JPL mode supported)
-SEFLG_JPLEPH: int = 1  # Use JPL ephemeris
-SEFLG_SWIEPH: int = 2  # Use Swiss Ephemeris (libephemeris uses Skyfield/JPL)
-SEFLG_MOSEPH: int = 4  # Use Moshier ephemeris (not supported)
+# Ephemeris selection
+SEFLG_JPLEPH: int = (
+    1  # Use JPL ephemeris (default: DE440 via Skyfield, range 1550-2650 CE)
+)
+SEFLG_SWIEPH: int = 2  # Use Swiss Ephemeris (same as JPLEPH in libephemeris)
+SEFLG_MOSEPH: int = 4  # Use Moshier semi-analytical ephemeris (VSOP87 + ELP2000-82B, range -3000..+3000 CE)
 
 # Observer location and reference frame
 SEFLG_HELCTR: int = 8  # Heliocentric position

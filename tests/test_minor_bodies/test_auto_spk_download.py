@@ -505,3 +505,165 @@ class TestEnsureMajorAsteroidSpkLogging:
         assert len(relevant_records) >= 1
         # Ensure "Chiron" appears (not just the numeric ID)
         assert any("Chiron" in record.message for record in relevant_records)
+
+
+class TestRequiredSpkBodies:
+    """Test REQUIRED_SPK_BODIES constant."""
+
+    def test_is_frozenset(self):
+        """REQUIRED_SPK_BODIES should be an immutable frozenset."""
+        from libephemeris.constants import REQUIRED_SPK_BODIES
+
+        assert isinstance(REQUIRED_SPK_BODIES, frozenset)
+
+    def test_has_expected_bodies(self):
+        """REQUIRED_SPK_BODIES should contain all expected body IDs."""
+        from libephemeris.constants import (
+            REQUIRED_SPK_BODIES,
+            SE_CHIRON,
+            SE_CERES,
+            SE_PALLAS,
+            SE_JUNO,
+            SE_VESTA,
+            SE_PHOLUS,
+            SE_NESSUS,
+            SE_ERIS,
+        )
+
+        # All major asteroids from MAJOR_ASTEROID_SPK_INFO
+        assert SE_CERES in REQUIRED_SPK_BODIES
+        assert SE_PALLAS in REQUIRED_SPK_BODIES
+        assert SE_JUNO in REQUIRED_SPK_BODIES
+        assert SE_VESTA in REQUIRED_SPK_BODIES
+        assert SE_CHIRON in REQUIRED_SPK_BODIES
+
+        # Additional centaurs and dwarf planets
+        assert SE_PHOLUS in REQUIRED_SPK_BODIES
+        assert SE_NESSUS in REQUIRED_SPK_BODIES
+        assert SE_ERIS in REQUIRED_SPK_BODIES
+
+    def test_all_bodies_in_spk_body_name_map(self):
+        """All REQUIRED_SPK_BODIES should have entries in SPK_BODY_NAME_MAP."""
+        from libephemeris.constants import REQUIRED_SPK_BODIES, SPK_BODY_NAME_MAP
+
+        for body_id in REQUIRED_SPK_BODIES:
+            assert body_id in SPK_BODY_NAME_MAP, (
+                f"Body {body_id} is in REQUIRED_SPK_BODIES but not in SPK_BODY_NAME_MAP"
+            )
+
+    def test_exported_from_main_module(self):
+        """REQUIRED_SPK_BODIES should be exported from main libephemeris module."""
+        assert hasattr(eph, "REQUIRED_SPK_BODIES")
+        assert isinstance(eph.REQUIRED_SPK_BODIES, frozenset)
+
+    def test_count_is_expected(self):
+        """REQUIRED_SPK_BODIES should have 8 bodies."""
+        from libephemeris.constants import REQUIRED_SPK_BODIES
+
+        assert len(REQUIRED_SPK_BODIES) == 8
+
+    def test_major_asteroids_are_subset(self):
+        """All bodies in MAJOR_ASTEROID_SPK_INFO should be in REQUIRED_SPK_BODIES."""
+        from libephemeris.constants import REQUIRED_SPK_BODIES
+
+        for body_id in MAJOR_ASTEROID_SPK_INFO.keys():
+            assert body_id in REQUIRED_SPK_BODIES, (
+                f"Body {body_id} is in MAJOR_ASTEROID_SPK_INFO but not in REQUIRED_SPK_BODIES"
+            )
+
+
+class TestEnsureMajorAsteroidSpkForNonMajor:
+    """Test ensure_major_asteroid_spk with non-major asteroids (REQUIRED_SPK_BODIES extras)."""
+
+    @pytest.fixture(autouse=True)
+    def clear_spk_state(self):
+        """Clear SPK state before and after each test."""
+        orig_map = dict(state._SPK_BODY_MAP)
+        state._SPK_BODY_MAP.clear()
+        yield
+        state._SPK_BODY_MAP.clear()
+        state._SPK_BODY_MAP.update(orig_map)
+
+    def test_returns_true_when_already_cached_for_pholus(self):
+        """Should return True when SPK is already cached for non-major asteroid."""
+        from libephemeris.constants import SE_PHOLUS, NAIF_PHOLUS
+
+        state._SPK_BODY_MAP[SE_PHOLUS] = ("/path/to/pholus.bsp", NAIF_PHOLUS)
+
+        result = ensure_major_asteroid_spk(SE_PHOLUS)
+
+        assert result is True
+
+    def test_returns_true_when_already_cached_for_eris(self):
+        """Should return True when SPK is already cached for Eris."""
+        from libephemeris.constants import SE_ERIS, NAIF_ERIS
+
+        state._SPK_BODY_MAP[SE_ERIS] = ("/path/to/eris.bsp", NAIF_ERIS)
+
+        result = ensure_major_asteroid_spk(SE_ERIS)
+
+        assert result is True
+
+    @patch("libephemeris.minor_bodies.auto_download_asteroid_spk")
+    def test_returns_false_when_astroquery_not_available_for_pholus(self, mock_auto):
+        """Should return False when astroquery is not available."""
+        from libephemeris.constants import SE_PHOLUS
+
+        # auto_download_asteroid_spk returns None for non-major asteroids
+        mock_auto.return_value = None
+
+        # Mock spk_auto._check_astroquery_available to return False
+        with patch(
+            "libephemeris.spk_auto._check_astroquery_available", return_value=False
+        ):
+            result = ensure_major_asteroid_spk(SE_PHOLUS)
+
+        assert result is False
+
+    @patch("libephemeris.minor_bodies.auto_download_asteroid_spk")
+    @patch("libephemeris.spk_auto._check_astroquery_available")
+    @patch("libephemeris.spk_auto.auto_get_spk")
+    def test_uses_spk_body_name_map_for_pholus(
+        self, mock_auto_get, mock_check, mock_auto_download
+    ):
+        """Should use SPK_BODY_NAME_MAP for non-major asteroids."""
+        from libephemeris.constants import SE_PHOLUS, NAIF_PHOLUS
+
+        # auto_download_asteroid_spk returns None for non-major asteroids
+        mock_auto_download.return_value = None
+        mock_check.return_value = True
+        mock_auto_get.return_value = "/path/to/pholus.bsp"
+
+        result = ensure_major_asteroid_spk(SE_PHOLUS)
+
+        assert result is True
+        # Verify auto_get_spk was called with correct parameters
+        mock_auto_get.assert_called_once()
+        call_kwargs = mock_auto_get.call_args[1]
+        assert call_kwargs["body_id"] == "5145"  # Horizons ID for Pholus
+        assert call_kwargs["ipl"] == SE_PHOLUS
+        assert call_kwargs["naif_id"] == NAIF_PHOLUS
+
+    @patch("libephemeris.minor_bodies.auto_download_asteroid_spk")
+    @patch("libephemeris.spk_auto._check_astroquery_available")
+    @patch("libephemeris.spk_auto.auto_get_spk")
+    def test_uses_spk_body_name_map_for_eris(
+        self, mock_auto_get, mock_check, mock_auto_download
+    ):
+        """Should use SPK_BODY_NAME_MAP for Eris."""
+        from libephemeris.constants import SE_ERIS, NAIF_ERIS
+
+        # auto_download_asteroid_spk returns None for non-major asteroids
+        mock_auto_download.return_value = None
+        mock_check.return_value = True
+        mock_auto_get.return_value = "/path/to/eris.bsp"
+
+        result = ensure_major_asteroid_spk(SE_ERIS)
+
+        assert result is True
+        # Verify auto_get_spk was called with correct parameters
+        mock_auto_get.assert_called_once()
+        call_kwargs = mock_auto_get.call_args[1]
+        assert call_kwargs["body_id"] == "136199"  # Horizons ID for Eris
+        assert call_kwargs["ipl"] == SE_ERIS
+        assert call_kwargs["naif_id"] == NAIF_ERIS
