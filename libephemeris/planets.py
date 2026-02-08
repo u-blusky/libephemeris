@@ -1303,6 +1303,7 @@ def _calc_body(
     # Handle lunar nodes (Mean/True North/South)
     if ipl in [SE_MEAN_NODE, SE_TRUE_NODE]:
         jd_tt = t.tt
+        is_sidereal = bool(iflag & SEFLG_SIDEREAL)
         if ipl == SE_MEAN_NODE:
             lon = lunar.calc_mean_lunar_node(jd_tt)
             # Calculate velocity via central difference numerical differentiation
@@ -1319,6 +1320,16 @@ def _calc_body(
                 elif lon_diff < -180:
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
+            # Apply sidereal correction if requested
+            if is_sidereal:
+                ayanamsa = _get_true_ayanamsa(t.ut1)
+                lon = (lon - ayanamsa) % 360.0
+                # Correct velocity for ayanamsha rate
+                if iflag & SEFLG_SPEED:
+                    dt_aya = 1.0 / 86400.0
+                    ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                    da = (ayanamsa_next - ayanamsa) / dt_aya
+                    dlon -= da
             return _to_native_floats((lon, 0.0, 0.0, dlon, 0.0, 0.0)), iflag
         else:  # SE_TRUE_NODE
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
@@ -1340,6 +1351,16 @@ def _calc_body(
                 dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
                 ddist = (dist_next - dist_prev) / (2.0 * dt)
+            # Apply sidereal correction if requested
+            if is_sidereal:
+                ayanamsa = _get_true_ayanamsa(t.ut1)
+                lon = (lon - ayanamsa) % 360.0
+                # Correct velocity for ayanamsha rate
+                if iflag & SEFLG_SPEED:
+                    dt_aya = 1.0 / 86400.0
+                    ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                    da = (ayanamsa_next - ayanamsa) / dt_aya
+                    dlon -= da
             return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # South nodes are 180° from north nodes
@@ -1359,6 +1380,7 @@ def _calc_body(
     # Handle Lilith (Mean/Osculating Apogee)
     if ipl in [SE_MEAN_APOG, SE_OSCU_APOG]:
         jd_tt = t.tt
+        is_sidereal = bool(iflag & SEFLG_SIDEREAL)
         if ipl == SE_MEAN_APOG:
             lon, lat = lunar.calc_mean_lilith_with_latitude(jd_tt)
             # Calculate velocity via central difference numerical differentiation
@@ -1378,6 +1400,15 @@ def _calc_body(
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
+            # Apply sidereal correction if requested
+            if is_sidereal:
+                ayanamsa = _get_true_ayanamsa(t.ut1)
+                lon = (lon - ayanamsa) % 360.0
+                if iflag & SEFLG_SPEED:
+                    dt_aya = 1.0 / 86400.0
+                    ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                    da = (ayanamsa_next - ayanamsa) / dt_aya
+                    dlon -= da
             return _to_native_floats((lon, lat, 0.0, dlon, dlat, 0.0)), iflag
         else:  # SE_OSCU_APOG
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
@@ -1399,11 +1430,21 @@ def _calc_body(
                 dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
                 ddist = (dist_next - dist_prev) / (2.0 * dt)
+            # Apply sidereal correction if requested
+            if is_sidereal:
+                ayanamsa = _get_true_ayanamsa(t.ut1)
+                lon = (lon - ayanamsa) % 360.0
+                if iflag & SEFLG_SPEED:
+                    dt_aya = 1.0 / 86400.0
+                    ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                    da = (ayanamsa_next - ayanamsa) / dt_aya
+                    dlon -= da
             return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # Handle Interpolated Apogee/Perigee
     if ipl in [SE_INTP_APOG, SE_INTP_PERG]:
         jd_tt = t.tt
+        is_sidereal = bool(iflag & SEFLG_SIDEREAL)
         if ipl == SE_INTP_APOG:
             lon, lat, dist = lunar.calc_interpolated_apogee(jd_tt)
         else:  # SE_INTP_PERG
@@ -1438,6 +1479,15 @@ def _calc_body(
             dlon = lon_diff / (2.0 * dt)
             dlat = (lat_next - lat_prev) / (2.0 * dt)
             ddist = (dist_next - dist_prev) / (2.0 * dt)
+        # Apply sidereal correction if requested
+        if is_sidereal:
+            ayanamsa = _get_true_ayanamsa(t.ut1)
+            lon = (lon - ayanamsa) % 360.0
+            if iflag & SEFLG_SPEED:
+                dt_aya = 1.0 / 86400.0
+                ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                da = (ayanamsa_next - ayanamsa) / dt_aya
+                dlon -= da
         return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
     # Handle Uranian planets (Hamburg School hypothetical bodies, IDs 40-47)
@@ -1448,7 +1498,7 @@ def _calc_body(
         # Use calc_uranian_planet() which uses Keplerian elements from seorbel.txt
         # to match pyswisseph's Uranian planet calculations
         pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
-        return pos, iflag
+        return _to_native_floats(pos), iflag
 
     # Handle Transpluto (Isis) - hypothetical trans-Plutonian planet (ID 48)
     if ipl == SE_ISIS:
@@ -1457,7 +1507,7 @@ def _calc_body(
         jd_tt = t.tt
         # Use calc_transpluto() which uses Keplerian elements from seorbel.txt
         pos = hypothetical.calc_transpluto(jd_tt)
-        return pos, iflag
+        return _to_native_floats(pos), iflag
 
     # Handle minor bodies (asteroids and TNOs)
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
@@ -1468,14 +1518,14 @@ def _calc_body(
 
         spk_result = spk.calc_spk_body_position(t, ipl, iflag)
         if spk_result is not None:
-            return spk_result, iflag
+            return _to_native_floats(spk_result), iflag
 
         # Try automatic SPK download if enabled and body not registered
         if get_auto_spk_download():
             try:
                 spk_result = _try_auto_spk_download(t, ipl, iflag)
                 if spk_result is not None:
-                    return spk_result, iflag
+                    return _to_native_floats(spk_result), iflag
             except Exception:
                 # If auto-download fails, continue to strict precision check
                 pass
@@ -1834,7 +1884,15 @@ def _calc_body(
     # Using central differences: f'(x) ≈ [f(x+h) - f(x-h)] / (2h)
     # This has error O(h²) compared to O(h) for forward differences,
     # providing ~100x better precision for the same timestep.
-    dt = 1.0 / 86400.0  # 1 second in days (half-step for central diff)
+    #
+    # For the Moon, we use a larger timestep (7e-5 days = ~6 seconds) which
+    # provides optimal velocity precision compared to Swiss Ephemeris.
+    # This value was empirically determined to minimize the maximum velocity error
+    # across a wide range of dates (1900-2100).
+    if ipl == SE_MOON:
+        dt = 7e-5  # ~6 seconds in days (optimized for Moon velocity precision)
+    else:
+        dt = 1.0 / 86400.0  # 1 second in days (half-step for central diff)
     dp1, dp2, dp3 = 0.0, 0.0, 0.0
 
     if iflag & SEFLG_SPEED:
@@ -1859,11 +1917,11 @@ def _calc_body(
         dp3 = (p3_next - p3_prev) / (2.0 * dt)
 
         # Handle longitude wrap-around for dp1
-        # 9000 = 180° / (2 second timestep) in degrees/day for central diff
-        # If velocity jumps by more than half a circle per 2 seconds, it's a wrap-around
-        if dp1 > 9000:
+        # The threshold depends on dt: 180° / (2*dt) in degrees/day
+        wrap_threshold = 180.0 / (2.0 * dt)
+        if dp1 > wrap_threshold:
             dp1 -= 360.0 / (2.0 * dt)
-        elif dp1 < -9000:
+        elif dp1 < -wrap_threshold:
             dp1 += 360.0 / (2.0 * dt)
 
     # 5. Sidereal Mode
