@@ -1,34 +1,43 @@
 """
 Pluto ephemeris for Moshier calculations.
 
-Implements a polynomial ephemeris for Pluto based on the theory by
-Chapront and Francou, as adapted by Meeus in "Astronomical Algorithms".
+Implements the Moshier analytical theory for Pluto based on a trigonometric
+fit to JPL DE404 ephemeris. This provides heliocentric ecliptic coordinates
+of Pluto valid from approximately -3000 CE to +3000 CE with accuracy of
+about 1-3 arcseconds.
 
-This provides heliocentric rectangular coordinates of Pluto valid from
-approximately 1885 to 2099 with accuracy of about 0.07 degrees in longitude.
-
-For dates outside this range, a simplified Keplerian solution is used.
+The algorithm evaluates Poisson series (trigonometric terms multiplied by
+powers of time) for longitude, latitude, and radius. The fundamental
+arguments are the mean longitudes of the major planets.
 
 This module has NO dependencies on Skyfield or SPK files.
 Only numpy is used for numerical operations.
 
 References:
-- Meeus, J. (1991), "Astronomical Algorithms", Chapter 37
-- Chapront, J. and Francou, G. (1995), Pluto theory tables
+- Swiss Ephemeris swemplan.c (Astrodienst AG)
+- Moshier, S.L., DE404 ephemeris fit
 """
 
 from __future__ import annotations
 
 import math
-from typing import Tuple
+from typing import List, Tuple
 
+from .pluto_data import (
+    FREQS,
+    PHASES,
+    PLU404_DISTANCE,
+    PLU404_MAX_HARMONIC,
+    PLUTO_ARG_TABLE,
+    PLUTO_LAT_TABLE,
+    PLUTO_LON_TABLE,
+    PLUTO_RAD_TABLE,
+)
 from .utils import (
     DEG_TO_RAD,
     J2000,
-    JD_PER_CENTURY,
     RAD_TO_DEG,
     cartesian_to_spherical,
-    jd_to_julian_centuries,
     normalize_angle,
 )
 from .vsop87 import calc_earth_heliocentric
@@ -40,200 +49,256 @@ from .vsop87 import calc_earth_heliocentric
 # Swiss Ephemeris Pluto body ID
 MOSHIER_PLUTO = 9
 
-# Pluto orbital elements at J2000.0
-PLUTO_EPOCH_JD = 2451545.0  # J2000.0
-PLUTO_SEMI_MAJOR_AXIS = 39.48211675  # AU
-PLUTO_ECCENTRICITY = 0.2488273
-PLUTO_INCLINATION = 17.14001206  # degrees
-PLUTO_LONG_ASC_NODE = 110.30393684  # degrees
-PLUTO_ARG_PERIHELION = 224.06891629  # degrees
-PLUTO_MEAN_LONGITUDE = 238.92881030  # degrees
+# Time scale: 10000 Julian years in days
+TIMESCALE = 3652500.0
 
-# Daily rates
-PLUTO_MEAN_MOTION = 0.00397570  # degrees/day
+# Arcseconds to radians
+STR = 4.8481368110953599359e-6  # arcseconds to radians
+
+# Modulo for 360 degrees in arcseconds
+ARCSEC_360 = 1296000.0
 
 
-# =============================================================================
-# PLUTO PERIODIC TERMS (Meeus, Chapter 37)
-# =============================================================================
-
-# Each term: (J, S, P, lon_sin, lon_cos, lat_sin, lat_cos, rad_sin, rad_cos)
-# J, S, P are integer arguments
-# lon/lat in 0.000001 degrees, rad in 0.0000001 AU
-
-_PLUTO_TERMS = [
-    # J   S   P     lon_sin   lon_cos    lat_sin   lat_cos    rad_sin   rad_cos
-    (0, 0, 1, -19799805, 19850055, -5452852, -14974862, 66865439, 68951812),
-    (0, 0, 2, 897144, -4954829, 3527812, 1672790, -11827535, -332538),
-    (0, 0, 3, 611149, 1211027, -1050748, 327647, 1593179, -1438890),
-    (0, 0, 4, -341243, -189585, 178690, -292153, -18444, 483220),
-    (0, 0, 5, 129287, -34992, 18763, 100340, -65977, -85431),
-    (0, 0, 6, -38164, 30893, -30697, -25823, 31174, -6032),
-    (0, 1, -1, 20442, -9987, 4878, 11248, -5794, 22161),
-    (0, 1, 0, -4063, -5071, 226, -64, 4601, 4032),
-    (0, 1, 1, -6016, -3336, 2030, -836, -1729, 234),
-    (0, 1, 2, -3956, 3039, 69, -604, -415, 702),
-    (0, 1, 3, -667, 3572, -247, -567, 239, 723),
-    (0, 2, -2, 1276, 501, -57, 1, 67, -67),
-    (0, 2, -1, 1152, -917, -122, 175, 1034, -451),
-    (0, 2, 0, 630, -1277, -49, -164, -129, 504),
-    (1, -1, 0, 2571, -459, -197, 199, 480, -231),
-    (1, -1, 1, 899, -1449, -25, 217, 2, -441),
-    (1, 0, -3, -1016, 1043, 589, -248, -3359, 265),
-    (1, 0, -2, -2343, -1012, -269, 711, 7856, -7832),
-    (1, 0, -1, 7042, 788, 185, 193, 36, 45763),
-    (1, 0, 0, 1199, -338, 315, 807, 8663, 8547),
-    (1, 0, 1, 418, -67, -130, -43, -809, -769),
-    (1, 0, 2, 120, -274, 5, 3, 263, -144),
-    (1, 0, 3, -60, -159, 2, 17, -126, 32),
-    (1, 0, 4, -82, -29, 2, 5, -35, -16),
-    (1, 1, -3, -36, -29, 2, 3, -19, -4),
-    (1, 1, -2, -40, 7, 3, 1, -15, 8),
-    (1, 1, -1, -14, 22, 2, -1, -4, 12),
-    (1, 1, 0, 4, 13, 1, -1, 5, 6),
-    (1, 1, 1, 5, 2, 0, -1, 3, 1),
-    (1, 1, 3, -1, 0, 0, 0, 1, -1),
-    (2, 0, -6, 2, 0, 0, -2, 2, 2),
-    (2, 0, -5, -4, 5, 2, 2, -2, -2),
-    (2, 0, -4, 4, -7, -7, 0, 14, 13),
-    (2, 0, -3, 14, 24, 10, -8, -63, 66),
-    (2, 0, -2, -49, -34, -3, 20, 136, -236),
-    (2, 0, -1, 163, -48, 6, 5, 273, 1065),
-    (2, 0, 0, 9, -24, 14, 17, 251, 149),
-    (2, 0, 1, -4, 1, -2, 0, -25, -9),
-    (2, 0, 2, -3, 1, 0, 0, 9, -2),
-    (2, 0, 3, 1, 3, 0, 0, -8, 7),
-    (3, 0, -2, -3, -1, 0, 1, 2, -10),
-    (3, 0, -1, 5, -3, 0, 0, 19, 35),
-    (3, 0, 0, 0, 0, 1, 0, 10, 3),
-]
+def _mods3600(x: float) -> float:
+    """Reduce angle in arcseconds to range [0, 360 degrees)."""
+    return x - ARCSEC_360 * math.floor(x / ARCSEC_360)
 
 
 # =============================================================================
-# PLUTO CALCULATION
+# SINE/COSINE TABLE FOR MULTIPLE ANGLES
 # =============================================================================
 
 
-def _calc_pluto_periodic(jd_tt: float) -> Tuple[float, float, float]:
-    """Calculate Pluto heliocentric coordinates using periodic terms.
+def _sscc(arg: float, n: int) -> Tuple[List[float], List[float]]:
+    """Compute sin and cos for multiple angles.
 
-    Valid approximately 1885-2099.
+    Builds tables of sin(k*arg) and cos(k*arg) for k = 1 to n.
+
+    Args:
+        arg: Fundamental angle in radians.
+        n: Maximum harmonic number.
+
+    Returns:
+        Tuple of (sin_table, cos_table) where each is a list of length n.
+    """
+    if n <= 0:
+        return [], []
+
+    ss = [0.0] * n
+    cc = [0.0] * n
+
+    su = math.sin(arg)
+    cu = math.cos(arg)
+    ss[0] = su  # sin(L)
+    cc[0] = cu  # cos(L)
+
+    if n >= 2:
+        # sin(2L) = 2*sin(L)*cos(L)
+        # cos(2L) = cos^2(L) - sin^2(L)
+        sv = 2.0 * su * cu
+        cv = cu * cu - su * su
+        ss[1] = sv
+        cc[1] = cv
+
+        # Recurrence for higher harmonics
+        for i in range(2, n):
+            s = su * cv + cu * sv
+            cv = cu * cv - su * sv
+            sv = s
+            ss[i] = sv
+            cc[i] = cv
+
+    return ss, cc
+
+
+# =============================================================================
+# MAIN PLUTO CALCULATION
+# =============================================================================
+
+
+def _calc_pluto_moshier(jd_tt: float) -> Tuple[float, float, float]:
+    """Calculate heliocentric ecliptic coordinates of Pluto using Moshier theory.
+
+    This implements the algorithm from Swiss Ephemeris swemplan.c, evaluating
+    the Poisson series for Pluto's longitude, latitude, and radius.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time.
 
     Returns:
-        Tuple of (longitude, latitude, radius) in degrees and AU.
+        Tuple of (longitude, latitude, radius) where:
+        - longitude is in radians (ecliptic J2000.0)
+        - latitude is in radians (ecliptic J2000.0)
+        - radius is in AU
     """
-    # Julian centuries from J2000.0
-    T = jd_to_julian_centuries(jd_tt)
+    # Time in units of 10000 Julian years from J2000.0
+    T = (jd_tt - J2000) / TIMESCALE
 
-    # Calculate the arguments J, S, P
-    # These are mean longitudes of Jupiter, Saturn, and Pluto
-    J = (34.35 + 3034.9057 * T) * DEG_TO_RAD
-    S = (50.08 + 1222.1138 * T) * DEG_TO_RAD
-    P = (238.96 + 144.9600 * T) * DEG_TO_RAD
+    # Build sin/cos tables for each planet's mean longitude
+    ss_all: List[List[float]] = []
+    cc_all: List[List[float]] = []
 
-    # Sum the periodic terms
-    sum_lon = 0.0
-    sum_lat = 0.0
-    sum_rad = 0.0
+    for i in range(9):
+        max_harm = PLU404_MAX_HARMONIC[i]
+        if max_harm > 0:
+            # Mean longitude at time T
+            sr = (_mods3600(FREQS[i] * T) + PHASES[i]) * STR
+            ss_tab, cc_tab = _sscc(sr, max_harm)
+            ss_all.append(ss_tab)
+            cc_all.append(cc_tab)
+        else:
+            ss_all.append([])
+            cc_all.append([])
 
-    for term in _PLUTO_TERMS:
-        j_mult, s_mult, p_mult = term[0], term[1], term[2]
-        lon_sin, lon_cos = term[3], term[4]
-        lat_sin, lat_cos = term[5], term[6]
-        rad_sin, rad_cos = term[7], term[8]
+    # Pointers into the data tables
+    p_idx = 0  # Index into argument table
+    pl_idx = 0  # Index into longitude table
+    pb_idx = 0  # Index into latitude table
+    pr_idx = 0  # Index into radius table
 
-        alpha = j_mult * J + s_mult * S + p_mult * P
-        sin_alpha = math.sin(alpha)
-        cos_alpha = math.cos(alpha)
+    # Accumulated sums (in arcseconds for lon/lat, relative units for radius)
+    sl = 0.0
+    sb = 0.0
+    sr = 0.0
 
-        sum_lon += lon_sin * sin_alpha + lon_cos * cos_alpha
-        sum_lat += lat_sin * sin_alpha + lat_cos * cos_alpha
-        sum_rad += rad_sin * sin_alpha + rad_cos * cos_alpha
+    # Process the argument table
+    args = PLUTO_ARG_TABLE
+    lon_tbl = PLUTO_LON_TABLE
+    lat_tbl = PLUTO_LAT_TABLE
+    rad_tbl = PLUTO_RAD_TABLE
 
-    # Base values
-    lon_base = 238.958116 + 144.96 * T
-    lat_base = -3.908239
-    rad_base = 40.7241346
+    while True:
+        # Number of periodic arguments
+        np = args[p_idx]
+        p_idx += 1
 
-    # Final values
-    longitude = lon_base + sum_lon * 1e-6
-    latitude = lat_base + sum_lat * 1e-6
-    radius = rad_base + sum_rad * 1e-7
-
-    return normalize_angle(longitude), latitude, radius
-
-
-def _calc_pluto_keplerian(jd_tt: float) -> Tuple[float, float, float]:
-    """Calculate Pluto position using Keplerian elements.
-
-    This is a fallback for dates outside the periodic term range.
-
-    Args:
-        jd_tt: Julian Day in Terrestrial Time.
-
-    Returns:
-        Tuple of (longitude, latitude, radius) in degrees and AU.
-    """
-    # Days from J2000.0
-    d = jd_tt - J2000
-
-    # Mean anomaly
-    n = PLUTO_MEAN_MOTION  # degrees/day
-    M = PLUTO_MEAN_LONGITUDE - PLUTO_ARG_PERIHELION - PLUTO_LONG_ASC_NODE + n * d
-    M = normalize_angle(M) * DEG_TO_RAD
-
-    # Solve Kepler's equation (Newton-Raphson)
-    e = PLUTO_ECCENTRICITY
-    E = M
-    for _ in range(10):
-        delta = E - e * math.sin(E) - M
-        E -= delta / (1 - e * math.cos(E))
-        if abs(delta) < 1e-12:
+        if np < 0:
+            # End of table
             break
 
-    # True anomaly
-    cos_E = math.cos(E)
-    sin_E = math.sin(E)
-    sqrt_1_e2 = math.sqrt(1 - e * e)
-    true_anom = math.atan2(sqrt_1_e2 * sin_E, cos_E - e)
+        if np == 0:
+            # Polynomial term
+            nt = args[p_idx]
+            p_idx += 1
 
-    # Radius
-    a = PLUTO_SEMI_MAJOR_AXIS
-    r = a * (1 - e * cos_E)
+            # Longitude polynomial
+            cu = lon_tbl[pl_idx]
+            pl_idx += 1
+            for _ in range(nt):
+                cu = cu * T + lon_tbl[pl_idx]
+                pl_idx += 1
+            sl += _mods3600(cu)
 
-    # Argument of latitude
-    omega = PLUTO_ARG_PERIHELION * DEG_TO_RAD
-    u = omega + true_anom
+            # Latitude polynomial
+            cu = lat_tbl[pb_idx]
+            pb_idx += 1
+            for _ in range(nt):
+                cu = cu * T + lat_tbl[pb_idx]
+                pb_idx += 1
+            sb += cu
 
-    # Orbital plane to ecliptic
-    Omega = PLUTO_LONG_ASC_NODE * DEG_TO_RAD
-    i = PLUTO_INCLINATION * DEG_TO_RAD
+            # Radius polynomial
+            cu = rad_tbl[pr_idx]
+            pr_idx += 1
+            for _ in range(nt):
+                cu = cu * T + rad_tbl[pr_idx]
+                pr_idx += 1
+            sr += cu
 
-    cos_u = math.cos(u)
-    sin_u = math.sin(u)
-    cos_i = math.cos(i)
-    sin_i = math.sin(i)
-    cos_Omega = math.cos(Omega)
-    sin_Omega = math.sin(Omega)
+            continue
 
-    # Heliocentric rectangular coordinates
-    x = r * (cos_Omega * cos_u - sin_Omega * sin_u * cos_i)
-    y = r * (sin_Omega * cos_u + cos_Omega * sin_u * cos_i)
-    z = r * sin_u * sin_i
+        # Trigonometric term: build the argument as sum of planet harmonics
+        k1 = 0
+        cv = 0.0
+        sv = 0.0
 
-    # Convert to spherical
-    longitude, latitude, radius = cartesian_to_spherical(x, y, z)
+        for _ in range(np):
+            # Harmonic number
+            j = args[p_idx]
+            p_idx += 1
+            # Planet index (1-based in table)
+            m = args[p_idx] - 1
+            p_idx += 1
 
-    return longitude, latitude, radius
+            if j != 0:
+                k = abs(j)
+                k -= 1  # Convert to 0-based index
+
+                # Get sin(k*angle) and cos(k*angle) for planet m
+                if k < len(ss_all[m]):
+                    su = ss_all[m][k]
+                    if j < 0:
+                        su = -su
+                    cu = cc_all[m][k]
+                else:
+                    # Handle case where harmonic exceeds table
+                    continue
+
+                if k1 == 0:
+                    # First angle
+                    sv = su
+                    cv = cu
+                    k1 = 1
+                else:
+                    # Combine angles: sin(a+b) = sin(a)*cos(b) + cos(a)*sin(b)
+                    t = su * cv + cu * sv
+                    cv = cu * cv - su * sv
+                    sv = t
+
+        # Highest power of T
+        nt = args[p_idx]
+        p_idx += 1
+
+        # Longitude contribution
+        cu = lon_tbl[pl_idx]
+        pl_idx += 1
+        su = lon_tbl[pl_idx]
+        pl_idx += 1
+        for _ in range(nt):
+            cu = cu * T + lon_tbl[pl_idx]
+            pl_idx += 1
+            su = su * T + lon_tbl[pl_idx]
+            pl_idx += 1
+        sl += cu * cv + su * sv
+
+        # Latitude contribution
+        cu = lat_tbl[pb_idx]
+        pb_idx += 1
+        su = lat_tbl[pb_idx]
+        pb_idx += 1
+        for _ in range(nt):
+            cu = cu * T + lat_tbl[pb_idx]
+            pb_idx += 1
+            su = su * T + lat_tbl[pb_idx]
+            pb_idx += 1
+        sb += cu * cv + su * sv
+
+        # Radius contribution
+        cu = rad_tbl[pr_idx]
+        pr_idx += 1
+        su = rad_tbl[pr_idx]
+        pr_idx += 1
+        for _ in range(nt):
+            cu = cu * T + rad_tbl[pr_idx]
+            pr_idx += 1
+            su = su * T + rad_tbl[pr_idx]
+            pr_idx += 1
+        sr += cu * cv + su * sv
+
+    # Convert results
+    # Longitude and latitude: arcseconds to radians
+    lon_rad = STR * sl
+    lat_rad = STR * sb
+    # Radius: scale factor applied
+    radius = STR * PLU404_DISTANCE * sr + PLU404_DISTANCE
+
+    return lon_rad, lat_rad, radius
 
 
 def calc_pluto_heliocentric(jd_tt: float) -> Tuple[float, float, float]:
     """Calculate heliocentric ecliptic coordinates of Pluto.
 
-    Uses periodic terms for 1885-2099, Keplerian elements otherwise.
+    Uses the Moshier DE404 fit for the full range -3000 to +3000 CE.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time.
@@ -241,13 +306,13 @@ def calc_pluto_heliocentric(jd_tt: float) -> Tuple[float, float, float]:
     Returns:
         Tuple of (longitude, latitude, radius) in degrees and AU.
     """
-    # Check if within periodic term range
-    year = 2000.0 + (jd_tt - J2000) / 365.25
+    lon_rad, lat_rad, radius = _calc_pluto_moshier(jd_tt)
 
-    if 1885.0 <= year <= 2099.0:
-        return _calc_pluto_periodic(jd_tt)
-    else:
-        return _calc_pluto_keplerian(jd_tt)
+    # Convert to degrees
+    lon_deg = normalize_angle(lon_rad * RAD_TO_DEG)
+    lat_deg = lat_rad * RAD_TO_DEG
+
+    return lon_deg, lat_deg, radius
 
 
 def calc_pluto_geocentric(jd_tt: float) -> Tuple[float, float, float]:
