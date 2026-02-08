@@ -12,7 +12,6 @@ Tests verify:
 """
 
 import pytest
-import math
 import libephemeris as leph
 from libephemeris.constants import (
     SE_SIDM_FAGAN_BRADLEY,
@@ -100,14 +99,13 @@ DOCUMENTED_J2000_VALUES = [
 ]
 
 
-# Star-based ayanamshas with wider tolerances due to dynamic calculation
-# Note: These values may differ from Swiss Ephemeris due to different star catalogs
-# and proper motion corrections used by libephemeris (Hipparcos/Gaia vs SE internal)
+# Star-based ayanamshas with tolerances reflecting improved SE-calibrated precision
+# With calibrated offsets at J2000, these ayanamshas now achieve <0.01 deg vs SE
 STAR_BASED_AYANAMSHAS = [
     (SE_SIDM_TRUE_CITRA, "True Citra", 23.86, 1.0),  # Spica at 180°
-    (SE_SIDM_TRUE_REVATI, "True Revati", 20.05, 1.0),  # Zeta Piscium
-    (SE_SIDM_TRUE_PUSHYA, "True Pushya", 22.72, 2.0),  # Delta Cancri (wider tolerance)
-    (SE_SIDM_TRUE_MULA, "True Mula", 24.59, 2.5),  # Lambda Scorpii (wider tolerance)
+    (SE_SIDM_TRUE_REVATI, "True Revati", 20.05, 0.5),  # Zeta Piscium (calibrated)
+    (SE_SIDM_TRUE_PUSHYA, "True Pushya", 22.72, 0.5),  # Delta Cancri (calibrated)
+    (SE_SIDM_TRUE_MULA, "True Mula", 24.59, 0.5),  # Lambda Scorpii (calibrated)
     (SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag", 26.85, 1.0),  # Sgr A*
     (SE_SIDM_TRUE_SHEORAN, "True Sheoran", 25.23, 1.0),
     (SE_SIDM_VALENS_MOON, "Valens Moon", 22.80, 1.0),
@@ -229,7 +227,7 @@ class TestPrecessionRate:
         expected_change = 5027.8 / 3600.0  # 1.397°
 
         assert abs(change - expected_change) < 0.01, (
-            f"Lahiri precession rate: expected {expected_change}°/century, got {change}°"
+            f"Lahiri precession rate: expected {expected_change}/century, got {change}"
         )
 
     def test_fagan_bradley_precession_rate(self):

@@ -10,7 +10,7 @@ Hipparcos 2007 reprocessed data instead, following the pattern of True Citra (Sp
 
 The improvement targets:
 - Previous precision: ~0.06 deg vs Swiss Ephemeris (without parallax/RV)
-- Target precision: <0.1 deg vs Swiss Ephemeris (with parallax/RV)
+- Current precision: <0.006 deg vs Swiss Ephemeris (10x improvement)
 """
 
 import pytest
@@ -43,10 +43,10 @@ class TestTrueMulaPrecision:
 
         diff = abs(aya_swe - aya_lib)
 
-        # Target: <0.1 deg precision (star-based modes have inherent variation)
-        assert diff < 0.1, (
+        # Target: <0.006 deg precision (calibrated offset at J2000)
+        assert diff < 0.006, (
             f"True Mula at J2000.0: SWE={aya_swe:.6f} deg, LIB={aya_lib:.6f} deg, "
-            f"Diff={diff:.6f} deg (target <0.1 deg)"
+            f"Diff={diff:.6f} deg (target <0.006 deg)"
         )
 
     def test_true_mula_at_multiple_dates(self):
@@ -72,10 +72,10 @@ class TestTrueMulaPrecision:
             diff = abs(aya_swe - aya_lib)
             max_diff = max(max_diff, diff)
 
-            # Should be <0.1 deg at all dates
-            assert diff < 0.1, (
+            # Should be <0.006 deg at all dates
+            assert diff < 0.006, (
                 f"True Mula at {label}: SWE={aya_swe:.6f} deg, LIB={aya_lib:.6f} deg, "
-                f"Diff={diff:.6f} deg (target <0.1 deg)"
+                f"Diff={diff:.6f} deg (target <0.006 deg)"
             )
 
         print(f"\nMax True Mula difference across all dates: {max_diff:.6f} deg")
@@ -123,7 +123,7 @@ class TestTrueMulaPrecision:
 
         # Sidereal position should match closely
         # Planet position accuracy + ayanamsha accuracy = total accuracy
-        assert diff < 0.15, (
+        assert diff < 0.02, (
             f"Sidereal Sun (True Mula): SWE={sun_swe:.6f} deg, "
             f"LIB={sun_lib:.6f} deg, Diff={diff:.6f} deg"
         )

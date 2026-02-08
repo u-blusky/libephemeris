@@ -7,7 +7,7 @@ Gaia DR3 coordinates for Zeta Piscium (HIP 5737) with full proper motion correct
 
 The improvement targets:
 - Previous precision: ±0.06° vs Swiss Ephemeris
-- Target precision: ±0.02° vs Swiss Ephemeris (3x improvement)
+- Current precision: <0.006° vs Swiss Ephemeris (10x improvement)
 """
 
 import pytest
@@ -40,10 +40,10 @@ class TestTrueRevatiPrecision:
 
         diff = abs(aya_swe - aya_lib)
 
-        # Target: <0.02° precision (previous was ~0.06°)
-        assert diff < 0.02, (
+        # Target: <0.006° precision (calibrated offset at J2000)
+        assert diff < 0.006, (
             f"True Revati at J2000.0: SWE={aya_swe:.6f}°, LIB={aya_lib:.6f}°, "
-            f"Diff={diff:.6f}° (target <0.02°)"
+            f"Diff={diff:.6f}° (target <0.006°)"
         )
 
     def test_true_revati_at_multiple_dates(self):
@@ -69,10 +69,10 @@ class TestTrueRevatiPrecision:
             diff = abs(aya_swe - aya_lib)
             max_diff = max(max_diff, diff)
 
-            # Should be <0.02° at all dates
-            assert diff < 0.02, (
+            # Should be <0.006° at all dates
+            assert diff < 0.006, (
                 f"True Revati at {label}: SWE={aya_swe:.6f}°, LIB={aya_lib:.6f}°, "
-                f"Diff={diff:.6f}° (target <0.02°)"
+                f"Diff={diff:.6f}° (target <0.006°)"
             )
 
         print(f"\nMax True Revati difference across all dates: {max_diff:.6f}°")
