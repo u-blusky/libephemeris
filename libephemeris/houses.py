@@ -69,7 +69,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, overload
 from .constants import *
 from .constants import SEFLG_SIDEREAL, SEFLG_SPEED, SEFLG_EQUATORIAL, SE_SUN
 from .state import get_timescale
@@ -4035,6 +4035,50 @@ def _houses_apc(
     return cusps
 
 
+@overload
+def house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys_or_objcoord: Tuple[float, float],
+    lon_or_hsys: Union[bytes, str],
+    lat_body: float = ...,
+) -> float: ...
+
+
+@overload
+def house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys_or_objcoord: Union[int, bytes, str],
+    lon_or_hsys: float,
+    lat_body: float = ...,
+) -> float: ...
+
+
+@overload
+def house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys_or_objcoord: Tuple[float, float],
+    lon_or_hsys: None = ...,
+    lat_body: float = ...,
+) -> float: ...
+
+
+@overload
+def house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys_or_objcoord: Union[int, bytes, str],
+    lon_or_hsys: None = ...,
+    lat_body: float = ...,
+) -> float: ...
+
+
 def house_pos(
     armc: float,
     lat: float,
@@ -4084,29 +4128,43 @@ def house_pos(
     VERY_SMALL = 1e-10
     MILLIARCSEC = 1.0 / 3600000.0  # Add small offset to avoid edge cases
 
+    # Declare typed local variables for proper type narrowing
+    lon: float
+    hsys_char: str
+    hsys_int: int
+
     # Detect which calling convention is used
     if isinstance(hsys_or_objcoord, tuple):
         # 5-arg pyswisseph form: (armc, lat, obliquity, objcoord, hsys)
         objcoord = hsys_or_objcoord
-        hsys = lon_or_hsys if lon_or_hsys is not None else b"P"
         lon = objcoord[0]
         lat_body = objcoord[1] if len(objcoord) > 1 else 0.0
+        # hsys comes from lon_or_hsys (bytes/str), default to b"P"
+        if isinstance(lon_or_hsys, bytes):
+            hsys_char = chr(lon_or_hsys[0])
+            hsys_int = lon_or_hsys[0]
+        elif isinstance(lon_or_hsys, str):
+            hsys_char = lon_or_hsys[0]
+            hsys_int = ord(lon_or_hsys[0])
+        else:
+            # Default to Placidus
+            hsys_char = "P"
+            hsys_int = ord("P")
     else:
         # 6-arg form: (armc, lat, obliquity, hsys, lon, lat_body)
-        hsys = hsys_or_objcoord
-        lon = lon_or_hsys if lon_or_hsys is not None else 0.0
-        # lat_body already set from parameter
-
-    # Convert hsys to char
-    if isinstance(hsys, bytes):
-        hsys_char = chr(hsys[0])
-        hsys_int = hsys[0]
-    elif isinstance(hsys, str):
-        hsys_char = hsys[0]
-        hsys_int = ord(hsys[0])
-    else:
-        hsys_char = chr(hsys)
-        hsys_int = hsys
+        # hsys comes from hsys_or_objcoord (int/bytes/str)
+        if isinstance(hsys_or_objcoord, bytes):
+            hsys_char = chr(hsys_or_objcoord[0])
+            hsys_int = hsys_or_objcoord[0]
+        elif isinstance(hsys_or_objcoord, str):
+            hsys_char = hsys_or_objcoord[0]
+            hsys_int = ord(hsys_or_objcoord[0])
+        else:
+            # int case
+            hsys_char = chr(hsys_or_objcoord)
+            hsys_int = hsys_or_objcoord
+        # lon comes from lon_or_hsys (float), default to 0.0
+        lon = float(lon_or_hsys) if lon_or_hsys is not None else 0.0
 
     # Normalize inputs
     lon = lon % 360.0
@@ -4338,6 +4396,50 @@ def _armc_to_mc(armc: float, eps: float) -> float:
     return mc % 360.0
 
 
+@overload
+def swe_house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys_or_objcoord: Tuple[float, float],
+    lon_or_hsys: Union[bytes, str],
+    lat_body: float = ...,
+) -> float: ...
+
+
+@overload
+def swe_house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys_or_objcoord: Union[int, bytes, str],
+    lon_or_hsys: float,
+    lat_body: float = ...,
+) -> float: ...
+
+
+@overload
+def swe_house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys_or_objcoord: Tuple[float, float],
+    lon_or_hsys: None = ...,
+    lat_body: float = ...,
+) -> float: ...
+
+
+@overload
+def swe_house_pos(
+    armc: float,
+    lat: float,
+    obliquity: float,
+    hsys_or_objcoord: Union[int, bytes, str],
+    lon_or_hsys: None = ...,
+    lat_body: float = ...,
+) -> float: ...
+
+
 def swe_house_pos(
     armc: float,
     lat: float,
@@ -4374,7 +4476,8 @@ def swe_house_pos(
         Decimal value: integer part = house number, decimal part = position within house
     """
     # Delegate to house_pos which now supports both calling conventions
-    return house_pos(armc, lat, obliquity, hsys_or_objcoord, lon_or_hsys, lat_body)
+    # Use type: ignore since the overloads cover all valid combinations
+    return house_pos(armc, lat, obliquity, hsys_or_objcoord, lon_or_hsys, lat_body)  # type: ignore[arg-type]
 
 
 def _gauquelin_sector_from_rise_set(

@@ -252,3 +252,174 @@ class TestHousePosAllHouses:
         assert houses_found == set(range(1, 13)), (
             f"Missing houses: {set(range(1, 13)) - houses_found}"
         )
+
+
+class TestHousePosTypeSignatures:
+    """Test type signature overloads for house_pos and swe_house_pos.
+
+    Tests that all supported calling conventions work correctly:
+    1. 5-arg pyswisseph form: house_pos(armc, lat, obliquity, objcoord, hsys)
+       where objcoord is tuple (lon, lat_body) and hsys is bytes/str
+    2. 6-arg extended form: house_pos(armc, lat, obliquity, hsys, lon, lat_body)
+       where hsys is int/bytes/str
+    """
+
+    # Standard test parameters
+    ARMC = 292.957
+    LAT = 41.9
+    EPS = 23.4393
+    LON = 15.0
+    LAT_BODY = 0.0
+
+    @pytest.mark.unit
+    def test_6arg_form_hsys_as_int(self):
+        """6-arg form with hsys as int (ord('P')) should work."""
+        result = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, ord("P"), self.LON, self.LAT_BODY
+        )
+        assert isinstance(result, float)
+        assert 1.0 <= result < 13.0
+
+    @pytest.mark.unit
+    def test_6arg_form_hsys_as_bytes(self):
+        """6-arg form with hsys as bytes should work."""
+        result = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, b"P", self.LON, self.LAT_BODY
+        )
+        assert isinstance(result, float)
+        assert 1.0 <= result < 13.0
+
+    @pytest.mark.unit
+    def test_6arg_form_hsys_as_str(self):
+        """6-arg form with hsys as str should work."""
+        result = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, "P", self.LON, self.LAT_BODY
+        )
+        assert isinstance(result, float)
+        assert 1.0 <= result < 13.0
+
+    @pytest.mark.unit
+    def test_5arg_form_objcoord_tuple_hsys_bytes(self):
+        """5-arg pyswisseph form with tuple objcoord and bytes hsys should work."""
+        result = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), b"P"
+        )
+        assert isinstance(result, float)
+        assert 1.0 <= result < 13.0
+
+    @pytest.mark.unit
+    def test_5arg_form_objcoord_tuple_hsys_str(self):
+        """5-arg pyswisseph form with tuple objcoord and str hsys should work."""
+        result = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), "P"
+        )
+        assert isinstance(result, float)
+        assert 1.0 <= result < 13.0
+
+    @pytest.mark.unit
+    def test_4arg_form_tuple_default_hsys(self):
+        """4-arg form with tuple objcoord and default hsys should work."""
+        result = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY)
+        )
+        assert isinstance(result, float)
+        assert 1.0 <= result < 13.0
+
+    @pytest.mark.unit
+    def test_calling_conventions_produce_same_result(self):
+        """All calling conventions should produce the same result."""
+        # 6-arg form with int hsys
+        result_6arg_int = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, ord("P"), self.LON, self.LAT_BODY
+        )
+
+        # 6-arg form with bytes hsys
+        result_6arg_bytes = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, b"P", self.LON, self.LAT_BODY
+        )
+
+        # 6-arg form with str hsys
+        result_6arg_str = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, "P", self.LON, self.LAT_BODY
+        )
+
+        # 5-arg form with tuple and bytes
+        result_5arg_bytes = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), b"P"
+        )
+
+        # 5-arg form with tuple and str
+        result_5arg_str = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), "P"
+        )
+
+        # All should be equal
+        assert result_6arg_int == result_6arg_bytes
+        assert result_6arg_bytes == result_6arg_str
+        assert result_6arg_str == result_5arg_bytes
+        assert result_5arg_bytes == result_5arg_str
+
+    @pytest.mark.unit
+    def test_swe_house_pos_same_as_house_pos_6arg_int(self):
+        """swe_house_pos should match house_pos for 6-arg int form."""
+        result_hp = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, ord("P"), self.LON, self.LAT_BODY
+        )
+        result_shp = ephem.swe_house_pos(
+            self.ARMC, self.LAT, self.EPS, ord("P"), self.LON, self.LAT_BODY
+        )
+        assert result_hp == result_shp
+
+    @pytest.mark.unit
+    def test_swe_house_pos_same_as_house_pos_5arg_tuple(self):
+        """swe_house_pos should match house_pos for 5-arg tuple form."""
+        result_hp = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), b"P"
+        )
+        result_shp = ephem.swe_house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), b"P"
+        )
+        assert result_hp == result_shp
+
+    @pytest.mark.unit
+    def test_pyswisseph_compatible_5arg_form(self):
+        """5-arg form should match pyswisseph swe.house_pos signature."""
+        # This is the exact signature pyswisseph uses:
+        # swe.house_pos(armc, geolat, eps, objcoord, hsys)
+        result_lib = ephem.house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), b"P"
+        )
+        result_swe = swe.house_pos(
+            self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), b"P"
+        )
+
+        # House numbers should match
+        assert int(result_lib) == int(result_swe)
+
+        # Fractions should be close
+        frac_lib = result_lib - int(result_lib)
+        frac_swe = result_swe - int(result_swe)
+        assert abs(frac_lib - frac_swe) < 0.06
+
+    @pytest.mark.unit
+    def test_multiple_house_systems_all_forms(self):
+        """All calling conventions should work with different house systems."""
+        house_systems = ["P", "K", "R", "C", "E", "W"]
+
+        for hsys in house_systems:
+            # 6-arg int form
+            result1 = ephem.house_pos(
+                self.ARMC, self.LAT, self.EPS, ord(hsys), self.LON, self.LAT_BODY
+            )
+            assert 1.0 <= result1 < 13.0, f"Failed for {hsys} (int form)"
+
+            # 5-arg tuple form with bytes
+            result2 = ephem.house_pos(
+                self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), hsys.encode()
+            )
+            assert 1.0 <= result2 < 13.0, f"Failed for {hsys} (tuple/bytes form)"
+
+            # Results should match
+            assert int(result1) == int(result2), (
+                f"House mismatch for {hsys}: int form={int(result1)}, tuple form={int(result2)}"
+            )
