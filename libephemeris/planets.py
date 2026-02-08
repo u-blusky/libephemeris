@@ -1056,6 +1056,83 @@ def _calc_body_pctr(
     return _to_native_floats((p1, p2, p3, dp1, dp2, dp3)), iflag
 
 
+class NutationFallbackWarning(UserWarning):
+    """Warning for degraded nutation precision when Skyfield is unavailable.
+
+    This warning is issued when the nutation calculation falls back from the
+    full IAU 2000A model (1365 terms, sub-milliarcsecond precision) to a
+    simplified 4-term model (~1 arcsecond precision).
+
+    The fallback occurs when `skyfield.nutationlib.iau2000a_radians` cannot
+    be imported, which typically means Skyfield is not installed or has
+    import issues.
+
+    **Precision impact:**
+    - IAU 2000A (Skyfield available): ~0.1 milliarcsecond accuracy
+    - 4-term fallback (Skyfield unavailable): ~1 arcsecond accuracy (~1000x degradation)
+
+    **Affected calculations:**
+    - True obliquity of the ecliptic
+    - Nutation in longitude and obliquity
+    - True lunar node (uses nutation)
+    - True ecliptic frame transformations
+
+    To avoid this warning, ensure Skyfield is installed:
+        pip install skyfield
+
+    See Also:
+        get_nutation_model: Check which nutation model is currently active
+    """
+
+    pass
+
+
+def get_nutation_model() -> dict:
+    """Check which nutation model is currently active.
+
+    This function determines whether the full IAU 2000A nutation model
+    (via Skyfield) is available, or if the library will fall back to
+    the simplified 4-term model.
+
+    Returns:
+        dict: A dictionary containing:
+            - ``model`` (str): Either "IAU2000A" (full model) or "simplified_4_term" (fallback)
+            - ``terms`` (int): Number of terms in the model (1365 or 4)
+            - ``precision`` (str): Expected precision ("sub-milliarcsecond" or "~1 arcsecond")
+            - ``skyfield_available`` (bool): Whether Skyfield's iau2000a is importable
+
+    Examples:
+        >>> import libephemeris as eph
+        >>> info = eph.get_nutation_model()
+        >>> if info["model"] == "IAU2000A":
+        ...     print("Using full precision nutation")
+        ... else:
+        ...     print(f"Using fallback model with {info['precision']} precision")
+
+        Check if Skyfield nutation is available:
+
+        >>> info = eph.get_nutation_model()
+        >>> if not info["skyfield_available"]:
+        ...     print("Install Skyfield for better precision: pip install skyfield")
+    """
+    try:
+        from skyfield.nutationlib import iau2000a_radians  # noqa: F401
+
+        return {
+            "model": "IAU2000A",
+            "terms": 1365,
+            "precision": "sub-milliarcsecond",
+            "skyfield_available": True,
+        }
+    except ImportError:
+        return {
+            "model": "simplified_4_term",
+            "terms": 4,
+            "precision": "~1 arcsecond",
+            "skyfield_available": False,
+        }
+
+
 def _calc_nutation_obliquity(
     jd: float, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -1065,8 +1142,22 @@ def _calc_nutation_obliquity(
     This matches the pyswisseph return format for swe_calc_ut(jd, SE_ECL_NUT, 0).
 
     Uses the full IAU 2000A nutation model (1365 terms) via Skyfield for
-    sub-milliarcsecond precision, compared to ~1 arcsec with the 4-term
-    simplified model.
+    sub-milliarcsecond precision. If Skyfield is unavailable, falls back to
+    a simplified 4-term model with ~1 arcsecond precision and emits a
+    :class:`NutationFallbackWarning`.
+
+    .. warning:: Fallback Precision Degradation
+
+        If Skyfield's ``iau2000a_radians`` function is not available, the
+        calculation degrades from 1365-term IAU 2000A (~0.1 mas precision)
+        to a 4-term model (~1 arcsecond precision). This is a ~1000x
+        precision reduction that affects:
+
+        - True obliquity of the ecliptic
+        - Nutation in longitude and obliquity
+        - Any calculations that depend on nutation (true lunar node, ecliptic)
+
+        Use :func:`get_nutation_model` to check which model is active.
 
     Args:
         jd: Julian Day in UT
@@ -1076,6 +1167,12 @@ def _calc_nutation_obliquity(
         Tuple containing:
             - Data tuple: (true_obliquity, mean_obliquity, nutation_longitude, nutation_obliquity, 0, 0)
             - Return flag
+
+    Warns:
+        NutationFallbackWarning: When using the simplified 4-term fallback model.
+
+    See Also:
+        get_nutation_model: Check which nutation model is currently active
     """
     import math
     from .state import get_timescale
@@ -1108,6 +1205,15 @@ def _calc_nutation_obliquity(
         delta_eps = math.degrees(deps_rad)
     except ImportError:
         # Fallback to simplified 4-term model if Skyfield unavailable
+        # Emit warning to inform users of degraded precision (~1000x worse)
+        warnings.warn(
+            "Using simplified 4-term nutation model (~1 arcsecond precision) "
+            "because Skyfield's IAU 2000A model is unavailable. "
+            "For sub-milliarcsecond precision, install Skyfield: pip install skyfield. "
+            "Use get_nutation_model() to check the active nutation model.",
+            NutationFallbackWarning,
+            stacklevel=4,  # Point to user's call to calc_ut/swe_calc_ut
+        )
         omega = math.radians(
             125.04452 - 1934.136261 * T + 0.0020708 * T**2 + T**3 / 450000
         )

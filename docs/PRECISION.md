@@ -607,6 +607,80 @@ pos, _ = ephem.fixstar_ut("Aldebaran", jd, SEFLG_SPEED)
 
 ---
 
+## Nutation Model
+
+### IAU 2000A vs Simplified 4-Term Model
+
+LibEphemeris uses the IAU 2000A nutation model (1365 terms) via Skyfield for
+sub-milliarcsecond precision. However, if Skyfield's `iau2000a_radians` function
+is not available, the library falls back to a simplified 4-term model.
+
+| Model | Terms | Precision | Requirement |
+|-------|-------|-----------|-------------|
+| IAU 2000A | 1365 | ~0.1 milliarcsecond | Skyfield installed |
+| Simplified 4-term | 4 | ~1 arcsecond | Fallback (no Skyfield) |
+
+**Precision degradation**: The 4-term fallback is approximately 1000x less precise
+than the full IAU 2000A model. This affects:
+
+- True obliquity of the ecliptic
+- Nutation in longitude and obliquity
+- True lunar node calculations
+- True ecliptic frame transformations
+
+### Fallback Warning
+
+When the fallback model is used, LibEphemeris emits a `NutationFallbackWarning`:
+
+```python
+import warnings
+import libephemeris as eph
+
+# The warning is emitted on first nutation calculation if Skyfield unavailable
+pos, _ = eph.calc_ut(jd, eph.SE_ECL_NUT, 0)
+
+# To suppress the warning if you understand the precision impact:
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", eph.NutationFallbackWarning)
+    pos, _ = eph.calc_ut(jd, eph.SE_ECL_NUT, 0)
+```
+
+### Checking the Active Nutation Model
+
+Use `get_nutation_model()` to determine which model is active:
+
+```python
+import libephemeris as eph
+
+info = eph.get_nutation_model()
+print(f"Model: {info['model']}")           # "IAU2000A" or "simplified_4_term"
+print(f"Terms: {info['terms']}")           # 1365 or 4
+print(f"Precision: {info['precision']}")   # "sub-milliarcsecond" or "~1 arcsecond"
+print(f"Skyfield available: {info['skyfield_available']}")
+
+if not info['skyfield_available']:
+    print("Install Skyfield for full precision: pip install skyfield")
+```
+
+### Ensuring Full Precision
+
+To ensure you always have full IAU 2000A precision:
+
+```bash
+pip install skyfield
+```
+
+Then verify:
+
+```python
+import libephemeris as eph
+
+info = eph.get_nutation_model()
+assert info['model'] == 'IAU2000A', "Full precision nutation not available"
+```
+
+---
+
 ## Eclipse Functions
 
 ### Implemented Features

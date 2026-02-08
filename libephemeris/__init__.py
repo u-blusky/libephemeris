@@ -70,6 +70,8 @@ from .planets import (
     swe_pheno_ut,
     get_planet_name,
     HeliocentricNodApsWarning,
+    NutationFallbackWarning,
+    get_nutation_model,
     # Elongation helper functions
     get_elongation_from_sun,
     get_signed_elongation,
