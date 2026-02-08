@@ -960,3 +960,87 @@ def validate_jd_range(
             body_name=body_name,
             ephemeris_file=ephemeris_file,
         )
+
+
+# =============================================================================
+# MOSHIER EPHEMERIS RANGE CONSTANTS
+# =============================================================================
+
+# Moshier semi-analytical ephemeris range: -3000 CE to +3000 CE
+# JD 625673.5 = Jan 1, -3000 (3001 BCE) at noon
+# JD 3182395.5 = Dec 31, +3000 at noon
+MOSHIER_JD_START: float = 625673.5
+MOSHIER_JD_END: float = 3182395.5
+MOSHIER_START_YEAR: int = -3000
+MOSHIER_END_YEAR: int = 3000
+
+
+def validate_jd_range_moshier(
+    jd: float, body_id: int | None = None, func_name: str = ""
+) -> None:
+    """Validate that Julian Day is within the Moshier ephemeris range.
+
+    The Moshier ephemeris covers the range from -3000 CE to +3000 CE
+    (JD 625673.5 to JD 3182395.5). This is much wider than the JPL DE440
+    ephemeris range (1550-2650 CE).
+
+    Args:
+        jd: Julian Day number (UT1 or TT) to validate
+        body_id: Optional body ID being calculated (for error message)
+        func_name: Optional function name for error message context
+
+    Raises:
+        EphemerisRangeError: If the Julian Day is outside the Moshier range
+
+    Example:
+        >>> from libephemeris.exceptions import validate_jd_range_moshier
+        >>> validate_jd_range_moshier(2451545.0)  # J2000.0 - OK
+        >>> validate_jd_range_moshier(100000.0)   # ~4660 BCE - raises error
+    """
+    from .planets import get_planet_name
+
+    if jd < MOSHIER_JD_START or jd > MOSHIER_JD_END:
+        # Convert JD to calendar date for message
+        from .time_utils import swe_revjul
+
+        req_year, req_month, req_day, req_hour = swe_revjul(jd, 1)  # Gregorian
+        req_date_str = f"{req_year}-{req_month:02d}-{req_day:02d}"
+
+        start_date = f"{MOSHIER_START_YEAR}-01-01"
+        end_date = f"{MOSHIER_END_YEAR}-12-31"
+
+        # Get body name if available
+        body_name = None
+        if body_id is not None:
+            body_name = get_planet_name(body_id)
+
+        # Build error message
+        parts = []
+        prefix = f"{func_name}: " if func_name else ""
+
+        if body_name and body_id is not None:
+            parts.append(f"{prefix}Cannot calculate {body_name} (ID {body_id})")
+        else:
+            parts.append(f"{prefix}Calculation failed")
+
+        parts.append(f"for JD {jd:.6f} ({req_date_str}):")
+        parts.append("date is outside Moshier ephemeris range.")
+        parts.append(
+            f"\n  Supported range: JD {MOSHIER_JD_START:.1f} to {MOSHIER_JD_END:.1f}"
+        )
+        parts.append(f" ({start_date} to {end_date})")
+        parts.append("\n  Ephemeris: Moshier semi-analytical (SEFLG_MOSEPH)")
+
+        message = " ".join(parts[:3]) + "".join(parts[3:])
+
+        raise EphemerisRangeError(
+            message=message,
+            requested_jd=jd,
+            start_jd=MOSHIER_JD_START,
+            end_jd=MOSHIER_JD_END,
+            start_date=start_date,
+            end_date=end_date,
+            body_id=body_id,
+            body_name=body_name,
+            ephemeris_file="Moshier (semi-analytical)",
+        )

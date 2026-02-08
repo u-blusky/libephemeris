@@ -93,6 +93,7 @@ from .constants import (
     SE_PARS_SPIRITUS,
     SE_PARS_AMORIS,
     SE_PARS_FIDEI,
+    SEFLG_MOSEPH,
 )
 
 # Import all sidereal mode constants (SE_SIDM_*)
@@ -733,6 +734,56 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         return None
 
 
+def _calc_body_moshier(
+    tjd: float,
+    ipl: int,
+    iflag: int,
+    is_ut: bool = True,
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+    """Dispatcher for Moshier semi-analytical ephemeris calculations.
+
+    This is the entry point for all calculations when SEFLG_MOSEPH is set.
+    The Moshier ephemeris provides semi-analytical planetary positions
+    with reduced precision compared to JPL ephemeris, but covers a much
+    wider date range (-3000 to +3000 CE).
+
+    Args:
+        tjd: Julian Day number (UT1 if is_ut=True, TT if is_ut=False)
+        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+        is_ut: True if tjd is in UT1, False if in TT
+
+    Returns:
+        Tuple containing:
+            - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
+            - Return flag: iflag value on success
+
+    Raises:
+        EphemerisRangeError: If the date is outside Moshier range (-3000 to +3000)
+        NotImplementedError: Moshier ephemeris is not yet implemented
+
+    Note:
+        This is a stub function. The actual Moshier algorithms will be
+        implemented in a future update. Currently raises NotImplementedError
+        to make it clear that SEFLG_MOSEPH is recognized but not yet functional.
+    """
+    from .exceptions import validate_jd_range_moshier
+
+    # Validate JD is within Moshier range (-3000 to +3000 CE)
+    func_name = "swe_calc_ut" if is_ut else "swe_calc"
+    validate_jd_range_moshier(tjd, ipl, func_name)
+
+    # TODO: Implement Moshier semi-analytical algorithms
+    # The Moshier ephemeris provides planetary positions using analytical
+    # series expansions rather than numerical integration (JPL).
+    # For now, raise NotImplementedError to make it clear this is not yet available.
+    raise NotImplementedError(
+        "Moshier ephemeris (SEFLG_MOSEPH) is not yet implemented in libephemeris. "
+        "Use SEFLG_SWIEPH or SEFLG_JPLEPH for JPL DE440 ephemeris (range 1550-2650), "
+        "or wait for Moshier support in a future release."
+    )
+
+
 def swe_calc_ut(
     tjd_ut: float, ipl: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -777,6 +828,11 @@ def swe_calc_ut(
     # Handle SE_ECL_NUT (-1) - returns nutation and obliquity
     if ipl == SE_ECL_NUT:
         return _calc_nutation_obliquity(tjd_ut, iflag)
+
+    # Route to Moshier ephemeris if SEFLG_MOSEPH is set
+    # Moshier is an EXPLICIT mode, not a fallback
+    if iflag & SEFLG_MOSEPH:
+        return _calc_body_moshier(tjd_ut, ipl, iflag, is_ut=True)
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
@@ -823,6 +879,11 @@ def swe_calc(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
+
+    # Route to Moshier ephemeris if SEFLG_MOSEPH is set
+    # Moshier is an EXPLICIT mode, not a fallback
+    if iflag & SEFLG_MOSEPH:
+        return _calc_body_moshier(tjd, ipl, iflag, is_ut=False)
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
