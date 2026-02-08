@@ -354,6 +354,390 @@ def light_time_correction(distance_au: float) -> float:
     return distance_au / C_LIGHT_AU_DAY
 
 
+def iterative_light_time_correction(
+    jd_tt: float,
+    earth_pos: Tuple[float, float, float],
+    target_func,
+    iterations: int = 3,
+) -> Tuple[Tuple[float, float, float], float]:
+    """Calculate light-time corrected position using iterative method.
+
+    Light travels at a finite speed (~8 minutes/AU). When we observe a planet
+    at time t, we see it where it was at time t - Δt, where Δt is the light
+    travel time. This function iterates to find the correct antedated position.
+
+    The Swiss Ephemeris Moshier algorithm uses 3 iterations, which achieves
+    convergence to ~10^-10 AU accuracy for all solar system objects.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (observation time).
+        earth_pos: Observer position as (x, y, z) in AU (heliocentric ecliptic).
+        target_func: Function(jd_tt) -> (x, y, z) returning target heliocentric
+                    position in AU at given time.
+        iterations: Number of light-time iterations (default 3, like Swiss Eph).
+
+    Returns:
+        Tuple containing:
+        - (x, y, z): Light-time corrected geocentric position in AU.
+        - light_time: Light travel time in days.
+
+    Example:
+        >>> def mars_helio(jd):
+        ...     return calc_vsop87_heliocentric_cartesian(jd, MARS)
+        >>> corrected_pos, lt = iterative_light_time_correction(
+        ...     jd_tt, earth_pos, mars_helio
+        ... )
+    """
+    # Initial estimate: target position at observation time
+    target_pos = target_func(jd_tt)
+
+    # Geocentric vector (initial)
+    dx = target_pos[0] - earth_pos[0]
+    dy = target_pos[1] - earth_pos[1]
+    dz = target_pos[2] - earth_pos[2]
+    distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    # Light-time in days
+    light_time = distance / C_LIGHT_AU_DAY
+
+    # Iterate to refine
+    for _ in range(iterations):
+        # Antedated time
+        t_corrected = jd_tt - light_time
+
+        # Target position at corrected time
+        target_pos = target_func(t_corrected)
+
+        # Recompute geocentric vector
+        dx = target_pos[0] - earth_pos[0]
+        dy = target_pos[1] - earth_pos[1]
+        dz = target_pos[2] - earth_pos[2]
+        distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+        # Update light-time
+        light_time = distance / C_LIGHT_AU_DAY
+
+    return (dx, dy, dz), light_time
+
+
+def annual_aberration_cartesian(
+    target_direction: Tuple[float, float, float],
+    earth_velocity: Tuple[float, float, float],
+) -> Tuple[float, float, float]:
+    """Calculate stellar aberration correction using Cartesian vectors.
+
+    Annual aberration is caused by Earth's orbital velocity (~30 km/s) combined
+    with the finite speed of light. The apparent position of a star or planet
+    is shifted in the direction of Earth's motion by up to κ ≈ 20.49552 arcsec.
+
+    This function uses the exact vector formula (relativistic to first order):
+        Δr = (v/c) - (r·v/c) * r
+
+    where r is the unit direction vector to the target and v is Earth's velocity.
+
+    Args:
+        target_direction: Unit direction vector (x, y, z) toward target (geocentric).
+        earth_velocity: Earth heliocentric velocity (vx, vy, vz) in AU/day.
+
+    Returns:
+        Aberration correction (dx, dy, dz) to be ADDED to the apparent position.
+        Units are dimensionless (fraction of unit vector).
+
+    Note:
+        The correction is typically ~20 arcsec maximum (~10^-4 radians).
+        To apply: apparent_direction = geometric_direction + correction
+        Then renormalize to unit length.
+
+    References:
+        - Explanatory Supplement to the Astronomical Almanac (3rd ed), Section 7.2
+        - Urban & Seidelmann (2013), "Aberration"
+    """
+    # Normalize target direction (should already be normalized, but ensure)
+    rx, ry, rz = target_direction
+    r_mag = math.sqrt(rx * rx + ry * ry + rz * rz)
+    if r_mag < 1e-30:
+        return (0.0, 0.0, 0.0)
+    rx /= r_mag
+    ry /= r_mag
+    rz /= r_mag
+
+    # Earth velocity in units of c (dimensionless)
+    vx = earth_velocity[0] / C_LIGHT_AU_DAY
+    vy = earth_velocity[1] / C_LIGHT_AU_DAY
+    vz = earth_velocity[2] / C_LIGHT_AU_DAY
+
+    # Dot product: r · v/c
+    r_dot_v = rx * vx + ry * vy + rz * vz
+
+    # Aberration formula: Δr = v/c - (r · v/c) * r
+    # This is the first-order (classical) Bradley aberration formula
+    dx = vx - r_dot_v * rx
+    dy = vy - r_dot_v * ry
+    dz = vz - r_dot_v * rz
+
+    return (dx, dy, dz)
+
+
+def apply_aberration_to_position(
+    position: Tuple[float, float, float],
+    earth_velocity: Tuple[float, float, float],
+) -> Tuple[float, float, float]:
+    """Apply stellar aberration correction to a geocentric position.
+
+    Convenience function that applies aberration to a position vector,
+    returning the apparent (aberrated) position.
+
+    Args:
+        position: Geocentric position (x, y, z) in AU.
+        earth_velocity: Earth heliocentric velocity (vx, vy, vz) in AU/day.
+
+    Returns:
+        Apparent (aberrated) position (x, y, z) in AU.
+        The distance is preserved; only direction is affected.
+    """
+    # Get distance
+    x, y, z = position
+    distance = math.sqrt(x * x + y * y + z * z)
+    if distance < 1e-30:
+        return position
+
+    # Unit direction
+    ux, uy, uz = x / distance, y / distance, z / distance
+
+    # Get aberration correction
+    dx, dy, dz = annual_aberration_cartesian((ux, uy, uz), earth_velocity)
+
+    # Apply correction to unit direction
+    ax = ux + dx
+    ay = uy + dy
+    az = uz + dz
+
+    # Renormalize
+    a_mag = math.sqrt(ax * ax + ay * ay + az * az)
+    if a_mag < 1e-30:
+        return position
+    ax /= a_mag
+    ay /= a_mag
+    az /= a_mag
+
+    # Scale back to original distance
+    return (ax * distance, ay * distance, az * distance)
+
+
+def aberration_in_longitude_latitude(
+    lon: float,
+    lat: float,
+    sun_lon: float,
+    obliquity: float,
+) -> Tuple[float, float]:
+    """Calculate aberration correction in ecliptic longitude and latitude.
+
+    This is the classical Bradley aberration formula for ecliptic coordinates,
+    using the approximation that Earth's velocity is directed along the ecliptic
+    at longitude (sun_lon + 90°).
+
+    The constant of aberration κ = 20.49552 arcseconds.
+
+    Args:
+        lon: Ecliptic longitude in degrees.
+        lat: Ecliptic latitude in degrees.
+        sun_lon: Apparent Sun longitude in degrees (geocentric).
+        obliquity: Obliquity of the ecliptic in degrees.
+
+    Returns:
+        Tuple of (delta_lon, delta_lat) corrections in degrees.
+        Add these to the geometric position to get apparent position.
+
+    Note:
+        This is a simplified formula assuming circular Earth orbit.
+        For higher precision, use annual_aberration_cartesian with
+        actual Earth velocity vectors.
+    """
+    # Constant of aberration in degrees
+    KAPPA = 20.49552 / 3600.0  # arcsec -> degrees
+
+    # Convert to radians
+    lon_rad = lon * DEG_TO_RAD
+    lat_rad = lat * DEG_TO_RAD
+    sun_rad = sun_lon * DEG_TO_RAD
+    eps_rad = obliquity * DEG_TO_RAD
+
+    cos_lon = math.cos(lon_rad)
+    sin_lon = math.sin(lon_rad)
+    cos_lat = math.cos(lat_rad)
+    sin_lat = math.sin(lat_rad)
+    cos_sun = math.cos(sun_rad)
+    sin_sun = math.sin(sun_rad)
+    cos_eps = math.cos(eps_rad)
+
+    # Bradley aberration formulas (simplified, assuming circular orbit)
+    # Δλ = -κ · (cos(λ☉) · cos(λ) + sin(λ☉) · sin(λ) · cos(ε)) / cos(β)
+    # Δβ = -κ · sin(β) · (sin(λ☉) · cos(λ) · cos(ε) - cos(λ☉) · sin(λ))
+    #      - κ · cos(β) · sin(λ☉) · sin(ε)
+    # However, a more standard form:
+    # Δλ = κ · (-cos(λ☉ - λ) + sin(λ☉) · sin(λ) · (1 - cos(ε))) / cos(β)
+    # For simplicity, use the vector approach which is more accurate.
+
+    # Simplified: velocity direction is perpendicular to Sun direction
+    # v_direction = sun_lon + 90°
+    v_lon_rad = sun_rad + math.pi / 2
+
+    # Δλ = (κ / cos(β)) · cos(v_lon - λ)
+    if abs(cos_lat) > 1e-10:
+        delta_lon = KAPPA * math.cos(v_lon_rad - lon_rad) / cos_lat
+    else:
+        delta_lon = 0.0
+
+    # Δβ = κ · sin(β) · sin(v_lon - λ)
+    delta_lat = KAPPA * sin_lat * math.sin(v_lon_rad - lon_rad)
+
+    return delta_lon, delta_lat
+
+
+# =============================================================================
+# CARTESIAN COORDINATE UTILITIES
+# =============================================================================
+
+
+def spherical_to_cartesian_velocity(
+    lon: float,
+    lat: float,
+    dist: float,
+    dlon: float,
+    dlat: float,
+    ddist: float,
+) -> Tuple[float, float, float, float, float, float]:
+    """Convert spherical coordinates and velocities to Cartesian.
+
+    Args:
+        lon: Longitude in degrees.
+        lat: Latitude in degrees.
+        dist: Distance in AU.
+        dlon: Longitude velocity in degrees/day.
+        dlat: Latitude velocity in degrees/day.
+        ddist: Distance velocity in AU/day.
+
+    Returns:
+        Tuple of (x, y, z, vx, vy, vz) in AU and AU/day.
+    """
+    lon_rad = lon * DEG_TO_RAD
+    lat_rad = lat * DEG_TO_RAD
+    dlon_rad = dlon * DEG_TO_RAD  # rad/day
+    dlat_rad = dlat * DEG_TO_RAD  # rad/day
+
+    cos_lon = math.cos(lon_rad)
+    sin_lon = math.sin(lon_rad)
+    cos_lat = math.cos(lat_rad)
+    sin_lat = math.sin(lat_rad)
+
+    # Position
+    x = dist * cos_lat * cos_lon
+    y = dist * cos_lat * sin_lon
+    z = dist * sin_lat
+
+    # Velocity (chain rule derivatives)
+    # dx/dt = cos(lat)·cos(lon)·dr/dt - r·cos(lat)·sin(lon)·dlon/dt
+    #         - r·sin(lat)·cos(lon)·dlat/dt
+    vx = (
+        cos_lat * cos_lon * ddist
+        - dist * cos_lat * sin_lon * dlon_rad
+        - dist * sin_lat * cos_lon * dlat_rad
+    )
+    vy = (
+        cos_lat * sin_lon * ddist
+        + dist * cos_lat * cos_lon * dlon_rad
+        - dist * sin_lat * sin_lon * dlat_rad
+    )
+    vz = sin_lat * ddist + dist * cos_lat * dlat_rad
+
+    return x, y, z, vx, vy, vz
+
+
+def compute_earth_velocity(
+    jd_tt: float,
+    h: float = 0.001,
+) -> Tuple[float, float, float]:
+    """Compute Earth's heliocentric velocity by numerical differentiation.
+
+    Uses central differences on the VSOP87 Earth position.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time.
+        h: Step size in days (default 0.001 = ~1.44 minutes).
+
+    Returns:
+        Tuple of (vx, vy, vz) velocity in AU/day (heliocentric ecliptic).
+
+    Note:
+        This function requires the vsop87 module. Import it locally to
+        avoid circular imports.
+    """
+    # Use lazy import to avoid circular dependency
+    from .vsop87 import calc_earth_heliocentric
+
+    # Get positions at t±h
+    lon_plus, lat_plus, r_plus = calc_earth_heliocentric(jd_tt + h)
+    lon_minus, lat_minus, r_minus = calc_earth_heliocentric(jd_tt - h)
+
+    # Convert to Cartesian
+    x_plus, y_plus, z_plus = spherical_to_cartesian(lon_plus, lat_plus, r_plus)
+    x_minus, y_minus, z_minus = spherical_to_cartesian(lon_minus, lat_minus, r_minus)
+
+    # Central differences
+    vx = (x_plus - x_minus) / (2 * h)
+    vy = (y_plus - y_minus) / (2 * h)
+    vz = (z_plus - z_minus) / (2 * h)
+
+    return vx, vy, vz
+
+
+def apply_light_time_and_aberration(
+    jd_tt: float,
+    geometric_pos: Tuple[float, float, float],
+    earth_pos: Tuple[float, float, float],
+    earth_velocity: Tuple[float, float, float],
+    target_func=None,
+    iterations: int = 3,
+) -> Tuple[Tuple[float, float, float], float]:
+    """Apply both light-time and aberration corrections.
+
+    This is the main entry point for computing apparent positions in the
+    Moshier ephemeris. It combines:
+    1. Light-time correction (iterative)
+    2. Annual stellar aberration
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (observation time).
+        geometric_pos: Uncorrected geocentric position (x, y, z) in AU.
+        earth_pos: Earth heliocentric position (x, y, z) in AU.
+        earth_velocity: Earth heliocentric velocity (vx, vy, vz) in AU/day.
+        target_func: Optional function(jd) -> (x, y, z) for light-time iteration.
+                    If None, only simple light-time delay is applied.
+        iterations: Number of light-time iterations (default 3).
+
+    Returns:
+        Tuple containing:
+        - (x, y, z): Apparent position with all corrections applied.
+        - light_time: Light travel time in days.
+    """
+    if target_func is not None:
+        # Full iterative light-time correction
+        corrected_pos, light_time = iterative_light_time_correction(
+            jd_tt, earth_pos, target_func, iterations
+        )
+    else:
+        # Simple light-time (no iteration, geometric position assumed correct)
+        x, y, z = geometric_pos
+        distance = math.sqrt(x * x + y * y + z * z)
+        light_time = distance / C_LIGHT_AU_DAY
+        corrected_pos = geometric_pos
+
+    # Apply aberration
+    apparent_pos = apply_aberration_to_position(corrected_pos, earth_velocity)
+
+    return apparent_pos, light_time
+
+
 # =============================================================================
 # TIME CONVERSIONS
 # =============================================================================

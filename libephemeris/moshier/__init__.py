@@ -103,9 +103,16 @@ from .utils import (
     ecliptic_to_equatorial,
     equatorial_to_ecliptic,
     rectangular_to_spherical_velocity,
-    # Aberration
+    spherical_to_cartesian_velocity,
+    # Aberration and light-time
     annual_aberration,
+    annual_aberration_cartesian,
+    apply_aberration_to_position,
+    aberration_in_longitude_latitude,
     light_time_correction,
+    iterative_light_time_correction,
+    apply_light_time_and_aberration,
+    compute_earth_velocity,
     # Time conversions
     jd_to_julian_centuries,
     jd_to_julian_millennia,
@@ -250,7 +257,7 @@ __all__ = [
     "RAD_TO_DEG",
     "ARCSEC_TO_RAD",
     "RAD_TO_ARCSEC",
-    # Utility functions
+    # Utility functions - coordinates
     "normalize_angle",
     "normalize_radians",
     "spherical_to_cartesian",
@@ -258,11 +265,21 @@ __all__ = [
     "ecliptic_to_equatorial",
     "equatorial_to_ecliptic",
     "rectangular_to_spherical_velocity",
+    "spherical_to_cartesian_velocity",
+    # Utility functions - aberration and light-time
     "annual_aberration",
+    "annual_aberration_cartesian",
+    "apply_aberration_to_position",
+    "aberration_in_longitude_latitude",
     "light_time_correction",
+    "iterative_light_time_correction",
+    "apply_light_time_and_aberration",
+    "compute_earth_velocity",
+    # Utility functions - time
     "jd_to_julian_centuries",
     "jd_to_julian_millennia",
     "julian_centuries_to_jd",
+    # Utility functions - numerical
     "numerical_derivative",
     "evaluate_polynomial",
     "evaluate_polynomial_derivative",
