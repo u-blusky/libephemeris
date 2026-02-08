@@ -75,6 +75,12 @@ from .precession import (
     precess_ecliptic,
     precess_to_j2000,
     precess_from_j2000,
+    ecliptic_of_date,
+    ecliptic_j2000_to_date,
+    precession_matrix_j2000_to_date,
+    nutation_matrix,
+    precession_nutation_matrix,
+    has_erfa,
 )
 
 # Import utility functions
@@ -229,6 +235,12 @@ __all__ = [
     "precess_ecliptic",
     "precess_to_j2000",
     "precess_from_j2000",
+    "ecliptic_of_date",
+    "ecliptic_j2000_to_date",
+    "precession_matrix_j2000_to_date",
+    "nutation_matrix",
+    "precession_nutation_matrix",
+    "has_erfa",
     # Constants
     "J2000",
     "JD_PER_CENTURY",
