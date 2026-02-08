@@ -172,6 +172,83 @@ class TestSolEclipseWhenGlob:
         # They should be at least 25 days apart (minimum time between eclipses)
         assert times2[0] - times1[0] >= 25
 
+    def test_search_direction_forward(self):
+        """Forward search should find eclipse at or after start date."""
+        # Start from Aug 10, 2017 (10 days before Aug 21, 2017 eclipse)
+        jd_start = swe_julday(2017, 8, 10, 0)
+
+        ecl_type, times = sol_eclipse_when_glob(
+            jd_start, eclipse_type=SE_ECL_TOTAL, search_direction="forward"
+        )
+
+        # Should find Aug 21, 2017 eclipse
+        year, month, day, _ = swe_revjul(times[0])
+        assert (year, month, day) == (2017, 8, 21)
+
+    def test_search_direction_backward(self):
+        """Backward search should find eclipse before start date."""
+        # Start from Sep 1, 2017 (after Aug 21, 2017 eclipse)
+        jd_start = swe_julday(2017, 9, 1, 0)
+
+        ecl_type, times = sol_eclipse_when_glob(
+            jd_start, eclipse_type=SE_ECL_TOTAL, search_direction="backward"
+        )
+
+        # Should find Aug 21, 2017 eclipse
+        year, month, day, _ = swe_revjul(times[0])
+        assert (year, month, day) == (2017, 8, 21)
+
+    def test_search_direction_bidirectional_finds_nearby_eclipse(self):
+        """Bidirectional search should find eclipse within 15 days even if forward search would miss."""
+        # Start from Aug 15, 2017 (6 days before Aug 21, 2017 eclipse)
+        # In this case, the eclipse maximum is after the start date, so bidirectional should find it
+        jd_start = swe_julday(2017, 8, 15, 0)
+
+        ecl_type, times = sol_eclipse_when_glob(
+            jd_start, eclipse_type=SE_ECL_TOTAL, search_direction="bidirectional"
+        )
+
+        # Should find Aug 21, 2017 eclipse
+        year, month, day, _ = swe_revjul(times[0])
+        assert (year, month, day) == (2017, 8, 21)
+
+    def test_search_direction_bidirectional_is_default(self):
+        """Default search should use bidirectional mode."""
+        jd_start = swe_julday(2017, 8, 1, 0)
+
+        # Both calls should return the same result
+        ecl_type_default, times_default = sol_eclipse_when_glob(
+            jd_start, eclipse_type=SE_ECL_TOTAL
+        )
+        ecl_type_bidir, times_bidir = sol_eclipse_when_glob(
+            jd_start, eclipse_type=SE_ECL_TOTAL, search_direction="bidirectional"
+        )
+
+        assert times_default[0] == times_bidir[0]
+
+    def test_invalid_search_direction_raises_error(self):
+        """Invalid search direction should raise ValueError."""
+        import pytest
+
+        jd_start = swe_julday(2024, 1, 1, 0)
+
+        with pytest.raises(ValueError, match="search_direction must be one of"):
+            sol_eclipse_when_glob(jd_start, search_direction="invalid")
+
+    def test_august_2017_eclipse_found_from_any_start_in_august(self):
+        """Aug 2017 total eclipse should be found regardless of exact start date in August."""
+        # This is the key regression test for the bug fix
+        for day in [1, 5, 10, 15, 20]:
+            jd_start = swe_julday(2017, 8, day, 0)
+
+            ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+
+            year, month, eclipse_day, _ = swe_revjul(times[0])
+            assert (year, month, eclipse_day) == (2017, 8, 21), (
+                f"Starting from Aug {day}, expected to find Aug 21 eclipse, "
+                f"but found {year}-{month}-{eclipse_day}"
+            )
+
 
 class TestNewMoonFinding:
     """Tests for internal New Moon finding logic."""

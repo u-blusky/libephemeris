@@ -325,6 +325,73 @@ def _find_next_new_moon(jd_start: float) -> float:
     return jd_guess
 
 
+def _find_previous_new_moon(jd_start: float) -> float:
+    """
+    Find the previous New Moon (Sun-Moon conjunction) before jd_start.
+
+    Uses iterative refinement to find exact moment of conjunction.
+
+    Args:
+        jd_start: Julian Day (UT) to start search from
+
+    Returns:
+        Julian Day of previous New Moon
+    """
+    # Get current positions
+    sun_pos, _ = swe_calc_ut(jd_start, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd_start, SE_MOON, SEFLG_SPEED)
+
+    sun_lon = sun_pos[0]
+    moon_lon = moon_pos[0]
+
+    # Calculate elongation (Moon - Sun), normalized to -180 to 180
+    elongation = (moon_lon - sun_lon) % 360.0
+    if elongation > 180:
+        elongation -= 360
+
+    # Estimate time to previous conjunction
+    # Moon gains ~12.2° per day on Sun
+    relative_speed = 12.190749  # degrees/day (average Moon speed - Sun speed)
+
+    # Time since last conjunction (go backwards)
+    if elongation > 0:
+        # Moon is ahead of Sun, last conjunction was elongation/speed days ago
+        dt = -elongation / relative_speed
+    else:
+        # Moon is behind Sun, last conjunction was (360 + elongation)/speed days ago
+        dt = -(360.0 + elongation) / relative_speed
+
+    jd_guess = jd_start + dt
+
+    # Newton-Raphson refinement
+    for _ in range(20):
+        sun_pos, _ = swe_calc_ut(jd_guess, SE_SUN, SEFLG_SPEED)
+        moon_pos, _ = swe_calc_ut(jd_guess, SE_MOON, SEFLG_SPEED)
+
+        sun_lon = sun_pos[0]
+        moon_lon = moon_pos[0]
+        sun_speed = sun_pos[3]
+        moon_speed = moon_pos[3]
+
+        # Elongation
+        diff = (moon_lon - sun_lon) % 360.0
+        if diff > 180:
+            diff -= 360
+
+        # Convergence check (< 0.1 arcsec)
+        if abs(diff) < 1e-5:
+            return jd_guess
+
+        # Newton-Raphson step
+        rel_speed = moon_speed - sun_speed
+        if abs(rel_speed) < 0.1:
+            rel_speed = 12.19
+
+        jd_guess -= diff / rel_speed
+
+    return jd_guess
+
+
 def _get_moon_node_distance(jd: float, moon_lon: float) -> float:
     """
     Calculate angular distance of Moon from nearest lunar node.
@@ -858,8 +925,21 @@ def _calculate_eclipse_type_and_magnitude(
 
     # Central eclipses possible when shadow axis passes within umbral/antumbral limit
     if gamma_limit_central > 0.0 and abs(gamma) <= gamma_limit_central:
-        # Check for hybrid (annular-total)
-        if abs(l2) < 0.01 or 0.99 <= moon_sun_ratio <= 1.01:
+        # Determine eclipse type based on umbral limit (l2)
+        # l2 < 0: umbra (total eclipse)
+        # l2 > 0: antumbra (annular eclipse)
+        # l2 very close to 0: hybrid (annular-total)
+        #
+        # For hybrid eclipse detection, the umbra tip must be extremely close
+        # to Earth's surface AND the moon_sun_ratio must be very close to 1.
+        # True hybrid eclipses are rare (about 5% of central eclipses).
+        #
+        # A stricter threshold is needed: both conditions must be met:
+        # - |l2| < 0.002 (umbra tip within ~12 km of surface)
+        # - 0.997 <= moon_sun_ratio <= 1.003 (Moon and Sun nearly equal size)
+        is_hybrid = abs(l2) < 0.002 and 0.997 <= moon_sun_ratio <= 1.003
+
+        if is_hybrid:
             eclipse_type = SE_ECL_ANNULAR_TOTAL | SE_ECL_CENTRAL
         elif l2 < 0:
             eclipse_type = SE_ECL_TOTAL | SE_ECL_CENTRAL
@@ -1142,12 +1222,17 @@ def sol_eclipse_when_glob(
     jd_start: float,
     flags: int = SEFLG_SWIEPH,
     eclipse_type: int = 0,
+    search_direction: str = "bidirectional",
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Find the next global solar eclipse after a given date.
 
     Searches forward in time from jd_start to find the next solar eclipse.
     Can filter by eclipse type (total, annular, partial, hybrid).
+
+    By default uses bidirectional search to check ±15 days around jd_start,
+    ensuring that eclipses close to the start date are not missed due to
+    the search algorithm starting slightly after a New Moon.
 
     Args:
         jd_start: Julian Day (UT) to start search from
@@ -1158,6 +1243,12 @@ def sol_eclipse_when_glob(
             - SE_ECL_PARTIAL (16): Partial eclipse
             - SE_ECL_ANNULAR_TOTAL (32): Hybrid eclipse
             - 0: Any eclipse type (default)
+        search_direction: Direction to search for eclipses:
+            - "forward": Only search forward from jd_start (like pyswisseph)
+            - "backward": Only search backward from jd_start
+            - "bidirectional" (default): Check ±15 days to ensure no eclipse
+              is missed, returning the closest eclipse to jd_start that is
+              >= jd_start (unless only found in backward direction)
 
     Returns:
         Tuple containing (matching pyswisseph format):
@@ -1178,12 +1269,13 @@ def sol_eclipse_when_glob(
         RuntimeError: If no eclipse found within search limit
 
     Algorithm:
-        1. Find next New Moon after jd_start
-        2. Check if Moon is close enough to node for eclipse
-        3. If not eclipse, advance to next New Moon
-        4. Calculate eclipse type and magnitude
-        5. If eclipse_type filter set, check if matches
-        6. Calculate phase times
+        1. For bidirectional search: check previous New Moon within 15 days
+        2. Find next New Moon after jd_start
+        3. Check if Moon is close enough to node for eclipse
+        4. If not eclipse, advance to next New Moon
+        5. Calculate eclipse type and magnitude
+        6. If eclipse_type filter set, check if matches
+        7. Return closest matching eclipse >= jd_start
 
     Precision:
         Eclipse times accurate to ~1 minute for most eclipses.
@@ -1202,25 +1294,28 @@ def sol_eclipse_when_glob(
     """
     MAX_SEARCH_YEARS = 20  # Maximum search range
     MAX_NEW_MOONS = int(MAX_SEARCH_YEARS * 12.4)  # ~12.4 lunations per year
+    BIDIRECTIONAL_WINDOW = 15.0  # Days to check backward in bidirectional mode
+
+    # Validate search_direction parameter
+    valid_directions = ("forward", "backward", "bidirectional")
+    if search_direction not in valid_directions:
+        raise ValueError(
+            f"search_direction must be one of {valid_directions}, got '{search_direction}'"
+        )
 
     # If eclipse_type is 0, accept any type
     if eclipse_type == 0:
         eclipse_type = SE_ECL_ALLTYPES_SOLAR
 
-    jd = jd_start
-
-    for _ in range(MAX_NEW_MOONS):
-        # Find next New Moon
-        jd_new_moon = _find_next_new_moon(jd)
-
+    def _check_new_moon_for_eclipse(
+        jd_new_moon: float,
+    ) -> Union[Tuple[int, Tuple[float, ...]], None]:
+        """Check if a New Moon corresponds to a matching eclipse."""
         # Get Moon position at New Moon
         moon_pos, _ = swe_calc_ut(jd_new_moon, SE_MOON, flags | SEFLG_SPEED)
         moon_lon = moon_pos[0]
-        # moon_lat = moon_pos[1]  # Used in _calculate_eclipse_type_and_magnitude
 
         # Check if close enough to ecliptic for eclipse
-        # Solar eclipse possible if |moon_lat| < ~1.5° (approximate)
-        # More accurate: check distance from node
         node_dist = _get_moon_node_distance(jd_new_moon, moon_lon)
 
         if node_dist < ECLIPSE_LIMIT_SOLAR:
@@ -1243,12 +1338,72 @@ def sol_eclipse_when_glob(
 
                 if type_matches:
                     # Refine eclipse maximum using Besselian elements
-                    # This achieves sub-second precision for maximum timing
                     jd_max_refined = _refine_solar_eclipse_maximum(jd_new_moon)
 
                     # Calculate phase times using high-precision Besselian method
                     times = _calculate_eclipse_phases(jd_max_refined, ecl_type)
                     return ecl_type, times
+
+        return None
+
+    # For bidirectional search, first check if there's a recent eclipse we might miss
+    backward_result: Union[Tuple[int, Tuple[float, ...]], None] = None
+    if search_direction == "bidirectional":
+        # Check the previous New Moon (within ~15 days before jd_start)
+        jd_prev_new_moon = _find_previous_new_moon(jd_start)
+
+        # Only consider if within the bidirectional window
+        if jd_start - jd_prev_new_moon <= BIDIRECTIONAL_WINDOW:
+            result = _check_new_moon_for_eclipse(jd_prev_new_moon)
+            if result is not None:
+                # Check if eclipse maximum is at or after jd_start
+                # (eclipse might have started before but maximum after)
+                jd_max = result[1][0]
+                if jd_max >= jd_start:
+                    # This eclipse's maximum is after jd_start, use it
+                    return result
+                else:
+                    # Store for comparison - eclipse maximum is before jd_start
+                    # but we'll still prefer forward search unless nothing found
+                    backward_result = result
+
+    # Handle backward-only search
+    if search_direction == "backward":
+        jd = jd_start
+        for _ in range(MAX_NEW_MOONS):
+            jd_prev_new_moon = _find_previous_new_moon(jd)
+            result = _check_new_moon_for_eclipse(jd_prev_new_moon)
+            if result is not None:
+                return result
+            # Go further back
+            jd = jd_prev_new_moon - 1
+
+        raise RuntimeError(
+            f"No matching solar eclipse found within {MAX_SEARCH_YEARS} years before JD {jd_start}"
+        )
+
+    # Forward search (default behavior for "forward" and "bidirectional")
+    jd = jd_start
+
+    for _ in range(MAX_NEW_MOONS):
+        # Find next New Moon
+        jd_new_moon = _find_next_new_moon(jd)
+
+        result = _check_new_moon_for_eclipse(jd_new_moon)
+        if result is not None:
+            # For bidirectional mode, we have a forward result
+            # Check if we had a backward result that might be closer
+            if search_direction == "bidirectional" and backward_result is not None:
+                # Compare distances from jd_start
+                backward_jd_max = backward_result[1][0]
+                forward_jd_max = result[1][0]
+
+                # If backward eclipse max is closer to jd_start (but before it),
+                # and forward is far away, still prefer forward since it's >= jd_start
+                # The bidirectional check already returned if backward was >= jd_start
+                pass  # Forward result is >= jd_start, use it
+
+            return result
 
         # Advance to next lunation
         jd = jd_new_moon + 25  # Skip ahead ~25 days to ensure we find next New Moon

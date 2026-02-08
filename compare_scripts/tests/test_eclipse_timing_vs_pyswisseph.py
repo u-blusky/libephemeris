@@ -10,9 +10,6 @@ Known eclipses tested:
 
 Reference: Swiss Ephemeris (pyswisseph) is the authoritative source for
 high-precision eclipse calculations.
-
-NOTE: The August 2017 eclipse tests are marked as xfail because the eclipse
-search algorithm may find a different eclipse depending on search start date.
 """
 
 import pytest
@@ -23,12 +20,6 @@ from libephemeris.constants import (
     SE_ECL_TOTAL,
     SE_ECL_ALLTYPES_SOLAR,
     SE_ECL_ALLTYPES_LUNAR,
-)
-
-# xfail marker for eclipse search issues
-_ECLIPSE_SEARCH_XFAIL = pytest.mark.xfail(
-    reason="Eclipse search may find different eclipse depending on search start",
-    strict=False,
 )
 
 
@@ -44,7 +35,6 @@ def time_diff_seconds(jd1: float, jd2: float) -> float:
 class TestSolarEclipseTimingVsPyswisseph:
     """Compare solar eclipse timing between libephemeris and pyswisseph."""
 
-    @_ECLIPSE_SEARCH_XFAIL
     def test_august_2017_total_solar_eclipse(self):
         """Test August 21, 2017 total solar eclipse ('Great American Eclipse').
 
@@ -246,7 +236,6 @@ class TestLunarEclipseTimingVsPyswisseph:
 class TestEclipseTimingSummary:
     """Summary tests comparing multiple eclipses against pyswisseph."""
 
-    @_ECLIPSE_SEARCH_XFAIL
     @pytest.mark.parametrize(
         "year,month,day,eclipse_type,description",
         [
