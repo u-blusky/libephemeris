@@ -23,9 +23,18 @@ from libephemeris.constants import (
 
 
 class OccultTolerance:
-    """Tolerance thresholds for occultation comparisons."""
+    """Tolerance thresholds for occultation comparisons.
 
-    TIME_SECONDS = 300.0  # 5 minutes for occultations
+    The improved algorithms now use:
+    - Bisection search for contact times instead of chord-based estimates
+    - Golden section search with increased iterations for sub-second precision
+    - Topocentric parallax corrections for local occultation timing
+    - Reduced initial search step size
+
+    This allows reducing the tolerance from 300s (5 minutes) to 60s (1 minute).
+    """
+
+    TIME_SECONDS = 60.0  # 1 minute for occultations (improved from 300s)
     POSITION_DEGREES = 0.5  # 0.5 degree for coordinates
 
 
