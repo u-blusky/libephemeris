@@ -1797,8 +1797,8 @@ def _houses_placidus(
         ra = (armc + offset_deg) % 360.0
         new_ra = ra  # Initialize for type safety
 
-        # Iterate to convergence (typically 5-7 iterations, max 10 for safety)
-        for _ in range(10):
+        # Iterate to convergence (typically 15-20 iterations needed for 1e-7° threshold)
+        for _ in range(25):
             # Calculate declination for point at this RA on ecliptic
             # Using spherical astronomy formula: tan(dec) = sin(RA) * tan(eps)
 
