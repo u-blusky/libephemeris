@@ -78,6 +78,12 @@ from .constants import (
     SE_CUPIDO,
     SE_POSEIDON,
     SE_ISIS,
+    SE_CHIRON,
+    SE_PHOLUS,
+    SE_CERES,
+    SE_PALLAS,
+    SE_JUNO,
+    SE_VESTA,
     SEFLG_SPEED,
     SEFLG_HELCTR,
     SEFLG_TOPOCTR,
@@ -150,7 +156,38 @@ _PLANET_NAMES = {
     SE_INTP_PERG: "Interpolated Perigee",
     SE_EARTH: "Earth",
     SE_ISIS: "Transpluto",
+    SE_CHIRON: "Chiron",
+    SE_PHOLUS: "Pholus",
+    SE_CERES: "Ceres",
+    SE_PALLAS: "Pallas",
+    SE_JUNO: "Juno",
+    SE_VESTA: "Vesta",
 }
+
+# Bodies supported by Moshier semi-analytical ephemeris
+# These are calculated using VSOP87 (planets), ELP 2000-82B (Moon),
+# Chapront-Francou theory (Pluto), and analytical formulas (nodes, Lilith).
+# NOT supported: asteroids (Chiron, Ceres, Pallas, Juno, Vesta), TNOs,
+# fixed stars, hypothetical planets - these require SPK/star catalogs.
+_MOSHIER_SUPPORTED_BODIES = frozenset(
+    {
+        SE_SUN,
+        SE_MOON,
+        SE_MERCURY,
+        SE_VENUS,
+        SE_MARS,
+        SE_JUPITER,
+        SE_SATURN,
+        SE_URANUS,
+        SE_NEPTUNE,
+        SE_PLUTO,
+        SE_EARTH,
+        SE_MEAN_NODE,
+        SE_TRUE_NODE,
+        SE_MEAN_APOG,
+        SE_OSCU_APOG,
+    }
+)
 
 
 class _CobCorrectedTarget:
@@ -780,12 +817,26 @@ def _calc_body_moshier(
         - Heliocentric mode returns heliocentric coordinates for planets
     """
     from . import lunar, moshier
-    from .exceptions import validate_jd_range_moshier
+    from .exceptions import validate_jd_range_moshier, CalculationError
     from .time_utils import swe_deltat
 
     # Validate JD is within Moshier range (-3000 to +3000 CE)
     func_name = "swe_calc_ut" if is_ut else "swe_calc"
     validate_jd_range_moshier(tjd, ipl, func_name)
+
+    # ========================================================================
+    # 0. Check if body is supported in Moshier mode
+    # ========================================================================
+    # Asteroids, TNOs, fixed stars, and hypothetical planets are NOT supported
+    # in Moshier mode - they require SPK kernels or star catalogs.
+    # Handle south nodes (negative of north node IDs) as supported
+    effective_ipl = abs(ipl) if ipl in (-SE_MEAN_NODE, -SE_TRUE_NODE) else ipl
+    if effective_ipl not in _MOSHIER_SUPPORTED_BODIES:
+        body_name = _PLANET_NAMES.get(ipl, f"Body {ipl}")
+        raise CalculationError(
+            f"Body {body_name} (ID {ipl}) is not available in Moshier ephemeris mode. "
+            f"Use SEFLG_SWIEPH with a JPL ephemeris file for this body."
+        )
 
     # ========================================================================
     # 1. Convert to TT (Terrestrial Time) for Moshier calculations

@@ -14,6 +14,16 @@ from libephemeris.constants import (
     SE_MOON,
     SE_MARS,
     SE_JUPITER,
+    SE_CHIRON,
+    SE_PHOLUS,
+    SE_CERES,
+    SE_PALLAS,
+    SE_JUNO,
+    SE_VESTA,
+    SE_MEAN_NODE,
+    SE_TRUE_NODE,
+    SE_MEAN_APOG,
+    SE_OSCU_APOG,
     SEFLG_MOSEPH,
     SEFLG_SWIEPH,
     SEFLG_JPLEPH,
@@ -21,6 +31,7 @@ from libephemeris.constants import (
 )
 from libephemeris.exceptions import (
     EphemerisRangeError,
+    CalculationError,
     validate_jd_range_moshier,
     MOSHIER_JD_START,
     MOSHIER_JD_END,
@@ -246,3 +257,151 @@ class TestMoshierFlagConstants:
         assert SEFLG_JPLEPH == 1
         assert SEFLG_SWIEPH == 2
         assert SEFLG_MOSEPH == 4
+
+
+class TestMoshierUnsupportedBodies:
+    """Test that unsupported bodies raise CalculationError in Moshier mode."""
+
+    def test_chiron_raises_calculation_error(self):
+        """Chiron (asteroid) should raise CalculationError in Moshier mode."""
+        jd = 2451545.0  # J2000.0
+
+        with pytest.raises(CalculationError) as exc_info:
+            eph.swe_calc_ut(jd, SE_CHIRON, SEFLG_MOSEPH)
+
+        err = exc_info.value
+        assert "Chiron" in str(err)
+        assert "ID 15" in str(err)
+        assert "not available in Moshier" in str(err)
+        assert "SEFLG_SWIEPH" in str(err)
+
+    def test_ceres_raises_calculation_error(self):
+        """Ceres (asteroid) should raise CalculationError in Moshier mode."""
+        jd = 2451545.0
+
+        with pytest.raises(CalculationError) as exc_info:
+            eph.swe_calc_ut(jd, SE_CERES, SEFLG_MOSEPH)
+
+        err = exc_info.value
+        assert "Ceres" in str(err)
+        assert "ID 17" in str(err)
+        assert "not available in Moshier" in str(err)
+
+    def test_pallas_raises_calculation_error(self):
+        """Pallas (asteroid) should raise CalculationError in Moshier mode."""
+        jd = 2451545.0
+
+        with pytest.raises(CalculationError) as exc_info:
+            eph.swe_calc_ut(jd, SE_PALLAS, SEFLG_MOSEPH)
+
+        err = exc_info.value
+        assert "Pallas" in str(err)
+        assert "ID 18" in str(err)
+
+    def test_juno_raises_calculation_error(self):
+        """Juno (asteroid) should raise CalculationError in Moshier mode."""
+        jd = 2451545.0
+
+        with pytest.raises(CalculationError) as exc_info:
+            eph.swe_calc_ut(jd, SE_JUNO, SEFLG_MOSEPH)
+
+        err = exc_info.value
+        assert "Juno" in str(err)
+        assert "ID 19" in str(err)
+
+    def test_vesta_raises_calculation_error(self):
+        """Vesta (asteroid) should raise CalculationError in Moshier mode."""
+        jd = 2451545.0
+
+        with pytest.raises(CalculationError) as exc_info:
+            eph.swe_calc_ut(jd, SE_VESTA, SEFLG_MOSEPH)
+
+        err = exc_info.value
+        assert "Vesta" in str(err)
+        assert "ID 20" in str(err)
+
+    def test_pholus_raises_calculation_error(self):
+        """Pholus (centaur) should raise CalculationError in Moshier mode."""
+        jd = 2451545.0
+
+        with pytest.raises(CalculationError) as exc_info:
+            eph.swe_calc_ut(jd, SE_PHOLUS, SEFLG_MOSEPH)
+
+        err = exc_info.value
+        assert "Pholus" in str(err)
+        assert "ID 16" in str(err)
+
+    def test_swe_calc_also_raises_for_unsupported_bodies(self):
+        """swe_calc() (TT time) should also raise for unsupported bodies."""
+        jd = 2451545.0
+
+        with pytest.raises(CalculationError) as exc_info:
+            eph.swe_calc(jd, SE_CHIRON, SEFLG_MOSEPH)
+
+        err = exc_info.value
+        assert "Chiron" in str(err)
+        assert "not available in Moshier" in str(err)
+
+
+class TestMoshierSupportedBodies:
+    """Test that supported bodies work correctly in Moshier mode."""
+
+    def test_mean_node_supported(self):
+        """Mean lunar node should be supported in Moshier mode."""
+        jd = 2451545.0
+        pos, flag = eph.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_MOSEPH)
+        assert len(pos) == 6
+        assert 0 <= pos[0] < 360  # Valid longitude
+
+    def test_true_node_supported(self):
+        """True lunar node should be supported in Moshier mode."""
+        jd = 2451545.0
+        pos, flag = eph.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_MOSEPH)
+        assert len(pos) == 6
+        assert 0 <= pos[0] < 360
+
+    def test_mean_apogee_supported(self):
+        """Mean lunar apogee (Lilith) should be supported in Moshier mode."""
+        jd = 2451545.0
+        pos, flag = eph.swe_calc_ut(jd, SE_MEAN_APOG, SEFLG_MOSEPH)
+        assert len(pos) == 6
+        assert 0 <= pos[0] < 360
+
+    def test_osculating_apogee_supported(self):
+        """Osculating lunar apogee should be supported in Moshier mode."""
+        jd = 2451545.0
+        pos, flag = eph.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_MOSEPH)
+        assert len(pos) == 6
+        assert 0 <= pos[0] < 360
+
+    def test_all_standard_planets_supported(self):
+        """Sun, Moon, and all planets through Pluto should be supported."""
+        jd = 2451545.0
+        from libephemeris.constants import (
+            SE_SUN,
+            SE_MOON,
+            SE_MERCURY,
+            SE_VENUS,
+            SE_MARS,
+            SE_JUPITER,
+            SE_SATURN,
+            SE_URANUS,
+            SE_NEPTUNE,
+            SE_PLUTO,
+        )
+
+        for body_id in [
+            SE_SUN,
+            SE_MOON,
+            SE_MERCURY,
+            SE_VENUS,
+            SE_MARS,
+            SE_JUPITER,
+            SE_SATURN,
+            SE_URANUS,
+            SE_NEPTUNE,
+            SE_PLUTO,
+        ]:
+            pos, flag = eph.swe_calc_ut(jd, body_id, SEFLG_MOSEPH)
+            assert len(pos) == 6, f"Body {body_id} should return 6-tuple"
+            assert 0 <= pos[0] < 360, f"Body {body_id} should have valid longitude"
