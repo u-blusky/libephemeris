@@ -39,7 +39,7 @@ from typing import Optional, Union
 from skyfield.framelib import ecliptic_frame
 
 from .exceptions import SPKNotFoundError
-from .logging_config import get_logger
+from .logging_config import format_file_size, get_logger
 from .state import get_library_path, get_loader, get_timescale
 
 
@@ -293,14 +293,22 @@ def download_spk(
         return filepath
 
     logger = get_logger()
-    logger.info("Downloading SPK ephemeris for %s (%s to %s)...", body, start, end)
+
+    # Deduce NAIF ID for logging (if possible)
+    naif_id = _deduce_naif_id(body)
+    if naif_id is not None:
+        logger.info(
+            "Downloading SPK for %s (NAIF %d) from JPL Horizons...", body, naif_id
+        )
+    else:
+        logger.info("Downloading SPK for %s from JPL Horizons...", body)
 
     # Build request URL
     url = _build_horizons_url(body, start, end, center)
 
     # Make request with retry
     max_retries = 2
-    last_error = None
+    last_error: Optional[Exception] = None
 
     for attempt in range(max_retries + 1):
         try:
@@ -337,8 +345,8 @@ def download_spk(
             with open(filepath, "wb") as f:
                 f.write(spk_data)
 
-            size_kb = len(spk_data) / 1024
-            logger.info("SPK download complete: %s (%.1f KB)", filename, size_kb)
+            size_str = format_file_size(len(spk_data))
+            logger.info("SPK saved: %s (%s)", filepath, size_str)
             return filepath
 
         except urllib.error.HTTPError as e:
@@ -350,11 +358,24 @@ def download_spk(
                     msg = error_data.get("message", str(e))
                 except Exception:
                     msg = str(e)
+                logger.warning("SPK download failed for %s: %s", body, msg)
                 raise ValueError(f"Invalid body '{body}': {msg}") from e
             elif attempt < max_retries:
+                logger.warning(
+                    "SPK download attempt %d failed for %s: HTTP %d, retrying...",
+                    attempt + 1,
+                    body,
+                    e.code,
+                )
                 time.sleep(1)  # Brief pause before retry
                 continue
             else:
+                logger.warning(
+                    "SPK download failed for %s: HTTP %d after %d attempts",
+                    body,
+                    e.code,
+                    max_retries + 1,
+                )
                 raise ConnectionError(
                     f"Failed to download SPK after {max_retries + 1} attempts: {e}"
                 ) from e
@@ -362,9 +383,16 @@ def download_spk(
         except urllib.error.URLError as e:
             last_error = e
             if attempt < max_retries:
+                logger.warning(
+                    "SPK download attempt %d failed for %s: %s, retrying...",
+                    attempt + 1,
+                    body,
+                    e.reason,
+                )
                 time.sleep(1)
                 continue
             else:
+                logger.warning("SPK download failed for %s: %s", body, e.reason)
                 raise ConnectionError(
                     f"Network error downloading SPK: {e.reason}"
                 ) from e

@@ -13,6 +13,7 @@ Note: Integration tests that download actual SPK files from Horizons
 are skipped by default. Set LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1 to run them.
 """
 
+import json
 import os
 import pytest
 from unittest.mock import patch, MagicMock
@@ -392,3 +393,230 @@ class TestSpkDownloadIntegration:
 
         assert 0 <= pos[0] < 360
         assert pos[2] > 0
+
+
+# =============================================================================
+# LOGGING TESTS
+# =============================================================================
+
+
+@pytest.fixture
+def capture_libephemeris_logs():
+    """Fixture to capture logs from libephemeris logger.
+
+    The libephemeris logger has propagate=False, so we need to add our own handler.
+    """
+    import logging
+
+    captured_records = []
+
+    class RecordCapture(logging.Handler):
+        def emit(self, record):
+            captured_records.append(record)
+
+    logger = logging.getLogger("libephemeris")
+    handler = RecordCapture()
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+
+    yield captured_records
+
+    logger.removeHandler(handler)
+
+
+class TestDownloadSpkLogging:
+    """Test logging output from download_spk() function."""
+
+    def test_download_logs_start_message_with_naif_id(
+        self, tmp_path, capture_libephemeris_logs
+    ):
+        """download_spk() logs start message with NAIF ID for numbered asteroids."""
+        # Mock the network requests to avoid actual downloads
+        mock_json_response = {
+            "spk_file_id": "test_id",
+            "spk": "https://ssd.jpl.nasa.gov/test.bsp",
+        }
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            # First call returns JSON with SPK URL
+            mock_response1 = MagicMock()
+            mock_response1.read.return_value = json.dumps(mock_json_response).encode()
+            mock_response1.__enter__ = MagicMock(return_value=mock_response1)
+            mock_response1.__exit__ = MagicMock(return_value=False)
+
+            # Second call returns SPK binary data
+            mock_response2 = MagicMock()
+            mock_response2.read.return_value = b"\x00" * 1024  # 1KB mock SPK
+            mock_response2.__enter__ = MagicMock(return_value=mock_response2)
+            mock_response2.__exit__ = MagicMock(return_value=False)
+
+            mock_urlopen.side_effect = [mock_response1, mock_response2]
+
+            path = eph.download_spk(
+                body="2060",
+                start="2020-01-01",
+                end="2025-01-01",
+                path=str(tmp_path),
+            )
+
+        # Verify start message includes NAIF ID
+        records = capture_libephemeris_logs
+        messages = [r.getMessage() for r in records]
+        assert any("NAIF 2002060" in msg for msg in messages)
+        assert any("Downloading SPK" in msg for msg in messages)
+
+    def test_download_logs_start_message_without_naif_id(
+        self, tmp_path, capture_libephemeris_logs
+    ):
+        """download_spk() logs start message without NAIF ID for named bodies."""
+        mock_json_response = {
+            "spk_file_id": "test_id",
+            "spk": "https://ssd.jpl.nasa.gov/test.bsp",
+        }
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response1 = MagicMock()
+            mock_response1.read.return_value = json.dumps(mock_json_response).encode()
+            mock_response1.__enter__ = MagicMock(return_value=mock_response1)
+            mock_response1.__exit__ = MagicMock(return_value=False)
+
+            mock_response2 = MagicMock()
+            mock_response2.read.return_value = b"\x00" * 1024
+            mock_response2.__enter__ = MagicMock(return_value=mock_response2)
+            mock_response2.__exit__ = MagicMock(return_value=False)
+
+            mock_urlopen.side_effect = [mock_response1, mock_response2]
+
+            path = eph.download_spk(
+                body="Chiron",
+                start="2020-01-01",
+                end="2025-01-01",
+                path=str(tmp_path),
+            )
+
+        # Verify start message for named body (no NAIF ID)
+        records = capture_libephemeris_logs
+        messages = [r.getMessage() for r in records]
+        start_messages = [m for m in messages if "Downloading SPK" in m]
+        assert len(start_messages) >= 1
+        # Should mention body name
+        assert any("Chiron" in msg for msg in start_messages)
+        # Should NOT have NAIF ID
+        assert not any("NAIF" in msg for msg in start_messages)
+
+    def test_download_logs_completion_with_file_size(
+        self, tmp_path, capture_libephemeris_logs
+    ):
+        """download_spk() logs completion message with file size."""
+        mock_json_response = {
+            "spk_file_id": "test_id",
+            "spk": "https://ssd.jpl.nasa.gov/test.bsp",
+        }
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_response1 = MagicMock()
+            mock_response1.read.return_value = json.dumps(mock_json_response).encode()
+            mock_response1.__enter__ = MagicMock(return_value=mock_response1)
+            mock_response1.__exit__ = MagicMock(return_value=False)
+
+            mock_response2 = MagicMock()
+            # 2MB mock SPK file
+            mock_response2.read.return_value = b"\x00" * (2 * 1024 * 1024)
+            mock_response2.__enter__ = MagicMock(return_value=mock_response2)
+            mock_response2.__exit__ = MagicMock(return_value=False)
+
+            mock_urlopen.side_effect = [mock_response1, mock_response2]
+
+            path = eph.download_spk(
+                body="2060",
+                start="2020-01-01",
+                end="2025-01-01",
+                path=str(tmp_path),
+            )
+
+        # Verify completion message with file size
+        records = capture_libephemeris_logs
+        messages = [r.getMessage() for r in records]
+        saved_messages = [m for m in messages if "SPK saved" in m]
+        assert len(saved_messages) == 1
+        # Should show "2.0 MB"
+        assert "MB" in saved_messages[0]
+
+    def test_download_logs_warning_on_network_error(
+        self, tmp_path, capture_libephemeris_logs
+    ):
+        """download_spk() logs warning on network error."""
+        import urllib.error
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
+
+            with pytest.raises(ConnectionError):
+                eph.download_spk(
+                    body="2060",
+                    start="2020-01-01",
+                    end="2025-01-01",
+                    path=str(tmp_path),
+                )
+
+        # Verify warning was logged
+        records = capture_libephemeris_logs
+        warning_records = [r for r in records if r.levelname == "WARNING"]
+        assert len(warning_records) >= 1
+        messages = [r.getMessage() for r in warning_records]
+        assert any("SPK download" in m and "failed" in m for m in messages)
+
+    def test_download_logs_warning_on_http_error(
+        self, tmp_path, capture_libephemeris_logs
+    ):
+        """download_spk() logs warning on HTTP error."""
+        import urllib.error
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_error = urllib.error.HTTPError(
+                url="https://test.com",
+                code=500,
+                msg="Internal Server Error",
+                hdrs=None,  # type: ignore[arg-type]
+                fp=None,
+            )
+            mock_urlopen.side_effect = mock_error
+
+            with pytest.raises(ConnectionError):
+                eph.download_spk(
+                    body="2060",
+                    start="2020-01-01",
+                    end="2025-01-01",
+                    path=str(tmp_path),
+                )
+
+        # Verify warning was logged
+        records = capture_libephemeris_logs
+        warning_records = [r for r in records if r.levelname == "WARNING"]
+        assert len(warning_records) >= 1
+        messages = [r.getMessage() for r in warning_records]
+        assert any("HTTP 500" in m for m in messages)
+
+    def test_download_skips_existing_file_no_log(
+        self, tmp_path, capture_libephemeris_logs
+    ):
+        """download_spk() doesn't log when file already exists."""
+        # Create existing file
+        existing_file = tmp_path / "2060_202001_202501.bsp"
+        existing_file.write_bytes(b"\x00" * 100)
+
+        path = eph.download_spk(
+            body="2060",
+            start="2020-01-01",
+            end="2025-01-01",
+            path=str(tmp_path),
+            overwrite=False,
+        )
+
+        # Should return immediately without logging
+        assert path == str(existing_file)
+        records = capture_libephemeris_logs
+        download_messages = [
+            r.getMessage() for r in records if "Downloading SPK" in r.getMessage()
+        ]
+        assert len(download_messages) == 0
