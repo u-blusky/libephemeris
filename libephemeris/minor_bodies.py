@@ -2159,6 +2159,27 @@ from .constants import (
     NAIF_CHIRON,
 )
 
+# Asteroids in JPL's "major body index" - Horizons refuses to generate SPK for these
+# because they have pre-computed ephemerides. These use Keplerian elements for calculation.
+# Note: Despite being called "major body index", these are NOT in DE440 (only planets 1-10,
+# Moon 301, Earth 399 are in DE440). We must use Keplerian fallback for these.
+JPL_MAJOR_BODY_INDEX_ASTEROIDS: frozenset[int] = frozenset(
+    {
+        SE_CERES,  # Asteroid 1 - in JPL major body index
+        SE_PALLAS,  # Asteroid 2 - in JPL major body index
+        SE_JUNO,  # Asteroid 3 - in JPL major body index
+        SE_VESTA,  # Asteroid 4 - in JPL major body index
+    }
+)
+
+# Asteroids that CAN have SPK downloaded from JPL Horizons
+# These are NOT in the major body index, so Horizons will generate SPK for them
+SPK_DOWNLOADABLE_ASTEROIDS: dict[int, tuple[int, str, int, str]] = {
+    SE_CHIRON: (2060, "2060", NAIF_CHIRON, "Chiron"),
+    # SE_PHOLUS would go here if added: (5145, "5145", NAIF_PHOLUS, "Pholus"),
+}
+
+# Combined info for all major asteroids (for backward compatibility and info lookup)
 MAJOR_ASTEROID_SPK_INFO: dict[int, tuple[int, str, int, str]] = {
     SE_CERES: (1, "1", NAIF_CERES, "Ceres"),
     SE_PALLAS: (2, "2", NAIF_PALLAS, "Pallas"),
@@ -2170,17 +2191,17 @@ MAJOR_ASTEROID_SPK_INFO: dict[int, tuple[int, str, int, str]] = {
 
 def is_major_asteroid(body_id: int) -> bool:
     """
-    Check if a body ID is a major asteroid with SPK support.
+    Check if a body ID is a major asteroid.
 
-    Major asteroids are bodies where automatic SPK downloads are supported
-    to provide sub-arcsecond precision instead of the ~10-30 arcsecond
-    precision from Keplerian elements.
+    Major asteroids are prominent bodies like Ceres, Vesta, Chiron, etc.
+    Note: Not all major asteroids can have SPK downloaded - use
+    is_spk_downloadable() to check if Horizons can generate SPK for a body.
 
     Args:
         body_id: Minor body identifier (SE_CERES, SE_VESTA, etc.)
 
     Returns:
-        bool: True if body is a major asteroid with SPK support
+        bool: True if body is a major asteroid
 
     Example:
         >>> from libephemeris.minor_bodies import is_major_asteroid
@@ -2191,6 +2212,63 @@ def is_major_asteroid(body_id: int) -> bool:
         False
     """
     return body_id in MAJOR_ASTEROID_SPK_INFO
+
+
+def is_spk_downloadable(body_id: int) -> bool:
+    """
+    Check if SPK can be downloaded from JPL Horizons for this body.
+
+    JPL Horizons refuses to generate SPK files for bodies in the "major body
+    index" (Ceres, Pallas, Juno, Vesta) because they have pre-computed
+    ephemerides. However, these are NOT included in DE440, so we must use
+    Keplerian fallback for them.
+
+    Bodies like Chiron are NOT in the major body index, so Horizons will
+    generate SPK files for them.
+
+    Args:
+        body_id: Minor body identifier (SE_CERES, SE_CHIRON, etc.)
+
+    Returns:
+        bool: True if Horizons can generate SPK for this body
+
+    Example:
+        >>> from libephemeris.minor_bodies import is_spk_downloadable
+        >>> from libephemeris.constants import SE_CERES, SE_CHIRON
+        >>> is_spk_downloadable(SE_CERES)  # In major body index
+        False
+        >>> is_spk_downloadable(SE_CHIRON)  # Not in major body index
+        True
+    """
+    return body_id in SPK_DOWNLOADABLE_ASTEROIDS
+
+
+def is_in_jpl_major_body_index(body_id: int) -> bool:
+    """
+    Check if body is in JPL's major body index (cannot download SPK).
+
+    Bodies in the major body index have pre-computed ephemerides in JPL
+    Horizons, so Horizons refuses to generate custom SPK files for them.
+    However, these ephemerides are NOT available in DE440 - only planets
+    1-10, Moon 301, and Earth 399 are in DE440.
+
+    For these bodies, we use Keplerian element calculations.
+
+    Args:
+        body_id: Minor body identifier
+
+    Returns:
+        bool: True if body is in JPL major body index
+
+    Example:
+        >>> from libephemeris.minor_bodies import is_in_jpl_major_body_index
+        >>> from libephemeris.constants import SE_CERES, SE_CHIRON
+        >>> is_in_jpl_major_body_index(SE_CERES)
+        True
+        >>> is_in_jpl_major_body_index(SE_CHIRON)
+        False
+    """
+    return body_id in JPL_MAJOR_BODY_INDEX_ASTEROIDS
 
 
 def get_major_asteroid_info(

@@ -1912,8 +1912,10 @@ def _calc_body(
                 # If auto-download fails, continue to strict precision check
                 pass
 
-        # For major asteroids in strict precision mode, require SPK
-        if get_strict_precision() and minor_bodies.is_major_asteroid(ipl):
+        # For SPK-downloadable asteroids in strict precision mode, require SPK
+        # Note: Bodies in JPL major body index (Ceres, Pallas, Juno, Vesta) cannot
+        # have SPK downloaded, so we use Keplerian fallback for them.
+        if get_strict_precision() and minor_bodies.is_spk_downloadable(ipl):
             info = minor_bodies.get_major_asteroid_info(ipl)
             if info is not None:
                 _, horizons_id, _, body_name = info
