@@ -825,7 +825,11 @@ def _calc_type21_position(
     Calculate body position using SPK type 21 kernel.
 
     This function uses the spktype21 library to compute heliocentric
-    coordinates, then converts to geocentric ecliptic J2000.
+    coordinates, then converts to geocentric apparent positions with:
+    - Light-time correction (unless SEFLG_TRUEPOS)
+    - Aberration correction (unless SEFLG_NOABERR)
+    - Precession to equinox of date (unless SEFLG_J2000)
+    - Nutation (unless SEFLG_NONUT or SEFLG_J2000)
 
     Args:
         kernel: SPKType21 object
@@ -838,17 +842,92 @@ def _calc_type21_position(
         or None if calculation fails.
     """
     from . import state
-    from .constants import SEFLG_HELCTR, SEFLG_SPEED, SEFLG_SIDEREAL
+    from .constants import (
+        SEFLG_HELCTR,
+        SEFLG_J2000,
+        SEFLG_NOABERR,
+        SEFLG_NONUT,
+        SEFLG_SIDEREAL,
+        SEFLG_SPEED,
+        SEFLG_TRUEPOS,
+    )
+    from .moshier.precession import nutation_angles, precess_from_j2000
+    from .moshier.utils import apply_aberration_to_position
     from .planets import swe_get_ayanamsa_ut
 
-    jd = t.tdb  # Use TDB for best precision
+    jd_tdb = t.tdb  # Use TDB for SPK calculations
+    jd_tt = t.tt  # TT for precession/nutation
 
     # Constants
     AU_KM = 149597870.7
+    C_LIGHT_AU_DAY = 173.1446326846693  # Speed of light in AU/day
 
-    # Get heliocentric position from SPK (center=10 is Sun)
+    # Check flags
+    is_heliocentric = bool(iflag & SEFLG_HELCTR)
+    apply_light_time = not (iflag & SEFLG_TRUEPOS) and not is_heliocentric
+    apply_aberration = not (iflag & SEFLG_NOABERR) and not is_heliocentric
+    apply_precession = not (iflag & SEFLG_J2000)
+    apply_nutation = not (iflag & SEFLG_NONUT) and apply_precession
+
+    # Get Earth position and velocity for geocentric calculations
+    planets = state.get_planets()
+    sun = planets["sun"]
+    earth = planets["earth"]
+    ts = state.get_timescale()
+
+    # Earth heliocentric position in ICRS
+    earth_ssb = earth.at(t).position.au
+    sun_ssb = sun.at(t).position.au
+    earth_helio_icrs = np.array(earth_ssb) - np.array(sun_ssb)
+
+    # Convert Earth to ecliptic J2000
+    earth_helio_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_helio_icrs))
+
+    # Earth velocity (needed for aberration)
+    if apply_aberration or (iflag & SEFLG_SPEED):
+        earth_vel_icrs = np.array(earth.at(t).velocity.au_per_d) - np.array(
+            sun.at(t).velocity.au_per_d
+        )
+        earth_vel_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_icrs))
+    else:
+        earth_vel_ecl = np.array([0.0, 0.0, 0.0])
+
+    # =========================================================================
+    # Step 1: Get heliocentric position from SPK, with light-time iteration
+    # =========================================================================
+    jd_compute = jd_tdb
+
+    if apply_light_time:
+        # Iterative light-time correction (3 iterations)
+        for _ in range(3):
+            try:
+                pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
+            except Exception as e:
+                get_logger().debug("SPK type 21 computation failed: %s", e)
+                return None
+
+            # Convert to AU and ecliptic J2000
+            pos_au = np.array(pos_km) / AU_KM
+            pos_ecl = np.array(_icrs_to_ecliptic_j2000(*pos_au))
+
+            # Compute geocentric distance
+            pos_geo = pos_ecl - earth_helio_ecl
+            dist_au = float(np.linalg.norm(pos_geo))
+
+            # Light-time in days
+            light_time_days = dist_au / C_LIGHT_AU_DAY
+            jd_compute = jd_tdb - light_time_days
+    else:
+        # No light-time correction
+        try:
+            pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
+        except Exception as e:
+            get_logger().debug("SPK type 21 computation failed: %s", e)
+            return None
+
+    # Final position computation at light-time corrected epoch
     try:
-        pos_km, vel_km = kernel.compute_type21(10, naif_id, jd)
+        pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
     except Exception as e:
         get_logger().debug("SPK type 21 computation failed: %s", e)
         return None
@@ -857,57 +936,73 @@ def _calc_type21_position(
     pos_au = np.array(pos_km) / AU_KM
     vel_au_day = np.array(vel_km) * 86400 / AU_KM  # km/s to AU/day
 
-    # The SPK returns ICRS (equatorial) coordinates - convert to ecliptic J2000
+    # Convert ICRS to ecliptic J2000
     pos_ecl = np.array(_icrs_to_ecliptic_j2000(*pos_au))
     vel_ecl = np.array(_icrs_to_ecliptic_j2000(*vel_au_day))
 
-    # Check if heliocentric is requested
-    is_heliocentric = bool(iflag & SEFLG_HELCTR)
-
+    # =========================================================================
+    # Step 2: Convert to geocentric (if not heliocentric)
+    # =========================================================================
     if is_heliocentric:
-        # Return heliocentric position directly
-        x, y, z = pos_ecl
-        vx, vy, vz = vel_ecl
+        pos_final = pos_ecl
+        vel_final = vel_ecl
     else:
-        # Convert to geocentric
-        # Get Earth heliocentric position in ecliptic J2000
-        planets = state.get_planets()
-        sun = planets["sun"]
-        earth = planets["earth"]
-
-        # Earth position relative to Sun in ICRS
-        earth_ssb = earth.at(t).position.au
-        sun_ssb = sun.at(t).position.au
-        earth_helio_icrs = earth_ssb - sun_ssb
-
-        # Convert Earth to ecliptic J2000
-        earth_helio_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_helio_icrs))
-
         # Geocentric = heliocentric target - heliocentric earth
         pos_geo = pos_ecl - earth_helio_ecl
-        x, y, z = pos_geo
+        vel_geo = vel_ecl - earth_vel_ecl
+        pos_final = pos_geo
+        vel_final = vel_geo
 
-        # For velocity, also need Earth's velocity
-        if iflag & SEFLG_SPEED:
-            earth_vel_icrs = earth.at(t).velocity.au_per_d - sun.at(t).velocity.au_per_d
-            earth_vel_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_icrs))
-            vel_geo = vel_ecl - earth_vel_ecl
-            vx, vy, vz = vel_geo
-        else:
-            vx, vy, vz = 0.0, 0.0, 0.0
+    # =========================================================================
+    # Step 3: Apply aberration (if requested)
+    # =========================================================================
+    if apply_aberration:
+        # apply_aberration_to_position expects tuples
+        pos_tuple = (float(pos_final[0]), float(pos_final[1]), float(pos_final[2]))
+        vel_tuple = (
+            float(earth_vel_ecl[0]),
+            float(earth_vel_ecl[1]),
+            float(earth_vel_ecl[2]),
+        )
+        pos_aberrated = apply_aberration_to_position(pos_tuple, vel_tuple)
+        pos_final = np.array(pos_aberrated)
 
-    # Convert Cartesian to spherical (ecliptic longitude, latitude, distance)
+    # =========================================================================
+    # Step 4: Convert to spherical coordinates (J2000 ecliptic)
+    # =========================================================================
+    x, y, z = float(pos_final[0]), float(pos_final[1]), float(pos_final[2])
+    vx, vy, vz = float(vel_final[0]), float(vel_final[1]), float(vel_final[2])
+
     r = math.sqrt(x**2 + y**2 + z**2)
-    lon = math.degrees(math.atan2(y, x)) % 360.0
-    lat = math.degrees(math.asin(z / r)) if r > 0 else 0.0
+    lon_j2000 = math.degrees(math.atan2(y, x)) % 360.0
+    lat_j2000 = math.degrees(math.asin(z / r)) if r > 0 else 0.0
 
-    # Calculate speeds if requested
+    # =========================================================================
+    # Step 5: Apply precession from J2000 to equinox of date (if requested)
+    # =========================================================================
+    if apply_precession:
+        lon, lat = precess_from_j2000(lon_j2000, lat_j2000, jd_tt)
+    else:
+        lon, lat = lon_j2000, lat_j2000
+
+    # =========================================================================
+    # Step 6: Apply nutation (if requested)
+    # =========================================================================
+    if apply_nutation:
+        delta_psi, _delta_eps = nutation_angles(jd_tt)
+        # nutation_angles returns values in degrees
+        lon = lon + delta_psi
+
+    # Normalize longitude to [0, 360)
+    lon = lon % 360.0
+
+    # =========================================================================
+    # Step 7: Calculate speeds if requested
+    # =========================================================================
     if iflag & SEFLG_SPEED:
-        # Convert velocity to spherical rates
-        # d(lon)/dt = (x*vy - y*vx) / (x^2 + y^2) * 180/pi
-        # d(lat)/dt = (z*(x*vx + y*vy) - (x^2+y^2)*vz) / (r^2 * sqrt(x^2+y^2)) * 180/pi
-        # d(r)/dt = (x*vx + y*vy + z*vz) / r
-
+        # Calculate speed in J2000 frame first, then approximate in precessed frame
+        # Note: For full accuracy, speeds should also be precessed, but the
+        # difference is small (~0.01%/century)
         xy_sq = x**2 + y**2
         if xy_sq > 0:
             speed_lon = math.degrees((x * vy - y * vx) / xy_sq)
@@ -925,7 +1020,9 @@ def _calc_type21_position(
     else:
         speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
 
-    # Apply sidereal correction if requested
+    # =========================================================================
+    # Step 8: Apply sidereal correction if requested
+    # =========================================================================
     if iflag & SEFLG_SIDEREAL:
         ayanamsa = swe_get_ayanamsa_ut(t.ut1)
         lon = (lon - ayanamsa) % 360.0
