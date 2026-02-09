@@ -52,6 +52,9 @@ _LAPSE_RATE: Optional[float] = None  # Atmospheric lapse rate for refraction
 
 # SPK kernel state for minor body calculations
 _SPK_KERNELS: dict[str, SpiceKernel] = {}  # Cached SPK kernels {filepath: kernel}
+_SPK_TYPE21_KERNELS: dict[
+    str, object
+] = {}  # Cached SPK type 21 kernels {filepath: SPKType21}
 _SPK_BODY_MAP: dict[
     int, tuple[str, int]
 ] = {}  # Body mappings {ipl: (spk_file, naif_id)}
@@ -1168,7 +1171,11 @@ def get_strict_precision() -> bool:
     if env_value in ("0", "false", "no", "off", "disabled"):
         return False
 
-    # Default to True (strict mode enabled)
+    # Default to True (strict mode enabled) because:
+    # - SPK type 21 is now fully supported via spktype21 library
+    # - Auto-download works with JPL Horizons API
+    # - Keplerian fallback has poor accuracy (1-10 degrees for asteroids)
+    # Users can explicitly disable strict mode if needed
     return True
 
 

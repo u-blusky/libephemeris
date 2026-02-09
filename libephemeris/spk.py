@@ -5,10 +5,18 @@ This module provides functionality to:
 - Download SPK (SPICE kernel) files from JPL Horizons API
 - Register mappings between libephemeris body IDs and SPK targets
 - Calculate positions using SPK data instead of Keplerian approximations
+- Support for both SPK type 2/3 (Skyfield) and type 21 (spktype21)
 
 Using SPK kernels provides significantly higher precision for asteroids and TNOs:
 - Keplerian model: ~10-30 arcseconds (asteroids), ~1-3 arcminutes (TNOs)
 - SPK kernel: ~arcseconds to sub-arcsecond (within kernel coverage)
+
+SPK Type Support:
+- Type 2, 3: Chebyshev polynomials (supported by Skyfield)
+- Type 21: Extended Modified Difference Arrays (supported by spktype21)
+
+JPL Horizons returns type 21 for most asteroids and comets. This module
+automatically detects the SPK type and uses the appropriate library.
 
 Usage:
     >>> import libephemeris as eph
@@ -25,17 +33,22 @@ Usage:
 References:
     - JPL Horizons API: https://ssd-api.jpl.nasa.gov/doc/horizons.html
     - NAIF SPICE: https://naif.jpl.nasa.gov/naif/
+    - spktype21: https://pypi.org/project/spktype21/
 """
 
 import json
 import math
 import os
 import re
+import ssl
 import sys
 import time
 import urllib.error
 import urllib.request
 from typing import Optional, Union
+
+import certifi
+import numpy as np
 
 from skyfield.framelib import ecliptic_frame
 
@@ -44,8 +57,28 @@ from .exceptions import SPKNotFoundError
 from .logging_config import format_file_size, get_logger
 from .state import get_library_path, get_loader, get_timescale
 
+# Lazy import for spktype21 (optional dependency for type 21 support)
+_spktype21_module = None
+
+
+def _get_spktype21():
+    """Lazy load spktype21 module."""
+    global _spktype21_module
+    if _spktype21_module is None:
+        try:
+            from spktype21 import SPKType21
+
+            _spktype21_module = SPKType21
+        except ImportError:
+            _spktype21_module = False  # Mark as unavailable
+    return _spktype21_module if _spktype21_module is not False else None
+
+
 # Threshold for showing progress bar (1 MB)
 _PROGRESS_THRESHOLD_BYTES = 1 * 1024 * 1024
+
+# Obliquity of J2000 for ICRS to ecliptic rotation
+_OBLIQUITY_J2000_RAD = math.radians(23.4392911)
 
 
 # =============================================================================
@@ -53,8 +86,12 @@ _PROGRESS_THRESHOLD_BYTES = 1 * 1024 * 1024
 # =============================================================================
 # Actual state is in state.py to maintain single source of truth
 
-# NAIF ID convention for numbered asteroids: naif_id = asteroid_number + 2000000
-NAIF_ASTEROID_OFFSET = 2000000
+# NAIF ID convention for numbered asteroids:
+# JPL Horizons uses: naif_id = asteroid_number + 20000000
+# Some older references use: naif_id = asteroid_number + 2000000
+# We support both by detecting the actual NAIF ID from SPK files
+NAIF_ASTEROID_OFFSET = 2000000  # Legacy/default offset
+NAIF_ASTEROID_OFFSET_HORIZONS = 20000000  # JPL Horizons SPK offset
 
 
 # =============================================================================
@@ -110,6 +147,57 @@ def _deduce_naif_id(body: str, asteroid_number: Optional[int] = None) -> Optiona
     if asteroid_number is not None:
         return asteroid_number + NAIF_ASTEROID_OFFSET
 
+    return None
+
+
+def _get_spk_targets(filepath: str) -> list[int]:
+    """
+    Get the list of target NAIF IDs in an SPK file.
+
+    Args:
+        filepath: Path to the SPK file
+
+    Returns:
+        List of target NAIF IDs in the file.
+    """
+    try:
+        from jplephem.spk import SPK
+
+        spk = SPK.open(filepath)
+        targets = [int(seg.target) for seg in spk.segments]
+        spk.close()
+        return targets
+    except Exception:
+        return []
+
+
+def _find_naif_id_for_asteroid(filepath: str, asteroid_number: int) -> Optional[int]:
+    """
+    Find the NAIF ID for an asteroid number in an SPK file.
+
+    JPL Horizons uses 20000000 + asteroid_number, while some older conventions
+    use 2000000 + asteroid_number. This function checks the SPK file to find
+    which convention is used.
+
+    Args:
+        filepath: Path to the SPK file
+        asteroid_number: Asteroid catalog number (e.g., 2060 for Chiron)
+
+    Returns:
+        The actual NAIF ID found in the file, or None if not found.
+    """
+    targets = _get_spk_targets(filepath)
+
+    # Try both conventions
+    horizons_naif = asteroid_number + NAIF_ASTEROID_OFFSET_HORIZONS  # 20000000 + num
+    legacy_naif = asteroid_number + NAIF_ASTEROID_OFFSET  # 2000000 + num
+
+    if horizons_naif in targets:
+        return horizons_naif
+    if legacy_naif in targets:
+        return legacy_naif
+
+    # Return None if neither found
     return None
 
 
@@ -317,11 +405,16 @@ def download_spk(
 
     for attempt in range(max_retries + 1):
         try:
+            # Create SSL context with certifi certificates
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+
             # First request: get SPK file URL from Horizons
             req = urllib.request.Request(url)
             req.add_header("User-Agent", "libephemeris/0.1")
 
-            with urllib.request.urlopen(req, timeout=timeout) as response:
+            with urllib.request.urlopen(
+                req, timeout=timeout, context=ssl_context
+            ) as response:
                 data = json.loads(response.read().decode("utf-8"))
 
             # Check for errors in response
@@ -337,46 +430,17 @@ def download_spk(
                     f"Unexpected Horizons response format. Keys: {list(data.keys())}"
                 )
 
-            spk_url = data["spk"]
+            spk_data_b64 = data["spk"]
 
-            # Download the actual SPK file
-            spk_req = urllib.request.Request(spk_url)
-            spk_req.add_header("User-Agent", "libephemeris/0.1")
+            # The SPK data is returned as base64-encoded binary data
+            import base64
 
-            with urllib.request.urlopen(spk_req, timeout=timeout) as spk_response:
-                content_length = spk_response.headers.get("Content-Length")
-                total_size = int(content_length) if content_length else 0
-
-                # Show progress bar for large files (>1MB) when stderr is a tty
-                show_progress = (
-                    total_size > _PROGRESS_THRESHOLD_BYTES and sys.stderr.isatty()
-                )
-
-                if show_progress:
-                    progress = SimpleProgressBar(
-                        total=total_size,
-                        description="[libephemeris] Downloading",
-                        file=sys.stderr,
-                    )
-                else:
-                    progress = None
-
-                # Read in chunks for progress updates
-                chunks = []
-                chunk_size = 64 * 1024  # 64KB chunks
-
-                while True:
-                    chunk = spk_response.read(chunk_size)
-                    if not chunk:
-                        break
-                    chunks.append(chunk)
-                    if progress:
-                        progress.update(len(chunk))
-
-                if progress:
-                    progress.close()
-
-                spk_data = b"".join(chunks)
+            try:
+                spk_data = base64.b64decode(spk_data_b64)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to decode SPK data from Horizons response: {e}"
+                ) from e
 
             # Write to file
             with open(filepath, "wb") as f:
@@ -502,29 +566,44 @@ def register_spk_body(
             body_id=body_id,
         )
 
-    # Load kernel if not already cached
-    state._load_spk_kernel(spk_file)
+    # Detect SPK type
+    spk_type = _detect_spk_type(spk_file)
 
-    # Validate that naif_id exists in kernel
-    kernel = state._SPK_KERNELS.get(spk_file)
-    if kernel is not None:
-        # Check if target exists in kernel
-        try:
-            _ = kernel[naif_id]
-        except KeyError:
-            # Try with string name
+    if spk_type == 21:
+        # Type 21: Use spktype21 library
+        kernel = _load_type21_kernel(spk_file)
+        if kernel is None:
+            raise ValueError(
+                f"Failed to load type 21 SPK file {spk_file}. "
+                "Install spktype21: pip install spktype21"
+            )
+        # Note: spktype21 doesn't provide a way to list segments easily,
+        # so we skip validation for type 21 kernels. The computation will
+        # fail at runtime if the NAIF ID is not in the kernel.
+    else:
+        # Type 2/3: Use Skyfield
+        state._load_spk_kernel(spk_file)
+
+        # Validate that naif_id exists in kernel
+        kernel = state._SPK_KERNELS.get(spk_file)
+        if kernel is not None:
+            # Check if target exists in kernel
             try:
-                _ = kernel[str(naif_id)]
+                _ = kernel[naif_id]
             except KeyError:
-                available = []
-                if hasattr(kernel, "names"):
-                    available = list(kernel.names())[:10]
-                raise ValueError(
-                    f"NAIF ID {naif_id} not found in SPK kernel {spk_file}. "
-                    f"Available targets (first 10): {available}"
-                )
+                # Try with string name
+                try:
+                    _ = kernel[str(naif_id)]
+                except KeyError:
+                    available = []
+                    if hasattr(kernel, "names"):
+                        available = list(kernel.names())[:10]
+                    raise ValueError(
+                        f"NAIF ID {naif_id} not found in SPK kernel {spk_file}. "
+                        f"Available targets (first 10): {available}"
+                    )
 
-    # Register mapping
+    # Register mapping (include SPK type for later use)
     state._SPK_BODY_MAP[ipl] = (spk_file, naif_id)
 
 
@@ -574,6 +653,8 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
     """
     Get the time coverage of an SPK kernel.
 
+    Supports both type 2/3 (Skyfield) and type 21 (spktype21) kernels.
+
     Args:
         spk_file: Path to SPK file
 
@@ -582,17 +663,47 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
     """
     from . import state
 
-    # Load if not cached
+    # Resolve path
+    if not os.path.isabs(spk_file):
+        full_path = os.path.join(get_library_path(), spk_file)
+        if os.path.exists(full_path):
+            spk_file = full_path
+
+    if not os.path.exists(spk_file):
+        return None
+
+    # Detect SPK type
+    spk_type = _detect_spk_type(spk_file)
+
+    if spk_type == 21:
+        # Use jplephem to get coverage for type 21
+        try:
+            from jplephem.spk import SPK
+
+            spk = SPK.open(spk_file)
+            start_jd = None
+            end_jd = None
+            for segment in spk.segments:
+                if hasattr(segment, "start_jd") and hasattr(segment, "end_jd"):
+                    seg_start = float(segment.start_jd)
+                    seg_end = float(segment.end_jd)
+                    if start_jd is None or seg_start < start_jd:
+                        start_jd = seg_start
+                    if end_jd is None or seg_end > end_jd:
+                        end_jd = seg_end
+            spk.close()
+            if start_jd is not None and end_jd is not None:
+                return (start_jd, end_jd)
+        except Exception:
+            pass
+        return None
+
+    # Type 2/3: Use Skyfield
     if spk_file not in state._SPK_KERNELS:
-        if not os.path.isabs(spk_file):
-            full_path = os.path.join(get_library_path(), spk_file)
-            if os.path.exists(full_path):
-                spk_file = full_path
-
-        if not os.path.exists(spk_file):
+        try:
+            state._load_spk_kernel(spk_file)
+        except ValueError:
             return None
-
-        state._load_spk_kernel(spk_file)
 
     kernel = state._SPK_KERNELS.get(spk_file)
     if kernel is None:
@@ -611,6 +722,215 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
         pass
 
     return None
+
+
+# =============================================================================
+# SPK TYPE DETECTION AND TYPE 21 SUPPORT
+# =============================================================================
+
+
+def _detect_spk_type(filepath: str) -> Optional[int]:
+    """
+    Detect the data type of an SPK file.
+
+    SPK files can contain multiple segment types. This function checks
+    for the presence of type 21 segments (Extended Modified Difference Arrays),
+    which are commonly returned by JPL Horizons for asteroids and comets.
+
+    Args:
+        filepath: Path to the SPK file
+
+    Returns:
+        21 if file contains type 21 segments, 2 for type 2/3, None if error.
+    """
+    try:
+        from jplephem.spk import SPK
+
+        spk = SPK.open(filepath)
+
+        for segment in spk.segments:
+            if hasattr(segment, "data_type") and segment.data_type == 21:
+                spk.close()
+                return 21
+
+        spk.close()
+        return 2  # Assume type 2/3 for Skyfield compatibility
+    except Exception:
+        return None
+
+
+def _load_type21_kernel(filepath: str):
+    """
+    Load an SPK type 21 kernel using spktype21 library.
+
+    Args:
+        filepath: Path to the SPK file
+
+    Returns:
+        SPKType21 object or None if loading fails
+    """
+    from . import state
+
+    # Check cache first
+    if filepath in state._SPK_TYPE21_KERNELS:
+        return state._SPK_TYPE21_KERNELS[filepath]
+
+    SPKType21 = _get_spktype21()
+    if SPKType21 is None:
+        get_logger().warning(
+            "spktype21 module not available. Install with: pip install spktype21"
+        )
+        return None
+
+    try:
+        kernel = SPKType21.open(filepath)
+        state._SPK_TYPE21_KERNELS[filepath] = kernel
+        return kernel
+    except Exception as e:
+        get_logger().warning("Failed to load type 21 SPK %s: %s", filepath, e)
+        return None
+
+
+def _icrs_to_ecliptic_j2000(x: float, y: float, z: float) -> tuple:
+    """
+    Rotate coordinates from ICRS (equatorial J2000) to ecliptic J2000.
+
+    SPK files from JPL Horizons contain coordinates in ICRS (equatorial).
+    This function converts to ecliptic J2000 for consistency with
+    libephemeris calculations.
+
+    Args:
+        x, y, z: Cartesian coordinates in ICRS
+
+    Returns:
+        Tuple of (x_ecl, y_ecl, z_ecl) in ecliptic J2000
+    """
+    ce = math.cos(_OBLIQUITY_J2000_RAD)
+    se = math.sin(_OBLIQUITY_J2000_RAD)
+
+    x_ecl = x
+    y_ecl = y * ce + z * se
+    z_ecl = -y * se + z * ce
+
+    return (x_ecl, y_ecl, z_ecl)
+
+
+def _calc_type21_position(
+    kernel,
+    naif_id: int,
+    t,
+    iflag: int,
+) -> Optional[tuple]:
+    """
+    Calculate body position using SPK type 21 kernel.
+
+    This function uses the spktype21 library to compute heliocentric
+    coordinates, then converts to geocentric ecliptic J2000.
+
+    Args:
+        kernel: SPKType21 object
+        naif_id: NAIF ID of the target body (e.g., 20002060 for Chiron)
+        t: Skyfield Time object
+        iflag: Calculation flags
+
+    Returns:
+        Position tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+        or None if calculation fails.
+    """
+    from . import state
+    from .constants import SEFLG_HELCTR, SEFLG_SPEED, SEFLG_SIDEREAL
+    from .planets import swe_get_ayanamsa_ut
+
+    jd = t.tdb  # Use TDB for best precision
+
+    # Constants
+    AU_KM = 149597870.7
+
+    # Get heliocentric position from SPK (center=10 is Sun)
+    try:
+        pos_km, vel_km = kernel.compute_type21(10, naif_id, jd)
+    except Exception as e:
+        get_logger().debug("SPK type 21 computation failed: %s", e)
+        return None
+
+    # Convert to AU
+    pos_au = np.array(pos_km) / AU_KM
+    vel_au_day = np.array(vel_km) * 86400 / AU_KM  # km/s to AU/day
+
+    # The SPK returns ICRS (equatorial) coordinates - convert to ecliptic J2000
+    pos_ecl = np.array(_icrs_to_ecliptic_j2000(*pos_au))
+    vel_ecl = np.array(_icrs_to_ecliptic_j2000(*vel_au_day))
+
+    # Check if heliocentric is requested
+    is_heliocentric = bool(iflag & SEFLG_HELCTR)
+
+    if is_heliocentric:
+        # Return heliocentric position directly
+        x, y, z = pos_ecl
+        vx, vy, vz = vel_ecl
+    else:
+        # Convert to geocentric
+        # Get Earth heliocentric position in ecliptic J2000
+        planets = state.get_planets()
+        sun = planets["sun"]
+        earth = planets["earth"]
+
+        # Earth position relative to Sun in ICRS
+        earth_ssb = earth.at(t).position.au
+        sun_ssb = sun.at(t).position.au
+        earth_helio_icrs = earth_ssb - sun_ssb
+
+        # Convert Earth to ecliptic J2000
+        earth_helio_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_helio_icrs))
+
+        # Geocentric = heliocentric target - heliocentric earth
+        pos_geo = pos_ecl - earth_helio_ecl
+        x, y, z = pos_geo
+
+        # For velocity, also need Earth's velocity
+        if iflag & SEFLG_SPEED:
+            earth_vel_icrs = earth.at(t).velocity.au_per_d - sun.at(t).velocity.au_per_d
+            earth_vel_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_icrs))
+            vel_geo = vel_ecl - earth_vel_ecl
+            vx, vy, vz = vel_geo
+        else:
+            vx, vy, vz = 0.0, 0.0, 0.0
+
+    # Convert Cartesian to spherical (ecliptic longitude, latitude, distance)
+    r = math.sqrt(x**2 + y**2 + z**2)
+    lon = math.degrees(math.atan2(y, x)) % 360.0
+    lat = math.degrees(math.asin(z / r)) if r > 0 else 0.0
+
+    # Calculate speeds if requested
+    if iflag & SEFLG_SPEED:
+        # Convert velocity to spherical rates
+        # d(lon)/dt = (x*vy - y*vx) / (x^2 + y^2) * 180/pi
+        # d(lat)/dt = (z*(x*vx + y*vy) - (x^2+y^2)*vz) / (r^2 * sqrt(x^2+y^2)) * 180/pi
+        # d(r)/dt = (x*vx + y*vy + z*vz) / r
+
+        xy_sq = x**2 + y**2
+        if xy_sq > 0:
+            speed_lon = math.degrees((x * vy - y * vx) / xy_sq)
+            xy = math.sqrt(xy_sq)
+            speed_lat = (
+                math.degrees((z * (x * vx + y * vy) / xy - xy * vz) / (r * r))
+                if r > 0
+                else 0.0
+            )
+        else:
+            speed_lon = 0.0
+            speed_lat = 0.0
+
+        speed_dist = (x * vx + y * vy + z * vz) / r if r > 0 else 0.0
+    else:
+        speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
+
+    # Apply sidereal correction if requested
+    if iflag & SEFLG_SIDEREAL:
+        ayanamsa = swe_get_ayanamsa_ut(t.ut1)
+        lon = (lon - ayanamsa) % 360.0
+
+    return (lon, lat, r, speed_lon, speed_lat, speed_dist)
 
 
 # =============================================================================
@@ -639,8 +959,8 @@ def download_and_register_spk(
         ipl: libephemeris body ID (e.g., SE_CHIRON)
         start: Start date (YYYY-MM-DD)
         end: End date (YYYY-MM-DD)
-        naif_id: NAIF ID in the kernel. If None, deduced from body number
-            using convention: naif_id = asteroid_number + 2000000
+        naif_id: NAIF ID in the kernel. If None, auto-detected from SPK file.
+            JPL Horizons uses: asteroid_number + 20000000
         path: Directory to save file (default: get_library_path())
         center: Reference center (default: "500@0" = SSB)
         overwrite: Overwrite existing file if True
@@ -674,12 +994,21 @@ def download_and_register_spk(
 
     # Deduce NAIF ID if not provided
     if naif_id is None:
-        naif_id = _deduce_naif_id(body)
+        # Try to get asteroid number
+        asteroid_number = _extract_asteroid_number(body)
+        if asteroid_number is not None:
+            # Try to find the NAIF ID in the SPK file (handles both conventions)
+            naif_id = _find_naif_id_for_asteroid(spk_path, asteroid_number)
+
+        if naif_id is None:
+            # Fall back to legacy convention
+            naif_id = _deduce_naif_id(body)
+
         if naif_id is None:
             raise ValueError(
                 f"Cannot deduce NAIF ID for '{body}'. "
                 f"Please provide naif_id explicitly. "
-                f"For numbered asteroids: naif_id = asteroid_number + 2000000"
+                f"For numbered asteroids: naif_id = asteroid_number + 20000000"
             )
 
     # Register
@@ -702,6 +1031,9 @@ def calc_spk_body_position(
     Calculate body position using SPK kernel.
 
     Internal function called by planets._calc_body() when SPK is registered.
+    Automatically detects SPK type and uses appropriate handler:
+    - Type 21: Uses spktype21 library (JPL Horizons asteroids/comets)
+    - Type 2/3: Uses Skyfield (Chebyshev polynomials)
 
     Args:
         t: Skyfield Time object
@@ -725,7 +1057,20 @@ def calc_spk_body_position(
 
     spk_file, naif_id = state._SPK_BODY_MAP[ipl]
 
-    # Get kernel
+    # Detect SPK type
+    spk_type = _detect_spk_type(spk_file)
+
+    # Handle type 21 (JPL Horizons asteroids/comets)
+    if spk_type == 21:
+        kernel = _load_type21_kernel(spk_file)
+        if kernel is not None:
+            result = _calc_type21_position(kernel, naif_id, t, iflag)
+            if result is not None:
+                return result
+        # Fall through to return None if type 21 calculation fails
+        return None
+
+    # Type 2/3: Use Skyfield
     kernel = state._SPK_KERNELS.get(spk_file)
     if kernel is None:
         return None

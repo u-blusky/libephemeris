@@ -44,6 +44,9 @@ classifiers = [
 dependencies = [
     "skyfield>=1.54",  # 1.54: deflectors= arg, 30% faster risings/settings, NumPy array Time subtraction
     "skyfield-data>=7.0.0",
+    "astroquery>=0.4.7",  # Required for automatic SPK kernel downloads from JPL Horizons
+    "certifi",  # SSL certificates for HTTPS connections to JPL Horizons
+    "spktype21>=0.1.0",  # Support for SPK type 21 files from JPL Horizons (asteroids, comets)
 ]
 
 [project.optional-dependencies]
@@ -51,13 +54,8 @@ dependencies = [
 precision = [
     "pyerfa>=2.0.0",
 ]
-# Automatic SPK kernel downloads from JPL Horizons
-spk = [
-    "astroquery>=0.4.0",
-]
 # Star catalog building (scripts/build_star_catalog.py)
 stars = [
-    "astroquery>=0.4.0",
     "astropy>=5.0.0",
 ]
 # N-body integration for asteroid orbit propagation
@@ -68,7 +66,6 @@ nbody = [
 # All optional features
 all = [
     "pyerfa>=2.0.0",
-    "astroquery>=0.4.0",
     "rebound>=4.0.0",
     "assist>=1.1.0",
 ]

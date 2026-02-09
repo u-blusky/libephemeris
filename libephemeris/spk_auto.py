@@ -272,7 +272,10 @@ def _download_spk_astroquery(
     location: str = "@0",
 ) -> str:
     """
-    Download SPK file using astroquery.jplhorizons.
+    Download SPK file using the spk module's download function.
+
+    This function wraps the main download_spk() function from spk.py,
+    which uses the JPL Horizons API directly to download SPK data.
 
     Args:
         body_id: JPL Horizons target identifier (e.g., "2060", "Chiron")
@@ -285,32 +288,37 @@ def _download_spk_astroquery(
         str: Path to the downloaded SPK file
 
     Raises:
-        ImportError: If astroquery is not installed
         ValueError: If body not found or download fails
     """
+    from . import spk
+
     logger = get_logger()
 
-    try:
-        from astroquery.jplhorizons import Horizons
-    except ImportError as e:
-        raise ImportError(
-            "astroquery is required for automatic SPK downloads. "
-            "Install it with: pip install astroquery"
-        ) from e
-
     logger.info(
-        "Downloading SPK for %s (%s to %s) via astroquery...", body_id, start, end
+        "Downloading SPK for %s (%s to %s) via JPL Horizons API...", body_id, start, end
     )
 
-    # Create Horizons query object
-    obj = Horizons(id=body_id, location=location, epochs={"start": start, "stop": end})
+    # Get the output directory from the path
+    output_dir = os.path.dirname(output_path)
+    if not output_dir:
+        output_dir = "."
+
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
 
     try:
-        # Download SPK file
-        # Note: This uses Horizons' SPK file generation capability
-        obj.download_spk(output_path)
-        logger.info("SPK download complete: %s", os.path.basename(output_path))
-        return output_path
+        # Use the main download_spk function which handles the API correctly
+        result_path = spk.download_spk(
+            body=body_id,
+            start=start,
+            end=end,
+            path=output_dir,
+            center="500@0",
+            overwrite=True,
+        )
+
+        logger.info("SPK download complete: %s", os.path.basename(result_path))
+        return result_path
     except Exception as e:
         raise ValueError(
             f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"

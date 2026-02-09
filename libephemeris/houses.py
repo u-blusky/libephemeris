@@ -1559,7 +1559,16 @@ def swe_houses_ex(
             armc = ascmc[2]
             # Recalculate Sunshine cusps with sidereal Asc and MC
             sunshine_cusps = _houses_sunshine(armc, lat, eps, sid_asc, sid_mc, sun_dec)
-            cusps = tuple(sunshine_cusps[1:13])
+            # Angular cusps (1, 4, 7, 10) are already correct with sid_asc/sid_mc
+            # Intermediate cusps (2, 3, 5, 6, 8, 9, 11, 12) are calculated
+            # geometrically and need to be converted to sidereal
+            intermediate_houses = {2, 3, 5, 6, 8, 9, 11, 12}  # 1-indexed
+            cusps = tuple(
+                (sunshine_cusps[i] - ayanamsa) % 360.0
+                if i in intermediate_houses
+                else sunshine_cusps[i]
+                for i in range(1, 13)
+            )
         else:
             # For other systems, just subtract ayanamsa from tropical cusps
             cusps = tuple([(c - ayanamsa) % 360.0 for c in cusps])
