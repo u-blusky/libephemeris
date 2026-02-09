@@ -539,7 +539,7 @@ def main():
 
         # Get list of bodies in the output file
         bodies = spice.spkobj(str(output_path))
-        print(f"\n  Bodies in output file:")
+        print("\n  Bodies in output file:")
         for body_id in bodies:
             print(f"    {body_id}")
 

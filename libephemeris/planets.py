@@ -1111,7 +1111,24 @@ def swe_calc_ut(
         - distance: Distance in AU
         - speed_*: Daily motion in respective coordinates
 
-    Flags:
+    Ephemeris Selection Flags:
+        The ephemeris mode is selected explicitly via flags. These modes are
+        mutually exclusive; only one should be set at a time.
+
+        - SEFLG_SWIEPH / SEFLG_JPLEPH (default): Uses NASA JPL DE440 ephemeris
+          via Skyfield. Valid range: 1550-2650 CE. Highest precision (sub-arcsecond).
+          Supports all bodies including asteroids via SPK kernels.
+
+        - SEFLG_MOSEPH: Uses Moshier semi-analytical ephemeris (VSOP87 for
+          planets, ELP2000-82B for Moon). Valid range: -3000 to +3000 CE.
+          Precision: ~1 arcsecond for planets, ~3 arcseconds for Moon.
+          Limitations: Asteroids (SE_AST_OFFSET+) are NOT supported in Moshier
+          mode and will raise UnknownBodyError.
+
+        Note: Moshier mode is an explicit selection, NOT a fallback. If DE440
+        is unavailable or out of range, EphemerisRangeError is raised.
+
+    Other Flags:
         - SEFLG_SPEED: Include velocity (default, always calculated)
         - SEFLG_HELCTR: Heliocentric instead of geocentric
         - SEFLG_TOPOCTR: Topocentric (requires swe_set_topo)
@@ -1120,6 +1137,10 @@ def swe_calc_ut(
     Example:
         >>> pos, retflag = swe_calc_ut(2451545.0, SE_MARS, SEFLG_SPEED)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
+
+        # Using Moshier for ancient dates outside DE440 range:
+        >>> jd_ancient = 1000000.0  # ~1700 BCE
+        >>> pos, retflag = swe_calc_ut(jd_ancient, SE_MARS, SEFLG_MOSEPH)
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
@@ -1896,6 +1917,23 @@ def _calc_body(
             info = minor_bodies.get_major_asteroid_info(ipl)
             if info is not None:
                 _, horizons_id, _, body_name = info
+
+                # Try auto-download using ensure_major_asteroid_spk if enabled
+                if get_auto_spk_download():
+                    from .logging_config import get_logger
+
+                    logger = get_logger()
+                    logger.info("Auto-downloading SPK for %s...", body_name)
+                    try:
+                        if minor_bodies.ensure_major_asteroid_spk(ipl, t.tt):
+                            # SPK download succeeded, try calculation again
+                            spk_result = spk.calc_spk_body_position(t, ipl, iflag)
+                            if spk_result is not None:
+                                return _to_native_floats(spk_result), iflag
+                    except Exception:
+                        # If auto-download fails, continue to raise SPKRequiredError
+                        pass
+
                 raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
 
         # Fallback to Keplerian approximation

@@ -405,3 +405,52 @@ class TestMoshierSupportedBodies:
             pos, flag = eph.swe_calc_ut(jd, body_id, SEFLG_MOSEPH)
             assert len(pos) == 6, f"Body {body_id} should return 6-tuple"
             assert 0 <= pos[0] < 360, f"Body {body_id} should have valid longitude"
+
+
+class TestMoshierPublicAPIExports:
+    """Test that SEFLG_MOSEPH is properly exported in the public API."""
+
+    def test_seflg_moseph_in_module(self):
+        """SEFLG_MOSEPH should be accessible from libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "SEFLG_MOSEPH")
+        assert libephemeris.SEFLG_MOSEPH == 4
+
+    def test_flg_moseph_in_module(self):
+        """FLG_MOSEPH alias should be accessible from libephemeris module."""
+        import libephemeris
+
+        assert hasattr(libephemeris, "FLG_MOSEPH")
+        assert libephemeris.FLG_MOSEPH == 4
+
+    def test_ephemeris_flags_in_all(self):
+        """Ephemeris selection flags should be documented in __all__."""
+        import libephemeris
+
+        assert "SEFLG_MOSEPH" in libephemeris.__all__
+        assert "FLG_MOSEPH" in libephemeris.__all__
+        assert "SEFLG_JPLEPH" in libephemeris.__all__
+        assert "SEFLG_SWIEPH" in libephemeris.__all__
+
+    def test_swe_calc_ut_docstring_documents_ephemeris_modes(self):
+        """swe_calc_ut docstring should document ephemeris mode flags."""
+        docstring = eph.swe_calc_ut.__doc__
+        assert docstring is not None
+
+        # Check that Moshier is documented
+        assert "SEFLG_MOSEPH" in docstring
+        assert "Moshier" in docstring
+        assert "VSOP87" in docstring
+        assert "ELP2000" in docstring
+
+        # Check range documentation
+        assert "-3000" in docstring
+        assert "+3000" in docstring
+
+        # Check that JPL mode is documented
+        assert "SEFLG_JPLEPH" in docstring or "SEFLG_SWIEPH" in docstring
+        assert "DE440" in docstring
+
+        # Check limitations are documented
+        assert "asteroid" in docstring.lower() or "Asteroid" in docstring
