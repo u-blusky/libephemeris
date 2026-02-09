@@ -3,6 +3,8 @@
 **Bug ID:** `LIBEPH-SPK21-PRECESSION`  
 **Severity:** High  
 **Affected Version:** 0.9.0  
+**Status:** ✅ **FIXED** in commit `b7b13ac`  
+**Fixed Version:** 0.9.1  
 **Date:** 2026-02-09  
 **Author:** AI Assistant  
 
