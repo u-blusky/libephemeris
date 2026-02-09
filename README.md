@@ -31,7 +31,7 @@ LibEphemeris is born from the need for a **truly open, maintainable, and scienti
 -   **Milestone 1 (Current)**: **Pure Python Library**
 
     -   A 1:1 drop-in replacement for `pyswisseph`.
-    -   Powered by [Skyfield](https://rhodesmill.org/skyfield/) and NASA JPL DE421+ ephemerides.
+    -   Powered by [Skyfield](https://rhodesmill.org/skyfield/) and NASA JPL DE440 ephemerides.
     -   Focus on correctness, readability, and higher scientific precision than Swiss Ephemeris implementations.
 
 -   **Milestone 2 (Next Step)**: **Rust Core Rewrite**
@@ -335,7 +335,7 @@ set_ephemeris_file("de441.bsp")  # very long time span, larger file
 
 Supported JPL kernels include, for example:
 
--   `de421.bsp`: 1900–2050 (legacy, ~16 MB)
+-   `de440.bsp`: 1550–2650 (default, ~128 MB) - recommended for most uses
 -   `de422.bsp`: −3000–3000 (~623 MB)
 -   `de430.bsp`: 1550–2650 (~128 MB)
 -   `de431.bsp`: −13200–17191 (~3.4 GB)

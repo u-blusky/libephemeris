@@ -131,11 +131,11 @@ Type 2 SPK structure per segment:
 
 ### Chaining with DE Ephemerides
 
-Skyfield automatically chains SPK segments. When you load both DE421 and the
+Skyfield automatically chains SPK segments. When you load both DE440 and the
 planet centers SPK, Skyfield computes:
 
 ```
-Earth → SSB → Jupiter Barycenter (from DE421)
+Earth → SSB → Jupiter Barycenter (from DE440)
                     ↓
              Jupiter Center (from planet_centers.bsp)
 ```
@@ -149,7 +149,7 @@ All segments use the J2000 reference frame (ICRF), consistent with DE ephemeride
 ## Usage in libephemeris
 
 After generating the SPK file, libephemeris will automatically load it alongside
-the main ephemeris (DE421/DE440). The planet center positions will be used
+the main ephemeris (DE440). The planet center positions will be used
 instead of barycenter + COB correction.
 
 ### Automatic Loading
@@ -168,7 +168,7 @@ pos, _ = eph.swe_calc_ut(jd, eph.SE_JUPITER, 0)
 from skyfield.api import load
 
 # Load both ephemerides
-planets = load('de421.bsp')
+planets = load('de440.bsp')
 centers = load('planet_centers.bsp')
 
 # Get Jupiter center via chaining

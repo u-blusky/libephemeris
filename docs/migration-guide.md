@@ -193,7 +193,7 @@ libephemeris uses JPL DE ephemerides with specific date ranges:
 
 | Ephemeris | Date Range | Size |
 |-----------|-----------|------|
-| DE421 (default) | 1900-2050 | ~16 MB |
+| DE440 (default) | 1550-2650 | ~128 MB |
 | DE422 | -3000 to 3000 | ~623 MB |
 | DE430 | 1550-2650 | ~128 MB |
 | DE431 | -13200 to 17191 | ~3.4 GB |
@@ -339,7 +339,7 @@ ctx3.set_sid_mode(27) # True Citra
 - [ ] Replace `import swisseph as swe` with `import libephemeris as swe`
 - [ ] Update constant names if using unprefixed versions (`SUN` -> `SE_SUN`)
 - [ ] Check house cusp array indexing (0-based in libephemeris)
-- [ ] Verify date range is within ephemeris coverage (1900-2050 for DE421)
+- [ ] Verify date range is within ephemeris coverage (1550-2650 for DE440)
 - [ ] For multi-threaded apps: migrate to `EphemerisContext` API
 - [ ] Update tests for relaxed tolerances on star-based ayanamshas (< 0.06 degrees)
 - [ ] Handle eclipse functions that return 0 for Saros/Inex numbers

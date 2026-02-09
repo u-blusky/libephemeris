@@ -220,7 +220,6 @@ Different JPL Development Ephemeris (DE) files provide different date ranges and
 
 | File | Date Range | Size | Notes |
 |------|------------|------|-------|
-| de421.bsp | 1900-2050 | ~16 MB | Legacy, smaller file |
 | de422.bsp | -3000-3000 | ~623 MB | Extended historical range |
 | de430.bsp | 1550-2650 | ~128 MB | Previous generation |
 | de431.bsp | -13200-17191 | ~3.4 GB | Very long time span |
@@ -243,7 +242,6 @@ set_ephemeris_file("de441.bsp")  # For extended date range
 
 - **de440.bsp (default)**: Best for most modern applications (1550-2650)
 - **de441.bsp**: For very ancient or far future dates
-- **de421.bsp**: For minimal disk usage when only modern dates are needed
 - **de431.bsp**: Alternative for extended range if DE441 not available
 
 ---
@@ -265,10 +263,10 @@ The tidal acceleration affects Delta T calculations for dates far from the prese
 
 ```python
 from libephemeris import set_tid_acc, get_tid_acc
-from libephemeris.constants import SE_TIDAL_DE421, SE_TIDAL_DE440
+from libephemeris.constants import SE_TIDAL_DE440
 
 # Match tidal acceleration to ephemeris file
-set_tid_acc(SE_TIDAL_DE421)  # When using de421.bsp
+set_tid_acc(SE_TIDAL_DE440)  # When using de440.bsp (default)
 print(f"Tidal acceleration: {get_tid_acc()}")
 
 # Use default (DE440-based)

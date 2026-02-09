@@ -70,14 +70,14 @@ EphemerisContext
 
    **Methods:**
 
-   .. method:: __init__(ephe_path=None, ephe_file="de421.bsp")
+   .. method:: __init__(ephe_path=None, ephe_file="de440.bsp")
 
       Initialize a new ephemeris context.
 
       :param ephe_path: Optional path to directory containing ephemeris files.
                         If None, uses default workspace directory.
       :type ephe_path: str, optional
-      :param ephe_file: Ephemeris file to use (default: "de421.bsp")
+      :param ephe_file: Ephemeris file to use (default: "de440.bsp")
       :type ephe_file: str
 
    .. method:: set_topo(lon, lat, alt)
@@ -1250,7 +1250,7 @@ swe_set_jpl_file / set_jpl_file
 
    Set the JPL ephemeris file to use.
 
-   :param filename: Ephemeris file name (e.g., "de421.bsp", "de440.bsp")
+   :param filename: Ephemeris file name (e.g., "de440.bsp", "de441.bsp")
    :type filename: str
 
 

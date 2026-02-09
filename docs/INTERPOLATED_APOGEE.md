@@ -411,7 +411,7 @@ The analytical perturbation series approach has no inherent date range limitatio
 beyond the validity of the underlying lunar theory.
 
 For practical purposes, the implementation is valid for:
-- DE421 (default): 1900 - 2050 (full precision)
+- DE440 (default): 1550 - 2650 (full precision)
 - Extended range: 3000 BCE - 3000 CE (reduced precision)
 
 ## References

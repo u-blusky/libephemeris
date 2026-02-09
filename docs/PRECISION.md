@@ -256,7 +256,6 @@ LibEphemeris uses JPL DE ephemerides with specific date ranges:
 | Ephemeris | Date Range | Precision |
 |-----------|------------|-----------| 
 | DE440 (default) | 1550-2650 | Full precision, ICRF 3.0 |
-| DE421 | 1900-2050 | Full precision |
 | DE422 | -3000 to 3000 | Full precision |
 | DE430 | 1550-2650 | Full precision |
 | DE431 | -13200 to 17191 | Full precision |
@@ -842,7 +841,6 @@ LibEphemeris (pure Python with Skyfield) is approximately 10-100x slower than py
 | Resource | Approximate Size |
 |----------|-----------------| 
 | DE440 ephemeris | ~128 MB |
-| DE421 ephemeris | ~16 MB |
 | DE431 ephemeris | ~3.4 GB |
 | Timescale data | ~2 MB |
 | Per EphemerisContext | ~1 KB |

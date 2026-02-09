@@ -10,7 +10,7 @@ Features
 
 - **Swiss Ephemeris Compatible**: Drop-in replacement for pyswisseph
 - **Pure Python**: No C extensions required
-- **High Precision**: Uses NASA JPL DE421 ephemeris via Skyfield
+- **High Precision**: Uses NASA JPL DE440 ephemeris via Skyfield
 - **Thread Safe**: EphemerisContext for concurrent calculations
 - **19 House Systems**: Including Placidus, Koch, Whole Sign, and more
 - **43 Ayanamshas**: Full sidereal zodiac support
