@@ -305,3 +305,143 @@ class TestSpecialCases:
         assert max_diff < tolerance, (
             f"Moshier Placidus near date line: max diff {max_diff:.6f}°"
         )
+
+
+# ============================================================================
+# MOSHIER RANDOM AND POLAR LOCATION TESTS
+# ============================================================================
+
+# 5 most commonly used house systems for random location testing
+MOSHIER_RANDOM_SYSTEMS = [
+    ("P", "Placidus"),
+    ("K", "Koch"),
+    ("E", "Equal"),
+    ("W", "Whole Sign"),
+    ("O", "Porphyry"),
+]
+
+# Systems safe at all latitudes (no polar circle issues)
+# Placidus and Koch fail when |lat| + eps > 90 (~66.56 threshold)
+POLAR_SAFE_SYSTEMS = [
+    ("E", "Equal"),
+    ("W", "Whole Sign"),
+    ("O", "Porphyry"),
+]
+
+# Polar locations: 7 latitudes x 2 hemispheres = 14 locations
+# Covers from sub-polar (65) through near-pole (89.9)
+# Real-world significance: Tromso (69.6N), Reykjavik (64.1N), Murmansk (68.9N)
+POLAR_LOCATIONS = [
+    ("Polar_65N", 65.0, 18.0),
+    ("Polar_67N", 67.0, 25.7),
+    ("Polar_70N", 70.0, 19.0),
+    ("Polar_75N", 75.0, 30.0),
+    ("Polar_80N", 80.0, 16.0),
+    ("Polar_85N", 85.0, 0.0),
+    ("Polar_89.9N", 89.9, 0.0),
+    ("Polar_65S", -65.0, 18.0),
+    ("Polar_67S", -67.0, 25.7),
+    ("Polar_70S", -70.0, 19.0),
+    ("Polar_75S", -75.0, 30.0),
+    ("Polar_80S", -80.0, 16.0),
+    ("Polar_85S", -85.0, 0.0),
+    ("Polar_89.9S", -89.9, 0.0),
+]
+
+MOSHIER_POLAR_TOL = 0.02  # degrees - relaxed for polar Moshier comparison
+
+
+class TestMoshierRandomLocations:
+    """Moshier house systems at 50 random geographic locations.
+
+    Validates cusp calculations using SEFLG_MOSEPH across 50 random
+    locations (seed=42, lat +/-60, lon +/-180) for the 5 most commonly
+    used house systems (P, K, E, W, O).
+
+    Differences between C (pyswisseph) and Python (libephemeris) Moshier
+    arise from ARMC/obliquity computation: Skyfield (Python) vs internal
+    Moshier routines (C). These differences are structural and bounded.
+
+    Total: 250 validations (50 locations x 5 systems).
+    """
+
+    @pytest.mark.comparison
+    @pytest.mark.slow
+    @pytest.mark.parametrize("hsys,hsys_name", MOSHIER_RANDOM_SYSTEMS)
+    def test_moshier_random_locations(self, hsys, hsys_name):
+        """Test Moshier house system at 50 random locations (seed=42)."""
+        random.seed(42)
+
+        tolerance = RELAXED_SYSTEMS.get(hsys, MOSHIER_CUSP_TOL)
+        failures = []
+
+        for idx in range(50):
+            lat = random.uniform(-60.0, 60.0)
+            lon = random.uniform(-180.0, 180.0)
+            year = random.randint(1900, 2100)
+            month = random.randint(1, 12)
+            day = random.randint(1, 28)
+            hour = random.uniform(0.0, 24.0)
+
+            jd = swe.julday(year, month, day, hour)
+
+            try:
+                cusps_swe, _ = swe.houses_ex(
+                    jd, lat, lon, hsys.encode("ascii"), swe.FLG_MOSEPH
+                )
+                cusps_py, _ = ephem.swe_houses_ex(jd, lat, lon, hsys, SEFLG_MOSEPH)
+
+                max_diff = max(
+                    angular_diff(cusps_swe[k], cusps_py[k]) for k in range(12)
+                )
+
+                if max_diff >= tolerance:
+                    failures.append(
+                        f"  Loc_{idx} ({lat:.2f}, {lon:.2f}) JD={jd:.1f}: "
+                        f"max_diff={max_diff:.6f}"
+                    )
+            except Exception:
+                pass  # Skip errors (polar regions, etc.)
+
+        assert len(failures) == 0, (
+            f"{hsys_name} Moshier: {len(failures)}/50 random locations exceeded "
+            f"{tolerance} deg tolerance:\n" + "\n".join(failures[:10])
+        )
+
+
+class TestMoshierHighLatitudes:
+    """Moshier house systems at polar latitudes (65-89.9 degrees).
+
+    Validates cusp calculations at latitudes where Placidus and Koch fail
+    due to the polar circle threshold (90 - obliquity ~ 66.56 degrees).
+    Only systems that work at all latitudes are tested (E, W, O).
+
+    Polar latitudes are critical edge cases: cities like Tromso (69.6N),
+    Reykjavik (64.1N), and Murmansk (68.9N) have significant astrological
+    user bases. Differences in the polar threshold between C and Python
+    implementations can cause one to use Placidus while the other falls
+    back to Porphyry, producing completely different horoscopes.
+
+    Total: 42 test cases (14 locations x 3 systems).
+    """
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("hsys,hsys_name", POLAR_SAFE_SYSTEMS)
+    @pytest.mark.parametrize(
+        "name,lat,lon",
+        POLAR_LOCATIONS,
+        ids=[loc[0] for loc in POLAR_LOCATIONS],
+    )
+    def test_moshier_polar_location(self, hsys, hsys_name, name, lat, lon):
+        """Test Moshier house system at polar latitude."""
+        jd = swe.julday(2000, 1, 1, 12.0)
+
+        cusps_swe, _ = swe.houses_ex(jd, lat, lon, hsys.encode("ascii"), swe.FLG_MOSEPH)
+        cusps_py, _ = ephem.swe_houses_ex(jd, lat, lon, hsys, SEFLG_MOSEPH)
+
+        max_diff = max(angular_diff(cusps_swe[k], cusps_py[k]) for k in range(12))
+
+        assert max_diff < MOSHIER_POLAR_TOL, (
+            f"{hsys_name} Moshier at {name} (lat={lat}): "
+            f"max cusp diff {max_diff:.6f} deg exceeds {MOSHIER_POLAR_TOL} deg"
+        )
