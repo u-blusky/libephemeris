@@ -24,7 +24,9 @@ Expected behavior differences:
 These tests are marked with pytest.mark.xfail where the flags are known to be
 unimplemented, documenting the gaps for future implementation.
 
-Total: 45 test cases (3 classes x 5 planets x 3 dates).
+Total: 85 test cases:
+- 3 frame flag classes x 5 planets x 3 dates = 45 tests
+- 1 edge case class x 5 planets x 8 extreme dates = 40 tests
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ swe = pytest.importorskip("swisseph", reason="pyswisseph required for comparison
 import libephemeris as ephem
 from libephemeris.constants import (
     SE_SUN,
+    SE_MOON,
     SE_MERCURY,
     SE_MARS,
     SE_JUPITER,
@@ -313,4 +316,153 @@ class TestMoshierNoNutation:
             f"{DISTANCE_TOLERANCE_PCT}% tolerance\n"
             f"  pyswisseph: {pos_swe[2]:.8f} AU\n"
             f"  libephemeris: {pos_py[2]:.8f} AU"
+        )
+
+
+# ============================================================================
+# EDGE CASE CONFIGURATIONS
+# ============================================================================
+
+# Dates spanning the full Moshier range for extreme date testing.
+# Format: (year, month, day, hour, description)
+# Year uses astronomical year numbering: year 0 = 1 BCE, -1 = 2 BCE, etc.
+EDGE_CASE_DATES = [
+    (-2000, 1, 1, 12.0, "-2000 CE (deep ancient)"),
+    (-1000, 6, 15, 12.0, "-1000 CE (ancient)"),
+    (0, 1, 1, 12.0, "0 CE / 1 BCE"),
+    (500, 3, 21, 12.0, "500 CE"),
+    (1000, 12, 25, 12.0, "1000 CE"),
+    (1200, 7, 4, 12.0, "1200 CE"),
+    (2700, 1, 1, 12.0, "2700 CE (post-DE440)"),
+    (3000, 6, 15, 12.0, "3000 CE (Moshier edge)"),
+]
+
+# 5 planets for edge case testing: Sun, Moon, and outer planets
+EDGE_CASE_PLANETS = [
+    (SE_SUN, "Sun"),
+    (SE_MOON, "Moon"),
+    (SE_MARS, "Mars"),
+    (SE_JUPITER, "Jupiter"),
+    (SE_SATURN, "Saturn"),
+]
+
+
+def _tolerance_for_year(year: int, body_id: int) -> float:
+    """Return graduated longitude tolerance in degrees based on era and body.
+
+    VSOP87 (planets) and ELP2000-82B (Moon) are series expansions about
+    J2000.0 that degrade with distance from that epoch. The C library
+    (pyswisseph) and Python (libephemeris) use different truncations of
+    these series, so differences between them grow with distance from J2000.
+
+    The Moon uses ELP2000-82B which diverges more than VSOP87 between the
+    C and Python implementations, especially at dates far from J2000.
+    Empirically, Moon differences reach ~0.12 deg at 3000 CE while planets
+    stay below ~0.02 deg at the same epoch.
+
+    Tolerance bands for planets (Sun, Mars, Jupiter, Saturn):
+        >= 1000 CE:     0.02 deg (72 arcsec)  - close to J2000
+        0 - 1000 CE:    0.1  deg (6 arcmin)   - moderate distance
+        -1000 - 0 CE:   0.5  deg (30 arcmin)  - far from J2000
+        < -1000 CE:     1.0  deg (1 degree)   - very far from J2000
+
+    Tolerance bands for Moon (ELP2000-82B):
+        >= 1000 CE:     0.15 deg (9 arcmin)   - ELP2000-82B divergence
+        0 - 1000 CE:    0.5  deg (30 arcmin)  - moderate distance
+        -1000 - 0 CE:   1.0  deg (1 degree)   - far from J2000
+        < -1000 CE:     2.0  deg (2 degrees)  - very far from J2000
+    """
+    if body_id == SE_MOON:
+        if year >= 1000:
+            return 0.15
+        elif year >= 0:
+            return 0.5
+        elif year >= -1000:
+            return 1.0
+        else:
+            return 2.0
+
+    # Planets: VSOP87 series
+    if year >= 1000:
+        return 0.02
+    elif year >= 0:
+        return 0.1
+    elif year >= -1000:
+        return 0.5
+    else:
+        return 1.0
+
+
+class TestMoshierEdgeCases:
+    """Test Moshier mode at extreme dates spanning -2000 to +3000 CE.
+
+    This class verifies positional continuity and accuracy across the full
+    Moshier range, comparing pyswisseph (C) vs libephemeris (Python) with
+    SEFLG_MOSEPH | SEFLG_SPEED.
+
+    The primary use case for Moshier is dates outside DE440 range (1550-2650 CE):
+    archaeological astronomy, astro-chronology, and ancient civilization studies.
+    VSOP87/ELP2000-82B accuracy degrades with distance from J2000.0, so tolerances
+    are graduated by era to detect regressions without false positives.
+
+    Total: 40 test cases (8 dates x 5 planets).
+    """
+
+    @pytest.mark.comparison
+    @pytest.mark.edge_case
+    @pytest.mark.parametrize(
+        "year,month,day,hour,date_desc",
+        EDGE_CASE_DATES,
+        ids=[d[4] for d in EDGE_CASE_DATES],
+    )
+    @pytest.mark.parametrize(
+        "body_id,body_name",
+        EDGE_CASE_PLANETS,
+        ids=[p[1] for p in EDGE_CASE_PLANETS],
+    )
+    def test_moshier_extreme_date(
+        self, year, month, day, hour, date_desc, body_id, body_name
+    ):
+        """MOSEPH position at extreme date should match between C and Python.
+
+        Compares longitude and latitude for each planet/date combination
+        using SEFLG_MOSEPH | SEFLG_SPEED with graduated tolerances based
+        on distance from J2000. Prints degradation report for analysis
+        with ``pytest -s``.
+        """
+        jd = swe.julday(year, month, day, hour)
+        flag = SEFLG_MOSEPH | SEFLG_SPEED
+
+        pos_swe, _ = swe.calc_ut(jd, body_id, flag)
+        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flag)
+
+        diff_lon = angular_diff(pos_swe[0], pos_py[0])
+        diff_lat = abs(pos_swe[1] - pos_py[1])
+
+        tol = _tolerance_for_year(year, body_id)
+        dist_from_j2000 = abs(year - 2000)
+
+        # Degradation report visible with pytest -s
+        print(
+            f"\n  [DEGRADATION] {body_name} @ {date_desc} "
+            f"(JD {jd:.1f}, {dist_from_j2000}y from J2000): "
+            f"dlon={diff_lon:.6f} deg, dlat={diff_lat:.6f} deg, "
+            f"tol={tol:.3f} deg"
+        )
+
+        assert diff_lon < tol, (
+            f"{body_name} MOSEPH at {date_desc}: "
+            f"longitude diff {diff_lon:.6f} deg exceeds "
+            f"{tol} deg tolerance\n"
+            f"  pyswisseph:   {pos_swe[0]:.6f} deg\n"
+            f"  libephemeris: {pos_py[0]:.6f} deg\n"
+            f"  Distance from J2000: {dist_from_j2000} years"
+        )
+        assert diff_lat < tol, (
+            f"{body_name} MOSEPH at {date_desc}: "
+            f"latitude diff {diff_lat:.6f} deg exceeds "
+            f"{tol} deg tolerance\n"
+            f"  pyswisseph:   {pos_swe[1]:.6f} deg\n"
+            f"  libephemeris: {pos_py[1]:.6f} deg\n"
+            f"  Distance from J2000: {dist_from_j2000} years"
         )
