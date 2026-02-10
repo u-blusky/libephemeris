@@ -277,11 +277,11 @@ class TestMoshierErrorHandling:
     """Test error handling for unsupported bodies."""
 
     def test_unsupported_body_raises_error(self):
-        """Unsupported body should raise ValueError."""
+        """Unsupported body should raise CalculationError."""
         jd = 2451545.0
 
         # Chiron (SE_CHIRON = 15) is not supported by Moshier
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(eph.CalculationError) as exc_info:
             eph.swe_calc_ut(jd, 15, SEFLG_MOSEPH)
 
-        assert "not supported by Moshier" in str(exc_info.value)
+        assert "not available in Moshier" in str(exc_info.value)

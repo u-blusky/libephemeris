@@ -146,7 +146,13 @@ class TestAutoDownloadInStrictMode:
                 eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
 
     def test_multiple_bodies_auto_download(self):
-        """Auto-download should work for multiple major asteroids."""
+        """Auto-download should work for SPK-downloadable asteroids.
+
+        Ceres is in JPL's major body index and cannot have SPK downloaded,
+        so it uses Keplerian fallback without error even in strict mode.
+        Chiron IS SPK-downloadable, so it should raise SPKRequiredError
+        when auto-download fails.
+        """
         eph.set_strict_precision(True)
         eph.set_auto_spk_download(True)
 
@@ -160,14 +166,17 @@ class TestAutoDownloadInStrictMode:
             "libephemeris.minor_bodies.ensure_major_asteroid_spk",
             side_effect=track_calls,
         ):
+            # Chiron is SPK-downloadable, so failed download => SPKRequiredError
             with pytest.raises(eph.SPKRequiredError):
                 eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
 
-            with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, SE_CERES, SEFLG_SPEED)
+            # Ceres is in JPL major body index => Keplerian fallback, no error
+            pos, flags = eph.calc_ut(2451545.0, SE_CERES, SEFLG_SPEED)
+            assert 0 <= pos[0] < 360  # Valid longitude
 
         assert SE_CHIRON in bodies_called
-        assert SE_CERES in bodies_called
+        # Ceres should NOT trigger auto-download (it's not SPK-downloadable)
+        assert SE_CERES not in bodies_called
 
 
 class TestAutoDownloadWithStrictDisabled:
