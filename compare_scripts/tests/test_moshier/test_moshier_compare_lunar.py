@@ -326,3 +326,92 @@ class TestLilithLatitude:
             f"True Lilith Moshier speed at {desc}: diff {diff_speed:.6f}°/day "
             f"(swe={pos_swe[3]:.6f}, lib={pos_py[3]:.6f})"
         )
+
+
+class TestMoshierNodalMotion:
+    """Validate qualitative retrograde motion of Moshier Mean Node.
+
+    Unlike TestNodalMotion which tests cross-library speed comparison,
+    this class validates that BOTH the C library (pyswisseph) and the
+    Python reimplementation (libephemeris) produce retrograde motion
+    for the Mean Node with speed in the expected physical range
+    (~0.053 deg/day). The numerical differentiation in planets.py
+    (dt=0.5) may give slightly different speeds from the C library,
+    so we verify the qualitative property (retrograde) and a broad
+    physical range [0.04, 0.07] deg/day rather than exact agreement.
+    """
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("year,month,day,hour,desc", TEST_DATES)
+    def test_mean_node_retrograde_both(self, year, month, day, hour, desc):
+        """Test Mean Node is retrograde with expected speed in both implementations."""
+        jd = swe.julday(year, month, day, hour)
+        flag_swe = swe.FLG_MOSEPH | swe.FLG_SPEED
+        flag_py = SEFLG_MOSEPH | SEFLG_SPEED
+
+        pos_swe, _ = swe.calc_ut(jd, swe.MEAN_NODE, flag_swe)
+        pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flag_py)
+
+        # Both must be retrograde (speed_lon < 0)
+        assert pos_swe[3] < 0, (
+            f"C Mean Node should be retrograde at {desc}: "
+            f"speed_lon={pos_swe[3]:.6f}°/day"
+        )
+        assert pos_py[3] < 0, (
+            f"Python Mean Node should be retrograde at {desc}: "
+            f"speed_lon={pos_py[3]:.6f}°/day"
+        )
+
+        # Both must have |speed_lon| in [0.04, 0.07] deg/day
+        abs_speed_swe = abs(pos_swe[3])
+        abs_speed_py = abs(pos_py[3])
+
+        assert 0.04 <= abs_speed_swe <= 0.07, (
+            f"C Mean Node |speed| out of range at {desc}: "
+            f"{abs_speed_swe:.6f}°/day not in [0.04, 0.07]"
+        )
+        assert 0.04 <= abs_speed_py <= 0.07, (
+            f"Python Mean Node |speed| out of range at {desc}: "
+            f"{abs_speed_py:.6f}°/day not in [0.04, 0.07]"
+        )
+
+
+class TestMoshierLilithLatitude:
+    """Validate latitude properties of Moshier Mean Lilith.
+
+    Unlike TestLilithLatitude which tests cross-library latitude comparison,
+    this class validates that BOTH implementations produce physically
+    reasonable latitudes for Mean Lilith: non-zero (from the Chapront
+    formula / ecliptic projection) and bounded within ±6°. The Python
+    implementation uses calc_mean_lilith_with_latitude() which differs
+    from the C library's Chapront implementation, so we also compare
+    the two with a tolerance of 0.1°.
+    """
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("year,month,day,hour,desc", TEST_DATES)
+    def test_mean_lilith_latitude_range_both(self, year, month, day, hour, desc):
+        """Test Mean Lilith latitude is bounded and consistent in both implementations."""
+        jd = swe.julday(year, month, day, hour)
+
+        pos_swe, _ = swe.calc_ut(jd, swe.MEAN_APOG, swe.FLG_MOSEPH)
+        pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, SEFLG_MOSEPH)
+
+        lat_swe = pos_swe[1]
+        lat_py = pos_py[1]
+
+        # Both must have |lat| < 6 degrees (physical bound for Mean Lilith)
+        assert abs(lat_swe) < 6.0, (
+            f"C Mean Lilith |lat| out of range at {desc}: {lat_swe:.6f}° not in (-6, 6)"
+        )
+        assert abs(lat_py) < 6.0, (
+            f"Python Mean Lilith |lat| out of range at {desc}: "
+            f"{lat_py:.6f}° not in (-6, 6)"
+        )
+
+        # Cross-library latitude comparison within 0.1 degrees
+        diff_lat = abs(lat_swe - lat_py)
+        assert diff_lat < 0.1, (
+            f"Mean Lilith Moshier latitude diff {diff_lat:.6f}° at {desc} "
+            f"exceeds 0.1° (swe={lat_swe:.6f}°, lib={lat_py:.6f}°)"
+        )
