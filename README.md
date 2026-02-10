@@ -111,6 +111,7 @@ See [PRECISION.md](docs/PRECISION.md) for detailed precision tables.
 -   **Heliacal events**: Schaefer (1990) atmospheric visibility model for heliacal rising/setting calculations with Ptolemaic visibility thresholds.
 -   **Photometric calculations**: Hapke model for Moon magnitude, Mallama (2018) formula for Pluto, IAU standard formulas for planets.
 -   **High-precision minor bodies via SPK**: Download SPK kernels from JPL Horizons for arcsecond-level precision on asteroids and TNOs.
+-   **Moshier analytical ephemeris**: Semi-analytical calculation mode (`SEFLG_MOSEPH`) using VSOP87, ELP 2000-82B and DE404 Pluto theory for extended date range (-3000 to +3000 CE) without JPL kernel dependencies.
 -   **Event finding**: Sun/Moon longitude crossings (e.g. ingress), with additional events planned (eclipses, etc.).
 -   **Thread safety**: Optional thread-safe `EphemerisContext` API for concurrent calculations.
 -   **Swiss Ephemeris compatibility**: Same function names, flags and result structure as `pyswisseph` in most common use cases.
@@ -583,6 +584,7 @@ libephemeris/
 │   ├── spk.py            # SPK kernel support for high-precision minor bodies
 │   ├── fixed_stars.py    # Fixed stars and points
 │   ├── crossing.py       # Longitude crossing events
+│   ├── moshier/          # Moshier analytical ephemeris (VSOP87, ELP82B, Pluto)
 │   ├── angles.py         # Angle helpers (Asc, MC, etc.)
 │   ├── arabic_parts.py   # Arabic parts calculations
 │   ├── time_utils.py     # Time conversion helpers

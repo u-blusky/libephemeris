@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-02-10
+
+### Added
+
+#### Moshier Analytical Ephemeris (`SEFLG_MOSEPH`)
+- Complete Moshier semi-analytical ephemeris engine as an explicit calculation mode
+- VSOP87 truncated theory for inner/outer planet positions
+- ELP 2000-82B truncated lunar theory for Moon positions
+- DE404-based Pluto analytical theory
+- Standalone IAU 2006 precession and IAU 2000B nutation (no external dependencies)
+- Standalone aberration and light-time correction utilities
+- Coordinate transformation support (ecliptic, equatorial, J2000, ICRS)
+- `SEFLG_MOSEPH` flag routing gate in `swe_calc_ut()` and `swe_calc()`
+- Extended date range: -3000 to +3000 CE (vs 1550-2650 for JPL DE440)
+- Sidereal/ayanamsha calculations in Moshier mode
+- House calculations (`swe_houses()`, `swe_houses_ex()`) in Moshier mode
+- Lunar points (True Node, Mean Lilith) in Moshier mode
+- `CalculationError` for unsupported bodies in Moshier mode
+
+#### SPK Improvements
+- SPK Type 21 (Modified Difference Arrays) support for JPL Horizons asteroid kernels
+- Apparent position calculations from SPK Type 21 data
+- Keplerian fallback for JPL major body index asteroids when SPK is unavailable
+
+#### Configuration
+- Auto SPK download enabled by default (`set_auto_spk_download`)
+
+### Fixed
+
+- SPK Type 21 now returns apparent positions instead of geometric
+- Keplerian fallback allowed for JPL major body index asteroids
+- `difdeg2n` aligned with pyswisseph for +/-180 degree separation
+- `SEFLG_BARYCTR` now matches Swiss Ephemeris behavior
+- Ayanamsa precision improved with IAU 2006 precession model
+- Moon velocity precision improved with optimized timestep
+- Placidus house convergence precision improved from 0.0003 deg to 0.0001 deg
+- Placidus polar latitude handling improved (64-66 deg)
+- Sunshine ('I'/'i') house system sidereal handling and lowercase support
+
+### Documentation
+
+- Marked SPK Type 21 apparent positions bug as fixed
+- Updated SEFLG_MOSEPH documentation to reflect supported status
+
 ## [0.9.0] - 2026-02-09
 
 ### Added
@@ -489,7 +533,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/g-battaglia/libephemeris/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/g-battaglia/libephemeris/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/g-battaglia/libephemeris/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/g-battaglia/libephemeris/compare/v0.6.0...v0.7.0
