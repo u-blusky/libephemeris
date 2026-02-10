@@ -873,11 +873,12 @@ def set_auto_spk_download(enabled: Optional[bool]) -> None:
         - If astroquery is not available and auto-download is enabled,
           the library will silently fall back to Keplerian propagation
         - Set to False for offline use or to ensure consistent behavior
+        - Default is True (enabled) when no env var is set
 
     Environment Variable:
-        LIBEPHEMERIS_AUTO_SPK: Set to "1", "true", or "yes" to enable,
-                               "0", "false", or "no" to disable.
-                               Case-insensitive.
+        LIBEPHEMERIS_AUTO_SPK: Set to "0", "false", or "no" to disable,
+                               "1", "true", or "yes" to enable.
+                               Case-insensitive. Default is enabled.
 
     Example:
         >>> from libephemeris import set_auto_spk_download, get_auto_spk_download
@@ -900,16 +901,17 @@ def get_auto_spk_download() -> bool:
     Note:
         - If set_auto_spk_download() was called with an explicit value, returns that.
         - Otherwise, checks the LIBEPHEMERIS_AUTO_SPK environment variable.
-        - If the environment variable is not set, returns False (disabled by default).
+        - If the environment variable is not set, returns True (enabled by default).
+        - Set LIBEPHEMERIS_AUTO_SPK=0 to disable auto-download via env var.
 
     Example:
         >>> from libephemeris import get_auto_spk_download
-        >>> get_auto_spk_download()  # Default is False
-        False
-        >>> import os
-        >>> os.environ['LIBEPHEMERIS_AUTO_SPK'] = '1'
-        >>> get_auto_spk_download()  # Now enabled via env var
+        >>> get_auto_spk_download()  # Default is True
         True
+        >>> import os
+        >>> os.environ['LIBEPHEMERIS_AUTO_SPK'] = '0'
+        >>> get_auto_spk_download()  # Now disabled via env var
+        False
     """
     # If explicitly set via function, use that value
     if _AUTO_SPK_DOWNLOAD is not None:
@@ -917,7 +919,18 @@ def get_auto_spk_download() -> bool:
 
     # Otherwise check environment variable
     env_value = os.environ.get(_AUTO_SPK_ENV_VAR, "").lower().strip()
-    return env_value in ("1", "true", "yes", "on", "enabled")
+
+    # If env var explicitly disables, return False
+    if env_value in ("0", "false", "no", "off", "disabled"):
+        return False
+
+    # Default to True (auto-download enabled) because:
+    # - strict_precision defaults to True, so SPK kernels are required
+    # - Without auto-download, minor bodies like Chiron raise SPKRequiredError
+    # - The library already requires network for DE440 via Skyfield
+    # - Downloads are cached in ~/.libephemeris/spk/ and only happen once
+    # Users can explicitly disable via env var or set_auto_spk_download(False)
+    return True
 
 
 def set_spk_cache_dir(path: Optional[str]) -> None:

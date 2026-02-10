@@ -41,12 +41,12 @@ class TestAutoSpkDownloadConfiguration:
     """Test set_auto_spk_download() and get_auto_spk_download() functions."""
 
     def test_default_is_disabled(self):
-        """Auto SPK download should be disabled by default."""
+        """Auto SPK download should be enabled by default."""
         # Ensure no env var is set
         with patch.dict(os.environ, {}, clear=True):
             # Clear any existing setting
             set_auto_spk_download(None)
-            assert get_auto_spk_download() is False
+            assert get_auto_spk_download() is True
 
     def test_enable_explicitly(self):
         """Should be able to enable auto SPK download explicitly."""
@@ -65,9 +65,9 @@ class TestAutoSpkDownloadConfiguration:
 
         # Reset to use env var
         set_auto_spk_download(None)
-        # With no env var set, should be False
+        # With no env var set, should be True (default enabled)
         with patch.dict(os.environ, {}, clear=True):
-            assert get_auto_spk_download() is False
+            assert get_auto_spk_download() is True
 
     def test_explicit_setting_overrides_env_var(self):
         """Explicit setting should override environment variable."""
@@ -105,8 +105,8 @@ class TestEnvironmentVariableSupport:
             ("NO", False),
             ("off", False),
             ("disabled", False),
-            ("", False),
-            ("anything_else", False),
+            ("", True),
+            ("anything_else", True),
         ],
     )
     def test_env_var_parsing(self, env_value, expected):
@@ -116,13 +116,13 @@ class TestEnvironmentVariableSupport:
             assert get_auto_spk_download() is expected
 
     def test_missing_env_var(self):
-        """Missing environment variable should default to False."""
+        """Missing environment variable should default to True (enabled)."""
         set_auto_spk_download(None)  # Use env var
         # Remove the env var if it exists
         env_copy = dict(os.environ)
         env_copy.pop(_AUTO_SPK_ENV_VAR, None)
         with patch.dict(os.environ, env_copy, clear=True):
-            assert get_auto_spk_download() is False
+            assert get_auto_spk_download() is True
 
 
 class TestFallbackBehavior:
@@ -182,10 +182,10 @@ class TestCloseResetsSetting:
         # setting it to True again works (to confirm reset happened).
         # We also need to ensure no env var interference.
         with patch.dict(os.environ, {}, clear=True):
-            # After close with no env var, should be False (default)
+            # After close with no env var, should be True (default enabled)
             # But we need to call set_auto_spk_download(None) since close()
             # internally sets it to None which means "use env var"
-            assert get_auto_spk_download() is False
+            assert get_auto_spk_download() is True
 
 
 class TestAutoSpkDownloadAttempt:

@@ -35,6 +35,23 @@ def disable_strict_precision_for_tests():
 
 
 # ============================================================================
+# GLOBAL SETUP - Disable auto SPK download for test suite
+# ============================================================================
+# By default, auto SPK download is enabled. We disable it in tests to avoid
+# network calls during test runs. Tests that specifically test auto-download
+# behavior should enable it explicitly.
+
+
+@pytest.fixture(autouse=True)
+def disable_auto_spk_download_for_tests():
+    """Disable auto SPK download for all tests by default."""
+    original = ephem.get_auto_spk_download()
+    ephem.set_auto_spk_download(False)
+    yield
+    ephem.set_auto_spk_download(original if original else None)
+
+
+# ============================================================================
 # TEST DATA FIXTURES
 # ============================================================================
 

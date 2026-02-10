@@ -109,8 +109,9 @@ class TestAutoSpkDownload:
         state.close()
 
     def test_get_auto_spk_download_default(self):
-        """Default auto SPK download is False."""
-        assert eph.get_auto_spk_download() is False
+        """Default auto SPK download is True."""
+        eph.set_auto_spk_download(None)
+        assert eph.get_auto_spk_download() is True
 
     def test_set_auto_spk_download_true(self):
         """set_auto_spk_download(True) enables auto download."""
@@ -127,8 +128,8 @@ class TestAutoSpkDownload:
         """set_auto_spk_download(None) uses environment variable."""
         eph.set_auto_spk_download(True)
         eph.set_auto_spk_download(None)
-        # Should return False since env var is not set
-        assert eph.get_auto_spk_download() is False
+        # Should return True since default is now enabled
+        assert eph.get_auto_spk_download() is True
 
     def test_auto_spk_download_exported(self):
         """set_auto_spk_download and get_auto_spk_download are exported."""
