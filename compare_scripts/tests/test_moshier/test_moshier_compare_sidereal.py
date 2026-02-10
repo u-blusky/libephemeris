@@ -583,3 +583,80 @@ class TestMoshierUserDefinedAyanamsha:
                 f"{planet_name} sidereal (SE_SIDM_USER, Moshier) at 2050: "
                 f"diff {diff_lon:.6f}° exceeds tolerance"
             )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "jd,date_desc",
+        [
+            (2415020.5, "1900-01-01"),
+            (2451545.0, "J2000.0"),
+            (2469807.5, "2050-01-01"),
+        ],
+    )
+    def test_user_ayanamsha_extrapolation_j2000_ref(self, jd, date_desc):
+        """Test SE_SIDM_USER ayanamsha extrapolation from J2000 reference.
+
+        Validates that user-defined ayanamsha with t0=J2000 and ayan_t0=23.5
+        extrapolates correctly across past, present, and future dates.
+        The precession model used for extrapolation should produce consistent
+        results between pyswisseph (C) and libephemeris (Python).
+
+        Uses SEFLG_MOSEPH context: while swe_get_ayanamsa_ut() itself does not
+        take an ephemeris flag, this test ensures the user-defined ayanamsha
+        pipeline is correct for KP, custom Raman, and similar systems that
+        rely on accurate extrapolation from a reference epoch.
+        """
+        t0 = 2451545.0  # J2000
+        ayan_t0 = 23.5
+
+        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+
+        ayan_swe = swe.get_ayanamsa_ut(jd)
+        ayan_py = ephem.swe_get_ayanamsa_ut(jd)
+
+        diff = abs(ayan_swe - ayan_py)
+
+        assert diff < 0.01, (
+            f"SE_SIDM_USER (t0=J2000) at {date_desc}: diff {diff:.6f}° exceeds 0.01° "
+            f"(swe={ayan_swe:.6f}°, lib={ayan_py:.6f}°)"
+        )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "jd,date_desc",
+        [
+            (2415020.5, "1900-01-01"),
+            (2451545.0, "J2000.0"),
+            (2469807.5, "2050-01-01"),
+        ],
+    )
+    def test_user_ayanamsha_extrapolation_historic_ref(self, jd, date_desc):
+        """Test SE_SIDM_USER ayanamsha extrapolation from historic J1900 reference.
+
+        Uses t0=J1900 to amplify precession model differences between IAU 2006
+        (libephemeris) and the C library's precession. Dates far from t0
+        accumulate more precession-based divergence, making this a stricter
+        test of extrapolation correctness for custom ayanamsha systems
+        (KP, Raman, etc.).
+
+        The 150-year span from J1900 to 2050 exercises the precession
+        extrapolation over a significant time range where model differences
+        between IAU 2006 and the Swiss Ephemeris C implementation could
+        produce measurable divergence.
+        """
+        t0 = 2415020.5  # J1900
+        ayan_t0 = 22.5
+
+        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+
+        ayan_swe = swe.get_ayanamsa_ut(jd)
+        ayan_py = ephem.swe_get_ayanamsa_ut(jd)
+
+        diff = abs(ayan_swe - ayan_py)
+
+        assert diff < 0.01, (
+            f"SE_SIDM_USER (t0=J1900) at {date_desc}: diff {diff:.6f}° exceeds 0.01° "
+            f"(swe={ayan_swe:.6f}°, lib={ayan_py:.6f}°)"
+        )
