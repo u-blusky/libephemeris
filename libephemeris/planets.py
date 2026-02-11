@@ -673,8 +673,8 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
     Try to automatically download and use SPK for a minor body.
 
     This is called when auto SPK download is enabled and no SPK is registered
-    for the given body. It attempts to download the SPK from JPL Horizons
-    and then calculate the position using the downloaded data.
+    for the given body. It downloads the SPK from JPL Horizons via direct HTTP
+    (no external dependencies beyond urllib) and then calculates the position.
 
     Args:
         t: Skyfield Time object
@@ -686,88 +686,47 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         or None if download fails or body not supported.
 
     Note:
-        This function is called internally by _calc_body() when auto SPK
-        download is enabled. It handles all errors gracefully and returns
-        None to allow fallback to Keplerian propagation.
+        This function uses spk.download_and_register_spk() which communicates
+        directly with JPL Horizons API via HTTP. No astroquery dependency.
     """
-    from . import spk_auto, spk, minor_bodies
-    from .constants import (
-        SE_CHIRON,
-        SE_PHOLUS,
-        SE_CERES,
-        SE_PALLAS,
-        SE_JUNO,
-        SE_VESTA,
-        SE_ERIS,
-        SE_SEDNA,
-        SE_HAUMEA,
-        SE_MAKEMAKE,
-        SE_IXION,
-        SE_ORCUS,
-        SE_QUAOAR,
-        NAIF_CHIRON,
-        NAIF_PHOLUS,
-        NAIF_CERES,
-        NAIF_PALLAS,
-        NAIF_JUNO,
-        NAIF_VESTA,
-        NAIF_ERIS,
-        NAIF_SEDNA,
-        NAIF_HAUMEA,
-        NAIF_MAKEMAKE,
-        NAIF_IXION,
-        NAIF_ORCUS,
-        NAIF_QUAOAR,
-    )
+    from . import spk
+    from .constants import SPK_BODY_NAME_MAP
+    from .logging_config import get_logger
 
-    # Mapping of body IDs to (Horizons body_id, NAIF ID)
-    # The Horizons body_id is the asteroid number as a string
-    BODY_INFO = {
-        SE_CHIRON: ("2060", NAIF_CHIRON),
-        SE_PHOLUS: ("5145", NAIF_PHOLUS),
-        SE_CERES: ("1", NAIF_CERES),
-        SE_PALLAS: ("2", NAIF_PALLAS),
-        SE_JUNO: ("3", NAIF_JUNO),
-        SE_VESTA: ("4", NAIF_VESTA),
-        SE_ERIS: ("136199", NAIF_ERIS),
-        SE_SEDNA: ("90377", NAIF_SEDNA),
-        SE_HAUMEA: ("136108", NAIF_HAUMEA),
-        SE_MAKEMAKE: ("136472", NAIF_MAKEMAKE),
-        SE_IXION: ("28978", NAIF_IXION),
-        SE_ORCUS: ("90482", NAIF_ORCUS),
-        SE_QUAOAR: ("50000", NAIF_QUAOAR),
-    }
+    logger = get_logger()
 
-    if ipl not in BODY_INFO:
+    # Check if this body is in the SPK download map
+    if ipl not in SPK_BODY_NAME_MAP:
         return None
 
-    body_id, naif_id = BODY_INFO[ipl]
-
-    # Check if astroquery is available
-    if not spk_auto._check_astroquery_available():
-        return None
+    horizons_id, naif_id = SPK_BODY_NAME_MAP[ipl]
 
     try:
-        # Calculate a reasonable date range for the SPK
-        # Use 10 years before and after the requested date
-        jd = t.tt
-        jd_start = jd - 3652.5  # ~10 years before
-        jd_end = jd + 3652.5  # ~10 years after
+        # Use a wide standard date range (1900-2100) so the downloaded SPK file
+        # is reusable across different queries without re-downloading. The file
+        # is cached on disk and will be reused on subsequent calls.
+        start_date = "1900-01-01"
+        end_date = "2100-01-01"
 
-        # Try to get or download SPK
-        spk_path = spk_auto.auto_get_spk(
-            body_id=body_id,
-            jd_start=jd_start,
-            jd_end=jd_end,
+        body_name = spk._get_body_name(ipl) or horizons_id
+        logger.info("Auto-downloading SPK for %s from JPL Horizons...", body_name)
+
+        # Download and register using direct HTTP (no astroquery needed).
+        # Don't pass naif_id — let download_and_register_spk auto-detect from
+        # the SPK file, since JPL Horizons uses the 20000000+N convention while
+        # our constants may use the older 2000000+N convention.
+        spk.download_and_register_spk(
+            body=horizons_id,
             ipl=ipl,
-            naif_id=naif_id,
+            start=start_date,
+            end=end_date,
         )
 
         # Now try to calculate using the newly registered SPK
         return spk.calc_spk_body_position(t, ipl, iflag)
 
-    except Exception:
-        # If anything fails, return None to fall back to Keplerian
+    except Exception as e:
+        logger.warning("Auto SPK download failed for body %d: %s", ipl, e)
         return None
 
 
@@ -1897,12 +1856,14 @@ def _calc_body(
         from . import spk
         from .state import get_auto_spk_download, get_strict_precision
         from .exceptions import SPKRequiredError
+        from .constants import SPK_BODY_NAME_MAP
 
         spk_result = spk.calc_spk_body_position(t, ipl, iflag)
         if spk_result is not None:
             return _to_native_floats(spk_result), iflag
 
-        # Try automatic SPK download if enabled and body not registered
+        # Try automatic SPK download if enabled and body not registered.
+        # Uses direct HTTP to JPL Horizons (no astroquery dependency).
         if get_auto_spk_download():
             try:
                 spk_result = _try_auto_spk_download(t, ipl, iflag)
@@ -1912,31 +1873,12 @@ def _calc_body(
                 # If auto-download fails, continue to strict precision check
                 pass
 
-        # For SPK-downloadable asteroids in strict precision mode, require SPK
-        # Note: Bodies in JPL major body index (Ceres, Pallas, Juno, Vesta) cannot
-        # have SPK downloaded, so we use Keplerian fallback for them.
-        if get_strict_precision() and minor_bodies.is_spk_downloadable(ipl):
-            info = minor_bodies.get_major_asteroid_info(ipl)
-            if info is not None:
-                _, horizons_id, _, body_name = info
-
-                # Try auto-download using ensure_major_asteroid_spk if enabled
-                if get_auto_spk_download():
-                    from .logging_config import get_logger
-
-                    logger = get_logger()
-                    logger.info("Auto-downloading SPK for %s...", body_name)
-                    try:
-                        if minor_bodies.ensure_major_asteroid_spk(ipl, t.tt):
-                            # SPK download succeeded, try calculation again
-                            spk_result = spk.calc_spk_body_position(t, ipl, iflag)
-                            if spk_result is not None:
-                                return _to_native_floats(spk_result), iflag
-                    except Exception:
-                        # If auto-download fails, continue to raise SPKRequiredError
-                        pass
-
-                raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
+        # In strict precision mode, require SPK for all downloadable bodies.
+        # All bodies in SPK_BODY_NAME_MAP can be downloaded from JPL Horizons.
+        if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
+            horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
+            body_name = spk._get_body_name(ipl) or str(ipl)
+            raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
 
         # Fallback to Keplerian approximation
         jd_tt = t.tt

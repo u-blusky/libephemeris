@@ -276,10 +276,22 @@ NAIF_EROS: int = 2000433  # 433 Eros (near-Earth asteroid, NEAR Shoemaker missio
 SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
     SE_CHIRON: ("2060", NAIF_CHIRON),  # 2060 Chiron (centaur)
     SE_PHOLUS: ("5145", NAIF_PHOLUS),  # 5145 Pholus (centaur)
-    SE_CERES: ("1", NAIF_CERES),  # 1 Ceres (dwarf planet)
-    SE_PALLAS: ("2", NAIF_PALLAS),  # 2 Pallas (main belt asteroid)
-    SE_JUNO: ("3", NAIF_JUNO),  # 3 Juno (main belt asteroid)
-    SE_VESTA: ("4", NAIF_VESTA),  # 4 Vesta (main belt asteroid)
+    SE_CERES: (
+        "Ceres;",
+        NAIF_CERES,
+    ),  # 1 Ceres (dwarf planet) - use name; to bypass major body index
+    SE_PALLAS: (
+        "Pallas;",
+        NAIF_PALLAS,
+    ),  # 2 Pallas (main belt asteroid) - use name; to bypass major body index
+    SE_JUNO: (
+        "Juno;",
+        NAIF_JUNO,
+    ),  # 3 Juno (main belt asteroid) - use name; to bypass major body index
+    SE_VESTA: (
+        "Vesta;",
+        NAIF_VESTA,
+    ),  # 4 Vesta (main belt asteroid) - use name; to bypass major body index
     SE_ERIS: ("136199", NAIF_ERIS),  # 136199 Eris (dwarf planet)
     SE_SEDNA: ("90377", NAIF_SEDNA),  # 90377 Sedna (detached TNO)
     SE_HAUMEA: ("136108", NAIF_HAUMEA),  # 136108 Haumea (dwarf planet)
@@ -296,7 +308,10 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
         NAIF_GONGGONG,
     ),  # 225088 Gonggong (TNO, dwarf planet candidate)
     SE_APOPHIS: ("99942", NAIF_APOPHIS),  # 99942 Apophis (Near-Earth asteroid)
-    SE_HYGIEA: ("10", NAIF_HYGIEA),  # 10 Hygiea (fourth largest asteroid)
+    SE_HYGIEA: (
+        "Hygiea;",
+        NAIF_HYGIEA,
+    ),  # 10 Hygiea (fourth largest asteroid) - use name; to bypass major body index
     SE_EROS: ("433", NAIF_EROS),  # 433 Eros (near-Earth asteroid, NEAR Shoemaker)
 }
 

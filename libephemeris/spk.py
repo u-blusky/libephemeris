@@ -44,6 +44,7 @@ import ssl
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Optional, Union
 
@@ -288,9 +289,9 @@ def _build_horizons_url(
     Returns:
         URL string for Horizons API request.
     """
-    # URL-encode the body name (handle spaces, special chars)
-    # For numbered asteroids, use the number directly
-    # For named objects, Horizons accepts the name
+    # URL-encode parameters properly using urllib.parse.urlencode.
+    # This is critical for body names containing special characters like
+    # "Ceres;" where the semicolon must be encoded as %3B.
     params = {
         "format": "json",
         "COMMAND": f"'{body}'",
@@ -302,7 +303,7 @@ def _build_horizons_url(
         "STOP_TIME": f"'{end}'",
     }
 
-    query = "&".join(f"{k}={v}" for k, v in params.items())
+    query = urllib.parse.urlencode(params, safe="'@")
     return f"{HORIZONS_API_URL}?{query}"
 
 
@@ -1100,6 +1101,16 @@ def download_and_register_spk(
         if naif_id is None:
             # Fall back to legacy convention
             naif_id = _deduce_naif_id(body)
+
+        if naif_id is None:
+            # Last resort: scan SPK file for target IDs.
+            # If there's exactly one unique target (excluding common centers like
+            # Sun=10, SSB=0), use it. This handles name-syntax bodies like "Ceres;"
+            # where we can't extract an asteroid number from the name.
+            targets = _get_spk_targets(spk_path)
+            unique_targets = set(t for t in targets if t not in (0, 10))
+            if len(unique_targets) == 1:
+                naif_id = unique_targets.pop()
 
         if naif_id is None:
             raise ValueError(

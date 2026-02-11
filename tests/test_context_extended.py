@@ -1257,9 +1257,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "mock_target"
-                if key == 2099999
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "mock_target"
+                    if key == 2099999
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2099999"],
             },
         )()
@@ -1298,9 +1300,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "target"
-                if key == 2001234
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "target"
+                    if key == 2001234
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2001234"],
             },
         )()
@@ -1345,9 +1349,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "target"
-                if key == 2005678
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "target"
+                    if key == 2005678
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2005678"],
             },
         )()
@@ -1407,9 +1413,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "target"
-                if key == 2009999
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "target"
+                    if key == 2009999
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2009999"],
             },
         )()
@@ -1449,9 +1457,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "target"
-                if key == 2000002
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "target"
+                    if key == 2000002
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2000002"],
             },
         )()
@@ -1493,9 +1503,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "target"
-                if key == 2000200
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "target"
+                    if key == 2000200
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2000200"],
             },
         )()
@@ -1556,7 +1568,7 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (_ for _ in ()).throw(KeyError(key)),
                 "names": lambda self: ["2001000", "2001001", "2001002"],
             },
         )()
@@ -1595,9 +1607,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "target"
-                if key == 2003000
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "target"
+                    if key == 2003000
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2003000"],
             },
         )()
@@ -1642,9 +1656,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "target"
-                if key == 2004000
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "target"
+                    if key == 2004000
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2004000"],
             },
         )()
@@ -1684,9 +1700,11 @@ class TestContextSpkBodyRegistration:
             "MockSpiceKernel",
             (),
             {
-                "__getitem__": lambda self, key: "target"
-                if key in (2005000, 2006000)
-                else ((_ for _ in ()).throw(KeyError(key))),
+                "__getitem__": lambda self, key: (
+                    "target"
+                    if key in (2005000, 2006000)
+                    else ((_ for _ in ()).throw(KeyError(key)))
+                ),
                 "names": lambda self: ["2005000", "2006000"],
             },
         )()

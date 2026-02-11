@@ -2159,24 +2159,16 @@ from .constants import (
     NAIF_CHIRON,
 )
 
-# Asteroids in JPL's "major body index" - Horizons refuses to generate SPK for these
-# because they have pre-computed ephemerides. These use Keplerian elements for calculation.
-# Note: Despite being called "major body index", these are NOT in DE440 (only planets 1-10,
-# Moon 301, Earth 399 are in DE440). We must use Keplerian fallback for these.
-JPL_MAJOR_BODY_INDEX_ASTEROIDS: frozenset[int] = frozenset(
-    {
-        SE_CERES,  # Asteroid 1 - in JPL major body index
-        SE_PALLAS,  # Asteroid 2 - in JPL major body index
-        SE_JUNO,  # Asteroid 3 - in JPL major body index
-        SE_VESTA,  # Asteroid 4 - in JPL major body index
-    }
-)
-
-# Asteroids that CAN have SPK downloaded from JPL Horizons
-# These are NOT in the major body index, so Horizons will generate SPK for them
+# All major asteroids can have SPK downloaded from JPL Horizons.
+# Bodies formerly in JPL's "major body index" (Ceres, Pallas, Juno, Vesta) are now
+# downloaded using the name syntax (e.g., "Ceres;") which bypasses the major body
+# index restriction. See SPK_BODY_NAME_MAP in constants.py for Horizons IDs.
 SPK_DOWNLOADABLE_ASTEROIDS: dict[int, tuple[int, str, int, str]] = {
+    SE_CERES: (1, "Ceres;", NAIF_CERES, "Ceres"),
+    SE_PALLAS: (2, "Pallas;", NAIF_PALLAS, "Pallas"),
+    SE_JUNO: (3, "Juno;", NAIF_JUNO, "Juno"),
+    SE_VESTA: (4, "Vesta;", NAIF_VESTA, "Vesta"),
     SE_CHIRON: (2060, "2060", NAIF_CHIRON, "Chiron"),
-    # SE_PHOLUS would go here if added: (5145, "5145", NAIF_PHOLUS, "Pholus"),
 }
 
 # Combined info for all major asteroids (for backward compatibility and info lookup)
@@ -2218,13 +2210,11 @@ def is_spk_downloadable(body_id: int) -> bool:
     """
     Check if SPK can be downloaded from JPL Horizons for this body.
 
-    JPL Horizons refuses to generate SPK files for bodies in the "major body
-    index" (Ceres, Pallas, Juno, Vesta) because they have pre-computed
-    ephemerides. However, these are NOT included in DE440, so we must use
-    Keplerian fallback for them.
+    All major asteroids (Ceres, Pallas, Juno, Vesta, Chiron) can have SPK
+    downloaded. Bodies in JPL's major body index are downloaded using the
+    name syntax (e.g., "Ceres;") which bypasses the restriction.
 
-    Bodies like Chiron are NOT in the major body index, so Horizons will
-    generate SPK files for them.
+    Additionally, any body in SPK_BODY_NAME_MAP (constants.py) is downloadable.
 
     Args:
         body_id: Minor body identifier (SE_CERES, SE_CHIRON, etc.)
@@ -2235,40 +2225,32 @@ def is_spk_downloadable(body_id: int) -> bool:
     Example:
         >>> from libephemeris.minor_bodies import is_spk_downloadable
         >>> from libephemeris.constants import SE_CERES, SE_CHIRON
-        >>> is_spk_downloadable(SE_CERES)  # In major body index
-        False
-        >>> is_spk_downloadable(SE_CHIRON)  # Not in major body index
+        >>> is_spk_downloadable(SE_CERES)
+        True
+        >>> is_spk_downloadable(SE_CHIRON)
         True
     """
-    return body_id in SPK_DOWNLOADABLE_ASTEROIDS
+    from .constants import SPK_BODY_NAME_MAP
+
+    return body_id in SPK_DOWNLOADABLE_ASTEROIDS or body_id in SPK_BODY_NAME_MAP
 
 
 def is_in_jpl_major_body_index(body_id: int) -> bool:
     """
-    Check if body is in JPL's major body index (cannot download SPK).
+    Check if body is in JPL's major body index.
 
-    Bodies in the major body index have pre-computed ephemerides in JPL
-    Horizons, so Horizons refuses to generate custom SPK files for them.
-    However, these ephemerides are NOT available in DE440 - only planets
-    1-10, Moon 301, and Earth 399 are in DE440.
-
-    For these bodies, we use Keplerian element calculations.
+    Note: This function is kept for backward compatibility but now always
+    returns False. All major body index asteroids (Ceres, Pallas, Juno, Vesta)
+    can now be downloaded using the name syntax (e.g., "Ceres;") which
+    bypasses the major body index restriction in Horizons.
 
     Args:
         body_id: Minor body identifier
 
     Returns:
-        bool: True if body is in JPL major body index
-
-    Example:
-        >>> from libephemeris.minor_bodies import is_in_jpl_major_body_index
-        >>> from libephemeris.constants import SE_CERES, SE_CHIRON
-        >>> is_in_jpl_major_body_index(SE_CERES)
-        True
-        >>> is_in_jpl_major_body_index(SE_CHIRON)
-        False
+        bool: Always False - all bodies are now downloadable.
     """
-    return body_id in JPL_MAJOR_BODY_INDEX_ASTEROIDS
+    return False
 
 
 def get_major_asteroid_info(
@@ -2303,18 +2285,16 @@ def auto_download_asteroid_spk(
     force: bool = False,
 ) -> Optional[str]:
     """
-    Automatically download SPK kernel for a major asteroid if not cached.
+    Automatically download SPK kernel for a minor body if not cached.
 
     This function checks if an SPK file is already available for the given
-    major asteroid. If not, it downloads the SPK from JPL Horizons and
-    registers it for use by calc_ut() and related functions.
+    body. If not, it downloads the SPK from JPL Horizons via direct HTTP
+    and registers it for use by calc_ut() and related functions.
 
-    Supported major asteroids:
-        - Ceres (SE_CERES, asteroid 1)
-        - Pallas (SE_PALLAS, asteroid 2)
-        - Juno (SE_JUNO, asteroid 3)
-        - Vesta (SE_VESTA, asteroid 4)
-        - Chiron (SE_CHIRON, asteroid 2060)
+    No external dependencies beyond urllib are required (no astroquery).
+
+    Supported bodies: All bodies in MAJOR_ASTEROID_SPK_INFO and
+    SPK_BODY_NAME_MAP (constants.py).
 
     Args:
         body_id: Minor body identifier (SE_CERES, SE_VESTA, SE_CHIRON, etc.)
@@ -2326,8 +2306,7 @@ def auto_download_asteroid_spk(
 
     Returns:
         str: Path to the SPK file if download successful or already cached.
-        None: If body is not a major asteroid, astroquery is not installed,
-              or download fails.
+        None: If body is not supported or download fails.
 
     Raises:
         No exceptions are raised; errors return None to allow graceful
@@ -2336,48 +2315,37 @@ def auto_download_asteroid_spk(
     Example:
         >>> from libephemeris.minor_bodies import auto_download_asteroid_spk
         >>> from libephemeris.constants import SE_CERES
-        >>> # Download SPK for Ceres (if astroquery is installed)
         >>> spk_path = auto_download_asteroid_spk(SE_CERES)
         >>> if spk_path:
         ...     print(f"SPK downloaded: {spk_path}")
-        ... else:
-        ...     print("Using Keplerian fallback")
-
-    Note:
-        This function requires the `astroquery` package to be installed.
-        Install it with: pip install astroquery
-
-        The SPK file is cached locally and will be reused on subsequent
-        calls. Use force=True to re-download even if cached.
 
     See Also:
         is_spk_available_for_body: Check if SPK is already available
-        calc_minor_body_heliocentric: Uses SPK automatically when available
     """
-    # Check if this is a major asteroid we support
-    if body_id not in MAJOR_ASTEROID_SPK_INFO:
+    from . import spk as spk_module
+    from . import state
+    from .constants import SPK_BODY_NAME_MAP
+
+    logger = get_logger()
+
+    # Try MAJOR_ASTEROID_SPK_INFO first, then SPK_BODY_NAME_MAP
+    if body_id in MAJOR_ASTEROID_SPK_INFO:
+        _, horizons_id, naif_id, body_name = MAJOR_ASTEROID_SPK_INFO[body_id]
+    elif body_id in SPK_BODY_NAME_MAP:
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[body_id]
+        body_name = spk_module._get_body_name(body_id) or str(body_id)
+    else:
         return None
 
-    asteroid_number, horizons_id, naif_id, body_name = MAJOR_ASTEROID_SPK_INFO[body_id]
-
     try:
-        from . import spk_auto
-        from . import state
-
-        # Check if astroquery is available
-        if not spk_auto._check_astroquery_available():
-            return None
-
         # Check if SPK is already registered (and not forcing re-download)
         if not force and body_id in state._SPK_BODY_MAP:
-            # Already registered, return the path (tuple is (spk_file, naif_id))
             spk_file, _ = state._SPK_BODY_MAP[body_id]
             return spk_file
 
         # Determine date range for SPK
         import time as time_module
 
-        # Current JD (approximate)
         current_jd = 2440587.5 + (time_module.time() / 86400.0)
 
         if jd_start is None:
@@ -2385,22 +2353,32 @@ def auto_download_asteroid_spk(
         if jd_end is None:
             jd_end = current_jd + 3652.5  # ~10 years after
 
-        # Use auto_get_spk to download and register
-        spk_path = spk_auto.auto_get_spk(
-            body_id=horizons_id,
-            jd_start=jd_start,
-            jd_end=jd_end,
+        # Convert JD to calendar dates
+        from skyfield.api import load
+
+        ts = load.timescale()
+        t_start = ts.tt_jd(jd_start)
+        t_end = ts.tt_jd(jd_end)
+
+        start_date = f"{t_start.utc[0]:04d}-{t_start.utc[1]:02d}-{t_start.utc[2]:02d}"
+        end_date = f"{t_end.utc[0]:04d}-{t_end.utc[1]:02d}-{t_end.utc[2]:02d}"
+
+        logger.info("Auto-downloading SPK for %s from JPL Horizons...", body_name)
+
+        # Download and register using direct HTTP (no astroquery needed).
+        # Don't pass naif_id — let download_and_register_spk auto-detect from
+        # the SPK file, since JPL Horizons uses the 20000000+N convention.
+        spk_path = spk_module.download_and_register_spk(
+            body=horizons_id,
             ipl=body_id,
-            naif_id=naif_id,
+            start=start_date,
+            end=end_date,
         )
 
         return spk_path
 
-    except ImportError:
-        # astroquery not available
-        return None
-    except Exception:
-        # Any other error - fail gracefully
+    except Exception as e:
+        logger.warning("Auto SPK download failed for %s: %s", body_name, e)
         return None
 
 
@@ -2497,7 +2475,8 @@ def ensure_major_asteroid_spk(
         logger.debug("SPK for %s (body %d) already cached", body_name, body_id)
         return True
 
-    # Try to download using major asteroid mechanism first
+    # Download using auto_download_asteroid_spk which now handles all bodies
+    # in MAJOR_ASTEROID_SPK_INFO and SPK_BODY_NAME_MAP via direct HTTP
     logger.info("SPK for %s not cached, downloading...", body_name)
     if jd is not None:
         jd_start = jd - 3652.5  # ~10 years before
@@ -2508,50 +2487,6 @@ def ensure_major_asteroid_spk(
 
     if spk_path is not None:
         return True
-
-    # If not a major asteroid, try the generic SPK download mechanism
-    # for bodies in SPK_BODY_NAME_MAP (e.g., SE_PHOLUS, SE_NESSUS, SE_ERIS)
-    if body_id not in MAJOR_ASTEROID_SPK_INFO and body_id in SPK_BODY_NAME_MAP:
-        try:
-            from . import spk_auto
-            from . import state
-
-            # Check if astroquery is available
-            if not spk_auto._check_astroquery_available():
-                logger.debug("astroquery not available for SPK download")
-                return False
-
-            horizons_id, naif_id = SPK_BODY_NAME_MAP[body_id]
-
-            # Determine date range for SPK
-            import time as time_module
-
-            current_jd = 2440587.5 + (time_module.time() / 86400.0)
-
-            if jd is not None:
-                jd_start = jd - 3652.5  # ~10 years before
-                jd_end = jd + 3652.5  # ~10 years after
-            else:
-                jd_start = current_jd - 3652.5
-                jd_end = current_jd + 3652.5
-
-            # Use auto_get_spk to download and register
-            spk_path = spk_auto.auto_get_spk(
-                body_id=horizons_id,
-                jd_start=jd_start,
-                jd_end=jd_end,
-                ipl=body_id,
-                naif_id=naif_id,
-            )
-
-            if spk_path is not None:
-                logger.info("SPK for %s downloaded successfully", body_name)
-                return True
-
-        except ImportError:
-            logger.debug("SPK download dependencies not available")
-        except Exception as e:
-            logger.debug("SPK download failed: %s", str(e))
 
     return False
 
