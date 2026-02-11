@@ -5,6 +5,7 @@ This module provides CLI commands for managing libephemeris, including
 downloading optional data files.
 
 Usage:
+    libephemeris init                 Initialize all data files
     libephemeris download-data       Download precision data files
     libephemeris status              Show data file status
     libephemeris --version           Show version
@@ -39,6 +40,41 @@ def cmd_download_data(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_init(args: argparse.Namespace) -> int:
+    """Handle the init command."""
+    from .download import init_all
+
+    # Apply cache dir from CLI if provided
+    cache_dir = args.cache_dir
+
+    try:
+        result = init_all(
+            cache_dir=cache_dir,
+            force=args.force,
+            show_progress=not args.no_progress,
+            quiet=args.quiet,
+        )
+        if not args.quiet:
+            print("\nInitialization complete.")
+            print(f"  DE440.bsp: {'OK' if result['de440'] else 'FAILED'}")
+            print(
+                f"  planet_centers.bsp: "
+                f"{'OK' if result['planet_centers'] else 'FAILED'}"
+            )
+            print(f"  SPK downloaded: {result['spk_success']}")
+            print(f"  SPK skipped (cached): {result['spk_skipped']}")
+            if result["spk_failed"] > 0:
+                print(f"  SPK failed: {result['spk_failed']}")
+        return 0 if result["spk_failed"] == 0 else 1
+    except KeyboardInterrupt:
+        print("\nInitialization cancelled.")
+        return 130
+    except Exception as e:
+        if not args.quiet:
+            print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     """Handle the status command."""
     from .download import print_data_status
@@ -59,11 +95,12 @@ def create_parser() -> argparse.ArgumentParser:
         prog="libephemeris",
         description="High-precision astronomical ephemeris library",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog="""\
 Examples:
-  libephemeris download-data     Download optional precision data files
-  libephemeris status            Show installed data files
-  libephemeris --version         Show version information
+  libephemeris init                Initialize all data files (DE440 + SPK)
+  libephemeris download-data       Download optional precision data files
+  libephemeris status              Show installed data files
+  libephemeris --version           Show version information
 
 For more information, visit: https://github.com/g-battaglia/libephemeris
 """,
@@ -116,6 +153,47 @@ are still accurate to ~0.1 arcseconds.
         help="Suppress all output except errors",
     )
     download_parser.set_defaults(func=cmd_download_data)
+
+    # init command
+    init_parser = subparsers.add_parser(
+        "init",
+        help="Initialize libephemeris with all required data files",
+        description="""\
+Download all data files required for full-precision calculations across
+the entire DE440 date range (1550-2650 CE).
+
+This includes:
+- DE440.bsp planetary ephemeris (~128 MB)
+- planet_centers.bsp precision offsets (~25 MB)
+- SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
+  in 20-year chunks covering 1550-2650 CE
+
+Requires: pip install astroquery
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    init_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force download even if files already exist",
+    )
+    init_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress output",
+    )
+    init_parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress all output except errors",
+    )
+    init_parser.add_argument(
+        "--cache-dir",
+        help="Custom SPK cache directory (default: ~/.libephemeris/spk/)",
+    )
+    init_parser.set_defaults(func=cmd_init)
 
     # status command
     status_parser = subparsers.add_parser(

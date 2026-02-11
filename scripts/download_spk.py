@@ -6,11 +6,18 @@ This script pre-downloads SPK (SPICE kernel) files from JPL Horizons for common
 minor bodies, allowing users to populate the cache ahead of time rather than
 downloading on demand.
 
+For full initialization (all bodies, all chunks, 1550-2650), use:
+    libephemeris init
+
+This script is useful for selective downloads (specific bodies, custom ranges).
+
 Usage:
     python scripts/download_spk.py                    # Download all common bodies
     python scripts/download_spk.py --bodies chiron ceres  # Download specific bodies
+    python scripts/download_spk.py --all              # Download all bodies
     python scripts/download_spk.py --list             # List available bodies
     python scripts/download_spk.py --cache-dir /path  # Use custom cache directory
+    python scripts/download_spk.py --chunk 20         # Use 20-year chunks
 
 Requirements:
     pip install astroquery
@@ -20,6 +27,7 @@ Requirements:
 import argparse
 import os
 import sys
+import time
 from typing import Optional
 
 # Ensure libephemeris can be imported from the project root
@@ -27,59 +35,31 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # Body definitions: name -> (horizons_id, ipl, naif_id)
+# Populated lazily from SPK_BODY_NAME_MAP
 AVAILABLE_BODIES: dict[str, tuple[str, int, int]] = {}
 
 
 def _init_bodies() -> None:
-    """Initialize body definitions from libephemeris constants."""
-    global AVAILABLE_BODIES
-    try:
-        from libephemeris.constants import (
-            SE_CHIRON,
-            SE_PHOLUS,
-            SE_CERES,
-            SE_PALLAS,
-            SE_JUNO,
-            SE_VESTA,
-            SE_ERIS,
-            SE_SEDNA,
-            SE_HAUMEA,
-            SE_MAKEMAKE,
-            SE_IXION,
-            SE_ORCUS,
-            SE_QUAOAR,
-            SE_VARUNA,
-            NAIF_CHIRON,
-            NAIF_PHOLUS,
-            NAIF_CERES,
-            NAIF_PALLAS,
-            NAIF_JUNO,
-            NAIF_VESTA,
-            NAIF_ERIS,
-            NAIF_SEDNA,
-            NAIF_HAUMEA,
-            NAIF_MAKEMAKE,
-            NAIF_IXION,
-            NAIF_ORCUS,
-            NAIF_QUAOAR,
-        )
+    """Initialize body definitions from libephemeris constants.
 
-        AVAILABLE_BODIES = {
-            "chiron": ("2060", SE_CHIRON, NAIF_CHIRON),
-            "pholus": ("5145", SE_PHOLUS, NAIF_PHOLUS),
-            "ceres": ("1", SE_CERES, NAIF_CERES),
-            "pallas": ("2", SE_PALLAS, NAIF_PALLAS),
-            "juno": ("3", SE_JUNO, NAIF_JUNO),
-            "vesta": ("4", SE_VESTA, NAIF_VESTA),
-            "eris": ("136199", SE_ERIS, NAIF_ERIS),
-            "sedna": ("90377", SE_SEDNA, NAIF_SEDNA),
-            "haumea": ("136108", SE_HAUMEA, NAIF_HAUMEA),
-            "makemake": ("136472", SE_MAKEMAKE, NAIF_MAKEMAKE),
-            "ixion": ("28978", SE_IXION, NAIF_IXION),
-            "orcus": ("90482", SE_ORCUS, NAIF_ORCUS),
-            "quaoar": ("50000", SE_QUAOAR, NAIF_QUAOAR),
-            "varuna": ("20000", SE_VARUNA, 2020000),
-        }
+    Reads all bodies from SPK_BODY_NAME_MAP in constants.py, ensuring
+    the body list is always synchronized with the library.
+    """
+    global AVAILABLE_BODIES
+
+    try:
+        from libephemeris.constants import SPK_BODY_NAME_MAP
+        from libephemeris.spk import _get_body_name
+
+        AVAILABLE_BODIES = {}
+        for ipl, (horizons_id, naif_id) in SPK_BODY_NAME_MAP.items():
+            name = _get_body_name(ipl)
+            if name is not None:
+                AVAILABLE_BODIES[name.lower()] = (horizons_id, ipl, naif_id)
+            else:
+                # Fallback to a generic name based on ipl
+                AVAILABLE_BODIES[f"body_{ipl}"] = (horizons_id, ipl, naif_id)
+
     except ImportError as e:
         print(f"Error importing libephemeris constants: {e}", file=sys.stderr)
         sys.exit(1)
@@ -96,13 +76,12 @@ COMMON_BODIES = [
     "eris",
     "sedna",
 ]
-ALL_BODIES = list(AVAILABLE_BODIES.keys()) if AVAILABLE_BODIES else []
 
 
 def check_astroquery() -> bool:
     """Check if astroquery is available."""
     try:
-        from astroquery.jplhorizons import Horizons
+        from astroquery.jplhorizons import Horizons  # noqa: F401
 
         return True
     except ImportError:
@@ -116,9 +95,10 @@ def download_spk_for_body(
     cache_dir: Optional[str] = None,
     force: bool = False,
     verbose: bool = True,
-) -> Optional[str]:
+    chunk_years: Optional[int] = None,
+) -> tuple[int, int, int]:
     """
-    Download SPK file for a specific body.
+    Download SPK file(s) for a specific body.
 
     Args:
         body_name: Name of the body (e.g., 'chiron', 'ceres')
@@ -127,46 +107,94 @@ def download_spk_for_body(
         cache_dir: Optional custom cache directory
         force: If True, re-download even if file exists
         verbose: If True, print progress messages
+        chunk_years: If set, split the range into chunks of this many years.
+            None means download as a single file.
 
     Returns:
-        Path to downloaded SPK file, or None on failure
+        Tuple of (success_count, skipped_count, failed_count)
     """
     from libephemeris import spk_auto
+    from libephemeris.spk_auto import _iso_to_jd
 
     body_name_lower = body_name.lower()
     if body_name_lower not in AVAILABLE_BODIES:
         if verbose:
             print(f"Unknown body: {body_name}", file=sys.stderr)
-        return None
+        return (0, 0, 1)
 
     horizons_id, ipl, naif_id = AVAILABLE_BODIES[body_name_lower]
 
     # Determine cache directory
     if cache_dir is None:
-        cache_dir = spk_auto.DEFAULT_AUTO_SPK_DIR
-
-    # Ensure cache directory exists
-    if not os.path.exists(cache_dir):
+        cache_dir = spk_auto.ensure_cache_dir()
+    else:
         os.makedirs(cache_dir, exist_ok=True)
 
-    # Convert dates to Julian Days for the filename
-    from libephemeris.spk_auto import _jd_to_iso_date
+    success = 0
+    skipped = 0
+    failed = 0
 
-    def _iso_to_jd(date_str: str) -> float:
-        """Convert ISO date string to Julian Day."""
-        parts = date_str.split("-")
-        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+    if chunk_years is not None:
+        # Parse start/end years and generate chunks
+        start_year = int(start_date.split("-")[0])
+        end_year = int(end_date.split("-")[0])
 
-        # Algorithm from Meeus, Astronomical Algorithms
-        if month <= 2:
-            year -= 1
-            month += 12
+        for chunk_start in range(start_year, end_year, chunk_years):
+            chunk_end = min(chunk_start + chunk_years, end_year)
+            chunk_start_date = f"{chunk_start}-01-01"
+            chunk_end_date = f"{chunk_end}-01-01"
 
-        a = int(year / 100)
-        b = 2 - a + int(a / 4)
+            s, sk, f = _download_single_chunk(
+                body_name=body_name_lower,
+                horizons_id=horizons_id,
+                ipl=ipl,
+                naif_id=naif_id,
+                start_date=chunk_start_date,
+                end_date=chunk_end_date,
+                cache_dir=cache_dir,
+                force=force,
+                verbose=verbose,
+            )
+            success += s
+            skipped += sk
+            failed += f
 
-        jd = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + b - 1524.5
-        return jd
+            # Rate limiting between Horizons requests
+            if s > 0:
+                time.sleep(1.5)
+    else:
+        s, sk, f = _download_single_chunk(
+            body_name=body_name_lower,
+            horizons_id=horizons_id,
+            ipl=ipl,
+            naif_id=naif_id,
+            start_date=start_date,
+            end_date=end_date,
+            cache_dir=cache_dir,
+            force=force,
+            verbose=verbose,
+        )
+        success += s
+        skipped += sk
+        failed += f
+
+    return (success, skipped, failed)
+
+
+def _download_single_chunk(
+    body_name: str,
+    horizons_id: str,
+    ipl: int,
+    naif_id: int,
+    start_date: str,
+    end_date: str,
+    cache_dir: str,
+    force: bool,
+    verbose: bool,
+) -> tuple[int, int, int]:
+    """Download a single SPK chunk for a body."""
+    from libephemeris import spk_auto
+    from libephemeris.spk_auto import _iso_to_jd
 
     jd_start = _iso_to_jd(start_date)
     jd_end = _iso_to_jd(end_date)
@@ -178,12 +206,16 @@ def download_spk_for_body(
     # Check if already cached
     if os.path.exists(output_path) and not force:
         if verbose:
-            print(f"  {body_name}: Already cached at {output_path}")
-        return output_path
+            print(f"    {body_name} [{start_date} to {end_date}]: cached")
+        return (0, 1, 0)
 
     # Download
     if verbose:
-        print(f"  {body_name}: Downloading from JPL Horizons...")
+        print(
+            f"    {body_name} [{start_date} to {end_date}]: downloading...",
+            end="",
+            flush=True,
+        )
 
     try:
         spk_path = spk_auto.download_spk_from_horizons(
@@ -194,12 +226,12 @@ def download_spk_for_body(
         )
         if verbose:
             size_mb = os.path.getsize(spk_path) / (1024 * 1024)
-            print(f"  {body_name}: Downloaded {size_mb:.2f} MB to {spk_path}")
-        return spk_path
+            print(f" OK ({size_mb:.2f} MB)")
+        return (1, 0, 0)
     except Exception as e:
         if verbose:
-            print(f"  {body_name}: Failed - {e}", file=sys.stderr)
-        return None
+            print(f" FAILED: {e}")
+        return (0, 0, 1)
 
 
 def list_available_bodies() -> None:
@@ -207,28 +239,39 @@ def list_available_bodies() -> None:
     print("\nAvailable bodies for SPK download:")
     print("=" * 60)
 
-    # Group by category
-    centaurs = ["chiron", "pholus"]
-    main_belt = ["ceres", "pallas", "juno", "vesta"]
-    tnos = ["eris", "sedna", "haumea", "makemake", "ixion", "orcus", "quaoar", "varuna"]
+    # Group by category using known classifications
+    centaurs = ["chiron", "pholus", "nessus", "asbolus", "chariklo"]
+    main_belt = ["ceres", "pallas", "juno", "vesta", "hygiea"]
+    near_earth = ["eros", "apophis"]
+    tnos = [
+        "eris",
+        "sedna",
+        "haumea",
+        "makemake",
+        "ixion",
+        "orcus",
+        "quaoar",
+        "varuna",
+        "gonggong",
+    ]
 
-    print("\nCentaurs:")
-    for name in centaurs:
-        if name in AVAILABLE_BODIES:
-            horizons_id, ipl, naif_id = AVAILABLE_BODIES[name]
-            print(f"  {name:12s} - Horizons ID: {horizons_id:8s} (NAIF: {naif_id})")
+    def _print_group(title: str, names: list[str]) -> None:
+        print(f"\n{title}:")
+        for name in names:
+            if name in AVAILABLE_BODIES:
+                horizons_id, ipl, naif_id = AVAILABLE_BODIES[name]
+                print(f"  {name:12s} - Horizons ID: {horizons_id:8s} (NAIF: {naif_id})")
 
-    print("\nMain Belt Asteroids:")
-    for name in main_belt:
-        if name in AVAILABLE_BODIES:
-            horizons_id, ipl, naif_id = AVAILABLE_BODIES[name]
-            print(f"  {name:12s} - Horizons ID: {horizons_id:8s} (NAIF: {naif_id})")
+    _print_group("Centaurs", centaurs)
+    _print_group("Main Belt Asteroids", main_belt)
+    _print_group("Near-Earth Asteroids", near_earth)
+    _print_group("Trans-Neptunian Objects (TNOs)", tnos)
 
-    print("\nTrans-Neptunian Objects (TNOs):")
-    for name in tnos:
-        if name in AVAILABLE_BODIES:
-            horizons_id, ipl, naif_id = AVAILABLE_BODIES[name]
-            print(f"  {name:12s} - Horizons ID: {horizons_id:8s} (NAIF: {naif_id})")
+    # List any bodies not in the above categories
+    all_categorized = set(centaurs + main_belt + near_earth + tnos)
+    uncategorized = [n for n in sorted(AVAILABLE_BODIES) if n not in all_categorized]
+    if uncategorized:
+        _print_group("Other", uncategorized)
 
     print("\nPreset groups:")
     print("  --common     Chiron, Pholus, Ceres, Pallas, Juno, Vesta, Eris, Sedna")
@@ -267,14 +310,10 @@ def main() -> int:
     # Initialize body definitions
     _init_bodies()
 
-    # Update ALL_BODIES after initialization
-    global ALL_BODIES
-    ALL_BODIES = list(AVAILABLE_BODIES.keys())
-
     parser = argparse.ArgumentParser(
         description="Download SPK files for common celestial bodies.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog="""\
 Examples:
   python scripts/download_spk.py                        # Download common bodies
   python scripts/download_spk.py --all                  # Download all bodies
@@ -282,6 +321,10 @@ Examples:
   python scripts/download_spk.py --list                 # List available bodies
   python scripts/download_spk.py --list-cache           # Show cache contents
   python scripts/download_spk.py --start 2020-01-01 --end 2050-01-01
+  python scripts/download_spk.py --chunk 20             # 20-year chunks
+  python scripts/download_spk.py --all --chunk 20 --start 1550-01-01 --end 2650-01-01
+
+For full initialization, prefer:  libephemeris init
         """,
     )
 
@@ -321,6 +364,13 @@ Examples:
         "--end",
         default="2100-01-01",
         help="End date for SPK coverage (default: 2100-01-01)",
+    )
+    parser.add_argument(
+        "--chunk",
+        type=int,
+        default=None,
+        metavar="YEARS",
+        help="Split downloads into chunks of N years (e.g., 20)",
     )
     parser.add_argument(
         "--cache-dir",
@@ -369,10 +419,10 @@ Examples:
                 print("Use --list to see available bodies", file=sys.stderr)
                 return 1
     elif args.download_all:
-        bodies_to_download = ALL_BODIES
+        bodies_to_download = sorted(AVAILABLE_BODIES.keys())
     else:
         # Default to common bodies
-        bodies_to_download = COMMON_BODIES
+        bodies_to_download = [b for b in COMMON_BODIES if b in AVAILABLE_BODIES]
 
     if not bodies_to_download:
         print("No bodies to download.", file=sys.stderr)
@@ -383,33 +433,46 @@ Examples:
     if verbose:
         print(f"\nDownloading SPK files for {len(bodies_to_download)} bodies...")
         print(f"Date range: {args.start} to {args.end}")
+        if args.chunk:
+            print(f"Chunk size: {args.chunk} years")
         if args.cache_dir:
             print(f"Cache directory: {args.cache_dir}")
         print()
 
     # Download each body
-    success_count = 0
-    fail_count = 0
+    total_success = 0
+    total_skipped = 0
+    total_failed = 0
 
     for body_name in bodies_to_download:
-        result = download_spk_for_body(
+        if verbose:
+            print(f"  {body_name}:")
+
+        success, skipped, failed = download_spk_for_body(
             body_name=body_name,
             start_date=args.start,
             end_date=args.end,
             cache_dir=args.cache_dir,
             force=args.force,
             verbose=verbose,
+            chunk_years=args.chunk,
         )
-        if result:
-            success_count += 1
-        else:
-            fail_count += 1
+        total_success += success
+        total_skipped += skipped
+        total_failed += failed
 
     if verbose:
         print()
-        print(f"Completed: {success_count} successful, {fail_count} failed")
+        parts = []
+        if total_success:
+            parts.append(f"{total_success} downloaded")
+        if total_skipped:
+            parts.append(f"{total_skipped} cached")
+        if total_failed:
+            parts.append(f"{total_failed} failed")
+        print(f"Completed: {', '.join(parts)}")
 
-    return 0 if fail_count == 0 else 1
+    return 0 if total_failed == 0 else 1
 
 
 if __name__ == "__main__":

@@ -962,12 +962,21 @@ def set_spk_cache_dir(path: Optional[str]) -> None:
     _SPK_CACHE_DIR = path
 
 
+_SPK_CACHE_DIR_ENV_VAR = "LIBEPHEMERIS_SPK_DIR"
+
+
 def get_spk_cache_dir() -> Optional[str]:
     """
-    Get the current SPK cache directory override.
+    Get the effective SPK cache directory.
+
+    Priority:
+        1. Value set via set_spk_cache_dir() (programmatic override)
+        2. LIBEPHEMERIS_SPK_DIR environment variable
+        3. None (caller uses DEFAULT_AUTO_SPK_DIR as fallback)
 
     Returns:
-        Optional[str]: The custom cache directory path if set,
+        Optional[str]: The effective cache directory path if set via
+                      programmatic override or environment variable,
                       or None if using the default location.
 
     Note:
@@ -977,12 +986,20 @@ def get_spk_cache_dir() -> Optional[str]:
     Example:
         >>> from libephemeris import get_spk_cache_dir, set_spk_cache_dir
         >>> get_spk_cache_dir()  # Default is None (uses default location)
-        None
         >>> set_spk_cache_dir("/custom/cache")
         >>> get_spk_cache_dir()
         '/custom/cache'
+        >>> set_spk_cache_dir(None)  # Revert to default
+        >>> import os; os.environ["LIBEPHEMERIS_SPK_DIR"] = "/env/cache"
+        >>> get_spk_cache_dir()
+        '/env/cache'
     """
-    return _SPK_CACHE_DIR
+    if _SPK_CACHE_DIR is not None:
+        return _SPK_CACHE_DIR
+    env_dir = os.environ.get(_SPK_CACHE_DIR_ENV_VAR)
+    if env_dir:
+        return env_dir
+    return None
 
 
 def set_spk_date_padding(days: int) -> None:

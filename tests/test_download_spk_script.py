@@ -116,7 +116,7 @@ class TestDownloadSpkForBody:
     """Test the download_spk_for_body function."""
 
     def test_unknown_body_returns_none(self, capsys):
-        """Test that unknown body returns None."""
+        """Test that unknown body returns failure tuple."""
         from scripts.download_spk import download_spk_for_body, _init_bodies
 
         _init_bodies()
@@ -126,12 +126,12 @@ class TestDownloadSpkForBody:
             end_date="2030-01-01",
         )
 
-        assert result is None
+        assert result == (0, 0, 1)
         captured = capsys.readouterr()
         assert "Unknown body" in captured.err
 
-    def test_already_cached_returns_path(self, tmp_path):
-        """Test that already cached file is returned without download."""
+    def test_already_cached_returns_skipped(self, tmp_path):
+        """Test that already cached file returns skipped count."""
         from scripts.download_spk import download_spk_for_body, _init_bodies
 
         _init_bodies()
@@ -157,8 +157,8 @@ class TestDownloadSpkForBody:
                 force=False,
             )
 
-            assert result is not None
-            assert "2060" in result
+            # Should report 0 success, 1 skipped, 0 failed
+            assert result == (0, 1, 0)
 
     def test_force_flag_triggers_redownload(self, tmp_path):
         """Test that force flag triggers re-download."""
@@ -185,9 +185,9 @@ class TestDownloadSpkForBody:
                 force=True,
             )
 
-            # Should return None due to the mocked error, but the key is that it tried
+            # Should return (0, 0, 1) due to the mocked error, but the key is that it tried
             # We're testing that force=True attempts a download
-            assert result is None  # Due to mocked error
+            assert result == (0, 0, 1)  # Due to mocked error
 
 
 class TestIsoToJd:
@@ -351,7 +351,7 @@ class TestArgumentParsing:
         with patch("scripts.download_spk.check_astroquery", return_value=True):
             with patch(
                 "scripts.download_spk.download_spk_for_body",
-                return_value="/path/to/file.bsp",
+                return_value=(1, 0, 0),
             ) as mock_download:
                 result = main()
 
@@ -375,7 +375,7 @@ class TestArgumentParsing:
         with patch("scripts.download_spk.check_astroquery", return_value=True):
             with patch(
                 "scripts.download_spk.download_spk_for_body",
-                return_value="/path/to/file.bsp",
+                return_value=(1, 0, 0),
             ):
                 result = main()
 

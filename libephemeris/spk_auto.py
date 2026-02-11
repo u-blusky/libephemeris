@@ -68,9 +68,14 @@ def ensure_cache_dir(cache_dir: Optional[str] = None) -> str:
     This function creates the cache directory if it doesn't exist and returns
     the absolute path to the cache directory.
 
+    Resolution order when cache_dir is None:
+        1. Value from set_spk_cache_dir() (programmatic override)
+        2. LIBEPHEMERIS_SPK_DIR environment variable
+        3. DEFAULT_AUTO_SPK_DIR (~/.libephemeris/spk/)
+
     Args:
-        cache_dir: Optional custom cache directory path. If None, uses the
-            default cache directory ({library_path}/spk_cache/).
+        cache_dir: Optional custom cache directory path. If None, resolves
+            via set_spk_cache_dir() / env var / default.
 
     Returns:
         str: Absolute path to the cache directory.
@@ -79,18 +84,19 @@ def ensure_cache_dir(cache_dir: Optional[str] = None) -> str:
         >>> from libephemeris.spk_auto import ensure_cache_dir
         >>> cache_path = ensure_cache_dir()
         >>> print(cache_path)
-        /path/to/libephemeris/spk_cache
+        /home/user/.libephemeris/spk
         >>> # Custom cache directory
         >>> cache_path = ensure_cache_dir("/custom/cache/path")
     """
-    if cache_dir is not None:
-        cache_path = os.path.abspath(cache_dir)
-    else:
-        cache_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+    if cache_dir is None:
+        from .state import get_spk_cache_dir
 
-    if not os.path.exists(cache_path):
-        os.makedirs(cache_path, exist_ok=True)
+        cache_dir = get_spk_cache_dir()
+    if cache_dir is None:
+        cache_dir = DEFAULT_AUTO_SPK_DIR
 
+    cache_path = os.path.abspath(cache_dir)
+    os.makedirs(cache_path, exist_ok=True)
     return cache_path
 
 
@@ -680,9 +686,12 @@ def list_cached_spk(
     if cache_dir is not None:
         dirs_to_check = [os.path.abspath(cache_dir)]
     else:
-        # Check both default cache directories
+        # Check both the resolved default and the legacy cache directory
+        from .state import get_spk_cache_dir
+
+        resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
-        dirs_to_check = [default_cache, DEFAULT_AUTO_SPK_DIR]
+        dirs_to_check = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_check:
         if not os.path.exists(dir_path):
@@ -769,9 +778,12 @@ def clear_spk_cache(cache_dir: Optional[str] = None) -> int:
     if cache_dir is not None:
         dirs_to_clear = [os.path.abspath(cache_dir)]
     else:
-        # Clear both default cache directories
+        # Clear both the resolved default and the legacy cache directory
+        from .state import get_spk_cache_dir
+
+        resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
-        dirs_to_clear = [default_cache, DEFAULT_AUTO_SPK_DIR]
+        dirs_to_clear = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_clear:
         if not os.path.exists(dir_path):
@@ -828,9 +840,12 @@ def get_cache_size(cache_dir: Optional[str] = None) -> float:
     if cache_dir is not None:
         dirs_to_check = [os.path.abspath(cache_dir)]
     else:
-        # Check both default cache directories
+        # Check both the resolved default and the legacy cache directory
+        from .state import get_spk_cache_dir
+
+        resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
-        dirs_to_check = [default_cache, DEFAULT_AUTO_SPK_DIR]
+        dirs_to_check = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_check:
         if not os.path.exists(dir_path):
@@ -902,9 +917,12 @@ def prune_old_cache(
     if cache_dir is not None:
         dirs_to_prune = [os.path.abspath(cache_dir)]
     else:
-        # Prune both default cache directories
+        # Prune both the resolved default and the legacy cache directory
+        from .state import get_spk_cache_dir
+
+        resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
-        dirs_to_prune = [default_cache, DEFAULT_AUTO_SPK_DIR]
+        dirs_to_prune = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_prune:
         if not os.path.exists(dir_path):
@@ -1075,6 +1093,40 @@ def _jd_to_iso_date(jd: float) -> str:
     return f"{year:04d}-{month:02d}-{day:02d}"
 
 
+def _iso_to_jd(date_str: str) -> float:
+    """
+    Convert ISO date string (YYYY-MM-DD) to Julian Day.
+
+    Uses the Meeus algorithm (Astronomical Algorithms) for the conversion.
+    This is the inverse of _jd_to_iso_date().
+
+    Args:
+        date_str: ISO date string in YYYY-MM-DD format
+
+    Returns:
+        float: Julian Day number
+
+    Example:
+        >>> _iso_to_jd("2000-01-01")
+        2451544.5
+        >>> _iso_to_jd("1550-01-01")
+        2287184.5
+    """
+    parts = date_str.split("-")
+    year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+
+    # Algorithm from Meeus, Astronomical Algorithms
+    if month <= 2:
+        year -= 1
+        month += 12
+
+    a = int(year / 100)
+    b = 2 - a + int(a / 4)
+
+    jd = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + b - 1524.5
+    return jd
+
+
 def _generate_spk_cache_filename(
     body_id: Union[int, str], jd_start: float, jd_end: float
 ) -> str:
@@ -1196,7 +1248,11 @@ def is_spk_cached(
         ... else:
         ...     print("Need to download Chiron SPK")
     """
-    # Determine cache directory
+    # Determine cache directory (resolve via state/env/default)
+    if cache_dir is None:
+        from .state import get_spk_cache_dir
+
+        cache_dir = get_spk_cache_dir()
     if cache_dir is None:
         cache_dir = DEFAULT_AUTO_SPK_DIR
 

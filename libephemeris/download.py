@@ -405,3 +405,193 @@ def print_data_status():
 
     print()
     print("Run 'libephemeris download-data' to download missing files.")
+
+
+def init_all(
+    cache_dir: Optional[str] = None,
+    force: bool = False,
+    show_progress: bool = True,
+    quiet: bool = False,
+) -> dict:
+    """Initialize libephemeris with all required data files.
+
+    Downloads:
+    1. DE440.bsp planetary ephemeris (~128 MB)
+    2. planet_centers.bsp precision data (~25 MB)
+    3. SPK kernels for all minor bodies defined in SPK_BODY_NAME_MAP
+       (1550-2650, 20-year chunks)
+
+    Args:
+        cache_dir: Custom SPK cache directory (default: ~/.libephemeris/spk/).
+            Also configurable via LIBEPHEMERIS_SPK_DIR env var or
+            set_spk_cache_dir().
+        force: Re-download existing files
+        show_progress: Show progress output
+        quiet: Suppress non-error output
+
+    Returns:
+        dict with summary:
+            - de440: bool (success)
+            - planet_centers: bool (success)
+            - spk_success: int (number of SPK chunks downloaded)
+            - spk_failed: int (number of SPK chunks that failed)
+            - spk_skipped: int (number of SPK chunks already cached)
+            - failed_details: list of (body_name, chunk_start, chunk_end, error)
+    """
+    import time
+
+    logger = get_logger()
+
+    result = {
+        "de440": False,
+        "planet_centers": False,
+        "spk_success": 0,
+        "spk_failed": 0,
+        "spk_skipped": 0,
+        "failed_details": [],
+    }
+
+    # -------------------------------------------------------------------------
+    # Step 1: DE440.bsp
+    # -------------------------------------------------------------------------
+    if not quiet:
+        print("Step 1/3: DE440.bsp planetary ephemeris")
+
+    try:
+        from .state import get_planets
+
+        get_planets()  # Downloads if not present
+        result["de440"] = True
+        if not quiet:
+            print("  [OK] DE440.bsp ready")
+    except Exception as e:
+        logger.error("Failed to initialize DE440: %s", e)
+        if not quiet:
+            print(f"  [FAIL] DE440.bsp: {e}", file=sys.stderr)
+
+    # -------------------------------------------------------------------------
+    # Step 2: planet_centers.bsp
+    # -------------------------------------------------------------------------
+    if not quiet:
+        print("Step 2/3: planet_centers.bsp precision data")
+
+    try:
+        download_planet_centers(
+            force=force,
+            show_progress=show_progress,
+            quiet=quiet,
+        )
+        result["planet_centers"] = True
+        if not quiet:
+            print("  [OK] planet_centers.bsp ready")
+    except Exception as e:
+        logger.error("Failed to download planet_centers.bsp: %s", e)
+        if not quiet:
+            print(f"  [FAIL] planet_centers.bsp: {e}", file=sys.stderr)
+
+    # -------------------------------------------------------------------------
+    # Step 3: SPK for all minor bodies
+    # -------------------------------------------------------------------------
+    if not quiet:
+        print("Step 3/3: SPK kernels for minor bodies")
+
+    from .constants import SPK_BODY_NAME_MAP
+    from .spk_auto import (
+        download_spk_from_horizons,
+        _generate_spk_cache_filename,
+        _iso_to_jd,
+        ensure_cache_dir,
+    )
+    from .spk import _get_body_name
+
+    effective_cache_dir = ensure_cache_dir(cache_dir)
+
+    if not quiet:
+        print(f"  Cache directory: {effective_cache_dir}")
+
+    CHUNK_SIZE_YEARS = 20
+    START_YEAR = 1550
+    END_YEAR = 2650
+    total_bodies = len(SPK_BODY_NAME_MAP)
+    total_chunks = ((END_YEAR - START_YEAR) // CHUNK_SIZE_YEARS) * total_bodies
+
+    if not quiet:
+        print(
+            f"  Bodies: {total_bodies} | "
+            f"Chunks per body: {(END_YEAR - START_YEAR) // CHUNK_SIZE_YEARS} | "
+            f"Total: {total_chunks}"
+        )
+        print()
+
+    chunk_count = 0
+
+    for body_idx, (ipl, (horizons_id, naif_id)) in enumerate(SPK_BODY_NAME_MAP.items()):
+        body_name = _get_body_name(ipl) or f"body_{ipl}"
+
+        if not quiet:
+            print(
+                f"  [{body_idx + 1}/{total_bodies}] {body_name} "
+                f"(Horizons: {horizons_id})"
+            )
+
+        body_success = 0
+        body_skipped = 0
+        body_failed = 0
+
+        for chunk_start in range(START_YEAR, END_YEAR, CHUNK_SIZE_YEARS):
+            chunk_end = min(chunk_start + CHUNK_SIZE_YEARS, END_YEAR)
+            chunk_count += 1
+
+            jd_start = _iso_to_jd(f"{chunk_start}-01-01")
+            jd_end = _iso_to_jd(f"{chunk_end}-01-01")
+
+            filename = _generate_spk_cache_filename(horizons_id, jd_start, jd_end)
+            output_path = os.path.join(effective_cache_dir, filename)
+
+            if os.path.exists(output_path) and not force:
+                body_skipped += 1
+                result["spk_skipped"] += 1
+                continue
+
+            try:
+                download_spk_from_horizons(
+                    body_id=horizons_id,
+                    jd_start=jd_start,
+                    jd_end=jd_end,
+                    output_path=output_path,
+                    ipl=ipl,
+                    naif_id=naif_id,
+                )
+                body_success += 1
+                result["spk_success"] += 1
+
+                # Rate limiting: small delay between Horizons requests
+                time.sleep(1.5)
+
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                body_failed += 1
+                result["spk_failed"] += 1
+                result["failed_details"].append(
+                    (body_name, chunk_start, chunk_end, str(e))
+                )
+                logger.warning(
+                    "Failed to download %s chunk %d-%d: %s",
+                    body_name,
+                    chunk_start,
+                    chunk_end,
+                    e,
+                )
+
+        if not quiet:
+            parts = []
+            if body_success:
+                parts.append(f"{body_success} downloaded")
+            if body_skipped:
+                parts.append(f"{body_skipped} cached")
+            if body_failed:
+                parts.append(f"{body_failed} failed")
+            print(f"    {', '.join(parts)}")
+
+    return result
