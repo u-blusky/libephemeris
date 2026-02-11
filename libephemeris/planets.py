@@ -1053,20 +1053,23 @@ def _calc_body_moshier(
         # Convert ecliptic to equatorial using mean obliquity of date
         obliquity = moshier.mean_obliquity(jd_tt)
         ra, dec = moshier.ecliptic_to_equatorial(lon, lat, obliquity)
-        lon = ra  # RA in degrees (0-360)
-        lat = dec  # Dec in degrees (-90 to +90)
 
         # Also transform velocities if requested
+        # Must use original ecliptic lon/lat (not yet overwritten with RA/Dec)
         if want_speed:
             # Numerical differentiation for velocity transformation
-            eps_plus = moshier.mean_obliquity(jd_tt + 0.001)
-            lon_plus = lon + dlon * 0.001
-            lat_plus = lat + dlat * 0.001
+            dt = 0.001
+            eps_plus = moshier.mean_obliquity(jd_tt + dt)
+            ecl_lon_plus = lon + dlon * dt
+            ecl_lat_plus = lat + dlat * dt
             ra_plus, dec_plus = moshier.ecliptic_to_equatorial(
-                lon_plus, lat_plus, eps_plus
+                ecl_lon_plus, ecl_lat_plus, eps_plus
             )
-            dlon = (ra_plus - ra) / 0.001
-            dlat = (dec_plus - dec) / 0.001
+            dlon = (ra_plus - ra) / dt
+            dlat = (dec_plus - dec) / dt
+
+        lon = ra  # RA in degrees (0-360)
+        lat = dec  # Dec in degrees (-90 to +90)
 
     # --- Sidereal mode (ayanamsha correction) ---
     if is_sidereal and not is_equatorial:
