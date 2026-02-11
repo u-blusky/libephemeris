@@ -388,12 +388,6 @@ def enable_auto_spk(
         occurs lazily when the body's position is first calculated, or
         immediately if download_now() is called.
     """
-    if not _check_astroquery_available():
-        raise ImportError(
-            "astroquery is required for automatic SPK downloads. "
-            "Install it with: pip install astroquery"
-        )
-
     # Import state to get configuration settings
     from . import state
 
@@ -1349,13 +1343,6 @@ def auto_get_spk(
         /home/user/.libephemeris/spk/2060_2458849_2462502.bsp
         >>> # Now calc_ut(jd, SE_CHIRON, ...) uses SPK data automatically
     """
-    # Check if astroquery is available
-    if not _check_astroquery_available():
-        raise ImportError(
-            "astroquery is required for automatic SPK downloads. "
-            "Install it with: pip install astroquery"
-        )
-
     # Validate inputs
     if jd_end <= jd_start:
         raise ValueError(
@@ -1483,7 +1470,7 @@ def download_spk_from_horizons(
     """
     Download an SPK file from JPL Horizons for a specified body and date range.
 
-    This function uses astroquery.jplhorizons to download an SPK (SPICE kernel)
+    This function uses the JPL Horizons HTTP API to download an SPK (SPICE kernel)
     file for the specified body and Julian Day range. The file can then be used
     for high-precision ephemeris calculations.
 
@@ -1509,7 +1496,6 @@ def download_spk_from_horizons(
         str: Path to the downloaded SPK file (same as output_path)
 
     Raises:
-        ImportError: If astroquery is not installed
         ValueError: If body is not found on Horizons, date range is invalid,
             the date range is too large for Horizons to process, or naif_id
             cannot be deduced when ipl is provided
@@ -1538,13 +1524,6 @@ def download_spk_from_horizons(
         - For numbered asteroids, use the asteroid number (e.g., "2060" for Chiron).
         - For major planets, use the body name (e.g., "Mars", "Jupiter").
     """
-    # Check if astroquery is available
-    if not _check_astroquery_available():
-        raise ImportError(
-            "astroquery is required for downloading SPK files from Horizons. "
-            "Install it with: pip install astroquery"
-        )
-
     # Validate inputs
     if jd_end <= jd_start:
         raise ValueError(
@@ -1560,65 +1539,45 @@ def download_spk_from_horizons(
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    # Import astroquery here to handle import errors gracefully
-    try:
-        from astroquery.jplhorizons import Horizons
-    except ImportError as e:
-        raise ImportError(
-            "astroquery is required for downloading SPK files from Horizons. "
-            "Install it with: pip install astroquery"
-        ) from e
+    from . import spk as _spk_mod
 
-    # Create Horizons query object
+    logger = get_logger()
     body_id_str = str(body_id)
+
+    # Map location format for spk.download_spk(): "@0" -> "500@0"
+    if location.startswith("@"):
+        center = f"500{location}"
+    else:
+        center = location
+
     try:
-        obj = Horizons(
-            id=body_id_str,
-            location=location,
-            epochs={"start": start_date, "stop": end_date},
+        # Download SPK via direct JPL Horizons HTTP API
+        result_path = _spk_mod.download_spk(
+            body=body_id_str,
+            start=start_date,
+            end=end_date,
+            path=output_dir or ".",
+            center=center,
+            overwrite=True,
         )
+
+        # Rename to the requested output_path if the API generated a
+        # different filename (download_spk uses its own naming convention)
+        if os.path.abspath(result_path) != os.path.abspath(output_path):
+            os.replace(result_path, output_path)
+
+        logger.info("SPK saved: %s", output_path)
+
+    except ValueError as e:
+        # Body not found or invalid parameters from the Horizons API
+        raise ValueError(
+            f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"
+        ) from e
+    except ConnectionError as e:
+        raise ConnectionError(
+            f"Network error downloading SPK for '{body_id}': {e}"
+        ) from e
     except Exception as e:
-        raise ValueError(f"Failed to create Horizons query for '{body_id}': {e}") from e
-
-    # Download SPK file with error handling
-    try:
-        obj.download_spk(output_path)
-    except Exception as e:
-        error_msg = str(e).lower()
-
-        # Handle body not found
-        if "unknown target" in error_msg or "no matches found" in error_msg:
-            raise ValueError(
-                f"Body '{body_id}' not found on JPL Horizons. "
-                "Check the body identifier and try again."
-            ) from e
-
-        # Handle date range too large
-        if (
-            "time span" in error_msg
-            or "too large" in error_msg
-            or "exceeds" in error_msg
-        ):
-            raise ValueError(
-                f"Date range too large for JPL Horizons. "
-                f"Requested range: JD {jd_start} to {jd_end} "
-                f"({start_date} to {end_date}). "
-                "Try a smaller date range."
-            ) from e
-
-        # Handle network failures
-        if (
-            "connection" in error_msg
-            or "timeout" in error_msg
-            or "network" in error_msg
-            or "urlopen" in error_msg
-            or "http" in error_msg
-        ):
-            raise ConnectionError(
-                f"Network error downloading SPK from Horizons: {e}"
-            ) from e
-
-        # Re-raise with more context for other errors
         raise ValueError(
             f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"
         ) from e

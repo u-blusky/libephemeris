@@ -412,6 +412,8 @@ def init_all(
     force: bool = False,
     show_progress: bool = True,
     quiet: bool = False,
+    start_year: int = 1550,
+    end_year: int = 2650,
 ) -> dict:
     """Initialize libephemeris with all required data files.
 
@@ -419,7 +421,7 @@ def init_all(
     1. DE440.bsp planetary ephemeris (~128 MB)
     2. planet_centers.bsp precision data (~25 MB)
     3. SPK kernels for all minor bodies defined in SPK_BODY_NAME_MAP
-       (1550-2650, 20-year chunks)
+       (default 1550-2650, 20-year chunks)
 
     Args:
         cache_dir: Custom SPK cache directory (default: ~/.libephemeris/spk/).
@@ -428,6 +430,8 @@ def init_all(
         force: Re-download existing files
         show_progress: Show progress output
         quiet: Suppress non-error output
+        start_year: First year of SPK coverage (default: 1550)
+        end_year: Last year of SPK coverage (default: 2650)
 
     Returns:
         dict with summary:
@@ -436,6 +440,7 @@ def init_all(
             - spk_success: int (number of SPK chunks downloaded)
             - spk_failed: int (number of SPK chunks that failed)
             - spk_skipped: int (number of SPK chunks already cached)
+            - spk_out_of_range: int (chunks outside body's Horizons SPK limits)
             - failed_details: list of (body_name, chunk_start, chunk_end, error)
     """
     import time
@@ -448,6 +453,7 @@ def init_all(
         "spk_success": 0,
         "spk_failed": 0,
         "spk_skipped": 0,
+        "spk_out_of_range": 0,
         "failed_details": [],
     }
 
@@ -510,20 +516,18 @@ def init_all(
         print(f"  Cache directory: {effective_cache_dir}")
 
     CHUNK_SIZE_YEARS = 20
-    START_YEAR = 1550
-    END_YEAR = 2650
+    START_YEAR = start_year
+    END_YEAR = end_year
+    chunks_per_body = (END_YEAR - START_YEAR) // CHUNK_SIZE_YEARS
     total_bodies = len(SPK_BODY_NAME_MAP)
-    total_chunks = ((END_YEAR - START_YEAR) // CHUNK_SIZE_YEARS) * total_bodies
 
     if not quiet:
         print(
             f"  Bodies: {total_bodies} | "
-            f"Chunks per body: {(END_YEAR - START_YEAR) // CHUNK_SIZE_YEARS} | "
-            f"Total: {total_chunks}"
+            f"Chunks per body: {chunks_per_body} | "
+            f"Total: {chunks_per_body * total_bodies}"
         )
         print()
-
-    chunk_count = 0
 
     for body_idx, (ipl, (horizons_id, naif_id)) in enumerate(SPK_BODY_NAME_MAP.items()):
         body_name = _get_body_name(ipl) or f"body_{ipl}"
@@ -537,16 +541,26 @@ def init_all(
         body_success = 0
         body_skipped = 0
         body_failed = 0
+        body_out_of_range = 0
+        chunk_idx = 0
 
         for chunk_start in range(START_YEAR, END_YEAR, CHUNK_SIZE_YEARS):
             chunk_end = min(chunk_start + CHUNK_SIZE_YEARS, END_YEAR)
-            chunk_count += 1
+            chunk_idx += 1
 
             jd_start = _iso_to_jd(f"{chunk_start}-01-01")
             jd_end = _iso_to_jd(f"{chunk_end}-01-01")
 
             filename = _generate_spk_cache_filename(horizons_id, jd_start, jd_end)
             output_path = os.path.join(effective_cache_dir, filename)
+
+            # Show per-chunk progress
+            if not quiet:
+                sys.stdout.write(
+                    f"\r    chunk {chunk_idx}/{chunks_per_body} "
+                    f"({chunk_start}-{chunk_end}) ... "
+                )
+                sys.stdout.flush()
 
             if os.path.exists(output_path) and not force:
                 body_skipped += 1
@@ -569,12 +583,44 @@ def init_all(
                 time.sleep(1.5)
 
             except KeyboardInterrupt:
+                if not quiet:
+                    sys.stdout.write("\n")
                 raise
             except Exception as e:
+                error_msg = str(e)
+
+                # Detect Horizons SPK limit errors to skip gracefully
+                if "START time outside set SPK limits" in error_msg:
+                    # Body data doesn't go back this far; try later chunks
+                    body_out_of_range += 1
+                    result["spk_out_of_range"] += 1
+                    logger.debug(
+                        "%s: chunk %d-%d before SPK start, skipping",
+                        body_name,
+                        chunk_start,
+                        chunk_end,
+                    )
+                    continue
+
+                if "STOP time outside set SPK limits" in error_msg:
+                    # Body data ends before this chunk; skip remaining chunks
+                    remaining = (END_YEAR - chunk_start) // CHUNK_SIZE_YEARS
+                    body_out_of_range += remaining
+                    result["spk_out_of_range"] += remaining
+                    logger.debug(
+                        "%s: chunk %d-%d past SPK end, skipping %d remaining",
+                        body_name,
+                        chunk_start,
+                        chunk_end,
+                        remaining,
+                    )
+                    break
+
+                # Genuine failure
                 body_failed += 1
                 result["spk_failed"] += 1
                 result["failed_details"].append(
-                    (body_name, chunk_start, chunk_end, str(e))
+                    (body_name, chunk_start, chunk_end, error_msg)
                 )
                 logger.warning(
                     "Failed to download %s chunk %d-%d: %s",
@@ -585,11 +631,15 @@ def init_all(
                 )
 
         if not quiet:
+            # Clear the per-chunk line and print summary
+            sys.stdout.write("\r" + " " * 60 + "\r")
             parts = []
             if body_success:
                 parts.append(f"{body_success} downloaded")
             if body_skipped:
                 parts.append(f"{body_skipped} cached")
+            if body_out_of_range:
+                parts.append(f"{body_out_of_range} out of range")
             if body_failed:
                 parts.append(f"{body_failed} failed")
             print(f"    {', '.join(parts)}")

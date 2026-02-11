@@ -5,7 +5,8 @@ This module provides CLI commands for managing libephemeris, including
 downloading optional data files.
 
 Usage:
-    libephemeris init                 Initialize all data files
+    libephemeris init                 Initialize all data files (1550-2650)
+    libephemeris init-fast            Fast init, modern range (1900-2100)
     libephemeris download-data       Download precision data files
     libephemeris status              Show data file status
     libephemeris --version           Show version
@@ -18,6 +19,19 @@ import argparse
 import sys
 
 from . import __version__
+
+
+def _print_init_summary(result: dict) -> None:
+    """Print the init result summary."""
+    print("\nInitialization complete.")
+    print(f"  DE440.bsp: {'OK' if result['de440'] else 'FAILED'}")
+    print(f"  planet_centers.bsp: {'OK' if result['planet_centers'] else 'FAILED'}")
+    print(f"  SPK downloaded: {result['spk_success']}")
+    print(f"  SPK skipped (cached): {result['spk_skipped']}")
+    if result.get("spk_out_of_range", 0) > 0:
+        print(f"  SPK out of range: {result['spk_out_of_range']}")
+    if result["spk_failed"] > 0:
+        print(f"  SPK failed: {result['spk_failed']}")
 
 
 def cmd_download_data(args: argparse.Namespace) -> int:
@@ -41,10 +55,9 @@ def cmd_download_data(args: argparse.Namespace) -> int:
 
 
 def cmd_init(args: argparse.Namespace) -> int:
-    """Handle the init command."""
+    """Handle the init command (full range 1550-2650)."""
     from .download import init_all
 
-    # Apply cache dir from CLI if provided
     cache_dir = args.cache_dir
 
     try:
@@ -55,16 +68,34 @@ def cmd_init(args: argparse.Namespace) -> int:
             quiet=args.quiet,
         )
         if not args.quiet:
-            print("\nInitialization complete.")
-            print(f"  DE440.bsp: {'OK' if result['de440'] else 'FAILED'}")
-            print(
-                f"  planet_centers.bsp: "
-                f"{'OK' if result['planet_centers'] else 'FAILED'}"
-            )
-            print(f"  SPK downloaded: {result['spk_success']}")
-            print(f"  SPK skipped (cached): {result['spk_skipped']}")
-            if result["spk_failed"] > 0:
-                print(f"  SPK failed: {result['spk_failed']}")
+            _print_init_summary(result)
+        return 0 if result["spk_failed"] == 0 else 1
+    except KeyboardInterrupt:
+        print("\nInitialization cancelled.")
+        return 130
+    except Exception as e:
+        if not args.quiet:
+            print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_init_fast(args: argparse.Namespace) -> int:
+    """Handle the init-fast command (modern range 1900-2100)."""
+    from .download import init_all
+
+    cache_dir = args.cache_dir
+
+    try:
+        result = init_all(
+            cache_dir=cache_dir,
+            force=args.force,
+            show_progress=not args.no_progress,
+            quiet=args.quiet,
+            start_year=1900,
+            end_year=2100,
+        )
+        if not args.quiet:
+            _print_init_summary(result)
         return 0 if result["spk_failed"] == 0 else 1
     except KeyboardInterrupt:
         print("\nInitialization cancelled.")
@@ -97,7 +128,8 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Examples:
-  libephemeris init                Initialize all data files (DE440 + SPK)
+  libephemeris init                Initialize all data files (1550-2650 CE)
+  libephemeris init-fast           Fast init, modern range (1900-2100 CE)
   libephemeris download-data       Download optional precision data files
   libephemeris status              Show installed data files
   libephemeris --version           Show version information
@@ -167,8 +199,6 @@ This includes:
 - planet_centers.bsp precision offsets (~25 MB)
 - SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
   in 20-year chunks covering 1550-2650 CE
-
-Requires: pip install astroquery
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -194,6 +224,48 @@ Requires: pip install astroquery
         help="Custom SPK cache directory (default: ~/.libephemeris/spk/)",
     )
     init_parser.set_defaults(func=cmd_init)
+
+    # init-fast command
+    init_fast_parser = subparsers.add_parser(
+        "init-fast",
+        help="Fast init with modern date range (1900-2100 CE)",
+        description="""\
+Download data files for modern-era calculations (1900-2100 CE).
+
+Same as 'init' but with a reduced date range, resulting in far fewer
+SPK chunks to download (~10x faster). Ideal for most astrological
+and astronomical applications.
+
+This includes:
+- DE440.bsp planetary ephemeris (~128 MB)
+- planet_centers.bsp precision offsets (~25 MB)
+- SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
+  in 20-year chunks covering 1900-2100 CE
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    init_fast_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force download even if files already exist",
+    )
+    init_fast_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress output",
+    )
+    init_fast_parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress all output except errors",
+    )
+    init_fast_parser.add_argument(
+        "--cache-dir",
+        help="Custom SPK cache directory (default: ~/.libephemeris/spk/)",
+    )
+    init_fast_parser.set_defaults(func=cmd_init_fast)
 
     # status command
     status_parser = subparsers.add_parser(
