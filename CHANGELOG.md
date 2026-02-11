@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-02-11
+
+### Added
+
+#### CLI Commands
+- `libephemeris init` command for full initialization: downloads DE440.bsp, planet_centers.bsp, and SPK kernels for all 21 minor bodies (20-year chunks, 1550-2650 CE)
+- `libephemeris init-fast` command for modern-era initialization (1900-2100 CE), ~10x faster than full init
+- Per-chunk progress indicator during SPK downloads (inline overwrite)
+- `--cache-dir` CLI option for custom SPK cache directory
+
+#### SPK Cache Centralization
+- Unified SPK cache directory at `~/.libephemeris/spk/` (was scattered)
+- Cache directory resolution: `set_spk_cache_dir()` > `LIBEPHEMERIS_SPK_DIR` env var > `--cache-dir` CLI > default
+- `init_all()` function with `start_year`/`end_year` parameters for programmatic use
+
+#### SPK Download Script
+- Updated `scripts/download_spk.py` to use `SPK_BODY_NAME_MAP` (21 bodies) with chunking support
+
+### Fixed
+
+- Rewrote `download_spk_from_horizons()` to use direct JPL Horizons HTTP API, replacing broken astroquery-based implementation (astroquery 0.4.11 `Horizons` constructor requires `step` in epochs dict, and `Horizons.download_spk()` method does not exist)
+- Smart-skip for Horizons SPK date range limits: `START time outside SPK limits` skips chunk and tries next; `STOP time outside SPK limits` breaks to next body (avoids hundreds of futile requests and warnings)
+- Removed unnecessary `astroquery` dependency from `enable_auto_spk()`, `auto_get_spk()`, and `download_spk_from_horizons()`
+
 ## [0.10.0] - 2026-02-10
 
 ### Added
@@ -533,7 +557,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/g-battaglia/libephemeris/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/g-battaglia/libephemeris/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/g-battaglia/libephemeris/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/g-battaglia/libephemeris/compare/v0.7.0...v0.8.0
