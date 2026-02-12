@@ -153,10 +153,13 @@ from .constants import (
     SE_ALRESCHA,
     SEFLG_SPEED,
     SEFLG_NOABERR,
+    SEFLG_EQUATORIAL,
     J2000,
     J1991_25,
     DAYS_PER_JULIAN_YEAR,
 )
+from .utils import cotrans_sp
+from .cache import get_true_obliquity
 
 
 @dataclass
@@ -3608,15 +3611,28 @@ def swe_fixstar_ut(
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 star_id, t.tt, noaberr
             )
-            return (
-                (lon, lat, dist, speed_lon, speed_lat, speed_dist),
-                iflag,
-                canonical_name or "",
-            )
+            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(star_id, t.tt, noaberr)
             # Return canonical star name on success (pyswisseph behavior)
-            return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, canonical_name or "")
+            result = (lon, lat, dist, 0.0, 0.0, 0.0)
+
+        # Convert to equatorial coordinates if requested
+        if iflag & SEFLG_EQUATORIAL:
+            # Calculate true obliquity for coordinate transformation
+            eps = get_true_obliquity(t.tt)
+
+            # Split into position and velocity tuples
+            pos = result[:3]
+            vel = result[3:]
+
+            # Transform from ecliptic to equatorial (rotate by eps)
+            pos_eq, vel_eq = cotrans_sp(pos, vel, eps)
+
+            # Merge back
+            result = pos_eq + vel_eq
+
+        return (result, iflag, canonical_name or "")
     except Exception as e:
         return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
@@ -3664,15 +3680,28 @@ def swe_fixstar(
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 star_id, jd, noaberr
             )
-            return (
-                (lon, lat, dist, speed_lon, speed_lat, speed_dist),
-                iflag,
-                canonical_name or "",
-            )
+            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(star_id, jd, noaberr)
             # Return canonical star name on success (pyswisseph behavior)
-            return ((lon, lat, dist, 0.0, 0.0, 0.0), iflag, canonical_name or "")
+            result = (lon, lat, dist, 0.0, 0.0, 0.0)
+
+        # Convert to equatorial coordinates if requested
+        if iflag & SEFLG_EQUATORIAL:
+            # Calculate true obliquity for coordinate transformation
+            eps = get_true_obliquity(jd)
+
+            # Split into position and velocity tuples
+            pos = result[:3]
+            vel = result[3:]
+
+            # Transform from ecliptic to equatorial (rotate by eps)
+            pos_eq, vel_eq = cotrans_sp(pos, vel, eps)
+
+            # Merge back
+            result = pos_eq + vel_eq
+
+        return (result, iflag, canonical_name or "")
     except Exception as e:
         return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
@@ -3887,16 +3916,28 @@ def swe_fixstar2_ut(
                 entry.id, t.tt, noaberr
             )
             star_name_out = _format_star_name(entry)
-            return (
-                star_name_out,
-                (lon, lat, dist, speed_lon, speed_lat, speed_dist),
-                iflag,
-                "",
-            )
+            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(entry.id, t.tt, noaberr)
             star_name_out = _format_star_name(entry)
-            return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
+            result = (lon, lat, dist, 0.0, 0.0, 0.0)
+
+        # Convert to equatorial coordinates if requested
+        if iflag & SEFLG_EQUATORIAL:
+            # Calculate true obliquity for coordinate transformation
+            eps = get_true_obliquity(t.tt)
+
+            # Split into position and velocity tuples
+            pos = result[:3]
+            vel = result[3:]
+
+            # Transform from ecliptic to equatorial (rotate by eps)
+            pos_eq, vel_eq = cotrans_sp(pos, vel, eps)
+
+            # Merge back
+            result = pos_eq + vel_eq
+
+        return (star_name_out, result, iflag, "")
     except Exception as e:
         return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
@@ -3959,16 +4000,28 @@ def swe_fixstar2(
                 entry.id, jd, noaberr
             )
             star_name_out = _format_star_name(entry)
-            return (
-                star_name_out,
-                (lon, lat, dist, speed_lon, speed_lat, speed_dist),
-                iflag,
-                "",
-            )
+            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(entry.id, jd, noaberr)
             star_name_out = _format_star_name(entry)
-            return (star_name_out, (lon, lat, dist, 0.0, 0.0, 0.0), iflag, "")
+            result = (lon, lat, dist, 0.0, 0.0, 0.0)
+
+        # Convert to equatorial coordinates if requested
+        if iflag & SEFLG_EQUATORIAL:
+            # Calculate true obliquity for coordinate transformation
+            eps = get_true_obliquity(jd)
+
+            # Split into position and velocity tuples
+            pos = result[:3]
+            vel = result[3:]
+
+            # Transform from ecliptic to equatorial (rotate by eps)
+            pos_eq, vel_eq = cotrans_sp(pos, vel, eps)
+
+            # Merge back
+            result = pos_eq + vel_eq
+
+        return (star_name_out, result, iflag, "")
     except Exception as e:
         return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
 
