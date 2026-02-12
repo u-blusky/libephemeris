@@ -388,6 +388,7 @@ clear_spk_cache()
 
 | Variable | Purpose | Values |
 |----------|---------|--------|
+| `LIBEPHEMERIS_EPHEMERIS` | Select ephemeris file | e.g., `de441.bsp` |
 | `LIBEPHEMERIS_IERS_DELTA_T` | Enable IERS Delta T | `1`, `true`, `yes` |
 | `LIBEPHEMERIS_AUTO_SPK` | Enable auto SPK download | `1`, `true`, `yes` |
 | `LIBEPHEMERIS_IERS_AUTO_DOWNLOAD` | Auto-download IERS data | `1`, `true`, `yes` |

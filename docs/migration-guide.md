@@ -197,6 +197,7 @@ libephemeris uses JPL DE ephemerides with specific date ranges:
 | DE422 | -3000 to 3000 | ~623 MB |
 | DE430 | 1550-2650 | ~128 MB |
 | DE431 | -13200 to 17191 | ~3.4 GB |
+| DE441 | -13200 to 17191 | ~3.4 GB |
 
 To use a different ephemeris for extended date ranges:
 
@@ -204,11 +205,19 @@ To use a different ephemeris for extended date ranges:
 from libephemeris import set_ephemeris_file, set_ephe_path
 
 # Set custom ephemeris file
-set_ephemeris_file("de431.bsp")
+set_ephemeris_file("de441.bsp")  # Extended range version of DE440
 
 # Or specify a custom directory
 set_ephe_path("/path/to/ephemeris/files")
 ```
+
+You can also select the ephemeris file via the `LIBEPHEMERIS_EPHEMERIS` environment variable:
+
+```bash
+export LIBEPHEMERIS_EPHEMERIS=de441.bsp
+```
+
+Priority: `set_ephemeris_file()` > `LIBEPHEMERIS_EPHEMERIS` env var > default `de440.bsp`.
 
 ---
 
@@ -330,6 +339,19 @@ ctx2.set_sid_mode(0)  # Fagan-Bradley
 ctx3.set_sid_mode(27) # True Citra
 
 # But they all share the same ephemeris data in memory
+```
+
+---
+
+## SEFLG_MOSEPH (Moshier Ephemeris Flag)
+
+The `SEFLG_MOSEPH` flag is accepted for API compatibility but **silently ignored**. All calculations in libephemeris always use JPL DE440/DE441 via Skyfield, regardless of whether `SEFLG_MOSEPH` is passed. Code that previously used `SEFLG_MOSEPH` to select the Moshier semi-analytical ephemeris will continue to work without errors, but will use the JPL ephemeris instead.
+
+```python
+# This still works, but SEFLG_MOSEPH is silently ignored:
+pos, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_MOSEPH | swe.SEFLG_SPEED)
+# Equivalent to:
+pos, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SPEED)
 ```
 
 ---

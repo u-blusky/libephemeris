@@ -852,8 +852,11 @@ def _calc_type21_position(
         SEFLG_SPEED,
         SEFLG_TRUEPOS,
     )
-    from .moshier.precession import nutation_angles, precess_from_j2000
-    from .moshier.utils import apply_aberration_to_position
+    from .astrometry import (
+        nutation_angles,
+        precess_from_j2000,
+        apply_aberration_to_position,
+    )
     from .planets import swe_get_ayanamsa_ut
 
     jd_tdb = t.tdb  # Use TDB for SPK calculations

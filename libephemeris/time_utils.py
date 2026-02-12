@@ -12,7 +12,7 @@ All algorithms follow Meeus "Astronomical Algorithms" (1998).
 
 from typing import Any
 
-from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH, SEFLG_MOSEPH
+from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH
 from .state import get_timescale, get_delta_t_userdef, get_iers_delta_t_enabled
 
 # Julian Day of Gregorian calendar reform: Oct 15, 1582
@@ -263,11 +263,11 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
     serr = ""
 
     # Check for valid ephemeris flags
-    ephe_selection = ephe_flag & (SEFLG_JPLEPH | SEFLG_SWIEPH | SEFLG_MOSEPH)
+    ephe_selection = ephe_flag & (SEFLG_JPLEPH | SEFLG_SWIEPH)
 
     # All ephemeris modes use the same Skyfield Delta T model
-    # SEFLG_MOSEPH only affects position calculations, not Delta T
     # SEFLG_SWIEPH and SEFLG_JPLEPH both use Skyfield/JPL internally
+    # SEFLG_MOSEPH is accepted for compatibility but ignored
     _ = ephe_selection  # Explicitly unused: all modes use same Delta T
 
     # Check for IERS Delta T if enabled

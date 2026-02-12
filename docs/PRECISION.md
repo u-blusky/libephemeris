@@ -259,7 +259,9 @@ LibEphemeris uses JPL DE ephemerides with specific date ranges:
 | DE422 | -3000 to 3000 | Full precision |
 | DE430 | 1550-2650 | Full precision |
 | DE431 | -13200 to 17191 | Full precision |
-| DE441 | -13200 to 17191 | Full precision |
+| DE441 | -13200 to 17191 | Full precision, extended DE440 |
+
+**Note**: All calculations always use JPL DE ephemerides via Skyfield. To use DE441 for extended date range coverage, set the `LIBEPHEMERIS_EPHEMERIS` environment variable (e.g., `LIBEPHEMERIS_EPHEMERIS=de441.bsp`) or call `set_ephemeris_file("de441.bsp")`. Priority: `set_ephemeris_file()` > `LIBEPHEMERIS_EPHEMERIS` env var > default `de440.bsp`.
 
 **Outside valid range**: Calculations will raise an exception with the supported date range.
 

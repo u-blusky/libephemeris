@@ -3,7 +3,7 @@ Global state management for libephemeris.
 
 This module maintains the library's singleton state including:
 - Ephemeris data loader (Skyfield Loader)
-- Planetary ephemeris (DE440 or other JPL files)
+- Planetary ephemeris (DE440 or DE441 via env var)
 - Timescale (for UTC/TT conversions)
 - Observer topocentric location
 - Sidereal mode configuration
@@ -37,6 +37,7 @@ _CONTEXT_SWAP_LOCK = threading.RLock()
 
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
+_EPHEMERIS_ENV_VAR = "LIBEPHEMERIS_EPHEMERIS"  # Env var for ephemeris file selection
 _LOADER: Optional[Loader] = None  # Skyfield data loader
 _PLANETS: Optional[SpiceKernel] = None  # Loaded planetary ephemeris
 _PLANET_CENTERS: Optional[SpiceKernel] = None  # Planet center offsets (599, 699, etc.)
@@ -112,6 +113,30 @@ def get_timescale() -> Timescale:
     return _TS
 
 
+def _get_effective_ephemeris_file() -> str:
+    """
+    Determine the effective ephemeris file to use.
+
+    Priority order:
+        1. set_ephemeris_file() (programmatic override via _EPHEMERIS_FILE if changed)
+        2. LIBEPHEMERIS_EPHEMERIS environment variable
+        3. Default: "de440.bsp"
+
+    Returns:
+        str: The ephemeris filename to use (e.g., "de440.bsp", "de441.bsp").
+    """
+    # If the user explicitly called set_ephemeris_file(), _EPHEMERIS_FILE is already set.
+    # We only consult the env var if the file is still the default.
+    if _EPHEMERIS_FILE != "de440.bsp":
+        return _EPHEMERIS_FILE
+
+    env_value = os.environ.get(_EPHEMERIS_ENV_VAR, "").strip()
+    if env_value:
+        return env_value
+
+    return _EPHEMERIS_FILE
+
+
 def get_planets() -> SpiceKernel:
     """
     Get or load the planetary ephemeris (DE440 by default).
@@ -123,15 +148,19 @@ def get_planets() -> SpiceKernel:
         FileNotFoundError: If ephemeris file cannot be found or downloaded
 
     Note:
-        Uses the ephemeris file set via set_ephemeris_file() (default: de440.bsp).
+        Uses the ephemeris file determined by (in priority order):
+        1. set_ephemeris_file() if called explicitly
+        2. LIBEPHEMERIS_EPHEMERIS environment variable (e.g., "de441.bsp")
+        3. Default: "de440.bsp"
+
         Searches in _EPHEMERIS_PATH if set, then workspace root, then downloads.
-        If DE440 is requested but not available, automatically falls back to DE421
-        if present locally (DE440 will be downloaded for better precision).
     """
     global _PLANETS, _EPHEMERIS_FILE
     logger = get_logger()
     if _PLANETS is None:
         load = get_loader()
+        effective_file = _get_effective_ephemeris_file()
+        _EPHEMERIS_FILE = effective_file
 
         # Try custom ephemeris path first if set
         if _EPHEMERIS_PATH:
@@ -150,30 +179,7 @@ def get_planets() -> SpiceKernel:
             _PLANETS = load(bsp_path)
             logger.info("Ephemeris loaded: %s", bsp_path)
         else:
-            # If DE440 is not found locally, try DE421 as fallback before downloading
-            # This allows offline use with DE421 while recommending DE440 for download
-            if _EPHEMERIS_FILE == "de440.bsp":
-                fallback_file = "de421.bsp"
-                # Check custom path first
-                if _EPHEMERIS_PATH:
-                    fallback_path = os.path.join(_EPHEMERIS_PATH, fallback_file)
-                    if os.path.exists(fallback_path):
-                        logger.debug(
-                            "Using cached fallback ephemeris: %s", fallback_path
-                        )
-                        _EPHEMERIS_FILE = fallback_file
-                        _PLANETS = load(fallback_path)
-                        logger.info("Ephemeris loaded: %s", fallback_path)
-                        return _PLANETS
-                # Check workspace root
-                fallback_path = os.path.join(base_dir, fallback_file)
-                if os.path.exists(fallback_path):
-                    logger.debug("Using cached fallback ephemeris: %s", fallback_path)
-                    _EPHEMERIS_FILE = fallback_file
-                    _PLANETS = load(fallback_path)
-                    logger.info("Ephemeris loaded: %s", fallback_path)
-                    return _PLANETS
-            # Download from internet (will get DE440 if that was requested)
+            # Download from internet
             logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
             _PLANETS = load(_EPHEMERIS_FILE)
             # Get the path where Skyfield downloaded the file

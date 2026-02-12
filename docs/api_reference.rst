@@ -260,7 +260,7 @@ swe_deltat_ex / deltat_ex
 
    :param tjd: Julian Day number in UT1
    :type tjd: float
-   :param ephe_flag: Ephemeris selection flag (SEFLG_SWIEPH, SEFLG_JPLEPH, SEFLG_MOSEPH)
+   :param ephe_flag: Ephemeris selection flag (SEFLG_SWIEPH, SEFLG_JPLEPH). Note: SEFLG_MOSEPH is accepted for compatibility but silently ignored — all calculations use JPL DE440/DE441.
    :type ephe_flag: int
    :returns: Tuple of (delta_t, error_message)
    :rtype: tuple[float, str]

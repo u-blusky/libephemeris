@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `SEFLG_MOSEPH` flag is now accepted but silently ignored — all calculations always use JPL DE440/DE441 via Skyfield
+- Removed Moshier semi-analytical ephemeris package (`moshier/`)
+- Removed DE421 fallback — if DE440 is not found locally, it will be downloaded
+
+### Added
+- Environment variable `LIBEPHEMERIS_EPHEMERIS` for ephemeris file selection (e.g., `de441.bsp` for extended range -13200 to +17191 CE)
+- Priority: `set_ephemeris_file()` > `LIBEPHEMERIS_EPHEMERIS` env var > default `de440.bsp`
+- New `astrometry.py` module with IAU 2006 precession, IAU 2000B nutation, and stellar aberration utilities
+
+### Removed
+- `libephemeris/moshier/` package (VSOP87, ELP2000-82B, Pluto analytical)
+- `_calc_body_moshier()` function and Moshier routing in `swe_calc_ut()`/`swe_calc()`
+- `validate_jd_range_moshier()` and Moshier range constants from `exceptions.py`
+- ~50 Moshier-related test files
+
 ## [0.11.0] - 2026-02-11
 
 ### Added

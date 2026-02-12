@@ -78,7 +78,6 @@ from .constants import (
     SE_SUN,
     SEFLG_JPLEPH,
     SEFLG_SWIEPH,
-    SEFLG_MOSEPH,
 )
 from .state import get_timescale
 from .planets import swe_get_ayanamsa_ut, swe_calc_ut
@@ -759,10 +758,8 @@ def swe_houses(
     sun_dec = 0.0
     if hsys_char in ("I", "i"):
         try:
-            # Propagate ephemeris flag (SEFLG_MOSEPH, SEFLG_SWIEPH, etc.) to swe_calc_ut
-            # so that houses are calculated consistently with user's chosen ephemeris.
-            # Extract ephemeris flags: SEFLG_JPLEPH=1, SEFLG_SWIEPH=2, SEFLG_MOSEPH=4
-            eph_flags = iflag & (SEFLG_JPLEPH | SEFLG_SWIEPH | SEFLG_MOSEPH)
+            # Extract ephemeris flags: SEFLG_JPLEPH=1, SEFLG_SWIEPH=2
+            eph_flags = iflag & (SEFLG_JPLEPH | SEFLG_SWIEPH)
             sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
         except Exception:
@@ -1545,8 +1542,8 @@ def swe_houses_ex(
             # using the sidereal Ascendant and MC.
             try:
                 # Get Sun's declination (geometric, not affected by sidereal)
-                # Propagate ephemeris flags (SEFLG_MOSEPH etc.) to swe_calc_ut
-                eph_flags = flags & (SEFLG_JPLEPH | SEFLG_SWIEPH | SEFLG_MOSEPH)
+                # Propagate ephemeris flags to swe_calc_ut
+                eph_flags = flags & (SEFLG_JPLEPH | SEFLG_SWIEPH)
                 sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
                 sun_dec = sun_pos[1]
             except Exception:

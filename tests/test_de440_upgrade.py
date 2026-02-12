@@ -195,17 +195,17 @@ class TestDE440VsDE421Compatibility:
 
 
 class TestDE440Fallback:
-    """Test the automatic fallback from DE440 to DE421."""
+    """Test ephemeris file selection (DE440 default, env var override)."""
 
-    def test_fallback_logic_exists(self):
-        """Verify that the fallback mechanism is implemented in get_planets()."""
+    def test_env_var_selection_logic_exists(self):
+        """Verify that env var ephemeris selection is implemented in get_planets()."""
         import inspect
         from libephemeris import state
 
         source = inspect.getsource(state.get_planets)
-        # Check that DE421 fallback logic is present
-        assert "de421.bsp" in source
-        assert "fallback" in source.lower()
+        # Check that env var selection logic is present
+        assert "_get_effective_ephemeris_file" in source
+        assert "_EPHEMERIS_FILE" in source
 
     def test_default_prefers_de440(self):
         """Verify that DE440 is preferred when available."""
@@ -227,21 +227,14 @@ class TestDE440Fallback:
             state.get_planets()
             assert state._EPHEMERIS_FILE == "de440.bsp"
 
-    def test_fallback_updates_ephemeris_file_variable(self):
-        """Test that fallback properly updates _EPHEMERIS_FILE when triggered."""
-        import os
+    def test_effective_ephemeris_uses_env_var(self):
+        """Test that _get_effective_ephemeris_file respects env var override."""
+        import inspect
         from libephemeris import state
 
-        # Reset state
-        ephem.close()
-
-        # The fallback logic should update _EPHEMERIS_FILE if fallback is used
-        # We just verify the logic is structured correctly by checking the source
-        import inspect
-
-        source = inspect.getsource(state.get_planets)
-        # Check that _EPHEMERIS_FILE is updated during fallback
-        assert "_EPHEMERIS_FILE = fallback_file" in source
+        source = inspect.getsource(state._get_effective_ephemeris_file)
+        # Check that the env var mechanism is implemented
+        assert "_EPHEMERIS_ENV_VAR" in source or "LIBEPHEMERIS_EPHEMERIS" in source
 
 
 class TestDE440OuterPlanetPrecision:

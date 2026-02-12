@@ -10,7 +10,7 @@ Neptune, and Pluto.
 
 ### The Problem
 
-JPL's Development Ephemerides (DE421, DE440, etc.) provide positions for planetary
+JPL's Development Ephemerides (DE440, DE441, etc.) provide positions for planetary
 system **barycenters** rather than planet **centers** for the outer planets. This
 is because these planets have significant moon systems whose combined mass affects
 the barycenter location.

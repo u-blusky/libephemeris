@@ -148,6 +148,7 @@ libephemeris/
 ├── eclipse.py            # Eclipse calculations
 ├── exceptions.py         # Exception hierarchy
 ├── context.py            # Thread-safe EphemerisContext
+├── astrometry.py         # IAU precession/nutation/aberration utilities
 ├── state.py              # Global state management
 └── time_utils.py         # Julian day conversions
 tests/
@@ -177,11 +178,12 @@ ephem.calc_ut(jd, SE_SUN, SEFLG_SPEED)
 return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 ```
 
-## *VERY IMPORTANT:*
+## Important Notes
 
-> Moshier è una modalità ESPLICITA attivata dal flag `SEFLG_MOSEPH` (4). NON è un fallback silenzioso.
-> - `SEFLG_SWIEPH` / `SEFLG_JPLEPH` (default): usa DE440 via Skyfield. Fuori range 1550-2650 → `EphemerisRangeError`.
-> - `SEFLG_MOSEPH`: usa algoritmi semi-analitici. Range -3000 a +3000 CE. Nessuna dipendenza da JPL/SPK.
-> I due sistemi sono completamente separati. Il flag viene controllato all'ingresso in `swe_calc_ut()`/`swe_calc()`.
+> `SEFLG_MOSEPH` is accepted for API compatibility but silently ignored. All calculations always use JPL DE440/DE441 via Skyfield.
 
-*KEEP ALLWAYS 1:1 Compatibility with PySwissEphemeris!*
+### Ephemeris File Selection
+
+The `LIBEPHEMERIS_EPHEMERIS` environment variable controls which JPL ephemeris file is used. For example, set `LIBEPHEMERIS_EPHEMERIS=de441.bsp` to use DE441 for extended date range coverage. The default is DE440.
+
+*KEEP ALWAYS 1:1 Compatibility with PySwissEphemeris!*
