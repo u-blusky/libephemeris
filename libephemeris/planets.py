@@ -1233,6 +1233,41 @@ def _calc_nutation_obliquity(
     return (true_obliquity, mean_obliquity, delta_psi, delta_eps, 0.0, 0.0), iflag
 
 
+def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
+    """Convert ecliptic coordinates to equatorial if SEFLG_EQUATORIAL is set.
+
+    For bodies computed in ecliptic coordinates (lunar nodes, Lilith, etc.),
+    this applies the ecliptic-to-equatorial transformation using the true
+    obliquity of the ecliptic at the given date.
+
+    Args:
+        result: 6-tuple of (lon, lat, dist, dlon, dlat, ddist) in ecliptic coords
+        jd_tt: Julian Day in Terrestrial Time (for obliquity calculation)
+        iflag: Calculation flags bitmask
+
+    Returns:
+        If SEFLG_EQUATORIAL is set: transformed (RA, Dec, dist, dRA, dDec, ddist)
+        Otherwise: original result unchanged
+    """
+    if not (iflag & SEFLG_EQUATORIAL):
+        return result
+    from .cache import get_true_obliquity
+    from .utils import cotrans_sp
+
+    eps = get_true_obliquity(jd_tt)
+    coord = (result[0], result[1], result[2])
+    speed = (result[3], result[4], result[5])
+    new_coord, new_speed = cotrans_sp(coord, speed, eps)
+    return (
+        new_coord[0],
+        new_coord[1],
+        new_coord[2],
+        new_speed[0],
+        new_speed[1],
+        new_speed[2],
+    )
+
+
 def _calc_body(
     t, ipl: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -1322,7 +1357,9 @@ def _calc_body(
                     ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
                     da = (ayanamsa_next - ayanamsa) / dt_aya
                     dlon -= da
-            return _to_native_floats((lon, 0.0, 0.0, dlon, 0.0, 0.0)), iflag
+            result = (lon, 0.0, 0.0, dlon, 0.0, 0.0)
+            result = _maybe_equatorial_convert(result, jd_tt, iflag)
+            return _to_native_floats(result), iflag
         else:  # SE_TRUE_NODE
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
             # Calculate velocity via central difference numerical differentiation
@@ -1353,7 +1390,9 @@ def _calc_body(
                     ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
                     da = (ayanamsa_next - ayanamsa) / dt_aya
                     dlon -= da
-            return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
+            result = (lon, lat, dist, dlon, dlat, ddist)
+            result = _maybe_equatorial_convert(result, jd_tt, iflag)
+            return _to_native_floats(result), iflag
 
     # South nodes are 180° from north nodes
     if ipl in [-SE_MEAN_NODE, -SE_TRUE_NODE]:
@@ -1401,7 +1440,9 @@ def _calc_body(
                     ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
                     da = (ayanamsa_next - ayanamsa) / dt_aya
                     dlon -= da
-            return _to_native_floats((lon, lat, 0.0, dlon, dlat, 0.0)), iflag
+            result = (lon, lat, 0.0, dlon, dlat, 0.0)
+            result = _maybe_equatorial_convert(result, jd_tt, iflag)
+            return _to_native_floats(result), iflag
         else:  # SE_OSCU_APOG
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
             # Calculate velocity via central difference numerical differentiation
@@ -1431,7 +1472,9 @@ def _calc_body(
                     ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
                     da = (ayanamsa_next - ayanamsa) / dt_aya
                     dlon -= da
-            return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
+            result = (lon, lat, dist, dlon, dlat, ddist)
+            result = _maybe_equatorial_convert(result, jd_tt, iflag)
+            return _to_native_floats(result), iflag
 
     # Handle Interpolated Apogee/Perigee
     if ipl in [SE_INTP_APOG, SE_INTP_PERG]:
@@ -1480,7 +1523,9 @@ def _calc_body(
                 ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
                 da = (ayanamsa_next - ayanamsa) / dt_aya
                 dlon -= da
-        return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
+        result = (lon, lat, dist, dlon, dlat, ddist)
+        result = _maybe_equatorial_convert(result, jd_tt, iflag)
+        return _to_native_floats(result), iflag
 
     # Handle Uranian planets (Hamburg School hypothetical bodies, IDs 40-47)
     if SE_CUPIDO <= ipl <= SE_POSEIDON:
