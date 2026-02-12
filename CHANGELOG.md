@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+#### Critical: Ecliptic-to-equatorial coordinate transformation (`cotrans_sp`, `cotrans`)
+
+Fixed sign errors in the ecliptic-to-equatorial coordinate transformation formulas
+in `utils.py`. Both `cotrans_sp()` (position + velocity) and `cotrans()` (position only)
+had every `sin(ε)` term with the **wrong sign**, effectively computing the inverse
+transformation (equatorial→ecliptic) instead of ecliptic→equatorial.
+
+**Root cause:** The formulas were using the equatorial→ecliptic signs:
+```
+sin(δ) = sin(β)·cos(ε) - cos(β)·sin(ε)·sin(λ)       ← WRONG (was minus)
+tan(α) = [sin(λ)·cos(ε) + tan(β)·sin(ε)] / cos(λ)   ← WRONG (was plus)
+```
+
+**Correct formulas** (matching Swiss Ephemeris `swe_cotrans_sp` and standard celestial mechanics):
+```
+sin(δ) = sin(β)·cos(ε) + cos(β)·sin(ε)·sin(λ)       ← FIXED (plus)
+tan(α) = [sin(λ)·cos(ε) - tan(β)·sin(ε)] / cos(λ)   ← FIXED (minus)
+```
+
+**7 sign corrections total:**
+- `cotrans_sp()` position: `sin_new_lat` formula (`-` → `+`), longitude `y` term (`+` → `-`)
+- `cotrans_sp()` latitude velocity: two terms in the derivative had inverted signs
+- `cotrans_sp()` longitude velocity: `dy/dt` lat_speed coefficient (`+` → `-`)
+- `cotrans()` position: same two sign fixes as `cotrans_sp()`
+
+**Impact:** Any body whose equatorial coordinates were computed via `cotrans_sp()`/`cotrans()`
+(lunar nodes, Lilith, interpolated apogee/perigee) returned incorrect declination and
+right ascension values. For example, True North Node declination was +5.74° instead of
+the correct -5.74° (sign inverted), and Mean Lilith declination was off by ~39°.
+
+#### Missing equatorial conversion for non-lunar bodies in `_calc_body()`
+
+Extended `_maybe_equatorial_convert()` to all body types that were missing it.
+Previously, only lunar nodes and Lilith (added in commit 9919746) had the
+`SEFLG_EQUATORIAL` conversion applied. All other body types computed via ecliptic
+coordinates silently ignored the `SEFLG_EQUATORIAL` flag, returning ecliptic
+longitude/latitude as if they were RA/Dec.
+
+**Affected body types (now fixed):**
+- Minor bodies via SPK kernels (e.g., Chiron, Ceres, Pallas)
+- Minor bodies via automatic SPK download
+- Minor bodies via Keplerian element fallback
+- Uranian hypothetical planets (Cupido through Poseidon)
+- Transpluto (Isis)
+- Fixed stars (Regulus, Spica)
+- Planetary moons (Galilean moons, Titan, etc.)
+
+**Example:** Chiron's `calc_ut()` with `FLG_EQUATORIAL` returned `(lon, lat)` verbatim
+as `(RA, Dec)` — producing a declination of -6.77° (the ecliptic latitude) instead of
+the correct equatorial declination of +13.41°.
+
 ### Changed
 - `SEFLG_MOSEPH` flag is now accepted but silently ignored — all calculations always use JPL DE440/DE441 via Skyfield
 - Removed Moshier semi-analytical ephemeris package (`moshier/`)

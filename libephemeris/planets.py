@@ -1323,6 +1323,7 @@ def _calc_body(
     if planetary_moons.is_planetary_moon(ipl):
         result = planetary_moons.calc_moon_position(t, ipl, iflag)
         if result is not None:
+            result = _maybe_equatorial_convert(result, t.tt, iflag)
             return result, iflag
         # If moon not registered, return zeros (body not available)
         return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
@@ -1535,6 +1536,7 @@ def _calc_body(
         # Use calc_uranian_planet() which uses Keplerian elements from seorbel.txt
         # to match pyswisseph's Uranian planet calculations
         pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
+        pos = _maybe_equatorial_convert(pos, jd_tt, iflag)
         return _to_native_floats(pos), iflag
 
     # Handle Transpluto (Isis) - hypothetical trans-Plutonian planet (ID 48)
@@ -1544,6 +1546,7 @@ def _calc_body(
         jd_tt = t.tt
         # Use calc_transpluto() which uses Keplerian elements from seorbel.txt
         pos = hypothetical.calc_transpluto(jd_tt)
+        pos = _maybe_equatorial_convert(pos, jd_tt, iflag)
         return _to_native_floats(pos), iflag
 
     # Handle minor bodies (asteroids and TNOs)
@@ -1556,6 +1559,7 @@ def _calc_body(
 
         spk_result = spk.calc_spk_body_position(t, ipl, iflag)
         if spk_result is not None:
+            spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
             return _to_native_floats(spk_result), iflag
 
         # Try automatic SPK download if enabled and body not registered.
@@ -1564,6 +1568,7 @@ def _calc_body(
             try:
                 spk_result = _try_auto_spk_download(t, ipl, iflag)
                 if spk_result is not None:
+                    spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
                     return _to_native_floats(spk_result), iflag
             except Exception:
                 # If auto-download fails, continue to strict precision check
@@ -1611,15 +1616,25 @@ def _calc_body(
             lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
             lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
 
-            return _to_native_floats((lon, lat, r_geo, 0.0, 0.0, 0.0)), iflag
+            return _to_native_floats(
+                _maybe_equatorial_convert(
+                    (lon, lat, r_geo, 0.0, 0.0, 0.0), jd_tt, iflag
+                )
+            ), iflag
         else:
-            return _to_native_floats((lon_hel, lat_hel, r_hel, 0.0, 0.0, 0.0)), iflag
+            return _to_native_floats(
+                _maybe_equatorial_convert(
+                    (lon_hel, lat_hel, r_hel, 0.0, 0.0, 0.0), jd_tt, iflag
+                )
+            ), iflag
 
     # Handle fixed stars
     if ipl in fixed_stars.FIXED_STARS:
         jd_tt = t.tt
         lon, lat, dist = fixed_stars.calc_fixed_star_position(ipl, jd_tt)
-        return _to_native_floats((lon, lat, dist, 0.0, 0.0, 0.0)), iflag
+        result = (lon, lat, dist, 0.0, 0.0, 0.0)
+        result = _maybe_equatorial_convert(result, jd_tt, iflag)
+        return _to_native_floats(result), iflag
 
     # Handle astrological angles (requires observer location)
     if SE_ANGLE_OFFSET <= ipl < SE_ARABIC_OFFSET:
