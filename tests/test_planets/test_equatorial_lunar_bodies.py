@@ -212,7 +212,7 @@ class TestEquatorialConsistencyWithPlanets:
         # Should still convert position even without speed
         assert ecl[1] == 0.0, "Mean node ecliptic latitude should be 0"
         assert equ[1] != 0.0, (
-            f"Mean node declination should NOT be 0 even without SEFLG_SPEED"
+            "Mean node declination should NOT be 0 even without SEFLG_SPEED"
         )
 
     @pytest.mark.unit

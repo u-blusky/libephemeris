@@ -1080,6 +1080,7 @@ def sol_eclipse_max_time(
 
     if is_local:
         # Local maximum: find minimum Sun-Moon separation from observer location
+        assert lat is not None and lon is not None
         return _calc_local_eclipse_max_time(jd_approx, lat, lon, altitude, search_range)
     else:
         # Global maximum: find minimum gamma using Besselian elements
@@ -1744,7 +1745,7 @@ def sol_eclipse_when_loc(
     lon: float,
     altitude: float = 0.0,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next solar eclipse visible from a specific location.
 
@@ -1928,7 +1929,7 @@ def swe_sol_eclipse_when_loc(
     ifl: int,
     geopos: "Sequence[float]",
     backward: bool = False,
-) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next solar eclipse visible from a specific geographic location.
 
@@ -2512,7 +2513,7 @@ def swe_sol_eclipse_when_loc(
 def sol_eclipse_where(
     jd: float,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Calculate the geographic location where a solar eclipse is central at a given time.
 
@@ -4471,7 +4472,7 @@ def lun_eclipse_when_loc(
     lon: float,
     altitude: float = 0.0,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next lunar eclipse visible from a specific location.
 
@@ -5617,7 +5618,7 @@ def lun_occult_when_loc(
     lon: float = 0.0,
     altitude: float = 0.0,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next lunar occultation visible from a specific location.
 
@@ -8517,9 +8518,7 @@ def vis_limit_mag(
             hor_result = azalt(
                 jd,
                 SE_ECL2HOR,
-                lat,
-                lon,
-                alt_m,
+                (lon, lat, alt_m),
                 pressure,
                 temperature,
                 (star_lon, star_lat, 1.0),
@@ -13923,7 +13922,7 @@ def planet_occult_when_loc(
     lon: float = 0.0,
     altitude: float = 0.0,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], Tuple[float, ...], int]:
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next planetary occultation visible from a specific location.
 

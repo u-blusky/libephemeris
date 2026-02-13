@@ -25,7 +25,7 @@ import sys
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from .logging_config import get_logger
 
@@ -60,7 +60,7 @@ def get_data_dir() -> Path:
     return data_dir
 
 
-def _format_size(size_bytes: int) -> str:
+def _format_size(size_bytes: float) -> str:
     """Format byte size to human readable string."""
     for unit in ["B", "KB", "MB", "GB"]:
         if size_bytes < 1024:
@@ -122,7 +122,7 @@ class SimpleProgressBar:
         self.file.flush()
 
 
-def _get_progress_bar(total: int, description: str) -> SimpleProgressBar:
+def _get_progress_bar(total: int, description: str) -> Any:
     """Get the best available progress bar.
 
     Tries to use rich if available, falls back to simple progress bar.
@@ -300,10 +300,12 @@ def download_planet_centers(
 
     try:
         download_file(
-            url=file_info["url"],
+            url=str(file_info["url"]),
             dest_path=dest_path,
             description="planet_centers.bsp",
-            expected_sha256=file_info.get("sha256"),
+            expected_sha256=str(file_info["sha256"])
+            if file_info.get("sha256")
+            else None,
             show_progress=show_progress,
         )
 
@@ -447,7 +449,7 @@ def init_all(
 
     logger = get_logger()
 
-    result = {
+    result: dict[str, Any] = {
         "de440": False,
         "planet_centers": False,
         "spk_success": 0,

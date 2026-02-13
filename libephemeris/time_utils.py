@@ -10,7 +10,7 @@ Functions match the Swiss Ephemeris API for compatibility.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH
 from .state import get_timescale, get_delta_t_userdef, get_iers_delta_t_enabled
@@ -626,8 +626,6 @@ def time_equ(jd: float) -> float:
         >>> print(f"Equation of Time: {eot_minutes:.2f} minutes")
         Equation of Time: -3.05 minutes
     """
-    from typing import Any
-
     from .state import get_planets, get_timescale
 
     ts = get_timescale()
@@ -870,8 +868,8 @@ def _sidtime_internal(
 def sidtime(
     jd: float,
     longitude: float = 0.0,
-    obliquity: float = None,
-    nutation: float = None,
+    obliquity: Optional[float] = None,
+    nutation: Optional[float] = None,
 ) -> float:
     """
     Calculate Local Apparent Sidereal Time for a given Julian Day and longitude.

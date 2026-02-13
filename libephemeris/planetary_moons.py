@@ -35,7 +35,7 @@ References:
 
 import math
 import os
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from skyfield.framelib import ecliptic_frame
 from skyfield.positionlib import ICRF
@@ -233,7 +233,7 @@ MOON_PARENT_MAP: dict[int, int] = {
 # =============================================================================
 # Registered satellite SPK kernels
 
-_MOON_SPK_KERNELS: dict[str, object] = {}  # {filepath: SpiceKernel}
+_MOON_SPK_KERNELS: dict[str, Any] = {}  # {filepath: SpiceKernel}
 _MOON_SPK_BY_BODY: dict[int, str] = {}  # {moon_id: filepath}
 
 

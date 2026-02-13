@@ -21,7 +21,7 @@ Thread Safety:
 
 import os
 import threading
-from typing import Optional, Tuple, Union
+from typing import Literal, Optional, Tuple, Union, overload
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
@@ -218,6 +218,12 @@ class EphemerisContext:
         self.sidereal_mode = mode
         self.sidereal_t0 = t0 if t0 != 0.0 else 2451545.0
         self.sidereal_ayan_t0 = ayan_t0
+
+    @overload
+    def get_sid_mode(self, full: Literal[True]) -> Tuple[int, float, float]: ...
+
+    @overload
+    def get_sid_mode(self, full: Literal[False] = ...) -> int: ...
 
     def get_sid_mode(self, full: bool = False) -> Union[int, Tuple[int, float, float]]:
         """

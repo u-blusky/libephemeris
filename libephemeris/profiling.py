@@ -134,7 +134,7 @@ class ProfileReport:
 
     def _identify_hot_paths(self) -> dict:
         """Group functions by category for hot path analysis."""
-        categories = {
+        categories: dict[str, list] = {
             "Skyfield Operations": [],
             "Libephemeris Core": [],
             "Math Operations": [],
@@ -227,7 +227,7 @@ class ProfileContext:
 
         # Extract function statistics
         function_stats = []
-        for key, value in stats.stats.items():
+        for key, value in stats.stats.items():  # type: ignore[attr-defined]
             filename, line_number, func_name = key
             # value: (ncalls, totcalls, tottime, cumtime, callers)
             ncalls = value[0]
@@ -304,10 +304,10 @@ def profile_function(func: Callable) -> Callable:
     def wrapper(*args, **kwargs) -> Any:
         with ProfileContext(name=func.__name__) as p:
             result = func(*args, **kwargs)
-        wrapper.last_profile = p.get_report()
+        wrapper.last_profile = p.get_report()  # type: ignore[attr-defined]
         return result
 
-    wrapper.last_profile = None
+    wrapper.last_profile = None  # type: ignore[attr-defined]
     return wrapper
 
 
@@ -401,7 +401,7 @@ def profile_house_calculations(
     lat, lon = 41.9028, 12.4964  # Rome
 
     # Warmup
-    ephem.swe_houses(jd_start, lat, lon, "P")
+    ephem.swe_houses(jd_start, lat, lon, ord("P"))
 
     with ProfileContext(
         name=f"House Calculations ({iterations} dates x {len(house_systems)} systems)"
@@ -409,7 +409,7 @@ def profile_house_calculations(
         for i in range(iterations):
             jd = jd_start + i
             for hsys in house_systems:
-                ephem.swe_houses(jd, lat, lon, hsys)
+                ephem.swe_houses(jd, lat, lon, ord(hsys))
 
     return p.get_report()
 

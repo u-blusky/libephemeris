@@ -16,7 +16,7 @@ stateful API behavior. This is thread-unsafe by design, matching SwissEph behavi
 
 import os
 import threading
-from typing import Optional, Union
+from typing import Literal, Optional, Union, overload
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
@@ -303,6 +303,14 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
     _SIDEREAL_MODE = mode
     _SIDEREAL_T0 = t0 if t0 != 0.0 else 2451545.0
     _SIDEREAL_AYAN_T0 = ayan_t0
+
+
+@overload
+def get_sid_mode(full: Literal[True]) -> tuple[int, float, float]: ...
+
+
+@overload
+def get_sid_mode(full: Literal[False] = ...) -> int: ...
 
 
 def get_sid_mode(full: bool = False) -> Union[int, tuple[int, float, float]]:
