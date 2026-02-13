@@ -122,6 +122,30 @@ test = "pytest -m \"not slow\""
 "test:progress" = "pytest --no-header -q -m \"not slow\""
 "test:fast" = "pytest -n auto -m \"not slow\""
 
+# Essential subset - 1 test file per library module, parallel (~490 tests vs ~5000 total)
+# Covers: planets, houses, eclipse, lunar, fixed_stars, minor_bodies, hypothetical,
+#         heliacal, rise/transit, arabic_parts, planetary_moons, time_utils,
+#         exceptions, context/state, sidereal, utils, constants/API
+"test:fast:essential" = """pytest -n auto -m "not slow" \
+    tests/test_planets/test_central_difference_velocity.py \
+    tests/test_planets/test_nod_aps.py \
+    tests/test_houses/test_house_algorithms.py \
+    tests/test_lunar_eclipse.py \
+    tests/test_lunar/test_interpolated_apogee.py \
+    tests/test_fixed_stars/test_fixstar2.py \
+    tests/test_asteroid_by_number.py \
+    tests/test_hypothetical.py \
+    tests/test_heliacal.py \
+    tests/test_rise_trans.py \
+    tests/test_arabic_parts.py \
+    tests/test_planetary_moons.py \
+    tests/test_time/test_date_conversion.py \
+    tests/test_exception_hierarchy.py \
+    tests/test_close.py \
+    tests/test_sidereal/test_ayanamsa_precision.py \
+    tests/test_deg_midp.py \
+    tests/test_get_planet_name.py"""
+
 # Unit tests (tests/ directory)
 "test:unit" = "pytest tests/ -v -m \"not slow\""
 "test:unit:full" = "pytest tests/ -v"
