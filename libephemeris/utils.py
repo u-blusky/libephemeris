@@ -243,9 +243,8 @@ def azalt(
         dist = coord[2]
 
         # Convert ecliptic to equatorial
-        # Note: cotrans uses convention where NEGATIVE obliquity converts
-        # ecliptic to equatorial with correct sign (matching astronomical convention)
-        eq_coord = cotrans((ecl_lon, ecl_lat, dist), -eps)
+        # cotrans convention: positive obliquity = ecliptic→equatorial
+        eq_coord = cotrans((ecl_lon, ecl_lat, dist), eps)
         ra = eq_coord[0]
         dec = eq_coord[1]
     else:
