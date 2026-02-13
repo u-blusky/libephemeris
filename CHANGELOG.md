@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-02-13
+
 ### Fixed
 
 #### Critical: Ecliptic-to-equatorial coordinate transformation (`cotrans_sp`, `cotrans`)
@@ -59,6 +61,14 @@ longitude/latitude as if they were RA/Dec.
 **Example:** Chiron's `calc_ut()` with `FLG_EQUATORIAL` returned `(lon, lat)` verbatim
 as `(RA, Dec)` — producing a declination of -6.77° (the ecliptic latitude) instead of
 the correct equatorial declination of +13.41°.
+
+#### Type safety and correctness fixes
+
+- Resolved all 34 mypy type errors and 1 ruff lint warning across the codebase
+- Fixed incorrect return type annotations on 6 eclipse functions (`sol_eclipse_when_loc`, `sol_eclipse_where`, `lun_eclipse_when_loc`, `lun_occult_when_loc`, `planet_occult_when_loc`, and their `swe_` wrappers) — annotations declared `Tuple[Tuple, Tuple, int]` but actual return order was `Tuple[int, Tuple, Tuple]`
+- Fixed `vis_limit_mag()` passing `lat, lon, alt_m` as separate arguments to `azalt()` instead of a single `(lon, lat, alt_m)` tuple
+- Added `@overload` signatures to `get_sid_mode()` in `state.py` and `context.py` for proper type narrowing
+- Fixed `Optional[float]` parameter annotations in `sidtime()` (was `float = None`)
 
 ### Changed
 - `SEFLG_MOSEPH` flag is now accepted but silently ignored — all calculations always use JPL DE440/DE441 via Skyfield
