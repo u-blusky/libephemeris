@@ -9,632 +9,426 @@
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
 
+**A pure-Python, high-precision astronomical ephemeris library. Drop-in replacement for `pyswisseph`, powered by NASA JPL DE440 via Skyfield.**
 
-**High-precision astronomical ephemeris library for Python (Swiss Ephemeris compatible, powered by Skyfield and JPL DE ephemerides).**
-
-> [!WARNING] > **Pre-Alpha Release**
->
-> LibEphemeris is currently in an early pre-alpha stage. The public API is unstable and may change without notice. Do not rely on it in production yet.
-
-## Project Philosophy & Roadmap
-
-LibEphemeris is born from the need for a **truly open, maintainable, and scientifically rigorous** alternative to the Swiss Ephemeris. While Swiss Ephemeris is the industry standard, its codebase is complex, difficult to maintain, and rooted in older C practices.
-
-**Our Goals:**
-
-1.  **True Open Source**: A codebase that is easy to read, contribute to, and maintain.
-2.  **Scientific Precision**: Leveraging modern astronomical data from NASA JPL (via Skyfield/Starfield) to guarantee precision that matches or exceeds current standards.
-3.  **Independence**: A completely original implementation, not just a wrapper around the existing C library.
-
-### Roadmap
-
--   **Milestone 1 (Current)**: **Pure Python Library**
-
-    -   A 1:1 drop-in replacement for `pyswisseph`.
-    -   Powered by [Skyfield](https://rhodesmill.org/skyfield/) and NASA JPL DE440 ephemerides.
-    -   Focus on correctness, readability, and higher scientific precision than Swiss Ephemeris implementations.
-
--   **Milestone 2 (Next Step)**: **Rust Core Rewrite**
-    -   Porting the core logic to **Rust** for maximum performance, memory safety, and stability.
-    -   Will utilize [Starfield](https://docs.rs/starfield/latest/starfield/) (a Rust port of Skyfield) instead of the Python Skyfield library.
-    -   This will provide a high-performance backend while maintaining the easy-to-use Python interface.
+> [!WARNING]
+> **Pre-Alpha** -- The public API may change without notice. Not yet recommended for production use.
 
 ---
 
-## Why LibEphemeris is More Accurate
+## Why LibEphemeris
 
-LibEphemeris uses **NASA JPL DE440** as its astronomical foundation, which is the **gold standard** for planetary ephemerides in professional astronomy and space navigation.
+Swiss Ephemeris is the industry standard, but its C codebase is opaque and hard to maintain. LibEphemeris is a ground-up rewrite in Python that:
 
-### NASA JPL DE440: The Gold Standard
+- Uses **NASA JPL DE440/DE441** -- the same ephemerides that guide Mars rovers and the James Webb Space Telescope.
+- Provides a **1:1 `pyswisseph`-compatible API** so you can swap `import swisseph` for `import libephemeris` with minimal changes.
+- Is **fully open source** (LGPL-3.0), readable, and testable.
+- Offers a **thread-safe Context API** for concurrent applications.
 
-| Aspect | JPL DE440 (LibEphemeris) | Swiss Ephemeris |
-|--------|--------------------------|-----------------|
-| **Source** | NASA Jet Propulsion Laboratory | Astrodienst AG (private company) |
-| **Usage** | NASA space missions (Mars rovers, Voyager, New Horizons, James Webb) | Astrological software |
-| **Moon precision** | ~1 milliarcsec (validated with Lunar Laser Ranging) | ~3 arcsec |
-| **Reference frame** | ICRF 3.0 (current IAU standard) | ICRF 2.0 |
-| **Validation** | Spacecraft tracking, radar ranging, VLBI observations | Internal validation |
-| **Publication** | Park et al. (2021), Astronomical Journal | Not peer-reviewed |
+### Precision at a glance
 
-### Example: True Lunar Node Calculation
+| Component | vs Swiss Ephemeris | Notes |
+|---|---|---|
+| Planets | < 1 arcsec | Effectively identical |
+| Moon | < 3.5 arcsec | Different lunar theories |
+| True Node | ~206 arcsec RMS | Different methodology (both valid) |
+| Houses | < 0.001° | Same algorithms |
+| Ayanamshas | < 0.06° | 43 systems supported |
+| Velocities | < 0.01°/day | Central-difference method |
 
-The True (osculating) Lunar Node illustrates why LibEphemeris is mathematically more rigorous:
-
-**Definition**: The True Node is where the Moon's **instantaneous orbital plane** intersects the ecliptic.
-
-| Method | LibEphemeris | Swiss Ephemeris |
-|--------|--------------|-----------------|
-| **Approach** | Geometric: computes angular momentum **h = r × v** from JPL state vectors | Analytical: uses perturbation series from lunar theory |
-| **Precision of source** | ~1 milliarcsec (JPL DE440) | Depends on series truncation |
-| **Truncation error** | None (exact geometric calculation) | Present (series always truncated) |
-
-**Why geometric is more accurate**: The True Node IS the intersection of the orbital plane with the ecliptic. Computing **h = r × v** directly determines that plane - this matches the mathematical definition exactly.
-
-Swiss Ephemeris documentation itself confirms this approach:
-> "We avoid this error, **computing the orbital elements from the position and the speed vectors of the Moon**."
-
-### Observed Differences vs Swiss Ephemeris
-
-When comparing LibEphemeris to Swiss Ephemeris:
-
-| Component | Difference | Notes |
-|-----------|------------|-------|
-| **Planets** | < 1 arcsec | Effectively identical |
-| **Moon** | < 3.5 arcsec | Different lunar theories |
-| **True Node** | ~206 arcsec RMS | Different methodology (both valid) |
-| **Houses** | < 0.001° | Identical algorithms |
-
-The True Node difference is **not an error** - it reflects different (both valid) approaches to computing the osculating orbital plane. For practical astrology, 0.06° is negligible.
-
-### When to Use LibEphemeris
-
-- **Scientific research** requiring documented, reproducible precision
-- **Modern astrology** (dates 1550-2650)
-- **Applications** needing the NASA/JPL standard
-- **Projects** requiring MIT-friendly licensing
-
-See [PRECISION.md](docs/PRECISION.md) for detailed precision tables.
-
----
-
-## Features at a Glance
-
--   **Planetary positions**: Sun, Moon, all major planets and Pluto.
--   **High precision**: Based on NASA JPL DE440 by default (configurable to other DE files).
--   **Multiple coordinate systems**: Ecliptic, equatorial, J2000 and of-date frames.
--   **Observation modes**: Geocentric, topocentric, heliocentric, barycentric.
--   **Velocities**: Full 6-component state vectors (position + velocity).
--   **House systems (19)**: Placidus, Koch, Regiomontanus, Campanus, Equal, Whole Sign, Porphyry, Alcabitius, Polich/Page (Topocentric), Morinus, Meridian, Vehlow, Horizontal, Carter, Krusinski, Natural Gradient, and more.
--   **Sidereal zodiac (43 ayanamshas)**: Fagan/Bradley, Lahiri, Raman, Krishnamurti, star-based and historical variants.
--   **Extended points**: Lunar nodes, Lilith (mean and true), interpolated apogee/perigee, major asteroids (Chiron, Pholus, Ceres, Pallas, Juno, Vesta), centaurs (Nessus, Asbolus, Chariklo), TNOs (Orcus, Ixion, Haumea, Quaoar, Makemake, Gonggong, Eris, Sedna), major fixed stars and Arabic parts.
--   **Saturn satellite system**: Complete TASS 1.7 implementation for all 8 major satellites (Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Hyperion, Iapetus) with sub-arcsecond precision.
--   **Heliacal events**: Schaefer (1990) atmospheric visibility model for heliacal rising/setting calculations with Ptolemaic visibility thresholds.
--   **Photometric calculations**: Hapke model for Moon magnitude, Mallama (2018) formula for Pluto, IAU standard formulas for planets.
--   **High-precision minor bodies via SPK**: Download SPK kernels from JPL Horizons for arcsecond-level precision on asteroids and TNOs.
--   **Event finding**: Sun/Moon longitude crossings (e.g. ingress), with additional events planned (eclipses, etc.).
--   **Thread safety**: Optional thread-safe `EphemerisContext` API for concurrent calculations.
--   **Swiss Ephemeris compatibility**: Same function names, flags and result structure as `pyswisseph` in most common use cases.
+DE440 uses ICRF 3.0, validated with Lunar Laser Ranging to ~1 milliarcsecond for the Moon. See [PRECISION.md](docs/PRECISION.md) for full tables.
 
 ---
 
 ## Installation
 
-Using `pip`:
-
 ```bash
 pip install libephemeris
 ```
 
-Using [`uv`](https://github.com/astral-sh/uv) (recommended for development):
-
-```bash
-uv pip install libephemeris
-```
-
-From source:
-
-```bash
-git clone https://github.com/g-battaglia/libephemeris.git
-cd libephemeris
-uv pip install -e .
-```
-
-### Optional: Download Precision Data
-
-For maximum precision on outer planet calculations (Jupiter, Saturn, Uranus, Neptune, Pluto), download the optional planet center data file:
+The DE440 ephemeris file (~128 MB) is downloaded automatically on first use. For optional precision data on outer planets:
 
 ```bash
 libephemeris download-data
 ```
 
-This downloads ~25MB of pre-computed planet center positions. Without this file, libephemeris uses analytical approximations which are still accurate to ~0.1 arcseconds.
-
-### Requirements
-
--   Python **3.9+**
--   `skyfield>=1.54`
--   `skyfield-data>=7.0.0`
--   A JPL ephemeris file (DE440 by default, downloaded automatically on first use if not present locally)
-
-### Optional Dependencies
-
-LibEphemeris has several optional dependencies that enhance functionality when installed:
-
-| Package | Install Command | Features Enabled |
-|---------|-----------------|------------------|
-| **astroquery** | `pip install astroquery` | Automatic SPK kernel downloads from JPL Horizons for arcsecond-level precision on asteroids and TNOs. Required for `set_auto_spk_download(True)` and `download_spk()`. |
-| **astropy** | `pip install astropy` | Required by the star catalog build script (`scripts/build_star_catalog.py`) for unit handling when querying Hipparcos data. Not needed for normal library usage. |
-
-> **Note:** `pyerfa` is a required dependency (not optional). It provides IAU 2006/2000A precision models for nutation, obliquity, and precession throughout the library.
-
-**Installation with optional dependencies:**
+### Optional extras
 
 ```bash
-# Install with automatic SPK download support
-pip install libephemeris[spk]
-
-# Install with all optional features
-pip install libephemeris[all]
-
-# Install with star catalog building support (for development)
-pip install libephemeris[stars]
+pip install libephemeris[spk]    # Automatic SPK downloads from JPL Horizons
+pip install libephemeris[nbody]  # REBOUND/ASSIST n-body integration
+pip install libephemeris[all]    # Everything
 ```
+
+**Requirements:** Python 3.9+ &bull; skyfield >= 1.54 &bull; pyerfa >= 2.0
 
 ---
 
-## Quick Start
+## Quick start
 
-### Basic planetary positions
+### Planetary positions
 
 ```python
-import libephemeris as ephem
+import libephemeris as swe
 from libephemeris.constants import *
 
-# Julian Day (J2000.0)
-jd = ephem.swe_julday(2000, 1, 1, 12.0)
+jd = swe.julday(2000, 1, 1, 12.0)  # J2000.0
 
-# Sun position (longitude, latitude, distance, and speeds)
-sun, flags = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
-print(f"Sun longitude: {sun[0]:.6f}°")
-print(f"Sun speed: {sun[3]:.6f}°/day")
+sun, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED)
+print(f"Sun: {sun[0]:.6f}°  speed: {sun[3]:.6f}°/day")
 
-# Moon position
-moon, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SWIEPH)
-print(f"Moon longitude: {moon[0]:.6f}°")
+moon, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)
+print(f"Moon: {moon[0]:.6f}°")
 ```
 
 ### Houses and angles
 
 ```python
-# Rome coordinates
-lat, lon, alt = 41.9028, 12.4964, 0.0
-jd = ephem.swe_julday(2024, 11, 5, 18.0)
+jd = swe.julday(2024, 11, 5, 18.0)
+cusps, ascmc = swe.houses(jd, 41.9028, 12.4964, b"P")  # Placidus, Rome
 
-# Placidus houses
-cusps, ascmc = ephem.swe_houses(jd, lat, lon, b"P")
-
-print(f"Ascendant: {ascmc[0]:.2f}°")
-print(f"MC:        {ascmc[1]:.2f}°")
-print(f"House 1:   {cusps[1]:.2f}°")
-print(f"House 10:  {cusps[10]:.2f}°")
+print(f"ASC: {ascmc[0]:.2f}°   MC: {ascmc[1]:.2f}°")
+for i in range(1, 13):
+    print(f"  House {i:2d}: {cusps[i]:.2f}°")
 ```
 
-### Sidereal calculations
+### Sidereal positions
 
 ```python
-# Lahiri ayanamsha
-ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-
-ayanamsha = ephem.swe_get_ayanamsa_ut(jd)
+swe.set_sid_mode(SE_SIDM_LAHIRI)
+ayanamsha = swe.get_ayanamsa_ut(jd)
+sun_sid, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL | SEFLG_SPEED)
 print(f"Lahiri ayanamsha: {ayanamsha:.6f}°")
-
-sun_sid, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
 print(f"Sidereal Sun: {sun_sid[0]:.6f}°")
 ```
 
-### Longitude crossings
+### Event finding
 
 ```python
-# Next time the Sun enters 0° Aries
-next_cross = ephem.swe_solcross_ut(0.0, jd, SEFLG_SWIEPH)
-print(f"Next Aries ingress (JD): {next_cross:.6f}")
+# Next Aries ingress after jd
+ingress_jd = swe.solcross_ut(0.0, jd, SEFLG_SWIEPH)
+
+# Next time Moon crosses 0° longitude
+moon_cross = swe.mooncross_ut(0.0, jd, SEFLG_SWIEPH)
+```
+
+### Eclipses
+
+```python
+# Next solar eclipse after J2000
+ecl_type, times = swe.sol_eclipse_when_glob(jd, SEFLG_SWIEPH)
+max_jd = times[0]
+y, m, d, h = swe.revjul(max_jd, SE_GREG_CAL)
+print(f"Next solar eclipse: {y}-{m:02d}-{d:02d}")
 ```
 
 ---
 
-## Thread Safety
+## Features
 
-LibEphemeris provides **two APIs** for different use cases:
+### Celestial bodies
 
-### Global API (pyswisseph-compatible, NOT thread-safe)
+| Category | Bodies |
+|---|---|
+| **Planets** | Sun, Moon, Mercury -- Pluto (+ Earth for heliocentric) |
+| **Lunar points** | Mean Node, True Node, Mean Lilith, True Lilith, Interpolated Apogee/Perigee |
+| **Main belt** | Ceres, Pallas, Juno, Vesta (+ any numbered asteroid via SBDB) |
+| **Centaurs** | Chiron, Pholus, Nessus, Asbolus, Chariklo |
+| **TNOs** | Eris, Sedna, Haumea, Makemake, Orcus, Ixion, Quaoar, Gonggong, Varuna |
+| **Near-Earth** | Apophis, Eros, Bennu, Ryugu, Itokawa, Toutatis |
+| **Hypothetical** | 8 Hamburg School Uranian planets, Transpluto, Vulcan, White Moon, Proserpina, Waldemath, Pickering/Leverrier/Lowell/Adams Planet X |
+| **Fixed stars** | 100+ stars with Hipparcos proper motion (Regulus, Spica, Sirius, Aldebaran, Antares, Pleiades cluster, etc.) |
+| **Planetary moons** | Galilean (Io, Europa, Ganymede, Callisto), Saturn (Mimas -- Iapetus), Uranus (Miranda -- Oberon), Triton, Phobos/Deimos, Charon |
+| **Arabic parts** | Part of Fortune, Spirit, Eros, Faith |
+| **Angles** | Ascendant, MC, Descendant, IC, Vertex, Antivertex |
 
-The traditional Swiss Ephemeris API using global state:
+### House systems (24)
+
+`P` Placidus &bull; `K` Koch &bull; `O` Porphyry &bull; `R` Regiomontanus &bull; `C` Campanus &bull; `E` Equal (Asc) &bull; `A`/`D` Equal (MC) &bull; `W` Whole Sign &bull; `M` Morinus &bull; `B` Alcabitius &bull; `T` Polich/Page (Topocentric) &bull; `U` Krusinski &bull; `G` Gauquelin &bull; `V` Vehlow &bull; `X` Meridian &bull; `H` Horizontal &bull; `F` Carter &bull; `S` Sripati &bull; `L` Pullen SD &bull; `Q` Pullen SR &bull; `N` Natural Gradient &bull; `Y` APC &bull; `I`/`i` Sunshine
+
+### Sidereal modes (43 ayanamshas)
+
+Western (Fagan/Bradley, De Luce, Djwhal Khul), Indian (Lahiri, Raman, Krishnamurti, Yukteshwar, Suryasiddhanta, Aryabhata), Babylonian (Kugler 1-3, Huber, ETPSC, Britton), star-based (Aldebaran 15Tau, True Citra, True Revati, True Pushya, True Mula, True Sheoran), galactic (Galactic Center, Galactic Equator variants), historical epochs (Hipparchos, Sassanian, J2000, J1900, B1950), Valens Moon, and user-defined.
+
+### Calculation flags
+
+| Flag | Effect |
+|---|---|
+| `SEFLG_SPEED` | Include velocities (6-component output) |
+| `SEFLG_TOPOCTR` | Topocentric positions (requires `set_topo()`) |
+| `SEFLG_HELCTR` | Heliocentric positions |
+| `SEFLG_BARYCTR` | Barycentric positions |
+| `SEFLG_EQUATORIAL` | Right ascension / declination |
+| `SEFLG_XYZ` | Cartesian (X, Y, Z) coordinates |
+| `SEFLG_SIDEREAL` | Sidereal positions (requires `set_sid_mode()`) |
+| `SEFLG_J2000` | J2000.0 reference frame |
+| `SEFLG_NONUT` | No nutation |
+| `SEFLG_NOABERR` | No aberration correction |
+| `SEFLG_NOGDEFL` | No gravitational deflection |
+| `SEFLG_TRUEPOS` | True geometric position (no light-time) |
+| `SEFLG_RADIANS` | Output in radians |
+| `SEFLG_ICRS` | ICRS reference frame |
+
+### Eclipse and occultation calculations
+
+- **Solar eclipses:** global search, local circumstances, geographic coordinates, contact times (C1-C4), path width, central line, magnitude, obscuration, Besselian elements.
+- **Lunar eclipses:** global search, local circumstances, umbral/penumbral magnitude and contact times (P1, U1, U2, U3, U4, P4), gamma parameter, duration.
+- **Occultations:** lunar occultations and planetary occultations of stars.
+- **Saros and Inex** series number computation.
+
+### Heliacal events and atmospheric modelling
+
+Schaefer (1990) atmospheric visibility model for heliacal rising/setting with Ptolemaic visibility thresholds. Includes atmospheric extinction (Rayleigh, aerosol, ozone, water vapour), twilight sky brightness, and Schaefer contrast threshold model with configurable observer skill levels.
+
+### Rise, set, and transit
+
+`rise_trans()` and `rise_trans_true_hor()` for computing rise, set, upper and lower culmination times. Supports disc-center, disc-bottom, and true-horizon modes with configurable refraction and twilight definitions (civil, nautical, astronomical).
+
+### High-precision minor bodies via SPK
+
+Default Keplerian elements give arcminute-level accuracy. For arcsecond-level precision, download SPK kernels directly from JPL Horizons:
 
 ```python
 import libephemeris as swe
 
-swe.set_topo(12.5, 41.9, 0)  # Rome
-pos, _ = swe.calc_ut(2451545.0, swe.SE_SUN, 0)
+# One-liner: download + register
+swe.download_and_register_spk(
+    body="Chiron", ipl=SE_CHIRON,
+    start="2000-01-01", end="2100-01-01",
+)
+
+# Now calc_ut uses the SPK automatically
+pos, _ = swe.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
 ```
 
-✅ **100% pyswisseph compatible**  
-⚠️ **NOT thread-safe** (matches Swiss Ephemeris behavior)
+Or enable automatic download:
+
+```python
+swe.set_auto_spk_download(True)
+swe.set_spk_cache_dir("./spk_cache")
+# First calculation triggers download
+pos, _ = swe.calc_ut(2460000.0, SE_CHIRON, 0)
+```
+
+### Planetary phenomena
+
+`pheno_ut()` / `pheno()` for computing phase angle, phase, elongation, apparent diameter, and apparent magnitude. Includes Hapke model for Moon, Mallama (2018) for Pluto, IAU standard formulas for planets. Elongation helpers: `get_elongation_from_sun()`, `is_morning_star()`, `is_evening_star()`.
+
+### N-body orbit propagation (optional)
+
+With `pip install libephemeris[nbody]`, use REBOUND and ASSIST for high-fidelity orbit propagation:
+
+```python
+from libephemeris import propagate_orbit_assist, compare_with_keplerian
+result = propagate_orbit_assist(SE_CHIRON, jd_start, jd_end, step_days=1.0)
+```
+
+### Orbital elements and nodal/apsidal data
+
+`get_orbital_elements_ut()` returns full Keplerian elements. `nod_aps_ut()` computes ascending/descending nodes and perihelion/aphelion for any body, with mean, osculating, and barycentric methods.
+
+### Time utilities
+
+Julian Day conversions (`julday`, `revjul`), Delta T (`deltat`, `deltat_ex`), UTC/TT/TAI conversions, sidereal time (`sidtime`, `sidtime0`), equation of time, LMT/LAT conversions, IERS observed Delta T with automatic data download.
+
+### Coordinate transformations
+
+`cotrans()` / `cotrans_sp()` for ecliptic-equatorial conversion, `azalt()` / `azalt_rev()` for horizontal coordinates, `refrac()` / `refrac_extended()` for atmospheric refraction.
+
+---
+
+## Thread safety
+
+LibEphemeris provides two APIs:
+
+### Global API (pyswisseph-compatible)
+
+```python
+import libephemeris as swe
+
+swe.set_topo(12.5, 41.9, 0)
+pos, _ = swe.calc_ut(2451545.0, SE_SUN, 0)
+```
+
+Uses global state -- not thread-safe, exactly like `pyswisseph`.
 
 ### Context API (thread-safe)
-
-For multi-threaded applications, use `EphemerisContext`:
 
 ```python
 from libephemeris import EphemerisContext, SE_SUN, SE_MOON
 
-# Each thread creates its own context
 ctx = EphemerisContext()
-ctx.set_topo(12.5, 41.9, 0)  # Rome
-
+ctx.set_topo(12.5, 41.9, 0)
 sun, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 moon, _ = ctx.calc_ut(2451545.0, SE_MOON, 0)
 ```
 
-✅ **Thread-safe**  
-✅ **Independent state per context**  
-✅ **Shared ephemeris files** (memory efficient)
-
-#### Multi-threading example
+Each `EphemerisContext` instance has its own isolated state (observer location, sidereal mode, SPK registrations, angle cache) while sharing the expensive ephemeris data across instances. Safe for `ThreadPoolExecutor` and similar patterns:
 
 ```python
-from libephemeris import EphemerisContext, SE_SUN
 from concurrent.futures import ThreadPoolExecutor
+from libephemeris import EphemerisContext, SE_SUN
 
-def calculate_chart(location, jd):
-    """Thread-safe calculation function."""
+def calc_sun(location):
     ctx = EphemerisContext()
-    ctx.set_topo(location['lon'], location['lat'], 0)
-
-    sun, _ = ctx.calc_ut(jd, SE_SUN, 0)
-    return {'location': location['name'], 'sun_lon': sun[0]}
+    ctx.set_topo(location["lon"], location["lat"], 0)
+    pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
+    return {"name": location["name"], "sun": pos[0]}
 
 locations = [
-    {'name': 'Rome', 'lon': 12.5, 'lat': 41.9},
-    {'name': 'London', 'lon': -0.1, 'lat': 51.5},
-    {'name': 'Tokyo', 'lon': 139.7, 'lat': 35.7},
+    {"name": "Rome", "lon": 12.5, "lat": 41.9},
+    {"name": "London", "lon": -0.1, "lat": 51.5},
+    {"name": "Tokyo", "lon": 139.7, "lat": 35.7},
 ]
 
-# Calculate concurrently
-with ThreadPoolExecutor(max_workers=3) as executor:
-    results = list(executor.map(
-        lambda loc: calculate_chart(loc, 2451545.0),
-        locations
-    ))
-
-for r in results:
-    print(f"{r['location']}: Sun at {r['sun_lon']:.2f}°")
+with ThreadPoolExecutor(max_workers=3) as pool:
+    results = list(pool.map(calc_sun, locations))
 ```
 
 ---
 
-## Configuring Ephemeris Files
+## Configuring the ephemeris
 
-By default, LibEphemeris uses the **JPL DE440** kernel (`de440.bsp`), which covers roughly **1550–2650**. The file is:
-
--   loaded from a local path if already present, or
--   automatically downloaded via Skyfield the first time it is needed.
-
-You can control which ephemeris file is used and where it is loaded from.
-
-### Choosing a different JPL kernel
-
-Use `set_ephemeris_file()` to select a different `.bsp` file:
+Default: **DE440** (1550--2650 CE, ~128 MB, auto-downloaded).
 
 ```python
-from libephemeris import set_ephemeris_file
+# Use a different kernel
+swe.set_ephemeris_file("de441.bsp")  # -13200 to +17191 CE, ~3.4 GB
 
-set_ephemeris_file("de441.bsp")  # very long time span, larger file
+# Use a custom directory
+swe.set_ephe_path("/data/jpl-kernels")
 ```
 
-Supported JPL kernels include, for example:
-
--   `de440.bsp`: 1550–2650 (default, ~128 MB) - recommended for most uses
--   `de422.bsp`: −3000–3000 (~623 MB)
--   `de430.bsp`: 1550–2650 (~128 MB)
--   `de431.bsp`: −13200–17191 (~3.4 GB)
--   `de440.bsp`: 1550–2650 (default, ~128 MB) - recommended for most uses
--   `de441.bsp`: −13200–17191 (~3.4 GB) - for extended historical/future work
-
-If the chosen file is not present locally, Skyfield will attempt to download it.
-
-### Custom ephemeris directory
-
-Use `set_ephe_path()` to point LibEphemeris to a directory containing JPL kernels:
-
-```python
-from libephemeris import set_ephe_path
-
-set_ephe_path("/path/to/jpl-kernels")
-```
-
-Resolution order for the ephemeris file is:
-
-1. The directory set via `set_ephe_path()`, if any.
-2. The project/workspace root.
-3. Download via Skyfield.
-
-If you try to compute positions outside the date range covered by the selected kernel, LibEphemeris will raise an exception describing the supported range.
-
-### Environment variable
-
-You can also select the ephemeris file via the **`LIBEPHEMERIS_EPHEMERIS`** environment variable, which is useful for CI, containers, or system-wide configuration:
+Or via environment variable:
 
 ```bash
-# Use DE441 for extended date range (-13200 to +17191 CE)
 export LIBEPHEMERIS_EPHEMERIS=de441.bsp
 ```
 
-The resolution order (highest priority first) is:
+Priority: `set_ephemeris_file()` > `LIBEPHEMERIS_EPHEMERIS` env var > default `de440.bsp`.
 
-1. `set_ephemeris_file()` called in code.
-2. The `LIBEPHEMERIS_EPHEMERIS` environment variable.
-3. Default (`de440.bsp`).
+| Kernel | Date range | Size |
+|---|---|---|
+| `de440.bsp` | 1550 -- 2650 | ~128 MB |
+| `de441.bsp` | -13200 -- +17191 | ~3.4 GB |
+| `de422.bsp` | -3000 -- +3000 | ~623 MB |
+| `de431.bsp` | -13200 -- +17191 | ~3.4 GB |
 
-### Note on `SEFLG_MOSEPH`
-
-The `SEFLG_MOSEPH` flag is still accepted for API compatibility with `pyswisseph`, but it is **silently ignored** — LibEphemeris always uses JPL ephemerides regardless of this flag.
-
----
-
-## High-Precision Minor Bodies with SPK Kernels
-
-By default, minor bodies (asteroids, TNOs like Chiron, Eris, Sedna) are calculated using **Keplerian orbital elements** with secular perturbations. This provides arcminute-level accuracy, which may not be sufficient for precise astrological or astronomical work.
-
-For **arcsecond-level precision**, you can download **SPK kernels** directly from NASA JPL Horizons and use them for calculations.
-
-### Quick example
-
-```python
-import libephemeris as eph
-
-# Download SPK for Chiron covering 2000-2100
-spk_path = eph.download_spk(
-    body="Chiron",
-    start="2000-01-01",
-    end="2100-01-01",
-    directory="./spk_kernels"
-)
-
-# Register the SPK for Chiron calculations
-eph.register_spk_body(
-    ipl=eph.SE_CHIRON,
-    spk_path=spk_path,
-    naif_id=eph.NAIF_CHIRON  # 2002060
-)
-
-# Now calc_ut automatically uses the SPK kernel
-pos, _ = eph.calc_ut(2451545.0, eph.SE_CHIRON, eph.SEFLG_SPEED)
-print(f"Chiron (SPK): {pos[0]:.6f}°")
-```
-
-### Convenience function
-
-For a one-liner approach:
-
-```python
-import libephemeris as eph
-
-# Download and register in one call
-eph.download_and_register_spk(
-    body="Eris",
-    ipl=eph.SE_ERIS,
-    start="2000-01-01",
-    end="2100-01-01",
-)
-
-# Calculations now use SPK automatically
-pos, _ = eph.calc_ut(2460000.0, eph.SE_ERIS, 0)
-```
-
-### Available functions
-
-| Function | Description |
-|----------|-------------|
-| `download_spk(body, start, end, ...)` | Download SPK from JPL Horizons |
-| `register_spk_body(ipl, spk_path, naif_id)` | Register SPK for a body |
-| `unregister_spk_body(ipl)` | Remove SPK registration |
-| `download_and_register_spk(...)` | Download and register in one call |
-| `list_spk_bodies()` | List all registered SPK bodies |
-| `get_spk_body_info(ipl)` | Get SPK info for a body |
-| `get_spk_coverage(spk_path)` | Get date range covered by SPK |
-| `set_auto_spk_download(enable)` | Enable/disable automatic SPK download |
-| `set_spk_cache_dir(path)` | Set SPK cache directory |
-| `set_spk_date_padding(days)` | Set date range padding for auto-downloads |
-
-### Automatic SPK Download (Experimental)
-
-LibEphemeris can automatically download and cache SPK kernels on demand:
-
-```python
-import libephemeris as eph
-
-# Enable automatic SPK download
-eph.set_auto_spk_download(True)
-eph.set_spk_cache_dir("./spk_cache")  # Optional: custom cache location
-
-# First calculation triggers automatic download
-pos, _ = eph.calc_ut(2460000.0, eph.SE_CHIRON, 0)  # Downloads SPK if needed
-```
-
-### NAIF ID constants
-
-SPK kernels use NASA NAIF IDs. LibEphemeris provides constants for common bodies:
-
-```python
-NAIF_ASTEROID_OFFSET = 2000000  # asteroid_number + offset = NAIF ID
-NAIF_CHIRON = 2002060           # Chiron (2060)
-NAIF_CERES = 2000001            # Ceres (1)
-NAIF_PALLAS = 2000002           # Pallas (2)
-NAIF_JUNO = 2000003             # Juno (3)
-NAIF_VESTA = 2000004            # Vesta (4)
-NAIF_PHOLUS = 2005145           # Pholus (5145)
-NAIF_NESSUS = 2007066           # Nessus (7066)
-NAIF_ASBOLUS = 2008405          # Asbolus (8405)
-NAIF_CHARIKLO = 2010199         # Chariklo (10199)
-NAIF_ERIS = 2136199             # Eris (136199)
-NAIF_SEDNA = 2090377            # Sedna (90377)
-NAIF_GONGGONG = 2225088         # Gonggong (225088)
-```
-
-For any numbered asteroid, the NAIF ID is `asteroid_number + 2000000`.
-
-### Thread-safe usage with EphemerisContext
-
-```python
-from libephemeris import EphemerisContext, SE_CHIRON
-
-ctx = EphemerisContext()
-
-# Register SPK in this context only
-ctx.register_spk_body(SE_CHIRON, "./chiron.bsp", 2002060)
-
-pos, _ = ctx.calc_ut(2451545.0, SE_CHIRON, 0)
-```
-
-### Precision comparison
-
-| Method | Typical Accuracy | Use Case |
-|--------|------------------|----------|
-| Keplerian (default) | ~1-10 arcminutes | Quick estimates, historical charts |
-| SPK kernel | ~1-5 arcseconds | Precise calculations, transit timing |
-
-### Notes
-
-- SPK files can be large (1-50 MB depending on date range)
-- Files are cached locally after download
-- If a date is outside SPK coverage, an exception is raised (no silent fallback)
-- SPK kernels are downloaded from JPL Horizons API (requires internet for download)
+> `SEFLG_MOSEPH` is accepted for API compatibility but silently ignored. All calculations always use JPL ephemerides.
 
 ---
 
-## Scientific Accuracy and Validation
+## Exception hierarchy
 
-### Ephemeris data
-
--   **Source**: NASA JPL DE ephemerides (DE440 by default).
--   **Time span**: 1550–2650 for DE440; extendable by selecting other kernels.
--   **Precision**: Sub-arcsecond accuracy for major planets within the supported range.
--   **Reference frame**: ICRS/J2000.0 (ICRF 3.0 for DE440/DE441).
-
-### Comparison with Swiss Ephemeris
-
-LibEphemeris has been tested against Swiss Ephemeris using an automated test suite.
-
-| Component            | Tests | Pass Rate | Max Difference |
-| -------------------- | ----- | --------- | -------------- |
-| Planetary positions  | 229   | 100%      | < 0.001°       |
-| House systems        | 113   | 100%      | < 0.001°       |
-| Ayanamsha values     | 129   | 100%      | < 0.06°        |
-| Lunar nodes / Lilith | 40+   | 100%      | < 0.01°        |
-| Velocities           | 100   | 100%      | < 0.01°/day    |
-
-These comparisons are implemented in the `tests/` and `compare_scripts/` directories, and are run regularly during development.
-
-### Performance Benchmarks
-
-LibEphemeris is a pure Python implementation, while pyswisseph is a C library. The performance difference reflects this architectural choice, prioritizing readability and maintainability over raw speed. Future Rust core implementation (Milestone 2) will significantly improve performance.
-
-| Operation       | Iterations | pyswisseph (C)       | libephemeris (Python) | Slowdown |
-| --------------- | ---------- | -------------------- | --------------------- | -------- |
-| calc_ut         | 5000       | 0.04s (~138,000/s)   | 4.2s (~1,180/s)       | ~117x    |
-| houses          | 1200       | 0.004s (~296,000/s)  | 0.13s (~9,400/s)      | ~31x     |
-| get_ayanamsa_ut | 1500       | 0.001s (~1,300,000/s)| 0.03s (~45,000/s)     | ~29x     |
-
-*Benchmarks run on Apple M1 Pro, Python 3.10. Results may vary depending on hardware and system load.*
-
-**Key observations:**
-
--   **House calculations** are the fastest operation, with only ~31x slowdown.
--   **Ayanamsa calculations** are similarly efficient at ~29x slowdown.
--   **Planetary positions** (calc_ut) are the most computationally intensive, as they involve JPL ephemeris file lookups via Skyfield.
-
-Run the benchmarks yourself:
-
-```bash
-pytest tests/test_precision/test_benchmark_comparison.py -v -s
 ```
+Error (base, pyswisseph-compatible)
+├── InputValidationError
+│   ├── CoordinateError          # invalid lat/lon
+│   └── InvalidBodyError         # body not valid for operation
+├── DataNotFoundError
+│   ├── UnknownBodyError         # unknown body ID
+│   ├── StarNotFoundError        # star not in catalog
+│   ├── SPKNotFoundError         # SPK file missing
+│   └── SPKRequiredError         # SPK needed in strict mode
+├── CalculationError
+│   ├── PolarCircleError         # houses at polar latitudes
+│   ├── EphemerisRangeError      # date outside kernel range
+│   └── ConvergenceError         # algorithm didn't converge
+└── ConfigurationError           # missing config (e.g. set_topo)
+```
+
+Catch broad categories (`except CalculationError`) or specific errors (`except PolarCircleError`). All inherit from `Error`, which is compatible with `swisseph.Error`.
 
 ---
 
-## Swiss Ephemeris Compatibility
+## pyswisseph compatibility
 
-LibEphemeris aims to behave as a **drop-in replacement** for `pyswisseph` in many scenarios:
+LibEphemeris exports every function with both `swe_` prefix and bare name:
 
--   Same function names (e.g. `swe_calc_ut`, `swe_houses`, `swe_julday`, `swe_revjul`, `swe_get_ayanamsa_ut`).
--   Same integer constants and flags from `libephemeris.constants` (e.g. `SE_SUN`, `SEFLG_SWIEPH`, `SEFLG_SPEED`, `SE_SIDM_LAHIRI`).
--   Similar return types and value ordering.
+```python
+# These are identical:
+swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+swe.calc_ut(jd, SE_SUN, SEFLG_SPEED)
+```
 
-There are still differences and missing features compared to the full Swiss Ephemeris API, especially around:
+Same constants (`SE_SUN`, `SEFLG_SPEED`, `SE_SIDM_LAHIRI`, etc.) and same return types. Both `SE_` and bare-name aliases are provided for all constants.
 
--   very long time ranges (beyond the chosen JPL kernel),
--   eclipse and occultation functions,
--   the full minor-planet and fixed-star catalogues.
+**Known differences:**
+- Very long time ranges beyond the loaded JPL kernel raise `EphemerisRangeError` instead of silently degrading.
+- True Node uses geometric `h = r x v` from JPL state vectors rather than perturbation series. Both approaches are valid; the difference is ~0.06° for practical purposes.
 
-Please open an issue if you hit a compatibility gap that is important for your use case.
+---
+
+## Performance
+
+LibEphemeris is pure Python; `pyswisseph` is C. The trade-off is readability and maintainability vs raw speed.
+
+| Operation | pyswisseph (C) | libephemeris (Python) | Ratio |
+|---|---|---|---|
+| `calc_ut` (5000 calls) | 0.04s | 4.2s | ~117x |
+| `houses` (1200 calls) | 0.004s | 0.13s | ~31x |
+| `get_ayanamsa_ut` (1500 calls) | 0.001s | 0.03s | ~29x |
+
+*Apple M1 Pro, Python 3.10. A future Rust core (Milestone 2) will close this gap.*
 
 ---
 
 ## Development
 
+```bash
+git clone https://github.com/g-battaglia/libephemeris.git
+cd libephemeris
+uv pip install -e ".[dev]"
+
+poe test           # fast tests (excludes @pytest.mark.slow)
+poe test:full      # all tests
+poe lint           # ruff check --fix
+poe format         # ruff format
+poe typecheck      # mypy
+poe coverage       # pytest with coverage
+```
+
 ### Project layout
 
-```text
+```
 libephemeris/
-├── libephemeris/
-│   ├── __init__.py
-│   ├── constants.py      # Constants and flags
-│   ├── context.py        # Thread-safe EphemerisContext
-│   ├── planets.py        # Planetary calculations
-│   ├── houses.py         # House systems
-│   ├── lunar.py          # Nodes and Lilith
-│   ├── minor_bodies.py   # Asteroids and TNOs (Keplerian)
-│   ├── hypothetical.py   # Uranian planets (Hamburg School)
-│   ├── heliacal.py       # Heliacal events (Schaefer model)
-│   ├── schaefer.py       # Atmospheric visibility model
-│   ├── eclipse.py        # Solar/lunar eclipses and occultations
-│   ├── spk.py            # SPK kernel support for high-precision minor bodies
-│   ├── fixed_stars.py    # Fixed stars and points
-│   ├── crossing.py       # Longitude crossing events
-│   ├── angles.py         # Angle helpers (Asc, MC, etc.)
-│   ├── arabic_parts.py   # Arabic parts calculations
-│   ├── time_utils.py     # Time conversion helpers
-│   └── state.py          # Global state (loader, ephemeris, sidereal mode)
-├── tests/                # Comprehensive test suite
-├── compare_scripts/      # Swiss Ephemeris comparison tools
-└── README.md
+├── __init__.py            # Public API (all exports and aliases)
+├── constants.py           # SE_*, SEFLG_*, SE_SIDM_* constants
+├── planets.py             # Core planetary calculations
+├── houses.py              # 24 house system implementations
+├── lunar.py               # Lunar nodes, Lilith, interpolated apsides
+├── minor_bodies.py        # Asteroids, TNOs (Keplerian + SBDB lookup)
+├── eclipse.py             # Solar/lunar eclipses, Besselian elements
+├── crossing.py            # Longitude crossing event search
+├── heliacal.py            # Heliacal rising/setting
+├── extinction.py          # Atmospheric extinction and twilight models
+├── fixed_stars.py         # Fixed star catalog with proper motion
+├── hypothetical.py        # Uranian planets, seorbel.txt parser
+├── planetary_moons.py     # Galilean moons, Titan, etc.
+├── arabic_parts.py        # Arabic parts (Lots)
+├── spk.py                 # SPK kernel download and registration
+├── rebound_integration.py # N-body integration (optional)
+├── context.py             # Thread-safe EphemerisContext
+├── state.py               # Global state management
+├── time_utils.py          # Julian Day, Delta T, sidereal time
+├── astrometry.py          # Precession, nutation, aberration (IAU)
+├── utils.py               # Coordinate transforms, angle utilities
+├── exceptions.py          # Exception hierarchy
+├── iers_data.py           # IERS Delta T observed data
+└── cli.py                 # CLI entry point
+tests/                     # Comprehensive test suite
+compare_scripts/           # Swiss Ephemeris comparison tools
 ```
 
-### Development workflow
+---
 
-Install in editable mode with development dependencies:
+## Roadmap
 
-```bash
-uv pip install -e ".[dev]"
-```
-
-Run tests (via `poethepoet` tasks defined in `pyproject.toml`):
-
-```bash
-poe test       # run pytest
-poe coverage   # run tests with coverage
-poe lint       # run Ruff (lint)
-poe format     # run Ruff formatter
-```
+1. **Milestone 1 (current):** Pure-Python library, 1:1 pyswisseph drop-in.
+2. **Milestone 2:** Rust core via [Starfield](https://docs.rs/starfield/latest/starfield/) for C-level performance with the same Python API.
 
 ---
 
 ## License
 
-LibEphemeris is licensed under the **GNU Lesser General Public License v3.0 (LGPL-3.0)**.
-
-See `LICENSE` for the full text.
-
-**What this means for you:**
-
-1.  **Commercial Use**: You **can** use this library in proprietary/commercial software without releasing your source code, provided you link to the library dynamically (e.g., as a normal Python dependency installed via `pip`).
-2.  **Modifications**: If you modify the source code of _LibEphemeris itself_, you **must** release those modifications under the LGPL.
+**LGPL-3.0.** You can use LibEphemeris as a dependency in proprietary software without releasing your source code. If you modify LibEphemeris itself, those modifications must be released under the LGPL. See [LICENSE](LICENSE).

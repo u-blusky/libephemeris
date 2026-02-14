@@ -1052,11 +1052,12 @@ wheels = [
 
 [[package]]
 name = "libephemeris"
-version = "0.11.0"
+version = "0.12.0"
 source = { editable = "." }
 dependencies = [
     { name = "astroquery" },
     { name = "certifi" },
+    { name = "pyerfa" },
     { name = "skyfield" },
     { name = "skyfield-data" },
     { name = "spktype21" },
@@ -1065,7 +1066,6 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "assist" },
-    { name = "pyerfa" },
     { name = "rebound" },
 ]
 dev = [
@@ -1098,9 +1098,6 @@ nbody = [
     { name = "assist" },
     { name = "rebound" },
 ]
-precision = [
-    { name = "pyerfa" },
-]
 stars = [
     { name = "astropy", version = "6.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "astropy", version = "6.1.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
@@ -1119,8 +1116,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "poethepoet", marker = "extra == 'dev'", specifier = ">=0.37.0,<0.38.0" },
-    { name = "pyerfa", marker = "extra == 'all'", specifier = ">=2.0.0" },
-    { name = "pyerfa", marker = "extra == 'precision'", specifier = ">=2.0.0" },
+    { name = "pyerfa", specifier = ">=2.0.0" },
     { name = "pyswisseph", marker = "extra == 'dev'", specifier = ">=2.10.3.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0,<9.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
@@ -1137,7 +1133,7 @@ requires-dist = [
     { name = "spktype21", specifier = ">=0.1.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=5.0.0" },
 ]
-provides-extras = ["precision", "stars", "nbody", "all", "dev", "docs"]
+provides-extras = ["stars", "nbody", "all", "dev", "docs"]
 
 [[package]]
 name = "librt"

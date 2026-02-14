@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-02-14
+
+### Fixed
+
+#### Critical: SE_SIDM_USER ayanamsha precession error
+
+Fixed the precession polynomial in `_calc_ayanamsa()` for `SE_SIDM_USER` when the
+user-defined reference epoch (`t0`) differs from J2000. The code was evaluating the
+IAU 2006 polynomial at `T_user` instead of computing the differential `p(T) - p(T0)`,
+causing ~2.2 arcsec error for non-J2000 reference epochs.
+
+#### Critical: PREC_RATE / PREC_RATE_QUAD NameError crash
+
+Fixed `NameError` crash in star-based ayanamsha calculations (`SE_SIDM_TRUE_REVATI`,
+`SE_SIDM_TRUE_PUSHYA`, `SE_SIDM_TRUE_MULA`, `SE_SIDM_GALCENT_*`) caused by undefined
+constants `PREC_RATE` and `PREC_RATE_QUAD`. Replaced with the full IAU 2006 5-term
+precession polynomial.
+
+#### Remaining forward-difference velocity calculations
+
+Converted the last two forward-difference `O(h)` velocity calculations to central
+difference `O(h²)` in `calc_seorbel_position()` and `_calc_keplerian_position()`
+(`hypothetical.py`), completing the migration started in commit 5577461.
+
+### Changed
+
+#### Precision: IAU 2006/2000A models throughout
+
+Upgraded all nutation and obliquity calculations to use IAU 2006/2000A models via
+`erfa.nut06a()` and `erfa.obl06()`, replacing the mixed Skyfield/simplified models
+that were previously used in some code paths. This ensures sub-milliarcsecond
+consistency across all calculations (nutation, obliquity, ayanamsha, coordinate
+transformations).
+
+- `_calc_nutation_obliquity()`: now uses `erfa.nut06a()` + `erfa.obl06()` directly
+- `_get_star_position_ecliptic()`: rewritten with full Skyfield astrometric pipeline
+  (adds annual aberration, previously missing)
+- `get_nutation_model()`: returns `IAU2006_2000A` source info
+- Central-difference velocity in `spk.py`, `planetary_moons.py`, `hypothetical.py`
+
+#### Dependency: pyerfa promoted to required
+
+`pyerfa` is now a required dependency (was optional via `[precision]` extra). All
+calculations unconditionally use `erfa.nut06a()` and `erfa.obl06()` for maximum
+precision. The `[precision]` install extra has been removed.
+
+### Removed
+
+- `[precision]` optional extra from `pyproject.toml` (pyerfa is now always required)
+- Redundant `pyerfa` entry from `[all]` extra (already in core dependencies)
+
 ## [0.12.0] - 2026-02-13
 
 ### Fixed
@@ -636,7 +687,9 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/g-battaglia/libephemeris/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/g-battaglia/libephemeris/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/g-battaglia/libephemeris/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/g-battaglia/libephemeris/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/g-battaglia/libephemeris/compare/v0.8.0...v0.9.0
