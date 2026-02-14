@@ -1,21 +1,19 @@
 # PyERFA Integration Benefits
 
-This document describes the precision improvements that pyerfa provides when integrated with libephemeris, and recommendations for when to use it.
+This document describes the precision improvements that pyerfa provides in libephemeris.
 
 ## Overview
 
 PyERFA is the Python wrapper for the ERFA (Essential Routines for Fundamental Astronomy) library, which is derived from the IAU SOFA (Standards of Fundamental Astronomy) library. It provides validated, high-precision implementations of fundamental astronomical transformations.
 
-LibEphemeris includes pyerfa as an optional dependency (`pip install libephemeris[precision]`) that enhances nutation, precession, and obliquity calculations beyond what Skyfield provides.
+LibEphemeris includes pyerfa as a **required dependency** that provides IAU 2006/2000A nutation, obliquity, and precession models throughout the library.
 
 ## Installation
 
-```bash
-# Install libephemeris with pyerfa support
-pip install libephemeris[precision]
+pyerfa is installed automatically with libephemeris:
 
-# Or install pyerfa separately
-pip install pyerfa
+```bash
+pip install libephemeris
 ```
 
 ## Precision Comparison
@@ -202,15 +200,15 @@ PyERFA adds minimal overhead:
 
 The caching system (`get_erfa_nutation_cached`) eliminates repeated calculation costs.
 
-## Fallback Behavior
+## Usage
 
-LibEphemeris gracefully falls back to Skyfield when pyerfa is not installed:
+Since pyerfa is a required dependency, all nutation calculations always use
+the highest-precision model:
 
 ```python
 from libephemeris.erfa_nutation import get_erfa_nutation_cached
 
-# Always works - uses nut06a if pyerfa is available, 
-# otherwise falls back to Skyfield's iau2000a_radians
+# Always uses erfa.nut06a (IAU 2006/2000A, ~0.01-0.05 mas)
 dpsi, deps = get_erfa_nutation_cached(jd_tt)
 ```
 
@@ -257,4 +255,4 @@ The difference grows approximately 0.25 mas per year from J2000.
 | Required for astrology | No | No |
 | Recommended for research | Yes | Yes |
 
-For most libephemeris users, pyerfa provides peace of mind that calculations use the most rigorous available models, even if the practical differences are below astrological precision requirements. For researchers and those requiring highest precision, pyerfa is strongly recommended.
+For most libephemeris users, pyerfa ensures that all calculations use the most rigorous models adopted by the IAU, even if the practical differences are below astrological precision requirements. Since pyerfa is a required dependency, no additional installation is needed.

@@ -1,17 +1,13 @@
 """
-Tests for optional dependencies documentation and availability checking.
+Tests for dependency documentation and availability checking.
 
 This module tests that:
-1. Optional dependencies are correctly documented in README.md
+1. Required and optional dependencies are correctly documented in README.md
 2. Optional dependencies are defined in pyproject.toml extras
-3. The library gracefully handles missing optional dependencies
-4. Optional features provide clear error messages when dependencies are missing
+3. Required dependencies (pyerfa, astroquery) are available and functional
 """
 
-import re
-import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -121,71 +117,38 @@ class TestPyerfaRequiredImport:
         assert "import erfa" in cache_source
 
 
-class TestAstroqueryOptionalImport:
-    """Tests for astroquery optional dependency handling."""
+class TestAstroqueryRequiredImport:
+    """Tests for astroquery required dependency (promoted from optional)."""
 
-    def test_spk_auto_module_imports_without_astroquery(self):
-        """spk_auto module should import even without astroquery."""
+    def test_spk_auto_module_imports(self):
+        """spk_auto module should import successfully."""
         from libephemeris import spk_auto
 
         assert spk_auto is not None
 
-    def test_astroquery_availability_check_function_exists(self):
-        """spk_auto should have a function to check astroquery availability."""
+    def test_astroquery_availability_check_returns_true(self):
+        """astroquery availability check should always return True (required dep)."""
         from libephemeris import spk_auto
 
         assert hasattr(spk_auto, "_check_astroquery_available")
-        # The function should return a boolean
         result = spk_auto._check_astroquery_available()
-        assert isinstance(result, bool)
+        assert result is True
 
-    def test_enable_auto_spk_raises_without_astroquery(self):
-        """enable_auto_spk should raise ImportError when astroquery is not available."""
-        from libephemeris import spk_auto
-        from libephemeris.constants import SE_CHIRON
-
-        # Mock astroquery as unavailable
-        with patch.object(spk_auto, "_check_astroquery_available", return_value=False):
-            with pytest.raises(ImportError) as exc_info:
-                spk_auto.enable_auto_spk(
-                    ipl=SE_CHIRON,
-                    body_id="2060",
-                )
-            assert "astroquery" in str(exc_info.value)
+    def test_astroquery_import_works(self):
+        """astroquery should be importable (required dependency)."""
+        from astroquery.jplhorizons import Horizons  # noqa: F401
 
 
-class TestOptionalDependencyErrorMessages:
-    """Tests for helpful error messages when optional dependencies are missing."""
+class TestDependencyFeatureIntegration:
+    """Tests that required dependencies are properly integrated."""
 
-    def test_spk_download_error_message_mentions_astroquery(self):
-        """SPK download functions should mention astroquery in error messages."""
+    def test_spk_auto_functions_exist(self):
+        """Key spk_auto functions should be available."""
         from libephemeris import spk_auto
 
-        with patch.object(spk_auto, "_check_astroquery_available", return_value=False):
-            with pytest.raises(ImportError) as exc_info:
-                spk_auto.auto_get_spk(
-                    body_id="2060",
-                    jd_start=2451545.0,
-                    jd_end=2488069.5,
-                )
-            error_msg = str(exc_info.value).lower()
-            assert "astroquery" in error_msg
-            assert "pip install" in error_msg
-
-    def test_download_spk_from_horizons_error_message(self):
-        """download_spk_from_horizons should provide helpful error message."""
-        from libephemeris import spk_auto
-
-        with patch.object(spk_auto, "_check_astroquery_available", return_value=False):
-            with pytest.raises(ImportError) as exc_info:
-                spk_auto.download_spk_from_horizons(
-                    body_id="2060",
-                    jd_start=2451545.0,
-                    jd_end=2488069.5,
-                    output_path="/tmp/test.bsp",
-                )
-            error_msg = str(exc_info.value).lower()
-            assert "astroquery" in error_msg
+        assert hasattr(spk_auto, "enable_auto_spk")
+        assert hasattr(spk_auto, "auto_get_spk")
+        assert hasattr(spk_auto, "download_spk_from_horizons")
 
 
 class TestOptionalDependencyFeatures:

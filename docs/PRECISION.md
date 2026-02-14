@@ -595,7 +595,7 @@ registered using `register_moon_spk()` before calculating moon positions.
 | Longitude | ~0.01 arcsec |
 | Latitude | ~0.01 arcsec |
 | Proper motion | Corrected for stellar curvature |
-| Nutation | IAU 2000A model (1365 terms) |
+| Nutation | IAU 2006/2000A model via pyerfa (~0.01-0.05 mas) |
 
 ### Velocity Limitation
 
@@ -610,74 +610,35 @@ pos, _ = ephem.fixstar_ut("Aldebaran", jd, SEFLG_SPEED)
 
 ## Nutation Model
 
-### IAU 2000A vs Simplified 4-Term Model
+### IAU 2006/2000A via pyerfa
 
-LibEphemeris uses the IAU 2000A nutation model (1365 terms) via Skyfield for
-sub-milliarcsecond precision. However, if Skyfield's `iau2000a_radians` function
-is not available, the library falls back to a simplified 4-term model.
+LibEphemeris uses the IAU 2006/2000A nutation model via pyerfa (`erfa.nut06a`)
+for all nutation calculations. This is the highest precision nutation model
+currently adopted by the IAU, with ~0.01-0.05 milliarcsecond accuracy.
 
-| Model | Terms | Precision | Requirement |
-|-------|-------|-----------|-------------|
-| IAU 2000A | 1365 | ~0.1 milliarcsecond | Skyfield installed |
-| Simplified 4-term | 4 | ~1 arcsecond | Fallback (no Skyfield) |
+| Component | Model | Precision |
+|-----------|-------|-----------|
+| Nutation in longitude | IAU 2006/2000A (erfa.nut06a) | ~0.01-0.05 mas |
+| Nutation in obliquity | IAU 2006/2000A (erfa.nut06a) | ~0.01-0.05 mas |
+| Mean obliquity | IAU 2006 (erfa.obl06) | Sub-milliarcsecond |
+| Precession (ayanamsa) | IAU 2006 (Capitaine et al. 2003, 5-term polynomial) | ~0.08 mas/cy |
 
-**Precision degradation**: The 4-term fallback is approximately 1000x less precise
-than the full IAU 2000A model. This affects:
-
-- True obliquity of the ecliptic
-- Nutation in longitude and obliquity
-- True lunar node calculations
-- True ecliptic frame transformations
-
-### Fallback Warning
-
-When the fallback model is used, LibEphemeris emits a `NutationFallbackWarning`:
-
-```python
-import warnings
-import libephemeris as eph
-
-# The warning is emitted on first nutation calculation if Skyfield unavailable
-pos, _ = eph.calc_ut(jd, eph.SE_ECL_NUT, 0)
-
-# To suppress the warning if you understand the precision impact:
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", eph.NutationFallbackWarning)
-    pos, _ = eph.calc_ut(jd, eph.SE_ECL_NUT, 0)
-```
+The model includes 1365+ lunisolar and planetary nutation terms with
+corrections from IAU 2006 precession-rate adjustments. `pyerfa` is a
+required dependency that wraps the official IAU ERFA C library.
 
 ### Checking the Active Nutation Model
 
-Use `get_nutation_model()` to determine which model is active:
+Use `get_nutation_model()` to inspect the active model:
 
 ```python
 import libephemeris as eph
 
 info = eph.get_nutation_model()
-print(f"Model: {info['model']}")           # "IAU2000A" or "simplified_4_term"
-print(f"Terms: {info['terms']}")           # 1365 or 4
-print(f"Precision: {info['precision']}")   # "sub-milliarcsecond" or "~1 arcsecond"
-print(f"Skyfield available: {info['skyfield_available']}")
-
-if not info['skyfield_available']:
-    print("Install Skyfield for full precision: pip install skyfield")
-```
-
-### Ensuring Full Precision
-
-To ensure you always have full IAU 2000A precision:
-
-```bash
-pip install skyfield
-```
-
-Then verify:
-
-```python
-import libephemeris as eph
-
-info = eph.get_nutation_model()
-assert info['model'] == 'IAU2000A', "Full precision nutation not available"
+print(f"Model: {info['model']}")           # "IAU2006_2000A"
+print(f"Terms: {info['terms']}")           # 1365
+print(f"Precision: {info['precision']}")   # "~0.01-0.05 mas"
+print(f"Source: {info['source']}")         # "pyerfa"
 ```
 
 ---

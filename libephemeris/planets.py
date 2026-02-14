@@ -1080,6 +1080,7 @@ def get_nutation_model() -> dict:
             - ``terms`` (int): Number of terms (1365+ lunisolar+planetary)
             - ``precision`` (str): Expected precision ("~0.01-0.05 mas")
             - ``source`` (str): "pyerfa" (the underlying C library)
+            - ``skyfield_available`` (bool): Always True (kept for backward compatibility)
 
     Examples:
         >>> import libephemeris as eph
@@ -1091,6 +1092,8 @@ def get_nutation_model() -> dict:
         "terms": 1365,
         "precision": "~0.01-0.05 mas",
         "source": "pyerfa",
+        # Backward compatibility: Skyfield is always available (required dep)
+        "skyfield_available": True,
     }
 
 
