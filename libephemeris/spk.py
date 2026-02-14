@@ -1246,11 +1246,28 @@ def calc_spk_body_position(
     speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
 
     if iflag & SEFLG_SPEED:
-        # Numerical differentiation (1 second timestep)
+        # Central difference numerical differentiation (1 second timestep)
         ts = get_timescale()
         dt = 1.0 / 86400.0  # 1 second in days
 
+        t_prev = ts.tt_jd(t.tt - dt)
         t_next = ts.tt_jd(t.tt + dt)
+
+        # Position at t - dt
+        target_pos_prev = target.at(t_prev)
+        observer_pos_prev = observer.at(t_prev)
+
+        target_xyz_prev = target_pos_prev.position.au
+        observer_xyz_prev = observer_pos_prev.position.au
+
+        rel_xyz_prev = [target_xyz_prev[i] - observer_xyz_prev[i] for i in range(3)]
+
+        rel_pos_prev = ICRF(rel_xyz_prev, t=t_prev, center=399)
+        ecl_pos_prev = rel_pos_prev.frame_latlon(ecliptic_frame)
+
+        lat_prev = ecl_pos_prev[0].degrees
+        lon_prev = ecl_pos_prev[1].degrees % 360.0
+        dist_prev = ecl_pos_prev[2].au
 
         # Position at t + dt
         target_pos_next = target.at(t_next)
@@ -1265,21 +1282,19 @@ def calc_spk_body_position(
         ecl_pos_next = rel_pos_next.frame_latlon(ecliptic_frame)
 
         lat_next = ecl_pos_next[0].degrees
-        lon_next = ecl_pos_next[1].degrees
+        lon_next = ecl_pos_next[1].degrees % 360.0
         dist_next = ecl_pos_next[2].au
 
-        lon_next = lon_next % 360.0
-
-        # Compute rates (per day)
-        speed_lon = (lon_next - lon) / dt
-        speed_lat = (lat_next - lat) / dt
-        speed_dist = (dist_next - dist) / dt
+        # Compute rates using central difference (per day)
+        speed_lon = (lon_next - lon_prev) / (2.0 * dt)
+        speed_lat = (lat_next - lat_prev) / (2.0 * dt)
+        speed_dist = (dist_next - dist_prev) / (2.0 * dt)
 
         # Handle 360 wrap
-        if speed_lon > 180.0 / dt:
-            speed_lon -= 360.0 / dt
-        if speed_lon < -180.0 / dt:
-            speed_lon += 360.0 / dt
+        if speed_lon > 180.0 / (2.0 * dt):
+            speed_lon -= 360.0 / (2.0 * dt)
+        if speed_lon < -180.0 / (2.0 * dt):
+            speed_lon += 360.0 / (2.0 * dt)
 
     # Apply sidereal correction if requested
     if iflag & SEFLG_SIDEREAL:

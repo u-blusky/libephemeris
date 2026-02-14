@@ -47,13 +47,10 @@ dependencies = [
     "astroquery>=0.4.7",  # Required for automatic SPK kernel downloads from JPL Horizons
     "certifi",  # SSL certificates for HTTPS connections to JPL Horizons
     "spktype21>=0.1.0",  # Support for SPK type 21 files from JPL Horizons (asteroids, comets)
+    "pyerfa>=2.0.0",  # IAU ERFA: high-precision nutation (IAU 2006/2000A), obliquity, precession, aberration
 ]
 
 [project.optional-dependencies]
-# High-precision IAU 2006 precession/obliquity for true lunar nodes
-precision = [
-    "pyerfa>=2.0.0",
-]
 # Star catalog building (scripts/build_star_catalog.py)
 stars = [
     "astropy>=5.0.0",

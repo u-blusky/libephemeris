@@ -1863,6 +1863,11 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
     # n = k × h = (-h_y, h_x, 0), longitude = atan2(h_x, -h_y)
     node_lon = math.degrees(math.atan2(float(h_x), float(-h_y))) % 360.0
 
+    # Note: ELP2000-82B perturbation corrections (_calc_elp2000_node_perturbations)
+    # are available but not applied here. The geometric h = r × v approach already
+    # captures perturbation effects through the JPL DE ephemeris state vectors.
+    # The perturbation series was designed for the mean node, not the geometric node.
+
     # Distance proxy: normalized angular momentum magnitude
     h_mag = math.sqrt(float(h_x**2 + h_y**2 + h_z**2))
     dist = h_mag * 1000.0  # Scale factor for consistency
@@ -2184,6 +2189,12 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     # Convert to spherical ecliptic coordinates (already in ecliptic of date)
     longitude = math.degrees(math.atan2(apogee_y, apogee_x)) % 360.0
     lat = math.degrees(math.asin(apogee_z / apogee_mag))
+
+    # Note: ELP2000/Moshier perturbation corrections (_calc_elp2000_apogee_perturbations)
+    # are available but not applied here. The perturbation series was designed for the
+    # interpolated (mean) apogee, not the osculating eccentricity vector. The geometric
+    # e = (v×h)/μ - r/|r| approach already captures perturbation effects through the
+    # JPL DE ephemeris state vectors.
 
     return longitude, lat, e_mag
 

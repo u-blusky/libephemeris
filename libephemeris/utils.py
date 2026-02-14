@@ -6,6 +6,7 @@ angular calculations and other mathematical utilities.
 """
 
 import math
+import erfa
 from typing import Optional, Tuple
 
 # Azalt calculation method flags (compatible with pyswisseph)
@@ -215,22 +216,20 @@ def azalt(
     coord = xin
 
     from .time_utils import _sidtime_internal
-    from skyfield.nutationlib import iau2000b_radians
     from .state import get_timescale
 
     # Get true obliquity (mean obliquity + nutation in obliquity)
     # This is needed for accurate ecliptic to equatorial conversion
-    T = (jd - 2451545.0) / 36525.0
-
-    # Mean obliquity (Laskar 1986 formula)
-    eps0 = (
-        84381.406 - 46.836769 * T - 0.0001831 * T * T + 0.00200340 * T * T * T
-    ) / 3600.0  # Convert arcsec to degrees
-
-    # Add nutation in obliquity for true obliquity
     ts = get_timescale()
     t = ts.ut1_jd(jd)
-    dpsi_rad, deps_rad = iau2000b_radians(t)
+    jd_tt = t.tt
+
+    # Mean obliquity IAU 2006 (Hilton et al. 2006, via pyerfa)
+    eps0_rad = erfa.obl06(2451545.0, jd_tt - 2451545.0)
+    eps0 = math.degrees(eps0_rad)
+
+    # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
+    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
     deps_deg = math.degrees(deps_rad)
     dpsi_deg = math.degrees(dpsi_rad)  # Nutation in longitude
     eps = eps0 + deps_deg  # True obliquity
@@ -395,22 +394,20 @@ def azalt_rev(
     altitude = geopos[2]
 
     from .time_utils import _sidtime_internal
-    from skyfield.nutationlib import iau2000b_radians
     from .state import get_timescale
 
     # Get true obliquity (mean obliquity + nutation in obliquity)
     # This is needed for accurate equatorial to ecliptic conversion
-    T = (jd - 2451545.0) / 36525.0
-
-    # Mean obliquity (Laskar 1986 formula)
-    eps0 = (
-        84381.406 - 46.836769 * T - 0.0001831 * T * T + 0.00200340 * T * T * T
-    ) / 3600.0  # Convert arcsec to degrees
-
-    # Add nutation in obliquity for true obliquity
     ts = get_timescale()
     t = ts.ut1_jd(jd)
-    dpsi_rad, deps_rad = iau2000b_radians(t)
+    jd_tt = t.tt
+
+    # Mean obliquity IAU 2006 (Hilton et al. 2006, via pyerfa)
+    eps0_rad = erfa.obl06(2451545.0, jd_tt - 2451545.0)
+    eps0 = math.degrees(eps0_rad)
+
+    # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
+    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
     deps_deg = math.degrees(deps_rad)
     dpsi_deg = math.degrees(dpsi_rad)  # Nutation in longitude
     eps = eps0 + deps_deg  # True obliquity

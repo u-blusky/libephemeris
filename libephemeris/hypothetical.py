@@ -2154,16 +2154,17 @@ def calc_uranian_position(
     else:
         distance = 100.0  # Default large distance
 
-    # Calculate velocity (numerical differentiation)
+    # Calculate velocity (central difference numerical differentiation)
     dt = 1.0 / 86400.0  # 1 second in days
+    lon_prev = calc_uranian_longitude(ipl, jd_tt - dt)
     lon_next = calc_uranian_longitude(ipl, jd_tt + dt)
 
     # Handle wrap-around
-    dlon = (lon_next - longitude) / dt
-    if dlon > 180.0 / dt:
-        dlon -= 360.0 / dt
-    elif dlon < -180.0 / dt:
-        dlon += 360.0 / dt
+    dlon = (lon_next - lon_prev) / (2.0 * dt)
+    if dlon > 180.0 / (2.0 * dt):
+        dlon -= 360.0 / (2.0 * dt)
+    elif dlon < -180.0 / (2.0 * dt):
+        dlon += 360.0 / (2.0 * dt)
 
     # Latitude and distance are constant
     dlat = 0.0
@@ -2469,19 +2470,20 @@ def calc_transpluto(jd_tt: float) -> Tuple[float, float, float, float, float, fl
     latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
     distance = r
 
-    # Calculate velocity via numerical differentiation
+    # Calculate velocity via central difference numerical differentiation
     dt_step = 1.0  # 1 day step for daily velocity
+    pos_prev = _calc_transpluto_raw(jd_tt - dt_step)
     pos_next = _calc_transpluto_raw(jd_tt + dt_step)
 
-    dlon = pos_next[0] - longitude
+    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
     # Handle wrap-around
-    if dlon > 180.0:
-        dlon -= 360.0
-    elif dlon < -180.0:
-        dlon += 360.0
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
 
-    dlat = pos_next[1] - latitude
-    ddist = pos_next[2] - distance
+    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
+    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 
@@ -2706,19 +2708,20 @@ def calc_vulcan(jd_tt: float) -> Tuple[float, float, float, float, float, float]
     pos = _calc_vulcan_raw(jd_tt)
     longitude, latitude, distance = pos
 
-    # Calculate velocity via numerical differentiation
+    # Calculate velocity via central difference numerical differentiation
     dt_step = 1.0  # 1 day step for daily velocity
+    pos_prev = _calc_vulcan_raw(jd_tt - dt_step)
     pos_next = _calc_vulcan_raw(jd_tt + dt_step)
 
-    dlon = pos_next[0] - longitude
+    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
     # Handle wrap-around (Vulcan moves ~19 deg/day, so this is important)
-    if dlon > 180.0:
-        dlon -= 360.0
-    elif dlon < -180.0:
-        dlon += 360.0
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
 
-    dlat = pos_next[1] - latitude
-    ddist = pos_next[2] - distance
+    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
+    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 
@@ -3341,19 +3344,20 @@ def calc_planet_x_lowell(
     latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
     distance = r
 
-    # Calculate velocity via numerical differentiation
+    # Calculate velocity via central difference numerical differentiation
     dt_step = 1.0  # 1 day step for daily velocity
+    pos_prev = _calc_planet_x_lowell_raw(jd_tt - dt_step)
     pos_next = _calc_planet_x_lowell_raw(jd_tt + dt_step)
 
-    dlon = pos_next[0] - longitude
+    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
     # Handle wrap-around
-    if dlon > 180.0:
-        dlon -= 360.0
-    elif dlon < -180.0:
-        dlon += 360.0
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
 
-    dlat = pos_next[1] - latitude
-    ddist = pos_next[2] - distance
+    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
+    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 
@@ -3489,19 +3493,20 @@ def calc_planet_x_pickering(
     latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
     distance = r
 
-    # Calculate velocity via numerical differentiation
+    # Calculate velocity via central difference numerical differentiation
     dt_step = 1.0  # 1 day step for daily velocity
+    pos_prev = _calc_planet_x_pickering_raw(jd_tt - dt_step)
     pos_next = _calc_planet_x_pickering_raw(jd_tt + dt_step)
 
-    dlon = pos_next[0] - longitude
+    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
     # Handle wrap-around
-    if dlon > 180.0:
-        dlon -= 360.0
-    elif dlon < -180.0:
-        dlon += 360.0
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
 
-    dlat = pos_next[1] - latitude
-    ddist = pos_next[2] - distance
+    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
+    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 

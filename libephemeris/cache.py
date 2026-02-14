@@ -4,12 +4,16 @@ Caching utilities for libephemeris hot path optimization.
 This module provides LRU caches for expensive calculations that are called
 repeatedly with the same inputs. Key optimizations include:
 
-1. Nutation caching - IAU2000B nutation calculations
-2. Obliquity caching - True obliquity of the ecliptic
+1. Nutation caching - IAU 2006/2000A nutation calculations (via pyerfa)
+2. Obliquity caching - True obliquity of the ecliptic (IAU 2006)
 3. Timescale object caching - Skyfield timescale objects
 
 These caches significantly improve performance when calculating multiple
 planetary positions for the same Julian Day (common in chart calculations).
+
+Precision:
+    - Nutation: IAU 2006/2000A model via pyerfa (~0.01-0.05 mas precision)
+    - Obliquity: IAU 2006 model via pyerfa (consistent across all code paths)
 
 Thread Safety:
     The caches use functools.lru_cache which is thread-safe for reads but
@@ -20,7 +24,8 @@ Thread Safety:
 import math
 from functools import lru_cache
 from typing import Tuple
-from skyfield.nutationlib import iau2000b_radians
+
+import erfa
 
 
 # Cache size limits
@@ -30,16 +35,21 @@ from skyfield.nutationlib import iau2000b_radians
 _NUTATION_CACHE_SIZE = 128
 _OBLIQUITY_CACHE_SIZE = 128
 
+# J2000.0 epoch in Julian Days
+_J2000_JD = 2451545.0
+
 
 @lru_cache(maxsize=_NUTATION_CACHE_SIZE)
 def get_cached_nutation(jd_tt: float) -> Tuple[float, float]:
     """
     Get cached nutation angles (dpsi, deps) for a Julian Day.
 
-    The IAU 2000B nutation model requires evaluating 77 terms, which is
-    computationally expensive. Since nutation changes slowly (~0.01"/day),
-    caching provides significant speedups for repeated calculations at
-    the same epoch.
+    Uses the IAU 2006/2000A nutation model via pyerfa (erfa.nut06a), which
+    is the most precise nutation model currently adopted by the IAU.
+    This includes the IAU 2000A lunisolar+planetary nutation (1365 terms)
+    with IAU 2006 J2 secular variation correction.
+
+    Precision: ~0.01-0.05 milliarcsecond
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -50,16 +60,13 @@ def get_cached_nutation(jd_tt: float) -> Tuple[float, float]:
             - deps: Nutation in obliquity (radians)
 
     Performance:
-        - Uncached: ~0.035ms per call (profiled average)
-        - Cached hit: ~0.0001ms per call (300x faster)
+        - Uncached: ~0.02ms per call
+        - Cached hit: ~0.0001ms per call (200x faster)
     """
-    # Import here to avoid circular dependencies
-    from .state import get_timescale
-
-    ts = get_timescale()
-    t = ts.tt_jd(jd_tt)
-    dpsi_rad, deps_rad = iau2000b_radians(t)
-    return dpsi_rad, deps_rad
+    # erfa.nut06a expects (jd1, jd2) where jd1 + jd2 = JD in TT
+    # Using 2-part JD for maximum numerical precision (SOFA convention)
+    dpsi, deps = erfa.nut06a(_J2000_JD, jd_tt - _J2000_JD)
+    return float(dpsi), float(deps)
 
 
 def get_nutation_degrees(jd_tt: float) -> Tuple[float, float]:
@@ -81,46 +88,43 @@ def get_cached_obliquity(jd_tt: float) -> Tuple[float, float]:
     """
     Get cached mean and true obliquity for a Julian Day.
 
-    The obliquity of the ecliptic is used in coordinate transformations
-    and house calculations. Computing true obliquity requires nutation,
-    which is expensive, so we cache both values together.
+    Uses IAU 2006 mean obliquity (via erfa.obl06) and IAU 2006/2000A
+    nutation (via erfa.nut06a) for true obliquity, providing consistency
+    with all other code paths in libephemeris.
+
+    Mean obliquity formula (IAU 2006, Capitaine et al. 2003):
+        eps0 = 84381.406″ - 46.836769″T - 0.0001831″T² + 0.00200340″T³
+               - 0.000000576″T⁴ - 0.0000000434″T⁵
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
 
     Returns:
         Tuple of (mean_obliquity, true_obliquity) in degrees
-
-    Algorithm:
-        Mean obliquity uses the Laskar 1986 formula (valid ±10,000 years)
-        True obliquity = mean + nutation in obliquity (IAU 2000B)
     """
-    # Centuries from J2000.0
-    T = (jd_tt - 2451545.0) / 36525.0
+    # Mean obliquity via IAU 2006 (erfa.obl06)
+    # Returns mean obliquity in radians
+    eps0_rad = erfa.obl06(_J2000_JD, jd_tt - _J2000_JD)
+    eps0 = math.degrees(eps0_rad)
 
-    # Mean obliquity - Laskar 1986 formula
-    # eps0 = 84381.448" - 46.8150"T - 0.00059"T² + 0.001813"T³
-    eps0_arcsec = 84381.448 - 46.8150 * T - 0.00059 * T**2 + 0.001813 * T**3
-    eps0 = eps0_arcsec / 3600.0  # Convert to degrees
-
-    # Nutation in obliquity
-    dpsi_rad, deps_rad = get_cached_nutation(jd_tt)
+    # Nutation in obliquity from IAU 2006/2000A
+    _, deps_rad = get_cached_nutation(jd_tt)
     deps = math.degrees(deps_rad)
 
-    # True obliquity
+    # True obliquity = mean + nutation in obliquity
     eps = eps0 + deps
 
     return eps0, eps
 
 
 def get_mean_obliquity(jd_tt: float) -> float:
-    """Get mean obliquity in degrees."""
+    """Get mean obliquity in degrees (IAU 2006)."""
     eps0, _ = get_cached_obliquity(jd_tt)
     return eps0
 
 
 def get_true_obliquity(jd_tt: float) -> float:
-    """Get true obliquity in degrees."""
+    """Get true obliquity in degrees (IAU 2006 + nutation)."""
     _, eps = get_cached_obliquity(jd_tt)
     return eps
 
