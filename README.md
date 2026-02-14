@@ -162,16 +162,14 @@ LibEphemeris has several optional dependencies that enhance functionality when i
 
 | Package | Install Command | Features Enabled |
 |---------|-----------------|------------------|
-| **pyerfa** | `pip install pyerfa` | High-precision IAU 2006 precession and obliquity for true lunar node calculations. Falls back to Lieske (1979) formulas when not installed. |
 | **astroquery** | `pip install astroquery` | Automatic SPK kernel downloads from JPL Horizons for arcsecond-level precision on asteroids and TNOs. Required for `set_auto_spk_download(True)` and `download_spk()`. |
 | **astropy** | `pip install astropy` | Required by the star catalog build script (`scripts/build_star_catalog.py`) for unit handling when querying Hipparcos data. Not needed for normal library usage. |
+
+> **Note:** `pyerfa` is a required dependency (not optional). It provides IAU 2006/2000A precision models for nutation, obliquity, and precession throughout the library.
 
 **Installation with optional dependencies:**
 
 ```bash
-# Install with high-precision lunar node support
-pip install libephemeris[precision]
-
 # Install with automatic SPK download support
 pip install libephemeris[spk]
 

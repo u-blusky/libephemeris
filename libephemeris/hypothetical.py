@@ -1920,19 +1920,20 @@ def calc_seorbel_position(
     latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
     distance = r
 
-    # Calculate velocity via numerical differentiation
+    # Calculate velocity via central difference numerical differentiation
     dt_step = 1.0  # 1 day step for daily velocity
+    pos_prev = _calc_seorbel_position_raw(elem, jd_tt - dt_step)
     pos_next = _calc_seorbel_position_raw(elem, jd_tt + dt_step)
 
-    dlon = pos_next[0] - longitude
+    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
     # Handle wrap-around
-    if dlon > 180.0:
-        dlon -= 360.0
-    elif dlon < -180.0:
-        dlon += 360.0
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
 
-    dlat = pos_next[1] - latitude
-    ddist = pos_next[2] - distance
+    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
+    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 
@@ -2973,19 +2974,20 @@ def _calc_keplerian_position(
     latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
     distance = r
 
-    # Calculate velocity via numerical differentiation
+    # Calculate velocity via central difference numerical differentiation
     dt_step = 1.0 / 86400.0  # 1 second
+    pos_prev = _calc_keplerian_position_raw(ipl, jd_tt - dt_step)
     pos_next = _calc_keplerian_position_raw(ipl, jd_tt + dt_step)
 
-    dlon = (pos_next[0] - longitude) / dt_step
+    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
     # Handle wrap-around
-    if dlon > 180.0 / dt_step:
-        dlon -= 360.0 / dt_step
-    elif dlon < -180.0 / dt_step:
-        dlon += 360.0 / dt_step
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
 
-    dlat = (pos_next[1] - latitude) / dt_step
-    ddist = (pos_next[2] - distance) / dt_step
+    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
+    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 

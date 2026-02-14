@@ -1052,28 +1052,13 @@ def _calc_body_pctr(
 
 
 class NutationFallbackWarning(UserWarning):
-    """Warning for degraded nutation precision when Skyfield is unavailable.
+    """Warning for degraded nutation precision (legacy, kept for API compatibility).
 
-    This warning is issued when the nutation calculation falls back from the
-    full IAU 2000A model (1365 terms, sub-milliarcsecond precision) to a
-    simplified 4-term model (~1 arcsecond precision).
-
-    The fallback occurs when `skyfield.nutationlib.iau2000a_radians` cannot
-    be imported, which typically means Skyfield is not installed or has
-    import issues.
-
-    **Precision impact:**
-    - IAU 2000A (Skyfield available): ~0.1 milliarcsecond accuracy
-    - 4-term fallback (Skyfield unavailable): ~1 arcsecond accuracy (~1000x degradation)
-
-    **Affected calculations:**
-    - True obliquity of the ecliptic
-    - Nutation in longitude and obliquity
-    - True lunar node (uses nutation)
-    - True ecliptic frame transformations
-
-    To avoid this warning, ensure Skyfield is installed:
-        pip install skyfield
+    .. deprecated::
+        This warning class is retained for backward API compatibility but is
+        no longer issued in normal operation. LibEphemeris now uses pyerfa
+        (IAU 2006/2000A, ~0.01-0.05 mas) as a required dependency for all
+        nutation calculations.
 
     See Also:
         get_nutation_model: Check which nutation model is currently active
@@ -1085,47 +1070,28 @@ class NutationFallbackWarning(UserWarning):
 def get_nutation_model() -> dict:
     """Check which nutation model is currently active.
 
-    This function determines whether the full IAU 2000A nutation model
-    (via Skyfield) is available, or if the library will fall back to
-    the simplified 4-term model.
+    LibEphemeris uses the IAU 2006/2000A nutation model via pyerfa
+    (erfa.nut06a) for all nutation calculations. This provides the
+    highest precision currently adopted by the IAU (~0.01-0.05 mas).
 
     Returns:
         dict: A dictionary containing:
-            - ``model`` (str): Either "IAU2000A" (full model) or "simplified_4_term" (fallback)
-            - ``terms`` (int): Number of terms in the model (1365 or 4)
-            - ``precision`` (str): Expected precision ("sub-milliarcsecond" or "~1 arcsecond")
-            - ``skyfield_available`` (bool): Whether Skyfield's iau2000a is importable
+            - ``model`` (str): "IAU2006_2000A" (pyerfa erfa.nut06a)
+            - ``terms`` (int): Number of terms (1365+ lunisolar+planetary)
+            - ``precision`` (str): Expected precision ("~0.01-0.05 mas")
+            - ``source`` (str): "pyerfa" (the underlying C library)
 
     Examples:
         >>> import libephemeris as eph
         >>> info = eph.get_nutation_model()
-        >>> if info["model"] == "IAU2000A":
-        ...     print("Using full precision nutation")
-        ... else:
-        ...     print(f"Using fallback model with {info['precision']} precision")
-
-        Check if Skyfield nutation is available:
-
-        >>> info = eph.get_nutation_model()
-        >>> if not info["skyfield_available"]:
-        ...     print("Install Skyfield for better precision: pip install skyfield")
+        >>> print(f"Model: {info['model']}, precision: {info['precision']}")
     """
-    try:
-        from skyfield.nutationlib import iau2000a_radians  # noqa: F401
-
-        return {
-            "model": "IAU2000A",
-            "terms": 1365,
-            "precision": "sub-milliarcsecond",
-            "skyfield_available": True,
-        }
-    except ImportError:
-        return {
-            "model": "simplified_4_term",
-            "terms": 4,
-            "precision": "~1 arcsecond",
-            "skyfield_available": False,
-        }
+    return {
+        "model": "IAU2006_2000A",
+        "terms": 1365,
+        "precision": "~0.01-0.05 mas",
+        "source": "pyerfa",
+    }
 
 
 def _calc_nutation_obliquity(
@@ -1134,8 +1100,17 @@ def _calc_nutation_obliquity(
     """
     Calculate nutation and obliquity data for SE_ECL_NUT (-1).
 
-    Uses IAU 2006/2000A nutation model via pyerfa for maximum precision.
-    Falls back to Skyfield IAU 2000A or simplified 4-term model if needed.
+    Uses the IAU 2006/2000A nutation model via pyerfa (erfa.nut06a)
+    and IAU 2006 mean obliquity via erfa.obl06() for maximum precision.
+
+    Args:
+        jd: Julian Day in UT
+        iflag: Calculation flags (not used for nutation)
+
+    Returns:
+        Tuple containing:
+            - Data tuple: (true_obliquity, mean_obliquity, nutation_longitude, nutation_obliquity, 0, 0)
+            - Return flag
     """
     import math
     from .state import get_timescale
@@ -2325,9 +2300,9 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     Algorithm:
         1. Convert UT to TT (Terrestrial Time) for astronomical precision
         2. Calculate Julian centuries T from J2000.0 epoch
-        3. For formula-based modes: ayanamsha = value_at_J2000 + (rate * T)
+        3. For formula-based modes: ayanamsha = value_at_J2000 + precession(T)
         4. For star-based modes: calculate using actual stellar positions
-        5. Apply IAU 2000B nutation (77 terms) for true obliquity
+        5. Apply IAU 2006/2000A nutation via pyerfa for true obliquity
 
     Supported modes (43 total):
         - Traditional Indian: Lahiri (23), Krishnamurti (1), Raman, etc.
@@ -2345,14 +2320,14 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         Ayanamsha value in degrees (tropical_lon - sidereal_lon)
 
     Precision:
-        - Uses full IAU 2000B nutation model (77 terms, ~0.1" precision)
-        - IAU 2006 precession formulas for star-based modes
-        - Consistent with Swiss Ephemeris precision
+        - Uses IAU 2006/2000A nutation model via pyerfa (~0.01-0.05 mas precision)
+        - IAU 2006 precession (5-term polynomial) for formula-based modes
+        - Star-based modes use full Skyfield pipeline (aberration, precession, nutation)
 
     References:
         - Swiss Ephemeris documentation (ayanamshas)
-        - IAU 2000B nutation model via Skyfield
-        - IAU 2006 precession formulas
+        - IAU 2006/2000A nutation model via pyerfa
+        - IAU 2006 precession: Capitaine et al. A&A 412 (2003)
         - Star positions from Hipparcos/Gaia catalogs
     """
 
@@ -2636,20 +2611,28 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
     # Handle SE_SIDM_USER (255): User-defined ayanamsha
     # User provides: t0 (reference epoch JD), ayan_t0 (ayanamsha at t0 in degrees)
-    # Ayanamsha = ayan_t0 + precession * (tjd_tt - t0) / 36525
+    # Ayanamsha = ayan_t0 + [p(T) - p(T0)]  where p is the precession polynomial
+    # and T, T0 are Julian centuries from J2000.0.
+    # NOTE: We must compute p(T) - p(T0), NOT p(T-T0), because the polynomial
+    # has nonlinear terms (T², T³...) and p(T-T0) ≠ p(T) - p(T0) when T0 ≠ 0.
     if sid_mode == SE_SIDM_USER:
         _, t0, ayan_t0 = get_sid_mode(full=True)
-        # Calculate time in Julian centuries from user's reference epoch
-        T_user = (tjd_tt - t0) / 36525.0
-        # IAU 2006 general precession in longitude (full polynomial)
-        precession_arcsec = (
-            _PREC_C1 * T_user
-            + _PREC_C2 * T_user**2
-            + _PREC_C3 * T_user**3
-            + _PREC_C4 * T_user**4
-            + _PREC_C5 * T_user**5
-        )
-        ayanamsa = ayan_t0 + precession_arcsec / 3600.0
+        # Julian centuries from J2000 for both epochs
+        T0_user = (t0 - J2000) / 36525.0
+        T_now = (tjd_tt - J2000) / 36525.0
+
+        # IAU 2006 general precession: delta = p(T_now) - p(T0_user)
+        def _prec_poly(Tc: float) -> float:
+            return (
+                _PREC_C1 * Tc
+                + _PREC_C2 * Tc**2
+                + _PREC_C3 * Tc**3
+                + _PREC_C4 * Tc**4
+                + _PREC_C5 * Tc**5
+            )
+
+        delta_prec_arcsec = _prec_poly(T_now) - _prec_poly(T0_user)
+        ayanamsa = ayan_t0 + delta_prec_arcsec / 3600.0
         return ayanamsa % 360.0
 
     if sid_mode not in ayanamsha_data:

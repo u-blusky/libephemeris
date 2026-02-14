@@ -470,8 +470,8 @@ aggiornata per usare `erfa.obl06()` e `erfa.nut06a()` invece di Skyfield.
 | `libephemeris/spk.py` | ~40 | 7 |
 | `libephemeris/planetary_moons.py` | ~40 | 7 |
 
-**File non modificati:** `cache.py` (già fixato), `astrometry.py` (già fixato),
-`fixed_stars.py` (già corretto), `pyproject.toml` (pyerfa già presente).
+**File non modificati:** `astrometry.py` (già fixato),
+`fixed_stars.py` (già corretto).
 
 ---
 

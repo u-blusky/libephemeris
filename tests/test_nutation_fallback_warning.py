@@ -3,9 +3,8 @@ Unit tests for NutationFallbackWarning and get_nutation_model() function.
 
 Tests verify that:
 1. get_nutation_model() correctly reports the active nutation model
-2. NutationFallbackWarning is emitted when using the fallback model
-3. The warning can be suppressed if understood
-4. NutationFallbackWarning is a proper UserWarning subclass
+2. NutationFallbackWarning is a proper UserWarning subclass (legacy, kept for API compat)
+3. The warning infrastructure works correctly
 """
 
 import warnings
@@ -26,37 +25,27 @@ class TestGetNutationModel:
     def test_get_nutation_model_has_required_keys(self):
         """Test that get_nutation_model returns all required keys."""
         info = get_nutation_model()
-        required_keys = ["model", "terms", "precision", "skyfield_available"]
+        required_keys = ["model", "terms", "precision", "source"]
         for key in required_keys:
             assert key in info, f"Missing required key: {key}"
 
     def test_get_nutation_model_valid_model_values(self):
-        """Test that model value is one of the expected values."""
+        """Test that model value is the IAU 2006/2000A model."""
         info = get_nutation_model()
-        assert info["model"] in ["IAU2000A", "simplified_4_term"]
+        assert info["model"] == "IAU2006_2000A"
 
-    def test_get_nutation_model_consistent_with_skyfield(self):
-        """Test that model info is consistent with skyfield_available flag."""
+    def test_get_nutation_model_uses_pyerfa(self):
+        """Test that the model source is pyerfa."""
         info = get_nutation_model()
-        if info["skyfield_available"]:
-            assert info["model"] == "IAU2000A"
-            assert info["terms"] == 1365
-            assert "milliarcsecond" in info["precision"].lower()
-        else:
-            assert info["model"] == "simplified_4_term"
-            assert info["terms"] == 4
-            assert "arcsecond" in info["precision"].lower()
+        assert info["source"] == "pyerfa"
+        assert info["terms"] == 1365
+        assert "mas" in info["precision"].lower()
 
     def test_get_nutation_model_terms_is_int(self):
         """Test that terms is an integer."""
         info = get_nutation_model()
         assert isinstance(info["terms"], int)
-        assert info["terms"] in [4, 1365]
-
-    def test_get_nutation_model_skyfield_available_is_bool(self):
-        """Test that skyfield_available is a boolean."""
-        info = get_nutation_model()
-        assert isinstance(info["skyfield_available"], bool)
+        assert info["terms"] == 1365
 
     def test_get_nutation_model_exported_from_package(self):
         """Test that get_nutation_model is exported from libephemeris package."""
@@ -120,12 +109,12 @@ class TestNutationFallbackBehavior:
         """Test that get_nutation_model() info matches actual behavior."""
         info = get_nutation_model()
 
-        # Calculate nutation - this should work with either model
+        # Calculate nutation - this should work with pyerfa
         pos, _ = eph.calc_ut(standard_jd, eph.SE_ECL_NUT, 0)
 
         # If we got here without error, the model reported is being used
         assert pos is not None
-        assert info["model"] in ["IAU2000A", "simplified_4_term"]
+        assert info["model"] == "IAU2006_2000A"
 
 
 @pytest.mark.unit
@@ -190,15 +179,17 @@ class TestNutationDocumentation:
     def test_warning_has_docstring(self):
         """Test that NutationFallbackWarning has a descriptive docstring."""
         assert NutationFallbackWarning.__doc__ is not None
-        assert len(NutationFallbackWarning.__doc__) > 100
-        assert "skyfield" in NutationFallbackWarning.__doc__.lower()
+        assert len(NutationFallbackWarning.__doc__) > 50
         assert "precision" in NutationFallbackWarning.__doc__.lower()
 
     def test_get_nutation_model_has_docstring(self):
         """Test that get_nutation_model has a descriptive docstring."""
         assert get_nutation_model.__doc__ is not None
         assert len(get_nutation_model.__doc__) > 100
-        assert "IAU2000A" in get_nutation_model.__doc__
+        assert (
+            "IAU 2006" in get_nutation_model.__doc__
+            or "IAU2006" in get_nutation_model.__doc__
+        )
 
 
 @pytest.fixture

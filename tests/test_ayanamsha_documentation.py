@@ -376,7 +376,7 @@ class TestUserDefinedAyanamsha:
         )
 
     def test_user_ayanamsha_precession(self):
-        """User ayanamsha should precess at standard rate."""
+        """User ayanamsha should precess at IAU 2006 rate."""
         t0 = J2000_JD
         ayan_t0 = 24.0
 
@@ -386,7 +386,8 @@ class TestUserDefinedAyanamsha:
         jd_century = t0 + 36525
         value = leph.swe_get_ayanamsa_ut(jd_century)
 
-        expected = ayan_t0 + (5027.8 / 3600.0)  # ~1.397° per century
+        # IAU 2006 linear precession rate: 5028.796195"/century
+        expected = ayan_t0 + (5028.796195 / 3600.0)  # ~1.397° per century
 
         assert abs(value - expected) < 0.01, (
             f"User ayanamsha after 100 years: expected {expected}°, got {value}°"

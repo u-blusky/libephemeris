@@ -329,13 +329,11 @@ class TestDocumentedObliquityModels:
 class TestInstallationDocumentation:
     """Verify that documented installation methods are accurate."""
 
-    def test_pyerfa_optional_dependency_documented(self):
-        """Verify the optional dependency is correctly documented."""
-        # Check pyproject.toml for the precision extra
+    def test_pyerfa_required_dependency_documented(self):
+        """Verify pyerfa is listed as a required dependency in pyproject.toml."""
         project_root = Path(__file__).parent.parent.parent
         pyproject_path = project_root / "pyproject.toml"
 
         if pyproject_path.exists():
             content = pyproject_path.read_text()
-            assert "precision" in content, "precision extra should be in pyproject.toml"
             assert "pyerfa" in content, "pyerfa should be mentioned in pyproject.toml"

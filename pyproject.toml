@@ -62,7 +62,6 @@ nbody = [
 ]
 # All optional features
 all = [
-    "pyerfa>=2.0.0",
     "rebound>=4.0.0",
     "assist>=1.1.0",
 ]

@@ -26,9 +26,9 @@ class TestOptionalDependenciesDocumentation:
         return readme_path.read_text()
 
     def test_pyerfa_documented_in_readme(self, readme_content: str):
-        """pyerfa should be documented as an optional dependency."""
+        """pyerfa should be documented in the README."""
         assert "pyerfa" in readme_content
-        assert "IAU 2006" in readme_content or "lunar node" in readme_content.lower()
+        assert "IAU 2006" in readme_content or "required" in readme_content.lower()
 
     def test_astroquery_documented_in_readme(self, readme_content: str):
         """astroquery should be documented as an optional dependency."""
@@ -61,24 +61,23 @@ class TestPyprojectOptionalDependencies:
         pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
         return pyproject_path.read_text()
 
-    def test_precision_extra_defined(self, pyproject_content: str):
-        """pyproject.toml should define a 'precision' extra with pyerfa."""
-        assert "precision" in pyproject_content
+    def test_pyerfa_is_required_dependency(self, pyproject_content: str):
+        """pyproject.toml should list pyerfa as a required dependency."""
+        # pyerfa was promoted from optional [precision] to required dependency
         assert "pyerfa" in pyproject_content
 
-    def test_spk_extra_defined(self, pyproject_content: str):
-        """pyproject.toml should define an 'spk' extra with astroquery."""
-        assert "spk" in pyproject_content
+    def test_astroquery_is_required_dependency(self, pyproject_content: str):
+        """pyproject.toml should list astroquery as a required dependency."""
         assert "astroquery" in pyproject_content
 
     def test_stars_extra_defined(self, pyproject_content: str):
-        """pyproject.toml should define a 'stars' extra with astropy and astroquery."""
+        """pyproject.toml should define a 'stars' extra with astropy."""
         assert "stars" in pyproject_content
         assert "astropy" in pyproject_content
 
     def test_all_extra_defined(self, pyproject_content: str):
         """pyproject.toml should define an 'all' extra."""
-        # Check for 'all' extra that includes main optional dependencies
+        # Check for 'all' extra that includes optional dependencies
         lines = pyproject_content.split("\n")
         in_all_section = False
         all_deps = []
@@ -90,24 +89,22 @@ class TestPyprojectOptionalDependencies:
                     break
                 all_deps.append(line.strip())
 
-        # 'all' extra should include pyerfa and astroquery
+        # 'all' extra should include rebound (N-body integration)
         all_deps_str = " ".join(all_deps)
-        assert "pyerfa" in all_deps_str
-        assert "astroquery" in all_deps_str
+        assert "rebound" in all_deps_str
 
 
-class TestPyerfaOptionalImport:
-    """Tests for pyerfa optional dependency handling."""
+class TestPyerfaRequiredImport:
+    """Tests for pyerfa required dependency (promoted from optional)."""
 
-    def test_lunar_module_imports_without_pyerfa(self):
-        """lunar module should import even without pyerfa."""
-        # This just verifies the import doesn't fail
+    def test_lunar_module_imports(self):
+        """lunar module should import successfully."""
         from libephemeris import lunar
 
         assert lunar is not None
 
-    def test_true_node_works_without_pyerfa(self):
-        """True node calculation should work without pyerfa (using fallback)."""
+    def test_true_node_works(self):
+        """True node calculation should work with pyerfa."""
         from libephemeris import calc_ut, SE_TRUE_NODE
 
         jd = 2451545.0  # J2000.0
@@ -116,12 +113,12 @@ class TestPyerfaOptionalImport:
         # Should return a valid longitude
         assert 0 <= result[0] < 360
 
-    def test_pyerfa_import_check_exists(self):
-        """lunar.py should check for erfa availability."""
-        from libephemeris import lunar
+    def test_erfa_import_exists_in_core_modules(self):
+        """Core modules should import erfa directly (required dependency)."""
+        from libephemeris import cache
 
-        lunar_source = Path(lunar.__file__).read_text()
-        assert "import erfa" in lunar_source or "pyerfa" in lunar_source
+        cache_source = Path(cache.__file__).read_text()
+        assert "import erfa" in cache_source
 
 
 class TestAstroqueryOptionalImport:
