@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
 
-NASA JPL based, pure Python astronomical ephemeris library focused on scientific precision.
+A pure Python astronomical ephemeris library based on NASA JPL data. Designed as a 1:1 API-compatible drop-in replacement for PySwisseph, strictly focused on scientific precision.
 
 - Drop-in replacement for `pyswisseph`
 - Uses NASA JPL ephemerides (DE440/DE441) via Skyfield
