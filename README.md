@@ -316,6 +316,20 @@ Priority: `set_ephemeris_file()` > `LIBEPHEMERIS_EPHEMERIS` env var > default `d
 
 > `SEFLG_MOSEPH` is accepted for API compatibility but silently ignored. All calculations always use JPL ephemerides.
 
+### Planet centers vs barycenters
+
+JPL DE440/DE441 provide positions for outer planets (Jupiter, Saturn, Uranus, Neptune, Pluto) as **system barycenters** -- the center of mass of the planet plus all its moons -- not the planet center itself. For Jupiter the difference can reach ~0.01°.
+
+LibEphemeris corrects this **automatically** using a three-tier strategy:
+
+1. **SPK-based planet centers** (default, <0.001 arcsec): a bundled `planet_centers.bsp` file (~25 MB) contains precise center-of-body segments (NAIF IDs 599, 699, 799, 899, 999) extracted from JPL satellite ephemerides. Downloaded with `libephemeris download-data`.
+
+2. **Analytical moon theories** (fallback if `planet_centers.bsp` is missing): computes the barycenter-to-center offset from satellite positions using Lieske E5 for Jupiter's Galilean moons, TASS 1.7 for Saturn (Titan dominates at 96% of moon mass), Keplerian elements with J2 precession for Triton, and a two-body solution for Charon.
+
+3. **Raw barycenters** (last resort): used only if both methods above fail.
+
+No configuration is needed -- the correction is applied transparently to all `calc_ut()` / `calc()` calls. Standard Swiss Ephemeris returns barycenters for outer planets by default and requires the `SEFLG_CENTER_BODY` flag for planet center positions.
+
 ---
 
 ## Exception hierarchy
