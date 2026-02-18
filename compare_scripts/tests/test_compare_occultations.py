@@ -93,16 +93,18 @@ class TestLunOccultWhenGlob:
         """Test global lunar occultation search."""
         jd_start = swe.julday(year, month, day, 0.0)
 
-        # SwissEphemeris
+        # SwissEphemeris (new API: tjdut, body, flags, ecltype, backwards)
         try:
-            ret_swe = swe.lun_occult_when_glob(jd_start, body_id, "", SEFLG_SWIEPH, 0)
+            ret_swe = swe.lun_occult_when_glob(
+                jd_start, body_id, SEFLG_SWIEPH, 0, False
+            )
             if ret_swe[0] == 0:
                 pytest.skip(f"No {body_name} occultation found by SwissEphemeris")
             jd_swe = ret_swe[1][0]
         except Exception as e:
             pytest.skip(f"SwissEphemeris failed: {e}")
 
-        # LibEphemeris
+        # LibEphemeris (legacy API: tjdut, planet, starname, flags, direction)
         try:
             ret_py = pyephem.lun_occult_when_glob(
                 jd_start, body_id, "", SEFLG_SWIEPH, 0
@@ -137,10 +139,10 @@ class TestLunOccultWhenLoc:
         """Test local lunar occultation search."""
         geopos = (lon, lat, alt)
 
-        # SwissEphemeris
+        # SwissEphemeris (API: tjdut, body, geopos, flags, backwards)
         try:
             ret_swe = swe.lun_occult_when_loc(
-                jd_2024, body_id, "", SEFLG_SWIEPH, geopos, 0
+                jd_2024, body_id, geopos, SEFLG_SWIEPH, False
             )
             if ret_swe[0] == 0:
                 pytest.skip(f"No {body_name} occultation visible at {loc_name}")
@@ -148,10 +150,10 @@ class TestLunOccultWhenLoc:
         except Exception as e:
             pytest.skip(f"SwissEphemeris failed: {e}")
 
-        # LibEphemeris
+        # LibEphemeris (API: jd_start, planet, star_name, lat, lon, altitude, flags)
         try:
             ret_py = pyephem.lun_occult_when_loc(
-                jd_2024, body_id, "", SEFLG_SWIEPH, geopos, 0
+                jd_2024, body_id, "", lat, lon, alt, SEFLG_SWIEPH
             )
             if ret_py[0] == 0:
                 pytest.skip(f"No {body_name} occultation visible (LibEphemeris)")
@@ -180,23 +182,23 @@ class TestLunOccultWhere:
         """Test lunar occultation location calculation."""
         # First find an occultation
         try:
-            ret = swe.lun_occult_when_glob(jd_2024, body_id, "", SEFLG_SWIEPH, 0)
+            ret = swe.lun_occult_when_glob(jd_2024, body_id, SEFLG_SWIEPH, 0, False)
             if ret[0] == 0:
                 pytest.skip(f"No {body_name} occultation found")
             jd_occult = ret[1][0]
         except Exception as e:
             pytest.skip(f"Failed to find occultation: {e}")
 
-        # SwissEphemeris
+        # SwissEphemeris (new API: tjdut, body, flags)
         try:
-            ret_swe = swe.lun_occult_where(jd_occult, body_id, "", SEFLG_SWIEPH)
+            ret_swe = swe.lun_occult_where(jd_occult, body_id, SEFLG_SWIEPH)
             if ret_swe[0] == 0:
                 pytest.skip("No central line (SwissEphemeris)")
             lon_swe, lat_swe = ret_swe[1][0], ret_swe[1][1]
         except Exception as e:
             pytest.skip(f"SwissEphemeris lun_occult_where failed: {e}")
 
-        # LibEphemeris
+        # LibEphemeris (legacy API: jd, body, starname, flags)
         try:
             ret_py = pyephem.lun_occult_where(jd_occult, body_id, "", SEFLG_SWIEPH)
             if ret_py[0] == 0:
@@ -236,7 +238,9 @@ class TestOccultationSummary:
     def test_venus_occultation_search(self, jd_2024):
         """Test Venus occultation search specifically."""
         try:
-            ret_swe = swe.lun_occult_when_glob(jd_2024, SE_VENUS, "", SEFLG_SWIEPH, 0)
+            ret_swe = swe.lun_occult_when_glob(
+                jd_2024, SE_VENUS, SEFLG_SWIEPH, 0, False
+            )
             ret_py = pyephem.lun_occult_when_glob(
                 jd_2024, SE_VENUS, "", SEFLG_SWIEPH, 0
             )
