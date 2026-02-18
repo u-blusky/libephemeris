@@ -11,20 +11,19 @@ class TestHousesEqualMc:
     """Test the _houses_equal_mc function."""
 
     @pytest.mark.unit
-    def test_uses_true_ascendant_not_approximation(self):
-        """Verify the function uses the provided Ascendant, not MC+90."""
+    def test_uses_mc_not_ascendant(self):
+        """Verify the function uses MC for house cusps, not Ascendant."""
         from libephemeris.houses import _houses_equal_mc
 
-        # Test with Asc and MC that are NOT 90 degrees apart
-        # At non-equatorial latitudes, Asc != MC + 90
-        asc = 45.0  # True Ascendant
-        mc = 0.0  # Midheaven
+        asc = 45.0
+        mc = 0.0
 
-        # MC + 90 would be 90.0, but we pass asc = 45.0
         cusps = _houses_equal_mc(asc, mc)
 
-        # First cusp should be the Ascendant (45.0), not MC+90 (90.0)
-        assert abs(cusps[1] - 45.0) < 0.0001, f"Cusp 1 should be 45.0, got {cusps[1]}"
+        # H10 should be MC (0.0)
+        assert abs(cusps[10] - 0.0) < 0.0001, f"H10 should be MC=0.0, got {cusps[10]}"
+        # H1 should be MC + 90 = 90.0 (NOT asc=45.0)
+        assert abs(cusps[1] - 90.0) < 0.0001, f"H1 should be MC+90=90.0, got {cusps[1]}"
 
     @pytest.mark.unit
     def test_equal_30_degree_divisions(self):
@@ -112,28 +111,31 @@ class TestHousesEqualMc:
         assert abs(cusps[3] - 50.0) < 0.0001
 
 
-class TestEqualMcVsOldApproximation:
-    """Test that the new implementation differs from the old approximation."""
+class TestEqualMcBehavior:
+    """Test the Equal houses from MC behavior."""
 
     @pytest.mark.unit
-    def test_differs_from_old_approximation_at_non_equatorial_lat(self):
-        """
-        At non-equatorial latitudes, the true Asc differs from MC+90.
-        This test verifies we now use the true Asc instead of approximation.
-        """
+    def test_h1_is_mc_plus_90(self):
+        """H1 should always be MC + 90 degrees."""
         from libephemeris.houses import _houses_equal_mc
 
-        # At latitude 45N, typical difference between true Asc and MC+90
-        # can be several degrees
-        true_asc = 45.0  # Example: true calculated Ascendant
-        mc = 320.0  # This would give old approx asc = 50.0
+        mc = 320.0
+        cusps = _houses_equal_mc(0.0, mc)
 
-        cusps = _houses_equal_mc(true_asc, mc)
+        expected_h1 = (mc + 90.0) % 360.0  # 50.0
+        assert abs(cusps[1] - expected_h1) < 0.0001
 
-        old_approx_asc = (mc + 90.0) % 360.0  # 50.0
+    @pytest.mark.unit
+    def test_ascendant_is_ignored(self):
+        """The asc parameter should be ignored in Equal from MC."""
+        from libephemeris.houses import _houses_equal_mc
 
-        # The cusp should be 45.0 (true_asc), not 50.0 (old approximation)
-        assert abs(cusps[1] - true_asc) < 0.0001
-        assert (
-            abs(cusps[1] - old_approx_asc) > 0.1
-        )  # Should differ from old approximation
+        mc = 0.0
+        cusps1 = _houses_equal_mc(45.0, mc)
+        cusps2 = _houses_equal_mc(90.0, mc)
+        cusps3 = _houses_equal_mc(180.0, mc)
+
+        # All should have the same cusps since MC is the same
+        for i in range(1, 13):
+            assert abs(cusps1[i] - cusps2[i]) < 0.0001
+            assert abs(cusps2[i] - cusps3[i]) < 0.0001

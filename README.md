@@ -132,6 +132,25 @@ pos, _ = swe.calc_ut(2460000.0, SE_CHIRON, 0)
 print(pos[0])
 ```
 
+### Optional Dependencies
+
+LibEphemeris has several optional dependencies for enhanced functionality:
+
+| Extra | Description | Dependencies |
+|-------|-------------|--------------|
+| `[spk]` | Automatic SPK downloads from JPL Horizons | `astroquery` |
+| `[stars]` | Star catalog access | `astropy` |
+| `[nbody]` | N-body integration | `rebound`, `reboundx` |
+| `[all]` | All optional features | All above |
+
+```bash
+pip install libephemeris[spk]    # For auto-downloading SPK kernels from Horizons
+pip install libephemeris[stars]  # For accessing star catalogs via astropy
+pip install libephemeris[all]    # Install all optional dependencies
+```
+
+**Note:** `pyerfa` is a required dependency and provides IAU 2006/2000A precession-nutation models for high-precision calculations.
+
 ---
 
 ## Thread safety

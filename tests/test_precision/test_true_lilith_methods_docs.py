@@ -62,8 +62,8 @@ class TestTrueLilithMethodsDocumentation:
             "Missing True Lilith vs Mean Lilith comparison"
         )
         assert "Interpolated" in content, "Missing Interpolated Apogee comparison"
-        assert "8-10" in content or "8°" in content or "~8" in content, (
-            "Missing Interpolated Apogee precision (~8-10 degrees)"
+        assert "1.1" in content or "1.1°" in content, (
+            "Missing Interpolated Apogee precision (~1.1 degrees)"
         )
 
     @pytest.mark.precision
@@ -127,9 +127,8 @@ class TestTrueLilithMethodsDocumentation:
         """Verify Mean Lilith precision is documented for comparison."""
         content = true_lilith_methods_doc
 
-        # Mean Lilith should show ~0.07 degree or ~250 arcsec
-        assert "0.07" in content or "250 arcsec" in content, (
-            "Missing Mean Lilith precision for comparison (~0.07 deg or ~250 arcsec)"
+        assert "12 arcsec" in content or "0.003" in content, (
+            "Missing Mean Lilith precision (~12 arcsec or ~0.003 deg)"
         )
 
     @pytest.mark.precision
