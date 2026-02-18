@@ -26,6 +26,7 @@ from libephemeris.constants import (
     SE_ORCUS,
     SE_QUAOAR,
     SE_VARUNA,
+    SE_HYGIEA,
     # NAIF IDs
     NAIF_CHIRON,
     NAIF_PHOLUS,
@@ -111,28 +112,28 @@ class TestMainBeltAsteroidMappings:
     """Test main belt asteroid mapping values."""
 
     def test_ceres_mapping(self):
-        """Ceres mapping is correct (asteroid #1)."""
+        """Ceres mapping uses name syntax to bypass JPL major body index."""
         horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_CERES]
-        assert horizons_id == "1"
+        assert horizons_id == "Ceres;"
         assert naif_id == NAIF_CERES
         assert naif_id == 1 + NAIF_ASTEROID_OFFSET
 
     def test_pallas_mapping(self):
-        """Pallas mapping is correct (asteroid #2)."""
+        """Pallas mapping uses name syntax to bypass JPL major body index."""
         horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_PALLAS]
-        assert horizons_id == "2"
+        assert horizons_id == "Pallas;"
         assert naif_id == NAIF_PALLAS
 
     def test_juno_mapping(self):
-        """Juno mapping is correct (asteroid #3)."""
+        """Juno mapping uses name syntax to bypass JPL major body index."""
         horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_JUNO]
-        assert horizons_id == "3"
+        assert horizons_id == "Juno;"
         assert naif_id == NAIF_JUNO
 
     def test_vesta_mapping(self):
-        """Vesta mapping is correct (asteroid #4)."""
+        """Vesta mapping uses name syntax to bypass JPL major body index."""
         horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_VESTA]
-        assert horizons_id == "4"
+        assert horizons_id == "Vesta;"
         assert naif_id == NAIF_VESTA
 
 
@@ -189,8 +190,8 @@ class TestGetHorizonsId:
         assert get_horizons_id(SE_ERIS) == "136199"
 
     def test_get_horizons_id_ceres(self):
-        """get_horizons_id returns '1' for Ceres."""
-        assert get_horizons_id(SE_CERES) == "1"
+        """get_horizons_id returns 'Ceres;' for Ceres (name syntax)."""
+        assert get_horizons_id(SE_CERES) == "Ceres;"
 
     def test_get_horizons_id_unknown(self):
         """get_horizons_id returns None for unknown body ID."""
@@ -314,22 +315,34 @@ class TestModuleExports:
 class TestHorizonsIdFormat:
     """Test that Horizons IDs are in the expected format for JPL Horizons API."""
 
+    _MAJOR_BODY_INDEX_ASTEROIDS = {SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA, SE_HYGIEA}
+
     def test_horizons_ids_are_numeric_strings(self):
-        """All Horizons IDs are numeric strings (asteroid catalog numbers)."""
+        """All Horizons IDs are numeric strings, except major body index asteroids.
+
+        Major body index asteroids (Ceres, Pallas, Juno, Vesta) use name syntax
+        (e.g., "Ceres;") to bypass JPL Horizons restriction that refuses SPK
+        generation for bodies in its major body index.
+        """
         for ipl, (horizons_id, _) in SPK_BODY_NAME_MAP.items():
-            assert horizons_id.isdigit(), (
-                f"Horizons ID '{horizons_id}' for ipl={ipl} is not a numeric string"
-            )
+            if ipl in self._MAJOR_BODY_INDEX_ASTEROIDS:
+                assert horizons_id.endswith(";"), (
+                    f"Major body index asteroid {ipl} should use name syntax"
+                )
+            else:
+                assert horizons_id.isdigit(), (
+                    f"Horizons ID '{horizons_id}' for ipl={ipl} is not a numeric string"
+                )
 
     def test_horizons_ids_match_asteroid_numbers(self):
-        """Horizons IDs match expected asteroid catalog numbers."""
+        """Horizons IDs match expected asteroid catalog numbers or name syntax."""
         expected = {
             SE_CHIRON: "2060",  # 2060 Chiron
             SE_PHOLUS: "5145",  # 5145 Pholus
-            SE_CERES: "1",  # 1 Ceres
-            SE_PALLAS: "2",  # 2 Pallas
-            SE_JUNO: "3",  # 3 Juno
-            SE_VESTA: "4",  # 4 Vesta
+            SE_CERES: "Ceres;",  # 1 Ceres (name syntax)
+            SE_PALLAS: "Pallas;",  # 2 Pallas (name syntax)
+            SE_JUNO: "Juno;",  # 3 Juno (name syntax)
+            SE_VESTA: "Vesta;",  # 4 Vesta (name syntax)
             SE_ERIS: "136199",  # 136199 Eris
             SE_SEDNA: "90377",  # 90377 Sedna
             SE_HAUMEA: "136108",  # 136108 Haumea

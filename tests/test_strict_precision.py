@@ -126,25 +126,17 @@ class TestSPKRequiredError:
         assert -90 <= pos[1] <= 90  # Latitude in range
         assert pos[2] > 0  # Distance positive
 
-    def test_non_major_asteroids_work_without_spk(self):
-        """Non-major asteroids should work without SPK even in strict mode."""
+    def test_pholus_requires_spk_in_strict_mode(self):
+        """Pholus requires SPK in strict mode (it's in SPK_BODY_NAME_MAP)."""
         eph.set_strict_precision(True)
-        # Pholus is not in MAJOR_ASTEROID_SPK_INFO
-        pos, flags = eph.calc_ut(2451545.0, SE_PHOLUS, SEFLG_SPEED)
+        with pytest.raises(eph.SPKRequiredError):
+            eph.calc_ut(2451545.0, SE_PHOLUS, SEFLG_SPEED)
 
-        assert 0 <= pos[0] < 360
-        assert -90 <= pos[1] <= 90
-        assert pos[2] > 0
-
-    def test_eris_works_without_spk(self):
-        """Eris should work without SPK (not a major asteroid for SPK purposes)."""
+    def test_eris_requires_spk_in_strict_mode(self):
+        """Eris requires SPK in strict mode (it's in SPK_BODY_NAME_MAP)."""
         eph.set_strict_precision(True)
-        # Eris is not in MAJOR_ASTEROID_SPK_INFO (no automatic download)
-        pos, flags = eph.calc_ut(2451545.0, SE_ERIS, SEFLG_SPEED)
-
-        assert 0 <= pos[0] < 360
-        assert -90 <= pos[1] <= 90
-        assert pos[2] > 0
+        with pytest.raises(eph.SPKRequiredError):
+            eph.calc_ut(2451545.0, SE_ERIS, SEFLG_SPEED)
 
 
 class TestExportedFunctions:
