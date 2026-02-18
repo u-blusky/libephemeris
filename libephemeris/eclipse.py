@@ -6464,8 +6464,11 @@ def lun_occult_where(
     # Calculate angular separation
     separation = _angular_separation(moon_ra, moon_dec, target_ra, target_dec)
 
-    # Check if occultation is occurring
-    occultation_threshold = moon_radius + target_radius
+    # Check if occultation is occurring (somewhere on Earth)
+    # Use parallax margin to detect occultations visible from some Earth locations
+    # even if not from geocenter. Lunar parallax can be up to ~1 degree.
+    LUNAR_PARALLAX_MARGIN = 1.0  # degrees
+    occultation_threshold = moon_radius + target_radius + LUNAR_PARALLAX_MARGIN
     if separation > occultation_threshold:
         # No occultation at this time
         return 0, zero_geopos, zero_attr
