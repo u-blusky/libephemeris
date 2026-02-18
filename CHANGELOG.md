@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-02-18
+
+### Fixed
+
+#### DE441 ephemeris range detection
+
+Fixed incorrect date range detection for DE441 ephemeris files. DE441 has segments
+split at 1969 (segments 0-13 cover -13200 to 1969, segments 14-27 cover 1969 to +17191).
+The previous code only checked the first segment, incorrectly reporting the range as
+-13200 to 1969. Now iterates all segments to find the overall min start_jd and max end_jd.
+
+### Changed
+
+- Improved README documentation with revised project description for clarity
+
 ## [0.13.0] - 2026-02-14
 
 ### Fixed
@@ -687,7 +702,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/g-battaglia/libephemeris/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/g-battaglia/libephemeris/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/g-battaglia/libephemeris/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/g-battaglia/libephemeris/compare/v0.10.0...v0.11.0
