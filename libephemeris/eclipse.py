@@ -5124,10 +5124,10 @@ def swe_lun_eclipse_how(
 
 def lun_occult_when_glob(
     tjdut: float,
-    planet: int,
-    starname: str,
+    body: Union[int, str],
     flags: int = SEFLG_SWIEPH,
-    direction: int = 0,
+    ecltype: int = 0,
+    backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Find the next lunar occultation of a planet or fixed star globally (UT).
@@ -5136,15 +5136,18 @@ def lun_occult_when_glob(
     a planet or star as seen from Earth. This function searches forward
     (or backward) in time to find the next such event globally (somewhere on Earth).
 
-    This function matches the pyswisseph swe_lun_occult_when_glob() API.
+    This function matches the pyswisseph swe_lun_occult_when_glob() API exactly.
 
     Args:
         tjdut: Julian Day (UT) to start search from
-        planet: Planet identifier (int). Use 0 if searching for a star.
-        starname: Star name (str). Use empty string "" if searching for a planet.
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
-        direction: Search direction. 0 or positive = forward in time,
-                   negative = backward in time.
+        body: Planet identifier (int) or star name (str). For planets use
+            SE_MERCURY, SE_VENUS, etc. For stars use the name as string
+            (e.g., "Regulus").
+        flags: Calculation flags (SEFLG_SWIEPH, SEFLG_J2000, etc.)
+        ecltype: Bit flags for eclipse type filter (0 = any type):
+            SE_ECL_CENTRAL, SE_ECL_NONCENTRAL, SE_ECL_TOTAL,
+            SE_ECL_ANNULAR, SE_ECL_PARTIAL, SE_ECL_ANNULAR_TOTAL
+        backwards: If True, search backward in time; if False, search forward.
 
     Returns:
         Tuple containing:
@@ -5165,8 +5168,7 @@ def lun_occult_when_glob(
                 [9]: Time when annular-total occultation becomes annular again
 
     Raises:
-        RuntimeError: If no occultation found within search limit
-        ValueError: If neither planet nor starname is specified
+        ValueError: If body is invalid
 
     Algorithm:
         1. Calculate Moon's position and the target body's position
@@ -5195,8 +5197,6 @@ def lun_occult_when_glob(
         - Swiss Ephemeris: swe_lun_occult_when_glob()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
-    # Use starname as star_name for internal consistency
-    star_name = starname
     from .state import get_planets, get_timescale
     from .fixed_stars import swe_fixstar_ut
     from .constants import (
@@ -5211,9 +5211,17 @@ def lun_occult_when_glob(
     )
     from .planets import _PLANET_MAP
 
+    # Handle body parameter - can be int (planet ID) or str (star name)
+    if isinstance(body, str):
+        planet = 0
+        star_name = body
+    else:
+        planet = body
+        star_name = ""
+
     if planet == 0 and not star_name:
         raise ValueError(
-            "Either planet ID or star_name must be specified for occultation search"
+            "Either planet ID or star name must be specified for occultation search"
         )
 
     jd_start = tjdut
@@ -5594,10 +5602,19 @@ def lun_occult_when_glob(
         else:
             step = 1.0
 
-        jd += step
+        # Apply step direction based on backwards parameter
+        if backwards:
+            jd -= step
+        else:
+            jd += step
 
-        if jd > jd_start + MAX_SEARCH_YEARS * 365.25:
-            break
+        # Check search limits
+        if backwards:
+            if jd < jd_start - MAX_SEARCH_YEARS * 365.25:
+                break
+        else:
+            if jd > jd_start + MAX_SEARCH_YEARS * 365.25:
+                break
 
     target_desc = star_name if planet == 0 else f"planet {planet}"
     raise RuntimeError(
@@ -5611,47 +5628,55 @@ swe_lun_occult_when_glob = lun_occult_when_glob
 
 
 def lun_occult_when_loc(
-    jd_start: float,
-    planet: int,
-    star_name: str = "",
-    lat: float = 0.0,
-    lon: float = 0.0,
-    altitude: float = 0.0,
+    tjdut: float,
+    body: Union[int, str],
+    geopos: Sequence[float],
     flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next lunar occultation visible from a specific location.
 
     A lunar occultation occurs when the Moon passes in front of (occults)
     a planet or star as seen from Earth. This function searches forward
-    in time to find the next occultation visible from a specific geographic
-    location, where both the Moon and the target are above the horizon.
+    (or backward) in time to find the next occultation visible from a
+    specific geographic location, where both the Moon and the target are
+    above the horizon.
+
+    This function matches the pyswisseph swe_lun_occult_when_loc() API exactly.
 
     Args:
-        jd_start: Julian Day (UT) to start search from
-        planet: Planet ID to check for occultation (SE_MERCURY, SE_VENUS, etc.)
-            Set to 0 if searching for a fixed star occultation.
-        star_name: Name of fixed star to check (e.g. "Regulus", "Spica").
-            Only used if planet is 0.
-        lat: Observer latitude in degrees (positive = North, negative = South)
-        lon: Observer longitude in degrees (positive = East, negative = West)
-        altitude: Observer altitude in meters above sea level (default 0)
+        tjdut: Julian Day (UT) to start search from
+        body: Planet identifier (int) or star name (str). For planets use
+            SE_MERCURY, SE_VENUS, etc. For stars use the name as string
+            (e.g., "Regulus").
+        geopos: Sequence of 3 floats with geographic position:
+            [0]: Longitude in degrees (East positive)
+            [1]: Latitude in degrees (North positive)
+            [2]: Altitude in meters above sea level
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        backwards: If True, search backward in time; if False, search forward.
 
     Returns:
         Tuple containing:
-            - times: Tuple of 10 floats with occultation phase times (JD UT):
+            - retflag: Occultation type flags bitmask (SE_ECL_* constants)
+                0: No occultation found
+                SE_ECL_TOTAL: Total occultation (body fully behind Moon)
+                SE_ECL_PARTIAL: Partial occultation (body partially behind Moon)
+                SE_ECL_VISIBLE: Occultation visible from location
+                SE_ECL_MAX_VISIBLE: Maximum visible from location
+                SE_ECL_1ST_VISIBLE: First contact visible
+                SE_ECL_2ND_VISIBLE: Second contact visible
+                SE_ECL_3RD_VISIBLE: Third contact visible
+                SE_ECL_4TH_VISIBLE: Fourth contact visible
+            - tret: Tuple of 10 floats with occultation phase times (JD UT):
                 [0]: Time of maximum occultation (minimum separation)
                 [1]: Time of first contact (occultation begins)
                 [2]: Time of second contact (full occultation begins, or 0)
                 [3]: Time of third contact (full occultation ends, or 0)
                 [4]: Time of fourth contact (occultation ends)
-                [5]: Reserved (0)
-                [6]: Reserved (0)
-                [7]: Time of moonrise (if Moon rises during occultation, else 0)
-                [8]: Time of moonset (if Moon sets during occultation, else 0)
-                [9]: Reserved (0)
-            - attr: Tuple of 20 floats with occultation attributes (pyswisseph compatible):
+                [5-9]: Reserved (0)
+            - attr: Tuple of 20 floats with occultation attributes:
                 [0]: Fraction of target diameter covered by Moon (magnitude)
                 [1]: Ratio of lunar diameter to target diameter
                 [2]: Fraction of target disc covered by Moon (obscuration)
@@ -5661,16 +5686,8 @@ def lun_occult_when_loc(
                 [6]: Apparent altitude of target above horizon at maximum (degrees)
                 [7]: Angular separation (elongation) at maximum (degrees)
                 [8-19]: Reserved (0)
-            - retflag: Occultation type flags bitmask (SE_ECL_* constants)
-                SE_ECL_TOTAL: Total occultation (body fully behind Moon)
-                SE_ECL_PARTIAL: Partial occultation (body partially behind Moon)
-                SE_ECL_VISIBLE: Occultation visible from location
-                SE_ECL_MAX_VISIBLE: Maximum visible from location
-                SE_ECL_1ST_VISIBLE: First contact visible
-                SE_ECL_4TH_VISIBLE: Fourth contact visible
 
     Raises:
-        RuntimeError: If no occultation visible from location within search limit
         ValueError: If neither planet nor star_name is specified
 
     Algorithm:
@@ -5714,10 +5731,25 @@ def lun_occult_when_loc(
     from .planets import _PLANET_MAP
     from .state import get_planets, get_timescale
 
+    # Handle body parameter - can be int (planet ID) or str (star name)
+    if isinstance(body, str):
+        planet = 0
+        star_name = body
+    else:
+        planet = body
+        star_name = ""
+
+    # Extract geographic position from sequence
+    lon = float(geopos[0])
+    lat = float(geopos[1])
+    altitude = float(geopos[2]) if len(geopos) > 2 else 0.0
+
     if planet == 0 and not star_name:
         raise ValueError(
-            "Either planet ID or star_name must be specified for occultation search"
+            "Either planet ID or star name must be specified for occultation search"
         )
+
+    jd_start = tjdut
 
     MAX_SEARCH_YEARS = 50
     MAX_OCCULTATIONS = int(MAX_SEARCH_YEARS * 20)  # Check many potential occultations
@@ -6258,9 +6290,8 @@ def swe_lun_occult_when_loc(
 
 
 def lun_occult_where(
-    jd: float,
+    tjdut: float,
     body: Union[int, str],
-    star_name: str = "",
     flags: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
@@ -6271,16 +6302,13 @@ def lun_occult_where(
     coordinates of the central line (where the occultation is most central)
     and attributes about the occultation geometry.
 
-    This function matches the pyswisseph swe_lun_occult_where() API.
+    This function matches the pyswisseph swe_lun_occult_where() API exactly.
 
     Args:
-        jd: Julian Day (UT) of the moment to calculate
+        tjdut: Julian Day (UT) of the moment to calculate
         body: Planet ID (int) or star name (str) to check for occultation.
             For planets use SE_MERCURY, SE_VENUS, etc.
             For stars use the star name as a string (e.g. "Regulus").
-            Set to 0 if using the star_name parameter for backward compatibility.
-        star_name: (Deprecated) Name of fixed star to check (e.g. "Regulus").
-            For backward compatibility only. Prefer passing star name as body.
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
@@ -6354,21 +6382,17 @@ def lun_occult_where(
     from .state import get_planets, get_timescale
 
     # Handle the body parameter - can be int (planet ID) or str (star name)
-    # This provides compatibility with both pyswisseph API (body as int or str)
-    # and our legacy API (planet int + star_name str)
     if isinstance(body, str):
-        # body is a star name
         planet = 0
         star_name = body
     else:
-        # body is a planet ID
         planet = body
-        # star_name may be passed for backward compatibility with planet=0
+        star_name = ""
 
     if planet == 0 and not star_name:
-        raise ValueError(
-            "Either planet ID or star_name must be specified for occultation"
-        )
+        raise ValueError("Planet ID or star name must be specified for occultation")
+
+    jd = tjdut
 
     # Get ephemeris and timescale
     eph = get_planets()
