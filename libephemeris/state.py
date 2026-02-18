@@ -834,14 +834,24 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
         if hasattr(_PLANETS, "spk") and hasattr(_PLANETS.spk, "segments"):
             segments = list(_PLANETS.spk.segments)
             if segments:
-                # Use the first segment's date range as representative
-                first_seg = segments[0]
-                start_jd = (
-                    float(first_seg.start_jd) if hasattr(first_seg, "start_jd") else 0.0
-                )
-                end_jd = (
-                    float(first_seg.end_jd) if hasattr(first_seg, "end_jd") else 0.0
-                )
+                # DE441 has segments split at 1969, so we need to find the
+                # overall min start_jd and max end_jd across ALL segments
+                start_jd = float("inf")
+                end_jd = float("-inf")
+                for seg in segments:
+                    if hasattr(seg, "start_jd"):
+                        seg_start = float(seg.start_jd)
+                        if seg_start < start_jd:
+                            start_jd = seg_start
+                    if hasattr(seg, "end_jd"):
+                        seg_end = float(seg.end_jd)
+                        if seg_end > end_jd:
+                            end_jd = seg_end
+                # Fallback if no valid dates found
+                if start_jd == float("inf"):
+                    start_jd = 0.0
+                if end_jd == float("-inf"):
+                    end_jd = 0.0
 
         # Extract DE number from filename (e.g., "de421.bsp" -> 421)
         denum = 0
