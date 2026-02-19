@@ -115,26 +115,24 @@ def get_timescale() -> Timescale:
 
 def _get_effective_ephemeris_file() -> str:
     """
-    Determine the effective ephemeris file to use.
+    Determine the ephemeris file to use.
 
-    Priority order:
-        1. set_ephemeris_file() (programmatic override via _EPHEMERIS_FILE if changed)
-        2. LIBEPHEMERIS_EPHEMERIS environment variable
+    Priority:
+        1. LIBEPHEMERIS_EPHEMERIS environment variable (if set)
+        2. set_ephemeris_file() programmatic override
         3. Default: "de440.bsp"
 
     Returns:
         str: The ephemeris filename to use (e.g., "de440.bsp", "de441.bsp").
     """
-    # If the user explicitly called set_ephemeris_file(), _EPHEMERIS_FILE is already set.
-    # We only consult the env var if the file is still the default.
-    if _EPHEMERIS_FILE != "de440.bsp":
-        return _EPHEMERIS_FILE
-
     env_value = os.environ.get(_EPHEMERIS_ENV_VAR, "").strip()
     if env_value:
         return env_value
 
-    return _EPHEMERIS_FILE
+    if _EPHEMERIS_FILE != "de440.bsp":
+        return _EPHEMERIS_FILE
+
+    return "de440.bsp"
 
 
 def get_planets() -> SpiceKernel:
