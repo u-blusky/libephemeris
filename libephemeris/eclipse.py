@@ -5209,7 +5209,7 @@ def lun_occult_when_glob(
         SE_NEPTUNE,
         SE_PLUTO,
     )
-    from .planets import _PLANET_MAP
+    from .planets import _PLANET_MAP, get_planet_target
 
     # Handle body parameter - can be int (planet ID) or str (star name)
     if isinstance(body, str):
@@ -5292,7 +5292,7 @@ def lun_occult_when_glob(
                 raise ValueError(f"illegal planet number {planet}.")
 
             target_name = _PLANET_MAP[planet]
-            target = eph[target_name]
+            target = get_planet_target(eph, target_name)
 
             t = ts.ut1_jd(jd)
             target_app = earth.at(t).observe(target).apparent()
@@ -5728,7 +5728,7 @@ def lun_occult_when_loc(
         SE_PLUTO,
     )
     from .fixed_stars import FIXED_STARS, _resolve_star_id
-    from .planets import _PLANET_MAP
+    from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
 
     # Handle body parameter - can be int (planet ID) or str (star name)
@@ -5823,7 +5823,7 @@ def lun_occult_when_loc(
                 raise ValueError(f"illegal planet number {planet}.")
 
             target_name = _PLANET_MAP[planet]
-            target = eph[target_name]
+            target = get_planet_target(eph, target_name)
             target_app = observer_at.at(t).observe(target).apparent()
             alt, az, _ = target_app.altaz()
             return alt.degrees, az.degrees
@@ -5932,7 +5932,7 @@ def lun_occult_when_loc(
                 target_app = observer_at.at(t).observe(star_obj).apparent()
             else:
                 target_name = _PLANET_MAP[planet]
-                target = eph[target_name]
+                target = get_planet_target(eph, target_name)
                 target_app = observer_at.at(t).observe(target).apparent()
 
             sep = moon_app.separation_from(target_app)
@@ -6378,7 +6378,7 @@ def lun_occult_where(
         SE_PLUTO,
     )
     from .fixed_stars import FIXED_STARS, _resolve_star_id
-    from .planets import _PLANET_MAP
+    from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
 
     # Handle the body parameter - can be int (planet ID) or str (star name)
@@ -6455,7 +6455,7 @@ def lun_occult_where(
                 raise ValueError(f"illegal planet number {planet}.")
 
             target_name = _PLANET_MAP[planet]
-            target = eph[target_name]
+            target = get_planet_target(eph, target_name)
 
             t = ts.ut1_jd(jd_calc)
             target_app = earth.at(t).observe(target).apparent()
@@ -6532,7 +6532,7 @@ def lun_occult_where(
             return observer_at.at(time_obj).observe(star_obj).apparent()
         else:
             target_name = _PLANET_MAP[planet]
-            target = eph[target_name]
+            target = get_planet_target(eph, target_name)
             return observer_at.at(time_obj).observe(target).apparent()
 
     # Function to calculate Moon-target separation at a given location
@@ -6845,7 +6845,7 @@ def rise_trans(
         SE_BIT_NAUTIC_TWILIGHT,
         SE_BIT_ASTRO_TWILIGHT,
     )
-    from .planets import _PLANET_MAP
+    from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
 
     # Extract event type from rsmi (lower bits)
@@ -6871,16 +6871,7 @@ def rise_trans(
         raise ValueError(f"illegal planet number {planet}.")
 
     target_name = _PLANET_MAP[planet]
-    # Try planet center first, fall back to barycenter if not available
-    from .planets import _PLANET_FALLBACK
-
-    try:
-        target = eph[target_name]
-    except KeyError:
-        if target_name in _PLANET_FALLBACK:
-            target = eph[_PLANET_FALLBACK[target_name]]
-        else:
-            raise
+    target = get_planet_target(eph, target_name)
     earth = eph["earth"]
 
     # Create observer location
@@ -7304,7 +7295,7 @@ def rise_trans_true_hor(
         SE_BIT_DISC_BOTTOM,
         SE_BIT_NO_REFRACTION,
     )
-    from .planets import _PLANET_MAP
+    from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
 
     # Extract event type from rsmi (lower bits)
@@ -7330,7 +7321,7 @@ def rise_trans_true_hor(
         raise ValueError(f"illegal planet number {planet}.")
 
     target_name = _PLANET_MAP[planet]
-    target = eph[target_name]
+    target = get_planet_target(eph, target_name)
     earth = eph["earth"]
 
     # Create observer location
@@ -7515,7 +7506,7 @@ def heliacal_ut(
         SE_EVENING_FIRST,
         SE_MORNING_LAST,
     )
-    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .planets import _PLANET_MAP, get_planet_target, swe_pheno_ut
     from .state import get_planets, get_timescale
     from skyfield.api import wgs84
 
@@ -7547,16 +7538,7 @@ def heliacal_ut(
 
     # Get celestial bodies
     target_name = _PLANET_MAP[body]
-    # Try planet center first, fall back to barycenter if not available
-    from .planets import _PLANET_FALLBACK
-
-    try:
-        target = eph[target_name]
-    except KeyError:
-        if target_name in _PLANET_FALLBACK:
-            target = eph[_PLANET_FALLBACK[target_name]]
-        else:
-            raise
+    target = get_planet_target(eph, target_name)
     sun = eph["sun"]
     earth = eph["earth"]
 
@@ -8010,7 +7992,7 @@ def heliacal_pheno_ut(
         SE_EVENING_FIRST,
         SE_MORNING_LAST,
     )
-    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .planets import _PLANET_MAP, get_planet_target, swe_pheno_ut
     from .state import get_planets, get_timescale
     from skyfield.api import wgs84
 
@@ -8036,16 +8018,7 @@ def heliacal_pheno_ut(
 
     # Get celestial bodies
     target_name = _PLANET_MAP[body]
-    # Try planet center first, fall back to barycenter if not available
-    from .planets import _PLANET_FALLBACK
-
-    try:
-        target = eph[target_name]
-    except KeyError:
-        if target_name in _PLANET_FALLBACK:
-            target = eph[_PLANET_FALLBACK[target_name]]
-        else:
-            raise
+    target = get_planet_target(eph, target_name)
     sun = eph["sun"]
     earth = eph["earth"]
 
@@ -8426,7 +8399,7 @@ def vis_limit_mag(
         - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
     """
     import math
-    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .planets import _PLANET_MAP, get_planet_target, swe_pheno_ut
     from .fixed_stars import swe_fixstar2_ut, swe_fixstar2_mag
     from .state import get_planets, get_timescale
     from .constants import (
@@ -8566,16 +8539,7 @@ def vis_limit_mag(
         # Get planet name from _PLANET_MAP
         if body_id in _PLANET_MAP:
             target_name = _PLANET_MAP[body_id]
-            # Try planet center first, fall back to barycenter if not available
-            from .planets import _PLANET_FALLBACK
-
-            try:
-                target = eph[target_name]
-            except KeyError:
-                if target_name in _PLANET_FALLBACK:
-                    target = eph[_PLANET_FALLBACK[target_name]]
-                else:
-                    raise
+            target = get_planet_target(eph, target_name)
 
             # Calculate position
             body_app = observer_at.at(t).observe(target).apparent()
@@ -13624,7 +13588,7 @@ def planet_occult_when_glob(
         SE_SUN,
         SE_MOON,
     )
-    from .planets import _PLANET_MAP
+    from .planets import _PLANET_MAP, get_planet_target
 
     if occulted_planet == 0 and not starname:
         raise ValueError(
@@ -14024,7 +13988,7 @@ def planet_occult_when_loc(
         SE_MOON,
     )
     from .fixed_stars import FIXED_STARS, _resolve_star_id
-    from .planets import _PLANET_MAP
+    from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
 
     if occulted_planet == 0 and not star_name:
