@@ -83,8 +83,8 @@ class TestFunctionDocumentation:
         assert "smooth" in doc.lower() or "interpolat" in doc.lower()
         assert "oscillation" in doc.lower()
 
-        # Should reference Swiss Ephemeris
-        assert "Swiss Ephemeris" in doc
+        # Should reference JPL or lunar theory sources
+        assert "JPL" in doc or "Chapront" in doc or "ELP" in doc
 
         # Should describe the return values
         assert "longitude" in doc.lower()
@@ -384,18 +384,17 @@ class TestDocumentedUseCases:
 class TestDocumentedReferences:
     """Tests verifying documented references are properly cited."""
 
-    def test_swiss_ephemeris_referenced(self):
-        """Verify Swiss Ephemeris is referenced in docstrings."""
+    def test_lunar_theory_referenced(self):
+        """Verify lunar theory is referenced in docstrings."""
         doc = calc_interpolated_apogee.__doc__
-        assert "Swiss Ephemeris" in doc
+        assert "ELP" in doc or "Chapront" in doc or "Meeus" in doc
 
     def test_chapront_referenced(self):
         """Verify Chapront (lunar theory source) is referenced."""
         doc = calc_interpolated_apogee.__doc__
         assert "Chapront" in doc
 
-    def test_dieter_koch_referenced(self):
-        """Verify Dieter Koch (SE author) is referenced."""
+    def test_lunar_theory_referenced(self):
+        """Verify ELP2000 lunar theory is referenced."""
         doc = calc_interpolated_apogee.__doc__
-        # May reference Koch or Meridian article
-        assert "Koch" in doc or "Meridian" in doc or "Lilith" in doc
+        assert "ELP" in doc or "Lunar Tables" in doc or "Lilith" in doc

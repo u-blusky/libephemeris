@@ -317,10 +317,10 @@ class TestDocumentedReferences:
         doc = lunar.__doc__
         assert "Meeus" in doc
 
-    def test_swiss_ephemeris_reference(self):
-        """Verify Swiss Ephemeris is referenced."""
+    def test_jpl_ephemeris_reference(self):
+        """Verify JPL ephemeris is referenced."""
         doc = calc_true_lunar_node.__doc__
-        assert "Swiss Ephemeris" in doc or "Swiss" in doc
+        assert "JPL" in doc or "DE440" in doc or "DE441" in doc or "Park" in doc
 
 
 class TestFundamentalArgumentsDocumentation:

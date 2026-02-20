@@ -1,10 +1,14 @@
 """
 Tests for Meeus polynomial validity range warnings in lunar module.
 
-The mean lunar node and mean Lilith calculations use polynomial approximations
-from Meeus "Astronomical Algorithms" that are optimized for dates near J2000.0.
-These tests verify that warnings are issued for dates outside the optimal range,
-and exceptions are raised for dates beyond the maximum valid range.
+NOTE: With precomputed correction tables from JPL ephemeris, the mean lunar
+node and mean Lilith functions no longer emit warnings for dates outside the
+polynomial validity range. The tables provide high precision across the full
+DE440/DE441 range. These tests now verify that:
+1. No warnings are emitted (corrections are applied automatically)
+2. Valid results are returned across the full date range
+3. The MeeusPolynomialWarning and MeeusRangeError classes still exist for
+   backward compatibility and for use by other functions
 """
 
 import pytest
@@ -37,13 +41,12 @@ class TestMeeusPolynomialValidityConstants:
 
 
 class TestMeanLunarNodeValidityWarnings:
-    """Test warnings for mean lunar node outside validity range."""
+    """Test that mean lunar node works without warnings using correction tables."""
 
     def test_no_warning_within_optimal_range(self):
         """No warning for dates within ±200 years of J2000."""
-        # J2000 = 2451545.0, 1 century = 36525 days
-        jd_1900 = 2451545.0 - 1.0 * 36525.0  # Year 1900
-        jd_2100 = 2451545.0 + 1.0 * 36525.0  # Year 2100
+        jd_1900 = 2451545.0 - 1.0 * 36525.0
+        jd_2100 = 2451545.0 + 1.0 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -65,80 +68,59 @@ class TestMeanLunarNodeValidityWarnings:
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
             assert len(meeus_warnings) == 0
-            # At J2000, result should be approximately 125° (from formula constant)
             assert 124 < result < 126
 
-    def test_warning_outside_optimal_range(self):
-        """Warning for dates outside ±200 years but within ±1000 years."""
-        # Year 1500 CE (5 centuries before J2000)
+    def test_no_warning_outside_optimal_range(self):
+        """No warning for dates outside ±200 years - corrections are applied."""
         jd_1500 = 2451545.0 - 5.0 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            calc_mean_lunar_node(jd_1500)
+            result = calc_mean_lunar_node(jd_1500)
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            assert len(meeus_warnings) == 1
-            assert "outside the optimal range" in str(meeus_warnings[0].message)
+            assert len(meeus_warnings) == 0
+            assert 0 <= result < 360
 
-    def test_warning_outside_valid_range(self):
-        """Warning for dates outside ±1000 years but within ±2000 years."""
-        # Year 500 CE (15 centuries before J2000)
-        jd_500 = 2451545.0 - 15.0 * 36525.0
+    def test_no_warning_outside_valid_range(self):
+        """No warning for dates outside ±1000 years - corrections are applied."""
+        jd_0ce = 2451545.0 - 20.0 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            calc_mean_lunar_node(jd_500)
+            result = calc_mean_lunar_node(jd_0ce)
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            assert len(meeus_warnings) == 1
-            assert "outside the recommended range" in str(meeus_warnings[0].message)
-
-    def test_exception_outside_max_range(self):
-        """Exception for dates outside ±2000 years (max range)."""
-        # Year -500 BCE (25 centuries before J2000)
-        jd_500_bce = 2451545.0 - 25.0 * 36525.0
-
-        with pytest.raises(MeeusRangeError) as exc_info:
-            calc_mean_lunar_node(jd_500_bce)
-        assert "outside the valid range" in str(exc_info.value)
-        assert "0-4000 CE" in str(exc_info.value)
-
-    def test_exception_for_distant_future(self):
-        """Exception for dates in distant future (year 5000 CE)."""
-        # Year 5000 CE (30 centuries after J2000)
-        jd_5000 = 2451545.0 + 30.0 * 36525.0
-
-        with pytest.raises(MeeusRangeError) as exc_info:
-            calc_mean_lunar_node(jd_5000)
-        assert "outside the valid range" in str(exc_info.value)
-
-    def test_result_valid_within_valid_range(self):
-        """Function should return a valid result within ±2000 years."""
-        # Date within valid range: Year 100 CE
-        jd_100 = 2451545.0 - 19.0 * 36525.0
-
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = calc_mean_lunar_node(jd_100)
-            # Result should still be normalized to 0-360
+            assert len(meeus_warnings) == 0
             assert 0 <= result < 360
+
+    def test_no_exception_outside_max_range(self):
+        """No exception for dates beyond ±2000 years - corrections cover DE441 range."""
+        jd_far = 2451545.0 - 25.0 * 36525.0
+
+        result = calc_mean_lunar_node(jd_far)
+        assert 0 <= result < 360
+
+    def test_no_exception_for_distant_future(self):
+        """No exception for far future dates - corrections cover DE441 range."""
+        jd_future = 2451545.0 + 25.0 * 36525.0
+
+        result = calc_mean_lunar_node(jd_future)
+        assert 0 <= result < 360
 
 
 class TestMeanLilithValidityWarnings:
-    """Test warnings for mean Lilith outside validity range."""
+    """Test that mean Lilith works without warnings using correction tables."""
 
     def test_no_warning_within_optimal_range(self):
         """No warning for dates within ±200 years of J2000."""
-        jd_1900 = 2451545.0 - 1.0 * 36525.0  # Year 1900
-        jd_2100 = 2451545.0 + 1.0 * 36525.0  # Year 2100
+        jd_1900 = 2451545.0 - 1.0 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             calc_mean_lilith(jd_1900)
-            calc_mean_lilith(jd_2100)
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
@@ -155,54 +137,40 @@ class TestMeanLilithValidityWarnings:
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
             assert len(meeus_warnings) == 0
-            # Result should be valid longitude
             assert 0 <= result < 360
 
-    def test_warning_outside_optimal_range(self):
-        """Warning for dates outside ±200 years but within ±1000 years."""
-        # Year 1500 CE (5 centuries before J2000)
+    def test_no_warning_outside_optimal_range(self):
+        """No warning for dates outside ±200 years - corrections are applied."""
         jd_1500 = 2451545.0 - 5.0 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            calc_mean_lilith(jd_1500)
+            result = calc_mean_lilith(jd_1500)
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            assert len(meeus_warnings) == 1
-            assert "outside the optimal range" in str(meeus_warnings[0].message)
+            assert len(meeus_warnings) == 0
+            assert 0 <= result < 360
 
-    def test_warning_outside_valid_range(self):
-        """Warning for dates outside ±1000 years but within ±2000 years."""
-        # Year 500 CE (15 centuries before J2000)
-        jd_500 = 2451545.0 - 15.0 * 36525.0
+    def test_no_warning_outside_valid_range(self):
+        """No warning for dates outside ±1000 years - corrections are applied."""
+        jd_0ce = 2451545.0 - 20.0 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            calc_mean_lilith(jd_500)
+            result = calc_mean_lilith(jd_0ce)
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            assert len(meeus_warnings) == 1
-            assert "outside the recommended range" in str(meeus_warnings[0].message)
-
-    def test_exception_outside_max_range(self):
-        """Exception for dates outside ±2000 years."""
-        jd_ancient = 2451545.0 - 25.0 * 36525.0  # ~500 BCE
-
-        with pytest.raises(MeeusRangeError) as exc_info:
-            calc_mean_lilith(jd_ancient)
-        assert "outside the valid range" in str(exc_info.value)
-
-    def test_result_valid_within_valid_range(self):
-        """Function should return a valid result within ±2000 years."""
-        # Date within valid range: Year 100 CE
-        jd_100 = 2451545.0 - 19.0 * 36525.0
-
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = calc_mean_lilith(jd_100)
+            assert len(meeus_warnings) == 0
             assert 0 <= result < 360
+
+    def test_no_exception_outside_max_range(self):
+        """No exception for dates beyond ±2000 years - corrections cover DE441 range."""
+        jd_far = 2451545.0 - 25.0 * 36525.0
+
+        result = calc_mean_lilith(jd_far)
+        assert 0 <= result < 360
 
 
 class TestMeeusPolynomialWarningClass:
@@ -212,46 +180,37 @@ class TestMeeusPolynomialWarningClass:
         """MeeusPolynomialWarning should be a UserWarning subclass."""
         assert issubclass(MeeusPolynomialWarning, UserWarning)
 
-    def test_warning_can_be_filtered(self):
-        """Warning can be filtered/suppressed if desired."""
-        # Use date that triggers warning but not exception (within valid range)
-        jd_1500 = 2451545.0 - 5.0 * 36525.0  # Year 1500
-
-        # Filter the warning
-        with warnings.catch_warnings(record=True) as w:
-            warnings.filterwarnings("ignore", category=MeeusPolynomialWarning)
-            calc_mean_lunar_node(jd_1500)
-            meeus_warnings = [
-                x for x in w if issubclass(x.category, MeeusPolynomialWarning)
-            ]
-            assert len(meeus_warnings) == 0
-
 
 class TestMeeusRangeErrorClass:
-    """Test the exception class itself."""
+    """Test that MeeusRangeError class exists for backward compatibility."""
 
-    def test_error_is_value_error(self):
+    def test_error_is_value_error_subclass(self):
         """MeeusRangeError should be a ValueError subclass."""
         assert issubclass(MeeusRangeError, ValueError)
 
-    def test_error_can_be_caught_as_value_error(self):
-        """MeeusRangeError can be caught as ValueError."""
-        jd_ancient = 2451545.0 - 25.0 * 36525.0  # ~500 BCE
-
-        with pytest.raises(ValueError):
-            calc_mean_lunar_node(jd_ancient)
+    def test_error_can_be_instantiated(self):
+        """MeeusRangeError can be instantiated."""
+        err = MeeusRangeError("test message")
+        assert str(err) == "test message"
 
 
 @pytest.mark.unit
 class TestMeeusPolynomialAccuracyDocumentation:
-    """Test that documented accuracy claims are reasonable."""
+    """Test that mean node/lilith produce valid results across ranges."""
+
+    def test_result_in_valid_range(self):
+        """Results should always be in [0, 360) range."""
+        for centuries in [-15, -10, -5, 0, 5, 10, 15]:
+            jd = 2451545.0 + centuries * 36525.0
+            result = calc_mean_lunar_node(jd)
+            assert 0 <= result < 360
 
     def test_optimal_range_dates(self):
         """Dates in optimal range (1800-2200) should work without warning."""
         test_dates = [
-            2378497.0,  # 1800-01-01
-            2451545.0,  # 2000-01-01 (J2000)
-            2524594.0,  # 2200-01-01
+            2378497.0,
+            2451545.0,
+            2524594.0,
         ]
 
         for jd in test_dates:
@@ -266,13 +225,9 @@ class TestMeeusPolynomialAccuracyDocumentation:
 
     def test_valid_range_boundary(self):
         """Test at boundary of valid range (~1000 CE and 3000 CE)."""
-        # Year 1000 CE (10 centuries before J2000)
         jd_1000 = 2451545.0 - 10.0 * 36525.0
-        # Year 3000 CE (10 centuries after J2000)
         jd_3000 = 2451545.0 + 10.0 * 36525.0
 
-        # These are at the boundary - should trigger optimal range warning
-        # but not the valid range warning or exception
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             calc_mean_lunar_node(jd_1000)
@@ -280,22 +235,17 @@ class TestMeeusPolynomialAccuracyDocumentation:
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            # At exactly 10 centuries, should trigger optimal range warning
-            # because abs_T = 10.0 > MEEUS_OPTIMAL_CENTURIES (2.0)
-            # but abs_T = 10.0 is NOT > MEEUS_VALID_CENTURIES (10.0)
-            for warning in meeus_warnings:
-                assert "outside the optimal range" in str(warning.message)
+            assert len(meeus_warnings) == 0
 
     def test_just_outside_valid_range(self):
-        """Test just outside valid range should warn with recommended message."""
-        # Year 999 CE (10.01 centuries before J2000)
+        """No warning just outside valid range - corrections are applied."""
         jd_just_outside = 2451545.0 - 10.01 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            calc_mean_lunar_node(jd_just_outside)
+            result = calc_mean_lunar_node(jd_just_outside)
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            assert len(meeus_warnings) == 1
-            assert "outside the recommended range" in str(meeus_warnings[0].message)
+            assert len(meeus_warnings) == 0
+            assert 0 <= result < 360
