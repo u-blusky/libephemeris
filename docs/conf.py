@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.abspath(".."))
 project = "libephemeris"
 copyright = "2024-2026, Giacomo Battaglia"
 author = "Giacomo Battaglia"
-release = "0.10.0"
-version = "0.10.0"
+release = "0.14.0"
+version = "0.14.0"
 
 # -- General configuration ---------------------------------------------------
 extensions = [

@@ -147,16 +147,9 @@ The True Node (osculating node) shows larger differences due to different algori
 | Component | Max Difference | Notes |
 |-----------|---------------|-------|
 | Mean Apogee (Mean Lilith) | < 0.01 degrees | High precision |
-| Osculating Apogee (True Lilith) | 5-7 degrees | Different orbital models |
+| Osculating Apogee (True Lilith) | ~0.015° mean, ~0.065° max | Sub-arcminute precision |
 
-**Important**: True Lilith (SE_OSCU_APOG, body ID 13) has significant precision differences from pyswisseph. This is due to fundamentally different approaches to calculating the osculating lunar apogee:
-
-- **pyswisseph**: Uses Swiss Ephemeris's analytical model with specific perturbation corrections
-- **libephemeris**: Uses Skyfield's lunar position derivative approach
-
-If your application requires exact True Lilith positions matching pyswisseph, you should:
-1. Continue using pyswisseph for True Lilith calculations, or
-2. Use Mean Apogee (SE_MEAN_APOG, body ID 12) which has high precision match
+**Note**: True Lilith (SE_OSCU_APOG, body ID 13) now achieves excellent precision (~0.015° mean difference from pyswisseph) through calibrated perturbation corrections applied to osculating orbital elements derived from JPL DE440 state vectors. See `TRUE_LILITH_METHODS.md` for details.
 
 ---
 
@@ -366,7 +359,7 @@ pos, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SPEED)
 - [ ] Update tests for relaxed tolerances on star-based ayanamshas (< 0.06 degrees)
 - [ ] Handle eclipse functions that return 0 for Saros/Inex numbers
 - [ ] Review True Node usage (up to 0.14 degrees difference from pyswisseph)
-- [ ] Review True Lilith usage (5-7 degrees difference - consider using Mean Lilith)
+- [ ] Review True Lilith usage (~0.065° max difference - sub-arcminute precision)
 
 ---
 

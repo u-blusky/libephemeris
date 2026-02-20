@@ -1,5 +1,9 @@
 # Performance Analysis & Precomputed Ephemeris (.leb) Design
 
+> **STATUS: DESIGN PROPOSAL** -- This document describes a potential future feature.
+> The `.leb` format and Rust/PyO3 port are **NOT yet implemented**.
+> It serves as a design reference for future development.
+
 This document summarizes a comprehensive analysis of the libephemeris codebase,
 its performance bottlenecks, and the design for a precomputed binary ephemeris
 format (`.leb`) with a Python-first implementation followed by a Rust port via PyO3.
