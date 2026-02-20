@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-02-20
+
+### Fixed
+
+- `generate_planet_centers_spk.py`: load leap seconds kernel in `verify_spk()` 
+  before calling `et2utc()` to prevent `SpiceMISSINGTIMEINFO` error during
+  SPK file verification
+
 ## [0.16.0] - 2026-02-20
 
 ### Added
@@ -836,7 +844,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/g-battaglia/libephemeris/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/g-battaglia/libephemeris/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/g-battaglia/libephemeris/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/g-battaglia/libephemeris/compare/v0.13.0...v0.14.0

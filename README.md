@@ -170,8 +170,23 @@ Dates outside the loaded kernel raise `EphemerisRangeError`.
 JPL DE ephemerides provide system barycenters for Jupiter/Saturn/Uranus/Neptune/Pluto.
 LibEphemeris corrects these to planet body centers automatically:
 
-1. Uses a compact SPK file (`planet_centers.bsp`) downloaded by `libephemeris download-data`
-2. Falls back to analytical satellite models when SPK coverage is not available
+1. Uses tier-specific SPK files (`planet_centers_{tier}.bsp`) downloaded by `libephemeris download:<tier>`
+2. Falls back to analytical satellite models when SPK coverage is not available:
+   - Jupiter: Galilean moon theory (E5/Meeus) — ~0.05 arcsec
+   - Saturn: TASS 1.7 (Titan-dominated) — ~0.02 arcsec
+   - Uranus: 5 major moons Keplerian — ~0.01 arcsec
+   - Neptune: Triton Keplerian — ~0.003 arcsec
+   - Pluto: Charon two-body — ~0.15 arcsec
+
+SPK coverage varies by tier:
+
+| Planet | base (1850-2150) | medium (1550-2650) | extended |
+|--------|------------------|--------------------|----------|
+| Jupiter | SPK | SPK | SPK 1600-2200, fallback outside |
+| Saturn | SPK | SPK | SPK -502 to +4500, fallback outside |
+| Uranus | SPK | SPK | SPK full (-12000 to +17000) |
+| Neptune | SPK | SPK | SPK full (-12000 to +17000) |
+| Pluto | SPK | SPK 1800-2200 | SPK 1800-2200, fallback outside |
 
 Full technical details are in `docs/PRECISION.md`.
 
