@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-02-20
+
+### Changed
+
+- Recalibrate interpolated perigee against JPL DE441 ephemeris
+- Expand perigee perturbation model from 43 to 67 terms for improved accuracy
+- Regenerate perigee correction table (15195 entries, 2-year step)
+
+### Documentation
+
+- Add interpolated perigee methodology document explaining JPL-vs-SE
+  methodological differences (~11 deg RMS) between JPL quadratic regression
+  on osculating elements and Swiss Ephemeris semi-analytical ELP2000-82B
+
 ## [0.16.1] - 2026-02-20
 
 ### Fixed
@@ -844,7 +858,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/g-battaglia/libephemeris/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/g-battaglia/libephemeris/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/g-battaglia/libephemeris/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/g-battaglia/libephemeris/compare/v0.14.0...v0.15.0
