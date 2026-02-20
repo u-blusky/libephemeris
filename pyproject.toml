@@ -170,6 +170,11 @@ coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml
 "coverage:full" = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"
 typecheck = "mypy libephemeris"
 
+# Lunar corrections table generation
+[tool.poe.tasks.generate-lunar-corrections]
+cmd = "python scripts/generate_lunar_corrections.py --force"
+help = "Regenerate precomputed correction tables for mean lunar elements (requires de441.bsp)"
+
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = false
