@@ -1673,8 +1673,30 @@ def discover_local_spks(path: str) -> Dict[str, str]:
 
             ipl, horizons_id, body_name = naif_to_body[target_naif]
 
-            # Skip if already registered
+            # If already registered, check if the new file has wider coverage
             if ipl in state._SPK_BODY_MAP:
+                existing_file, _ = state._SPK_BODY_MAP[ipl]
+                try:
+                    existing_coverage = spk.get_spk_coverage(existing_file)
+                    new_coverage = spk.get_spk_coverage(filepath)
+                    if existing_coverage and new_coverage:
+                        existing_span = existing_coverage[1] - existing_coverage[0]
+                        new_span = new_coverage[1] - new_coverage[0]
+                        if new_span > existing_span:
+                            # Re-register with wider-range file
+                            spk.register_spk_body(ipl, filepath, target_naif)
+                            results[body_name] = "registered"
+                            logger.debug(
+                                "Re-registered %s with wider SPK %s "
+                                "(span %.0f > %.0f days)",
+                                body_name,
+                                bsp_file,
+                                new_span,
+                                existing_span,
+                            )
+                            continue
+                except Exception:
+                    pass
                 if body_name not in results:
                     results[body_name] = "already_registered"
                 continue

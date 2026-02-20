@@ -61,7 +61,7 @@ TIERS: Dict[str, PrecisionTier] = {
     "extended": PrecisionTier(
         name="extended",
         ephemeris_file="de441.bsp",
-        spk_date_range=("1550-01-01", "2650-01-01"),
+        spk_date_range=("1600-01-01", "2500-01-01"),
         description="Extended range (-13200 to +17191), ~3.1 GB",
     ),
 }
