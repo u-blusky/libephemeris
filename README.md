@@ -84,6 +84,64 @@ print("MC:", ascmc[1], "deg")
 
 ---
 
+## Calculation flags
+
+Flags are bitmasks that control what is calculated and how the result is returned. `calc_ut()` returns a 6-element tuple `(longitude, latitude, distance, speed_lon, speed_lat, speed_dist)` and a return flag. Combine multiple flags with bitwise OR (`|`).
+
+### Velocity
+
+- `SEFLG_SPEED` — Populates the speed fields (`pos[3]`–`pos[5]`) with daily motion in longitude, latitude, and distance. Without this flag those values are zero. Almost every call should include it.
+
+### Observer
+
+By default the observer is at Earth's center (geocentric).
+
+- `SEFLG_HELCTR` — Heliocentric: moves the observer to the Sun. Distances become heliocentric AU.
+- `SEFLG_TOPOCTR` — Topocentric: places the observer on Earth's surface at the position set with `swe_set_topo()`. This matters most for the Moon (up to ~1° parallax).
+
+### Coordinates
+
+By default the output is ecliptic longitude/latitude of date.
+
+- `SEFLG_EQUATORIAL` — Switches to equatorial coordinates: `pos[0]` becomes Right Ascension (0–360°) and `pos[1]` becomes Declination (±90°). Speeds change accordingly.
+
+### Reference frame
+
+By default positions are precessed to the equinox of date.
+
+- `SEFLG_J2000` — Keeps coordinates in the J2000.0 reference frame instead of precessing to the equinox of date.
+- `SEFLG_NONUT` — Excludes nutation, giving positions on the mean ecliptic/equator.
+
+### Position corrections
+
+By default positions are apparent (light-time and aberration corrected).
+
+- `SEFLG_TRUEPOS` — Geometric position: no light-time correction. Returns where the body actually is at the instant of calculation.
+- `SEFLG_NOABERR` — Astrometric position: light-time corrected but no aberration. Comparable to star catalog positions.
+- `SEFLG_ASTROMETRIC` — Convenience shorthand for `SEFLG_NOABERR | SEFLG_NOGDEFL`.
+
+### Sidereal zodiac
+
+- `SEFLG_SIDEREAL` — Subtracts the ayanamsha from ecliptic longitude, returning sidereal rather than tropical positions. Requires a prior `swe_set_sid_mode()` call to select the ayanamsha (Lahiri, Fagan-Bradley, etc.).
+
+### Combining flags
+
+```python
+# Heliocentric position with velocity
+pos, _ = swe.calc_ut(jd, SE_MARS, SEFLG_SPEED | SEFLG_HELCTR)
+
+# Sidereal equatorial coordinates
+pos, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_SIDEREAL)
+```
+
+> [!NOTE]
+> `SEFLG_MOSEPH` and `SEFLG_SWIEPH` are accepted for API compatibility but
+> silently ignored — all calculations always use JPL DE440/DE441 via Skyfield.
+> `SEFLG_BARYCTR` is mapped to heliocentric. `SEFLG_XYZ`, `SEFLG_RADIANS`,
+> `SEFLG_SPEED3`, and `SEFLG_ICRS` are defined but not yet implemented.
+
+---
+
 ## Choose the ephemeris (DE440 vs DE441)
 
 Default ephemeris: **DE440** (1550--2650 CE).
