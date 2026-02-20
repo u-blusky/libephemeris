@@ -124,24 +124,86 @@ MAJOR_IPLS = {
 LUNAR_IPLS = {SE_MEAN_NODE, SE_TRUE_NODE}
 
 # Default dates per tier (label, year, month, day, hour)
+# Extended to cover full SPK date ranges with regular milestones
 DEFAULT_DATES: dict[str, list[tuple[str, int, int, int, float]]] = {
     "base": [
+        ("1850-01-01", 1850, 1, 1, 0.0),
+        ("1875-01-01", 1875, 1, 1, 0.0),
+        ("1900-01-01", 1900, 1, 1, 0.0),
+        ("1925-01-01", 1925, 1, 1, 0.0),
+        ("1950-01-01", 1950, 1, 1, 0.0),
+        ("1975-01-01", 1975, 1, 1, 0.0),
         ("J2000", 2000, 1, 1, 12.0),
-        ("1950-06-15", 1950, 6, 15, 0.0),
-        ("2024-11-05", 2024, 11, 5, 18.0),
+        ("2025-01-01", 2025, 1, 1, 0.0),
+        ("2050-01-01", 2050, 1, 1, 0.0),
+        ("2075-01-01", 2075, 1, 1, 0.0),
+        ("2100-01-01", 2100, 1, 1, 0.0),
+        ("2125-01-01", 2125, 1, 1, 0.0),
+        ("2150-01-01", 2150, 1, 1, 0.0),
     ],
     "medium": [
-        ("J2000", 2000, 1, 1, 12.0),
-        ("1900-01-01", 1900, 1, 1, 0.0),
-        ("2024-11-05", 2024, 11, 5, 18.0),
+        ("1550-01-01", 1550, 1, 1, 0.0),
         ("1600-01-01", 1600, 1, 1, 0.0),
+        ("1650-01-01", 1650, 1, 1, 0.0),
+        ("1700-01-01", 1700, 1, 1, 0.0),
+        ("1750-01-01", 1750, 1, 1, 0.0),
+        ("1800-01-01", 1800, 1, 1, 0.0),
+        ("1850-01-01", 1850, 1, 1, 0.0),
+        ("1900-01-01", 1900, 1, 1, 0.0),
+        ("J2000", 2000, 1, 1, 12.0),
+        ("2050-01-01", 2050, 1, 1, 0.0),
+        ("2100-01-01", 2100, 1, 1, 0.0),
+        ("2150-01-01", 2150, 1, 1, 0.0),
+        ("2200-01-01", 2200, 1, 1, 0.0),
+        ("2250-01-01", 2250, 1, 1, 0.0),
+        ("2300-01-01", 2300, 1, 1, 0.0),
+        ("2350-01-01", 2350, 1, 1, 0.0),
+        ("2400-01-01", 2400, 1, 1, 0.0),
+        ("2450-01-01", 2450, 1, 1, 0.0),
+        ("2500-01-01", 2500, 1, 1, 0.0),
+        ("2550-01-01", 2550, 1, 1, 0.0),
+        ("2600-01-01", 2600, 1, 1, 0.0),
+        ("2650-01-01", 2650, 1, 1, 0.0),
     ],
     "extended": [
+        ("year -12800", -12800, 1, 1, 0.0),
+        ("year -12000", -12000, 1, 1, 0.0),
+        ("year -11200", -11200, 1, 1, 0.0),
+        ("year -10400", -10400, 1, 1, 0.0),
+        ("year -9600", -9600, 1, 1, 0.0),
+        ("year -8800", -8800, 1, 1, 0.0),
+        ("year -8000", -8000, 1, 1, 0.0),
+        ("year -7200", -7200, 1, 1, 0.0),
+        ("year -6400", -6400, 1, 1, 0.0),
+        ("year -5600", -5600, 1, 1, 0.0),
+        ("year -4800", -4800, 1, 1, 0.0),
+        ("year -4000", -4000, 1, 1, 0.0),
+        ("year -3200", -3200, 1, 1, 0.0),
+        ("year -2400", -2400, 1, 1, 0.0),
+        ("year -1600", -1600, 1, 1, 0.0),
+        ("year -800", -800, 1, 1, 0.0),
+        ("year 0", 0, 1, 1, 0.0),
+        ("year 800", 800, 1, 1, 0.0),
         ("J2000", 2000, 1, 1, 12.0),
-        ("1900-01-01", 1900, 1, 1, 0.0),
-        ("2024-11-05", 2024, 11, 5, 18.0),
-        ("1550-01-01", 1550, 1, 1, 0.0),
-        ("0800-01-01", 800, 1, 1, 0.0),
+        ("year 2400", 2400, 1, 1, 0.0),
+        ("year 3200", 3200, 1, 1, 0.0),
+        ("year 4000", 4000, 1, 1, 0.0),
+        ("year 4800", 4800, 1, 1, 0.0),
+        ("year 5600", 5600, 1, 1, 0.0),
+        ("year 6400", 6400, 1, 1, 0.0),
+        ("year 7200", 7200, 1, 1, 0.0),
+        ("year 8000", 8000, 1, 1, 0.0),
+        ("year 8800", 8800, 1, 1, 0.0),
+        ("year 9600", 9600, 1, 1, 0.0),
+        ("year 10400", 10400, 1, 1, 0.0),
+        ("year 11200", 11200, 1, 1, 0.0),
+        ("year 12000", 12000, 1, 1, 0.0),
+        ("year 12800", 12800, 1, 1, 0.0),
+        ("year 13600", 13600, 1, 1, 0.0),
+        ("year 14400", 14400, 1, 1, 0.0),
+        ("year 15200", 15200, 1, 1, 0.0),
+        ("year 16000", 16000, 1, 1, 0.0),
+        ("year 16800", 16800, 1, 1, 0.0),
     ],
 }
 
@@ -197,7 +259,16 @@ def _format_dms(deg: float) -> str:
 # =============================================================================
 
 
-def _get_source(ipl: int, tier_name: str) -> str:
+def _parse_spk_date(date_str: str) -> float:
+    """Parse SPK date string 'YYYY-MM-DD' to Julian Day."""
+    parts = date_str.split("-")
+    year = int(parts[0])
+    month = int(parts[1])
+    day = int(parts[2])
+    return eph.swe_julday(year, month, day, 0.0)
+
+
+def _get_source(ipl: int, tier_name: str, jd: float) -> str:
     """Determine the data source used for a body calculation.
 
     Returns one of: "DE440s", "DE440", "DE441", "Analytical", "SPK", "ASSIST", "Keplerian".
@@ -208,7 +279,14 @@ def _get_source(ipl: int, tier_name: str) -> str:
     if ipl in LUNAR_IPLS:
         return "Analytical"
     if ipl in state._SPK_BODY_MAP:
-        return "SPK"
+        from libephemeris.spk import get_spk_coverage
+
+        spk_file, _ = state._SPK_BODY_MAP[ipl]
+        coverage = get_spk_coverage(spk_file)
+        if coverage is not None:
+            spk_start, spk_end = coverage
+            if spk_start <= jd <= spk_end:
+                return "SPK"
     # Check if ASSIST would be used as fallback
     try:
         from libephemeris.rebound_integration import check_assist_available
@@ -489,7 +567,7 @@ def run_diagnostic(tier_name: str) -> None:
 
             # Calculate
             data = _calc_body(jd, ipl)
-            source = _get_source(ipl, tier_name)
+            source = _get_source(ipl, tier_name, jd)
 
             if data["error"]:
                 error_count += 1
