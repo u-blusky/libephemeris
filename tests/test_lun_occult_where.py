@@ -31,7 +31,7 @@ class TestLunOccultWhere:
         """Test that return values have correct structure."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -49,7 +49,7 @@ class TestLunOccultWhere:
         """Test that function finds valid location during a known occultation."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -75,7 +75,7 @@ class TestLunOccultWhere:
         """Test that occultation type flags are set correctly."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -87,7 +87,7 @@ class TestLunOccultWhere:
         """Test that geographic limits are reasonable."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -112,7 +112,7 @@ class TestLunOccultWhere:
         """Test that occultation attributes are reasonable."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -144,7 +144,7 @@ class TestLunOccultWhere:
         """Test that swe_lun_occult_where is an alias."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -166,7 +166,7 @@ class TestLunOccultWhere:
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -184,7 +184,7 @@ class TestLunOccultWhereEdgeCases:
         """Test occultation location changes during an event."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -201,7 +201,7 @@ class TestLunOccultWhereEdgeCases:
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -214,7 +214,7 @@ class TestLunOccultWhereEdgeCases:
         """Test that fraction covered is 1.0 for total occultation."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -239,7 +239,7 @@ class TestLunOccultWhereIntegration:
         """
         jd_start = julday(2017, 1, 1, 0)
         glob_type, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -255,7 +255,7 @@ class TestLunOccultWhereIntegration:
         """Test that calling the function multiple times gives same result."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -277,7 +277,7 @@ class TestLunOccultWherePySwissephAPI:
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -307,7 +307,7 @@ class TestLunOccultWherePlanetOccultations:
 
         try:
             retflags, times = lun_occult_when_glob(
-                jd_start, SE_VENUS, SEFLG_SWIEPH, 0, False
+                jd_start, SE_VENUS, "", SEFLG_SWIEPH, 0, False
             )
             if retflags != 0:
                 jd_max = times[0]
@@ -372,7 +372,7 @@ class TestLunOccultWhereAttributes:
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -385,7 +385,7 @@ class TestLunOccultWhereAttributes:
         """Test that apparent altitude includes refraction correction."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
@@ -402,7 +402,7 @@ class TestLunOccultWhereAttributes:
         """Test that angular separation is small during occultation."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 

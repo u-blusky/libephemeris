@@ -5124,9 +5124,10 @@ def swe_lun_eclipse_how(
 
 def lun_occult_when_glob(
     tjdut: float,
-    body: Union[int, str],
+    ipl: int,
+    starname: str,
     flags: int = SEFLG_SWIEPH,
-    ecltype: int = 0,
+    ifltype: int = 0,
     backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
@@ -5140,11 +5141,12 @@ def lun_occult_when_glob(
 
     Args:
         tjdut: Julian Day (UT) to start search from
-        body: Planet identifier (int) or star name (str). For planets use
-            SE_MERCURY, SE_VENUS, etc. For stars use the name as string
-            (e.g., "Regulus").
+        ipl: Planet identifier (int). Use SE_MERCURY, SE_VENUS, etc.
+            Use 0 if searching for a star occultation.
+        starname: Star name (str) for star occultations, or empty string
+            if searching for a planet occultation (e.g., "Regulus").
         flags: Calculation flags (SEFLG_SWIEPH, SEFLG_J2000, etc.)
-        ecltype: Bit flags for eclipse type filter (0 = any type):
+        ifltype: Bit flags for eclipse type filter (0 = any type):
             SE_ECL_CENTRAL, SE_ECL_NONCENTRAL, SE_ECL_TOTAL,
             SE_ECL_ANNULAR, SE_ECL_PARTIAL, SE_ECL_ANNULAR_TOTAL
         backwards: If True, search backward in time; if False, search forward.
@@ -5168,7 +5170,7 @@ def lun_occult_when_glob(
                 [9]: Time when annular-total occultation becomes annular again
 
     Raises:
-        ValueError: If body is invalid
+        ValueError: If neither planet ID nor star name is specified
 
     Algorithm:
         1. Calculate Moon's position and the target body's position
@@ -5211,13 +5213,8 @@ def lun_occult_when_glob(
     )
     from .planets import _PLANET_MAP, get_planet_target
 
-    # Handle body parameter - can be int (planet ID) or str (star name)
-    if isinstance(body, str):
-        planet = 0
-        star_name = body
-    else:
-        planet = body
-        star_name = ""
+    planet = ipl
+    star_name = starname
 
     if planet == 0 and not star_name:
         raise ValueError(
@@ -5629,8 +5626,11 @@ swe_lun_occult_when_glob = lun_occult_when_glob
 
 def lun_occult_when_loc(
     tjdut: float,
-    body: Union[int, str],
-    geopos: Sequence[float],
+    ipl: int,
+    starname: str,
+    lat: float,
+    lon: float,
+    alt: float = 0.0,
     flags: int = SEFLG_SWIEPH,
     backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
@@ -5647,13 +5647,13 @@ def lun_occult_when_loc(
 
     Args:
         tjdut: Julian Day (UT) to start search from
-        body: Planet identifier (int) or star name (str). For planets use
-            SE_MERCURY, SE_VENUS, etc. For stars use the name as string
-            (e.g., "Regulus").
-        geopos: Sequence of 3 floats with geographic position:
-            [0]: Longitude in degrees (East positive)
-            [1]: Latitude in degrees (North positive)
-            [2]: Altitude in meters above sea level
+        ipl: Planet identifier (int). Use SE_MERCURY, SE_VENUS, etc.
+            Use 0 if searching for a star occultation.
+        starname: Star name (str) for star occultations, or empty string
+            if searching for a planet occultation (e.g., "Regulus").
+        lat: Geographic latitude in degrees (North positive)
+        lon: Geographic longitude in degrees (East positive)
+        alt: Altitude in meters above sea level (default 0)
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
         backwards: If True, search backward in time; if False, search forward.
 
@@ -5706,10 +5706,10 @@ def lun_occult_when_loc(
         >>> from libephemeris import julday, lun_occult_when_loc
         >>> jd = julday(2017, 1, 1, 0)
         >>> rome_lat, rome_lon = 41.9028, 12.4964
-        >>> times, attr, ocl_type = lun_occult_when_loc(jd, 0, "Regulus",
+        >>> ocl_type, times, attr = lun_occult_when_loc(jd, 0, "Regulus",
         ...                                              rome_lat, rome_lon)
         >>> print(f"Occultation maximum at JD {times[0]:.5f}")
-        >>> print(f"Moon altitude: {attr[4]:.1f}°")
+        >>> print(f"Moon altitude: {attr[5]:.1f}°")
 
     References:
         - Swiss Ephemeris: swe_lun_occult_when_loc()
@@ -5731,18 +5731,9 @@ def lun_occult_when_loc(
     from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
 
-    # Handle body parameter - can be int (planet ID) or str (star name)
-    if isinstance(body, str):
-        planet = 0
-        star_name = body
-    else:
-        planet = body
-        star_name = ""
-
-    # Extract geographic position from sequence
-    lon = float(geopos[0])
-    lat = float(geopos[1])
-    altitude = float(geopos[2]) if len(geopos) > 2 else 0.0
+    planet = ipl
+    star_name = starname
+    altitude = alt
 
     if planet == 0 and not star_name:
         raise ValueError(
@@ -6282,7 +6273,7 @@ def swe_lun_occult_when_loc(
 
     # Call the internal implementation
     ecl_type, times, attr = lun_occult_when_loc(
-        tjdut, planet, star_name, lat, lon, altitude, flags
+        tjdut, planet, star_name, lat, lon, altitude, flags, backwards
     )
 
     # Return in pyswisseph order: (retflags, tret, attr)

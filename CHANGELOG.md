@@ -84,7 +84,7 @@ to GitHub Releases with SHA256 hash calculation.
 - Saturn extended tier now merges `sat441xl_part-1.bsp` + `sat441xl_part-2.bsp`
   for continuous coverage from -502 to +4500
 
-### Coverage summary
+#### Coverage summary
 
 | Planet | base | medium | extended |
 |--------|------|--------|----------|

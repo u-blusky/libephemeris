@@ -92,7 +92,7 @@ class TestTiersDict:
         [
             ("base", "1850-01-01", "2150-01-01"),
             ("medium", "1900-01-01", "2100-01-01"),
-            ("extended", "1550-01-01", "2650-01-01"),
+            ("extended", "1600-01-01", "2500-01-01"),
         ],
     )
     def test_spk_date_ranges(self, name, expected_start, expected_end):
@@ -174,8 +174,8 @@ class TestGetSpkDateRangeForTier:
     def test_explicit_tier_name(self):
         """With an explicit tier name, should return that tier's range."""
         assert get_spk_date_range_for_tier("extended") == (
-            "1550-01-01",
-            "2650-01-01",
+            "1600-01-01",
+            "2500-01-01",
         )
 
     def test_follows_current_tier(self):
