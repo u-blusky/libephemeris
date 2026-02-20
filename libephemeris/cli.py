@@ -1,16 +1,15 @@
 """
 Command-line interface for libephemeris.
 
-This module provides CLI commands for managing libephemeris, including
-downloading optional data files.
+This module provides CLI commands for managing libephemeris data files.
 
 Usage:
-    libephemeris init                 Initialize all data files (1550-2650)
-    libephemeris init-fast            Fast init, modern range (1900-2100)
-    libephemeris download-data       Download precision data files
-    libephemeris status              Show data file status
-    libephemeris --version           Show version
-    libephemeris --help              Show help
+    libephemeris download:base         Download data for 'base' tier (1850-2150)
+    libephemeris download:medium       Download data for 'medium' tier (1550-2650)
+    libephemeris download:extended     Download data for 'extended' tier (-13200 to +17191)
+    libephemeris status                Show data file status
+    libephemeris --version             Show version
+    libephemeris --help                Show help
 """
 
 from __future__ import annotations
@@ -21,25 +20,47 @@ import sys
 from . import __version__
 
 
-def _print_init_summary(result: dict) -> None:
-    """Print the init result summary."""
-    print("\nInitialization complete.")
-    print(f"  DE440.bsp: {'OK' if result['de440'] else 'FAILED'}")
-    print(f"  planet_centers.bsp: {'OK' if result['planet_centers'] else 'FAILED'}")
-    print(f"  SPK downloaded: {result['spk_success']}")
-    print(f"  SPK skipped (cached): {result['spk_skipped']}")
-    if result.get("spk_out_of_range", 0) > 0:
-        print(f"  SPK out of range: {result['spk_out_of_range']}")
-    if result["spk_failed"] > 0:
-        print(f"  SPK failed: {result['spk_failed']}")
+# ---------------------------------------------------------------------------
+# Tier descriptions for --help output
+# ---------------------------------------------------------------------------
+
+_TIER_INFO = {
+    "base": {
+        "label": "base",
+        "ephemeris": "de440s.bsp (~31 MB)",
+        "range": "1850-2150 CE",
+        "spk_range": "1850-2150",
+        "description": "Lightweight tier for modern-era calculations.",
+    },
+    "medium": {
+        "label": "medium",
+        "ephemeris": "de440.bsp (~114 MB)",
+        "range": "1550-2650 CE",
+        "spk_range": "1900-2100",
+        "description": "General purpose tier (default). Covers most historical and future dates.",
+    },
+    "extended": {
+        "label": "extended",
+        "ephemeris": "de441.bsp (~3.1 GB)",
+        "range": "-13200 to +17191 CE",
+        "spk_range": "1600-2500 (JPL Horizons limit)",
+        "description": "Full extended range for deep historical and far-future research.",
+    },
+}
 
 
-def cmd_download_data(args: argparse.Namespace) -> int:
-    """Handle the download-data command."""
-    from .download import download_planet_centers
+# ---------------------------------------------------------------------------
+# Command handlers
+# ---------------------------------------------------------------------------
+
+
+def _cmd_download(tier_name: str, args: argparse.Namespace) -> int:
+    """Handle a download:<tier> command."""
+    from .download import download_for_tier
 
     try:
-        download_planet_centers(
+        download_for_tier(
+            tier_name=tier_name,
             force=args.force,
             show_progress=not args.no_progress,
             quiet=args.quiet,
@@ -54,56 +75,19 @@ def cmd_download_data(args: argparse.Namespace) -> int:
         return 1
 
 
-def cmd_init(args: argparse.Namespace) -> int:
-    """Handle the init command (full range 1550-2650)."""
-    from .download import init_all
-
-    cache_dir = args.cache_dir
-
-    try:
-        result = init_all(
-            cache_dir=cache_dir,
-            force=args.force,
-            show_progress=not args.no_progress,
-            quiet=args.quiet,
-        )
-        if not args.quiet:
-            _print_init_summary(result)
-        return 0 if result["spk_failed"] == 0 else 1
-    except KeyboardInterrupt:
-        print("\nInitialization cancelled.")
-        return 130
-    except Exception as e:
-        if not args.quiet:
-            print(f"Error: {e}", file=sys.stderr)
-        return 1
+def cmd_download_base(args: argparse.Namespace) -> int:
+    """Download data for the 'base' tier."""
+    return _cmd_download("base", args)
 
 
-def cmd_init_fast(args: argparse.Namespace) -> int:
-    """Handle the init-fast command (modern range 1900-2100)."""
-    from .download import init_all
+def cmd_download_medium(args: argparse.Namespace) -> int:
+    """Download data for the 'medium' tier."""
+    return _cmd_download("medium", args)
 
-    cache_dir = args.cache_dir
 
-    try:
-        result = init_all(
-            cache_dir=cache_dir,
-            force=args.force,
-            show_progress=not args.no_progress,
-            quiet=args.quiet,
-            start_year=1900,
-            end_year=2100,
-        )
-        if not args.quiet:
-            _print_init_summary(result)
-        return 0 if result["spk_failed"] == 0 else 1
-    except KeyboardInterrupt:
-        print("\nInitialization cancelled.")
-        return 130
-    except Exception as e:
-        if not args.quiet:
-            print(f"Error: {e}", file=sys.stderr)
-        return 1
+def cmd_download_extended(args: argparse.Namespace) -> int:
+    """Download data for the 'extended' tier."""
+    return _cmd_download("extended", args)
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -120,6 +104,51 @@ def cmd_version(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Parser construction
+# ---------------------------------------------------------------------------
+
+
+def _add_download_flags(parser: argparse.ArgumentParser) -> None:
+    """Add common --force / --no-progress / --quiet flags to a download subparser."""
+    parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force download even if files already exist",
+    )
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress output",
+    )
+    parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress all output except errors",
+    )
+
+
+def _make_download_description(tier: str) -> str:
+    """Build the long description for a download:<tier> subparser."""
+    info = _TIER_INFO[tier]
+    return f"""\
+Download all data files for the '{tier}' precision tier.
+
+  Ephemeris:  {info["ephemeris"]}
+  Date range: {info["range"]}
+  SPK range:  {info["spk_range"]}
+
+{info["description"]}
+
+Downloads:
+  1. The ephemeris file ({info["ephemeris"].split(" ")[0]})
+  2. planet_centers.bsp precision offsets (~25 MB)
+  3. SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
+"""
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser for the CLI."""
     parser = argparse.ArgumentParser(
@@ -128,11 +157,11 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Examples:
-  libephemeris init                Initialize all data files (1550-2650 CE)
-  libephemeris init-fast           Fast init, modern range (1900-2100 CE)
-  libephemeris download-data       Download optional precision data files
-  libephemeris status              Show installed data files
-  libephemeris --version           Show version information
+  libephemeris download:medium       Download data for the default tier
+  libephemeris download:base         Lightweight, modern-era data
+  libephemeris download:extended     Full range (-13200 to +17191 CE)
+  libephemeris status                Show installed data files
+  libephemeris --version             Show version information
 
 For more information, visit: https://github.com/g-battaglia/libephemeris
 """,
@@ -151,127 +180,41 @@ For more information, visit: https://github.com/g-battaglia/libephemeris
         metavar="<command>",
     )
 
-    # download-data command
-    download_parser = subparsers.add_parser(
-        "download-data",
-        help="Download optional precision data files",
-        description="""
-Download optional data files that enhance calculation precision.
-
-The main data file is planet_centers.bsp which provides precise planet
-center positions for Jupiter, Saturn, Uranus, Neptune, and Pluto.
-This enables sub-arcsecond precision for outer planet calculations.
-
-Without these files, libephemeris uses analytical approximations which
-are still accurate to ~0.1 arcseconds.
-""",
+    # download:base
+    dl_base = subparsers.add_parser(
+        "download:base",
+        help=f"Download data for 'base' tier ({_TIER_INFO['base']['range']})",
+        description=_make_download_description("base"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    download_parser.add_argument(
-        "--force",
-        "-f",
-        action="store_true",
-        help="Force download even if file already exists",
-    )
-    download_parser.add_argument(
-        "--no-progress",
-        action="store_true",
-        help="Disable progress bar",
-    )
-    download_parser.add_argument(
-        "--quiet",
-        "-q",
-        action="store_true",
-        help="Suppress all output except errors",
-    )
-    download_parser.set_defaults(func=cmd_download_data)
+    _add_download_flags(dl_base)
+    dl_base.set_defaults(func=cmd_download_base)
 
-    # init command
-    init_parser = subparsers.add_parser(
-        "init",
-        help="Initialize libephemeris with all required data files",
-        description="""\
-Download all data files required for full-precision calculations across
-the entire DE440 date range (1550-2650 CE).
-
-This includes:
-- DE440.bsp planetary ephemeris (~128 MB)
-- planet_centers.bsp precision offsets (~25 MB)
-- SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
-  in 20-year chunks covering 1550-2650 CE
-""",
+    # download:medium
+    dl_medium = subparsers.add_parser(
+        "download:medium",
+        help=f"Download data for 'medium' tier ({_TIER_INFO['medium']['range']})",
+        description=_make_download_description("medium"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    init_parser.add_argument(
-        "--force",
-        "-f",
-        action="store_true",
-        help="Force download even if files already exist",
-    )
-    init_parser.add_argument(
-        "--no-progress",
-        action="store_true",
-        help="Disable progress output",
-    )
-    init_parser.add_argument(
-        "--quiet",
-        "-q",
-        action="store_true",
-        help="Suppress all output except errors",
-    )
-    init_parser.add_argument(
-        "--cache-dir",
-        help="Custom SPK cache directory (default: ~/.libephemeris/spk/)",
-    )
-    init_parser.set_defaults(func=cmd_init)
+    _add_download_flags(dl_medium)
+    dl_medium.set_defaults(func=cmd_download_medium)
 
-    # init-fast command
-    init_fast_parser = subparsers.add_parser(
-        "init-fast",
-        help="Fast init with modern date range (1900-2100 CE)",
-        description="""\
-Download data files for modern-era calculations (1900-2100 CE).
-
-Same as 'init' but with a reduced date range, resulting in far fewer
-SPK chunks to download (~10x faster). Ideal for most astrological
-and astronomical applications.
-
-This includes:
-- DE440.bsp planetary ephemeris (~128 MB)
-- planet_centers.bsp precision offsets (~25 MB)
-- SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
-  in 20-year chunks covering 1900-2100 CE
-""",
+    # download:extended
+    dl_extended = subparsers.add_parser(
+        "download:extended",
+        help=f"Download data for 'extended' tier ({_TIER_INFO['extended']['range']})",
+        description=_make_download_description("extended"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    init_fast_parser.add_argument(
-        "--force",
-        "-f",
-        action="store_true",
-        help="Force download even if files already exist",
-    )
-    init_fast_parser.add_argument(
-        "--no-progress",
-        action="store_true",
-        help="Disable progress output",
-    )
-    init_fast_parser.add_argument(
-        "--quiet",
-        "-q",
-        action="store_true",
-        help="Suppress all output except errors",
-    )
-    init_fast_parser.add_argument(
-        "--cache-dir",
-        help="Custom SPK cache directory (default: ~/.libephemeris/spk/)",
-    )
-    init_fast_parser.set_defaults(func=cmd_init_fast)
+    _add_download_flags(dl_extended)
+    dl_extended.set_defaults(func=cmd_download_extended)
 
-    # status command
+    # status
     status_parser = subparsers.add_parser(
         "status",
         help="Show data file status",
-        description="Show the status of optional data files.",
+        description="Show the status of installed data files and current tier.",
     )
     status_parser.set_defaults(func=cmd_status)
 

@@ -7,11 +7,13 @@ provides precise planet center positions for outer planets (Jupiter-Pluto).
 
 Usage:
     # From command line
-    libephemeris download-data
+    libephemeris download:medium       Download data for 'medium' tier
+    libephemeris download:base         Download data for 'base' tier
+    libephemeris download:extended     Download data for 'extended' tier
 
     # From Python
-    from libephemeris.download import download_planet_centers
-    download_planet_centers()
+    from libephemeris.download import download_for_tier
+    download_for_tier("medium")
 
 Without the data files, libephemeris will fall back to analytical approximations
 which are still accurate to ~0.1 arcseconds.
@@ -406,7 +408,8 @@ def print_data_status():
             print(f"        Expected size: ~{info['expected_size_mb']:.1f} MB")
 
     print()
-    print("Run 'libephemeris download-data' to download missing files.")
+    print("Run 'libephemeris download:<tier>' to download all data files.")
+    print("Available tiers: base, medium, extended")
 
 
 def init_all(
@@ -647,3 +650,98 @@ def init_all(
             print(f"    {', '.join(parts)}")
 
     return result
+
+
+def download_for_tier(
+    tier_name: str,
+    force: bool = False,
+    show_progress: bool = True,
+    quiet: bool = False,
+) -> dict:
+    """Download all data files required for a specific precision tier.
+
+    Sets the precision tier, then downloads:
+    1. The tier's ephemeris file (de440s / de440 / de441)
+    2. planet_centers.bsp precision offsets
+    3. SPK kernels for all 21 minor bodies (full tier date range)
+
+    For the 'extended' tier, SPK files are downloaded as single max-range
+    files (1600-2500) rather than chunked, since that's the full Horizons
+    range for minor bodies.
+
+    Args:
+        tier_name: One of "base", "medium", "extended"
+        force: If True, re-download even if files already exist
+        show_progress: If True, show progress output
+        quiet: If True, suppress non-error output
+
+    Returns:
+        Dict with summary (same format as ensure_all_ephemerides)
+
+    Raises:
+        ValueError: If tier_name is not valid
+    """
+    from .state import TIERS, set_precision_tier
+
+    if tier_name not in TIERS:
+        valid = ", ".join(sorted(TIERS.keys()))
+        raise ValueError(f"Unknown tier '{tier_name}'. Valid tiers: {valid}")
+
+    tier = TIERS[tier_name]
+
+    if not quiet:
+        print(f"libephemeris: downloading data for tier '{tier_name}'")
+        print(f"  Ephemeris file: {tier.ephemeris_file}")
+        print(f"  Description:    {tier.description}")
+        print(f"  SPK date range: {tier.spk_date_range[0]} to {tier.spk_date_range[1]}")
+        print()
+
+    # Activate the tier so ensure_all_ephemerides uses the right config
+    set_precision_tier(tier_name)
+
+    # Step 1: planet_centers.bsp (same for all tiers)
+    if not quiet:
+        print("Step 1/2: planet_centers.bsp precision data")
+
+    try:
+        download_planet_centers(
+            force=force,
+            show_progress=show_progress,
+            quiet=quiet,
+        )
+        if not quiet:
+            print("  [OK] planet_centers.bsp ready")
+            print()
+    except Exception as e:
+        if not quiet:
+            print(f"  [WARN] planet_centers.bsp: {e}", file=sys.stderr)
+            print("  (non-critical, continuing...)")
+            print()
+
+    # Step 2: Ephemeris file + SPK kernels (via ensure_all_ephemerides)
+    if not quiet:
+        print(f"Step 2/2: {tier.ephemeris_file} + SPK kernels for minor bodies")
+
+    from .spk_auto import ensure_all_ephemerides
+
+    results = ensure_all_ephemerides(
+        force_download=force,
+        show_progress=show_progress and not quiet,
+    )
+
+    # Print final summary
+    if not quiet:
+        summary = results.get("summary", {})
+        print()
+        print("Download complete:")
+        print(f"  Tier:         {tier_name}")
+        print(f"  Ephemeris:    {tier.ephemeris_file}")
+        if isinstance(summary, dict):
+            print(f"  SPK cached:   {summary.get('cached', 0)}")
+            print(f"  SPK downloaded: {summary.get('downloaded', 0)}")
+            if summary.get("fallback", 0):
+                print(f"  SPK fallback: {summary['fallback']}")
+            if summary.get("errors", 0):
+                print(f"  SPK errors:   {summary['errors']}")
+
+    return results
