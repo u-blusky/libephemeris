@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-02-20
+
+### Added
+
+#### 3-tier planet_centers SPK system
+
+New tier-specific `planet_centers_*.bsp` files provide precise planet center
+positions for Jupiter, Saturn, Uranus, Neptune, and Pluto. Each tier has its
+own file with appropriate date coverage:
+
+| Tier | File | Coverage | Size |
+|------|------|----------|------|
+| base | `planet_centers_base.bsp` | 1850-2150 | ~15-20 MB |
+| medium | `planet_centers_medium.bsp` | 1550-2650 | ~40-50 MB |
+| extended | `planet_centers_extended.bsp` | partial -12000 to +17000 | ~80-100 MB |
+
+Files are saved in the workspace root (alongside `de440.bsp`, `de441.bsp`).
+
+#### Uranus analytical COB fallback
+
+New `uranian.py` module implements Keplerian theory for Uranus' 5 major moons
+(Ariel, Umbriel, Titania, Oberon, Miranda). This provides ~0.01 arcsec precision
+for Uranus center-of-body corrections when SPK coverage is unavailable.
+
+Previously, Uranus had no analytical fallback outside SPK range.
+
+#### Planet centers generation commands
+
+New `poe` tasks for generating tier-specific planet_centers files:
+
+```bash
+poe generate-planet-centers:base      # ~500 MB source download
+poe generate-planet-centers:medium    # ~4 GB source download
+poe generate-planet-centers:extended  # ~6.5 GB source download
+poe generate-planet-centers:all       # Generate all 3 tiers
+```
+
+Requires `spiceypy >= 6.0.0`. Downloads satellite SPK files from JPL NAIF
+and extracts planet center segments (NAIF 599, 699, 799, 899, 999).
+
+#### GitHub release script
+
+New `scripts/release_planet_centers.py` for uploading planet_centers files
+to GitHub Releases with SHA256 hash calculation.
+
+### Changed
+
+- `get_planet_centers()` in `state.py` now loads the appropriate file for the
+  active precision tier, with automatic reload when tier changes
+- `download_for_tier()` now downloads tier-specific `planet_centers_{tier}.bsp`
+  to workspace root instead of bundled `planet_centers.bsp`
+- `print_data_status()` shows tier-specific files with current tier indicator
+- Saturn extended tier now merges `sat441xl_part-1.bsp` + `sat441xl_part-2.bsp`
+  for continuous coverage from -502 to +4500
+
+### Coverage summary
+
+| Planet | base | medium | extended |
+|--------|------|--------|----------|
+| Jupiter | SPK ✓ | SPK ✓ | SPK 1600-2200, fallback outside |
+| Saturn | SPK ✓ | SPK ✓ | SPK -502 to +4500, fallback outside |
+| Uranus | SPK ✓ | SPK ✓ | SPK full -12000/+17000 |
+| Neptune | SPK ✓ | SPK ✓ | SPK full -12000/+17000 |
+| Pluto | SPK ✓ | SPK 1800-2200 | SPK 1800-2200, fallback outside |
+
+Fallback uses analytical moon theories (E5 for Jupiter, TASS 1.7 for Saturn,
+Keplerian for Uranus/Neptune, Charon two-body for Pluto) with ~0.01-0.15 arcsec
+precision.
+
 ## [0.15.0] - 2026-02-20
 
 ### Added
@@ -767,7 +836,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/g-battaglia/libephemeris/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/g-battaglia/libephemeris/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/g-battaglia/libephemeris/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/g-battaglia/libephemeris/compare/v0.12.0...v0.13.0

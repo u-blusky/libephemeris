@@ -300,10 +300,20 @@ Download SPK kernels for minor bodies directly (without the full CLI tier setup)
 
 ### Data generation
 
-| Command | Description |
-|---------|-------------|
-| `poe generate-planet-centers-spk` | Generate `planet_centers.bsp` (requires `spiceypy`) |
-| `poe generate-lunar-corrections` | Regenerate lunar correction tables (requires `de441.bsp`) |
+Generate `planet_centers_*.bsp` files for each precision tier. Requires `spiceypy >= 6.0.0`.
+
+| Command | Description | Download |
+|---------|-------------|----------|
+| `poe generate-planet-centers:base` | Generate for base tier (1850-2150) | ~500 MB |
+| `poe generate-planet-centers:medium` | Generate for medium tier (1550-2650) | ~4 GB |
+| `poe generate-planet-centers:extended` | Generate for extended tier (partial) | ~6.5 GB |
+| `poe generate-planet-centers:all` | Generate all 3 tiers | ~11 GB |
+| `poe generate-lunar-corrections` | Regenerate lunar correction tables (requires `de441.bsp`) | — |
+
+Generated files are saved in the workspace root:
+- `planet_centers_base.bsp` (~15-20 MB)
+- `planet_centers_medium.bsp` (~40-50 MB)
+- `planet_centers_extended.bsp` (~80-100 MB)
 
 ---
 
