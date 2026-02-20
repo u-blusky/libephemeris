@@ -176,10 +176,39 @@ coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml
 "coverage:full" = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"
 typecheck = "mypy libephemeris"
 
-# Lunar corrections table generation
+# Lunar test suites
+"test:lunar" = "pytest tests/test_lunar/ -v -m \"not slow\""
+"test:lunar:perigee" = """pytest -v \
+    tests/test_lunar/test_elp2000_perigee_perturbations.py \
+    tests/test_lunar/test_interpolated_perigee.py \
+    tests/test_lunar/test_osculating_perigee.py"""
+"test:lunar:apogee" = """pytest -v \
+    tests/test_lunar/test_elp2000_apogee_perturbations.py \
+    tests/test_lunar/test_interpolated_apogee.py"""
+"test:lunar:lilith" = """pytest -v \
+    tests/test_lunar/test_mean_lilith_enhanced.py \
+    tests/test_lunar/test_true_lilith_precision.py \
+    tests/test_lunar/test_true_lilith_annual_equation.py \
+    tests/test_lunar/test_true_lilith_evection_secondary.py \
+    tests/test_lunar/test_true_lilith_parallactic_inequality.py \
+    tests/test_lunar/test_true_lilith_reduction_to_ecliptic.py \
+    tests/test_lunar/test_true_lilith_solar_perturbation.py \
+    tests/test_lunar/test_true_lilith_variation.py"""
+
+# Lunar corrections and calibration
 [tool.poe.tasks.generate-lunar-corrections]
 cmd = "python scripts/generate_lunar_corrections.py --force"
 help = "Regenerate precomputed correction tables for mean lunar elements (requires de441.bsp)"
+
+[tool.poe.tasks.calibrate-perigee]
+cmd = "python scripts/calibrate_perigee_perturbations.py --start-year 1500 --end-year 2500 --output /tmp/perigee_calibration.json"
+help = "Calibrate perigee perturbation coefficients against JPL DE441 (full run, ~30 min)"
+envfile = ".env"
+
+[tool.poe.tasks."calibrate-perigee:quick"]
+cmd = "python scripts/calibrate_perigee_perturbations.py --quick --output /tmp/perigee_calibration_quick.json"
+help = "Quick perigee calibration (100-year range, ~2 min, for validation)"
+envfile = ".env"
 
 [tool.mypy]
 python_version = "3.9"

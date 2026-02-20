@@ -156,6 +156,45 @@ tests/
 └── test_*/               # Test subdirectories by feature
 ```
 
+## Scripts & Calibration
+
+The `scripts/` directory contains data generation and calibration tools:
+
+```
+scripts/
+├── calibrate_perigee_perturbations.py  # Perigee perturbation series calibration (v2.2)
+├── generate_lunar_corrections.py       # Lunar correction table generation
+├── generate_planet_centers_spk.py      # Planet centers SPK file generation
+├── build_star_catalog.py               # Fixed star catalog builder
+├── calibrate_true_node.py              # True node calibration
+├── download_spk.py                     # SPK kernel downloader
+├── download_max_range_spk.py           # Extended-range SPK downloader
+├── update_orbital_elements.py          # Orbital elements updater
+├── tier_diagnostic_*.py                # Tier diagnostic tables
+├── profile_hot_paths.py                # Performance profiling
+└── release_planet_centers.py           # Planet centers release script
+```
+
+### Lunar Calibration Workflow
+
+When modifying the perigee perturbation series, follow this order:
+
+1. **Calibrate**: `poe calibrate-perigee` (or `poe calibrate-perigee:quick` for validation)
+2. **Apply**: paste new coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
+3. **Sync**: update the matching series in `scripts/generate_lunar_corrections.py`
+4. **Regenerate**: `poe generate-lunar-corrections` (regenerates `lunar_corrections.py`)
+5. **Test**: `poe test:lunar:perigee`
+
+See `docs/interpolated_perigee_methodology.md` for the full methodology.
+
+### Lunar Test Commands
+```bash
+poe test:lunar              # All lunar tests (no slow)
+poe test:lunar:perigee      # Perigee: perturbations + interpolated + osculating
+poe test:lunar:apogee       # Apogee: perturbations + interpolated
+poe test:lunar:lilith       # Lilith: mean + true (all correction modules)
+```
+
 ## Key Patterns
 
 ### Swiss Ephemeris API Compatibility

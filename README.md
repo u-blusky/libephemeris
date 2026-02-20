@@ -250,6 +250,11 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 - `docs/HOUSE_SYSTEMS.md`
 - `docs/AYANAMSHA.md`
 - `docs/testing.md`
+- `docs/interpolated_perigee_methodology.md` (perigee calibration method and precision)
+- `docs/INTERPOLATED_APOGEE.md` (apogee methodology)
+- `docs/TRUE_LILITH_METHODS.md` (True Lilith correction methods)
+- `docs/PLANET_CENTERS_SPK.md` (planet centers SPK system)
+- `docs/PRECISION_TUNING.md` (precision tuning guide)
 
 ---
 
@@ -290,6 +295,10 @@ All development tasks use [poethepoet](https://poethepoet.naberhaus.dev/) (`poe`
 | `poe test:unit:fast` | Unit tests, parallel |
 | `poe test:compare` | Comparison tests vs pyswisseph (`compare_scripts/tests/`) |
 | `poe test:compare:fast` | Comparison tests, parallel |
+| `poe test:lunar` | All lunar tests (nodes, Lilith, perigee, apogee) |
+| `poe test:lunar:perigee` | Perigee tests (perturbations + interpolated + osculating) |
+| `poe test:lunar:apogee` | Apogee tests (perturbations + interpolated) |
+| `poe test:lunar:lilith` | Lilith tests (mean + true, all correction modules) |
 | `poe coverage` | Fast tests with coverage report |
 | `poe coverage:full` | All tests with coverage report |
 
@@ -324,6 +333,17 @@ Generate `planet_centers_*.bsp` files for each precision tier. Requires `spiceyp
 | `poe generate-planet-centers:extended` | Generate for extended tier (partial) | ~6.5 GB |
 | `poe generate-planet-centers:all` | Generate all 3 tiers | ~11 GB |
 | `poe generate-lunar-corrections` | Regenerate lunar correction tables (requires `de441.bsp`) | — |
+
+### Calibration
+
+Calibrate perturbation series coefficients against JPL DE441 ephemeris. See `docs/interpolated_perigee_methodology.md` for full details.
+
+| Command | Description |
+|---------|-------------|
+| `poe calibrate-perigee` | Full perigee calibration, 1500-2500 CE (~30 min, requires `de441.bsp`) |
+| `poe calibrate-perigee:quick` | Quick validation run, 100-year range (~2 min) |
+
+After calibration, update coefficients in `lunar.py`, sync `generate_lunar_corrections.py`, and run `poe generate-lunar-corrections` followed by `poe test:lunar:perigee`.
 
 Generated files are saved in the workspace root:
 - `planet_centers_base.bsp` (~15-20 MB)

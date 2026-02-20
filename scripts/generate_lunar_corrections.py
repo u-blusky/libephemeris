@@ -557,6 +557,7 @@ def compute_perigee_perturbation_series(jd_tt: float) -> float:
     Compute the trigonometric perturbation series for perigee.
 
     Uses the same coefficients as _calc_elp2000_perigee_perturbations() in lunar.py.
+    Calibrated against JPL DE441 using passage-interpolated harmonic fitting (v2.2).
     """
     D, M, M_prime, F = compute_perigee_fundamental_arguments(jd_tt)
     T = (jd_tt - 2451545.0) / 36525.0
@@ -565,42 +566,93 @@ def compute_perigee_perturbation_series(jd_tt: float) -> float:
 
     perturbation = 0.0
 
-    # Primary evection harmonics (calibrated against JPL DE441)
-    perturbation += +0.2808 * math.sin(D - M_prime)
-    perturbation += -9.6235 * math.sin(2.0 * D - 2.0 * M_prime)
-    perturbation += -0.0479 * math.sin(3.0 * D - 3.0 * M_prime)
-    perturbation += +0.9350 * math.sin(4.0 * D - 4.0 * M_prime)
-    perturbation += +0.0097 * math.sin(5.0 * D - 5.0 * M_prime)
-    perturbation += -0.1320 * math.sin(6.0 * D - 6.0 * M_prime)
-    perturbation += +0.0196 * math.sin(8.0 * D - 8.0 * M_prime)
+    # Polynomial mean perigee corrections
+    perturbation += -0.1749
+    perturbation += -0.1411 * T
+    perturbation += -0.0140 * T * T
+    perturbation += +0.0168 * T * T * T
 
-    # Solar anomaly coupling
-    perturbation += +0.4533 * E * math.sin(M)
-    perturbation += +0.0069 * E2 * math.sin(2.0 * M)
-    perturbation += -0.3250 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
-    perturbation += -0.0458 * E * math.sin(D - M_prime + M)
-    perturbation += +0.0650 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
-    perturbation += -0.0392 * E * math.sin(4.0 * D - 4.0 * M_prime + M)
-    perturbation += -0.0146 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
-    perturbation += -0.0071 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
-    perturbation += +0.0556 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+    # Primary evection harmonics sin(kD - kM')
+    perturbation += +0.3002 * math.sin(D - M_prime)
+    perturbation += -22.2062 * math.sin(2.0 * D - 2.0 * M_prime)
+    perturbation += -0.1594 * math.sin(3.0 * D - 3.0 * M_prime)
+    perturbation += +6.4536 * math.sin(4.0 * D - 4.0 * M_prime)
+    perturbation += +0.0938 * math.sin(5.0 * D - 5.0 * M_prime)
+    perturbation += -2.2814 * math.sin(6.0 * D - 6.0 * M_prime)
+    perturbation += -0.0375 * math.sin(7.0 * D - 7.0 * M_prime)
+    perturbation += +0.4792 * math.sin(8.0 * D - 8.0 * M_prime)
+    perturbation += +0.0075 * math.sin(9.0 * D - 9.0 * M_prime)
+    perturbation += -0.0598 * math.sin(10.0 * D - 10.0 * M_prime)
+    perturbation += +0.0114 * math.sin(12.0 * D - 12.0 * M_prime)
+    perturbation += -0.0031 * math.sin(14.0 * D - 14.0 * M_prime)
+    perturbation += +0.0011 * math.sin(16.0 * D - 16.0 * M_prime)
+
+    # Evection phase corrections cos(kD - kM')
+    perturbation += -0.0750 * math.cos(2.0 * D - 2.0 * M_prime)
+    perturbation += -0.0013 * math.cos(3.0 * D - 3.0 * M_prime)
+    perturbation += +0.0393 * math.cos(4.0 * D - 4.0 * M_prime)
+    perturbation += -0.0061 * math.cos(8.0 * D - 8.0 * M_prime)
+    perturbation += +0.0039 * math.cos(10.0 * D - 10.0 * M_prime)
+    perturbation += -0.0023 * math.cos(6.0 * D - 6.0 * M_prime)
+    perturbation += -0.0011 * math.cos(9.0 * D - 9.0 * M_prime)
+
+    # Solar anomaly coupling (M terms)
+    perturbation += +0.4684 * E * math.sin(M)
+    perturbation += -0.9747 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
+    perturbation += +0.0935 * E * math.sin(2.0 * D - 2.0 * M_prime + M)
+    perturbation += -0.0266 * E * math.sin(D - M_prime - M)
+    perturbation += -0.0580 * E * math.sin(D - M_prime + M)
+    perturbation += +0.5348 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
+    perturbation += -0.0829 * E * math.sin(4.0 * D - 4.0 * M_prime + M)
+    perturbation += -0.2059 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
+    perturbation += +0.0586 * E * math.sin(6.0 * D - 6.0 * M_prime + M)
+
+    # Solar double coupling (E² terms)
+    perturbation += +0.0016 * E2 * math.sin(2.0 * M)
+    perturbation += -0.0390 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
+    perturbation += +0.0707 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+    perturbation += +0.0284 * E2 * math.sin(4.0 * D - 4.0 * M_prime - 2.0 * M)
 
     # Lunar anomaly harmonics
-    perturbation += +0.7216 * math.sin(M_prime)
-    perturbation += +0.0913 * math.sin(2.0 * M_prime)
-    perturbation += +0.0767 * math.sin(3.0 * M_prime)
+    perturbation += +0.0106 * math.sin(M_prime)
+    perturbation += +0.0013 * math.sin(2.0 * M_prime)
 
     # Latitude coupling
-    perturbation += +0.2219 * math.sin(2.0 * F - 2.0 * M_prime)
-    perturbation += -0.0172 * math.sin(2.0 * F - 2.0 * D)
-    perturbation += -0.0201 * math.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
+    perturbation += +0.1695 * math.sin(2.0 * F - 2.0 * M_prime)
+    perturbation += -0.0539 * math.sin(2.0 * F - 2.0 * D)
+    perturbation += -0.0258 * math.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
 
     # Cross-coupling terms
-    perturbation += +2.6062 * math.sin(2.0 * D - M_prime)
-    perturbation += +0.1043 * math.sin(2.0 * D - 3.0 * M_prime)
-    perturbation += +0.2525 * math.sin(4.0 * D - 3.0 * M_prime)
-    perturbation += +0.0908 * math.sin(2.0 * D)
-    perturbation += +0.0236 * math.sin(4.0 * D)
+    perturbation += -0.0354 * math.sin(2.0 * D - M_prime)
+    perturbation += +0.0039 * math.sin(2.0 * D - 3.0 * M_prime)
+    perturbation += +0.1551 * math.sin(4.0 * D - 3.0 * M_prime)
+    perturbation += +0.0067 * math.sin(4.0 * D - 5.0 * M_prime)
+    perturbation += -0.0024 * math.sin(2.0 * D)
+    perturbation += -0.4541 * math.sin(6.0 * D - 5.0 * M_prime)
+    perturbation += -0.0010 * math.sin(3.0 * D - 2.0 * M_prime)
+
+    # Solar-latitude cross-coupling
+    perturbation += -0.0017 * E * math.sin(2.0 * F - 2.0 * M_prime + M)
+    perturbation += -0.0098 * E * math.sin(2.0 * F - 2.0 * M_prime - M)
+    perturbation += +0.0095 * E * math.sin(2.0 * F - 2.0 * D - M)
+
+    # Higher-order evection-solar coupling
+    perturbation += +0.0376 * E * math.sin(8.0 * D - 8.0 * M_prime - M)
+    perturbation += -0.0209 * E * math.sin(8.0 * D - 8.0 * M_prime + M)
+    perturbation += -0.0066 * E * math.sin(10.0 * D - 10.0 * M_prime - M)
+
+    # Secular and long-period corrections
+    perturbation += +0.0013 * T * math.sin(M)
+    perturbation += -0.0014 * T * math.sin(D - M_prime)
+    perturbation += -0.0042 * T * math.cos(2.0 * D - 2.0 * M_prime)
+
+    # Cosine phase corrections
+    perturbation += +0.0168 * math.cos(M)
+    perturbation += +0.0217 * math.cos(2.0 * F - 2.0 * M_prime)
+
+    # Sun-Moon anomaly coupling
+    perturbation += -0.0021 * E * math.sin(M - M_prime)
+    perturbation += -0.0012 * E * math.sin(2.0 * D + M - M_prime)
 
     return perturbation
 

@@ -4,15 +4,12 @@ Tests for the ELP2000-82B perigee perturbation series.
 This module tests the accuracy and correctness of the perturbation
 series used for calculating the interpolated lunar perigee.
 
-IMPORTANT: The interpolated perigee computed from JPL DE441 (via quadratic
-regression on osculating elements) differs intrinsically from Swiss Ephemeris's
-INTP_PERG (which uses Moshier's semi-analytical method). The RMS difference
-is approximately 10-11 degrees due to the different smoothing definitions.
+The perturbation series is calibrated against JPL DE441 using
+passage-interpolated harmonic fitting (v2.2). The series alone achieves
+~2 deg RMS near J2000, and with the correction table achieves < 0.1 deg.
 
-Both approaches are scientifically valid - they answer slightly different
-questions about what "interpolated perigee" means. The JPL approach uses
-actual high-precision Moon positions, while SE uses analytical perturbation
-theory to separate short-period from long-period effects.
+The SE comparison shows ~1-2 deg RMS difference, which reflects the
+intrinsic difference between JPL-calibrated and SE analytical approaches.
 
 Tests validate:
 1. Basic functionality and reasonable output ranges
@@ -93,10 +90,11 @@ class TestELP2000PerigeePerturbationsPrecision:
         assert abs(error) < 15.0, f"Error at J2000.0: {error} deg"
 
     def test_se_comparison_intrinsic_difference(self):
-        """Verify that SE-JPL difference is in expected range (~10-11 deg RMS).
+        """Verify that SE-JPL difference is in expected range (~1-2 deg RMS).
 
-        This is NOT a test failure - it documents the intrinsic difference
-        between the two approaches to computing "interpolated perigee".
+        This documents the intrinsic difference between the JPL-calibrated
+        v2.2 perturbation series and SE's Moshier analytical method.
+        With the v2.2 calibration + correction table, this should be ~1-2 deg.
         """
         import swisseph as swe
 
@@ -115,10 +113,10 @@ class TestELP2000PerigeePerturbationsPrecision:
         rms_error = math.sqrt(sum(e**2 for e in errors) / len(errors))
         max_error = max(abs(e) for e in errors)
 
-        assert 5.0 < rms_error < 15.0, (
-            f"Expected ~10-11 deg RMS JPL-SE difference, got {rms_error:.2f} deg"
+        assert rms_error < 5.0, (
+            f"Expected < 5 deg RMS JPL-SE difference, got {rms_error:.2f} deg"
         )
-        assert max_error < 20.0, f"Max error {max_error:.2f} deg unexpectedly high"
+        assert max_error < 10.0, f"Max error {max_error:.2f} deg unexpectedly high"
 
 
 class TestELP2000PerigeePerturbationsTerms:

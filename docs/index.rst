@@ -63,8 +63,14 @@ Contents
 
    api_reference
    PRECISION
+   PRECISION_TUNING
    INTERPOLATED_APOGEE
+   interpolated_perigee_methodology
    TRUE_LILITH_METHODS
+   HOUSE_SYSTEMS
+   AYANAMSHA
+   PLANET_CENTERS_SPK
+   testing
 
 
 Indices and Tables

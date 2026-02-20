@@ -1656,17 +1656,26 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     (~25 degrees vs ~5 degrees from mean position) due to the asymmetric nature
     of solar perturbations on the lunar orbit.
 
-    This function implements a comprehensive 67-term perturbation series
-    calibrated against JPL DE441 ephemeris via least-squares fitting on
-    the range [-2000, 4000] CE.
+    This function implements a 61-term perturbation series calibrated against
+    JPL DE441 ephemeris using passage-interpolated harmonic fitting (v2.2).
+
+    **Calibration Method (v2.2):**
+
+    1. Find all perigee passages (Earth-Moon distance minima) over 1000 years
+       using JPL DE441. At each passage, the Moon's longitude IS the perigee
+       longitude (unambiguous ground truth).
+    2. Cubic spline interpolation between passages creates a smooth, continuous
+       perigee longitude curve sampled daily.
+    3. Harmonic series coefficients are fit via least-squares on 365K samples
+       spanning [1500, 2500] CE.
 
     **Key Physical Insight:**
 
     The dominant perturbation of the perigee comes from the evection term
     (2D - 2M'), which has the OPPOSITE sign compared to apogee. While the apogee
-    has a coefficient of +4.69 degrees for this term, the perigee has approximately
-    -9.62 degrees coefficient. This is because solar perturbations affect the
-    perigee much more strongly than the apogee.
+    has a coefficient of +4.69 degrees for this term, the perigee has -22.21
+    degrees. This asymmetry is because solar perturbations affect the perigee
+    much more strongly than the apogee.
 
     Note that apogee and perigee can deviate from being exactly 180 degrees
     apart by up to 28 degrees depending on Sun-Moon geometry.
@@ -1675,12 +1684,15 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     =========
 
     The perturbation series includes:
-    1. Primary evection harmonics (kD - kM') for k=1..18
-    2. Solar anomaly coupling terms (E*sin, E2*sin variants)
-    3. Lunar anomaly harmonics (sin(kM'))
-    4. Latitude coupling terms (F-dependent)
-    5. Cross-coupling terms (D, M, M', F combinations)
-    6. Secular corrections (T*sin terms)
+    1. Primary evection harmonics sin(kD - kM') for k=1..16
+    2. Evection phase corrections cos(kD - kM')
+    3. Solar anomaly coupling terms (E*sin, E²*sin variants)
+    4. Lunar anomaly harmonics (sin(kM'))
+    5. Latitude coupling terms (F-dependent)
+    6. Cross-coupling terms (D, M, M', F combinations)
+    7. Higher-order evection-solar coupling
+    8. Secular corrections (T*sin, T*cos terms)
+    9. Polynomial mean perigee corrections (const, T, T², T³)
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT).
@@ -1692,13 +1704,15 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     Precision
     =========
 
-    The trigonometric series alone has RMS ~10 degrees. Combined with the
-    precomputed residual correction table (PERIGEE_PERTURBATION_CORRECTIONS),
-    overall precision is < 0.1 degrees across the full DE441 range.
+    The trigonometric series alone has RMS ~2 degrees near J2000 (~8 degrees
+    over the full 1000-year range). Combined with the precomputed residual
+    correction table (PERIGEE_PERTURBATION_CORRECTIONS), overall precision
+    is < 0.1 degrees across the full DE441 range.
 
     References:
         - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988)
         - Chapront-Touze, M. & Chapront, J. "Lunar Tables and Programs" (1991)
+        - Park, R.S. et al. "JPL Planetary and Lunar Ephemerides DE440/DE441"
         - JPL DE441 ephemeris (calibration reference)
     """
     T = (jd_tt - 2451545.0) / 36525.0
@@ -1711,51 +1725,119 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     perturbation = 0.0
 
     # ========================================================================
-    # PRIMARY EVECTION HARMONICS (kD - kM')
+    # POLYNOMIAL MEAN PERIGEE CORRECTIONS
+    # Absorb secular drift errors in the mean perigee model (calc_mean_lilith)
     # ========================================================================
-    perturbation += +0.2808 * math.sin(D - M_prime)
-    perturbation += -9.6235 * math.sin(2.0 * D - 2.0 * M_prime)
-    perturbation += -0.0479 * math.sin(3.0 * D - 3.0 * M_prime)
-    perturbation += +0.9350 * math.sin(4.0 * D - 4.0 * M_prime)
-    perturbation += +0.0097 * math.sin(5.0 * D - 5.0 * M_prime)
-    perturbation += -0.1320 * math.sin(6.0 * D - 6.0 * M_prime)
-    perturbation += +0.0196 * math.sin(8.0 * D - 8.0 * M_prime)
+    perturbation += -0.1749
+    perturbation += -0.1411 * T
+    perturbation += -0.0140 * T * T
+    perturbation += +0.0168 * T * T * T
+
+    # ========================================================================
+    # PRIMARY EVECTION HARMONICS sin(kD - kM')
+    # ========================================================================
+    perturbation += +0.3002 * math.sin(D - M_prime)
+    perturbation += -22.2062 * math.sin(2.0 * D - 2.0 * M_prime)
+    perturbation += -0.1594 * math.sin(3.0 * D - 3.0 * M_prime)
+    perturbation += +6.4536 * math.sin(4.0 * D - 4.0 * M_prime)
+    perturbation += +0.0938 * math.sin(5.0 * D - 5.0 * M_prime)
+    perturbation += -2.2814 * math.sin(6.0 * D - 6.0 * M_prime)
+    perturbation += -0.0375 * math.sin(7.0 * D - 7.0 * M_prime)
+    perturbation += +0.4792 * math.sin(8.0 * D - 8.0 * M_prime)
+    perturbation += +0.0075 * math.sin(9.0 * D - 9.0 * M_prime)
+    perturbation += -0.0598 * math.sin(10.0 * D - 10.0 * M_prime)
+    perturbation += +0.0114 * math.sin(12.0 * D - 12.0 * M_prime)
+    perturbation += -0.0031 * math.sin(14.0 * D - 14.0 * M_prime)
+    perturbation += +0.0011 * math.sin(16.0 * D - 16.0 * M_prime)
+
+    # ========================================================================
+    # EVECTION PHASE CORRECTIONS cos(kD - kM')
+    # ========================================================================
+    perturbation += -0.0750 * math.cos(2.0 * D - 2.0 * M_prime)
+    perturbation += -0.0013 * math.cos(3.0 * D - 3.0 * M_prime)
+    perturbation += +0.0393 * math.cos(4.0 * D - 4.0 * M_prime)
+    perturbation += -0.0061 * math.cos(8.0 * D - 8.0 * M_prime)
+    perturbation += +0.0039 * math.cos(10.0 * D - 10.0 * M_prime)
+    perturbation += -0.0023 * math.cos(6.0 * D - 6.0 * M_prime)
+    perturbation += -0.0011 * math.cos(9.0 * D - 9.0 * M_prime)
 
     # ========================================================================
     # SOLAR ANOMALY COUPLING (M terms)
     # ========================================================================
-    perturbation += +0.4533 * E * math.sin(M)
-    perturbation += +0.0069 * E2 * math.sin(2.0 * M)
-    perturbation += -0.3250 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
-    perturbation += -0.0458 * E * math.sin(D - M_prime + M)
-    perturbation += +0.0650 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
-    perturbation += -0.0392 * E * math.sin(4.0 * D - 4.0 * M_prime + M)
-    perturbation += -0.0146 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
-    perturbation += -0.0071 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
-    perturbation += +0.0556 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+    perturbation += +0.4684 * E * math.sin(M)
+    perturbation += -0.9747 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
+    perturbation += +0.0935 * E * math.sin(2.0 * D - 2.0 * M_prime + M)
+    perturbation += -0.0266 * E * math.sin(D - M_prime - M)
+    perturbation += -0.0580 * E * math.sin(D - M_prime + M)
+    perturbation += +0.5348 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
+    perturbation += -0.0829 * E * math.sin(4.0 * D - 4.0 * M_prime + M)
+    perturbation += -0.2059 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
+    perturbation += +0.0586 * E * math.sin(6.0 * D - 6.0 * M_prime + M)
+
+    # ========================================================================
+    # SOLAR DOUBLE COUPLING (E² terms)
+    # ========================================================================
+    perturbation += +0.0016 * E2 * math.sin(2.0 * M)
+    perturbation += -0.0390 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
+    perturbation += +0.0707 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+    perturbation += +0.0284 * E2 * math.sin(4.0 * D - 4.0 * M_prime - 2.0 * M)
 
     # ========================================================================
     # LUNAR ANOMALY HARMONICS (M' alone)
     # ========================================================================
-    perturbation += +0.7216 * math.sin(M_prime)
-    perturbation += +0.0913 * math.sin(2.0 * M_prime)
-    perturbation += +0.0767 * math.sin(3.0 * M_prime)
+    perturbation += +0.0106 * math.sin(M_prime)
+    perturbation += +0.0013 * math.sin(2.0 * M_prime)
 
     # ========================================================================
     # LATITUDE COUPLING TERMS (F-dependent)
     # ========================================================================
-    perturbation += +0.2219 * math.sin(2.0 * F - 2.0 * M_prime)
-    perturbation += -0.0172 * math.sin(2.0 * F - 2.0 * D)
-    perturbation += -0.0201 * math.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
+    perturbation += +0.1695 * math.sin(2.0 * F - 2.0 * M_prime)
+    perturbation += -0.0539 * math.sin(2.0 * F - 2.0 * D)
+    perturbation += -0.0258 * math.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
 
     # ========================================================================
-    # CROSS-COUPLING TERMS (D, M, M', F combinations)
+    # CROSS-COUPLING TERMS (D, M' combinations)
     # ========================================================================
-    perturbation += +2.6062 * math.sin(2.0 * D - M_prime)
-    perturbation += +0.1043 * math.sin(2.0 * D - 3.0 * M_prime)
-    perturbation += +0.2525 * math.sin(4.0 * D - 3.0 * M_prime)
-    perturbation += +0.0908 * math.sin(2.0 * D)
-    perturbation += +0.0236 * math.sin(4.0 * D)
+    perturbation += -0.0354 * math.sin(2.0 * D - M_prime)
+    perturbation += +0.0039 * math.sin(2.0 * D - 3.0 * M_prime)
+    perturbation += +0.1551 * math.sin(4.0 * D - 3.0 * M_prime)
+    perturbation += +0.0067 * math.sin(4.0 * D - 5.0 * M_prime)
+    perturbation += -0.0024 * math.sin(2.0 * D)
+    perturbation += -0.4541 * math.sin(6.0 * D - 5.0 * M_prime)
+    perturbation += -0.0010 * math.sin(3.0 * D - 2.0 * M_prime)
+
+    # ========================================================================
+    # SOLAR-LATITUDE CROSS-COUPLING
+    # ========================================================================
+    perturbation += -0.0017 * E * math.sin(2.0 * F - 2.0 * M_prime + M)
+    perturbation += -0.0098 * E * math.sin(2.0 * F - 2.0 * M_prime - M)
+    perturbation += +0.0095 * E * math.sin(2.0 * F - 2.0 * D - M)
+
+    # ========================================================================
+    # HIGHER-ORDER EVECTION-SOLAR COUPLING
+    # ========================================================================
+    perturbation += +0.0376 * E * math.sin(8.0 * D - 8.0 * M_prime - M)
+    perturbation += -0.0209 * E * math.sin(8.0 * D - 8.0 * M_prime + M)
+    perturbation += -0.0066 * E * math.sin(10.0 * D - 10.0 * M_prime - M)
+
+    # ========================================================================
+    # SECULAR AND LONG-PERIOD CORRECTIONS
+    # ========================================================================
+    perturbation += +0.0013 * T * math.sin(M)
+    perturbation += -0.0014 * T * math.sin(D - M_prime)
+    perturbation += -0.0042 * T * math.cos(2.0 * D - 2.0 * M_prime)
+
+    # ========================================================================
+    # COSINE PHASE CORRECTIONS
+    # ========================================================================
+    perturbation += +0.0168 * math.cos(M)
+    perturbation += +0.0217 * math.cos(2.0 * F - 2.0 * M_prime)
+
+    # ========================================================================
+    # SUN-MOON ANOMALY COUPLING
+    # ========================================================================
+    perturbation += -0.0021 * E * math.sin(M - M_prime)
+    perturbation += -0.0012 * E * math.sin(2.0 * D + M - M_prime)
 
     return perturbation
 
