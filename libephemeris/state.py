@@ -16,12 +16,58 @@ stateful API behavior. This is thread-unsafe by design, matching SwissEph behavi
 
 import os
 import threading
-from typing import Literal, Optional, Union, overload
+from dataclasses import dataclass
+from typing import Dict, List, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
 
 from .logging_config import get_logger
+
+
+# =============================================================================
+# PRECISION TIER SYSTEM
+# =============================================================================
+
+# Three tiers with different date ranges and file sizes:
+# - base: de440s.bsp (1849-2150, ~31 MB) - lightweight, modern usage
+# - medium: de440.bsp (1549-2650, ~114 MB) - general purpose (DEFAULT)
+# - extended: de441.bsp (-13198 to +17191, ~3.1 GB) - historical research
+
+
+@dataclass(frozen=True)
+class PrecisionTier:
+    """Configuration for a precision tier."""
+
+    name: str
+    ephemeris_file: str
+    spk_date_range: Tuple[str, str]
+    description: str
+
+
+TIERS: Dict[str, PrecisionTier] = {
+    "base": PrecisionTier(
+        name="base",
+        ephemeris_file="de440s.bsp",
+        spk_date_range=("1850-01-01", "2150-01-01"),
+        description="Modern usage (1850-2150), ~31 MB",
+    ),
+    "medium": PrecisionTier(
+        name="medium",
+        ephemeris_file="de440.bsp",
+        spk_date_range=("1900-01-01", "2100-01-01"),
+        description="General purpose (1550-2650), ~114 MB",
+    ),
+    "extended": PrecisionTier(
+        name="extended",
+        ephemeris_file="de441.bsp",
+        spk_date_range=("1550-01-01", "2650-01-01"),
+        description="Extended range (-13200 to +17191), ~3.1 GB",
+    ),
+}
+
+_DEFAULT_TIER: str = "medium"
+_PRECISION_TIER_ENV_VAR: str = "LIBEPHEMERIS_PRECISION"
 
 # =============================================================================
 # GLOBAL STATE VARIABLES
@@ -37,7 +83,9 @@ _CONTEXT_SWAP_LOCK = threading.RLock()
 
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
+_EPHEMERIS_FILE_EXPLICIT: bool = False  # True if set_ephemeris_file() was called
 _EPHEMERIS_ENV_VAR = "LIBEPHEMERIS_EPHEMERIS"  # Env var for ephemeris file selection
+_PRECISION_TIER: Optional[str] = None  # Programmatic tier override
 _LOADER: Optional[Loader] = None  # Skyfield data loader
 _PLANETS: Optional[SpiceKernel] = None  # Loaded planetary ephemeris
 _PLANET_CENTERS: Optional[SpiceKernel] = None  # Planet center offsets (599, 699, etc.)
@@ -113,26 +161,148 @@ def get_timescale() -> Timescale:
     return _TS
 
 
+# =============================================================================
+# PRECISION TIER ACCESSORS
+# =============================================================================
+
+
+def _get_current_tier() -> PrecisionTier:
+    """
+    Get the current precision tier configuration.
+
+    Priority:
+        1. Programmatic override via set_precision_tier()
+        2. LIBEPHEMERIS_PRECISION environment variable
+        3. Default: "medium" (de440.bsp)
+
+    Returns:
+        PrecisionTier: The active precision tier configuration.
+    """
+    # Priority 1: programmatic override
+    if _PRECISION_TIER is not None and _PRECISION_TIER in TIERS:
+        return TIERS[_PRECISION_TIER]
+
+    # Priority 2: env var
+    env_value = os.environ.get(_PRECISION_TIER_ENV_VAR, "").lower().strip()
+    if env_value in TIERS:
+        return TIERS[env_value]
+
+    # Priority 3: default
+    return TIERS[_DEFAULT_TIER]
+
+
+def get_precision_tier() -> str:
+    """
+    Get the name of the current precision tier.
+
+    Returns:
+        str: Current tier name ("base", "medium", or "extended").
+
+    Example:
+        >>> from libephemeris.state import get_precision_tier
+        >>> get_precision_tier()  # Default
+        'medium'
+    """
+    return _get_current_tier().name
+
+
+def set_precision_tier(tier: str) -> None:
+    """
+    Set the precision tier programmatically.
+
+    This controls both the main ephemeris file and the date range used
+    for auto-downloading SPK files for minor bodies.
+
+    Args:
+        tier: Tier name ("base", "medium", or "extended").
+
+    Raises:
+        ValueError: If tier name is not valid.
+
+    Note:
+        This overrides the LIBEPHEMERIS_PRECISION environment variable.
+        Changing the tier clears cached ephemeris data to force a reload.
+
+    Example:
+        >>> from libephemeris.state import set_precision_tier, get_precision_tier
+        >>> set_precision_tier("extended")
+        >>> get_precision_tier()
+        'extended'
+    """
+    global _PRECISION_TIER, _PLANETS
+    if tier not in TIERS:
+        raise ValueError(
+            f"Invalid tier: {tier!r}. Must be one of: {list(TIERS.keys())}"
+        )
+    _PRECISION_TIER = tier
+    # Clear cached planets to force reload with the new ephemeris file
+    _PLANETS = None
+
+
+def list_tiers() -> List[PrecisionTier]:
+    """
+    List all available precision tiers.
+
+    Returns:
+        List of PrecisionTier objects with name, ephemeris_file, etc.
+    """
+    return list(TIERS.values())
+
+
+def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, str]:
+    """
+    Get the SPK date range for a tier.
+
+    This determines the date range used when auto-downloading SPK files
+    from JPL Horizons for minor bodies.
+
+    Args:
+        tier_name: Tier name, or None to use the current tier.
+
+    Returns:
+        Tuple of (start_date, end_date) in "YYYY-MM-DD" format.
+
+    Example:
+        >>> from libephemeris.state import get_spk_date_range_for_tier
+        >>> get_spk_date_range_for_tier()
+        ('1900-01-01', '2100-01-01')
+        >>> get_spk_date_range_for_tier("extended")
+        ('1550-01-01', '2650-01-01')
+    """
+    if tier_name is not None:
+        if tier_name not in TIERS:
+            raise ValueError(
+                f"Invalid tier: {tier_name!r}. Must be one of: {list(TIERS.keys())}"
+            )
+        return TIERS[tier_name].spk_date_range
+    return _get_current_tier().spk_date_range
+
+
 def _get_effective_ephemeris_file() -> str:
     """
     Determine the ephemeris file to use.
 
     Priority:
         1. LIBEPHEMERIS_EPHEMERIS environment variable (if set)
-        2. set_ephemeris_file() programmatic override
-        3. Default: "de440.bsp"
+        2. set_ephemeris_file() programmatic override (explicit call)
+        3. Precision tier setting (base/medium/extended)
+        4. Default: "de440.bsp" (medium tier)
 
     Returns:
         str: The ephemeris filename to use (e.g., "de440.bsp", "de441.bsp").
     """
+    # Priority 1: env var override
     env_value = os.environ.get(_EPHEMERIS_ENV_VAR, "").strip()
     if env_value:
         return env_value
 
-    if _EPHEMERIS_FILE != "de440.bsp":
+    # Priority 2: explicit programmatic override via set_ephemeris_file()
+    if _EPHEMERIS_FILE_EXPLICIT:
         return _EPHEMERIS_FILE
 
-    return "de440.bsp"
+    # Priority 3: precision tier
+    tier = _get_current_tier()
+    return tier.ephemeris_file
 
 
 def get_planets() -> SpiceKernel:
@@ -380,11 +550,26 @@ def set_ephe_path(path: Optional[str]) -> None:
         This sets the directory where get_planets() will look for the ephemeris
         file specified by set_ephemeris_file(). If the file is not found there,
         it will fall back to the workspace root and then download if needed.
+
+        When a valid directory is provided, any SPK files (.bsp) present in
+        it are automatically scanned and registered for known minor bodies.
+        This allows pre-downloaded SPK files to be used without manual
+        registration. No network requests are made during this scan.
     """
     global _EPHEMERIS_PATH, _PLANETS
     _EPHEMERIS_PATH = path
     # Clear cached planets to force reload from new path
     _PLANETS = None
+
+    # Auto-discover local SPK files (no network, just file scanning)
+    if path and os.path.isdir(path):
+        try:
+            from .spk_auto import discover_local_spks
+
+            discover_local_spks(path)
+        except Exception:
+            # Discovery is best-effort; don't fail set_ephe_path()
+            pass
 
 
 def set_ephemeris_file(filename: str) -> None:
@@ -401,6 +586,7 @@ def set_ephemeris_file(filename: str) -> None:
         - de430.bsp: 1550-2650 (128 MB)
         - de431.bsp: -13200-17191 (3.4 GB)
         - de440.bsp: 1550-2650 (default, 128 MB) - recommended for most uses
+        - de440s.bsp: 1849-2150 (31 MB) - lightweight
         - de441.bsp: -13200-17191 (3.4 GB) - for extended historical work
 
         The file will be searched in:
@@ -409,9 +595,13 @@ def set_ephemeris_file(filename: str) -> None:
         3. Downloaded from JPL if not found locally
 
         Changing the ephemeris file clears the cached planets and forces a reload.
+
+        This takes priority over the precision tier setting. To revert to
+        tier-based ephemeris selection, call close() to reset state.
     """
-    global _EPHEMERIS_FILE, _PLANETS
+    global _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT, _PLANETS
     _EPHEMERIS_FILE = filename
+    _EPHEMERIS_FILE_EXPLICIT = True
     # Clear cached planets to force reload with new file
     _PLANETS = None
 
@@ -700,11 +890,13 @@ def close() -> None:
         >>> close()  # Close files and reset state
         >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # Reloads ephemeris
     """
-    global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _LOADER, _PLANETS, _PLANET_CENTERS, _TS
+    global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
+    global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
     global _SPK_KERNELS, _SPK_BODY_MAP, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
+    global _PRECISION_TIER
 
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:
@@ -730,6 +922,7 @@ def close() -> None:
     # Reset all global state to initial values
     _EPHEMERIS_PATH = None
     _EPHEMERIS_FILE = "de440.bsp"
+    _EPHEMERIS_FILE_EXPLICIT = False
     _LOADER = None
     _PLANETS = None
     _PLANET_CENTERS = None
@@ -746,6 +939,7 @@ def close() -> None:
     _SPK_CACHE_DIR = None
     _SPK_DATE_PADDING = 0
     _IERS_DELTA_T_ENABLED = None
+    _PRECISION_TIER = None
 
     # Clear IERS cache
     try:

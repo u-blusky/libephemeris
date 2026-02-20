@@ -132,6 +132,13 @@ from .state import (
     # Strict precision mode
     set_strict_precision,
     get_strict_precision,
+    # Precision tier system
+    PrecisionTier,
+    TIERS,
+    set_precision_tier,
+    get_precision_tier,
+    list_tiers,
+    get_spk_date_range_for_tier,
 )
 from .iers_data import (
     # IERS data download functions
@@ -398,6 +405,10 @@ from .spk import (  # SPK kernel support for high-precision minor body calculati
     download_and_register_spk,
 )
 from . import spk_auto  # Automatic SPK download and caching
+from .spk_auto import (
+    discover_local_spks,
+    ensure_all_ephemerides,
+)
 from .minor_bodies import (  # Generic asteroid lookup by number
     calc_asteroid_by_number,
     fetch_orbital_elements_from_sbdb,
@@ -1020,6 +1031,16 @@ __all__ = [
     # Strict precision mode
     "set_strict_precision",
     "get_strict_precision",
+    # Precision tier system
+    "PrecisionTier",
+    "TIERS",
+    "set_precision_tier",
+    "get_precision_tier",
+    "list_tiers",
+    "get_spk_date_range_for_tier",
+    # SPK discovery and ensure
+    "discover_local_spks",
+    "ensure_all_ephemerides",
     # IERS data download functions
     "download_iers_finals",
     "download_leap_seconds",

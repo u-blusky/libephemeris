@@ -32,7 +32,7 @@ References:
 import hashlib
 import os
 import threading
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 from .logging_config import get_logger
 from .state import get_library_path
@@ -1584,6 +1584,296 @@ def download_spk_from_horizons(
 
     # Register the SPK body if ipl is provided
     if ipl is not None:
-        _register_spk_after_download(output_path, body_id, ipl, naif_id)
+        _register_spk_after_download(output_path, body_id_str, ipl, naif_id)
 
     return output_path
+
+
+# =============================================================================
+# LOCAL SPK DISCOVERY
+# =============================================================================
+
+
+def discover_local_spks(path: str) -> Dict[str, str]:
+    """
+    Scan a directory for SPK files and register known minor bodies.
+
+    This function reads the NAIF IDs contained in each .bsp file and
+    matches them against the bodies in SPK_BODY_NAME_MAP. Matched bodies
+    are automatically registered for use in calculations.
+
+    No network requests are made. This is a purely local file operation.
+
+    Args:
+        path: Directory path to scan for .bsp files.
+
+    Returns:
+        Dict mapping body name -> status string for each processed body.
+        Possible status values: "registered", "already_registered",
+        "error: <message>".
+
+    Example:
+        >>> from libephemeris.spk_auto import discover_local_spks
+        >>> results = discover_local_spks("/path/to/ephemeris/")
+        >>> for body, status in results.items():
+        ...     print(f"{body}: {status}")
+        Chiron: registered
+        Ceres: registered
+    """
+    from . import spk, state
+    from .constants import SPK_BODY_NAME_MAP
+
+    logger = get_logger()
+    results: Dict[str, str] = {}
+
+    if not os.path.isdir(path):
+        logger.debug("SPK discovery path does not exist: %s", path)
+        return results
+
+    # Collect all .bsp files
+    bsp_files = [f for f in os.listdir(path) if f.lower().endswith(".bsp")]
+    if not bsp_files:
+        logger.debug("No .bsp files found in %s", path)
+        return results
+
+    # Build a reverse map: naif_id -> (ipl, horizons_id, body_name)
+    naif_to_body: Dict[int, tuple] = {}
+    for ipl, (horizons_id, naif_id) in SPK_BODY_NAME_MAP.items():
+        body_name = spk._get_body_name(ipl) or horizons_id
+        naif_to_body[naif_id] = (ipl, horizons_id, body_name)
+        # Also map the Horizons convention (20000000+N)
+        # in case the file uses that instead of the 2000000+N convention
+        asteroid_number = naif_id - 2000000
+        if asteroid_number > 0:
+            horizons_naif = asteroid_number + 20000000
+            if horizons_naif not in naif_to_body:
+                naif_to_body[horizons_naif] = (ipl, horizons_id, body_name)
+
+    logger.debug(
+        "Scanning %d .bsp files in %s for known bodies...",
+        len(bsp_files),
+        path,
+    )
+
+    for bsp_file in bsp_files:
+        filepath = os.path.join(path, bsp_file)
+
+        # Read NAIF target IDs from the SPK file
+        try:
+            targets = spk._get_spk_targets(filepath)
+        except Exception:
+            continue
+
+        if not targets:
+            continue
+
+        for target_naif in targets:
+            if target_naif not in naif_to_body:
+                continue
+
+            ipl, horizons_id, body_name = naif_to_body[target_naif]
+
+            # Skip if already registered
+            if ipl in state._SPK_BODY_MAP:
+                if body_name not in results:
+                    results[body_name] = "already_registered"
+                continue
+
+            try:
+                spk.register_spk_body(ipl, filepath, target_naif)
+                results[body_name] = "registered"
+                logger.debug(
+                    "Discovered and registered %s (NAIF %d) from %s",
+                    body_name,
+                    target_naif,
+                    bsp_file,
+                )
+            except Exception as e:
+                results[body_name] = f"error: {e}"
+                logger.debug(
+                    "Failed to register %s from %s: %s",
+                    body_name,
+                    bsp_file,
+                    e,
+                )
+
+    registered_count = sum(1 for v in results.values() if v == "registered")
+    if registered_count > 0:
+        logger.info(
+            "SPK discovery: registered %d bodies from %s",
+            registered_count,
+            path,
+        )
+
+    return results
+
+
+# =============================================================================
+# ENSURE ALL EPHEMERIDES
+# =============================================================================
+
+
+def ensure_all_ephemerides(
+    force_download: bool = False,
+    show_progress: bool = True,
+) -> Dict[str, Union[str, int, dict]]:
+    """
+    Ensure all ephemeris files are present for the current precision tier.
+
+    Downloads the main ephemeris file and all minor body SPK files needed
+    for the current tier if they are not already present/registered.
+
+    This function must be called explicitly by the user. It is NOT triggered
+    automatically during library initialization or set_ephe_path().
+
+    Args:
+        force_download: If True, re-download even if files exist.
+        show_progress: If True, print progress to stdout (if interactive).
+
+    Returns:
+        Dict with summary:
+            - tier: Current tier name
+            - ephemeris: Status of the main ephemeris file
+            - spks: Dict mapping body name -> status
+            - summary: Dict with counts (cached, downloaded, fallback, errors)
+
+    Example:
+        >>> import libephemeris as eph
+        >>> eph.set_precision_tier("base")
+        >>> results = eph.ensure_all_ephemerides()
+        >>> print(f"Tier: {results['tier']}")
+        >>> print(f"Summary: {results['summary']}")
+    """
+    import sys
+
+    from . import spk, state
+    from .constants import SPK_BODY_NAME_MAP
+    from .state import _get_current_tier, get_spk_date_range_for_tier
+
+    logger = get_logger()
+    tier = _get_current_tier()
+
+    logger.info(
+        "Ensuring all ephemerides for tier '%s' (%s)",
+        tier.name,
+        tier.description,
+    )
+
+    results: Dict[str, Union[str, int, dict]] = {
+        "tier": tier.name,
+        "ephemeris": {},
+        "spks": {},
+        "summary": {
+            "total": len(SPK_BODY_NAME_MAP) + 1,
+            "cached": 0,
+            "downloaded": 0,
+            "fallback": 0,
+            "errors": 0,
+        },
+    }
+    summary = results["summary"]
+    assert isinstance(summary, dict)
+
+    # 1. Ensure main ephemeris file is available
+    logger.info("Checking main ephemeris: %s", tier.ephemeris_file)
+    eph_file = tier.ephemeris_file
+
+    # Check if the file exists in known locations
+    search_paths = []
+    if state._EPHEMERIS_PATH:
+        search_paths.append(state._EPHEMERIS_PATH)
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    search_paths.append(base_dir)
+
+    eph_found = False
+    for sp in search_paths:
+        full_path = os.path.join(sp, eph_file)
+        if os.path.exists(full_path):
+            results["ephemeris"] = {
+                "file": eph_file,
+                "status": "cached",
+                "path": full_path,
+            }
+            summary["cached"] += 1
+            eph_found = True
+            break
+
+    if not eph_found or force_download:
+        try:
+            load = state.get_loader()
+            load(eph_file)
+            results["ephemeris"] = {"file": eph_file, "status": "downloaded"}
+            summary["downloaded"] += 1
+        except Exception as e:
+            results["ephemeris"] = {"file": eph_file, "status": f"error: {e}"}
+            summary["errors"] += 1
+
+    # 2. Ensure all minor body SPKs
+    start_date, end_date = get_spk_date_range_for_tier()
+    total_spks = len(SPK_BODY_NAME_MAP)
+    spk_results: Dict[str, str] = {}
+    processed = 0
+
+    logger.info(
+        "Checking %d minor body SPKs (range %s to %s)...",
+        total_spks,
+        start_date,
+        end_date,
+    )
+
+    for ipl, (horizons_id, naif_id) in SPK_BODY_NAME_MAP.items():
+        body_name = spk._get_body_name(ipl) or horizons_id
+        processed += 1
+
+        # Show progress
+        if show_progress and sys.stdout.isatty():
+            pct = processed * 100 // total_spks
+            sys.stdout.write(
+                f"\r  SPK files: [{processed}/{total_spks}] {pct}% - {body_name:<20s}"
+            )
+            sys.stdout.flush()
+
+        # Check if already registered
+        if ipl in state._SPK_BODY_MAP and not force_download:
+            spk_results[body_name] = "cached"
+            summary["cached"] += 1
+            continue
+
+        # Try to download and register
+        try:
+            spk.download_and_register_spk(
+                body=horizons_id,
+                ipl=ipl,
+                start=start_date,
+                end=end_date,
+                overwrite=force_download,
+            )
+            spk_results[body_name] = "downloaded"
+            summary["downloaded"] += 1
+        except Exception as e:
+            # Download failed - body will use Keplerian fallback
+            spk_results[body_name] = f"fallback ({e})"
+            summary["fallback"] += 1
+            logger.debug(
+                "SPK download failed for %s, will use Keplerian fallback: %s",
+                body_name,
+                e,
+            )
+
+    if show_progress and sys.stdout.isatty():
+        sys.stdout.write(
+            f"\r  SPK files: [{total_spks}/{total_spks}] 100% - Done{'':20s}\n"
+        )
+        sys.stdout.flush()
+
+    results["spks"] = spk_results
+
+    logger.info(
+        "Ephemerides ready: %d cached, %d downloaded, %d fallback, %d errors",
+        summary["cached"],
+        summary["downloaded"],
+        summary["fallback"],
+        summary["errors"],
+    )
+
+    return results

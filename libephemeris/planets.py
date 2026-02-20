@@ -678,11 +678,12 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
     horizons_id, naif_id = SPK_BODY_NAME_MAP[ipl]
 
     try:
-        # Use a wide standard date range (1900-2100) so the downloaded SPK file
-        # is reusable across different queries without re-downloading. The file
+        # Use the date range from the current precision tier so the downloaded
+        # SPK file matches the user's configured coverage level. The file
         # is cached on disk and will be reused on subsequent calls.
-        start_date = "1900-01-01"
-        end_date = "2100-01-01"
+        from .state import get_spk_date_range_for_tier
+
+        start_date, end_date = get_spk_date_range_for_tier()
 
         body_name = spk._get_body_name(ipl) or horizons_id
         logger.info("Auto-downloading SPK for %s from JPL Horizons...", body_name)
