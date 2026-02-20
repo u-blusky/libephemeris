@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-02-20
+
+### Added
+
+#### Tier-based CLI download commands
+
+Replaced the old `init`, `init-fast`, and `download-data` CLI commands with three
+tier-aware download commands. Each command downloads all data required for its
+precision tier (ephemeris file, `planet_centers.bsp`, SPK kernels for 21 minor bodies):
+
+- `libephemeris download:base` — de440s.bsp + SPK (1850-2150)
+- `libephemeris download:medium` — de440.bsp + SPK (1900-2100)
+- `libephemeris download:extended` — de441.bsp + SPK (1600-2500)
+
+#### Programmatic tier download
+
+New `download_for_tier()` function in the public API:
+
+```python
+from libephemeris import download_for_tier
+download_for_tier("medium")
+```
+
+#### Max-range SPK download script
+
+New `scripts/download_max_range_spk.py` downloads a single SPK file per body
+covering the full JPL Horizons range (1600-2500) with `--body`, `--force`,
+`--dry-run`, `--delay` options and `[N/total]` progress display.
+
+#### Extended tier diagnostic dates
+
+Tier diagnostic scripts now generate milestone dates covering the full range
+of each tier: base (13 dates/25y), medium (22 dates/50y), extended (38 dates/800y).
+
+### Fixed
+
+#### SPK source detection in diagnostics
+
+`_get_source()` in `scripts/_tier_diagnostic.py` now checks actual SPK file
+coverage via `get_spk_coverage()` instead of assuming the tier's `spk_date_range`.
+Previously reported "SPK" for dates outside the file's actual coverage.
+
+#### `discover_local_spks()` wider-range file preference
+
+When multiple SPK files exist for the same body (e.g., different date ranges),
+`discover_local_spks()` now compares coverage spans and re-registers with the
+wider file. Previously used whichever file `os.listdir()` returned first.
+
+#### Extended tier SPK date range
+
+Fixed `spk_date_range` for the extended tier from `("1550-01-01", "2650-01-01")`
+to `("1600-01-01", "2500-01-01")` to match actual JPL Horizons limits. The old
+range caused `_try_auto_spk_download()` to request impossible ranges.
+
+### Changed
+
+- Updated README: new CLI commands section, full `poe` task reference in Development
+- `poe spk:download:extended` now runs `download_max_range_spk.py` instead of
+  the old `ensure_all_ephemerides` one-liner
+
+### Removed
+
+- `libephemeris init`, `libephemeris init-fast`, `libephemeris download-data`
+  CLI commands (replaced by `download:<tier>`)
+
 ## [0.14.0] - 2026-02-18
 
 ### Fixed
@@ -702,7 +767,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/g-battaglia/libephemeris/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/g-battaglia/libephemeris/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/g-battaglia/libephemeris/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/g-battaglia/libephemeris/compare/v0.11.0...v0.12.0
