@@ -49,6 +49,28 @@ poe typecheck                     # Run mypy type checking
 - `unit` / `integration` - Test categories
 - `precision` / `comparison` / `edge_case` - Specialized tests
 
+### Important: Never Run the Full Test Suite
+**Do NOT run `poe test` or `poe test:full` during development.** The full suite is
+too large and slow. Always run targeted tests for the area you changed:
+
+```bash
+# Run a single test file
+pytest tests/test_lunar/test_elp2000_perigee_perturbations.py -v
+
+# Run a specific test class
+pytest tests/test_lunar/test_file.py::TestClassName -v
+
+# Run by marker or keyword
+pytest -k "perigee" -v
+pytest -m "unit" tests/test_lunar/ -v
+
+# Feature-specific suites (use these instead of poe test)
+poe test:lunar              # All lunar tests (no slow)
+poe test:lunar:perigee      # Perigee tests only
+poe test:lunar:apogee       # Apogee tests only
+poe test:lunar:lilith       # Lilith tests only
+```
+
 ## Code Style Guidelines
 
 ### Imports
@@ -181,9 +203,11 @@ When modifying the perigee perturbation series, follow this order:
 
 1. **Calibrate**: `poe calibrate-perigee` (or `poe calibrate-perigee:quick` for validation)
 2. **Apply**: paste new coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
-3. **Sync**: update the matching series in `scripts/generate_lunar_corrections.py`
-4. **Regenerate**: `poe generate-lunar-corrections` (regenerates `lunar_corrections.py`)
-5. **Test**: `poe test:lunar:perigee`
+3. **Regenerate**: `poe generate-lunar-corrections` (regenerates `lunar_corrections.py`)
+4. **Test**: `poe test:lunar:perigee`
+
+Note: `generate_lunar_corrections.py` imports the perturbation series directly from
+`lunar.py`, so there is no manual sync step needed.
 
 See `docs/interpolated_perigee_methodology.md` for the full methodology.
 

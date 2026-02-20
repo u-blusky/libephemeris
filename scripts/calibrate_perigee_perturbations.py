@@ -12,7 +12,7 @@ Method (v2.2 - Passage-Interpolated Harmonic Fit):
        continuous perigee longitude curve
     3. Sample the spline daily to get ~365K clean "interpolated perigee" values
     4. Compute perturbation = interpolated_perigee - mean_perigee
-    5. Fit 89-term harmonic series via least-squares
+     5. Fit 120-term harmonic series via least-squares
 
     This avoids both failure modes:
     - v2.0 (raw osculating): noise was correlated with design matrix terms
@@ -41,12 +41,7 @@ import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from multiprocessing import cpu_count
-from typing import TYPE_CHECKING
-
 import numpy as np
-
-if TYPE_CHECKING:
-    pass
 
 # =============================================================================
 # DEFAULT PARAMETERS
@@ -164,12 +159,12 @@ def compute_fundamental_arguments(
 
 
 # =============================================================================
-# 89-TERM DESIGN MATRIX
+# 120-TERM DESIGN MATRIX
 # =============================================================================
 
 
 def build_design_vector(jd_tt: float) -> list[float]:
-    """Build the 89-term design vector for the harmonic fit."""
+    """Build the 120-term design vector for the harmonic fit."""
     D, M, M_prime, F = compute_fundamental_arguments(jd_tt)
     T = (jd_tt - 2451545.0) / 36525.0
     E = 1.0 - 0.002516 * T - 0.0000074 * T**2
@@ -300,7 +295,7 @@ def build_design_vector(jd_tt: float) -> list[float]:
 
 
 def get_term_labels() -> list[str]:
-    """Get human-readable labels for all 89 terms."""
+    """Get human-readable labels for all 120 terms."""
     labels = []
     for k in range(1, 21):
         labels.append(f"sin({k}D-{k}M')")
@@ -642,7 +637,7 @@ def setup_ephemeris(ephemeris: str) -> bool:
 
 
 def get_term_code_expressions() -> list[tuple[str, str, str]]:
-    """Get (category, label, code_expression) for all 89 terms."""
+    """Get (category, label, code_expression) for all 120 terms."""
     terms = []
 
     cat = "PRIMARY EVECTION HARMONICS sin(kD - kM')"
