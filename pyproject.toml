@@ -117,6 +117,7 @@ test = "pytest -m \"not slow\""
 "test:full" = "pytest"
 "test:progress" = "pytest --no-header -q -m \"not slow\""
 "test:fast" = "pytest -n auto -m \"not slow\""
+"test:full:fast" = "pytest -n auto"
 
 # Essential subset - 1 test file per library module, parallel (~490 tests vs ~5000 total)
 # Covers: planets, houses, eclipse, lunar, fixed_stars, minor_bodies, hypothetical,
