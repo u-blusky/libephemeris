@@ -423,11 +423,14 @@ def generate_tier_spk(
     return output_path
 
 
-def verify_spk(output_path: str) -> None:
+def verify_spk(output_path: str, leapseconds_path: str) -> None:
     """Verify the generated SPK file."""
     import spiceypy as spice
 
     print(f"\n=== Verification ===\n")
+
+    # Load leap seconds kernel for time conversions
+    spice.furnsh(leapseconds_path)
 
     file_size = os.path.getsize(output_path)
     print(f"  Output file: {output_path}")
@@ -470,8 +473,9 @@ def generate_for_tier(
     output_path = str(output_dir / TIER_OUTPUT[tier])
     result = generate_tier_spk(tier, source_files, output_path, cache_dir)
 
-    # Verify
-    verify_spk(result)
+    # Verify (leap seconds kernel is in cache_dir)
+    leapseconds_path = os.path.join(cache_dir, "naif0012.tls")
+    verify_spk(result, leapseconds_path)
 
     return result
 
