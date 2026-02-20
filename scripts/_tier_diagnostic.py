@@ -200,7 +200,7 @@ def _format_dms(deg: float) -> str:
 def _get_source(ipl: int, tier_name: str) -> str:
     """Determine the data source used for a body calculation.
 
-    Returns one of: "DE440s", "DE440", "DE441", "Analytical", "SPK", "Keplerian".
+    Returns one of: "DE440s", "DE440", "DE441", "Analytical", "SPK", "ASSIST", "Keplerian".
     """
     if ipl in MAJOR_IPLS:
         eph_file = TIERS[tier_name].ephemeris_file
@@ -209,6 +209,14 @@ def _get_source(ipl: int, tier_name: str) -> str:
         return "Analytical"
     if ipl in state._SPK_BODY_MAP:
         return "SPK"
+    # Check if ASSIST would be used as fallback
+    try:
+        from libephemeris.rebound_integration import check_assist_available
+
+        if check_assist_available():
+            return "ASSIST"
+    except ImportError:
+        pass
     return "Keplerian"
 
 
@@ -392,6 +400,11 @@ def _parse_cli_args() -> argparse.Namespace:
         action="store_true",
         help="Omit equatorial coordinates (narrower table)",
     )
+    parser.add_argument(
+        "--download",
+        action="store_true",
+        help="Download all SPK files before computing (requires network)",
+    )
     return parser.parse_args()
 
 
@@ -431,7 +444,14 @@ def run_diagnostic(tier_name: str) -> None:
     eph.close()
     set_precision_tier(tier_name)
     eph.set_strict_precision(False)
-    eph.set_auto_spk_download(False)
+
+    if args.download:
+        eph.set_auto_spk_download(True)
+        print("  Downloading SPK files for all minor bodies...")
+        eph.ensure_all_ephemerides(show_progress=True)
+        print()
+    else:
+        eph.set_auto_spk_download(False)
 
     # Discover local SPK files
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

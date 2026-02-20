@@ -1175,6 +1175,120 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     )
 
 
+def _keplerian_position_at(
+    jd_tt: float, ipl: int, iflag: int, planets_dict
+) -> Tuple[float, float, float]:
+    """Compute ecliptic position of a minor body via Keplerian fallback.
+
+    Returns (lon, lat, dist) in ecliptic coordinates, either heliocentric
+    or geocentric depending on iflag.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time.
+        ipl: Minor body ID (SE_CHIRON, SE_CERES, etc.).
+        iflag: Calculation flags (SEFLG_HELCTR checked).
+        planets_dict: Skyfield planets dict from get_planets().
+
+    Returns:
+        Tuple of (longitude_deg, latitude_deg, distance_au).
+    """
+    from . import minor_bodies
+    from .state import get_timescale
+
+    lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(ipl, jd_tt)
+
+    if iflag & SEFLG_HELCTR:
+        return lon_hel, lat_hel, r_hel
+
+    # Convert heliocentric ecliptic spherical to Cartesian
+    lon_rad = math.radians(lon_hel)
+    lat_rad = math.radians(lat_hel)
+    x_hel_ecl = r_hel * math.cos(lat_rad) * math.cos(lon_rad)
+    y_hel_ecl = r_hel * math.cos(lat_rad) * math.sin(lon_rad)
+    z_hel_ecl = r_hel * math.sin(lat_rad)
+
+    # Get Earth position in ecliptic frame
+    ts = get_timescale()
+    t = ts.tt_jd(jd_tt)
+    earth = planets_dict["earth"]
+    sun = planets_dict["sun"]
+    earth_helio = sun.at(t).observe(earth)
+    earth_xyz_ecl = earth_helio.frame_xyz(ecliptic_frame).au
+
+    # Geocentric = minor body heliocentric - Earth heliocentric
+    x_geo_ecl = x_hel_ecl - earth_xyz_ecl[0]
+    y_geo_ecl = y_hel_ecl - earth_xyz_ecl[1]
+    z_geo_ecl = z_hel_ecl - earth_xyz_ecl[2]
+
+    # Convert geocentric Cartesian back to spherical
+    r_geo = math.sqrt(x_geo_ecl**2 + y_geo_ecl**2 + z_geo_ecl**2)
+    lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
+    lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
+
+    return lon, lat, r_geo
+
+
+def _assist_position_at(
+    jd_tt: float, ipl: int, iflag: int, planets_dict
+) -> Tuple[float, float, float]:
+    """Compute ecliptic position of a minor body via ASSIST N-body integration.
+
+    Returns (lon, lat, dist) in ecliptic coordinates, either heliocentric
+    or geocentric depending on iflag.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time.
+        ipl: Minor body ID (SE_CHIRON, SE_CERES, etc.).
+        iflag: Calculation flags (SEFLG_HELCTR checked).
+        planets_dict: Skyfield planets dict from get_planets().
+
+    Returns:
+        Tuple of (longitude_deg, latitude_deg, distance_au).
+
+    Raises:
+        ImportError: If ASSIST/REBOUND not installed.
+        FileNotFoundError: If ephemeris data files not found.
+    """
+    from . import minor_bodies
+    from .rebound_integration import propagate_orbit_assist, AssistEphemConfig
+    from .state import get_timescale
+
+    elements = minor_bodies.MINOR_BODY_ELEMENTS[ipl]
+    jd_start = elements.epoch
+
+    result = propagate_orbit_assist(elements, jd_start, jd_tt)
+
+    lon_hel = result.ecliptic_lon
+    lat_hel = result.ecliptic_lat
+    r_hel = result.distance
+
+    if iflag & SEFLG_HELCTR:
+        return lon_hel, lat_hel, r_hel
+
+    ts = get_timescale()
+    t = ts.tt_jd(jd_tt)
+    sun = planets_dict["sun"]
+    earth = planets_dict["earth"]
+    earth_helio = sun.at(t).observe(earth)
+    earth_xyz_ecl = earth_helio.frame_xyz(ecliptic_frame).au
+
+    lon_rad = math.radians(lon_hel)
+    lat_rad = math.radians(lat_hel)
+    x_hel_ecl = r_hel * math.cos(lat_rad) * math.cos(lon_rad)
+    y_hel_ecl = r_hel * math.cos(lat_rad) * math.sin(lon_rad)
+    z_hel_ecl = r_hel * math.sin(lat_rad)
+
+    x_geo_ecl = x_hel_ecl - earth_xyz_ecl[0]
+    y_geo_ecl = y_hel_ecl - earth_xyz_ecl[1]
+    z_geo_ecl = z_hel_ecl - earth_xyz_ecl[2]
+
+    r_geo = math.sqrt(x_geo_ecl**2 + y_geo_ecl**2 + z_geo_ecl**2)
+    lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
+    lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
+
+    return lon, lat, r_geo
+
+
 def _calc_body(
     t, ipl: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -1493,52 +1607,71 @@ def _calc_body(
             body_name = spk._get_body_name(ipl) or str(ipl)
             raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
 
-        # Fallback to Keplerian approximation
         jd_tt = t.tt
-        # Get heliocentric position in ecliptic coordinates
-        lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(ipl, jd_tt)
 
-        # Convert to geocentric if not heliocentric flag
-        if not (iflag & SEFLG_HELCTR):
-            # Convert heliocentric ecliptic spherical to Cartesian
-            lon_rad = math.radians(lon_hel)
-            lat_rad = math.radians(lat_hel)
-            x_hel_ecl = r_hel * math.cos(lat_rad) * math.cos(lon_rad)
-            y_hel_ecl = r_hel * math.cos(lat_rad) * math.sin(lon_rad)
-            z_hel_ecl = r_hel * math.sin(lat_rad)
+        # Try ASSIST N-body integration fallback if available
+        try:
+            from .rebound_integration import check_assist_available
 
-            # Get Earth position and convert from ICRS to ecliptic frame
-            # Using Skyfield's rigorous frame conversion with true obliquity of date
-            earth = planets["earth"]
-            sun = planets["sun"]
-            earth_bary = earth.at(t)
+            if check_assist_available():
+                lon, lat, dist = _assist_position_at(jd_tt, ipl, iflag, planets)
 
-            # For geocentric minor body, we need heliocentric Earth
-            # Earth relative to Sun in ecliptic frame
-            earth_helio = sun.at(t).observe(earth)
-            earth_xyz_ecl = earth_helio.frame_xyz(ecliptic_frame).au
+                speed_lon = 0.0
+                speed_lat = 0.0
+                speed_dist = 0.0
+                if iflag & SEFLG_SPEED:
+                    dt = 1.0 / 86400.0
+                    lon_prev, lat_prev, dist_prev = _assist_position_at(
+                        jd_tt - dt, ipl, iflag, planets
+                    )
+                    lon_next, lat_next, dist_next = _assist_position_at(
+                        jd_tt + dt, ipl, iflag, planets
+                    )
+                    speed_lon = (lon_next - lon_prev) / (2.0 * dt)
+                    speed_lat = (lat_next - lat_prev) / (2.0 * dt)
+                    speed_dist = (dist_next - dist_prev) / (2.0 * dt)
 
-            # Geocentric position: minor body heliocentric - Earth heliocentric
-            x_geo_ecl = x_hel_ecl - earth_xyz_ecl[0]
-            y_geo_ecl = y_hel_ecl - earth_xyz_ecl[1]
-            z_geo_ecl = z_hel_ecl - earth_xyz_ecl[2]
+                    if speed_lon > 180.0 / (2.0 * dt):
+                        speed_lon -= 360.0 / (2.0 * dt)
+                    if speed_lon < -180.0 / (2.0 * dt):
+                        speed_lon += 360.0 / (2.0 * dt)
 
-            # Convert geocentric Cartesian back to spherical
-            r_geo = math.sqrt(x_geo_ecl**2 + y_geo_ecl**2 + z_geo_ecl**2)
-            lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
-            lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
+                return _to_native_floats(
+                    _maybe_equatorial_convert(
+                        (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
+                    )
+                ), iflag
+        except Exception:
+            pass
 
-            return _to_native_floats(
-                _maybe_equatorial_convert(
-                    (lon, lat, r_geo, 0.0, 0.0, 0.0), jd_tt, iflag
-                )
-            ), iflag
-        else:
-            return _to_native_floats(
-                _maybe_equatorial_convert(
-                    (lon_hel, lat_hel, r_hel, 0.0, 0.0, 0.0), jd_tt, iflag
-                )
-            ), iflag
+        # Keplerian as last resort
+        lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
+
+        speed_lon = 0.0
+        speed_lat = 0.0
+        speed_dist = 0.0
+        if iflag & SEFLG_SPEED:
+            dt = 1.0 / 86400.0
+            lon_prev, lat_prev, dist_prev = _keplerian_position_at(
+                jd_tt - dt, ipl, iflag, planets
+            )
+            lon_next, lat_next, dist_next = _keplerian_position_at(
+                jd_tt + dt, ipl, iflag, planets
+            )
+            speed_lon = (lon_next - lon_prev) / (2.0 * dt)
+            speed_lat = (lat_next - lat_prev) / (2.0 * dt)
+            speed_dist = (dist_next - dist_prev) / (2.0 * dt)
+
+            if speed_lon > 180.0 / (2.0 * dt):
+                speed_lon -= 360.0 / (2.0 * dt)
+            if speed_lon < -180.0 / (2.0 * dt):
+                speed_lon += 360.0 / (2.0 * dt)
+
+        return _to_native_floats(
+            _maybe_equatorial_convert(
+                (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
+            )
+        ), iflag
 
     # Handle fixed stars
     if ipl in fixed_stars.FIXED_STARS:

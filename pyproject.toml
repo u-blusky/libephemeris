@@ -156,6 +156,12 @@ test = "pytest -m \"not slow\""
 "diag:base" = "python scripts/tier_diagnostic_base.py"
 "diag:medium" = "python scripts/tier_diagnostic_medium.py"
 "diag:extended" = "python scripts/tier_diagnostic_extended.py"
+"diag:download" = "python -c \"import libephemeris as eph; eph.ensure_all_ephemerides(show_progress=True)\""
+
+# Tier-specific SPK downloads for minor bodies
+"spk:download:base" = "python -c \"import libephemeris as eph; eph.set_precision_tier('base'); eph.ensure_all_ephemerides(show_progress=True)\""
+"spk:download:medium" = "python -c \"import libephemeris as eph; eph.set_precision_tier('medium'); eph.ensure_all_ephemerides(show_progress=True)\""
+"spk:download:extended" = "python -c \"import libephemeris as eph; eph.set_precision_tier('extended'); eph.ensure_all_ephemerides(show_progress=True)\""
 
 # SPK generation (requires spiceypy, downloads ~500MB temporarily)
 "generate-planet-centers-spk" = "python scripts/generate_planet_centers_spk.py"
