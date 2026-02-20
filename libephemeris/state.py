@@ -89,6 +89,7 @@ _PRECISION_TIER: Optional[str] = None  # Programmatic tier override
 _LOADER: Optional[Loader] = None  # Skyfield data loader
 _PLANETS: Optional[SpiceKernel] = None  # Loaded planetary ephemeris
 _PLANET_CENTERS: Optional[SpiceKernel] = None  # Planet center offsets (599, 699, etc.)
+_PLANET_CENTERS_TIER: Optional[str] = None  # Tier of loaded planet_centers file
 _TS: Optional[Timescale] = None  # Timescale object
 _TOPO: Optional[Topos] = None  # Observer location
 _SIDEREAL_MODE: Optional[int] = None  # Active sidereal mode ID
@@ -358,47 +359,74 @@ def get_planets() -> SpiceKernel:
 
 def get_planet_centers() -> Optional[SpiceKernel]:
     """
-    Get or load the planet centers SPK file (if available).
+    Get or load the planet centers SPK file for the active tier.
 
     This file contains precise offsets from system barycenters to planet centers
     for Jupiter (599), Saturn (699), Uranus (799), Neptune (899), and Pluto (999).
+
+    The function loads the appropriate file for the current precision tier:
+    - base: planet_centers_base.bsp (1850-2150)
+    - medium: planet_centers_medium.bsp (1550-2650)
+    - extended: planet_centers_extended.bsp (extended range, partial coverage)
+
+    Falls back to legacy planet_centers.bsp if tier-specific file not found.
 
     Returns:
         SpiceKernel containing planet center segments, or None if not available.
 
     Note:
-        The planet_centers.bsp file is generated using the
-        scripts/generate_planet_centers_spk.py script and provides <0.001 arcsec
+        The planet_centers files are generated using the
+        scripts/generate_planet_centers_spk.py script and provide <0.001 arcsec
         precision for planet center positions.
     """
-    global _PLANET_CENTERS
-    if _PLANET_CENTERS is None:
-        # Try to find planet_centers.bsp in the data directory
-        data_dir = os.path.join(os.path.dirname(__file__), "data")
-        centers_path = os.path.join(data_dir, "planet_centers.bsp")
+    global _PLANET_CENTERS, _PLANET_CENTERS_TIER
 
-        if os.path.exists(centers_path):
-            load = get_loader()
-            try:
-                _PLANET_CENTERS = load(centers_path)
-            except Exception:
-                # If loading fails, return None (fall back to barycenter)
-                pass
+    current_tier = get_precision_tier()
+
+    # Reload if tier changed or not loaded
+    if _PLANET_CENTERS is None or _PLANET_CENTERS_TIER != current_tier:
+        _PLANET_CENTERS = None
+        _PLANET_CENTERS_TIER = None
+
+        workspace_root = os.path.join(os.path.dirname(__file__), "..")
+        data_dir = os.path.join(os.path.dirname(__file__), "data")
+
+        # Search order: tier-specific in workspace root → legacy in workspace root → bundled
+        candidates = [
+            os.path.join(workspace_root, f"planet_centers_{current_tier}.bsp"),
+            os.path.join(workspace_root, "planet_centers.bsp"),
+            os.path.join(data_dir, "planet_centers.bsp"),
+        ]
+
+        load = get_loader()
+
+        for path in candidates:
+            if os.path.exists(path):
+                try:
+                    _PLANET_CENTERS = load(path)
+                    _PLANET_CENTERS_TIER = current_tier
+                    break
+                except Exception:
+                    pass
+
     return _PLANET_CENTERS
 
 
-def get_planet_center_segment(naif_id: int):
+def get_planet_center_segment(naif_id: int, jd: Optional[float] = None):
     """
-    Get a planet center segment from the planet_centers.bsp file.
+    Get a planet center segment from the planet_centers SPK file.
 
     This returns a Skyfield segment that can be used with .at(t) to get
     the position of the planet center relative to its system barycenter.
 
     Args:
         naif_id: NAIF ID of the planet center (599, 699, 799, 899, or 999)
+        jd: Optional Julian Date to check coverage. If provided and the date
+            is outside the segment's coverage, returns None (triggers fallback).
 
     Returns:
-        Skyfield ChebyshevPosition segment, or None if not available.
+        Skyfield ChebyshevPosition segment, or None if not available or
+        if jd is outside the segment's coverage.
 
     Example:
         >>> seg = get_planet_center_segment(599)  # Jupiter center
@@ -411,6 +439,16 @@ def get_planet_center_segment(naif_id: int):
 
     for seg in centers.segments:
         if seg.target == naif_id:
+            # If jd provided, check coverage
+            if jd is not None:
+                try:
+                    start_jd = getattr(seg, "start_jd", None)
+                    end_jd = getattr(seg, "end_jd", None)
+                    if start_jd is not None and end_jd is not None:
+                        if not (start_jd <= jd <= end_jd):
+                            return None  # Outside coverage, trigger fallback
+                except Exception:
+                    pass  # If we can't check coverage, return segment anyway
             return seg
     return None
 

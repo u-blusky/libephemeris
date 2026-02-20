@@ -39,11 +39,31 @@ GITHUB_RELEASES_BASE = (
 
 # Data file definitions: (filename, sha256 hash, description)
 DATA_FILES = {
+    # Legacy single file (kept for backward compatibility)
     "planet_centers.bsp": {
         "url": f"{GITHUB_RELEASES_BASE}/planet_centers.bsp",
         "sha256": None,  # Will be set after first release
         "size_mb": 25.4,
         "description": "Precise planet center positions for Jupiter, Saturn, Uranus, Neptune, Pluto (1989-2049)",
+    },
+    # Tier-specific files
+    "planet_centers_base.bsp": {
+        "url": f"{GITHUB_RELEASES_BASE}/planet_centers_base.bsp",
+        "sha256": None,
+        "size_mb": 18.0,
+        "description": "Planet centers for 'base' tier (1850-2150)",
+    },
+    "planet_centers_medium.bsp": {
+        "url": f"{GITHUB_RELEASES_BASE}/planet_centers_medium.bsp",
+        "sha256": None,
+        "size_mb": 45.0,
+        "description": "Planet centers for 'medium' tier (1550-2650)",
+    },
+    "planet_centers_extended.bsp": {
+        "url": f"{GITHUB_RELEASES_BASE}/planet_centers_extended.bsp",
+        "sha256": None,
+        "size_mb": 90.0,
+        "description": "Planet centers for 'extended' tier (partial -12000 to +17000)",
     },
 }
 
@@ -374,10 +394,16 @@ def check_data_status() -> dict[str, dict]:
         - description: str
     """
     data_dir = get_data_dir()
+    workspace_root = Path(__file__).parent.parent
     status = {}
 
     for filename, info in DATA_FILES.items():
-        path = data_dir / filename
+        # Tier-specific files are in workspace root, legacy in data dir
+        if filename.startswith("planet_centers_"):
+            path = workspace_root / filename
+        else:
+            path = data_dir / filename
+
         exists = path.exists()
         status[filename] = {
             "exists": exists,
@@ -392,21 +418,48 @@ def check_data_status() -> dict[str, dict]:
 
 def print_data_status():
     """Print the status of all data files to stdout."""
+    from .state import get_precision_tier
+
     status = check_data_status()
+    current_tier = get_precision_tier()
 
     print("libephemeris data files:")
     print()
 
-    for filename, info in status.items():
+    # Show tier-specific planet_centers first
+    tier_files = [
+        "planet_centers_base.bsp",
+        "planet_centers_medium.bsp",
+        "planet_centers_extended.bsp",
+    ]
+    for filename in tier_files:
+        if filename not in status:
+            continue
+        info = status[filename]
+        tier_name = filename.replace("planet_centers_", "").replace(".bsp", "")
+        marker = " *" if tier_name == current_tier else ""
         if info["exists"]:
             size_str = _format_size(info["size"])
-            print(f"  [OK] {filename} ({size_str})")
+            print(f"  [OK] {filename} ({size_str}){marker}")
             print(f"        {info['description']}")
         else:
-            print(f"  [--] {filename} (not installed)")
+            print(f"  [--] {filename} (not installed){marker}")
             print(f"        {info['description']}")
-            print(f"        Expected size: ~{info['expected_size_mb']:.1f} MB")
 
+    # Show legacy planet_centers.bsp
+    legacy_file = "planet_centers.bsp"
+    if legacy_file in status:
+        info = status[legacy_file]
+        print()
+        if info["exists"]:
+            size_str = _format_size(info["size"])
+            print(f"  [OK] {legacy_file} ({size_str}) - legacy")
+            print(f"        {info['description']}")
+        else:
+            print(f"  [--] {legacy_file} (not installed) - legacy")
+
+    print()
+    print(f"Current tier: {current_tier}")
     print()
     print("Run 'libephemeris download:<tier>' to download all data files.")
     print("Available tiers: base, medium, extended")
@@ -699,22 +752,23 @@ def download_for_tier(
     # Activate the tier so ensure_all_ephemerides uses the right config
     set_precision_tier(tier_name)
 
-    # Step 1: planet_centers.bsp (same for all tiers)
+    # Step 1: planet_centers file for this tier (workspace root)
     if not quiet:
-        print("Step 1/2: planet_centers.bsp precision data")
+        print("Step 1/2: planet_centers precision data")
 
     try:
-        download_planet_centers(
+        _download_planet_centers_for_tier(
+            tier_name=tier_name,
             force=force,
             show_progress=show_progress,
             quiet=quiet,
         )
         if not quiet:
-            print("  [OK] planet_centers.bsp ready")
+            print("  [OK] planet_centers ready")
             print()
     except Exception as e:
         if not quiet:
-            print(f"  [WARN] planet_centers.bsp: {e}", file=sys.stderr)
+            print(f"  [WARN] planet_centers: {e}", file=sys.stderr)
             print("  (non-critical, continuing...)")
             print()
 
@@ -745,3 +799,91 @@ def download_for_tier(
                 print(f"  SPK errors:   {summary['errors']}")
 
     return results
+
+
+def _download_planet_centers_for_tier(
+    tier_name: str,
+    force: bool = False,
+    show_progress: bool = True,
+    quiet: bool = False,
+) -> Path:
+    """Download planet_centers SPK file for a specific tier.
+
+    Saves to workspace root (same location as de440.bsp, de441.bsp).
+
+    Args:
+        tier_name: One of "base", "medium", "extended"
+        force: If True, re-download even if file exists
+        show_progress: If True, show progress bar
+        quiet: If True, suppress output
+
+    Returns:
+        Path to the downloaded file
+
+    Raises:
+        Exception: If download fails
+    """
+    import urllib.request
+
+    filename = f"planet_centers_{tier_name}.bsp"
+    file_info = DATA_FILES.get(filename)
+
+    if file_info is None:
+        raise ValueError(f"No planet_centers file for tier '{tier_name}'")
+
+    # Save to workspace root (parent of libephemeris package)
+    workspace_root = Path(__file__).parent.parent
+    dest_path = workspace_root / filename
+
+    if dest_path.exists() and not force:
+        if not quiet:
+            print(f"  {filename} already exists at {dest_path}")
+        return dest_path
+
+    url = file_info["url"]
+    expected_size_mb = file_info.get("size_mb", 50)
+
+    if not quiet:
+        print(f"  Downloading {filename} (~{expected_size_mb:.0f} MB)...")
+
+    # Get file size
+    total_size = 0
+    try:
+        req = urllib.request.Request(url, method="HEAD")
+        with urllib.request.urlopen(req, timeout=30) as response:
+            total_size = int(response.headers.get("Content-Length", 0))
+    except Exception:
+        pass
+
+    # Download with progress
+    downloaded = 0
+    chunk_size = 1024 * 1024
+
+    with urllib.request.urlopen(url, timeout=300) as response:
+        with open(dest_path, "wb") as f:
+            if show_progress and total_size > 0 and not quiet:
+                progress = SimpleProgressBar(total_size, f"  {filename}")
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    progress.update(len(chunk))
+                print()  # Newline after progress bar
+            else:
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if not quiet:
+                        print(
+                            f"\r  Downloaded {downloaded / 1024 / 1024:.1f} MB", end=""
+                        )
+
+    if not quiet:
+        print(f"  Downloaded to {dest_path}")
+
+    return dest_path

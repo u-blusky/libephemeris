@@ -59,6 +59,18 @@ GM_SATURN_MOONS_TOTAL: float = (
 # Neptune's moons (NEP097)
 GM_TRITON: float = 1428.49546
 
+# Uranus' major moons (URA111 / GUST86)
+GM_ARIEL: float = 14.0
+GM_UMBRIEL: float = 13.0
+GM_TITANIA: float = 41.0
+GM_OBERON: float = 29.0
+GM_MIRANDA: float = 0.7
+
+# Total Uranus major moons GM
+GM_URANUS_MOONS_TOTAL: float = (
+    GM_ARIEL + GM_UMBRIEL + GM_TITANIA + GM_OBERON + GM_MIRANDA
+)
+
 # Pluto's moons (PLU060)
 GM_CHARON: float = 106.1
 
@@ -156,6 +168,7 @@ def get_cob_offset(
     Notes:
         - For Jupiter: uses Galilean moon positions (E5/Meeus theory)
         - For Saturn: uses TASS 1.7 theory (primarily Titan)
+        - For Uranus: uses Keplerian elements for 5 major moons
         - For Neptune: uses Triton Keplerian elements
         - For Pluto: uses Charon 2-body solution
         - For other planets: returns (0, 0, 0)
@@ -170,6 +183,8 @@ def get_cob_offset(
         return _jupiter_cob_offset(jd)
     elif name_lower == "saturn":
         return _saturn_cob_offset(jd)
+    elif name_lower == "uranus":
+        return _uranus_cob_offset(jd)
     elif name_lower == "neptune":
         return _neptune_cob_offset(jd)
     elif name_lower in ("pluto", "pluto barycenter"):
@@ -248,6 +263,20 @@ def _saturn_cob_offset(jd: float) -> Tuple[float, float, float]:
 
     # COB offset = -barycenter offset
     return (-bary_x, -bary_y, -bary_z)
+
+
+def _uranus_cob_offset(jd: float) -> Tuple[float, float, float]:
+    """
+    Calculate Uranus COB offset using Keplerian elements for major moons.
+
+    Titania and Oberon dominate (~77% of moon mass), but we include all 5
+    major moons for better accuracy.
+
+    Precision: ~100-200 km (~0.005-0.01 arcsec at Uranus opposition)
+    """
+    from .uranian import uranus_cob_offset
+
+    return uranus_cob_offset(jd)
 
 
 def _neptune_cob_offset(jd: float) -> Tuple[float, float, float]:
