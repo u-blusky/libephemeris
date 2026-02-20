@@ -40,11 +40,13 @@ pip install libephemeris
 
 DE440 (~128 MB) downloads automatically on first use.
 
-Optional data for outer-planet center corrections:
+Download all data files for your use case (ephemeris + SPK kernels):
 
 ```bash
-libephemeris download-data
+libephemeris download:medium      # recommended for most users
 ```
+
+See [CLI commands](#cli-commands) for all options and tiers.
 
 ### Optional extras
 
@@ -249,14 +251,59 @@ For batch workloads, use `EphemerisContext`, parallelism, and caching.
 git clone https://github.com/g-battaglia/libephemeris.git
 cd libephemeris
 uv pip install -e ".[dev]"
-
-poe test           # fast tests
-poe test:full      # all tests
-poe lint           # ruff check --fix
-poe format         # ruff format
-poe typecheck      # mypy
-poe coverage       # pytest with coverage
 ```
+
+All development tasks use [poethepoet](https://poethepoet.naberhaus.dev/) (`poe`).
+
+### Code quality
+
+| Command | Description |
+|---------|-------------|
+| `poe format` | Format code with Ruff |
+| `poe lint` | Lint and auto-fix with Ruff |
+| `poe typecheck` | Type-check with mypy |
+
+### Tests
+
+| Command | Description |
+|---------|-------------|
+| `poe test` | Fast tests (excludes `@pytest.mark.slow`) |
+| `poe test:full` | All tests including slow ones |
+| `poe test:fast` | Fast tests, parallel (`-n auto`) |
+| `poe test:fast:essential` | Parallel essential subset (~670 tests, 1 file per module) |
+| `poe test:unit` | Unit tests only (`tests/`) |
+| `poe test:unit:fast` | Unit tests, parallel |
+| `poe test:compare` | Comparison tests vs pyswisseph (`compare_scripts/tests/`) |
+| `poe test:compare:fast` | Comparison tests, parallel |
+| `poe coverage` | Fast tests with coverage report |
+| `poe coverage:full` | All tests with coverage report |
+
+### Tier diagnostics
+
+Run diagnostic tables showing all celestial bodies with coordinates, velocities, and data source for each precision tier:
+
+| Command | Description |
+|---------|-------------|
+| `poe diag:base` | Diagnostic for base tier (1850-2150) |
+| `poe diag:medium` | Diagnostic for medium tier (1550-2650) |
+| `poe diag:extended` | Diagnostic for extended tier (-13200 to +17191) |
+
+### SPK downloads (dev)
+
+Download SPK kernels for minor bodies directly (without the full CLI tier setup):
+
+| Command | Description |
+|---------|-------------|
+| `poe spk:download:base` | SPK for base tier range (1850-2150) |
+| `poe spk:download:medium` | SPK for medium tier range (1900-2100) |
+| `poe spk:download:extended` | Max-range SPK files (1600-2500, single file per body) |
+
+### Data generation
+
+| Command | Description |
+|---------|-------------|
+| `poe generate-planet-centers-spk` | Generate `planet_centers.bsp` (requires `spiceypy`) |
+| `poe generate-lunar-corrections` | Regenerate lunar correction tables (requires `de441.bsp`) |
 
 ---
 
