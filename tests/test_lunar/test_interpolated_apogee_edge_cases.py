@@ -92,11 +92,12 @@ class TestEphemerisRange:
         # min_jd should be before max_jd
         assert min_jd < max_jd
 
-        # For de421.bsp, range should be approximately 1899-2053
-        # min_jd ~= 2415020 (1900)
-        # max_jd ~= 2471184 (2053)
-        assert min_jd > 2400000  # Reasonable lower bound
-        assert max_jd < 2500000  # Reasonable upper bound
+        # Range depends on the loaded ephemeris file:
+        # - DE421: ~1899-2053 (min_jd ~2415020, max_jd ~2471184)
+        # - DE440: ~1549-2650 (min_jd ~2287184, max_jd ~2688976)
+        # - DE441: ~-13200-17191 (min_jd ~625673, max_jd ~7857139)
+        assert min_jd > 600000  # Reasonable lower bound (accommodates DE441)
+        assert max_jd < 8000000  # Reasonable upper bound (accommodates DE441)
 
 
 class TestInterpolatedApogeeAtBoundary:

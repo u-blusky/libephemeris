@@ -404,6 +404,234 @@ def compute_correction_for_year(
     return (year, node_corr, apse_corr)
 
 
+# =============================================================================
+# PERIGEE PERTURBATION RESIDUAL COMPUTATION
+# =============================================================================
+
+# Perigee table uses a finer step since perturbations are larger
+PERIGEE_STEP_YEARS = 2
+PERIGEE_HALF_WINDOW_DAYS = 28.0
+PERIGEE_N_SAMPLES = 9
+PERIGEE_FIT_START = -2000
+PERIGEE_FIT_END = 4000
+
+
+def _unwrap_longitudes(longitudes: list[float]) -> list[float]:
+    """Unwrap a sequence of longitudes to handle 0/360 discontinuity."""
+    if not longitudes:
+        return []
+
+    unwrapped = [longitudes[0]]
+    for i in range(1, len(longitudes)):
+        diff = longitudes[i] - longitudes[i - 1]
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        unwrapped.append(unwrapped[-1] + diff)
+
+    return unwrapped
+
+
+def compute_interpolated_perigee_jpl(jd_tt: float) -> float:
+    """
+    Compute interpolated perigee directly from JPL ephemeris.
+
+    Uses quadratic polynomial regression on 9 samples of the osculating
+    perigee in a +/-28 day window, with unwrap of longitudes.
+    Same approach as calc_interpolated_apogee() in production.
+    """
+    from libephemeris.lunar import calc_osculating_perigee
+
+    step = 2.0 * PERIGEE_HALF_WINDOW_DAYS / (PERIGEE_N_SAMPLES - 1)
+
+    times = []
+    lons = []
+    for i in range(PERIGEE_N_SAMPLES):
+        t = jd_tt - PERIGEE_HALF_WINDOW_DAYS + i * step
+        lon, _, _ = calc_osculating_perigee(t)
+        times.append(t - jd_tt)
+        lons.append(lon)
+
+    lons = _unwrap_longitudes(lons)
+
+    # Quadratic fit: solve for coefficients [a, b, c] where lon = a*t^2 + b*t + c
+    n = len(times)
+    sum_t0 = float(n)
+    sum_t1 = sum(times)
+    sum_t2 = sum(t**2 for t in times)
+    sum_t3 = sum(t**3 for t in times)
+    sum_t4 = sum(t**4 for t in times)
+    sum_y = sum(lons)
+    sum_ty = sum(t * y for t, y in zip(times, lons))
+    sum_t2y = sum(t**2 * y for t, y in zip(times, lons))
+
+    A = [
+        [sum_t4, sum_t3, sum_t2],
+        [sum_t3, sum_t2, sum_t1],
+        [sum_t2, sum_t1, sum_t0],
+    ]
+    rhs = [sum_t2y, sum_ty, sum_y]
+
+    for col in range(3):
+        max_row = col
+        for row in range(col + 1, 3):
+            if abs(A[row][col]) > abs(A[max_row][col]):
+                max_row = row
+        A[col], A[max_row] = A[max_row], A[col]
+        rhs[col], rhs[max_row] = rhs[max_row], rhs[col]
+        for row in range(col + 1, 3):
+            if abs(A[col][col]) < 1e-30:
+                continue
+            factor = A[row][col] / A[col][col]
+            for k in range(col, 3):
+                A[row][k] -= factor * A[col][k]
+            rhs[row] -= factor * rhs[col]
+
+    x = [0.0, 0.0, 0.0]
+    for i in range(2, -1, -1):
+        x[i] = rhs[i]
+        for j in range(i + 1, 3):
+            x[i] -= A[i][j] * x[j]
+        if abs(A[i][i]) > 1e-30:
+            x[i] /= A[i][i]
+
+    return x[2] % 360.0
+
+
+def compute_perigee_fundamental_arguments(
+    jd_tt: float,
+) -> tuple[float, float, float, float]:
+    """Compute fundamental lunar arguments D, M, M', F in radians."""
+    T = (jd_tt - 2451545.0) / 36525.0
+    T2 = T * T
+    T3 = T2 * T
+    T4 = T3 * T
+    T5 = T4 * T
+
+    D = (
+        297.8501921
+        + 445267.1114034 * T
+        - 0.0018819 * T2
+        + T3 / 545868.0
+        - T4 / 113065000.0
+        + T5 / 18999000000.0
+    )
+    D = math.radians(D % 360.0)
+
+    M = (
+        357.5291092
+        + 35999.0502909 * T
+        - 0.0001536 * T2
+        + T3 / 24490000.0
+        - T4 / 992300000.0
+        + T5 / 189900000000.0
+    )
+    M = math.radians(M % 360.0)
+
+    M_prime = (
+        134.9633964
+        + 477198.8675055 * T
+        + 0.0087414 * T2
+        + T3 / 69699.0
+        - T4 / 14712000.0
+        + T5 / 2520410000.0
+    )
+    M_prime = math.radians(M_prime % 360.0)
+
+    F = (
+        93.2720950
+        + 483202.0175233 * T
+        - 0.0036539 * T2
+        - T3 / 3526000.0
+        + T4 / 863310000.0
+        - T5 / 142650000000.0
+    )
+    F = math.radians(F % 360.0)
+
+    return D, M, M_prime, F
+
+
+def compute_perigee_perturbation_series(jd_tt: float) -> float:
+    """
+    Compute the trigonometric perturbation series for perigee.
+
+    Uses the same coefficients as _calc_elp2000_perigee_perturbations() in lunar.py.
+    """
+    D, M, M_prime, F = compute_perigee_fundamental_arguments(jd_tt)
+    T = (jd_tt - 2451545.0) / 36525.0
+    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
+    E2 = E * E
+
+    perturbation = 0.0
+
+    # Primary evection harmonics (calibrated against JPL DE441)
+    perturbation += +0.2808 * math.sin(D - M_prime)
+    perturbation += -9.6235 * math.sin(2.0 * D - 2.0 * M_prime)
+    perturbation += -0.0479 * math.sin(3.0 * D - 3.0 * M_prime)
+    perturbation += +0.9350 * math.sin(4.0 * D - 4.0 * M_prime)
+    perturbation += +0.0097 * math.sin(5.0 * D - 5.0 * M_prime)
+    perturbation += -0.1320 * math.sin(6.0 * D - 6.0 * M_prime)
+    perturbation += +0.0196 * math.sin(8.0 * D - 8.0 * M_prime)
+
+    # Solar anomaly coupling
+    perturbation += +0.4533 * E * math.sin(M)
+    perturbation += +0.0069 * E2 * math.sin(2.0 * M)
+    perturbation += -0.3250 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
+    perturbation += -0.0458 * E * math.sin(D - M_prime + M)
+    perturbation += +0.0650 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
+    perturbation += -0.0392 * E * math.sin(4.0 * D - 4.0 * M_prime + M)
+    perturbation += -0.0146 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
+    perturbation += -0.0071 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
+    perturbation += +0.0556 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+
+    # Lunar anomaly harmonics
+    perturbation += +0.7216 * math.sin(M_prime)
+    perturbation += +0.0913 * math.sin(2.0 * M_prime)
+    perturbation += +0.0767 * math.sin(3.0 * M_prime)
+
+    # Latitude coupling
+    perturbation += +0.2219 * math.sin(2.0 * F - 2.0 * M_prime)
+    perturbation += -0.0172 * math.sin(2.0 * F - 2.0 * D)
+    perturbation += -0.0201 * math.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
+
+    # Cross-coupling terms
+    perturbation += +2.6062 * math.sin(2.0 * D - M_prime)
+    perturbation += +0.1043 * math.sin(2.0 * D - 3.0 * M_prime)
+    perturbation += +0.2525 * math.sin(4.0 * D - 3.0 * M_prime)
+    perturbation += +0.0908 * math.sin(2.0 * D)
+    perturbation += +0.0236 * math.sin(4.0 * D)
+
+    return perturbation
+
+
+def compute_perigee_residual_for_year(year: int) -> tuple[int, float] | None:
+    """
+    Compute perigee perturbation residual for a single year.
+
+    residual = interpolated_perigee_JPL - mean_perigee - trig_series
+
+    Returns:
+        (year, residual) or None if computation fails
+    """
+    from libephemeris.lunar import calc_mean_lilith
+
+    jd = year_to_jd(year)
+
+    try:
+        interp_perigee = compute_interpolated_perigee_jpl(jd)
+    except Exception:
+        return None
+
+    mean_perigee = (calc_mean_lilith(jd) + 180.0) % 360.0
+    perturbation_target = normalize_angle_diff(interp_perigee - mean_perigee)
+
+    trig_series = compute_perigee_perturbation_series(jd)
+    residual = perturbation_target - trig_series
+
+    return (year, residual)
+
+
 def format_corrections_table(corrections: list[float], values_per_line: int = 8) -> str:
     """Format corrections list as Python tuple with nice formatting."""
     lines = []
@@ -425,6 +653,10 @@ def generate_output_file(
     ephemeris: str,
     output_path: str,
     window_days: float,
+    perigee_corrections: list[float] | None = None,
+    perigee_start_year: int | None = None,
+    perigee_end_year: int | None = None,
+    perigee_step: int | None = None,
 ) -> None:
     """Generate the Python output file with corrections."""
 
@@ -525,12 +757,56 @@ MEAN_APSE_CORRECTIONS: tuple[float, ...] = (
 )
 '''
 
+    # Add perigee perturbation corrections if available
+    if perigee_corrections is not None and perigee_start_year is not None:
+        p_step = perigee_step or PERIGEE_STEP_YEARS
+        p_end = (
+            perigee_end_year
+            or perigee_start_year + (len(perigee_corrections) - 1) * p_step
+        )
+        content += f"""
+# =============================================================================
+# PERIGEE PERTURBATION METADATA
+# =============================================================================
+
+# Step in years between perigee corrections
+PERIGEE_CORRECTION_STEP_YEARS: int = {p_step}
+
+# Start year for perigee correction table (inclusive)
+PERIGEE_CORRECTION_START_YEAR: int = {perigee_start_year}
+
+# End year for perigee correction table (inclusive)
+PERIGEE_CORRECTION_END_YEAR: int = {p_end}
+
+# Number of perigee correction entries
+PERIGEE_CORRECTION_COUNT: int = {len(perigee_corrections)}
+
+# =============================================================================
+# PERIGEE PERTURBATION CORRECTIONS
+# =============================================================================
+# Residual corrections for the interpolated perigee perturbation series.
+# These correct the difference between the trigonometric perturbation series
+# and the actual interpolated perigee position from JPL ephemeris.
+#
+# Usage:
+#   perturbation = trig_series(jd) + interpolated_correction(jd)
+#
+# Index i corresponds to year:
+#   year = PERIGEE_CORRECTION_START_YEAR + i * PERIGEE_CORRECTION_STEP_YEARS
+# =============================================================================
+PERIGEE_PERTURBATION_CORRECTIONS: tuple[float, ...] = (
+{format_corrections_table(perigee_corrections)}
+)
+"""
+
     with open(output_path, "w") as f:
         f.write(content)
 
     print(f"Generated: {output_path}")
     print(f"  - {len(node_corrections)} node corrections")
     print(f"  - {len(apse_corrections)} apse corrections")
+    if perigee_corrections is not None:
+        print(f"  - {len(perigee_corrections)} perigee perturbation corrections")
     print(f"  - Range: {start_year} to {end_year} CE")
     print(f"  - Step: {step} years")
 
@@ -717,6 +993,85 @@ def main():
     node_corrections = [results[year][0] for year in years]
     apse_corrections = [results[year][1] for year in years]
 
+    # --- Phase 2: Compute perigee perturbation corrections ---
+    print("\nPhase 2: Computing perigee perturbation corrections...")
+    perigee_years = list(range(args.start_year, args.end_year + 1, PERIGEE_STEP_YEARS))
+    n_perigee = len(perigee_years)
+    print(f"  Range: {args.start_year} to {args.end_year} CE")
+    print(f"  Step: {PERIGEE_STEP_YEARS} years")
+    print(f"  Samples: {n_perigee}")
+
+    perigee_results = {}
+    perigee_failed = []
+
+    with ProcessPoolExecutor(
+        max_workers=args.workers,
+        initializer=init_worker,
+        initargs=(args.ephemeris,),
+    ) as executor:
+        futures = {
+            executor.submit(compute_perigee_residual_for_year, year): year
+            for year in perigee_years
+        }
+
+        if tqdm is not None:
+            for future in tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc="Computing perigee corrections",
+            ):
+                result = future.result()
+                if result is None:
+                    perigee_failed.append(futures[future])
+                else:
+                    year, residual = result
+                    perigee_results[year] = residual
+        else:
+            completed = 0
+            for future in as_completed(futures):
+                result = future.result()
+                if result is None:
+                    perigee_failed.append(futures[future])
+                else:
+                    year, residual = result
+                    perigee_results[year] = residual
+                completed += 1
+                if completed % 500 == 0:
+                    print(
+                        f"  Progress: {completed}/{n_perigee} ({100 * completed // n_perigee}%)"
+                    )
+
+    if perigee_failed:
+        print(f"  WARNING: {len(perigee_failed)} perigee samples failed")
+        perigee_failed.sort()
+
+    # Build ordered perigee corrections list
+    # For failed years, use linear interpolation from neighbors
+    perigee_corrections = []
+    actual_perigee_start = None
+    actual_perigee_end = None
+
+    for year in perigee_years:
+        if year in perigee_results:
+            perigee_corrections.append(perigee_results[year])
+            if actual_perigee_start is None:
+                actual_perigee_start = year
+            actual_perigee_end = year
+        else:
+            # Fill with 0.0 for failed samples (will be interpolated at runtime)
+            perigee_corrections.append(0.0)
+            if actual_perigee_start is None:
+                actual_perigee_start = year
+            actual_perigee_end = year
+
+    if actual_perigee_start is None:
+        actual_perigee_start = args.start_year
+    if actual_perigee_end is None:
+        actual_perigee_end = args.end_year
+
+    print(f"  Successful: {len(perigee_results)}/{n_perigee}")
+    print(f"  Failed: {len(perigee_failed)}")
+
     generate_output_file(
         node_corrections,
         apse_corrections,
@@ -726,6 +1081,10 @@ def main():
         args.ephemeris,
         args.output,
         args.window_days,
+        perigee_corrections=perigee_corrections,
+        perigee_start_year=actual_perigee_start,
+        perigee_end_year=actual_perigee_end,
+        perigee_step=PERIGEE_STEP_YEARS,
     )
 
     return 0

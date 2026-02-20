@@ -13658,7 +13658,6 @@ def planet_occult_when_glob(
         jd: float, planet_id: int
     ) -> Tuple[float, float, float, float]:
         """Get planet's geocentric RA, Dec, distance, and angular radius."""
-        from .planets import get_planet_target
 
         if planet_id not in _PLANET_MAP:
             raise ValueError(f"Invalid planet ID: {planet_id}")

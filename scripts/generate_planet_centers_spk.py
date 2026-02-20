@@ -263,7 +263,7 @@ def download_source_files(
     # Download leap seconds kernel
     leapseconds_path = os.path.join(cache_dir, "naif0012.tls")
     if not os.path.exists(leapseconds_path):
-        print(f"\n  Downloading leap seconds kernel...")
+        print("\n  Downloading leap seconds kernel...")
         download_file(LEAPSECONDS_URL, leapseconds_path, ssl_ctx, fallback_ctx)
 
     return local_files
@@ -354,7 +354,7 @@ def extract_segment(
                         dc[1],
                         output_handle,
                     )
-                    print(f"    Written to output")
+                    print("    Written to output")
                     break
 
             if not found_segment:
@@ -380,7 +380,7 @@ def generate_tier_spk(
     """Generate planet_centers SPK for a specific tier."""
     import spiceypy as spice
 
-    print(f"\n=== Extracting Planet Center Segments ===\n")
+    print("\n=== Extracting Planet Center Segments ===\n")
 
     # Load leap seconds kernel
     leapseconds_path = os.path.join(cache_dir, "naif0012.tls")
@@ -427,7 +427,7 @@ def verify_spk(output_path: str, leapseconds_path: str) -> None:
     """Verify the generated SPK file."""
     import spiceypy as spice
 
-    print(f"\n=== Verification ===\n")
+    print("\n=== Verification ===\n")
 
     # Load leap seconds kernel for time conversions
     spice.furnsh(leapseconds_path)
@@ -438,7 +438,7 @@ def verify_spk(output_path: str, leapseconds_path: str) -> None:
 
     # List bodies
     bodies = spice.spkobj(output_path)
-    print(f"\n  Bodies in file:")
+    print("\n  Bodies in file:")
     for body_id in sorted(bodies):
         cover = spice.spkcov(output_path, body_id)
         n_windows = spice.wncard(cover)
