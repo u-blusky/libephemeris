@@ -1012,7 +1012,7 @@ After calibration:
 
     print(f"  Passages for spline: {len(passages)}")
     print(f"  Daily samples: {n_samples} (step {args.sample_step_days} day(s))")
-    print(f"  Interpolating with cubic spline...")
+    print("  Interpolating with cubic spline...")
 
     # Interpolate
     interp_lons_unwrapped = cubic_spline_interpolate(
@@ -1021,7 +1021,7 @@ After calibration:
     # Wrap back to [0, 360)
     interp_lons = interp_lons_unwrapped % 360.0
 
-    print(f"  Spline interpolation complete")
+    print("  Spline interpolation complete")
 
     # =================================================================
     # PHASE 3: HARMONIC FIT ON INTERPOLATED DATA
@@ -1063,7 +1063,7 @@ After calibration:
     fit_rms = float(np.sqrt(np.mean(errors**2)))
     fit_max = float(np.max(np.abs(errors)))
 
-    print(f"\n  Fit results (on spline-interpolated data):")
+    print("\n  Fit results (on spline-interpolated data):")
     print(f"    RMS residual: {fit_rms:.4f} deg")
     print(f"    Max residual: {fit_max:.4f} deg")
     print(f"    Mean residual: {float(np.mean(errors)):.6f} deg")
@@ -1097,19 +1097,17 @@ After calibration:
     passage_max = max(abs(e) for e in passage_errors)
     passage_mean = sum(passage_errors) / len(passage_errors)
 
-    print(f"  Passage validation results:")
+    print("  Passage validation results:")
     print(f"    RMS error:  {passage_rms:.4f} deg")
     print(f"    Max error:  {passage_max:.4f} deg")
     print(f"    Mean error: {passage_mean:.4f} deg")
-    print(f"    Target: RMS < 0.5 deg")
+    print("    Target: RMS < 0.5 deg")
     if passage_rms < 0.5:
-        print(f"    STATUS: PASS")
+        print("    STATUS: PASS")
     elif passage_rms < 1.0:
-        print(f"    STATUS: MARGINAL")
+        print("    STATUS: MARGINAL")
     else:
-        print(
-            f"    STATUS: FAIL (consider adding more terms or using correction table)"
-        )
+        print("    STATUS: FAIL (consider adding more terms or using correction table)")
 
     # Residual by century
     print("\n  Fit RMS by century:")
@@ -1153,7 +1151,7 @@ After calibration:
                 se_errors.append(error)
             se_rms = math.sqrt(sum(e**2 for e in se_errors) / len(se_errors))
             se_max = max(abs(e) for e in se_errors)
-            print(f"  SE comparison (1900-2100):")
+            print("  SE comparison (1900-2100):")
             print(f"    RMS: {se_rms:.2f} deg")
             print(f"    Max: {se_max:.2f} deg")
         except ImportError:
@@ -1203,7 +1201,7 @@ After calibration:
     print(f"\n{'=' * 70}")
     print("SUMMARY")
     print(f"{'=' * 70}")
-    print(f"  Method: Passage-interpolated harmonic fit (v2.2)")
+    print("  Method: Passage-interpolated harmonic fit (v2.2)")
     print(f"  Range: [{args.start_year}, {args.end_year}] CE")
     print(f"  Passages: {len(passages)}, Samples: {n_samples}")
     print(f"  Fit RMS (spline): {fit_rms:.4f} deg")

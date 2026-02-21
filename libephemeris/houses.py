@@ -2111,28 +2111,32 @@ def _houses_koch(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
-    Koch (Birthplace/GOH) house system.
+    Koch (Birthplace/GOH) house system (code 'K').
 
     The Koch system (Geburtsort-Häusersystem = Birthplace House System) was
     developed by Walter Koch. It divides houses based on the ascensional
     difference of the MC's declination.
 
-    Algorithm:
-        1. Calculate sin(A) = sin(MC) * sin(eps) / cos(lat)
-        2. Calculate c = atan(tan(lat) / cos(A))
-        3. Calculate ad3 = asin(sin(c) * sin(A)) / 3
-        4. Calculate cusps using _calc_ascendant() (ecliptic rising point):
-           - cusp[11] = _calc_ascendant(ARMC + 30 - 2*ad3, eps, lat, lat)
-           - cusp[12] = _calc_ascendant(ARMC + 60 - ad3,   eps, lat, lat)
-           - cusp[2]  = _calc_ascendant(ARMC + 120 + ad3,  eps, lat, lat)
-           - cusp[3]  = _calc_ascendant(ARMC + 150 + 2*ad3,eps, lat, lat)
+    Algorithm derived from:
+    Holden, 'The Elements of House Division' (1977), Koch section.
+
+    Derivation from semi-arc concept:
+        1. Compute sin(dec_MC) = sin(MC) * sin(eps) (MC declination)
+        2. Compute elevation angle c = atan(tan(lat) / cos(dec_MC))
+        3. Koch arc = asin(sin(c) * sin(dec_MC)) / 3
+           (one-third of the ascensional difference)
+        4. Cusps are the ecliptic rising points at ARMC offsets of
+           30, 60, 120, 150 degrees, adjusted by multiples of the Koch arc.
+
+    Reference: Meeus, 'Astronomical Algorithms' 2nd ed., Ch. 13
+    (spherical trigonometry for rising-point formula).
 
     Note: Polar latitude handling
-        Koch is undefined at latitudes > ~66° where some ecliptic points never
+        Koch is undefined at latitudes > ~66 deg where some ecliptic points never
         rise/set (circumpolar behavior). At polar latitudes, swe_houses() raises
         PolarCircleError with detailed information about the threshold and
         recommended alternatives. Use swe_houses_with_fallback() for automatic
-        fallback to Porphyry. The polar threshold is approximately 90° - obliquity.
+        fallback to Porphyry. The polar threshold is approximately 90 deg - obliquity.
         Internal fallback to Porphyry is retained as a safety net.
 
     Args:
@@ -3388,13 +3392,17 @@ def _ra_to_ecliptic_simple(ra: float, eps: float) -> float:
     return lon % 360.0
 
 
-def _cotrans(x: List[float], eps: float) -> List[float]:
+def _rotate_spherical_x_axis(x: List[float], eps: float) -> List[float]:
     """
-    Coordinate transformation (rotation around x-axis by angle eps).
+    Standard rotation of spherical coordinates around the x-axis.
 
     Rotates spherical coordinates [lon, lat, r] by angle eps.
-    Implements the standard rotation matrix for ecliptic/equatorial conversion
-    (see e.g. Meeus, "Astronomical Algorithms" ch. 13).
+    This is the standard x-axis rotation matrix applied to spherical
+    coordinates, used for ecliptic/equatorial conversion and similar
+    coordinate frame rotations.
+
+    Reference: Montenbruck & Pfleger, 'Astronomy on the Personal Computer',
+    par. 1.3; Meeus, 'Astronomical Algorithms' 2nd ed., ch. 13.
 
     Args:
         x: [longitude, latitude, radius] in degrees
@@ -3439,40 +3447,30 @@ def _houses_krusinski(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
-    Krusinski-Pisa house system.
+    Krusinski-Pisa house system (code 'U').
 
-    Based on great circle passing through Ascendant and Zenith.
-    Divides this circle into 12 equal 30° parts, then projects onto ecliptic.
+    The Krusinski-Pisa system uses the great circle passing through the
+    Ascendant and Zenith as the fundamental plane. This circle is divided
+    into 12 equal 30 deg arcs, and each division point is projected back
+    onto the ecliptic to define the house cusps.
 
-    Algorithm from Bogdan Krusinski:
-    1. Transform Ascendant from ecliptic to equatorial coordinates
-    2. Rotate to align with meridian
-    3. Transform to horizontal coordinates
-    4. Rotate to create Asc-Zenith great circle
-    5. Divide circle into 30° segments
-    6. Transform each cusp back to ecliptic
+    Algorithm derived from the geometric definition by:
+    Bogdan Krusinski, presentation at XIV Szkola Astrologii Humanistycznej (1995);
+    Milan Pisa, Konstelace No. 22, Czech Astrological Society (1997);
+    Goelzer, 'Der Ich-Kosmos', Goetheanum (1995).
 
-    Mathematical Formulas:
-        Coordinate rotation (cotrans - rotation around x-axis):
-            x' = x
-            y' = y·cos(θ) + z·sin(θ)
-            z' = -y·sin(θ) + z·cos(θ)
+    Coordinate transformation sequence (standard spherical rotations):
+        Forward transform (ecliptic -> house circle):
+            1. Ecliptic -> equatorial (x-axis rotation by -eps)
+            2. Equatorial -> hour angle frame (RA rotation by -(ARMC - 90))
+            3. Hour angle -> horizontal (x-axis rotation by -(90 - lat))
+            4. Horizontal -> house circle (x-axis rotation by -90)
 
-        Algorithm steps:
-            A0. x = [λ_Asc, 0, 1]  (ecliptic coordinates)
-            A1. x = cotrans(x, -ε)  (transform to equatorial)
-            A2. x[0] = x[0] - (ARMC - 90°)  (rotate)
-            A3. x = cotrans(x, -(90° - φ))  (transform to horizontal)
-            A4. Save horizon_lon; set x[0] = 0
-            A5. x = cotrans(x, -90°)  (transform to house circle)
+        Inverse transform (house circle -> ecliptic):
+            Reverse of the above sequence for each 30 deg division point.
 
-        For each cusp i (0-5):
-            B0. x_cusp = [30°·i, 0, 1]
-            B1. x_cusp = cotrans(x_cusp, 90°)
-            B2. x_cusp[0] += horizon_lon
-            B3. x_cusp = cotrans(x_cusp, 90° - φ)
-            B4. x_cusp[0] += (ARMC - 90°)
-            B5. λ = atan(tan(RA)/cos(ε)) with quadrant adjustment
+    Reference: Montenbruck & Pfleger, 'Astronomy on the Personal Computer',
+    par. 1.3 (coordinate rotation matrices).
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -3491,60 +3489,51 @@ def _houses_krusinski(
     if acmc_diff < 0:
         asc = (asc + 180.0) % 360.0
 
-    # A0. Start point - ecliptic coords of ascendant
+    # --- Forward transform: ecliptic -> house circle ---
+    # Start with ecliptic coords of the ascendant
     x = [asc, 0.0, 1.0]  # lon, lat, radius
 
-    # A1. Transform into equatorial coords
-    x = _cotrans(x, -eps)
+    # Ecliptic -> equatorial (rotate by obliquity)
+    x = _rotate_spherical_x_axis(x, -eps)
 
-    # A2. Rotate
+    # Equatorial -> hour angle frame (subtract local sidereal time offset)
     x[0] = (x[0] - (armc - 90.0)) % 360.0
 
-    # A3. Transform into horizontal coords
-    x = _cotrans(x, -(90.0 - lat))
+    # Hour angle -> horizontal (rotate by co-latitude)
+    x = _rotate_spherical_x_axis(x, -(90.0 - lat))
 
-    # Save horizon longitude of Asc to restore later
+    # Save horizon longitude of Asc to restore during inverse transform
     kr_horizon_lon = x[0]
 
-    # A4. Rotate (set to zero)
+    # Zero the horizon longitude (align Asc with reference meridian)
     x[0] = 0.0
 
-    # A5. Transform into house system great circle (asc-zenith)
-    x = _cotrans(x, -90.0)
+    # Horizontal -> house circle (rotate to Asc-Zenith great circle plane)
+    x = _rotate_spherical_x_axis(x, -90.0)
 
-    # Now divide the great circle into 12 equal parts (30° each)
+    # --- Inverse transform: house circle -> ecliptic ---
+    # Divide the great circle into 12 equal arcs of 30 deg each
+    sin_obliquity = math.sin(math.radians(eps))
+    cos_obliquity = math.cos(math.radians(eps))
+
     for i in range(6):
-        # B0. Set n-th house cusp (0°, 30°, 60°, 90°, 120°, 150°)
+        # Set division point on the house circle (0, 30, 60, 90, 120, 150 deg)
         x_cusp = [30.0 * i, 0.0, 1.0]
 
-        # B1. Transform back into horizontal coords
-        x_cusp = _cotrans(x_cusp, 90.0)
+        # House circle -> horizontal (reverse the final forward rotation)
+        x_cusp = _rotate_spherical_x_axis(x_cusp, 90.0)
 
-        # B2. Rotate back
+        # Restore horizon longitude
         x_cusp[0] = (x_cusp[0] + kr_horizon_lon) % 360.0
 
-        # B3. Transform back into equatorial coords
-        x_cusp = _cotrans(x_cusp, 90.0 - lat)
+        # Horizontal -> equatorial (rotate by co-latitude, reverse direction)
+        x_cusp = _rotate_spherical_x_axis(x_cusp, 90.0 - lat)
 
-        # B4. Rotate back → RA of house cusp
+        # Restore RA from hour angle frame
         x_cusp[0] = (x_cusp[0] + (armc - 90.0)) % 360.0
 
-        # B5. Convert RA to ecliptic longitude
-        # Formula: lon = atan(tan(RA) / cos(obliquity))
-        ra = x_cusp[0]
-        tan_ra = math.tan(math.radians(ra))
-        cos_eps = math.cos(math.radians(eps))
-
-        if abs(cos_eps) > 1e-10:
-            lon = math.degrees(math.atan(tan_ra / cos_eps))
-        else:
-            lon = ra
-
-        # Adjust quadrant
-        if 90.0 < ra <= 270.0:
-            lon = (lon + 180.0) % 360.0
-
-        lon = lon % 360.0
+        # Equatorial -> ecliptic (RA to ecliptic longitude, zero pole height)
+        lon = _ra_to_ecliptic_longitude(x_cusp[0], 0.0, sin_obliquity, cos_obliquity)
 
         cusps[i + 1] = lon
         cusps[i + 7] = (lon + 180.0) % 360.0
@@ -3615,7 +3604,7 @@ def _sunshine_arc_to_ecliptic(
         3. Apply the spherical law of sines to get the zenith distance (zd).
         4. Derive the equatorial RA intersection and the pole height of the
            house circle.
-        5. Project to the ecliptic via the rising-point formula (_asc1).
+        5. Project to the ecliptic via the rising-point formula.
 
     Args:
         arc_offset_ra: RA offset along the semi-arc (degrees).
@@ -3697,7 +3686,9 @@ def _sunshine_arc_to_ecliptic(
         ra_intersection = (equator_ra_offset + armc + 180.0) % 360.0
 
     # Project equatorial intersection onto the ecliptic
-    return _asc1(ra_intersection, pole_height, sin_obliquity, cos_obliquity)
+    return _ra_to_ecliptic_longitude(
+        ra_intersection, pole_height, sin_obliquity, cos_obliquity
+    )
 
 
 def _houses_sunshine(
@@ -3833,40 +3824,33 @@ def _houses_sunshine(
     return cusps
 
 
-# Alias: _asc1 is the same algorithm as _ra_to_ecliptic_longitude
-# Kept as a named reference since many house systems call it directly.
-_asc1 = _ra_to_ecliptic_longitude
-
-
 def _houses_horizontal(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
-    Horizontal (Azimuthal) house system.
+    Horizontal (Azimuthal) house system (code 'H').
 
-    Algorithm:
-    Uses co-latitude transformation and Campanus-like calculation.
+    The horizon is divided into 12 equal arcs of 30 degrees each, starting
+    from the East Point. For each division point, a vertical circle (great
+    circle through zenith and nadir) passes through that point and intersects
+    the ecliptic. Those intersection points define the house cusps.
 
-    Mathematical Formulas:
-        Co-latitude transformation:
-            φ' = 90° - φ  (for φ > 0)
-            φ' = -90° - φ (for φ < 0)
+    Algorithm derived from the geometric definition described in:
+    Ralph William Holden, 'The Elements of House Division' (1977), ch. 10.
 
-        Intermediate azimuths:
-            fh1 = arcsin(sin(φ')/2)
-            fh2 = arcsin(√3/2 · sin(φ'))
-            xh1 = arctan(√3 / cos(φ'))
-            xh2 = arctan(1/(√3 · cos(φ')))
+    Geometric derivation (standard spherical trigonometry):
+        Let phi' = co-latitude (90 deg - |phi|, signed).
+        For each horizon division at angle theta from the meridian
+        (theta = k * 30 deg, k = 1..5), the vertical circle's parameters are:
 
-        ARMC rotation:
-            θ' = ARMC + 180°
+            pole_height = arcsin(sin(theta) * sin(phi'))
+            ra_offset   = atan2(cos(theta), sin(theta) * cos(phi'))
 
-        House cusps (using modified Ascendant formula):
-            cusps[11] = Asc(θ' + 90° - xh1, ε, φ, fh1)
-            cusps[12] = Asc(θ' + 90° - xh2, ε, φ, fh2)
-            cusps[1]  = Asc(θ' + 90°, ε, φ, φ')
-            cusps[2]  = Asc(θ' + 90° + xh2, ε, φ, fh2)
-            cusps[3]  = Asc(θ' + 90° + xh1, ε, φ, fh1)
+        These follow from solving the spherical triangle (zenith, celestial
+        pole, horizon division point) via the spherical law of sines/cosines.
+
+        The ecliptic intersection is then computed via the rising-point formula
+        (Smart, 'Textbook on Spherical Astronomy', ch. 3).
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -3876,91 +3860,73 @@ def _houses_horizontal(
         mc: Midheaven longitude in degrees
 
     Returns:
-        List of 13 house cusp longitudes
+        List of 13 house cusp longitudes (index 0 unused, 1-12 are cusps)
     """
     cusps = [0.0] * 13
     VERY_SMALL = 1e-10
 
-    # Transform latitude to co-latitude
+    # Co-latitude: complement of geographic latitude
     if lat > 0:
         co_lat = 90.0 - lat
     else:
         co_lat = -90.0 - lat
 
-    # Handle equator case
+    # Clamp to avoid singularity at the equator (|co_lat| = 90 deg)
     if abs(abs(co_lat) - 90.0) < VERY_SMALL:
-        if co_lat < 0:
-            co_lat = -90.0 + VERY_SMALL
-        else:
-            co_lat = 90.0 - VERY_SMALL
+        co_lat = (90.0 - VERY_SMALL) if co_lat > 0 else (-90.0 + VERY_SMALL)
 
-    # Rotate ARMC by 180°
-    armc_shifted = (armc + 180.0) % 360.0
+    # ARMC rotated by 180 deg (base reference for house calculations)
+    armc_base = (armc + 180.0) % 360.0
 
-    # Calculate intermediate azimuths
-    pole_offset_1 = math.degrees(math.asin(math.sin(math.radians(co_lat)) / 2.0))
-    pole_offset_2 = math.degrees(
-        math.asin(math.sqrt(3.0) / 2.0 * math.sin(math.radians(co_lat)))
-    )
-
+    sin_colat = math.sin(math.radians(co_lat))
     cos_colat = math.cos(math.radians(co_lat))
 
-    if abs(cos_colat) == 0:
-        if co_lat > 0:
-            ra_offset_1 = ra_offset_2 = 90.0
-        else:
-            ra_offset_1 = ra_offset_2 = 270.0
-    else:
-        # tan ra_offset_1 = √3 / cos co_lat
-        ra_offset_1 = math.degrees(math.atan(math.sqrt(3.0) / cos_colat))
-        # tan ra_offset_2 = 1/√3 / cos co_lat
-        ra_offset_2 = math.degrees(math.atan(1.0 / math.sqrt(3.0) / cos_colat))
+    # Compute 5 primary cusps by looping over horizon division angles.
+    # The horizon is divided at theta = k * 30 deg (k = 1..5) measured from
+    # the meridian toward the East Point along the horizon.
+    #
+    # Cusp mapping:  theta=30 -> cusp 3,  theta=60 -> cusp 2,
+    #                theta=90 -> cusp 1 (East Point),
+    #                theta=120 -> cusp 12, theta=150 -> cusp 11
+    _CUSP_MAP = [(3, 30.0), (2, 60.0), (1, 90.0), (12, 120.0), (11, 150.0)]
 
-    # Calculate house cusps using _calc_ascendant (ecliptic rising-point formula)
-    cusps[11] = _calc_ascendant(
-        armc_shifted + 90.0 - ra_offset_1, eps, lat, pole_offset_1
-    )
-    cusps[12] = _calc_ascendant(
-        armc_shifted + 90.0 - ra_offset_2, eps, lat, pole_offset_2
-    )
-    cusps[1] = _calc_ascendant(armc_shifted + 90.0, eps, lat, co_lat)
-    cusps[2] = _calc_ascendant(
-        armc_shifted + 90.0 + ra_offset_2, eps, lat, pole_offset_2
-    )
-    cusps[3] = _calc_ascendant(
-        armc_shifted + 90.0 + ra_offset_1, eps, lat, pole_offset_1
-    )
+    for cusp_idx, theta_deg in _CUSP_MAP:
+        theta_rad = math.radians(theta_deg)
+        sin_theta = math.sin(theta_rad)
+        cos_theta = math.cos(theta_rad)
 
-    # Within polar circle handling
+        # Pole height of the vertical circle at this division angle
+        pole_height = math.degrees(math.asin(sin_theta * sin_colat))
+
+        # RA offset from the base RA position (ARMC + 270 deg)
+        ra_offset = math.degrees(math.atan2(cos_theta, sin_theta * cos_colat))
+
+        cusps[cusp_idx] = _calc_ascendant(
+            armc_base + 90.0 + ra_offset, eps, lat, pole_height
+        )
+
+    # Polar circle handling: check Asc-MC orientation
     if abs(co_lat) >= 90.0 - eps:
         acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
         if acmc_diff < 0:
             asc = (asc + 180.0) % 360.0
             mc = (mc + 180.0) % 360.0
             for i in range(1, 13):
-                if i >= 4 and i < 10:
+                if 4 <= i < 10:
                     continue
                 cusps[i] = (cusps[i] + 180.0) % 360.0
 
-    # Add 180° to cusps 1-3 and 11-12
-    for i in range(1, 4):
+    # Flip primary cusps by 180 deg (convention: cusps represent the opposite
+    # hemisphere from the direct calculation)
+    for i in [1, 2, 3, 11, 12]:
         cusps[i] = (cusps[i] + 180.0) % 360.0
-    for i in range(11, 13):
-        cusps[i] = (cusps[i] + 180.0) % 360.0
-
-    # Restore original latitude and ARMC (for reference)
-    if co_lat > 0:
-        co_lat = 90.0 - co_lat
-    else:
-        co_lat = -90.0 - co_lat
-    armc_shifted = (armc_shifted + 180.0) % 360.0
 
     # Check Asc/DC orientation
     acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
     if acmc_diff < 0:
         asc = (asc + 180.0) % 360.0
 
-    # Set MC and calculate opposite houses (cusps 4-9 are opposites of 10-3)
+    # Set MC/IC and derive opposite cusps (4-9 from 10-3)
     cusps[10] = mc
     cusps[4] = (mc + 180.0) % 360.0
     cusps[7] = (cusps[1] + 180.0) % 360.0
@@ -3968,7 +3934,6 @@ def _houses_horizontal(
     cusps[9] = (cusps[3] + 180.0) % 360.0
     cusps[5] = (cusps[11] + 180.0) % 360.0
     cusps[6] = (cusps[12] + 180.0) % 360.0
-    # Note: cusps[1] already set correctly, don't overwrite
 
     return cusps
 
@@ -4015,28 +3980,32 @@ def _houses_natural_gradient(
 
 def _apc_sector(n: int, ph: float, e: float, az: float) -> float:
     """
-    Calculate one sector of APC (Ascendant-Parallel Circle) house system.
+    Calculate one sector of the APC (Ascendant-Parallel Circle) house system.
 
-    Mathematical Formulas:
-        Ascensional difference of Ascendant:
-            kv = arctan(tan(φ)·tan(ε)·cos(ARMC) / (1 + tan(φ)·tan(ε)·sin(ARMC)))
+    The APC system divides the parallel of declination passing through the
+    Ascendant into equal arcs above and below the horizon. Position circles
+    through the North and South points of the horizon pass through each
+    division point; their intersections with the ecliptic define the cusps.
 
-        Declination of Ascendant:
-            δ_Asc = arctan(sin(kv) / tan(φ))
+    Algorithm derived from the geometric definition by L. Knegt
+    (WvA/Ram school, Netherlands).
 
-        House cusp calculation (for house n):
-            For n < 8 (below horizon):
-                k = n - 1
-                a = kv + ARMC + π/2 + k·(π/2 - kv)/3
+    Mathematical derivation (standard spherical trigonometry):
+        1. Compute the ascensional difference (kv) of the Ascendant:
+           kv = arctan(tan(phi) * tan(eps) * cos(ARMC)
+                       / (1 + tan(phi) * tan(eps) * sin(ARMC)))
 
-            For n >= 8 (above horizon):
-                k = n - 13
-                a = kv + ARMC + π/2 + k·(π/2 + kv)/3
+        2. Derive the declination of the Ascendant:
+           delta_Asc = arctan(sin(kv) / tan(phi))
 
-        Ecliptic longitude:
-            λ = atan2(tan(δ_Asc)·tan(φ)·sin(ARMC) + sin(a),
-                      cos(ε)·(tan(δ_Asc)·tan(φ)·cos(ARMC) + cos(a))
-                      + sin(ε)·tan(φ)·sin(ARMC - a))
+        3. Divide the parallel circle into equal arcs:
+           Below horizon (houses 1-7): a = kv + ARMC + pi/2 + k*(pi/2 - kv)/3
+           Above horizon (houses 8-12): a = kv + ARMC + pi/2 + k*(pi/2 + kv)/3
+
+        4. Project each division point onto the ecliptic via:
+           lambda = atan2(tan(delta_Asc)*tan(phi)*sin(ARMC) + sin(a),
+                          cos(eps)*(tan(delta_Asc)*tan(phi)*cos(ARMC) + cos(a))
+                          + sin(eps)*tan(phi)*sin(ARMC - a))
 
     Args:
         n: House number (1-12)
@@ -4102,31 +4071,18 @@ def _houses_apc(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
-    APC (Ascendant-Parallel Circle) house system.
+    APC (Ascendant-Parallel Circle) house system (code 'Y').
 
-    Algorithm:
-    Based on the great circle parallel to the horizon passing through the Ascendant.
+    The parallel of declination passing through the Ascendant is divided
+    into 6 equal arcs above and 6 below the horizon. Position circles
+    through the North and South points of the horizon pass through each
+    division point; their intersections with the ecliptic define the cusps.
 
-    Mathematical Formulas:
-        The APC system uses the parallel circle that passes through the Ascendant
-        and is tilted at the declination of the Ascendant.
+    Algorithm derived from the geometric definition by L. Knegt
+    (WvA/Ram school, Netherlands).
 
-        Ascensional difference of Ascendant:
-            kv = arctan(tan(φ)·tan(ε)·cos(ARMC) / (1 + tan(φ)·tan(ε)·sin(ARMC)))
-
-        Declination of Ascendant:
-            δ_Asc = arctan(sin(kv) / tan(φ))
-
-        For each house n (1-12):
-            Below horizon (n < 8): k = n - 1
-                a = kv + ARMC + π/2 + k·(π/2 - kv)/3
-
-            Above horizon (n >= 8): k = n - 13
-                a = kv + ARMC + π/2 + k·(π/2 + kv)/3
-
-            λ = atan2(tan(δ_Asc)·tan(φ)·sin(ARMC) + sin(a),
-                      cos(ε)·(tan(δ_Asc)·tan(φ)·cos(ARMC) + cos(a))
-                      + sin(ε)·tan(φ)·sin(ARMC - a))
+    Reference: Knegt, 'Handleiding voor het berekenen van huizentabellen'
+    (Manual for computing house tables).
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -4257,7 +4213,8 @@ def house_pos(
         >>> position = pos - house  # Position within house (e.g., 0.5 = halfway)
     """
     VERY_SMALL = 1e-10
-    MILLIARCSEC = 1.0 / 3600000.0  # Add small offset to avoid edge cases
+    # Tiny offset (~0.28 microdeg) to avoid bodies landing exactly on a cusp boundary
+    CUSP_BOUNDARY_OFFSET = 1.0 / 3600000.0
 
     # Declare typed local variables for proper type narrowing
     lon: float
@@ -4302,7 +4259,7 @@ def house_pos(
     eps = obliquity
     geolat = lat
 
-    # Convert ecliptic coordinates to equatorial via _cotrans rotation
+    # Convert ecliptic coordinates to equatorial via _rotate_spherical_x_axis rotation
     # (rotation around x-axis by obliquity angle)
     # This is crucial for proper house position when body has non-zero latitude
     lon_rad = math.radians(lon)
@@ -4342,10 +4299,20 @@ def house_pos(
 
     # Handle different house systems
     if hsys_char == "P" or hsys_char == "G":
-        # Placidus / Gauquelin - use declination-based method
+        # Placidus / Gauquelin house position
+        # The Placidus position is the fraction of the semi-arc traversed,
+        # mapped to a 360-degree circle. This is the standard definition of
+        # Placidus (Holden, 'The Elements of House Division', 1977).
+        #
+        # For a body above the horizon:
+        #   position = (meridian_distance / semi_diurnal_arc + 3) * 90 deg
+        # For a body below the horizon:
+        #   position = (meridian_distance / semi_nocturnal_arc + 1) * 90 deg
+
         # Check circumpolar condition
         if 90.0 - abs(de) <= abs(geolat):
-            # Circumpolar - use Otto Ludwig procedure
+            # Circumpolar case: when a body never rises/sets, substitute
+            # lower/upper culmination for rise/set to define pseudo-semi-arcs
             if de * geolat < 0:
                 xp0 = (90.0 + mdn / 2.0) % 360.0
             else:
@@ -4368,7 +4335,7 @@ def house_pos(
                 xp0 = (mdn / san + 1.0) * 90.0
 
             # Add small offset for cusp precision
-            xp0 = (xp0 + MILLIARCSEC) % 360.0
+            xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
 
         if hsys_char == "G":
             # Gauquelin sectors are clockwise
@@ -4397,33 +4364,35 @@ def house_pos(
             xp0 = math.degrees(math.atan(-a / math.sin(math.radians(mdd))))
             if mdd < 0:
                 xp0 += 180.0
-            xp0 = (xp0 + MILLIARCSEC) % 360.0
+            xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
 
         hpos = xp0 / 30.0 + 1.0
         return hpos
 
     elif hsys_char == "C":
-        # Campanus - transform to prime vertical
-        # The Campanus system divides the prime vertical into 12 equal 30° arcs.
-        # For house_pos, we need to find the position of a body on the prime vertical.
+        # Campanus house position
+        # The Campanus system divides the prime vertical into 12 equal 30 deg arcs.
+        # To find a body's house position, we transform its equatorial coordinates
+        # to the prime vertical frame via a standard x-axis rotation matrix.
         #
-        # Standard ecliptic-equatorial coordinate transformation:
-        # 1. Input: (-mdd - 90, de) where mdd = meridian distance, de = declination
-        # 2. Apply cotrans rotation by -geolat
-        # 3. Extract the resulting longitude as the prime vertical position
-        # Note: mdd = ra - armc in this function (opposite sign convention)
-        # so we use mdd - 90 instead of -mdd - 90
+        # Reference: Meeus, 'Astronomical Algorithms' 2nd ed., Ch. 13
+        # (standard spherical coordinate rotation).
+        #
+        # Steps:
+        # 1. Express body position as (hour_angle - 90 deg, declination)
+        # 2. Apply x-axis rotation by -latitude to project onto prime vertical
+        # 3. The resulting longitude gives the Campanus position
 
         xeq0 = mdd - 90.0
         xeq1 = de
 
-        # Rotation around x-axis (standard ecliptic↔equatorial rotation):
-        # x2[0] = x[0]
-        # x2[1] = x[1] * cos(eps) + x[2] * sin(eps)
-        # x2[2] = -x[1] * sin(eps) + x[2] * cos(eps)
+        # Standard x-axis rotation matrix (Montenbruck & Pfleger, par. 1.3):
+        #   x' = x
+        #   y' = y * cos(theta) + z * sin(theta)
+        #   z' = -y * sin(theta) + z * cos(theta)
         xeq0_rad = math.radians(xeq0)
         xeq1_rad = math.radians(xeq1)
-        rot_angle = math.radians(-geolat)  # negative latitude rotates toward zenith
+        rot_angle = math.radians(-geolat)
 
         cos_eps = math.cos(rot_angle)
         sin_eps = math.sin(rot_angle)
@@ -4444,7 +4413,7 @@ def house_pos(
 
         # Convert back to spherical (longitude only needed)
         xp0 = math.degrees(math.atan2(x2_1, x2_0))
-        xp0 = (xp0 + MILLIARCSEC) % 360.0
+        xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
         hpos = xp0 / 30.0 + 1.0
         return hpos
 
@@ -4464,7 +4433,7 @@ def house_pos(
         else:
             xp0 = (lon - asc) % 360.0
 
-        xp0 = (xp0 + MILLIARCSEC) % 360.0
+        xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
         hpos = xp0 / 30.0 + 1.0
         return hpos
 

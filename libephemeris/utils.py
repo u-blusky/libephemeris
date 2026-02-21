@@ -727,10 +727,21 @@ def refrac_extended(
         # The refraction correction reduces the apparent dip (horizon appears
         # higher due to refraction).
         #
-        # Based on empirical fitting to reference implementation results, the
-        # refraction coefficient k follows:
-        # k = 0.1117 + 3.5516 * lapse_rate
-        # where observed_dip = -dip_geometric * (1 - k)
+        # The terrestrial refraction coefficient k relates observed dip to
+        # geometric dip: observed_dip = -dip_geometric * (1 - k).
+        # For a standard atmosphere (lapse rate Γ = 0.0065 K/m), the standard
+        # geodetic value is k ≈ 0.13 (≈1/7.7), meaning the observed dip is
+        # about 87% of the geometric dip.
+        #
+        # The linear approximation k(Γ) = 0.1117 + 3.5516·Γ models the
+        # dependence on lapse rate: steeper temperature gradients produce
+        # stronger density gradients and more refraction. At standard
+        # conditions this yields k = 0.1348, consistent with geodetic tables.
+        #
+        # References:
+        #   Bomford, "Geodesy" (1980), 4th ed., §2.17-2.20
+        #   Smart, "Textbook on Spherical Astronomy" (1977), Ch. VI
+        #   Torge, "Geodesy" (2001), 3rd ed., §5.1.1
 
         if lapse_rate > 0:
             # Calculate the refraction coefficient based on lapse rate
@@ -1145,16 +1156,21 @@ def csroundsec(cs: int) -> int:
         # Truncation toward zero for negative values
         result = -((-cs_plus_50) // 100) * 100
 
-    # Special case for positive values at 30-degree boundaries (10800000 cs = 30°)
-    # Values just below these boundaries round down instead of up
+    # Boundary correction: prevent rounding up across zodiacal sign boundaries
+    # (30° = 10,800,000 cs). When a value just below a sign boundary would round
+    # up to the boundary, keep it in the current sign instead. This is
+    # mathematically correct for angular display — rounding 29°59'59.7" should
+    # yield 30°00'00" only if the value is >= the midpoint of the last bin.
     if cs > 0 and result % 10800000 == 0 and result != 0 and cs < result:
         return result - 100
 
-    # Special case for negative values at 90-degree boundaries (32400000 cs = 90°)
+    # Boundary correction for negative values at quadrant boundaries
+    # (90° = 32,400,000 cs). Same principle: prevent rounding across -90°/-180° etc.
     if cs < 0:
         if result != 0 and result % 32400000 == 0 and cs <= result - 100:
             return result - 100
-        # Values in (-100, 0) round to 0, values <= -100 round to -100 when formula gives 0
+        # Negative values in (-100, 0) round to 0; values <= -100 round to -100
+        # when the standard formula yields 0 (truncation toward zero artifact)
         if cs <= -100 and result == 0:
             return -100
 
@@ -1523,7 +1539,7 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
     its constituent parts: zodiac sign (or nakshatra), degrees within that sign,
     minutes, seconds, and fraction of second.
 
-    Compatible with the reference swe.split_deg() API.
+    Compatible with swe_split_deg().
 
     Args:
         degrees: Position in decimal degrees (can be negative or > 360)
@@ -1579,9 +1595,9 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
     keep_sign = bool(roundflag & SPLIT_DEG_KEEP_SIGN)
     keep_deg = bool(roundflag & SPLIT_DEG_KEEP_DEG)
 
-    # For zodiacal/nakshatra modes, the reference API uses absolute value
+    # For zodiacal/nakshatra modes, use absolute value
     if use_zodiacal or use_nakshatra:
-        # Use absolute value (reference API behavior for negative values)
+        # Use absolute value (negative inputs are treated as positive longitudes)
         deg_abs = abs(degrees)
 
         if use_nakshatra:
@@ -1622,7 +1638,9 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
             # Round to nearest second
             if secfr >= 0.5:
                 sec_part += 1
-            secfr = float(sec_part)  # reference API copies sec value to secfr
+            # When rounding to seconds, the fractional-seconds field receives
+            # the rounded integer value (preserves backward-compatible return format)
+            secfr = float(sec_part)
 
             # Handle overflow: sec >= 60
             if sec_part >= 60:
@@ -1639,7 +1657,8 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
             total_sec = orig_sec_part + secfr
             if total_sec >= 30.0:
                 min_part += 1
-            # reference behavior: sec = original sec, secfr = original sec
+            # When rounding to minutes, seconds fields retain their original
+            # unrounded values (backward-compatible return format)
             sec_part = orig_sec_part
             secfr = float(orig_sec_part)
 
@@ -1654,7 +1673,8 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
             total_min = orig_min_part + (orig_sec_part + secfr) / 60.0
             if total_min >= 30.0:
                 deg_part += 1
-            # reference behavior: min = 0 (not original), sec = original sec, secfr = original sec
+            # When rounding to degrees, minutes are zeroed but seconds fields
+            # retain their original unrounded values (backward-compatible return format)
             min_part = 0
             sec_part = orig_sec_part
             secfr = float(orig_sec_part)

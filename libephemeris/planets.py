@@ -2494,63 +2494,132 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     _PREC_C5 = -0.0000000383  # arcsec/century⁵ (quintic term)
 
     ayanamsha_data = {
-        # Values at J2000.0 (JD 2451545.0)
-        # Precession rate uses IAU 2006 model (~5028.8 arcsec/century at J2000)
-        SE_SIDM_FAGAN_BRADLEY: (24.740300, _PREC_C1),  # Fagan/Bradley
-        SE_SIDM_LAHIRI: (23.857092, _PREC_C1),  # Lahiri
-        SE_SIDM_DELUCE: (27.815753, _PREC_C1),  # De Luce
-        SE_SIDM_RAMAN: (22.410791, _PREC_C1),  # Raman
-        SE_SIDM_USHASHASHI: (20.057541, _PREC_C1),  # Ushashashi
-        SE_SIDM_KRISHNAMURTI: (23.760240, _PREC_C1),  # Krishnamurti
-        SE_SIDM_DJWHAL_KHUL: (28.359679, _PREC_C1),  # Djwhal Khul
-        SE_SIDM_YUKTESHWAR: (22.478803, _PREC_C1),  # Yukteshwar
-        SE_SIDM_JN_BHASIN: (22.762137, _PREC_C1),  # JN Bhasin
-        SE_SIDM_BABYL_KUGLER1: (23.533640, _PREC_C1),  # Babylonian (Kugler 1)
-        SE_SIDM_BABYL_KUGLER2: (24.933640, _PREC_C1),  # Babylonian (Kugler 2)
-        SE_SIDM_BABYL_KUGLER3: (25.783640, _PREC_C1),  # Babylonian (Kugler 3)
-        SE_SIDM_BABYL_HUBER: (24.733640, _PREC_C1),  # Babylonian (Huber)
-        SE_SIDM_BABYL_ETPSC: (24.522528, _PREC_C1),  # Babylonian (ETPSC)
-        SE_SIDM_ALDEBARAN_15TAU: (24.758924, _PREC_C1),  # Aldebaran at 15 Tau
-        SE_SIDM_HIPPARCHOS: (20.247788, _PREC_C1),  # Hipparchos
-        SE_SIDM_SASSANIAN: (19.992959, _PREC_C1),  # Sassanian
-        SE_SIDM_GALCENT_0SAG: (0.0, 0.0),  # Galactic Center at 0 Sag (calculated)
-        SE_SIDM_J2000: (0.0, 0.0),  # J2000 (no ayanamsa)
-        SE_SIDM_J1900: (1.396581, _PREC_C1),  # J1900
-        SE_SIDM_B1950: (0.698370, _PREC_C1),  # B1950
-        SE_SIDM_SURYASIDDHANTA: (20.895059, _PREC_C1),  # Suryasiddhanta
-        SE_SIDM_SURYASIDDHANTA_MSUN: (
-            20.680425,
-            _PREC_C1,
-        ),  # Suryasiddhanta (mean Sun)
-        SE_SIDM_ARYABHATA: (20.895060, _PREC_C1),  # Aryabhata
-        SE_SIDM_ARYABHATA_MSUN: (20.657427, _PREC_C1),  # Aryabhata (mean Sun)
-        SE_SIDM_SS_REVATI: (20.103388, _PREC_C1),  # SS Revati
-        SE_SIDM_SS_CITRA: (23.005763, _PREC_C1),  # SS Citra
-        SE_SIDM_TRUE_CITRA: (0.0, 0.0),  # True Citra (calculated)
-        SE_SIDM_TRUE_REVATI: (0.0, 0.0),  # True Revati (calculated)
-        SE_SIDM_TRUE_PUSHYA: (0.0, 0.0),  # True Pushya (calculated)
-        SE_SIDM_GALCENT_RGILBRAND: (
-            0.0,
-            0.0,
-        ),  # Galactic Center (Gil Brand, calculated)
-        SE_SIDM_GALEQU_IAU1958: (0.0, 0.0),  # Galactic Equator (IAU 1958, calculated)
-        SE_SIDM_GALEQU_TRUE: (0.0, 0.0),  # Galactic Equator (True, calculated)
-        SE_SIDM_GALEQU_MULA: (0.0, 0.0),  # Galactic Equator at Mula (calculated)
-        SE_SIDM_GALALIGN_MARDYKS: (
-            0.0,
-            0.0,
-        ),  # Galactic Alignment (Mardyks, calculated)
-        SE_SIDM_TRUE_MULA: (0.0, 0.0),  # True Mula (calculated)
-        SE_SIDM_GALCENT_MULA_WILHELM: (
-            0.0,
-            0.0,
-        ),  # Galactic Center at Mula (Wilhelm, calculated)
-        SE_SIDM_ARYABHATA_522: (20.575847, _PREC_C1),  # Aryabhata 522
-        SE_SIDM_BABYL_BRITTON: (24.615753, _PREC_C1),  # Babylonian (Britton)
-        SE_SIDM_TRUE_SHEORAN: (0.0, 0.0),  # True Sheoran (calculated)
-        SE_SIDM_GALCENT_COCHRANE: (0.0, 0.0),  # Galactic Center (Cochrane, calculated)
-        SE_SIDM_GALEQU_FIORENZA: (25.000019, _PREC_C1),  # Galactic Equator (Fiorenza)
-        SE_SIDM_VALENS_MOON: (0.0, 0.0),  # Valens (Moon, calculated)
+        # Ayanamsha values at J2000.0 (JD 2451545.0) and precession rates.
+        # Format: (ayanamsa_at_J2000_degrees, precession_rate_arcsec_per_century)
+        #
+        # Well-documented systems have published defining epochs and zero-point
+        # definitions; the J2000 value is computed from these using IAU 2006
+        # precession. Entries marked "(calculated)" are computed dynamically
+        # from star/galactic center positions rather than fixed epoch values.
+        #
+        # --- Well-documented systems with published definitions ---
+        #
+        # Fagan/Bradley: Cyril Fagan & Donald Bradley. Defining epoch chosen
+        # so that the sidereal longitude of Spica = 29°06'05" Virgo.
+        # See: Fagan, "Zodiacs Old and New" (1951); Bradley, "Sidereal Time
+        # and the Synetic Vernal Point" (1950 NCGR).
+        SE_SIDM_FAGAN_BRADLEY: (24.740300, _PREC_C1),
+        #
+        # Lahiri (Chitrapaksha): Official Indian government ayanamsha.
+        # Defined so that the sidereal longitude of Spica = 0° Libra.
+        # See: Indian Calendar Reform Committee (N.C. Lahiri, 1957);
+        # Indian Astronomical Ephemeris (published annually by Positional
+        # Astronomy Centre, Kolkata).
+        SE_SIDM_LAHIRI: (23.857092, _PREC_C1),
+        #
+        # Krishnamurti: K.S. Krishnamurti, "Krishnamurti Paddhati" (KP system).
+        # Based on Newcomb's precession with a specific initial epoch.
+        SE_SIDM_KRISHNAMURTI: (23.760240, _PREC_C1),
+        #
+        # Raman: B.V. Raman, "A Manual of Hindu Astrology" (1935).
+        # Ayanamsha = 21°00'00" at 1900 CE.
+        SE_SIDM_RAMAN: (22.410791, _PREC_C1),
+        #
+        # Yukteshwar: Sri Yukteshwar Giri, "The Holy Science" (1894/1949).
+        # Based on a precessional cycle of 24,000 years.
+        SE_SIDM_YUKTESHWAR: (22.478803, _PREC_C1),
+        #
+        # --- Indian textual traditions ---
+        #
+        # Suryasiddhanta: Classical Indian astronomical text (~4th c. CE).
+        # Zero ayanamsha at 499 CE (Aryabhata epoch).
+        SE_SIDM_SURYASIDDHANTA: (20.895059, _PREC_C1),
+        SE_SIDM_SURYASIDDHANTA_MSUN: (20.680425, _PREC_C1),  # mean Sun variant
+        #
+        # Aryabhata: Aryabhatiya (499 CE). Zero ayanamsha at 499 CE.
+        SE_SIDM_ARYABHATA: (20.895060, _PREC_C1),
+        SE_SIDM_ARYABHATA_MSUN: (20.657427, _PREC_C1),  # mean Sun variant
+        SE_SIDM_ARYABHATA_522: (20.575847, _PREC_C1),  # epoch 522 CE variant
+        #
+        # SS Revati / SS Citra: Suryasiddhanta star-referenced variants.
+        # Revati (zeta Piscium) at 0° Aries; Citra (Spica) at 0° Libra.
+        SE_SIDM_SS_REVATI: (20.103388, _PREC_C1),
+        SE_SIDM_SS_CITRA: (23.005763, _PREC_C1),
+        #
+        # --- Other astrological traditions ---
+        #
+        # De Luce: Robert De Luce, "Constellational Astrology" (1963).
+        SE_SIDM_DELUCE: (27.815753, _PREC_C1),
+        # Ushashashi: Ushashashi ayanamsha (Indian tradition).
+        SE_SIDM_USHASHASHI: (20.057541, _PREC_C1),
+        # Djwhal Khul: Theosophical/esoteric tradition (Alice Bailey).
+        SE_SIDM_DJWHAL_KHUL: (28.359679, _PREC_C1),
+        # JN Bhasin: J.N. Bhasin ayanamsha.
+        SE_SIDM_JN_BHASIN: (22.762137, _PREC_C1),
+        #
+        # --- Babylonian systems ---
+        # J2000 epoch values computed from defining reference epochs using
+        # IAU 2006 precession. Original definitions reference Babylonian
+        # star catalogs and Normal Star positions.
+        #
+        # Kugler 1/2/3: F.X. Kugler, "Sternkunde und Sterndienst in Babel"
+        # (1907-1924). Three different proposed zero-point solutions.
+        SE_SIDM_BABYL_KUGLER1: (23.533640, _PREC_C1),
+        SE_SIDM_BABYL_KUGLER2: (24.933640, _PREC_C1),
+        SE_SIDM_BABYL_KUGLER3: (25.783640, _PREC_C1),
+        #
+        # Huber: Peter Huber, "Über den Nullpunkt der babylonischen Ekliptik",
+        # Centaurus 5 (1958), pp. 192-208.
+        SE_SIDM_BABYL_HUBER: (24.733640, _PREC_C1),
+        #
+        # ETPSC: R. Mercier, "Studies in the Medieval Conception of Precession",
+        # Archives Internationales d'Histoire des Sciences 26 (1976/77).
+        SE_SIDM_BABYL_ETPSC: (24.522528, _PREC_C1),
+        #
+        # Britton: John P. Britton, "Studies in Babylonian Lunar Theory",
+        # Archive for History of Exact Sciences 64 (2010).
+        SE_SIDM_BABYL_BRITTON: (24.615753, _PREC_C1),
+        #
+        # --- Star-anchored / historical systems ---
+        #
+        # Aldebaran at 15° Taurus: defined by fixing Aldebaran's sidereal
+        # longitude, from Babylonian Normal Star tradition.
+        SE_SIDM_ALDEBARAN_15TAU: (24.758924, _PREC_C1),
+        # Hipparchos: zero-point inferred from Hipparchus' star catalog (~130 BCE).
+        SE_SIDM_HIPPARCHOS: (20.247788, _PREC_C1),
+        # Sassanian: derived from Sassanid Persian astronomical tables (~3rd-7th c. CE).
+        SE_SIDM_SASSANIAN: (19.992959, _PREC_C1),
+        #
+        # --- Standard equinox references ---
+        #
+        SE_SIDM_J2000: (0.0, 0.0),  # J2000 (no ayanamsa, identity)
+        # J1900 / B1950: precession accumulated since these standard epochs.
+        SE_SIDM_J1900: (1.396581, _PREC_C1),
+        SE_SIDM_B1950: (0.698370, _PREC_C1),
+        #
+        # --- Galactic equator / Fiorenza ---
+        #
+        # Fiorenza: Nick Anthony Fiorenza, "The Sidereal Zodiac & Ayanamsha".
+        SE_SIDM_GALEQU_FIORENZA: (25.000019, _PREC_C1),
+        #
+        # --- Dynamically calculated systems (star/galactic positions) ---
+        # These use (0.0, 0.0) as placeholder; actual ayanamsha is computed
+        # from real-time astronomical positions below.
+        #
+        SE_SIDM_GALCENT_0SAG: (0.0, 0.0),  # Galactic Center at 0° Sagittarius
+        SE_SIDM_TRUE_CITRA: (0.0, 0.0),  # True position of Spica at 0° Libra
+        SE_SIDM_TRUE_REVATI: (0.0, 0.0),  # True position of Revati (zeta Psc)
+        SE_SIDM_TRUE_PUSHYA: (0.0, 0.0),  # True position of Pushya (delta Cnc)
+        SE_SIDM_TRUE_MULA: (0.0, 0.0),  # True position of Mula (lambda Sco)
+        SE_SIDM_TRUE_SHEORAN: (0.0, 0.0),  # True Sheoran
+        SE_SIDM_GALCENT_RGILBRAND: (0.0, 0.0),  # Galactic Center (R. Gil Brand)
+        SE_SIDM_GALEQU_IAU1958: (0.0, 0.0),  # Galactic Equator (IAU 1958 node)
+        SE_SIDM_GALEQU_TRUE: (0.0, 0.0),  # Galactic Equator (true node)
+        SE_SIDM_GALEQU_MULA: (0.0, 0.0),  # Galactic Equator at Mula
+        SE_SIDM_GALALIGN_MARDYKS: (0.0, 0.0),  # Galactic Alignment (Mardyks)
+        SE_SIDM_GALCENT_MULA_WILHELM: (0.0, 0.0),  # Gal. Center at Mula (Wilhelm)
+        SE_SIDM_GALCENT_COCHRANE: (0.0, 0.0),  # Galactic Center (Cochrane)
+        SE_SIDM_VALENS_MOON: (0.0, 0.0),  # Valens (Moon-based)
     }
 
     # For modes that need astronomical calculation (marked with 0.0, 0.0)

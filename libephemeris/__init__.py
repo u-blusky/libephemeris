@@ -447,17 +447,21 @@ from .hypothetical import (  # Hamburg School Uranian planets
     VULCAN_ELEMENTS,  # Vulcan orbital elements
     WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements
     PICKERING_PLANET_X_ELEMENTS,  # Pickering's Planet O/X orbital elements
-    # Orbital elements parser for custom hypothetical bodies
-    parse_seorbel,
+    # Orbital elements parser for custom hypothetical bodies (canonical names)
+    parse_orbital_elements,
+    OrbitalElements,
+    get_orbital_body_by_name,
+    calc_orbital_position,
     get_bundled_fictitious_orbits_path,
     load_bundled_fictitious_orbits,
-    # Backward-compatibility shims (delegate to the functions above)
-    get_bundled_seorbel_path,
-    load_bundled_seorbel,
+    # Backward-compatible aliases (legacy SE-derived names)
+    parse_seorbel,
     SeorbelElements,
-    TPolynomial,
     get_seorbel_body_by_name,
     calc_seorbel_position,
+    get_bundled_seorbel_path,
+    load_bundled_seorbel,
+    TPolynomial,
     SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
     SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
     SE_ZEUS as SE_ZEUS_HYPO,  # Alias to avoid conflict with constants.py
@@ -1106,17 +1110,21 @@ __all__ = [
     "VULCAN_ELEMENTS",
     "WALDEMATH_ELEMENTS",  # Waldemath Moon orbital elements
     "PICKERING_PLANET_X_ELEMENTS",  # Pickering's Planet O/X orbital elements
-    # Orbital elements parser for custom hypothetical bodies
-    "parse_seorbel",
+    # Orbital elements parser for custom hypothetical bodies (canonical names)
+    "parse_orbital_elements",
+    "OrbitalElements",
+    "get_orbital_body_by_name",
+    "calc_orbital_position",
     "get_bundled_fictitious_orbits_path",
     "load_bundled_fictitious_orbits",
-    # Backward-compatibility shims
-    "get_bundled_seorbel_path",
-    "load_bundled_seorbel",
+    # Backward-compatible aliases (legacy SE-derived names)
+    "parse_seorbel",
     "SeorbelElements",
-    "TPolynomial",
     "get_seorbel_body_by_name",
     "calc_seorbel_position",
+    "get_bundled_seorbel_path",
+    "load_bundled_seorbel",
+    "TPolynomial",
     # Planetary moons (Galilean moons, Titan, etc.)
     "register_moon_spk",
     "unregister_moon_spk",
