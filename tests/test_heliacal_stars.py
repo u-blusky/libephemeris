@@ -5,7 +5,7 @@ Tests the calculation of heliacal rising and setting events for bright fixed sta
 The heliacal rising of Sirius was crucial for the Egyptian calendar and marked
 the beginning of the Nile flood season.
 
-Reference: Swiss Ephemeris documentation and historical astronomical records.
+Reference: Historical astronomical records and Meeus, Astronomical Algorithms.
 """
 
 import pytest

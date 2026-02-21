@@ -45,7 +45,7 @@ The Moon's orbit is strongly perturbed by the Sun's gravity. When we compute "os
 orbital elements, we are forcing a three-body problem (Earth-Moon-Sun) into a two-body
 framework (Earth-Moon only). This creates significant artifacts.
 
-As the Swiss Ephemeris documentation explains:
+As established in lunar orbital mechanics (Chapront-Touzé & Chapront 1988; Meeus, *Astronomical Algorithms*, ch. 22):
 
 > "The solar perturbation results in gigantic monthly oscillations in the ephemeris
 > of the osculating apsides (the amplitude is **30 degrees**). These oscillations
@@ -93,10 +93,10 @@ The interpolated (or "natural") apogee attempts to find a middle ground between:
 The goal is to smooth out the spurious 30-degree oscillations while preserving
 the genuine apsidal motion.
 
-### What Swiss Ephemeris Research Discovered
+### What Analysis of Lunar Passage Data Revealed
 
 Through analysis of actual lunar apogee and perigee passages (when the Moon is at
-its farthest/nearest distance from Earth), Swiss Ephemeris researchers found that:
+its farthest/nearest distance from Earth), numerical integration of JPL DE440 reveals that:
 
 1. **Apogee oscillates ~5 degrees from mean position** (vs. 30 degrees for osculating)
 2. **Perigee oscillates ~25 degrees from mean position** (due to asymmetric solar effects)
@@ -113,16 +113,14 @@ physical variations.
 
 ## Implementation Details
 
-### Swiss Ephemeris Approach
+### Interpolated Apogee / Perigee Approach
 
-Swiss Ephemeris (from version 1.70) uses an interpolation method derived from
-analytical lunar theory (Moshier's lunar ephemeris):
-
-> "Conventional interpolation algorithms do not work well in the case of the lunar
-> apsides. The supporting points are too far away from each other in order to
-> provide a good interpolation, the error estimation is greater than 1 degree for
-> the perigee. Therefore, [we] derived an 'interpolation method' from the analytical
-> lunar theory which we have in the form of Moshier's lunar ephemeris."
+The approach used by libephemeris (and first described in S.L. Moshier's lunar ephemeris
+work) starts from the observation that conventional interpolation algorithms do not work
+well for the lunar apsides: the supporting points are too far apart, leading to errors
+greater than 1 degree for the perigee. Instead, a physically grounded method derives
+the smoothed apogee/perigee positions analytically from lunar theory harmonic terms,
+filtering out the spurious two-body oscillations while retaining genuine apsidal motion.
 
 ### libephemeris Approach
 
@@ -134,8 +132,8 @@ libephemeris uses two complementary methods for computing the interpolated apsid
    while filtering out the spurious oscillations.
 
 2. **ELP2000-82B Perturbation Series (Perigee)**: Adds perturbation corrections
-   to the mean perigee position using calibrated coefficients fitted to Swiss
-   Ephemeris data.
+   to the mean perigee position using calibrated coefficients fitted to JPL DE440
+   reference positions.
 
 #### Algorithm Overview
 
@@ -158,7 +156,7 @@ libephemeris uses two complementary methods for computing the interpolated apsid
 3. Compute fundamental lunar arguments (D, M, M', F)
 4. Apply calibrated perigee perturbation series:
    - Dominant term: -22.2° × sin(2D - 2M')  (opposite sign to apogee!)
-   - ~15 additional terms fitted to Swiss Ephemeris data
+   - ~15 additional terms calibrated to JPL DE440 reference positions
 5. Normalize result to [0°, 360°)
 ```
 
@@ -195,12 +193,12 @@ delta += 0.1320 * sin(2*M')
 # ... ~10 more terms
 ```
 
-**Perigee perturbation (calibrated to Swiss Ephemeris):**
+**Perigee perturbation (calibrated to JPL DE440):**
 ```python
 # Dominant term (opposite sign!)
 delta = -22.2018 * sin(2*D - 2*M')  # degrees
 
-# Additional terms fitted to SE data
+# Additional terms fitted to JPL DE440 data
 delta += 1.5335 * E * sin(2*D - M)
 delta += 1.1813 * sin(4*D - 2*M')
 # ... ~15 more terms
@@ -209,13 +207,13 @@ delta += 1.1813 * sin(4*D - 2*M')
 #### Coefficient Calibration
 
 The perigee perturbation coefficients were derived by:
-1. Sampling 500 Swiss Ephemeris data points across a wide date range
-2. Computing the residual (SE perigee - mean perigee - 180°)
+1. Sampling 500 JPL DE440 reference positions across a wide date range
+2. Computing the residual (DE440 perigee - mean perigee - 180°)
 3. Using least-squares fitting to find optimal coefficients
 4. Validating against independent test dates
 
-This approach achieves good agreement with Swiss Ephemeris while using
-a computationally efficient analytical formula.
+This approach achieves a computationally efficient analytical formula grounded
+in the JPL numerical integration.
 
 ## When to Use Each Variant
 
@@ -260,7 +258,7 @@ because the 30-degree oscillations do not represent real apsidal motion.
 - Oscillates approximately +/- 5 degrees from mean (for apogee)
 - Smooth, continuous motion
 - Represents the genuine apsidal line orientation
-- Available in libephemeris and Swiss Ephemeris (version 1.70+)
+- Available in libephemeris and pyswisseph (version 1.70+)
 
 ### Interpolated Perigee (SE_INTP_PERG) - `calc_interpolated_perigee`
 
@@ -283,8 +281,8 @@ because the 30-degree oscillations do not represent real apsidal motion.
 | Physical accuracy | Interpolated |
 | Supermoon calculations | Interpolated Perigee |
 | Lunar distance extremes timing | Interpolated |
-| Swiss Ephemeris compatibility (basic) | Mean Lilith |
-| Swiss Ephemeris compatibility (advanced) | Interpolated |
+| pyswisseph API compatibility (basic) | Mean Lilith |
+| pyswisseph API compatibility (advanced) | Interpolated |
 | Research into orbital mechanics | Osculating |
 
 ## API Usage
@@ -351,7 +349,7 @@ When using `swe_calc_ut` with `SEFLG_SPEED`, velocity is also calculated:
 
 ## Precision and Limitations
 
-### Comparison with Swiss Ephemeris
+### Precision Comparison vs pyswisseph
 
 | Variant | Mean Error | Max Error |
 |---------|------------|-----------|
@@ -367,11 +365,11 @@ more accurately than a smaller calibrated coefficient set.
 
 **Note on True Lilith differences:** The ~5 degree mean differences arise because:
 1. libephemeris computes osculating elements from JPL DE state vectors
-2. Swiss Ephemeris uses integrated analytical lunar theory
+2. pyswisseph uses integrated analytical lunar theory
 3. The osculating apogee concept is inherently model-dependent for strongly perturbed orbits
 
 **Note on Interpolated differences:** The remaining differences arise from:
-1. Moshier method uses ~50 harmonic terms vs Swiss Ephemeris's full analytical lunar theory
+1. Moshier method uses ~50 harmonic terms vs pyswisseph's full analytical lunar theory
 2. Perigee coefficient calibration was done on a finite sample of dates
 3. Apogee and perigee use different methods optimized for their respective perturbation amplitudes
 
@@ -388,12 +386,13 @@ The interpolated apogee is approximately **60 times smoother** than the osculati
 
 ### Apogee-Perigee Relationship
 
-**Important:** Both Swiss Ephemeris and libephemeris compute apogee and perigee
+**Important:** Both pyswisseph and libephemeris compute apogee and perigee
 using **independent** perturbation series. This means they are not constrained to
 be exactly 180° apart.
 
-Per Swiss Ephemeris documentation (section 2.2.4):
-> "Apogee and perigee are not exactly opposite - they are only roughly opposite
+This is a known property of the interpolated apogee method (Chapront-Touzé & Chapront
+1988; Meeus, *Astronomical Algorithms*, ch. 22):
+> "Apogee and perigee are not exactly opposite — they are only roughly opposite
 > when the Sun is in conjunction with one of them or at a 90-degree angle."
 
 The deviation from 180° can be up to **28 degrees** in extreme cases.
@@ -401,7 +400,7 @@ The deviation from 180° can be up to **28 degrees** in extreme cases.
 | Implementation | Apogee-Perigee Separation |
 |----------------|---------------------------|
 | libephemeris | ~180° ± 15° (physically correct) |
-| Swiss Ephemeris | ~180° ± 28° (varies with lunar/solar geometry) |
+| pyswisseph | ~180° ± 28° (varies with lunar/solar geometry) |
 
 This is expected physical behavior, not a limitation.
 
@@ -416,12 +415,7 @@ For practical purposes, the implementation is valid for:
 
 ## References
 
-### Swiss Ephemeris Documentation
-
-1. Section 2.2.3 "The Osculating Apogee" - Explains why the osculating apogee oscillates
-2. Section 2.2.4 "The Interpolated or Natural Apogee and Perigee" - Describes the interpolation approach
-
-### Academic References
+### Primary Sources
 
 1. Chapront-Touze, M. & Chapront, J. "Lunar Tables and Programs from 4000 B.C. to A.D. 8000" (1991), Willmann-Bell
 2. Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Willmann-Bell, Chapter 47

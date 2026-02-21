@@ -1,5 +1,5 @@
 """
-Swiss Ephemeris API-compatible constants for libephemeris.
+Reference API-compatible constants for libephemeris.
 
 This module defines all constants used for planetary calculations, including:
 - Planet/Body IDs: Numeric identifiers for celestial bodies
@@ -9,7 +9,7 @@ This module defines all constants used for planetary calculations, including:
 - Eclipse Types: Classification of solar and lunar eclipses
 
 Constants are organized into logical groups for easy navigation.
-Values match Swiss Ephemeris v2.x for API compatibility.
+Values match reference API v2.x for API compatibility.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ SE_URANUS: int = 7
 SE_NEPTUNE: int = 8
 SE_PLUTO: int = 9
 
-# Planet aliases without SE_ prefix for pyswisseph compatibility
+# Planet aliases without SE_ prefix for reference API compatibility
 SUN: int = SE_SUN
 MOON: int = SE_MOON
 MERCURY: int = SE_MERCURY
@@ -84,7 +84,7 @@ SE_ADMETOS: int = SE_FICT_OFFSET + 5  # 45 - Sixth Uranian planet (Admetos)
 SE_VULKANUS: int = SE_FICT_OFFSET + 6  # 46 - Seventh Uranian planet (Vulkanus)
 SE_POSEIDON: int = SE_FICT_OFFSET + 7  # 47 - Eighth Uranian planet (Poseidon)
 
-# Pyswisseph-compatible aliases for Uranian planets
+# Reference API-compatible aliases for Uranian planets
 CUPIDO: int = SE_CUPIDO
 HADES: int = SE_HADES
 ZEUS: int = SE_ZEUS
@@ -94,47 +94,47 @@ ADMETOS: int = SE_ADMETOS
 VULKANUS: int = SE_VULKANUS
 POSEIDON: int = SE_POSEIDON
 
-# Transpluto (Isis) - hypothetical trans-Plutonian planet (section 2.7.2 of Swiss Ephemeris docs)
+# Transpluto (Isis) - hypothetical trans-Plutonian planet
 SE_ISIS: int = SE_FICT_OFFSET + 8  # 48 - Transpluto/Isis
 SE_TRANSPLUTO: int = SE_ISIS  # Alias for SE_ISIS
-ISIS: int = SE_ISIS  # Pyswisseph-compatible alias
-TRANSPLUTO: int = SE_TRANSPLUTO  # Pyswisseph-compatible alias
+ISIS: int = SE_ISIS  # Reference API-compatible alias
+TRANSPLUTO: int = SE_TRANSPLUTO  # Reference API-compatible alias
 
-# Vulcan - hypothetical intramercurial planet (section 2.7.5 of Swiss Ephemeris docs / seorbel.txt #16)
+# Vulcan - hypothetical intramercurial planet
 SE_VULCAN: int = SE_FICT_OFFSET + 15  # 55 - Intramercurial hypothetical planet
-VULCAN: int = SE_VULCAN  # Pyswisseph-compatible alias
+VULCAN: int = SE_VULCAN  # Reference API-compatible alias
 
-# Waldemath - Dr. Waldemath's hypothetical second moon of Earth (section 2.7.7 of Swiss Ephemeris docs / seorbel.txt #18)
+# Waldemath - Dr. Waldemath's hypothetical second moon of Earth
 # Note: This is different from Mean Lilith and True Lilith which are lunar apogee points
 SE_WALDEMATH: int = SE_FICT_OFFSET + 18  # 58 - Waldemath's hypothetical Dark Moon
-WALDEMATH: int = SE_WALDEMATH  # Pyswisseph-compatible alias
+WALDEMATH: int = SE_WALDEMATH  # Reference API-compatible alias
 
-# Planet X Leverrier - Leverrier's calculated "Planet X" that led to Neptune's discovery (section 2.7.8 of Swiss Ephemeris docs / seorbel.txt #12)
+# Planet X Leverrier - Leverrier's calculated "Planet X" that led to Neptune's discovery
 # This is the orbital elements Leverrier computed in 1846 to predict the position of Neptune.
 # Historical note: Leverrier called it "Planet X" before Neptune was discovered at that position.
 SE_PLANET_X_LEVERRIER: int = (
     SE_FICT_OFFSET + 11
 )  # 51 - Leverrier's Planet X (Neptune prediction)
-PLANET_X_LEVERRIER: int = SE_PLANET_X_LEVERRIER  # Pyswisseph-compatible alias
+PLANET_X_LEVERRIER: int = SE_PLANET_X_LEVERRIER  # Reference API-compatible alias
 
 # Planet X Adams - Adams' calculated "Planet X" (independently derived, similar to Leverrier's)
 # John Couch Adams independently predicted Neptune's position around the same time as Leverrier.
-# This uses Adams' orbital elements from seorbel.txt #13 (SE_FICT_OFFSET + 12 = 52).
+# This uses Adams' orbital elements prediction (SE_FICT_OFFSET + 12 = 52).
 SE_PLANET_X_ADAMS: int = (
     SE_FICT_OFFSET + 12
 )  # 52 - Adams' Planet X (Neptune prediction)
-PLANET_X_ADAMS: int = SE_PLANET_X_ADAMS  # Pyswisseph-compatible alias
+PLANET_X_ADAMS: int = SE_PLANET_X_ADAMS  # Reference API-compatible alias
 
 # Planet X Lowell - Percival Lowell's predicted "Planet X" that led to Pluto's discovery
 # Lowell predicted a trans-Neptunian planet based on perceived perturbations in Uranus's orbit.
 # The search based on his predictions eventually led to Clyde Tombaugh's discovery of Pluto in 1930,
 # though Pluto was too small to be Lowell's predicted Planet X.
-# This uses Lowell's orbital elements from seorbel.txt #14 (SE_FICT_OFFSET + 13 = 53).
+# This uses Lowell's orbital elements prediction (SE_FICT_OFFSET + 13 = 53).
 # Orbital elements (1915 prediction): a=43.0 AU, e=0.202, i=10°
 SE_PLANET_X_LOWELL: int = (
     SE_FICT_OFFSET + 13
 )  # 53 - Lowell's Planet X (Pluto prediction)
-PLANET_X_LOWELL: int = SE_PLANET_X_LOWELL  # Pyswisseph-compatible alias
+PLANET_X_LOWELL: int = SE_PLANET_X_LOWELL  # Reference API-compatible alias
 
 # Planet X Pickering - William H. Pickering's predicted "Planet O" (1919)
 # Pickering proposed several trans-Neptunian planets (Planet O, P, Q, R, S, T, U).
@@ -145,27 +145,27 @@ PLANET_X_LOWELL: int = SE_PLANET_X_LOWELL  # Pyswisseph-compatible alias
 # - Orbital period: ~373.5 years
 # Like Lowell's Planet X, these predictions were based on supposed perturbations in outer
 # planet orbits, which later proved to be observational errors.
-# This uses seorbel.txt #15 (SE_FICT_OFFSET + 14 = 54).
+# This uses Pickering's orbital elements prediction (SE_FICT_OFFSET + 14 = 54).
 SE_PLANET_X_PICKERING: int = (
     SE_FICT_OFFSET + 14
 )  # 54 - Pickering's Planet O/X prediction
-PLANET_X_PICKERING: int = SE_PLANET_X_PICKERING  # Pyswisseph-compatible alias
+PLANET_X_PICKERING: int = SE_PLANET_X_PICKERING  # Reference API-compatible alias
 
 # White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
-# In Swiss Ephemeris, this is calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
+# Calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
 # Note: Some systems use True Lilith + 180° instead; libephemeris supports both via calc_white_moon_position()
 SE_WHITE_MOON: int = (
     SE_FICT_OFFSET + 16
 )  # 56 - White Moon Selena (opposite to Black Moon Lilith)
-WHITE_MOON: int = SE_WHITE_MOON  # Pyswisseph-compatible alias
+WHITE_MOON: int = SE_WHITE_MOON  # Reference API-compatible alias
 SE_SELENA: int = SE_WHITE_MOON  # Alias - Selena is another name for White Moon
-SELENA: int = SE_WHITE_MOON  # Pyswisseph-compatible alias
+SELENA: int = SE_WHITE_MOON  # Reference API-compatible alias
 
 # Proserpina - hypothetical trans-Plutonian planet used by some astrologers
-# This is a hypothetical body not in the standard Swiss Ephemeris seorbel.txt
+# This is a hypothetical body not in the standard fictitious bodies set
 # Orbital elements are based on traditional astrological sources
 SE_PROSERPINA: int = SE_FICT_OFFSET + 17  # 57 - Hypothetical trans-Plutonian planet
-PROSERPINA: int = SE_PROSERPINA  # Pyswisseph-compatible alias
+PROSERPINA: int = SE_PROSERPINA  # Reference API-compatible alias
 
 SE_NALL_NAT_POINTS: int = SE_NPLANETS + SE_NFICT_ELEM + SE_AST_OFFSET + SE_COMET_OFFSET
 
@@ -575,8 +575,8 @@ SE_PARS_FIDEI: int = SE_ARABIC_OFFSET + 4  # Part of Faith
 SEFLG_JPLEPH: int = (
     1  # Use JPL ephemeris (default: DE440 via Skyfield, range 1550-2650 CE)
 )
-SEFLG_SWIEPH: int = 2  # Use Swiss Ephemeris (same as JPLEPH in libephemeris)
-SEFLG_MOSEPH: int = 4  # Use Moshier semi-analytical ephemeris (VSOP87 + ELP2000-82B, range -3000..+3000 CE)
+SEFLG_SWIEPH: int = 2  # Use reference ephemeris (same as JPLEPH in libephemeris)
+SEFLG_MOSEPH: int = 4  # Semi-analytical ephemeris flag (accepted for API compatibility, always uses JPL)
 
 # Observer location and reference frame
 SEFLG_HELCTR: int = 8  # Heliocentric position
@@ -597,10 +597,10 @@ SEFLG_SIDEREAL: int = 65536  # Sidereal positions
 SEFLG_ICRS: int = 131072  # ICRS reference frame
 
 # =============================================================================
-# PYSWISSEPH-COMPATIBLE FLAG ALIASES (FLG_* instead of SEFLG_*)
+# REFERENCE API-COMPATIBLE FLAG ALIASES (FLG_* instead of SEFLG_*)
 # =============================================================================
-# pyswisseph uses FLG_* prefix while Swiss Ephemeris C library uses SEFLG_*
-# These aliases provide full API compatibility with pyswisseph
+# FLG_* prefix aliases for SEFLG_* flags
+# These aliases provide full API compatibility
 
 FLG_JPLEPH: int = SEFLG_JPLEPH
 FLG_SWIEPH: int = SEFLG_SWIEPH
@@ -688,9 +688,9 @@ SE_SIDM_VALENS_MOON: int = 42  # Vettius Valens (Moon-based)
 SE_SIDM_USER: int = 255  # User-defined ayanamsha
 
 # =============================================================================
-# PYSWISSEPH-COMPATIBLE SIDEREAL MODE ALIASES (SIDM_* instead of SE_SIDM_*)
+# REFERENCE API-COMPATIBLE SIDEREAL MODE ALIASES (SIDM_* instead of SE_SIDM_*)
 # =============================================================================
-# pyswisseph uses SIDM_* prefix while Swiss Ephemeris C library uses SE_SIDM_*
+# SIDM_* prefix aliases for SE_SIDM_* constants
 
 # Western sidereal traditions
 SIDM_FAGAN_BRADLEY: int = SE_SIDM_FAGAN_BRADLEY
@@ -793,7 +793,7 @@ SE_ECL_3RD_VISIBLE: int = 2048  # Third contact visible
 SE_ECL_4TH_VISIBLE: int = 4096  # Fourth contact visible
 SE_ECL_ONE_TRY: int = 32768  # Try only once (optimization flag)
 
-# pyswisseph-compatible alias for grazing occultation
+# reference API-compatible alias for grazing occultation
 ECL_GRAZING: int = SE_ECL_GRAZING
 
 # ============================================================================
@@ -806,7 +806,7 @@ SE_NODBIT_OSCU: int = 2  # Osculating elements (instantaneous/perturbed)
 SE_NODBIT_OSCU_BAR: int = 4  # Barycentric osculating elements
 SE_NODBIT_FOPOINT: int = 256  # Focal point (second focus of ellipse)
 
-# pyswisseph-compatible aliases (without SE_ prefix)
+# reference API-compatible aliases (without SE_ prefix)
 NODBIT_MEAN: int = SE_NODBIT_MEAN
 NODBIT_OSCU: int = SE_NODBIT_OSCU
 NODBIT_OSCU_BAR: int = SE_NODBIT_OSCU_BAR
@@ -831,7 +831,7 @@ SE_BIT_NAUTIC_TWILIGHT: int = 2048  # Nautical twilight (Sun at -12 degrees)
 SE_BIT_ASTRO_TWILIGHT: int = 4096  # Astronomical twilight (Sun at -18 degrees)
 SE_BIT_FIXED_DISC_SIZE: int = 16384  # Use fixed disc size (ignore parallax)
 
-# pyswisseph-compatible aliases (without SE_ prefix)
+# reference API-compatible aliases (without SE_ prefix)
 CALC_RISE: int = SE_CALC_RISE
 CALC_SET: int = SE_CALC_SET
 CALC_MTRANSIT: int = SE_CALC_MTRANSIT
@@ -856,7 +856,7 @@ SE_EVENING_LAST: int = SE_HELIACAL_SETTING  # Alias: last visibility at evening
 SE_EVENING_FIRST: int = 3  # First visibility at evening (after superior conjunction)
 SE_MORNING_LAST: int = 4  # Last visibility at morning (before superior conjunction)
 
-# pyswisseph-compatible aliases (without SE_ prefix)
+# reference API-compatible aliases (without SE_ prefix)
 HELIACAL_RISING: int = SE_HELIACAL_RISING
 HELIACAL_SETTING: int = SE_HELIACAL_SETTING
 MORNING_FIRST: int = SE_MORNING_FIRST
@@ -874,7 +874,7 @@ SE_HELFLAG_NO_DETAILS: int = 1 << 10  # 1024 - Skip detailed calculations
 SE_HELFLAG_VISLIM_DARK: int = 1 << 11  # 2048 - Assume Sun at nadir (dark sky)
 SE_HELFLAG_VISLIM_NOMOON: int = 1 << 12  # 4096 - Exclude Moon's contribution
 
-# pyswisseph-compatible aliases (without SE_ prefix)
+# reference API-compatible aliases (without SE_ prefix)
 HELFLAG_OPTICAL_PARAMS: int = SE_HELFLAG_OPTICAL_PARAMS
 HELFLAG_NO_DETAILS: int = SE_HELFLAG_NO_DETAILS
 HELFLAG_VISLIM_DARK: int = SE_HELFLAG_VISLIM_DARK
@@ -925,7 +925,7 @@ SE_TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
 SE_TIDAL_DEFAULT: float = SE_TIDAL_DE440  # Default value based on DE440
 SE_TIDAL_AUTOMATIC: float = 0.0  # Let library choose based on ephemeris file
 
-# pyswisseph-compatible aliases (without SE_ prefix)
+# reference API-compatible aliases (without SE_ prefix)
 TIDAL_DE200: float = SE_TIDAL_DE200
 TIDAL_DE403: float = SE_TIDAL_DE403
 TIDAL_DE404: float = SE_TIDAL_DE404
@@ -970,7 +970,7 @@ DAYS_PER_JULIAN_CENTURY: float = 36525.0
 # =============================================================================
 # PLANETARY MOON IDENTIFIERS
 # =============================================================================
-# Body IDs for planetary satellites (moons) following Swiss Ephemeris 2.10+ convention
+# Body IDs for planetary satellites (moons) following reference API 2.10+ convention
 # These require satellite SPK files (jup365.bsp, sat441.bsp, etc.) to be registered
 # using register_moon_spk() before calculation.
 
@@ -1009,7 +1009,7 @@ SE_MOON_DEIMOS: int = SE_MOON_OFFSET + 42  # Mars II - smaller, farther moon
 # Pluto's Moon
 SE_MOON_CHARON: int = SE_MOON_OFFSET + 51  # Pluto I - largest moon (binary system)
 
-# Aliases without SE_ prefix for pyswisseph compatibility
+# Aliases without SE_ prefix for reference API compatibility
 MOON_IO: int = SE_MOON_IO
 MOON_EUROPA: int = SE_MOON_EUROPA
 MOON_GANYMEDE: int = SE_MOON_GANYMEDE

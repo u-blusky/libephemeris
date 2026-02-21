@@ -67,11 +67,11 @@ export LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD=1
 export LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1
 ```
 
-### 4. Swiss Ephemeris Data Files
+### 4. Ephemeris Data Files
 
 Some tests require ephemeris data files in `swisseph/ephe/`:
 
-- `seorbel.txt` - orbital elements
+- `fictitious_orbits.csv` - bundled orbital elements dataset (included in package)
 - Asteroid/TNO data files
 
 ---

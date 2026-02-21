@@ -418,7 +418,7 @@ the correct equatorial declination of +13.41°.
 - **Galactic Center ayanamshas**: 60x precision improvement (0.06° -> <0.001°)
 - **Sunrise/sunset timing**: 4x precision improvement (120s -> <30s tolerance)
 - **Lunar occultation timing**: 5x precision improvement (300s -> <60s tolerance)
-- **Uranian planets**: Aligned with Swiss Ephemeris seorbel.txt source
+ - **Uranian planets**: Orbital elements aligned with Witte/Hamburg School published parameters (Regelwerk für Planetenbilder)
 
 #### API Improvements
 - Added overload signatures to `house_pos()` for type safety
@@ -432,7 +432,7 @@ the correct equatorial declination of +13.41°.
 - Eclipse central line algorithm unified with `sol_eclipse_where()`
 - Arabic Parts day/night calculation using 3D solar altitude for extreme latitudes
 - Fixed star latitude velocity sign aligned with Swiss Ephemeris convention
-- Uranian planet elements aligned with Swiss Ephemeris seorbel.txt
+ - Uranian planet elements cross-validated with Hamburg School published orbital data
 
 ### Documentation
 

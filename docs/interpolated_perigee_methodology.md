@@ -205,4 +205,4 @@ python scripts/generate_lunar_corrections.py
 - Chapront-Touzé, M. & Chapront, J. (1988). "ELP 2000-82B: A semi-analytical lunar ephemeris", Astronomy & Astrophysics, 190, 342-352
 - Chapront-Touzé, M. & Chapront, J. (1991). "Lunar Tables and Programs from 4000 B.C. to A.D. 8000", Willmann-Bell
 - Park, R.S. et al. (2021). "The JPL Planetary and Lunar Ephemerides DE440 and DE441", The Astronomical Journal, 161:105
-- Moshier, S.L. (implementation of ELP2000-82B in Swiss Ephemeris)
+- Moshier, S.L. "Ephemeris Calculation Software" (1989-2023). Available at http://www.moshier.net — independent C implementation of ELP2000-82B used as reference for the analytical series coefficients.

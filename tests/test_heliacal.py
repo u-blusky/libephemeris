@@ -281,7 +281,7 @@ class TestHeliacalAtmosphericConditions:
 
 
 class TestSweHeliacalUt:
-    """Test swe_heliacal_ut Swiss Ephemeris-compatible API."""
+    """Test swe_heliacal_ut pyswisseph-compatible API."""
 
     def test_swe_heliacal_ut_basic_call(self):
         """Test basic swe_heliacal_ut call with array parameters."""

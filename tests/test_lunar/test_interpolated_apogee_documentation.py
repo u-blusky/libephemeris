@@ -49,7 +49,7 @@ class TestInterpolatedApogeeDocumentationExists:
         assert "mean" in content.lower()
         assert "30 degree" in content.lower() or "30°" in content
         assert "5 degree" in content.lower() or "5°" in content
-        assert "Swiss Ephemeris" in content
+        assert "pyswisseph" in content or "SE_INTP_APOG" in content
         assert "SE_INTP_APOG" in content
         assert "SE_INTP_PERG" in content
 
@@ -243,7 +243,8 @@ class TestDocumentedApogeePerigeeRelationship:
 
         Note: With the analytical ELP2000-82B perturbation series for apogee
         and polynomial regression for perigee, there can be differences of up
-        to ~10° from exact opposition. Swiss Ephemeris documentation confirms
+        to ~10° from exact opposition. This is a physical property of the Moon's
+        orbit (Chapront-Touzé & Chapront 1988; Meeus, Astronomical Algorithms ch. 47)
         that apogee and perigee are NOT exactly 180° apart at all times.
         """
         jd = 2451545.0
@@ -256,8 +257,7 @@ class TestDocumentedApogeePerigeeRelationship:
         if diff > 180:
             diff = 360 - diff
 
-        # Documentation notes Swiss Ephemeris apogee and perigee can differ
-        # by up to ~28° from exact opposition at certain lunar phases
+        # Apogee and perigee can differ by up to ~28° from exact opposition
         assert abs(diff - 180) < 28.0, (
             f"Apogee-perigee separation {diff:.2f} should be ~180 degrees"
         )

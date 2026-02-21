@@ -3,7 +3,8 @@ include README.md
 include pyproject.toml
 recursive-include libephemeris *.py
 include libephemeris/py.typed
-include libephemeris/seorbel.txt
+recursive-include libephemeris/data *.csv
+
 exclude tests/*
 exclude compare_scripts/*
 exclude .gitignore

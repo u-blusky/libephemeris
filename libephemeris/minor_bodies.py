@@ -32,7 +32,7 @@ RESONANT LIBRATION MODEL (plutinos):
 - Applies periodic correction with ~20,000 year period calibrated from JPL Horizons
 - Reduces position errors from 5-10° to <2° over 100-year timescales
 
-For research-grade precision, use full numerical integration (Swiss Ephemeris, JPL Horizons)
+For research-grade precision, use full numerical integration (e.g., JPL Horizons)
 
 Orbital elements source: JPL Small-Body Database (epoch JD 2461000.5 TDB = 2025-Sep-19)
 Algorithm: Keplerian mechanics with Laplace-Lagrange secular perturbations + resonant libration

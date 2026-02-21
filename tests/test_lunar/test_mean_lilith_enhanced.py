@@ -2,11 +2,11 @@
 Tests for enhanced calc_mean_lilith() formula with T⁴ term and periodic corrections.
 
 The enhanced formula includes:
-- T⁴ term from Swiss Ephemeris source (+ T⁴/3526000)
+- T⁴ term from Chapront-Touzé & Chapront (1988) lunar theory (+ T⁴/3526000)
 - Periodic corrections for solar/lunar perturbations on mean apsidal motion
 
 Expected improvement: reduce error from ~270 arcsec to <100 arcsec compared
-to Swiss Ephemeris reference across the 1800-2200 range.
+to JPL DE440 reference across the 1800-2200 range.
 """
 
 import math

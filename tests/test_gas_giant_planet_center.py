@@ -3,18 +3,18 @@ Tests for gas giant planet center calculations.
 
 This test module verifies that gas giant positions (Jupiter, Saturn, Uranus, Neptune)
 use planet center NAIF IDs (599, 699, 799, 899) rather than system barycenter IDs
-(5, 6, 7, 8), ensuring sub-arcsecond accuracy matching Swiss Ephemeris.
+(5, 6, 7, 8), ensuring sub-arcsecond accuracy matching pyswisseph.
 
 The issue being addressed:
 - Gas giant barycenters include the mass distribution of their moons
 - For Jupiter, the Galilean moons (Io, Europa, Ganymede, Callisto) can offset
   the barycenter from Jupiter's center by up to several arcseconds
-- Swiss Ephemeris uses planet centers, not barycenters
+- pyswisseph uses planet centers, not barycenters
 - This test validates that libephemeris correctly uses planet centers
 
 References:
 - JPL NAIF IDs: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/req/naif_ids.html
-- Swiss Ephemeris documentation on planet positions
+- JPL DE440 documentation on planet center positions
 """
 
 import pytest

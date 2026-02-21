@@ -55,7 +55,7 @@ class TestModuleDocumentation:
         """Verify docstring includes references."""
         doc = lunar.__doc__
         assert "Chapront" in doc or "Meeus" in doc
-        assert "ELP" in doc or "Swiss Ephemeris" in doc
+        assert "ELP" in doc or "pyswisseph" in doc or "JPL" in doc
 
 
 class TestCalcTrueLunarNodeDocumentation:
@@ -92,13 +92,12 @@ class TestCalcTrueLunarNodeDocumentation:
     def test_docstring_mentions_precision_estimate(self):
         """Verify docstring provides precision estimate."""
         doc = calc_true_lunar_node.__doc__
-        # Should mention precision compared to Swiss Ephemeris
         assert "0.01" in doc or "arcsec" in doc or "precision" in doc.lower()
 
     def test_docstring_has_references(self):
         """Verify docstring includes references."""
         doc = calc_true_lunar_node.__doc__
-        assert "Swiss Ephemeris" in doc or "Vallado" in doc or "Capitaine" in doc
+        assert "Vallado" in doc or "Capitaine" in doc or "Meeus" in doc or "IAU" in doc
 
 
 class TestPerturbationDocumentation:

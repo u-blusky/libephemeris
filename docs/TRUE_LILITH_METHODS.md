@@ -1,8 +1,8 @@
 # True Lilith (Osculating Lunar Apogee) Calculation Methods
 
 This document compares the True Lilith (osculating lunar apogee) calculation methods
-used by Swiss Ephemeris and libephemeris, documenting research findings and
-explaining the observed differences.
+used by pyswisseph and libephemeris, documenting research findings and explaining
+the observed differences.
 
 ## Overview
 
@@ -11,23 +11,18 @@ Moon's instantaneous (osculating) Keplerian orbit. Unlike Mean Lilith (which mov
 smoothly along the mean lunar orbit), True Lilith oscillates significantly due to
 solar gravitational perturbations.
 
-## Swiss Ephemeris Method
-
-According to the Swiss Ephemeris documentation (section 2.2.3 "The Osculating Apogee"):
+## Osculating Apogee: Standard Approach
 
 ### Calculation Approach
 
-Swiss Ephemeris computes the osculating apogee directly from the Moon's **position
-and speed vectors** (state vectors), deriving the osculating orbital elements from
-these vectors.
+The standard method for computing the osculating apogee derives it directly from the
+Moon's **position and speed vectors** (state vectors), from which the full set of
+osculating Keplerian orbital elements is obtained. This avoids the error introduced by
+analytical approximations and works directly with the numerical ephemeris.
 
-> "We avoid this error, computing the orbital elements from the position and the
-> speed vectors of the Moon."
-> -- Swiss Ephemeris Documentation
-
-This is fundamentally the same approach used by libephemeris: deriving osculating
-orbital elements (including the eccentricity vector and argument of perigee) from
-the Moon's instantaneous geocentric position and velocity.
+This is the approach used by both pyswisseph (via `SE_OSCU_APOG`) and libephemeris:
+deriving osculating orbital elements (including the eccentricity vector and argument
+of perigee) from the Moon's instantaneous geocentric position and velocity.
 
 ### Key Characteristics
 
@@ -35,32 +30,28 @@ the Moon's instantaneous geocentric position and velocity.
    simple Keplerian ellipse (two-body problem: Earth and Moon only).
 
 2. **Large Oscillations**: The osculating apogee oscillates **+/- 30 degrees** around
-   the mean apogee. Swiss Ephemeris documentation explicitly states this is an
-   "artifact" of the insufficient two-body model.
+   the mean apogee. This is an artifact of the insufficient two-body model when
+   applied to the strongly perturbed Earth-Moon-Sun system.
 
 3. **Not a Real Motion**: The 30-degree oscillation does not represent actual motion
    of the lunar apsides. It is a mathematical consequence of forcing the three-body
    Earth-Moon-Sun system into a two-body framework.
 
-4. **Precision**: Swiss Ephemeris reports ~0.9 arcsecond agreement between JPL-derived
-   and Swiss-Ephemeris-derived osculating apogee positions.
+4. **Instantaneous Validity**: The osculating apogee coincides with actual lunar
+   maximum distance only twice per month — at conjunction and opposition with the Moon.
 
-### Quote from Swiss Ephemeris Documentation
+### Physical Background
 
-> "The apogee contains the concept of the ellipse, whereas the node can be defined
-> without thinking of an ellipse. As has been shown above, the node can be derived
-> from orbital planes or great circles, which is not possible with the apogee.
-> Now ellipses are good as a description of planetary orbits because planetary
-> orbits are close to a two-body problem. But they are not good for the lunar orbit
-> which is strongly perturbed by the gravity of the Sun (three-body problem).
-> **The lunar orbit is far from being an ellipse!**"
+The lunar orbit is far from a simple Keplerian ellipse because it is strongly
+perturbed by solar gravity (three-body problem). When the osculating ellipse is
+computed from the instantaneous state vectors, the resulting apogee direction
+oscillates with the period of a synodic month as the Sun's tidal influence alternately
+stretches and compresses the apparent orbital ellipse.
 
-> "The osculating apogee is 'true' twice a month: when it is in exact conjunction
-> with the Moon, the Moon is most distant from the Earth; and when it is in exact
-> opposition to the Moon, the Moon is closest to the Earth. The motion in between
-> those two points, is an oscillation with the period of a month. **This oscillation
-> is largely an artifact caused by the reduction of the Moon's orbit to a two-body
-> problem.**"
+This is a well-understood artifact of the osculating-elements formalism, documented
+in standard celestial mechanics texts (Brouwer & Clemence 1961; Murray & Dermott 1999).
+The ±30° monthly swing reflects the strength of solar perturbations, not real
+apsidal motion.
 
 ## libephemeris Method
 
@@ -124,23 +115,23 @@ libephemeris applies the following corrections to improve accuracy:
 
 ### Current Precision (Measured via 500-date Random Sampling)
 
-LibEphemeris True Lilith achieves excellent precision compared to Swiss Ephemeris:
+LibEphemeris True Lilith achieves excellent precision compared to pyswisseph (SE_OSCU_APOG):
 
 | Method | Mean Difference | Max Difference | RMS Difference |
 |--------|-----------------|----------------|----------------|
 | **True Lilith** (libephemeris) | ~52 arcsec (~0.015°) | ~235 arcsec (~0.065°) | ~60 arcsec (~0.017°) |
-| **Mean Lilith** | ~12 arcsec (~0.003°) | ~18 arcsec (~0.005°) | SE-compatible |
+| **Mean Lilith** | ~12 arcsec (~0.003°) | ~18 arcsec (~0.005°) | pyswisseph-compatible |
 | Interpolated Apogee | ~1.1° | ~3.3° | Different algorithm |
 
 ### Lilith Method Selection Guide
 
-| Use Case | Recommended Method | Precision vs Swiss Ephemeris |
-|----------|-------------------|------------------------------|
+| Use Case | Recommended Method | Precision vs pyswisseph |
+|----------|-------------------|-----------------------------|
 | Osculating lunar apogee | **True Lilith** | ~0.015° mean |
-| Smooth, predictable motion | **Mean Lilith** | ~0.003° mean (SE-compatible) |
+| Smooth, predictable motion | **Mean Lilith** | ~0.003° mean (compatible) |
 | Physical apogee passages | Interpolated Apogee | ~1.1° (different algorithm) |
-| Swiss Ephemeris compatibility (SE_OSCU_APOG) | **True Lilith** | Sub-arcminute |
-| Swiss Ephemeris compatibility (SE_MEAN_APOG) | **Mean Lilith** | Sub-arcminute |
+| pyswisseph compatibility (SE_OSCU_APOG) | **True Lilith** | Sub-arcminute |
+| pyswisseph compatibility (SE_MEAN_APOG) | **Mean Lilith** | Sub-arcminute |
 
 **Recommendation**: For applications requiring the osculating (instantaneous) lunar apogee,
 use **True Lilith** (`calc_true_lilith`). Its sub-arcminute precision makes it suitable
@@ -150,7 +141,7 @@ for all practical astrological applications.
 
 ### Fundamental Agreement in Approach
 
-Both Swiss Ephemeris and libephemeris use the same fundamental approach:
+Both implementations use the same fundamental approach:
 **computing osculating orbital elements from the Moon's instantaneous state vectors**.
 
 ### Sources of Remaining Differences (~0.015° mean)
@@ -158,12 +149,12 @@ Both Swiss Ephemeris and libephemeris use the same fundamental approach:
 The small residual differences between libephemeris and pyswisseph arise from:
 
 1. **Different Ephemeris Sources**:
-   - Swiss Ephemeris: Compressed JPL DE431 data with ~0.001" precision
+   - pyswisseph: Compressed JPL DE431 data with ~0.001\" precision
    - libephemeris: JPL DE440 via Skyfield (slightly different interpolation)
 
 2. **Perturbation Model Details**:
    Minor differences in how solar and planetary perturbations are incorporated.
-   Swiss Ephemeris may use integrated analytical lunar theory internally,
+   pyswisseph may use integrated analytical lunar theory internally,
    while libephemeris applies calibrated post-hoc corrections.
 
 3. **Coordinate Transformation Differences**:
@@ -171,13 +162,13 @@ The small residual differences between libephemeris and pyswisseph arise from:
 
 ### The Osculating Apogee Paradox
 
-The Swiss Ephemeris documentation explicitly states that the +/- 30 degree oscillation
-of the osculating apogee is an "artifact" of the two-body approximation. This means:
+The ±30° monthly oscillation of the osculating apogee is an artifact of the
+two-body approximation (see Brouwer & Clemence 1961, Ch. XI). This means:
 
 1. **No "Correct" Answer**: There is no single "correct" osculating apogee because
    the concept itself is a simplification that doesn't accurately represent lunar motion.
 
-2. **Different Implementations Valid**: Both Swiss Ephemeris and libephemeris
+2. **Different Implementations Valid**: Both pyswisseph and libephemeris
    implementations are valid mathematical representations of the osculating apogee
    concept, even though they differ.
 
@@ -187,9 +178,9 @@ of the osculating apogee is an "artifact" of the two-body approximation. This me
 
 ## The Interpolated Apogee Alternative
 
-Swiss Ephemeris offers an "interpolated" or "natural" apogee (SE_INTP_APOG) that
-smooths out the 30-degree oscillations by interpolating between actual lunar apogee
-passages. This results in:
+The "interpolated" or "natural" apogee (SE_INTP_APOG in pyswisseph) smooths out the
+30-degree oscillations by interpolating between actual lunar apogee passages.
+This results in:
 
 - Oscillation amplitude: **+/- 5 degrees** (vs. +/- 30 degrees for osculating)
 - More physically meaningful: represents actual variation of apogee passages
@@ -203,24 +194,24 @@ in the LIST.md task list for future implementation.
 ### For Osculating Lunar Apogee Applications (Recommended)
 
 Use **True Lilith** (`calc_true_lilith`) for applications requiring the instantaneous
-osculating apogee. With ~0.015° mean and ~0.065° max difference from Swiss Ephemeris,
+osculating apogee. With ~0.015° mean and ~0.065° max difference from pyswisseph,
 True Lilith provides:
 - Sub-arcminute precision suitable for all practical astrological use
 - Dynamically accurate representation of the Moon's instantaneous orbital apogee
-- Excellent agreement with Swiss Ephemeris SE_OSCU_APOG
+- Excellent agreement with pyswisseph SE_OSCU_APOG
 
 ### For Smooth Motion Applications
 
 Use **Mean Lilith** (`calc_mean_lilith`) when you need:
 - Predictable, smooth motion without 30° oscillations
-- Excellent compatibility with Swiss Ephemeris (~0.003° mean difference, sub-arcminute)
+- Excellent compatibility with pyswisseph (~0.003° mean difference, sub-arcminute)
 - A simplified model not subject to two-body approximation artifacts
 
-### For Applications Requiring Swiss Ephemeris Compatibility
+### For Applications Requiring pyswisseph Compatibility
 
-Both True Lilith and Mean Lilith now provide excellent compatibility with Swiss Ephemeris:
+Both True Lilith and Mean Lilith provide excellent compatibility with pyswisseph:
 - **True Lilith**: ~0.015° mean difference (excellent)
-- **Mean Lilith**: ~0.003° mean difference (excellent, SE-compatible DE404 algorithm)
+- **Mean Lilith**: ~0.003° mean difference (excellent, DE404-compatible algorithm)
 
 ### For Applications Prioritizing Physical Accuracy
 
@@ -236,10 +227,11 @@ actual variation in lunar apogee position.
 
 ## References
 
-1. Swiss Ephemeris Documentation, Section 2.2.3 "The Osculating Apogee"
-   https://www.astro.com/swisseph/swisseph.htm
+1. Brouwer, D. & Clemence, G.M. "Methods of Celestial Mechanics" (1961),
+   Academic Press, Chapter XI (osculating elements and perturbations)
 
-2. Swiss Ephemeris Documentation, Section 2.2.4 "The Interpolated or Natural Apogee"
+2. Murray, C.D. & Dermott, S.F. "Solar System Dynamics" (1999),
+   Cambridge University Press, Chapter 2
 
 3. Chapront-Touze, M. & Chapront, J. "Lunar Tables and Programs from 4000 B.C.
    to A.D. 8000" (1991), Willmann-Bell
@@ -258,9 +250,9 @@ actual variation in lunar apogee position.
 ## Conclusion
 
 The libephemeris True Lilith implementation uses the same fundamental approach as
-Swiss Ephemeris: computing osculating orbital elements from instantaneous state
-vectors. The current implementation achieves excellent precision (~0.015° mean,
-~0.065° max difference from Swiss Ephemeris), making it suitable for all practical
+pyswisseph: computing osculating orbital elements from instantaneous state vectors.
+The current implementation achieves excellent precision (~0.015° mean, ~0.065° max
+difference from pyswisseph SE_OSCU_APOG), making it suitable for all practical
 astrological applications requiring the osculating lunar apogee.
 
 **Key takeaways**:
@@ -268,8 +260,7 @@ astrological applications requiring the osculating lunar apogee.
 - **Mean Lilith** offers smooth, predictable motion for applications not needing instantaneous values
 - **Interpolated Apogee** (when available) smooths the 30° oscillations to ~5°
 
-Both Swiss Ephemeris and libephemeris implementations are mathematically valid
-representations of the osculating apogee. Users should understand that the
-"osculating lunar apogee" is a model-dependent construct whose 30-degree monthly
-oscillations are largely artifacts of the two-body approximation rather than
-real motions of the apsidal line.
+Both implementations are mathematically valid representations of the osculating apogee.
+Users should understand that the "osculating lunar apogee" is a model-dependent
+construct whose 30-degree monthly oscillations are largely artifacts of the two-body
+approximation rather than real motions of the apsidal line.

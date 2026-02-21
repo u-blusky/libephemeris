@@ -2,7 +2,7 @@
 Tests for Placidus house convergence accuracy.
 
 These tests verify that the Placidus house system iteration converges
-to match Swiss Ephemeris within 0.0001° (0.36 arcseconds).
+to match pyswisseph within 0.0001° (0.36 arcseconds).
 """
 
 import pytest
@@ -23,7 +23,7 @@ HIGH_PRECISION_TOL = 0.0001
 
 
 class TestPlacidusConvergence:
-    """Tests for Placidus house cusp convergence to Swiss Ephemeris precision."""
+    """Tests for Placidus house cusp convergence to pyswisseph precision."""
 
     @pytest.mark.parametrize(
         "name,jd,lat,lon",
@@ -37,7 +37,7 @@ class TestPlacidusConvergence:
         ],
     )
     def test_placidus_high_precision_match(self, name, jd, lat, lon):
-        """Test that Placidus cusps match Swiss Ephemeris within 0.0001°."""
+        """Test that Placidus cusps match pyswisseph within 0.0001°."""
         cusps_swe, _ = swe.houses(jd, lat, lon, b"P")
         cusps_py, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
 
@@ -137,7 +137,7 @@ class TestPolarAdjacentLatitudes:
     (~66.56°) where Placidus/Koch become undefined. The iteration may take longer
     to converge or may oscillate.
 
-    The tests verify that cusps match Swiss Ephemeris within 0.01° (36 arcseconds).
+    The tests verify that cusps match pyswisseph within 0.01° (36 arcseconds).
     """
 
     @pytest.mark.parametrize(
@@ -160,7 +160,7 @@ class TestPolarAdjacentLatitudes:
         ],
     )
     def test_placidus_polar_adjacent_match(self, name, jd, lat, lon):
-        """Test that Placidus cusps at polar-adjacent latitudes match Swiss Ephemeris."""
+        """Test that Placidus cusps at polar-adjacent latitudes match pyswisseph."""
         cusps_swe, _ = swe.houses(jd, lat, lon, b"P")
         cusps_py, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
 
@@ -189,7 +189,7 @@ class TestPolarAdjacentLatitudes:
         ],
     )
     def test_koch_polar_adjacent_match(self, name, jd, lat, lon):
-        """Test that Koch cusps at polar-adjacent latitudes match Swiss Ephemeris."""
+        """Test that Koch cusps at polar-adjacent latitudes match pyswisseph."""
         cusps_swe, _ = swe.houses(jd, lat, lon, b"K")
         cusps_py, _ = ephem.swe_houses(jd, lat, lon, ord("K"))
 
@@ -232,7 +232,7 @@ class TestPlacidusConvergenceStability:
             diff = angular_diff(cusps_swe[i], cusps_py[i])
             max_diff = max(max_diff, diff)
 
-        # At these latitudes, we should match Swiss Ephemeris within tolerance
+        # At these latitudes, we should match pyswisseph within tolerance
         assert max_diff < POLAR_ADJACENT_TOL, (
             f"Placidus at lat={lat}°: max diff {max_diff:.6f}° exceeds tolerance"
         )

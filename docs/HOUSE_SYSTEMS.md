@@ -702,7 +702,7 @@ For n >= 8 (above horizon):
 ## References
 
 1. Meeus, Jean. "Astronomical Algorithms" 2nd Edition (1998), Chapter 13
-2. Swiss Ephemeris Documentation and Source Code
+2. Koch, Dieter & Treindl, Alois. House System Technical Notes. Referenced for algorithm description only.
 3. Hand, Robert. "Horoscope Symbols" (1981)
 4. Holden, Ralph William. "The Elements of House Division" (1977)
 5. IERS Conventions 2003 (IAU nutation models)

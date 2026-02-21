@@ -2,13 +2,13 @@ libephemeris Documentation
 ==========================
 
 libephemeris is a pure-Python astronomical ephemeris library compatible with
-the Swiss Ephemeris API. It provides high-precision planetary positions,
+the pyswisseph API. It provides high-precision planetary positions,
 house calculations, eclipse predictions, and more.
 
 Features
 --------
 
-- **Swiss Ephemeris Compatible**: Drop-in replacement for pyswisseph
+- **pyswisseph Compatible**: Drop-in replacement for pyswisseph
 - **Pure Python**: No C extensions required
 - **High Precision**: Uses NASA JPL DE440 ephemeris via Skyfield
 - **Thread Safe**: EphemerisContext for concurrent calculations

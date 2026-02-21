@@ -2,7 +2,7 @@
 Tests for Ayanamsha definitions documentation.
 
 These tests verify that the documented ayanamsha values, zero epochs, and
-precession rates are correct and match Swiss Ephemeris behavior.
+precession rates are correct and match pyswisseph behavior.
 
 Tests verify:
 1. J2000 ayanamsha values match documented values

@@ -14,11 +14,11 @@ The model calculates:
 2. Sky brightness from twilight, moonlight, zodiacal light, and airglow
 3. Visibility thresholds based on contrast sensitivity
 
-This implementation matches the Swiss Ephemeris C library approach for
+This implementation follows the standard approach for
 compatibility with archaeoastronomical applications.
 
 Constants:
-    Most constants are from Schaefer (1990) and match Swiss Ephemeris.
+    Most constants are from Schaefer (1990).
 """
 
 import math

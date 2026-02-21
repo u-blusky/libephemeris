@@ -2,10 +2,10 @@ libephemeris API Reference
 ==========================
 
 .. module:: libephemeris
-   :synopsis: A pure-Python Swiss Ephemeris-compatible astronomical library.
+   :synopsis: A pure-Python pyswisseph-compatible astronomical library.
 
 This is the complete API reference for libephemeris, a pure-Python implementation
-of astronomical ephemeris calculations compatible with the Swiss Ephemeris.
+of astronomical ephemeris calculations compatible with the pyswisseph API.
 
 .. contents:: Table of Contents
    :local:
@@ -17,7 +17,7 @@ Exceptions
 
 .. autoexception:: Error
 
-   Swiss Ephemeris-compatible exception class.
+   pyswisseph-compatible exception class.
 
    This exception is raised for ephemeris-related errors such as:
 
@@ -2685,16 +2685,17 @@ Generic Hypothetical Functions
    :rtype: tuple
 
 
-seorbel.txt Parser
-~~~~~~~~~~~~~~~~~~
+Orbital Elements Parser
+~~~~~~~~~~~~~~~~~~~~~~~
 
-Functions for parsing Swiss Ephemeris orbital elements file.
+Functions for parsing orbital elements files in the legacy text format and
+the bundled fictitious orbits dataset (``data/fictitious_orbits.csv``).
 
 .. function:: parse_seorbel(filepath)
 
-   Parse a seorbel.txt format file.
+   Parse an orbital elements file in the legacy comma-separated text format.
 
-   :param filepath: Path to seorbel.txt file
+   :param filepath: Path to the orbital elements file
    :type filepath: str
    :returns: List of SeorbelElements objects
    :rtype: list
@@ -2702,15 +2703,21 @@ Functions for parsing Swiss Ephemeris orbital elements file.
 
 .. function:: get_bundled_seorbel_path()
 
-   Get path to the bundled seorbel.txt file.
+   Deprecated. Returns the path to the bundled fictitious orbits dataset.
 
-   :returns: Path to seorbel.txt included with libephemeris
+   Delegates to :func:`get_bundled_fictitious_orbits_path` for backward
+   compatibility.
+
+   :returns: Path to ``data/fictitious_orbits.csv`` included with libephemeris
    :rtype: str
 
 
 .. function:: load_bundled_seorbel()
 
-   Load and parse the bundled seorbel.txt file.
+   Deprecated. Loads the bundled fictitious orbits dataset.
+
+   Delegates to :func:`load_bundled_fictitious_orbits` for backward
+   compatibility.
 
    :returns: List of SeorbelElements objects
    :rtype: list

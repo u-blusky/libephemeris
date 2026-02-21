@@ -9,7 +9,7 @@ Note on precision:
     The libephemeris implementation calculates osculating orbital elements from
     JPL DE421 ephemeris data. This matches JPL Horizons orbital elements exactly.
 
-    Swiss Ephemeris uses mean orbital elements from specific data sources that
+    pyswisseph uses mean orbital elements from specific data sources that
     may differ from instantaneous osculating elements. The longitude of ascending
     node (Omega) can differ by ~40° for inner planets due to different conventions.
 

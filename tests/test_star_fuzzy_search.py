@@ -279,8 +279,8 @@ class TestStarAliasesAlternateSpellings:
 
 
 @pytest.mark.integration
-class TestSwissEphemerisCompatibility:
-    """Integration tests for Swiss Ephemeris compatibility with fuzzy matching."""
+class TestPyswissephCompatibility:
+    """Integration tests for pyswisseph API compatibility with fuzzy matching."""
 
     @pytest.fixture
     def standard_jd(self):

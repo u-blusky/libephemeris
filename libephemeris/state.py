@@ -10,8 +10,8 @@ This module maintains the library's singleton state including:
 - Cached angles for Arabic parts calculations
 - SPK kernel registry for minor body calculations
 
-All state is stored in module-level globals to provide SwissEphemeris-compatible
-stateful API behavior. This is thread-unsafe by design, matching SwissEph behavior.
+All state is stored in module-level globals to provide a stateful module-level API
+compatible with pyswisseph's threading model (thread-unsafe by design).
 """
 
 import os
@@ -876,8 +876,8 @@ def get_library_path() -> str:
     Get the path where ephemeris files are stored.
 
     For libephemeris, this returns the directory containing the JPL ephemeris
-    files (.bsp files used by Skyfield). This is analogous to pyswisseph's
-    get_library_path(), which returns the path of the Swiss Ephemeris library.
+    files (.bsp files used by Skyfield). This is analogous to the reference API's
+    get_library_path(), which returns the ephemeris data path.
 
     Returns:
         str: The absolute path to the directory containing ephemeris files.
@@ -1010,7 +1010,7 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
     including the file path and the date range covered by the ephemeris.
 
     Args:
-        ifno: File number indicator (for compatibility with pyswisseph):
+        ifno: File number indicator (for compatibility with reference API):
               - 0: planet file (main ephemeris - DE421, DE431, etc.)
               - 1: moon file (same as planets in JPL ephemeris)
               - 2: main asteroid file (not applicable for JPL ephemeris)

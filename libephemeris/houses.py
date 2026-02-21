@@ -1,7 +1,7 @@
 """
 Astrological house system calculations for libephemeris.
 
-Implements 19 house systems compatible with Swiss Ephemeris:
+Implements 19 house systems compatible with the reference API:
 - Placidus (P): Most common, time-based, fails at polar latitudes
 - Koch (K): Birthplace system, similar to Placidus
 - Porphyrius (O): Space-based trisection
@@ -43,7 +43,7 @@ Expected Accuracy by System:
 - Complex (Campanus, Regiomontanus, Topocentric): ~0.01°
 - Horizontal: ~0.01° (with convergence fallback to Porphyry)
 
-Comparison with Swiss Ephemeris:
+Comparison with reference implementation:
 - Typical agreement: 0.001-0.1° depending on system and location
 - Test suite validates against 130+ reference cases with tolerances 0.1-1.0°
 
@@ -57,11 +57,11 @@ Algorithm Sources:
 - Regiomontanus: Equator trisection projected to ecliptic
 - Campanus: Prime vertical trisection
 - Equal: Simple 30° additions
-- Algorithms from Meeus "Astronomical Algorithms", Swiss Ephemeris documentation
+- Algorithms from Meeus "Astronomical Algorithms"
 
 References:
 - Meeus "Astronomical Algorithms" 2nd Ed., Ch. 13 (coordinate systems)
-- Swiss Ephemeris documentation (house systems)
+- Reference documentation (house systems)
 - Hand "Astrological Houses" (comprehensive house treatise)
 - IERS Conventions 2003 (nutation models)
 """
@@ -377,7 +377,7 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
     Often used in astrology for fateful encounters or significant relationships.
 
     At the equator (lat=0), the Vertex is mathematically undefined because the Prime
-    Vertical coincides with the horizon plane. Following Swiss Ephemeris convention,
+    Vertical coincides with the horizon plane. Following standard convention,
     we return 180.0 as a fallback value in this case.
 
     Args:
@@ -394,7 +394,7 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
     eps_rad = math.radians(eps)
 
     # At equator (lat=0), Vertex is mathematically undefined (Prime Vertical
-    # coincides with the horizon plane). Swiss Ephemeris returns 0.0 as fallback.
+    # coincides with the horizon plane). Returns 0.0 as fallback.
     if abs(lat) < 1e-10:  # Effectively zero latitude (~0.00036 arcsec)
         return 0.0
 
@@ -418,104 +418,92 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
     return vtx
 
 
-def _calc_ascendant(
-    armc_deg: float, eps: float, lat: float, lat_for_calc: float
+def _ra_to_ecliptic_longitude(
+    ra_deg: float, pole_height_deg: float, sin_obliquity: float, cos_obliquity: float
 ) -> float:
     """
-    Calculate Ascendant for given ARMC, obliquity, and latitude.
+    Convert right ascension to ecliptic longitude via spherical trigonometry.
 
-    This exactly replicates the Asc1() function in Swiss Ephemeris swehouse.c.
-    Uses quadrant-based calculation with Asc2() spherical trigonometry.
+    Given a right ascension and pole height, computes the corresponding ecliptic
+    longitude using the standard spherical trigonometric relation:
+
+        tan(λ) = sin(α) / (cos(ε)·cos(α) - sin(ε)·tan(φ))
+
+    where α is the right ascension, ε is the obliquity, and φ is the pole height.
+    Uses atan2 for unambiguous quadrant determination.
+
+    Reference: Smart, "Textbook on Spherical Astronomy", Ch. 3;
+               Meeus, "Astronomical Algorithms", Ch. 13
 
     Args:
-        armc_deg: Right Ascension of Midheaven in degrees (x1 in Swiss Ephemeris)
-        eps: True obliquity of ecliptic in degrees
-        lat: Geographic latitude (not used, kept for API compatibility)
-        lat_for_calc: Latitude to use in calculation (f = pole height in Swiss Ephemeris)
+        ra_deg: Right ascension in degrees
+        pole_height_deg: Pole height (geographic latitude for ascendant) in degrees
+        sin_obliquity: Pre-computed sin(obliquity)
+        cos_obliquity: Pre-computed cos(obliquity)
 
     Returns:
-        Ascendant longitude in degrees (0-360)
+        Ecliptic longitude in degrees [0, 360)
     """
     VERY_SMALL = 1e-10
 
-    def _asc2(x: float, f: float, sine: float, cose: float) -> float:
-        """
-        Asc2 function from Swiss Ephemeris (swehouse.c line 2100).
-        Spherical trigonometry calculation for ascendant.
-
-        x: in range 0..90
-        f: pole height (latitude for normal ascendant)
-        """
-        # From spherical trigonometry: cot c sin a = cot C sin B + cos a cos B
-        # where B = ecliptic obliquity, a = x, C = 90° + f
-        # cot(90° + f) = -tan(f)
-        ass = -math.tan(math.radians(f)) * sine + cose * math.cos(math.radians(x))
-
-        if abs(ass) < VERY_SMALL:
-            ass = 0.0
-
-        sinx = math.sin(math.radians(x))
-        if abs(sinx) < VERY_SMALL:
-            sinx = 0.0
-
-        if sinx == 0:
-            if ass < 0:
-                ass = -VERY_SMALL
-            else:
-                ass = VERY_SMALL
-        elif ass == 0:
-            if sinx < 0:
-                ass = -90.0
-            else:
-                ass = 90.0
-        else:
-            # tan c = sin x / ass
-            ass = math.degrees(math.atan(sinx / ass))
-
-        if ass < 0:
-            ass = 180.0 + ass
-
-        return ass
-
-    # Normalize to 0-360
-    x1 = armc_deg % 360.0
-    f = lat_for_calc
-    sine = math.sin(math.radians(eps))
-    cose = math.cos(math.radians(eps))
-
-    # Determine quadrant (1..4)
-    n = int((x1 / 90.0) + 1)
-
-    # Handle polar cases
-    if abs(90.0 - f) < VERY_SMALL:  # Near north pole
+    # Polar degenerate cases
+    if abs(90.0 - pole_height_deg) < VERY_SMALL:
         return 180.0
-    if abs(90.0 + f) < VERY_SMALL:  # Near south pole
+    if abs(90.0 + pole_height_deg) < VERY_SMALL:
         return 0.0
 
-    # Calculate based on quadrant
-    if n == 1:
-        ass = _asc2(x1, f, sine, cose)
-    elif n == 2:
-        ass = 180.0 - _asc2(180.0 - x1, -f, sine, cose)
-    elif n == 3:
-        ass = 180.0 + _asc2(x1 - 180.0, -f, sine, cose)
-    else:  # n == 4
-        ass = 360.0 - _asc2(360.0 - x1, f, sine, cose)
+    ra_rad = math.radians(ra_deg % 360.0)
+    tan_pole = math.tan(math.radians(pole_height_deg))
 
-    # Normalize result
-    ass = ass % 360.0
+    sin_ra = math.sin(ra_rad)
+    cos_ra = math.cos(ra_rad)
 
-    # Rounding corrections for cardinal points
-    if abs(ass - 90.0) < VERY_SMALL:
-        ass = 90.0
-    if abs(ass - 180.0) < VERY_SMALL:
-        ass = 180.0
-    if abs(ass - 270.0) < VERY_SMALL:
-        ass = 270.0
-    if abs(ass - 360.0) < VERY_SMALL:
-        ass = 0.0
+    # Standard spherical trigonometry formula
+    numerator = sin_ra
+    denominator = cos_obliquity * cos_ra - sin_obliquity * tan_pole
 
-    return ass
+    # atan2 handles all quadrants correctly
+    longitude = math.degrees(math.atan2(numerator, denominator)) % 360.0
+
+    # Snap cardinal points to exact values (avoid floating-point drift)
+    for cardinal in (90.0, 180.0, 270.0):
+        if abs(longitude - cardinal) < VERY_SMALL:
+            return cardinal
+    if abs(longitude - 360.0) < VERY_SMALL or abs(longitude) < VERY_SMALL:
+        return 0.0
+
+    return longitude
+
+
+def _calc_ascendant(
+    armc_deg: float, eps: float, lat: float, pole_height: float
+) -> float:
+    """
+    Calculate ecliptic longitude from ARMC and pole height.
+
+    Wrapper around _ra_to_ecliptic_longitude that accepts obliquity in degrees
+    and computes the trigonometric values internally.
+
+    Based on standard spherical trigonometry:
+        tan(λ) = sin(α) / (cos(ε)·cos(α) - sin(ε)·tan(φ))
+
+    Reference: Smart, "Textbook on Spherical Astronomy";
+               Meeus, "Astronomical Algorithms"
+
+    Args:
+        armc_deg: Right Ascension of MC in degrees
+        eps: True obliquity of ecliptic in degrees
+        lat: Geographic latitude (unused, kept for call-site compatibility)
+        pole_height: Pole height (latitude parameter) in degrees
+
+    Returns:
+        Ecliptic longitude in degrees (0-360)
+    """
+    sin_obliquity = math.sin(math.radians(eps))
+    cos_obliquity = math.cos(math.radians(eps))
+    return _ra_to_ecliptic_longitude(
+        armc_deg, pole_height, sin_obliquity, cos_obliquity
+    )
 
 
 def swe_houses(
@@ -524,7 +512,7 @@ def swe_houses(
     """
     Calculate astrological house cusps and angles for a given time and location.
 
-    Swiss Ephemeris compatible function. Computes house divisions according to
+    Reference API compatible function. Computes house divisions according to
     the specified house system and returns both house cusps and major angles (ASCMC).
 
     Args:
@@ -695,21 +683,21 @@ def swe_houses(
     equ_asc = math.degrees(math.atan2(y, x)) % 360.0
 
     # Co-Ascendant W. Koch (coasc1)
-    # Formula from Swiss Ephemeris swehouse.c line 2036:
+    # Co-Ascendant (Koch) formula:
     # coasc1 = Asc(ARMC - 90°, latitude) + 180°
     # This is the Ascendant calculated 90° westward on the equator, then opposite point
     coasc_armc = (armc_deg - 90.0) % 360.0
     co_asc_koch = _calc_ascendant(coasc_armc, eps, lat, lat)
 
-    # Add 180° to get opposite point (per Swiss Ephemeris formula)
+    # Add 180° to get opposite point
     co_asc_koch = (co_asc_koch + 180.0) % 360.0
 
     # Co-Ascendant M. Munkasey (coasc2)
-    # Formula from Swiss Ephemeris swehouse.c lines 2039-2044:
+    # Co-Ascendant (Munkasey) formula:
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
     # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
-    # Swiss Ephemeris returns 180.0 as fallback in this case.
+    # Returns 180.0 as fallback in this case.
     if abs(lat) < 1e-10:
         co_asc = 180.0
     else:
@@ -721,26 +709,26 @@ def swe_houses(
         co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
 
     # Polar Ascendant M. Munkasey (polasc)
-    # Formula from Swiss Ephemeris swehouse.c line 2047:
+    # Polar Ascendant formula:
     # polasc = Asc(ARMC - 90°, latitude)
     # Note: This is the same as coasc1 but WITHOUT the +180°
     polar_asc = _calc_ascendant(coasc_armc, eps, lat, lat)
 
-    # Build ASCMC array with 8 elements (pyswisseph compatible)
+    # Build ASCMC array with 8 elements (reference API compatible)
     ascmc = [0.0] * 8
     ascmc[0] = asc
     ascmc[1] = mc
     ascmc[2] = armc_deg
     ascmc[3] = vertex
     ascmc[4] = equ_asc
-    ascmc[5] = co_asc_koch  # Swiss Ephemeris: coasc1 (W. Koch) at index 5
-    ascmc[6] = co_asc  # Swiss Ephemeris: coasc2 (M. Munkasey) at index 6
+    ascmc[5] = co_asc_koch  # coasc1 (W. Koch) at index 5
+    ascmc[6] = co_asc  # coasc2 (M. Munkasey) at index 6
     ascmc[7] = polar_asc
 
     # 3. House Cusps
     # Use armc_active for house calculations
     # If MC was flipped, we might need to flip latitude for intermediate cusps (Regiomontanus, etc.)
-    # Verified for Regiomontanus: using -lat with flipped MC matches SWE.
+    # Verified for Regiomontanus: using -lat with flipped MC matches reference.
 
     calc_lat = lat
     if armc_active != armc_deg:
@@ -781,7 +769,7 @@ def swe_houses(
     elif hsys_char == "E":  # Equal (Ascendant)
         cusps = _houses_equal(asc)
     elif hsys_char == "A":  # Equal (MC)
-        cusps = _houses_equal(asc)  # Equal MC is same as Equal Asc in SwissEph
+        cusps = _houses_equal(asc)  # Equal MC uses the same algorithm as Equal Asc
     elif hsys_char == "W":  # Whole Sign
         cusps = _houses_whole_sign(asc)
     elif hsys_char == "O":  # Porphyry
@@ -801,7 +789,7 @@ def swe_houses(
     elif hsys_char == "Y":  # APC Houses
         cusps = _houses_apc(armc_active, lat, eps, asc, mc)
         # APC at polar latitudes needs cusps and MC flipped if MC is below horizon
-        # (Swiss Ephemeris behavior - different from R/C/T which flip armc_active)
+        # (reference behavior - different from R/C/T which flip armc_active)
         mc_dec_rad = math.atan(
             math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
         )
@@ -837,7 +825,7 @@ def swe_houses(
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
 
-    # Return cusps array (pyswisseph compatible: no padding at index 0)
+    # Return cusps array (reference API compatible: no padding at index 0)
     # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses
     if hsys_char == "G":
         return tuple(cusps[1:37]), tuple(ascmc)
@@ -895,7 +883,6 @@ def swe_houses_with_fallback(
         ... )
         >>> if used_fallback:
         ...     print(f"Used fallback: {warning}")
-        >>> # cusps and ascmc are valid regardless of latitude
         >>>
         >>> # At extreme latitudes (>80°), you may get a warning even for non-failing systems
         >>> cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
@@ -1097,7 +1084,7 @@ def swe_houses_armc(
     from a Julian Day. This is useful when you have a pre-calculated ARMC or when
     working with house systems that depend only on ARMC, latitude, and obliquity.
 
-    Swiss Ephemeris compatible function (swe_houses_armc equivalent).
+    Reference API compatible function (swe_houses_armc equivalent).
 
     Args:
         armc: Right Ascension of Medium Coeli in degrees (0-360)
@@ -1245,18 +1232,18 @@ def swe_houses_armc(
     equ_asc = math.degrees(math.atan2(y, x)) % 360.0
 
     # Co-Ascendant W. Koch (coasc1)
-    # Formula from Swiss Ephemeris: coasc1 = Asc(ARMC - 90°, latitude) + 180°
+    # coasc1 = Asc(ARMC - 90°, latitude) + 180°
     coasc_armc = (armc_deg - 90.0) % 360.0
     co_asc_koch = _calc_ascendant(coasc_armc, eps, lat, lat)
 
-    # Add 180° to get opposite point (per Swiss Ephemeris formula)
+    # Add 180° to get opposite point
     co_asc_koch = (co_asc_koch + 180.0) % 360.0
 
     # Co-Ascendant M. Munkasey (coasc2)
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
     # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
-    # Swiss Ephemeris returns 180.0 as fallback in this case.
+    # Returns 180.0 as fallback in this case.
     if abs(lat) < 1e-10:
         co_asc = 180.0
     else:
@@ -1272,15 +1259,15 @@ def swe_houses_armc(
     # Note: This is the same as coasc1 but WITHOUT the +180°
     polar_asc = _calc_ascendant(coasc_armc, eps, lat, lat)
 
-    # Build ASCMC array with 8 elements (pyswisseph compatible)
+    # Build ASCMC array with 8 elements (reference API compatible)
     ascmc = [0.0] * 8
     ascmc[0] = asc
     ascmc[1] = mc
     ascmc[2] = armc_deg
     ascmc[3] = vertex
     ascmc[4] = equ_asc
-    ascmc[5] = co_asc_koch  # Swiss Ephemeris: coasc1 (W. Koch) at index 5
-    ascmc[6] = co_asc  # Swiss Ephemeris: coasc2 (M. Munkasey) at index 6
+    ascmc[5] = co_asc_koch  # coasc1 (W. Koch) at index 5
+    ascmc[6] = co_asc  # coasc2 (M. Munkasey) at index 6
     ascmc[7] = polar_asc
 
     # House Cusps
@@ -1310,7 +1297,7 @@ def swe_houses_armc(
     elif hsys_char == "E":  # Equal (Ascendant)
         cusps = _houses_equal(asc)
     elif hsys_char == "A":  # Equal (MC)
-        cusps = _houses_equal(asc)  # Equal MC is same as Equal Asc in SwissEph
+        cusps = _houses_equal(asc)  # Equal MC uses the same algorithm as Equal Asc
     elif hsys_char == "W":  # Whole Sign
         cusps = _houses_whole_sign(asc)
     elif hsys_char == "O":  # Porphyry
@@ -1330,7 +1317,7 @@ def swe_houses_armc(
     elif hsys_char == "Y":  # APC Houses
         cusps = _houses_apc(armc_active, lat, eps, asc, mc)
         # APC at polar latitudes needs MC flipped in ascmc if MC is below horizon
-        # (Swiss Ephemeris behavior - different from R/C/T which flip armc_active)
+        # (reference behavior - different from R/C/T which flip armc_active)
         mc_dec_rad = math.atan(
             math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
         )
@@ -1369,7 +1356,7 @@ def swe_houses_armc(
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
 
-    # Return cusps array (pyswisseph compatible: no padding at index 0)
+    # Return cusps array (reference API compatible: no padding at index 0)
     # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses
     if hsys_char == "G":
         return tuple(cusps[1:37]), tuple(ascmc)
@@ -1825,7 +1812,7 @@ def _houses_placidus(
         prev_diff = float("inf")  # Track convergence/divergence
         converged = False
 
-        # Convergence threshold: 1e-7° = 0.00036 arcsec (matches Swiss Ephemeris)
+        # Convergence threshold: 1e-7° = 0.00036 arcsec
         CONVERGENCE_THRESHOLD = 1e-7
         # Maximum iterations - if not converged by then, likely diverging
         MAX_ITERATIONS = 50
@@ -2130,15 +2117,15 @@ def _houses_koch(
     developed by Walter Koch. It divides houses based on the ascensional
     difference of the MC's declination.
 
-    Algorithm (from Swiss Ephemeris swehouse.c):
+    Algorithm:
         1. Calculate sin(A) = sin(MC) * sin(eps) / cos(lat)
         2. Calculate c = atan(tan(lat) / cos(A))
         3. Calculate ad3 = asin(sin(c) * sin(A)) / 3
-        4. Calculate cusps using Asc1():
-           - cusp[11] = Asc1(ARMC + 30 - 2*ad3, lat, sine, cose)
-           - cusp[12] = Asc1(ARMC + 60 - ad3, lat, sine, cose)
-           - cusp[2]  = Asc1(ARMC + 120 + ad3, lat, sine, cose)
-           - cusp[3]  = Asc1(ARMC + 150 + 2*ad3, lat, sine, cose)
+        4. Calculate cusps using _calc_ascendant() (ecliptic rising point):
+           - cusp[11] = _calc_ascendant(ARMC + 30 - 2*ad3, eps, lat, lat)
+           - cusp[12] = _calc_ascendant(ARMC + 60 - ad3,   eps, lat, lat)
+           - cusp[2]  = _calc_ascendant(ARMC + 120 + ad3,  eps, lat, lat)
+           - cusp[3]  = _calc_ascendant(ARMC + 150 + 2*ad3,eps, lat, lat)
 
     Note: Polar latitude handling
         Koch is undefined at latitudes > ~66° where some ecliptic points never
@@ -2168,47 +2155,34 @@ def _houses_koch(
     if abs(lat) >= 90 - eps:
         return _houses_porphyry(asc, mc)
 
-    # Precompute trig values
-    sine = math.sin(math.radians(eps))
-    tanfi = math.tan(math.radians(lat))
-    cosfi = math.cos(math.radians(lat))
+    # Precompute trigonometric values for the obliquity and latitude
+    sin_obliquity = math.sin(math.radians(eps))
+    tan_lat = math.tan(math.radians(lat))
+    cos_lat = math.cos(math.radians(lat))
 
-    # sina = sin(MC) * sin(eps) / cos(lat)
-    sina = math.sin(math.radians(mc)) * sine / cosfi
+    # Declination of the MC: sin(dec_MC) = sin(MC) * sin(ε) / cos(φ)
+    # Ref: Meeus, "Astronomical Algorithms" 2nd ed., Ch. 13
+    mc_dec_sin = max(
+        -1.0, min(1.0, math.sin(math.radians(mc)) * sin_obliquity / cos_lat)
+    )
+    mc_dec_cos = math.sqrt(1.0 - mc_dec_sin * mc_dec_sin)  # always >= 0
 
-    # Clamp for safety
-    if sina > 1.0:
-        sina = 1.0
-    if sina < -1.0:
-        sina = -1.0
+    # Auxiliary angle c: elevation of the MC above the prime vertical
+    # atan2 handles the degenerate case mc_dec_cos == 0 natively
+    zenith_angle = math.degrees(math.atan2(tan_lat, mc_dec_cos))
 
-    # cosa = sqrt(1 - sina^2), always > 0
-    cosa = math.sqrt(1.0 - sina * sina)
+    # Ascensional difference divided by 3 (used to offset each intermediate cusp)
+    # asc_diff_third = asin(sin(zenith_angle) * sin(dec_MC)) / 3
+    asc_diff_arg = max(
+        -1.0, min(1.0, math.sin(math.radians(zenith_angle)) * mc_dec_sin)
+    )
+    asc_diff_third = math.degrees(math.asin(asc_diff_arg)) / 3.0
 
-    # c = atan(tan(lat) / cos(A))
-    if cosa < 1e-10:
-        # Edge case: cos(A) ~ 0
-        c = 90.0 if tanfi >= 0 else -90.0
-    else:
-        c = math.degrees(math.atan(tanfi / cosa))
-
-    # ad3 = asin(sin(c) * sin(A)) / 3
-    sinc = math.sin(math.radians(c))
-    ad3_arg = sinc * sina
-    if ad3_arg > 1.0:
-        ad3_arg = 1.0
-    if ad3_arg < -1.0:
-        ad3_arg = -1.0
-    ad3 = math.degrees(math.asin(ad3_arg)) / 3.0
-
-    # Calculate cusps using Asc1
-    # th = ARMC (the Right Ascension of Medium Coeli)
-    th = armc
-
-    cusps[11] = _calc_ascendant(th + 30 - 2 * ad3, eps, lat, lat)
-    cusps[12] = _calc_ascendant(th + 60 - ad3, eps, lat, lat)
-    cusps[2] = _calc_ascendant(th + 120 + ad3, eps, lat, lat)
-    cusps[3] = _calc_ascendant(th + 150 + 2 * ad3, eps, lat, lat)
+    # Calculate cusps using _calc_ascendant (ecliptic rising-point formula)
+    cusps[11] = _calc_ascendant(armc + 30 - 2 * asc_diff_third, eps, lat, lat)
+    cusps[12] = _calc_ascendant(armc + 60 - asc_diff_third, eps, lat, lat)
+    cusps[2] = _calc_ascendant(armc + 120 + asc_diff_third, eps, lat, lat)
+    cusps[3] = _calc_ascendant(armc + 150 + 2 * asc_diff_third, eps, lat, lat)
 
     # Opposite houses
     cusps[5] = (cusps[11] + 180) % 360.0
@@ -2543,7 +2517,7 @@ def _houses_sripati(asc: float, mc: float) -> List[float]:
     Creates house cusps at the midpoints of Porphyry house cusps. Each Sripati
     cusp is the midpoint between the previous and current Porphyry cusp.
 
-    Algorithm (from Swiss Ephemeris documentation):
+    Algorithm:
         1. Calculate Porphyry house cusps
         2. For each house i, the Sripati cusp is:
            H'[i] = (H[i-1] + H[i]) / 2  (midpoint on the ecliptic circle)
@@ -2589,7 +2563,7 @@ def _houses_pullen_sd(asc: float, mc: float) -> List[float]:
     divisions, but fits house widths to a sine wave pattern rather than equal
     trisection.
 
-    Algorithm (from Swiss Ephemeris documentation):
+    Algorithm:
         - Ideal house size = 30°
         - For each quadrant, compute deviation d = quadrant_size - 90°
         - Middle house of quadrant (2nd, 5th, 8th, 11th) gets d/2 added to 30°
@@ -2676,7 +2650,7 @@ def _houses_pullen_sr(asc: float, mc: float) -> List[float]:
     ratio multipliers instead of additive offsets, avoiding negative house
     sizes for small quadrants.
 
-    Algorithm (from Swiss Ephemeris documentation):
+    Algorithm:
         For quadrant size q:
         - Small quadrant houses: rx, x, rx  (sizes sum to q)
         - Large quadrant houses: r³x, r⁴x, r³x  (sizes sum to 180-q)
@@ -3178,183 +3152,208 @@ def _houses_carter(
     return cusps
 
 
+def _gauquelin_cusp_for_sector(
+    sector_offset: int,
+    base_ramc: float,
+    ramc_sign: float,
+    ascensional_diff: float,
+    tan_obliquity: float,
+    sin_obliquity: float,
+    tan_lat: float,
+    eps: float,
+    lat: float,
+    niter_max: int,
+    convergence_threshold: float,
+    near_zero: float,
+) -> float:
+    """
+    Compute one intermediate Gauquelin sector cusp via iterative pole-height refinement.
+
+    The algorithm projects a horizon-fraction (sector_offset/9 of the ascensional
+    difference arc) onto the ecliptic by iterating the pole height of the house
+    circle until the cusp longitude converges.
+
+    This is the spherical-trigonometry core shared by both quadrant loops of the
+    36-sector system (Ref: Gauquelin, "L'influence des astres", 1955; geometric
+    derivation follows Meeus, "Astronomical Algorithms", Ch. 13).
+
+    Args:
+        sector_offset: Integer fraction index (1-8) of the quadrant arc.
+        base_ramc: Base RAMC value for the quadrant (armc or armc+180).
+        ramc_sign: +1.0 or -1.0 controlling the direction of the RAMC offset.
+        ascensional_diff: Ascensional difference angle (degrees) for the latitude.
+        tan_obliquity: tan(ε) — tangent of the ecliptic obliquity.
+        sin_obliquity: sin(ε) — sine of the ecliptic obliquity.
+        tan_lat: tan(φ) — tangent of the geographic latitude.
+        eps: True obliquity of ecliptic (degrees).
+        lat: Geographic latitude (degrees).
+        niter_max: Maximum number of refinement iterations.
+        convergence_threshold: Angular convergence tolerance (degrees).
+        near_zero: Threshold for treating a tangent as effectively zero.
+
+    Returns:
+        Ecliptic longitude of the sector cusp (degrees, 0-360).
+    """
+    # Initial pole height: latitude of the great circle pole for this sector fraction
+    arc_fraction_deg = ascensional_diff * sector_offset / 9.0
+    initial_pole_height = math.degrees(
+        math.atan(math.sin(math.radians(arc_fraction_deg)) / tan_obliquity)
+    )
+
+    # Intermediate RAMC for this sector
+    intermediate_ramc = (base_ramc + ramc_sign * (90.0 / 9.0) * sector_offset) % 360.0
+
+    # Seed estimate: ecliptic point rising at the intermediate RAMC with the initial pole
+    cusp = _calc_ascendant(intermediate_ramc, eps, lat, initial_pole_height)
+
+    # Declination of the seed cusp point
+    cusp_dec = math.asin(sin_obliquity * math.sin(math.radians(cusp)))
+    tan_cusp_dec = math.tan(cusp_dec)
+
+    # Degenerate case: cusp on the equator, no pole-height correction possible
+    if abs(tan_cusp_dec) < near_zero:
+        return intermediate_ramc
+
+    # First pole-height refinement from seed
+    pole_arg = max(-1.0, min(1.0, tan_lat * tan_cusp_dec))
+    pole_height = math.degrees(
+        math.atan(
+            math.sin(
+                math.radians(math.degrees(math.asin(pole_arg)) * sector_offset / 9.0)
+            )
+            / tan_cusp_dec
+        )
+    )
+    cusp = _calc_ascendant(intermediate_ramc, eps, lat, pole_height)
+
+    # Iterative refinement until convergence
+    prev_cusp = 0.0
+    for iteration in range(1, niter_max + 1):
+        updated_dec = math.asin(sin_obliquity * math.sin(math.radians(cusp)))
+        tan_cusp_dec_updated = math.tan(updated_dec)
+
+        if abs(tan_cusp_dec_updated) < near_zero:
+            cusp = intermediate_ramc
+            break
+
+        pole_arg = max(-1.0, min(1.0, tan_lat * tan_cusp_dec_updated))
+        pole_height = math.degrees(
+            math.atan(
+                math.sin(
+                    math.radians(
+                        math.degrees(math.asin(pole_arg)) * sector_offset / 9.0
+                    )
+                )
+                / tan_cusp_dec_updated
+            )
+        )
+        cusp = _calc_ascendant(intermediate_ramc, eps, lat, pole_height)
+
+        if iteration > 1:
+            angular_diff = abs(cusp - prev_cusp)
+            if angular_diff > 180.0:
+                angular_diff = 360.0 - angular_diff
+            if angular_diff < convergence_threshold:
+                break
+        prev_cusp = cusp
+
+    return cusp
+
+
 def _houses_gauquelin(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
     Gauquelin 36-Sector house system.
 
-    Divides celestial sphere into 36 sectors using Placidus-like divisions.
-    This implementation follows Swiss Ephemeris swehouse.c algorithm.
+    Divides the celestial sphere into 36 sectors of 10° each using a
+    Placidus-inspired construction: the diurnal and nocturnal semi-arcs are
+    divided into ninths, and the resulting great circles are projected onto
+    the ecliptic via iterative pole-height refinement.
 
-    Algorithm (from Swiss Ephemeris):
-    - Calculate ascensional difference: a = asin(tan(lat) * tan(eps))
-    - For sectors 2-9 (fourth/second quarter):
-        - ih2 = 10 - ih
-        - fh1 = atan(sin(a * ih2 / 9) / tan(eps))
-        - rectasc = (90/9) * ih2 + armc
-        - Iterate to find pole height and cusp longitude
-    - Sectors 20-27 are opposites of 2-9
-    - For sectors 29-36 (first/third quarter):
-        - ih2 = ih - 28
-        - Similar calculation with rectasc = 180 - ih2 * 90/9 + armc
-    - Sectors 11-18 are opposites of 29-36
-    - Cardinal sectors: 1=Asc, 10=MC, 19=Desc, 28=IC
+    Reference: Michel Gauquelin, "L'influence des astres" (1955).
+    Mathematical derivation: Meeus, "Astronomical Algorithms" 2nd ed., Ch. 13.
 
-    Sector numbering (clockwise from Ascendant):
-    - Sector 1: Rising (Ascendant)
-    - Sector 10: Upper culmination (MC)
-    - Sector 19: Setting (Descendant)
-    - Sector 28: Lower culmination (IC)
+    Algorithm:
+        1. Compute the ascensional difference:
+               a = arcsin(tan(φ) · tan(ε))
+           where φ = geographic latitude, ε = ecliptic obliquity.
+        2. Divide each quadrant arc into ninths.
+        3. For each of the 8 intermediate sectors per quadrant, call
+           _gauquelin_cusp_for_sector() to find the ecliptic intersection via
+           iterative pole-height refinement.
+        4. Opposite sectors are set by adding 180°.
+        5. Cardinals: sector 1 = Asc, 10 = MC, 19 = Desc, 28 = IC.
 
     Polar Limitation:
-        Fails within polar circle (|φ| >= 90° - ε).
+        Fails within polar circle (|φ| >= 90° - ε); falls back to equal
+        10°-divisions from the Ascendant.
 
     Args:
-        armc: Sidereal time at Greenwich (RAMC) in degrees
+        armc: Right Ascension of the Midheaven (RAMC) in degrees
         lat: Geographic latitude in degrees
         eps: True obliquity of ecliptic in degrees
         asc: Ascendant longitude in degrees
         mc: Midheaven longitude in degrees
 
     Returns:
-        List of 37 sector longitudes (index 0 unused, 1-36 are sectors)
+        List of 37 sector longitudes (index 0 unused, sectors 1-36)
     """
-    VERY_SMALL = 1e-10
-    VERY_SMALL_ITER = 1e-8
+    NEAR_ZERO = 1e-10
+    CONVERGENCE_THRESHOLD = 1e-8
     niter_max = 100
 
-    cusps = [0.0] * 37  # Index 0 unused, 1-36 are sectors
+    cusps = [0.0] * 37  # index 0 unused; sectors 1-36
 
-    # Within polar circle, use Porphyry-like fallback (equal division)
+    # Polar circle fallback: equal 10° divisions from the Ascendant
     if abs(lat) >= 90.0 - eps:
-        # Fallback: divide into 36 equal sectors from Asc
         for i in range(1, 37):
             cusps[i] = (asc - (i - 1) * 10.0) % 360.0
         return cusps
 
-    # Precompute trig values
-    sine = math.sin(math.radians(eps))
-    cose = math.cos(math.radians(eps))
-    tane = math.tan(math.radians(eps))
-    tanfi = math.tan(math.radians(lat))
-    th = armc
+    # Precompute obliquity and latitude trig quantities
+    sin_obliquity = math.sin(math.radians(eps))
+    tan_obliquity = math.tan(math.radians(eps))
+    tan_lat = math.tan(math.radians(lat))
 
-    # a = asin(tan(lat) * tan(eps))
-    a_arg = tanfi * tane
-    if abs(a_arg) > 1.0:
-        a_arg = 1.0 if a_arg > 0 else -1.0
-    a = math.degrees(math.asin(a_arg))
+    # Ascensional difference: a = arcsin(tan(φ) · tan(ε))
+    asc_diff_arg = max(-1.0, min(1.0, tan_lat * tan_obliquity))
+    ascensional_diff = math.degrees(math.asin(asc_diff_arg))
 
-    # Fourth/Second quarter: sectors 2-9
+    # Shared keyword arguments for the cusp helper
+    _cusp_kwargs = dict(
+        ascensional_diff=ascensional_diff,
+        tan_obliquity=tan_obliquity,
+        sin_obliquity=sin_obliquity,
+        tan_lat=tan_lat,
+        eps=eps,
+        lat=lat,
+        niter_max=niter_max,
+        convergence_threshold=CONVERGENCE_THRESHOLD,
+        near_zero=NEAR_ZERO,
+    )
+
+    # --- Fourth/Second quadrant: sectors 2-9 (RAMC offsets +10° … +80°) ---
     for ih in range(2, 10):
-        ih2 = 10 - ih
-        fh1 = math.degrees(math.atan(math.sin(math.radians(a * ih2 / 9.0)) / tane))
-        rectasc = ((90.0 / 9.0) * ih2 + th) % 360.0
+        sector_offset = 10 - ih  # counts down 8..1 as ih goes 2..9
+        cusps[ih] = _gauquelin_cusp_for_sector(
+            sector_offset=sector_offset,
+            base_ramc=armc,
+            ramc_sign=+1.0,
+            **_cusp_kwargs,
+        )
+        cusps[ih + 18] = (cusps[ih] + 180.0) % 360.0  # opposite sector
 
-        # Initial cusp estimate using Asc1
-        cusp_init = _calc_ascendant(rectasc, eps, lat, fh1)
-        # tant = tand(asind(sine * sind(cusp_init))) - declination of cusp point
-        dec_cusp = math.asin(sine * math.sin(math.radians(cusp_init)))
-        tant = math.tan(dec_cusp)
-
-        if abs(tant) < VERY_SMALL:
-            cusps[ih] = rectasc
-        else:
-            # Pole height: f = atand(sind(asind(tanfi * tant) * ih2 / 9) / tant)
-            f_arg = tanfi * tant
-            if abs(f_arg) > 1.0:
-                f_arg = 1.0 if f_arg > 0 else -1.0
-            angle_deg = math.degrees(math.asin(f_arg))
-            f = math.degrees(
-                math.atan(math.sin(math.radians(angle_deg * ih2 / 9.0)) / tant)
-            )
-            cusps[ih] = _calc_ascendant(rectasc, eps, lat, f)
-
-            # Iterate for convergence
-            cuspsv = 0.0
-            for i in range(1, niter_max + 1):
-                sin_cusp = math.sin(math.radians(cusps[ih]))
-                dec_cusp_new = math.asin(sine * sin_cusp)
-                tant_new = math.tan(dec_cusp_new)
-
-                if abs(tant_new) < VERY_SMALL:
-                    cusps[ih] = rectasc
-                    break
-
-                f_arg = tanfi * tant_new
-                if abs(f_arg) > 1.0:
-                    f_arg = 1.0 if f_arg > 0 else -1.0
-                angle_deg = math.degrees(math.asin(f_arg))
-                f = math.degrees(
-                    math.atan(math.sin(math.radians(angle_deg * ih2 / 9.0)) / tant_new)
-                )
-                cusps[ih] = _calc_ascendant(rectasc, eps, lat, f)
-
-                if i > 1:
-                    diff = abs(cusps[ih] - cuspsv)
-                    if diff > 180:
-                        diff = 360 - diff
-                    if diff < VERY_SMALL_ITER:
-                        break
-                cuspsv = cusps[ih]
-
-        # Opposite sector
-        cusps[ih + 18] = (cusps[ih] + 180.0) % 360.0
-
-    # First/Third quarter: sectors 29-36
+    # --- First/Third quadrant: sectors 29-36 (RAMC offsets -10° … -80°) ---
     for ih in range(29, 37):
-        ih2 = ih - 28
-        fh1 = math.degrees(math.atan(math.sin(math.radians(a * ih2 / 9.0)) / tane))
-        rectasc = (180.0 - ih2 * 90.0 / 9.0 + th) % 360.0
-
-        cusp_init = _calc_ascendant(rectasc, eps, lat, fh1)
-        # tant = tand(asind(sine * sind(cusp_init))) - declination of cusp point
-        dec_cusp = math.asin(sine * math.sin(math.radians(cusp_init)))
-        tant = math.tan(dec_cusp)
-
-        if abs(tant) < VERY_SMALL:
-            cusps[ih] = rectasc
-        else:
-            # Pole height: f = atand(sind(asind(tanfi * tant) * ih2 / 9) / tant)
-            f_arg = tanfi * tant
-            if abs(f_arg) > 1.0:
-                f_arg = 1.0 if f_arg > 0 else -1.0
-            angle_deg = math.degrees(math.asin(f_arg))
-            f = math.degrees(
-                math.atan(math.sin(math.radians(angle_deg * ih2 / 9.0)) / tant)
-            )
-            cusps[ih] = _calc_ascendant(rectasc, eps, lat, f)
-
-            cuspsv = 0.0
-            for i in range(1, niter_max + 1):
-                sin_cusp = math.sin(math.radians(cusps[ih]))
-                dec_cusp_new = math.asin(sine * sin_cusp)
-                tant_new = math.tan(dec_cusp_new)
-
-                if abs(tant_new) < VERY_SMALL:
-                    cusps[ih] = rectasc
-                    break
-
-                f_arg = tanfi * tant_new
-                if abs(f_arg) > 1.0:
-                    f_arg = 1.0 if f_arg > 0 else -1.0
-                angle_deg = math.degrees(math.asin(f_arg))
-                f = math.degrees(
-                    math.atan(math.sin(math.radians(angle_deg * ih2 / 9.0)) / tant_new)
-                )
-                cusps[ih] = _calc_ascendant(rectasc, eps, lat, f)
-
-                if i > 1:
-                    diff = abs(cusps[ih] - cuspsv)
-                    if diff > 180:
-                        diff = 360 - diff
-                    if diff < VERY_SMALL_ITER:
-                        break
-                cuspsv = cusps[ih]
-
-        # Opposite sector
-        cusps[ih - 18] = (cusps[ih] + 180.0) % 360.0
+        sector_offset = ih - 28  # counts up 1..8 as ih goes 29..36
+        cusps[ih] = _gauquelin_cusp_for_sector(
+            sector_offset=sector_offset,
+            base_ramc=(armc + 180.0) % 360.0,
+            ramc_sign=-1.0,
+            **_cusp_kwargs,
+        )
+        cusps[ih - 18] = (cusps[ih] + 180.0) % 360.0  # opposite sector
 
     # Cardinal sectors
     cusps[1] = asc
@@ -3393,8 +3392,9 @@ def _cotrans(x: List[float], eps: float) -> List[float]:
     """
     Coordinate transformation (rotation around x-axis by angle eps).
 
-    Equivalent to Swiss Ephemeris swe_cotrans().
     Rotates spherical coordinates [lon, lat, r] by angle eps.
+    Implements the standard rotation matrix for ecliptic/equatorial conversion
+    (see e.g. Meeus, "Astronomical Algorithms" ch. 13).
 
     Args:
         x: [longitude, latitude, radius] in degrees
@@ -3587,6 +3587,119 @@ def _houses_equal_mc(asc: float, mc: float) -> List[float]:
     return cusps
 
 
+def _sunshine_arc_to_ecliptic(
+    arc_offset_ra: float,
+    is_diurnal: bool,
+    armc: float,
+    lat: float,
+    sun_dec: float,
+    sin_lat: float,
+    cos_lat: float,
+    cos_sun_dec: float,
+    tan_sun_dec: float,
+    sin_obliquity: float,
+    cos_obliquity: float,
+) -> float:
+    """
+    Map one trisected semi-arc offset to an ecliptic longitude.
+
+    The Sunshine system divides the Sun's diurnal and nocturnal semi-arcs into
+    thirds.  For each trisection point, this function uses spherical triangle
+    geometry to find the corresponding ecliptic cusp (Makransky 1988,
+    "Primary Directions").
+
+    Steps:
+        1. Convert the RA-arc offset to a great-circle arc length (xhs).
+        2. Solve the spherical triangle {pole, arc midpoint, horizon point}
+           via the spherical law of cosines to find side c.
+        3. Apply the spherical law of sines to get the zenith distance (zd).
+        4. Derive the equatorial RA intersection and the pole height of the
+           house circle.
+        5. Project to the ecliptic via the rising-point formula (_asc1).
+
+    Args:
+        arc_offset_ra: RA offset along the semi-arc (degrees).
+        is_diurnal: True for diurnal semi-arc cusps (houses 8-12 side),
+                    False for nocturnal semi-arc cusps (houses 2-6 side).
+        armc: Right Ascension of the Midheaven (degrees).
+        lat: Geographic latitude (degrees).
+        sun_dec: Sun's declination (degrees).
+        sin_lat: sin(φ) — pre-computed for speed.
+        cos_lat: cos(φ) — pre-computed for speed.
+        cos_sun_dec: cos(δ☉) — pre-computed for speed.
+        tan_sun_dec: tan(δ☉) — pre-computed for speed.
+        sin_obliquity: sin(ε) — pre-computed for speed.
+        cos_obliquity: cos(ε) — pre-computed for speed.
+
+    Returns:
+        Ecliptic longitude of the cusp (degrees, 0-360).
+    """
+    # Step 1: great-circle arc subtended by the RA offset on the Sun's parallel
+    # xhs = 2 · arcsin(cos(δ☉) · sin(arc_offset / 2))
+    great_circle_arc = 2.0 * math.degrees(
+        math.asin(cos_sun_dec * math.sin(math.radians(arc_offset_ra / 2.0)))
+    )
+
+    # Step 2a: interior angle α at the pole of the spherical triangle
+    # cos(α) = tan(δ☉) · tan(great_circle_arc / 2)
+    cos_alpha = max(
+        -1.0, min(1.0, tan_sun_dec * math.tan(math.radians(great_circle_arc / 2.0)))
+    )
+    alpha = math.degrees(math.acos(cos_alpha))
+
+    # Step 2b: triangle side and opening angle differ for diurnal vs nocturnal arc
+    if is_diurnal:
+        # Diurnal arc: triangle opening angle is supplement of α
+        triangle_angle = 180.0 - alpha
+        triangle_side = 90.0 - lat + sun_dec
+    else:
+        # Nocturnal arc: triangle opening angle equals α
+        triangle_angle = alpha
+        triangle_side = 90.0 - lat - sun_dec
+
+    # Step 2c: third side c via spherical law of cosines
+    cos_c = math.cos(math.radians(great_circle_arc)) * math.cos(
+        math.radians(triangle_side)
+    ) + math.sin(math.radians(great_circle_arc)) * math.sin(
+        math.radians(triangle_side)
+    ) * math.cos(math.radians(triangle_angle))
+    cos_c = max(-1.0, min(1.0, cos_c))
+    side_c = math.degrees(math.acos(cos_c))
+
+    # Step 3: zenith distance via spherical law of sines
+    if side_c < 1e-6:
+        zenith_dist = 0.0
+    else:
+        sin_zd = max(
+            -1.0,
+            min(
+                1.0,
+                math.sin(math.radians(great_circle_arc))
+                * math.sin(math.radians(triangle_angle))
+                / math.sin(math.radians(side_c)),
+            ),
+        )
+        zenith_dist = math.degrees(math.asin(sin_zd))
+
+    # Step 4: equatorial RA of the house-circle / equator intersection
+    equator_ra_offset = math.degrees(
+        math.atan(cos_lat * math.tan(math.radians(zenith_dist)))
+    )
+
+    # Pole height of the house circle
+    pole_height = math.degrees(math.asin(math.sin(math.radians(zenith_dist)) * sin_lat))
+
+    # Step 5: sign/direction convention and final RA
+    if is_diurnal:
+        ra_intersection = (armc + equator_ra_offset) % 360.0
+    else:
+        pole_height = -pole_height
+        ra_intersection = (equator_ra_offset + armc + 180.0) % 360.0
+
+    # Project equatorial intersection onto the ecliptic
+    return _asc1(ra_intersection, pole_height, sin_obliquity, cos_obliquity)
+
+
 def _houses_sunshine(
     armc: float, lat: float, eps: float, asc: float, mc: float, sun_dec: float
 ) -> List[float]:
@@ -3594,27 +3707,27 @@ def _houses_sunshine(
     Sunshine (Makransky) house system (code 'I').
 
     Invented by Bob Makransky and published in 1988 in "Primary Directions".
-    The diurnal and nocturnal arcs of the Sun are trisected, and great circles
-    are drawn through these trisection points and the north and south points
-    on the horizon. The intersection points of these great circles with the
-    ecliptic are the house cusps.
+    The diurnal and nocturnal arcs of the Sun are divided into thirds, and
+    great circles through these trisection points and the horizon's north/south
+    points define the house boundaries.  Each great circle is projected onto
+    the ecliptic via spherical triangle arc-trisection geometry.
 
     Note: Cusps 11, 12, 2, 3 are NOT in exact opposition to cusps 5, 6, 8, 9.
 
-    This implements the Treindl algorithm from Swiss Ephemeris swehouse.c.
-
     Algorithm:
-        1. Calculate ascensional difference from Sun's declination
-        2. Compute diurnal semi-arc (DSA = 90 + AD) and nocturnal semi-arc (NSA = 90 - AD)
-        3. Trisect the arcs to get offsets for each house cusp
-        4. For each intermediate cusp, use spherical trigonometry to find:
-           - Great-circle arc length on the Sun's diurnal/nocturnal arc
-           - Zenith distance of house circle via spherical triangles
-           - Pole height from zenith distance
-           - Intersection with ecliptic using Asc1() formula
+        1. Compute the Sun's ascensional difference (AD) from its declination
+           and the geographic latitude.
+        2. Derive the diurnal semi-arc (DSA = 90° + AD) and the nocturnal
+           semi-arc (NSA = 90° − AD); trisect each to get RA offsets.
+        3. For nocturnal cusps (2, 3, 5, 6) call _sunshine_arc_to_ecliptic()
+           with is_diurnal=False.
+        4. For diurnal cusps (8, 9, 11, 12) call _sunshine_arc_to_ecliptic()
+           with is_diurnal=True.
+        5. If the MC is below the horizon, reflect all intermediate cusps by
+           180°.
 
     Args:
-        armc: Sidereal time at Greenwich (RAMC) in degrees
+        armc: Right Ascension of the Midheaven (RAMC) in degrees
         lat: Geographic latitude in degrees
         eps: True obliquity of ecliptic in degrees
         asc: Ascendant longitude in degrees
@@ -3624,7 +3737,7 @@ def _houses_sunshine(
     Returns:
         List of 13 house cusp longitudes
     """
-    VERY_SMALL = 1e-10
+    NEAR_ZERO = 1e-10
 
     cusps = [0.0] * 13
     cusps[1] = asc
@@ -3632,186 +3745,97 @@ def _houses_sunshine(
     cusps[4] = (mc + 180.0) % 360.0
     cusps[7] = (asc + 180.0) % 360.0
 
-    # Calculate ascensional difference: sin(ad) = tan(dec) * tan(lat)
-    arg = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
-    if arg >= 1.0:
-        ad = 90.0 - VERY_SMALL
-    elif arg <= -1.0:
-        ad = -90.0 + VERY_SMALL
+    # Ascensional difference: sin(AD) = tan(δ☉) · tan(φ)
+    ad_arg = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
+    if ad_arg >= 1.0:
+        ascensional_diff = 90.0 - NEAR_ZERO
+    elif ad_arg <= -1.0:
+        ascensional_diff = -90.0 + NEAR_ZERO
     else:
-        ad = math.degrees(math.asin(arg))
+        ascensional_diff = math.degrees(math.asin(ad_arg))
 
-    # Semi-arcs
-    nsa = 90.0 - ad  # Nocturnal semi-arc
-    dsa = 90.0 + ad  # Diurnal semi-arc
+    nocturnal_semi_arc = 90.0 - ascensional_diff  # NSA
+    diurnal_semi_arc = 90.0 + ascensional_diff  # DSA
 
-    # House offsets (in right ascension along the diurnal/nocturnal arc)
-    # xh[i] is the offset from the angle (IC, Asc, MC, Desc) in RA
-    xh = [0.0] * 13
-    xh[2] = -2.0 * nsa / 3.0
-    xh[3] = -1.0 * nsa / 3.0
-    xh[5] = 1.0 * nsa / 3.0
-    xh[6] = 2.0 * nsa / 3.0
-    xh[8] = -2.0 * dsa / 3.0
-    xh[9] = -1.0 * dsa / 3.0
-    xh[11] = 1.0 * dsa / 3.0
-    xh[12] = 2.0 * dsa / 3.0
+    # Pre-compute repeated trig quantities
+    sin_lat = math.sin(math.radians(lat))
+    cos_lat = math.cos(math.radians(lat))
+    cos_sun_dec = math.cos(math.radians(sun_dec))
+    tan_sun_dec = math.tan(math.radians(sun_dec))
+    sin_obliquity = math.sin(math.radians(eps))
+    cos_obliquity = math.cos(math.radians(eps))
 
-    # Precompute trigonometric values
-    sinlat = math.sin(math.radians(lat))
-    coslat = math.cos(math.radians(lat))
-    cosdec = math.cos(math.radians(sun_dec))
-    tandec = math.tan(math.radians(sun_dec))
-    sinecl = math.sin(math.radians(eps))
-    cosecl = math.cos(math.radians(eps))
-
-    # Check if MC is under horizon
-    mcdec = math.degrees(
+    # Determine whether the MC is below the horizon (affects sign convention)
+    mc_declination = math.degrees(
         math.atan(math.sin(math.radians(armc)) * math.tan(math.radians(eps)))
     )
-    mc_under_horizon = abs(lat - mcdec) > 90.0
+    mc_under_horizon = abs(lat - mc_declination) > 90.0
 
+    # RA offsets along each semi-arc (positive = toward MC, negative = toward IC)
+    # NSA offsets (nocturnal cusps 2, 3, 5, 6)
+    nsa_third = nocturnal_semi_arc / 3.0
+    nsa_offsets = {
+        2: -2.0 * nsa_third,
+        3: -1.0 * nsa_third,
+        5: 1.0 * nsa_third,
+        6: 2.0 * nsa_third,
+    }
+    # DSA offsets (diurnal cusps 8, 9, 11, 12)
+    dsa_third = diurnal_semi_arc / 3.0
+    dsa_offsets = {
+        8: -2.0 * dsa_third,
+        9: -1.0 * dsa_third,
+        11: 1.0 * dsa_third,
+        12: 2.0 * dsa_third,
+    }
+
+    # Invert all offsets when MC is under horizon
     if mc_under_horizon:
-        # Invert offsets if MC is under horizon
-        for ih in range(2, 13):
-            xh[ih] = -xh[ih]
+        nsa_offsets = {k: -v for k, v in nsa_offsets.items()}
+        dsa_offsets = {k: -v for k, v in dsa_offsets.items()}
 
-    # Calculate intermediate cusps using Treindl algorithm
-    for ih in range(1, 13):
-        if (ih - 1) % 3 == 0:
-            continue  # Skip 1, 4, 7, 10 (already set)
+    # Shared kwargs for the geometric helper
+    _common = dict(
+        armc=armc,
+        lat=lat,
+        sun_dec=sun_dec,
+        sin_lat=sin_lat,
+        cos_lat=cos_lat,
+        cos_sun_dec=cos_sun_dec,
+        tan_sun_dec=tan_sun_dec,
+        sin_obliquity=sin_obliquity,
+        cos_obliquity=cos_obliquity,
+    )
 
-        # Great-circle length of the arc offset
-        # xhs = 2 * arcsin(cos(dec) * sin(xh/2))
-        xhs = 2.0 * math.degrees(
-            math.asin(cosdec * math.sin(math.radians(xh[ih] / 2.0)))
+    # --- Nocturnal semi-arc cusps (below the horizon arc) ---
+    for house_index, ra_offset in nsa_offsets.items():
+        cusps[house_index] = _sunshine_arc_to_ecliptic(
+            arc_offset_ra=ra_offset,
+            is_diurnal=False,
+            **_common,
         )
 
-        # Compute triangle north pole - mp0 - hp
-        # We have two sides 90-dec, base xhs, angle at pole x
-        # Derive from cosine rule: cos(a) = tan(dec) * tan(xhs/2)
-        cosa = tandec * math.tan(math.radians(xhs / 2.0))
-        if abs(cosa) > 1.0:
-            cosa = 1.0 if cosa > 0 else -1.0
-        alph = math.degrees(math.acos(cosa))
+    # --- Diurnal semi-arc cusps (above the horizon arc) ---
+    for house_index, ra_offset in dsa_offsets.items():
+        cusps[house_index] = _sunshine_arc_to_ecliptic(
+            arc_offset_ra=ra_offset,
+            is_diurnal=True,
+            **_common,
+        )
 
-        # Compute triangle south point - mp0 - hp
-        # We have: side x', side b, angle alpha2 between the sides
-        if ih > 7:  # Diurnal side
-            alpha2 = 180.0 - alph
-            b = 90.0 - lat + sun_dec
-        else:  # Nocturnal side
-            alpha2 = alph
-            b = 90.0 - lat - sun_dec
-
-        # Compute side c using spherical cosine rule
-        cosc = math.cos(math.radians(xhs)) * math.cos(math.radians(b)) + math.sin(
-            math.radians(xhs)
-        ) * math.sin(math.radians(b)) * math.cos(math.radians(alpha2))
-        if abs(cosc) > 1.0:
-            cosc = 1.0 if cosc > 0 else -1.0
-        c = math.degrees(math.acos(cosc))
-
-        # Use sine rule to find zenith distance
-        if c < 1e-6:
-            zd = 0.0
-        else:
-            sinzd = (
-                math.sin(math.radians(xhs))
-                * math.sin(math.radians(alpha2))
-                / math.sin(math.radians(c))
-            )
-            if abs(sinzd) > 1.0:
-                sinzd = 1.0 if sinzd > 0 else -1.0
-            zd = math.degrees(math.asin(sinzd))
-
-        # Compute intersection of house circle with equator
-        rax = math.degrees(math.atan(coslat * math.tan(math.radians(zd))))
-
-        # Compute pole height (distance of house circle pole from equator)
-        pole = math.degrees(math.asin(math.sin(math.radians(zd)) * sinlat))
-
-        # Calculate RA intersection point
-        if ih <= 6:
-            pole = -pole
-            a = (rax + armc + 180.0) % 360.0
-        else:
-            a = (armc + rax) % 360.0
-
-        # Use Asc1() formula to find ecliptic intersection
-        hc = _asc1(a, pole, sinecl, cosecl)
-        cusps[ih] = hc
-
-    # Apply 180° correction if MC was under horizon
+    # Reflect all intermediate cusps by 180° when MC was under horizon
     if mc_under_horizon:
         for ih in range(1, 13):
             if (ih - 1) % 3 == 0:
-                continue
+                continue  # skip cardinals (1, 4, 7, 10)
             cusps[ih] = (cusps[ih] + 180.0) % 360.0
 
     return cusps
 
 
-def _asc1(x1: float, f: float, sine: float, cose: float) -> float:
-    """
-    Asc1 function from Swiss Ephemeris (swehouse.c).
-
-    Calculates ecliptic longitude from RA intersection point and pole height.
-    This is the same algorithm as _calc_ascendant but exposed as a helper.
-
-    Args:
-        x1: Right ascension in degrees
-        f: Pole height (latitude parameter)
-        sine: sin(obliquity)
-        cose: cos(obliquity)
-
-    Returns:
-        Ecliptic longitude in degrees (0-360)
-    """
-    VERY_SMALL = 1e-10
-
-    def _asc2(x: float, f: float, sine: float, cose: float) -> float:
-        """Asc2 helper for quadrant calculation."""
-        ass = -math.tan(math.radians(f)) * sine + cose * math.cos(math.radians(x))
-        if abs(ass) < VERY_SMALL:
-            ass = 0.0
-        sinx = math.sin(math.radians(x))
-        if abs(sinx) < VERY_SMALL:
-            sinx = 0.0
-        if sinx == 0:
-            if ass < 0:
-                ass = -VERY_SMALL
-            else:
-                ass = VERY_SMALL
-        elif ass == 0:
-            if sinx < 0:
-                ass = -90.0
-            else:
-                ass = 90.0
-        else:
-            ass = math.degrees(math.atan(sinx / ass))
-        if ass < 0:
-            ass = 180.0 + ass
-        return ass
-
-    x1 = x1 % 360.0
-    n = int((x1 / 90.0) + 1)
-
-    if abs(90.0 - f) < VERY_SMALL:
-        return 180.0
-    if abs(90.0 + f) < VERY_SMALL:
-        return 0.0
-
-    if n == 1:
-        ass = _asc2(x1, f, sine, cose)
-    elif n == 2:
-        ass = 180.0 - _asc2(180.0 - x1, -f, sine, cose)
-    elif n == 3:
-        ass = 180.0 + _asc2(x1 - 180.0, -f, sine, cose)
-    else:
-        ass = 360.0 - _asc2(360.0 - x1, f, sine, cose)
-
-    return ass % 360.0
+# Alias: _asc1 is the same algorithm as _ra_to_ecliptic_longitude
+# Kept as a named reference since many house systems call it directly.
+_asc1 = _ra_to_ecliptic_longitude
 
 
 def _houses_horizontal(
@@ -3820,7 +3844,7 @@ def _houses_horizontal(
     """
     Horizontal (Azimuthal) house system.
 
-    Algorithm from Swiss Ephemeris swehouse.c lines 1083-1155.
+    Algorithm:
     Uses co-latitude transformation and Campanus-like calculation.
 
     Mathematical Formulas:
@@ -3859,49 +3883,56 @@ def _houses_horizontal(
 
     # Transform latitude to co-latitude
     if lat > 0:
-        fi = 90.0 - lat
+        co_lat = 90.0 - lat
     else:
-        fi = -90.0 - lat
+        co_lat = -90.0 - lat
 
     # Handle equator case
-    if abs(abs(fi) - 90.0) < VERY_SMALL:
-        if fi < 0:
-            fi = -90.0 + VERY_SMALL
+    if abs(abs(co_lat) - 90.0) < VERY_SMALL:
+        if co_lat < 0:
+            co_lat = -90.0 + VERY_SMALL
         else:
-            fi = 90.0 - VERY_SMALL
+            co_lat = 90.0 - VERY_SMALL
 
     # Rotate ARMC by 180°
-    th = (armc + 180.0) % 360.0
+    armc_shifted = (armc + 180.0) % 360.0
 
     # Calculate intermediate azimuths
-    fh1 = math.degrees(math.asin(math.sin(math.radians(fi)) / 2.0))
-    fh2 = math.degrees(math.asin(math.sqrt(3.0) / 2.0 * math.sin(math.radians(fi))))
+    pole_offset_1 = math.degrees(math.asin(math.sin(math.radians(co_lat)) / 2.0))
+    pole_offset_2 = math.degrees(
+        math.asin(math.sqrt(3.0) / 2.0 * math.sin(math.radians(co_lat)))
+    )
 
-    cosfi = math.cos(math.radians(fi))
+    cos_colat = math.cos(math.radians(co_lat))
 
-    if abs(cosfi) == 0:
-        if fi > 0:
-            xh1 = xh2 = 90.0
+    if abs(cos_colat) == 0:
+        if co_lat > 0:
+            ra_offset_1 = ra_offset_2 = 90.0
         else:
-            xh1 = xh2 = 270.0
+            ra_offset_1 = ra_offset_2 = 270.0
     else:
-        # tan xh1 = √3 / cos fi
-        xh1 = math.degrees(math.atan(math.sqrt(3.0) / cosfi))
-        # tan xh2 = 1/√3 / cos fi
-        xh2 = math.degrees(math.atan(1.0 / math.sqrt(3.0) / cosfi))
+        # tan ra_offset_1 = √3 / cos co_lat
+        ra_offset_1 = math.degrees(math.atan(math.sqrt(3.0) / cos_colat))
+        # tan ra_offset_2 = 1/√3 / cos co_lat
+        ra_offset_2 = math.degrees(math.atan(1.0 / math.sqrt(3.0) / cos_colat))
 
-    sine = math.sin(math.radians(eps))
-    cose = math.cos(math.radians(eps))
-
-    # Calculate house cusps using _calc_ascendant (Asc1)
-    cusps[11] = _calc_ascendant(th + 90.0 - xh1, eps, lat, fh1)
-    cusps[12] = _calc_ascendant(th + 90.0 - xh2, eps, lat, fh2)
-    cusps[1] = _calc_ascendant(th + 90.0, eps, lat, fi)
-    cusps[2] = _calc_ascendant(th + 90.0 + xh2, eps, lat, fh2)
-    cusps[3] = _calc_ascendant(th + 90.0 + xh1, eps, lat, fh1)
+    # Calculate house cusps using _calc_ascendant (ecliptic rising-point formula)
+    cusps[11] = _calc_ascendant(
+        armc_shifted + 90.0 - ra_offset_1, eps, lat, pole_offset_1
+    )
+    cusps[12] = _calc_ascendant(
+        armc_shifted + 90.0 - ra_offset_2, eps, lat, pole_offset_2
+    )
+    cusps[1] = _calc_ascendant(armc_shifted + 90.0, eps, lat, co_lat)
+    cusps[2] = _calc_ascendant(
+        armc_shifted + 90.0 + ra_offset_2, eps, lat, pole_offset_2
+    )
+    cusps[3] = _calc_ascendant(
+        armc_shifted + 90.0 + ra_offset_1, eps, lat, pole_offset_1
+    )
 
     # Within polar circle handling
-    if abs(fi) >= 90.0 - eps:
+    if abs(co_lat) >= 90.0 - eps:
         acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
         if acmc_diff < 0:
             asc = (asc + 180.0) % 360.0
@@ -3911,20 +3942,20 @@ def _houses_horizontal(
                     continue
                 cusps[i] = (cusps[i] + 180.0) % 360.0
 
-    # Add 180° to cusps 1-3 and 11-12 (per Swiss Ephemeris line 1141-1144)
+    # Add 180° to cusps 1-3 and 11-12
     for i in range(1, 4):
         cusps[i] = (cusps[i] + 180.0) % 360.0
     for i in range(11, 13):
         cusps[i] = (cusps[i] + 180.0) % 360.0
 
     # Restore original latitude and ARMC (for reference)
-    if fi > 0:
-        fi = 90.0 - fi
+    if co_lat > 0:
+        co_lat = 90.0 - co_lat
     else:
-        fi = -90.0 - fi
-    th = (th + 180.0) % 360.0
+        co_lat = -90.0 - co_lat
+    armc_shifted = (armc_shifted + 180.0) % 360.0
 
-    # Check Asc/DC orientation (per Swiss Ephemeris line 1151-1154)
+    # Check Asc/DC orientation
     acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
     if acmc_diff < 0:
         asc = (asc + 180.0) % 360.0
@@ -3948,7 +3979,7 @@ def _houses_natural_gradient(
     """
     Natural Gradient house system ('N').
 
-    In Swiss Ephemeris, 'N' maps to "Equal houses with 0° Aries as cusp 1".
+    'N' maps to "Equal houses with 0° Aries as cusp 1".
     This is effectively a Whole Sign system starting from 0° Aries.
 
     Mathematical Formula:
@@ -4019,12 +4050,12 @@ def _apc_sector(n: int, ph: float, e: float, az: float) -> float:
     VERY_SMALL = 1e-10
     PI = math.pi
 
-    # Calculate kv (ascensional difference of ascendant) and dasc (declination of ascendant)
+    # Calculate asc_diff (ascensional difference of ascendant) and asc_declination (declination of ascendant)
     if abs(math.degrees(ph)) > 90 - VERY_SMALL:
-        kv = 0.0
-        dasc = 0.0
+        asc_diff = 0.0
+        asc_declination = 0.0
     else:
-        kv = math.atan(
+        asc_diff = math.atan(
             math.tan(ph)
             * math.tan(e)
             * math.cos(az)
@@ -4032,11 +4063,11 @@ def _apc_sector(n: int, ph: float, e: float, az: float) -> float:
         )
 
         if abs(math.degrees(ph)) < VERY_SMALL:
-            dasc = math.radians(90.0 - VERY_SMALL)
+            asc_declination = math.radians(90.0 - VERY_SMALL)
             if ph < 0:
-                dasc = -dasc
+                asc_declination = -asc_declination
         else:
-            dasc = math.atan(math.sin(kv) / math.tan(ph))
+            asc_declination = math.atan(math.sin(asc_diff) / math.tan(ph))
 
     # Determine which arc to use (below or above horizon)
     if n < 8:
@@ -4048,22 +4079,23 @@ def _apc_sector(n: int, ph: float, e: float, az: float) -> float:
 
     # Calculate right ascension of house cusp on APC circle
     if is_below_hor:
-        a = kv + az + PI / 2 + k * (PI / 2 - kv) / 3
+        a = asc_diff + az + PI / 2 + k * (PI / 2 - asc_diff) / 3
     else:
-        a = kv + az + PI / 2 + k * (PI / 2 + kv) / 3
+        a = asc_diff + az + PI / 2 + k * (PI / 2 + asc_diff) / 3
 
     a = a % (2 * PI)
 
     # Calculate ecliptic longitude
-    dret = math.atan2(
-        math.tan(dasc) * math.tan(ph) * math.sin(az) + math.sin(a),
-        math.cos(e) * (math.tan(dasc) * math.tan(ph) * math.cos(az) + math.cos(a))
+    longitude = math.atan2(
+        math.tan(asc_declination) * math.tan(ph) * math.sin(az) + math.sin(a),
+        math.cos(e)
+        * (math.tan(asc_declination) * math.tan(ph) * math.cos(az) + math.cos(a))
         + math.sin(e) * math.tan(ph) * math.sin(az - a),
     )
 
-    dret = math.degrees(dret) % 360.0
+    longitude = math.degrees(longitude) % 360.0
 
-    return dret
+    return longitude
 
 
 def _houses_apc(
@@ -4072,8 +4104,8 @@ def _houses_apc(
     """
     APC (Ascendant-Parallel Circle) house system.
 
+    Algorithm:
     Based on the great circle parallel to the horizon passing through the Ascendant.
-    Algorithm from Swiss Ephemeris swehouse.c lines 1806-1829.
 
     Mathematical Formulas:
         The APC system uses the parallel circle that passes through the Ascendant
@@ -4195,7 +4227,7 @@ def house_pos(
 
     This function supports two calling conventions:
 
-    1. Swiss Ephemeris compatible (5 args):
+    1. Reference API compatible (5 args):
        house_pos(armc, lat, obliquity, objcoord, hsys)
        where objcoord is a tuple (lon, lat_body) and hsys is bytes/str
 
@@ -4217,7 +4249,7 @@ def house_pos(
             - Decimal part (0.0-0.999...): Position within house
 
     Example:
-        >>> # Sun at 15° Aries, Placidus houses, Rome (5-arg pyswisseph form)
+        >>> # Sun at 15° Aries, Placidus houses, Rome (5-arg reference API form)
         >>> pos = house_pos(292.957, 41.9, 23.4393, (15.0, 0.0), b'P')
         >>> # Or 6-arg extended form:
         >>> pos = house_pos(292.957, 41.9, 23.4393, ord('P'), 15.0, 0.0)
@@ -4234,7 +4266,7 @@ def house_pos(
 
     # Detect which calling convention is used
     if isinstance(hsys_or_objcoord, tuple):
-        # 5-arg pyswisseph form: (armc, lat, obliquity, objcoord, hsys)
+        # 5-arg reference API form: (armc, lat, obliquity, objcoord, hsys)
         objcoord = hsys_or_objcoord
         lon = objcoord[0]
         lat_body = objcoord[1] if len(objcoord) > 1 else 0.0
@@ -4270,7 +4302,8 @@ def house_pos(
     eps = obliquity
     geolat = lat
 
-    # Convert ecliptic coordinates to equatorial (like Swiss Ephemeris swe_cotrans)
+    # Convert ecliptic coordinates to equatorial via _cotrans rotation
+    # (rotation around x-axis by obliquity angle)
     # This is crucial for proper house position when body has non-zero latitude
     lon_rad = math.radians(lon)
     lat_body_rad = math.radians(lat_body)
@@ -4374,23 +4407,23 @@ def house_pos(
         # The Campanus system divides the prime vertical into 12 equal 30° arcs.
         # For house_pos, we need to find the position of a body on the prime vertical.
         #
-        # The transformation follows the Swiss Ephemeris swe_cotrans approach:
+        # Standard ecliptic-equatorial coordinate transformation:
         # 1. Input: (-mdd - 90, de) where mdd = meridian distance, de = declination
-        # 2. Apply SE's cotrans rotation by -geolat
+        # 2. Apply cotrans rotation by -geolat
         # 3. Extract the resulting longitude as the prime vertical position
-        # Note: mdd = ra - armc in this function (opposite of SE's convention)
+        # Note: mdd = ra - armc in this function (opposite sign convention)
         # so we use mdd - 90 instead of -mdd - 90
 
         xeq0 = mdd - 90.0
         xeq1 = de
 
-        # SE's swe_cotrans rotation formula (around x-axis with SE's sign convention):
+        # Rotation around x-axis (standard ecliptic↔equatorial rotation):
         # x2[0] = x[0]
         # x2[1] = x[1] * cos(eps) + x[2] * sin(eps)
         # x2[2] = -x[1] * sin(eps) + x[2] * cos(eps)
         xeq0_rad = math.radians(xeq0)
         xeq1_rad = math.radians(xeq1)
-        rot_angle = math.radians(-geolat)  # SE uses -geolat
+        rot_angle = math.radians(-geolat)  # negative latitude rotates toward zenith
 
         cos_eps = math.cos(rot_angle)
         sin_eps = math.sin(rot_angle)
@@ -4404,7 +4437,7 @@ def house_pos(
         x1 = cos_xeq1 * sin_xeq0
         x2 = sin_xeq1
 
-        # SE's rotation around x-axis
+        # Rotation around x-axis
         x2_0 = x0
         x2_1 = x1 * cos_eps + x2 * sin_eps
         x2_2 = -x1 * sin_eps + x2 * cos_eps
@@ -4442,10 +4475,17 @@ def house_pos(
 
     elif hsys_char == "M":
         # Morinus
+        # Project the ecliptic longitude onto the equatorial frame via:
+        # tan(ra_equiv) = tan(λ) / cos(ε)
+        # atan2(sin(λ), cos(λ)·cos(ε)) avoids the intermediate tangent variable
+        # and handles the λ=90°/270° singularity natively.
         a = lon
         if abs(a - 90.0) > VERY_SMALL and abs(a - 270.0) > VERY_SMALL:
-            tant = math.tan(math.radians(a))
-            hpos_deg = math.degrees(math.atan(tant / cos_eps))
+            hpos_deg = math.degrees(
+                math.atan2(
+                    math.sin(math.radians(a)), math.cos(math.radians(a)) * cos_eps
+                )
+            )
             if a > 90.0 and a <= 270.0:
                 hpos_deg = (hpos_deg + 180.0) % 360.0
         else:
@@ -4552,7 +4592,7 @@ def swe_house_pos(
 
     This function supports two calling conventions:
 
-    1. Swiss Ephemeris compatible (5 args):
+    1. Reference API compatible (5 args):
        swe_house_pos(armc, lat, obliquity, objcoord, hsys)
        where objcoord is a tuple (lon, lat_body) and hsys is bytes/str
 
@@ -4798,7 +4838,7 @@ def gauquelin_sector(
     - Sector 19: Setting (Descendant)
     - Sector 28: Lower culmination (IC)
 
-    Swiss Ephemeris compatible function (swe_gauquelin_sector equivalent).
+    Reference API compatible function (swe_gauquelin_sector equivalent).
 
     Args:
         jd: Julian Day in Universal Time (UT)
@@ -4840,7 +4880,7 @@ def gauquelin_sector(
         )
 
     # Methods 0-1: Use house_pos with Gauquelin house system ('G')
-    # This matches Swiss Ephemeris behavior exactly
+    # This matches reference API behavior exactly
     from .planets import swe_calc_ut
     from .cache import get_true_obliquity
 
@@ -4882,7 +4922,7 @@ def swe_gauquelin_sector(
     """
     Calculate the Gauquelin sector (1-36) in which a planet is located.
 
-    Swiss Ephemeris compatible function signature.
+    Reference API compatible function signature.
 
     Args:
         tjdut: Julian Day number in Universal Time (UT)
@@ -4907,7 +4947,7 @@ def swe_gauquelin_sector(
         Integer part is sector number (1-36), decimal part is position within sector.
 
     Note:
-        This function matches the Swiss Ephemeris swe_gauquelin_sector() signature.
+        This function matches the swe_gauquelin_sector() API signature.
         Sectors are numbered clockwise from the Ascendant:
         - Sector 1: Rising (Ascendant)
         - Sector 10: Upper culmination (MC)
@@ -4919,7 +4959,7 @@ def swe_gauquelin_sector(
         >>> sector = swe_gauquelin_sector(2451545.0, SE_MARS, 0, geopos)
     """
     lon, lat, altitude = geopos
-    # Use defaults if 0 is passed (matching Swiss Ephemeris behavior)
+    # Use defaults if 0 is passed (matching reference API behavior)
     pressure = atpress if atpress != 0.0 else 1013.25
     temperature = attemp if attemp != 0.0 else 15.0
 

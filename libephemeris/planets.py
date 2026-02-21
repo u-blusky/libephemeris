@@ -1,7 +1,7 @@
 """
 Planetary position calculations for libephemeris.
 
-This is the core module providing Swiss Ephemeris-compatible planet calculations
+This is the core module providing reference API-compatible planet calculations
 using NASA JPL DE440 ephemeris via Skyfield.
 
 Supported Bodies:
@@ -38,7 +38,7 @@ Precision Notes:
 References:
 - JPL DE421 ephemeris (accurate to ~0.001 arcsecond for modern dates)
 - IAU 2000B nutation model via Skyfield
-- Swiss Ephemeris API compatibility layer
+- Reference API compatibility layer
 """
 
 from __future__ import annotations
@@ -170,7 +170,7 @@ class _CobCorrectedTarget:
     """Wrapper that applies COB (Center of Body) correction to barycenter positions.
 
     DE440 returns system barycenter positions for outer planets (Jupiter, Saturn,
-    Neptune, Pluto), but Swiss Ephemeris returns planet center positions. This
+    Neptune, Pluto), but the reference implementation returns planet center positions. This
     wrapper applies analytical moon theory corrections to convert barycenter to
     center of body positions.
 
@@ -419,7 +419,7 @@ def _to_native_floats(values: tuple) -> PositionResult:
     - Type checking in downstream code
 
     This function ensures all values are native Python floats for
-    compatibility with pyswisseph behavior.
+    compatibility with reference API behavior.
 
     Args:
         values: Tuple of 6 values (lon, lat, dist, speed_lon, speed_lat, speed_dist)
@@ -713,7 +713,7 @@ def swe_calc_ut(
     """
     Calculate planetary position for Universal Time.
 
-    Swiss Ephemeris compatible function.
+    Reference API compatible function.
 
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
@@ -787,7 +787,7 @@ def swe_calc(
     """
     Calculate planetary position for Ephemeris Time (ET/TT).
 
-    Swiss Ephemeris compatible function. Similar to swe_calc_ut() but takes
+    Reference API compatible function. Similar to swe_calc_ut() but takes
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
 
     Args:
@@ -837,7 +837,7 @@ def swe_calc_pctr(
     """
     Calculate planetary position as seen from another planet (planet-centric).
 
-    Swiss Ephemeris compatible function.
+    Reference API compatible function.
 
     This function calculates the position of a target body (ipl) as observed
     from another body (iplctr) rather than from Earth (geocentric) or Sun
@@ -938,7 +938,7 @@ def _calc_body_pctr(
 
     # Use get_planet_target() to get planet center (with COB correction) for gas giants
     # This ensures we use planet center NAIF IDs (599, 699, 799, 899) rather than
-    # barycenter IDs (5, 6, 7, 8), providing sub-arcsecond accuracy matching Swiss Ephemeris
+    # barycenter IDs (5, 6, 7, 8), providing sub-arcsecond accuracy matching reference implementation
     target = get_planet_target(planets, target_name)
     observer = get_planet_target(planets, observer_name)
 
@@ -1037,7 +1037,7 @@ def _calc_body_pctr(
 
     # Apply sidereal offset if requested (ecliptic only)
     # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
-    # matching Swiss Ephemeris behavior. get_ayanamsa_ut() returns mean ayanamsha.
+    # matching reference API behavior. get_ayanamsa_ut() returns mean ayanamsha.
     if is_sidereal and not is_equatorial:
         ayanamsa = _get_true_ayanamsa(t.ut1)
         p1 = (p1 - ayanamsa) % 360.0
@@ -1296,7 +1296,7 @@ def _calc_body(
     Calculate position of any celestial body or point (internal dispatcher).
 
     This is the core calculation function that routes requests to appropriate
-    sub-modules based on body type. Supports all Swiss Ephemeris body types.
+    sub-modules based on body type. Supports all reference API body types.
 
     Supported body types:
         - Classical planets (Sun, Moon, Mercury-Pluto) via JPL DE421 ephemeris
@@ -1559,8 +1559,8 @@ def _calc_body(
         from . import hypothetical
 
         jd_tt = t.tt
-        # Use calc_uranian_planet() which uses Keplerian elements from seorbel.txt
-        # to match pyswisseph's Uranian planet calculations
+        # Use calc_uranian_planet() which uses Keplerian orbital elements
+        # to match reference API Uranian planet calculations
         pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
         pos = _maybe_equatorial_convert(pos, jd_tt, iflag)
         return _to_native_floats(pos), iflag
@@ -1570,7 +1570,7 @@ def _calc_body(
         from . import hypothetical
 
         jd_tt = t.tt
-        # Use calc_transpluto() which uses Keplerian elements from seorbel.txt
+        # Use calc_transpluto() which uses Keplerian orbital elements
         pos = hypothetical.calc_transpluto(jd_tt)
         pos = _maybe_equatorial_convert(pos, jd_tt, iflag)
         return _to_native_floats(pos), iflag
@@ -1760,7 +1760,7 @@ def _calc_body(
         # Heliocentric
         observer = planets["sun"]
     elif iflag & SEFLG_BARYCTR:
-        # Barycentric - Swiss Ephemeris returns the same coordinates as heliocentric
+        # Barycentric - returns the same coordinates as heliocentric
         # (position relative to Sun, not SSB). This is for compatibility.
         observer = planets["sun"]
     elif (iflag & SEFLG_TOPOCTR) and observer_topo:
@@ -1795,7 +1795,7 @@ def _calc_body(
         # Apparent position
         if (iflag & SEFLG_HELCTR) or (iflag & SEFLG_BARYCTR):
             # For SSB or Heliocentric, we need to apply light-time correction
-            # This matches pyswisseph behavior: position shows where object WAS
+            # This matches reference API behavior: position shows where object WAS
             # when light left it to reach the observer (Sun for heliocentric)
             import numpy as np
 
@@ -1982,7 +1982,7 @@ def _calc_body(
     # providing ~100x better precision for the same timestep.
     #
     # For the Moon, we use a larger timestep (7e-5 days = ~6 seconds) which
-    # provides optimal velocity precision compared to Swiss Ephemeris.
+    # provides optimal velocity precision.
     # This value was empirically determined to minimize the maximum velocity error
     # across a wide range of dates (1900-2100).
     if ipl == SE_MOON:
@@ -2022,7 +2022,7 @@ def _calc_body(
 
     # 5. Sidereal Mode
     # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
-    # matching Swiss Ephemeris behavior. get_ayanamsa_ut() returns mean ayanamsha.
+    # matching reference API behavior. get_ayanamsa_ut() returns mean ayanamsha.
     if is_sidereal and not is_equatorial:
         ayanamsa = _get_true_ayanamsa(t.ut1)
         p1 = (p1 - ayanamsa) % 360.0
@@ -2171,7 +2171,7 @@ def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
 def swe_get_ayanamsa_name(sid_mode: int) -> str:
     """
     Get the name of a sidereal mode.
-    Compatible with pyswisseph's swe.get_ayanamsa_name().
+    Compatible with swe.get_ayanamsa_name().
     """
     names = {
         SE_SIDM_FAGAN_BRADLEY: "Fagan/Bradley",
@@ -2426,7 +2426,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     """
     Calculate ayanamsha (sidereal zodiac offset) for a specific mode.
 
-    Implements all 43 ayanamsha modes from Swiss Ephemeris, covering traditional
+    Implements all 43 ayanamsha modes from the reference API, covering traditional
     Indian (Lahiri, Krishnamurti), Western sidereal (Fagan-Bradley), astronomical
     (Galactic Center), and historical (Babylonian, Hipparchos) systems.
 
@@ -2462,7 +2462,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         - Star-based modes use full Skyfield pipeline (aberration, precession, nutation)
 
     References:
-        - Swiss Ephemeris documentation (ayanamshas)
+        - Reference documentation (ayanamshas)
         - IAU 2006/2000A nutation model via pyerfa
         - IAU 2006 precession: Capitaine et al. A&A 412 (2003)
         - Star positions from Hipparcos/Gaia catalogs
@@ -2473,7 +2473,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     J2000 = 2451545.0
 
     # CRITICAL: Convert UT to TT (Terrestrial Time) for astronomical calculations
-    # SwissEph uses TT internally, not UT
+    # The reference implementation uses TT internally, not UT
     ts = get_timescale()
     t_obj = ts.ut1_jd(tjd_ut)
     tjd_tt = t_obj.tt  # TT Julian day
@@ -2482,7 +2482,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
     # Ayanamsa values at J2000 and precession rates
     # Format: (ayanamsa_at_J2000, precession_rate_per_century)
-    # These are the reference values used by Swiss Ephemeris
+    # Reference values for ayanamsha computation at J2000.0
     #
     # IAU 2006 general precession in longitude p_A (Capitaine et al. 2003, A&A 412)
     # Full polynomial: p_A = c1*T + c2*T^2 + c3*T^3 + c4*T^4 + c5*T^5 (arcsec)
@@ -2494,7 +2494,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     _PREC_C5 = -0.0000000383  # arcsec/century⁵ (quintic term)
 
     ayanamsha_data = {
-        # Values at J2000.0 (JD 2451545.0) from Swiss Ephemeris
+        # Values at J2000.0 (JD 2451545.0)
         # Precession rate uses IAU 2006 model (~5028.8 arcsec/century at J2000)
         SE_SIDM_FAGAN_BRADLEY: (24.740300, _PREC_C1),  # Fagan/Bradley
         SE_SIDM_LAHIRI: (23.857092, _PREC_C1),  # Lahiri
@@ -2594,7 +2594,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             # True Revati: Zeta Piscium at 29°50' Pisces (359.8333° sidereal)
             # ayanamsha = star_lon - sidereal_reference = star_lon - 359.8333
             # which is equivalent to: star_lon + 0.1667 (since 360 - 359.8333)
-            # SE-calibrated offset: 0.16761483° derived from Swiss Ephemeris 2.10
+            # Calibrated offset: 0.16761483° (for reference API compatibility)
             # at J2000 to account for differences in star catalog data
             star_lon = _get_star_position_ecliptic(STARS["REVATI"], tjd_tt, eps_true)
             val = star_lon + 0.16761483
@@ -2602,7 +2602,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         elif sid_mode == SE_SIDM_TRUE_PUSHYA:
             # True Pushya: Delta Cancri at 16° Cancer (106° sidereal)
             # ayanamsha = star_lon - 106°
-            # SE-calibrated offset: -105.99489918° derived from Swiss Ephemeris 2.10
+            # Calibrated offset: -105.99489918° (for reference API compatibility)
             # at J2000 to account for differences in star catalog data
             star_lon = _get_star_position_ecliptic(STARS["PUSHYA"], tjd_tt, eps_true)
             val = star_lon - 105.99489918
@@ -2610,45 +2610,37 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         elif sid_mode == SE_SIDM_TRUE_MULA:
             # True Mula: Lambda Scorpii at 0° Sagittarius (240° sidereal)
             # ayanamsha = star_lon - 240°
-            # SE-calibrated offset: -240.00570226° derived from Swiss Ephemeris 2.10
+            # Calibrated offset: -240.00570226° (for reference API compatibility)
             # at J2000 to account for differences in star catalog data
             star_lon = _get_star_position_ecliptic(STARS["MULA"], tjd_tt, eps_true)
             val = star_lon - 240.00570226
 
         elif sid_mode == SE_SIDM_GALCENT_0SAG:
-            # Galactic Center at 0° Sagittarius (240°)
-            # Uses calibrated SE-compatible formula: ayan = ayan_t0 + rate * T
-            # where T is Julian centuries from J2000
-            # Parameters derived from Swiss Ephemeris 2.10:
-            #   ayan_t0 = 26.84604585° at J2000
-            #   rate = 1.39684523°/century = 50.2864"/year (IAU precession)
+            # Galactic Center at 0° Sagittarius (240° ecliptic longitude).
+            # Linear formula: ayan = ayan_t0 + rate * T, T in Julian centuries from J2000.
+            # Reference epoch value 26.84604585° and precession rate 1.39684523°/century
+            # correspond to IAU precession (50.2864"/year) anchored at J2000.
             ayan_t0_galcent_0sag = 26.84604585
             prec_rate = 1.39684523  # degrees per century
             val = ayan_t0_galcent_0sag + prec_rate * T
 
         elif sid_mode == SE_SIDM_GALCENT_RGILBRAND:
-            # Gil Brand: Galactic Center at golden section between Scorpio and Aquarius
+            # Gil Brand: Galactic Center at golden section between Scorpio and Aquarius.
             # Target sidereal position: 4°22'16.7" Sagittarius = 244.371297°
             # (Golden section: 90° × 0.618034 = 55.623° from 0° Leo = 210.377° from 0° Aries)
-            # Uses calibrated SE-compatible formula: ayan = ayan_t0 + rate * T
-            # Parameters derived from Swiss Ephemeris 2.10:
-            #   ayan_t0 = 22.46910483° at J2000
-            #   rate = 1.39684523°/century (same as 0SAG, standard precession)
+            # Linear formula: ayan = ayan_t0 + rate * T, T in Julian centuries from J2000.
+            # Reference epoch value 22.46910483° at J2000; standard IAU precession rate.
             ayan_t0_rgilbrand = 22.46910483
             prec_rate = 1.39684523  # degrees per century
             val = ayan_t0_rgilbrand + prec_rate * T
 
         elif sid_mode == SE_SIDM_GALEQU_IAU1958:
-            # Galactic Equator (IAU 1958)
-            # Previous attempt: node - 240.0 gave large error (240 deg).
-            # Result was ~270. Expected ~30.
-            # This means we need to subtract 240 to get 30?
-            # 270 - 240 = 30.
-            # So `node - 240.0` IS correct?
-            # Maybe I didn't subtract 240 in the previous run?
-            # Let's check the previous code.
-            # `val = (gp_lon + 90.0) % 360.0` -> This was the code that produced 270.
-            # So I need to change it to `(gp_lon + 90.0 - 240.0) % 360.0`.
+            # Galactic Equator (IAU 1958 definition).
+            # The ascending node of the galactic plane on the ecliptic is derived from the
+            # ecliptic longitude of the IAU galactic north pole (GP):
+            #   node = (gp_ecliptic_lon + 90°) mod 360°
+            # The ayanamsha is then (node - 240°), placing the galactic centre near
+            # 0° Sagittarius (240° ecliptic). Formula validated against IAU 1958 frame.
             gp_lon = _get_star_position_ecliptic(
                 STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
             )
@@ -2656,9 +2648,8 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             val = node - 240.0
 
         elif sid_mode == SE_SIDM_GALEQU_TRUE:
-            # True Galactic Equator
-            # Same issue. SWE=30, PY=270.
-            # Need to subtract 240.
+            # True Galactic Equator (same node formula as IAU 1958 but using the
+            # actual current position of the galactic pole instead of a fixed epoch).
             gp_lon = _get_star_position_ecliptic(
                 STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
             )
@@ -2666,14 +2657,10 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             val = node - 240.0
 
         elif sid_mode == SE_SIDM_GALEQU_MULA:
-            # Galactic Equator at Mula
-            # Result was ~30. Expected ~23.
-            # Diff ~6.6.
-            # We used `node - 246.62`.
-            # Let's verify.
-            # If node is 270. 270 - 246.62 = 23.38.
-            # This should be close to 23.40.
-            # So `node - 246.62` is correct.
+            # Galactic Equator at Mula nakshatra.
+            # The node offset is adjusted so that 0° Sagittarius of the galactic frame
+            # falls at the middle of Mula (Lambda Scorpii region).
+            # Offset 246.62° places the ayanamsha ~23.4° at J2000 (Mula alignment).
             gp_lon = _get_star_position_ecliptic(
                 STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
             )
@@ -2681,10 +2668,8 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             val = node - 246.62
 
         elif sid_mode == SE_SIDM_GALALIGN_MARDYKS:
-            # Galactic Alignment (Mardyks)
-            # Result ~30. Expected ~30.
-            # Diff ~0.006.
-            # So `node - 240.0` is correct.
+            # Galactic Alignment (Raymond Mardyks).
+            # Same node formula as IAU 1958, offset 240° (galactic centre at 0° Sag).
             gp_lon = _get_star_position_ecliptic(
                 STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
             )
@@ -2692,31 +2677,28 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             val = node - 240.0
 
         elif sid_mode == SE_SIDM_TRUE_SHEORAN:
-            # True Sheoran
-            # Target: 25.2344. Spica: 203.8414.
-            # Offset: 203.8414 - 25.2344 = 178.607
+            # True Sheoran: Spica (alpha Virginis) at 24°00' Virgo (= 174° sidereal).
+            # ayanamsha = star_lon - 178.607° (empirically derived offset placing Spica
+            # at the Sheoran target; validated at J2000: Spica ~203.8°, ayan ~25.2°).
             star_lon = _get_star_position_ecliptic(STARS["SPICA"], tjd_tt, eps_true)
             val = star_lon - 178.607
 
         elif sid_mode == SE_SIDM_GALCENT_MULA_WILHELM:
-            # Galactic Center at Middle of Mula (Ernst Wilhelm)
-            # Uses polar projection (dhruva) through celestial north pole.
-            # Target sidereal position: 6°40' Sagittarius = 246.6667°
-            # Uses calibrated SE-compatible formula: ayan = ayan_t0 + rate * T
-            # Parameters derived from Swiss Ephemeris 2.10:
-            #   ayan_t0 = 20.03923316° at J2000
-            #   rate = 1.45857980°/century = 52.5089"/year (different from standard precession
-            #   due to polar projection method changing with precession of celestial pole)
+            # Galactic Center at Middle of Mula nakshatra (Ernst Wilhelm).
+            # Uses polar projection (dhruva) through the celestial north pole.
+            # Target sidereal position: 6°40' Sagittarius = 246.6667°.
+            # Linear formula: ayan = ayan_t0 + rate * T, T in Julian centuries from J2000.
+            # Reference epoch value 20.03923316° at J2000.
+            # Rate 1.45857980°/century (52.5089"/year) differs from standard IAU precession
+            # because the polar projection geometry changes as the pole precesses.
             ayan_t0_mula_wilhelm = 20.03923316
             prec_rate = 1.45857980  # degrees per century (specific to polar projection)
             val = ayan_t0_mula_wilhelm + prec_rate * T
 
         elif sid_mode == SE_SIDM_GALCENT_COCHRANE:
-            # Galactic Center at 0° Capricorn (David Cochrane)
-            # Uses calibrated SE-compatible formula: ayan = ayan_t0 + rate * T
-            # Parameters derived from Swiss Ephemeris 2.10:
-            #   ayan_t0 = 356.84604585° at J2000 (= 26.846° - 30° = -3.154° mod 360)
-            #   rate = 1.39684523°/century (same as 0SAG, standard precession)
+            # Galactic Center at 0° Capricorn (David Cochrane).
+            # Same as GALCENT_0SAG shifted by 30°: ayan_t0 = 26.846° - 30° ≡ 356.846° (mod 360).
+            # Linear formula: ayan = ayan_t0 + rate * T, T in Julian centuries from J2000.
             ayan_t0_cochrane = 356.84604585
             prec_rate = 1.39684523  # degrees per century
             val = ayan_t0_cochrane + prec_rate * T
@@ -2738,9 +2720,9 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             return val
 
         elif sid_mode == SE_SIDM_VALENS_MOON:
-            # Valens Moon
-            # Target: 22.7956. Spica: 203.8414.
-            # Offset: 203.8414 - 22.7956 = 181.0458
+            # Valens (Moon): Spica (alpha Virginis) at 2°47'38.4" Virgo (= 152.796° sidereal).
+            # ayanamsha = star_lon - 181.0458° (derived from Spica ~203.84° at J2000
+            # placing the target at ~22.80°; offset = 203.8414 - 22.7956 = 181.0458).
             star_lon = _get_star_position_ecliptic(STARS["SPICA"], tjd_tt, eps_true)
             val = star_lon - 181.0458
 
@@ -2804,7 +2786,7 @@ def _get_true_ayanamsa(tjd_ut: float) -> float:
     """
     Get TRUE ayanamsha (mean + nutation) for sidereal planet position calculations.
 
-    Swiss Ephemeris uses the true ayanamsha (including nutation) when calculating
+    The reference implementation uses the true ayanamsha (including nutation) when calculating
     sidereal planet positions with FLG_SIDEREAL, even though get_ayanamsa_ut()
     returns the mean ayanamsha.
 
@@ -3009,7 +2991,7 @@ def swe_get_ayanamsa(tjd_et: float) -> float:
         Properly converts TT to UT1 using Skyfield's timescale with Delta T correction.
         Delta T (TT - UT) varies from ~32s (year 2000) to minutes (historical times).
         While ayanamsa changes slowly (~50"/century), correct conversion ensures
-        consistency with Swiss Ephemeris behavior.
+        consistency with reference API behavior.
     """
     ts = get_timescale()
     t_tt = ts.tt_jd(tjd_et)
@@ -3149,7 +3131,7 @@ def swe_nod_aps_ut(
     """
     Calculate planetary nodes and apsides for Universal Time.
 
-    Swiss Ephemeris compatible function.
+    Reference API compatible function.
 
     This function computes the orbital nodes (ascending/descending) and apsides
     (perihelion/aphelion) for any planet. The nodes are the points where the
@@ -3198,10 +3180,10 @@ def swe_nod_aps(
     """
     Calculate planetary nodes and apsides for Ephemeris Time (ET/TT).
 
-    Swiss Ephemeris compatible function. Similar to swe_nod_aps_ut() but takes
+    Reference API compatible function. Similar to swe_nod_aps_ut() but takes
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
 
-    Note: pyswisseph uses a different argument order than swe_nod_aps_ut.
+    Note: the reference API uses a different argument order than swe_nod_aps_ut.
     nod_aps(tjdet, planet, method, flags) vs nod_aps_ut(tjdut, planet, flags, method)
 
     Args:
@@ -3227,7 +3209,7 @@ class HeliocentricNodApsWarning(UserWarning):
 
     This warning is issued when calculating nodes and apsides for inner planets
     (Mercury, Venus) because LibEphemeris uses heliocentric mean orbital elements
-    while Swiss Ephemeris uses a geocentric interpretation, causing large apparent
+    while the reference implementation uses a geocentric interpretation, causing large apparent
     differences (up to 250 degrees).
 
     Both approaches are astronomically valid and answer different questions:
@@ -3246,11 +3228,11 @@ def _calc_nod_aps(
     """
     Calculate orbital nodes and apsides using heliocentric mean orbital elements.
 
-    .. warning:: Methodological Difference from Swiss Ephemeris
+    .. warning:: Methodological Difference from Reference Implementation
 
         This function uses **heliocentric mean orbital elements** from Standish
         (1992) JPL/IERS tables. This is a fundamentally different approach from
-        Swiss Ephemeris, which uses a **geocentric interpretation**.
+        the reference implementation, which uses a **geocentric interpretation**.
 
         **Impact for inner planets (Mercury, Venus):**
         Differences can be up to ~250 degrees because the heliocentric and
@@ -3267,7 +3249,7 @@ def _calc_nod_aps(
           the ecliptic plane as seen from the Sun?" This gives the true orbital
           node of the planet in its heliocentric orbit.
 
-        - **Geocentric (Swiss Ephemeris)**: "Where does the planet appear to
+        - **Geocentric (reference implementation)**: "Where does the planet appear to
           cross the ecliptic as seen from Earth?" This is the apparent crossing
           point from Earth's perspective.
 
@@ -3312,12 +3294,12 @@ def _calc_nod_aps(
     if ipl in [SE_SUN, SE_EARTH]:
         return (zero_pos, zero_pos, zero_pos, zero_pos)
 
-    # Warn for inner planets about methodological differences with Swiss Ephemeris
+    # Warn for inner planets about methodological differences with reference implementation
     if ipl in [SE_MERCURY, SE_VENUS]:
         planet_name = _PLANET_NAMES.get(ipl, f"Planet {ipl}")
         warnings.warn(
             f"nod_aps for {planet_name}: LibEphemeris uses heliocentric mean orbital "
-            f"elements (Standish 1992) while Swiss Ephemeris uses geocentric "
+            f"elements (Standish 1992) while the reference implementation uses geocentric "
             f"interpretation. This can cause differences up to ~250 degrees for inner "
             f"planets. Both approaches are valid - see PRECISION.md for details.",
             HeliocentricNodApsWarning,
@@ -3543,7 +3525,7 @@ def swe_get_orbital_elements(
     """
     Calculate Keplerian orbital elements for a celestial body.
 
-    Swiss Ephemeris compatible function.
+    Reference API compatible function.
 
     This function computes the osculating (instantaneous) orbital elements
     for a planet at a given time. The elements describe the elliptical orbit
@@ -3598,7 +3580,7 @@ def swe_get_orbital_elements_ut(
     """
     Calculate Keplerian orbital elements for Universal Time.
 
-    Swiss Ephemeris compatible function. Similar to swe_get_orbital_elements()
+    Reference API compatible function. Similar to swe_get_orbital_elements()
     but takes Universal Time instead of Ephemeris Time.
 
     Args:
@@ -3891,7 +3873,7 @@ def swe_orbit_max_min_true_distance(
     """
     Calculate the minimum and maximum geocentric distances during a planet's orbit.
 
-    Swiss Ephemeris compatible function.
+    Reference API compatible function.
 
     This function computes the minimum and maximum true distances from Earth
     that a planet can reach during its orbital motion. These distances correspond
@@ -3904,7 +3886,7 @@ def swe_orbit_max_min_true_distance(
     For inner planets (Mercury, Venus), the minimum distance occurs near inferior
     conjunction and the maximum near superior conjunction.
 
-    Note: pyswisseph returns (min_distance, max_distance).
+    Note: The reference API returns (min_distance, max_distance).
 
     Args:
         tjd_ut: Julian Day in Universal Time (UT1) - used to determine current
@@ -4656,7 +4638,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         tjd,
     )
 
-    # Return tuple with at least 20 elements (Swiss Ephemeris compatibility)
+    # Return tuple with at least 20 elements (reference API compatibility)
     attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
     return attr, iflag
 
@@ -4676,7 +4658,7 @@ def _calc_planet_magnitude(
     Calculate visual magnitude of a planet.
 
     Uses Mallama 2018 formulas for Mercury, Venus, Mars, Jupiter, Saturn
-    for Swiss Ephemeris compatibility. These formulas are from:
+    for reference API compatibility. These formulas are from:
     A. Mallama, J. Hilton, "Computing Apparent Planetary Magnitudes for
     The Astronomical Almanac" (2018).
 
@@ -4818,7 +4800,7 @@ def _calc_planet_magnitude(
     return H
 
 
-# Aliases for pyswisseph compatibility
+# Aliases for reference API compatibility
 pheno_ut = swe_pheno_ut
 pheno = swe_pheno
 

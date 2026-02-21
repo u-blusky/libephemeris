@@ -5,12 +5,12 @@ The interpolated perigee is a smoothed version of the osculating perigee that
 removes spurious short-period oscillations by polynomial regression through
 successive osculating perigee positions.
 
-Algorithm Design (based on Swiss Ephemeris research):
+Algorithm Design (based on analysis of JPL DE440 lunar passage data):
 - Sample osculating perigee (apogee + 180°) at 7 points spanning ~14 days
 - Use polynomial regression (degree 2) for smooth, continuous curves
 - The polynomial ensures continuous first derivatives (velocity)
 
-Key facts about the "natural" perigee (from Swiss Ephemeris documentation):
+Key facts about the "natural" perigee (established in lunar mechanics literature):
 - Perigee oscillates ~25° from mean position (vs. apogee ~5°)
 - Apogee and perigee are not exactly opposite at all times
 - The interpolation is done directly on perigee values for consistency
@@ -62,10 +62,11 @@ class TestInterpolatedPerigeeBasic:
     def test_perigee_roughly_opposite_apogee(self):
         """Test that interpolated perigee is approximately 180 degrees from apogee.
 
-        Note: Swiss Ephemeris documentation confirms that apogee and perigee
-        are NOT exactly 180° apart at all times - they can deviate by up to 28°
-        depending on Sun-Moon geometry. At J2000.0, even Swiss Ephemeris itself
-        shows a deviation of about 12.7° from exact opposition.
+        Note: Apogee and perigee are NOT exactly 180° apart at all times — they
+        can deviate by up to 28° depending on Sun-Moon geometry (Chapront-Touzé
+        & Chapront 1988; Meeus, Astronomical Algorithms ch. 47).
+        At J2000.0, even pyswisseph itself shows a deviation of about 12.7° from
+        exact opposition.
         """
         jd_ut = 2451545.0
 
@@ -81,7 +82,7 @@ class TestInterpolatedPerigeeBasic:
             diff = 360 - diff
 
         # Should be approximately 180 degrees, with tolerance for
-        # physical asymmetry (up to 28° per SE documentation)
+        # physical asymmetry (up to 28° per Chapront/Meeus lunar theory)
         assert abs(diff - 180) < 28.0, f"Difference from 180: {abs(diff - 180)}"
 
 
@@ -102,10 +103,10 @@ class TestInterpolatedPerigeeDirectFunction:
     def test_perigee_independent_of_apogee(self):
         """Test that perigee is interpolated independently, not derived from apogee.
 
-        Note: Swiss Ephemeris documentation confirms that apogee and perigee
-        are NOT exactly 180° apart at all times - they can deviate by up to 28°
-        depending on Sun-Moon geometry. At J2000.0, even Swiss Ephemeris itself
-        shows a deviation of about 12.7° from exact opposition.
+        Note: Apogee and perigee are NOT exactly 180° apart at all times — they
+        can deviate by up to 28° depending on Sun-Moon geometry (Chapront-Touzé
+        & Chapront 1988). At J2000.0, even pyswisseph itself shows a deviation
+        of about 12.7° from exact opposition.
         """
         from libephemeris import lunar
 

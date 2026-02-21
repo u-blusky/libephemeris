@@ -7,7 +7,7 @@ between TDB and TT where relevant.
 Background:
 -----------
 - TT (Terrestrial Time): A theoretical ideal atomic clock on Earth's geoid.
-  Used as input for Swiss Ephemeris swe_calc() function.
+  Used as input for the swe_calc() function (pyswisseph-compatible API).
 - TDB (Barycentric Dynamical Time): Time used for planetary ephemerides.
   It's the independent variable in the equations of motion.
 - The difference TDB - TT is a periodic function with maximum amplitude of

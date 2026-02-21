@@ -360,7 +360,7 @@ The True Node is where the Moon's **instantaneous orbital plane** intersects the
 5. Apply IAU 2006 precession (J2000 → date)
 6. Apply IAU 2006/2000A nutation (1365 terms)
 
-This computes **exactly** what the True Node is by definition: the intersection of the orbital plane with the ecliptic. Swiss Ephemeris's own documentation recommends this approach: *"We avoid this error, computing the orbital elements from the position and the speed vectors of the Moon."*
+This computes **exactly** what the True Node is by definition: the intersection of the orbital plane with the ecliptic. Deriving the node directly from the state vectors avoids the approximation errors inherent in analytical series — the geometric construction is exact by definition.
 
 **Stage 2: ELP2000-82B perturbation corrections (120+ terms)**
 
@@ -499,7 +499,7 @@ Precision: <0.01 arcsec over ±100 years; <1 arcsec over ±500 years.
 
 ### Swiss Ephemeris comparison
 
-Swiss Ephemeris uses a larger catalog (~1000+ stars from sefstars.txt). Both use Hipparcos data and similar proper motion models. LibEphemeris covers 102 stars, selected for astrological and navigational significance. Star positions agree to ~0.01 arcsecond.
+Swiss Ephemeris uses a larger catalog (~1000+ stars from its own bundled star catalog). Both use Hipparcos data and similar proper motion models. LibEphemeris covers 102 stars, selected for astrological and navigational significance. Star positions agree to ~0.01 arcsecond.
 
 ---
 

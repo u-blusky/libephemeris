@@ -1,8 +1,9 @@
 """
-Tests for the seorbel.txt parser.
+Tests for the orbital elements file parser.
 
 This module tests the parse_seorbel() function and related utilities
-for parsing Swiss Ephemeris seorbel.txt orbital elements files.
+for parsing hypothetical/fictitious body orbital elements files, as well
+as the bundled fictitious_orbits.csv dataset included with libephemeris.
 """
 
 import math
@@ -19,6 +20,8 @@ from libephemeris.hypothetical import (
     calc_seorbel_position,
     get_bundled_seorbel_path,
     load_bundled_seorbel,
+    get_bundled_fictitious_orbits_path,
+    load_bundled_fictitious_orbits,
     _parse_t_polynomial,
     _parse_epoch_or_equinox,
     _parse_seorbel_line,
@@ -591,25 +594,26 @@ J2000, J2000, 0.0, 60.0, 0.0, 0.0, 0.0, 0.0, Planet2
             Path(filepath).unlink()
 
 
-class TestBundledSeorbel:
-    """Tests for bundled seorbel.txt functionality."""
+class TestBundledFictitiousOrbits:
+    """Tests for the bundled fictitious_orbits.csv dataset."""
 
-    def test_get_bundled_seorbel_path_exists(self):
-        """Test that the bundled seorbel.txt path exists."""
-        path = get_bundled_seorbel_path()
-        assert path.exists(), "Bundled seorbel.txt should exist"
-        assert path.is_file(), "Bundled seorbel.txt should be a file"
-        assert path.name == "seorbel.txt", "File should be named seorbel.txt"
+    def test_get_bundled_fictitious_orbits_path_exists(self):
+        """Test that the bundled fictitious_orbits.csv path exists."""
+        path = get_bundled_fictitious_orbits_path()
+        assert path.exists(), "Bundled fictitious_orbits.csv should exist"
+        assert path.is_file(), "Bundled fictitious_orbits.csv should be a file"
+        assert path.name == "fictitious_orbits.csv", (
+            "File should be named fictitious_orbits.csv"
+        )
 
-    def test_get_bundled_seorbel_path_in_package(self):
+    def test_get_bundled_fictitious_orbits_path_in_package(self):
         """Test that the bundled file is inside the libephemeris package."""
-        path = get_bundled_seorbel_path()
-        # The file should be in the libephemeris package directory
+        path = get_bundled_fictitious_orbits_path()
         assert "libephemeris" in str(path), "Path should contain 'libephemeris'"
 
-    def test_load_bundled_seorbel_returns_list(self):
-        """Test that load_bundled_seorbel returns a list of elements."""
-        elements = load_bundled_seorbel()
+    def test_load_bundled_fictitious_orbits_returns_list(self):
+        """Test that load_bundled_fictitious_orbits returns a list of elements."""
+        elements = load_bundled_fictitious_orbits()
         assert isinstance(elements, list), "Should return a list"
         assert len(elements) > 0, "Should have at least one element"
         for elem in elements:
@@ -617,12 +621,12 @@ class TestBundledSeorbel:
                 "Each element should be SeorbelElements"
             )
 
-    def test_load_bundled_seorbel_contains_expected_bodies(self):
-        """Test that load_bundled_seorbel contains expected hypothetical bodies."""
-        elements = load_bundled_seorbel()
+    def test_load_bundled_fictitious_orbits_contains_expected_bodies(self):
+        """Test that the dataset contains the expected hypothetical bodies."""
+        elements = load_bundled_fictitious_orbits()
         names = [elem.name for elem in elements]
 
-        # Check for Uranian planets (Hamburg School)
+        # Hamburg School Uranian planets
         expected_bodies = [
             "Cupido",
             "Hades",
@@ -630,97 +634,101 @@ class TestBundledSeorbel:
             "Kronos",
             "Apollon",
             "Admetos",
-            # Note: The file has "Vulcanus" not "Vulkanus"
+            "Vulkanus",
             "Poseidon",
         ]
-
         for body in expected_bodies:
             assert any(body.lower() in name.lower() for name in names), (
-                f"Expected body '{body}' not found in bundled seorbel.txt"
+                f"Expected body '{body}' not found in bundled dataset"
             )
 
-    def test_load_bundled_seorbel_cupido_elements(self):
-        """Test that Cupido has correct orbital elements from bundled file."""
-        elements = load_bundled_seorbel()
+    def test_load_bundled_fictitious_orbits_cupido_elements(self):
+        """Test that Cupido has correct orbital elements from bundled dataset."""
+        elements = load_bundled_fictitious_orbits()
         cupido = get_seorbel_body_by_name(elements, "Cupido")
 
         assert cupido is not None, "Cupido should be found"
-        assert abs(cupido.semi_axis - 40.99837) < 0.001, "Cupido semi-axis should match"
+        assert abs(cupido.semi_axis - 40.99837) < 0.001, (
+            "Cupido semi-axis should match Witte/Neely value"
+        )
         assert abs(cupido.eccentricity.constant - 0.00460) < 0.0001, (
-            "Cupido eccentricity should match"
+            "Cupido eccentricity should match Witte/Neely value"
+        )
+        assert cupido.epoch_jd == pytest.approx(2415020.0), (
+            "Cupido epoch should be J1900"
         )
 
-    def test_load_bundled_seorbel_transpluto_elements(self):
-        """Test that Transpluto/Isis has correct orbital elements."""
-        elements = load_bundled_seorbel()
+    def test_load_bundled_fictitious_orbits_transpluto_elements(self):
+        """Test that Isis-Transpluto has correct orbital elements (Strubell 1952)."""
+        elements = load_bundled_fictitious_orbits()
         transpluto = get_seorbel_body_by_name(elements, "Isis-Transpluto")
 
-        assert transpluto is not None, "Transpluto should be found"
+        assert transpluto is not None, "Isis-Transpluto should be found"
         assert abs(transpluto.semi_axis - 77.775) < 0.001, (
-            "Transpluto semi-axis should match"
+            "Transpluto semi-axis should match Strubell 1952 value"
         )
         assert abs(transpluto.eccentricity.constant - 0.3) < 0.01, (
-            "Transpluto eccentricity should match"
+            "Transpluto eccentricity should match Strubell 1952 value"
         )
 
-    def test_load_bundled_seorbel_geocentric_bodies(self):
+    def test_load_bundled_fictitious_orbits_geocentric_bodies(self):
         """Test that geocentric bodies are correctly identified."""
-        elements = load_bundled_seorbel()
+        elements = load_bundled_fictitious_orbits()
 
-        # Waldemath is geocentric (orbits Earth, not Sun)
+        # Waldemath: geocentric (orbits Earth)
         waldemath = get_seorbel_body_by_name(elements, "Waldemath")
         assert waldemath is not None, "Waldemath should be found"
         assert waldemath.is_geocentric, "Waldemath should be geocentric"
 
-        # White Moon (Selena) is geocentric
-        selena = get_seorbel_body_by_name(elements, "Selena/White Moon")
-        assert selena is not None, "Selena/White Moon should be found"
+        # Selena: geocentric
+        selena = get_seorbel_body_by_name(elements, "Selena")
+        assert selena is not None, "Selena should be found"
         assert selena.is_geocentric, "Selena should be geocentric"
 
-    def test_load_bundled_seorbel_can_calculate_position(self):
-        """Test that we can calculate positions from bundled elements."""
-        elements = load_bundled_seorbel()
+    def test_load_bundled_fictitious_orbits_can_calculate_position(self):
+        """Test that positions can be calculated from the bundled elements."""
+        elements = load_bundled_fictitious_orbits()
         cupido = get_seorbel_body_by_name(elements, "Cupido")
 
         assert cupido is not None, "Cupido should be found"
 
-        # Calculate position at J2000.0
         pos = calc_seorbel_position(cupido, 2451545.0)
 
-        # Basic sanity checks
         assert 0 <= pos[0] < 360, "Longitude should be in range [0, 360)"
         assert -90 <= pos[1] <= 90, "Latitude should be in range [-90, 90]"
         assert pos[2] > 0, "Distance should be positive"
 
-    def test_bundled_seorbel_matches_swisseph_source(self):
-        """Test that bundled seorbel.txt matches the original Swiss Ephemeris source."""
-        bundled_path = get_bundled_seorbel_path()
-        bundled_elements = parse_seorbel(bundled_path)
+    def test_load_bundled_fictitious_orbits_vulcan_tpoly(self):
+        """Test that Vulcan's T-polynomial elements are parsed correctly."""
+        elements = load_bundled_fictitious_orbits()
+        vulcan = get_seorbel_body_by_name(elements, "Vulcan")
 
-        # If the original file exists, compare
-        original_path = (
-            Path(__file__).parent.parent / "swisseph" / "ephe" / "seorbel.txt"
+        assert vulcan is not None, "Vulcan should be found"
+        assert vulcan.equinox_is_jdate is True
+        assert vulcan.mean_anomaly.constant == pytest.approx(252.8987988)
+        assert vulcan.mean_anomaly.linear == pytest.approx(707550.7341)
+        assert vulcan.arg_perihelion.linear == pytest.approx(1670.056)
+        assert vulcan.asc_node.linear == pytest.approx(-1670.056)
+
+    # --- Backward-compatibility shims ---
+
+    def test_get_bundled_seorbel_path_delegates_to_new_function(self):
+        """Test that get_bundled_seorbel_path() is a shim to the new API."""
+        new_path = get_bundled_fictitious_orbits_path()
+        compat_path = get_bundled_seorbel_path()
+        assert compat_path == new_path, (
+            "Compat shim should return the same path as the new function"
         )
-        if original_path.exists():
-            original_elements = parse_seorbel(original_path)
 
-            # Should have same number of bodies
-            assert len(bundled_elements) == len(original_elements), (
-                "Bundled file should have same number of bodies as original"
-            )
-
-            # Check that first few bodies match
-            for i in range(min(5, len(bundled_elements))):
-                assert bundled_elements[i].name == original_elements[i].name, (
-                    f"Body {i} name should match"
-                )
-                assert (
-                    abs(bundled_elements[i].semi_axis - original_elements[i].semi_axis)
-                    < 0.0001
-                ), f"Body {i} semi-axis should match"
-        else:
-            # Skip comparison if original file doesn't exist
-            pytest.skip("Original swisseph/ephe/seorbel.txt not found for comparison")
+    def test_load_bundled_seorbel_delegates_to_new_function(self):
+        """Test that load_bundled_seorbel() is a shim to the new API."""
+        new_elements = load_bundled_fictitious_orbits()
+        compat_elements = load_bundled_seorbel()
+        assert len(compat_elements) == len(new_elements), (
+            "Compat shim should return same number of elements"
+        )
+        for a, b in zip(compat_elements, new_elements):
+            assert a.name == b.name, "Element names should match"
 
 
 class TestParseTPolynomialEdgeCases:

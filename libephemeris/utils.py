@@ -1,7 +1,7 @@
 """
 Utility functions for libephemeris.
 
-Provides helper functions compatible with pyswisseph API including
+Provides helper functions compatible with the reference API including
 angular calculations and other mathematical utilities.
 """
 
@@ -9,15 +9,15 @@ import math
 import erfa
 from typing import Optional, Tuple
 
-# Azalt calculation method flags (compatible with pyswisseph)
+# Azalt calculation method flags (compatible with the reference API)
 SE_ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
 SE_EQU2HOR: int = 1  # Equatorial coordinates to horizontal
 
-# Azalt_rev calculation method flags (compatible with pyswisseph)
+# Azalt_rev calculation method flags (compatible with the reference API)
 SE_HOR2ECL: int = 0  # Horizontal to ecliptic coordinates
 SE_HOR2EQU: int = 1  # Horizontal to equatorial coordinates
 
-# Refraction calculation flags (compatible with pyswisseph)
+# Refraction calculation flags (compatible with the reference API)
 SE_TRUE_TO_APP: int = 0  # True altitude to apparent altitude
 SE_APP_TO_TRUE: int = 1  # Apparent altitude to true altitude
 
@@ -169,7 +169,7 @@ def azalt(
     (azimuth and altitude) for a given observer location and time.
     It accounts for atmospheric refraction.
 
-    Compatible with pyswisseph's swe.azalt() function.
+    Compatible with the reference swe.azalt() API.
 
     Args:
         jd: Julian Day in Universal Time (UT1)
@@ -191,7 +191,7 @@ def azalt(
             - apparent_altitude: Altitude with atmospheric refraction applied (degrees)
 
     Note:
-        - Swiss Ephemeris convention: Azimuth is measured from South, westward.
+        - Reference API convention: Azimuth is measured from South, westward.
           This differs from the common convention (from North, eastward).
           To convert: az_from_north = (azimuth + 180) % 360
         - Refraction is calculated using the Bennett formula, which is accurate
@@ -282,7 +282,7 @@ def azalt(
     cos_dec = math.cos(dec_rad)
 
     # Numerator and denominator for azimuth calculation
-    # Swiss Ephemeris convention: azimuth from South, westward
+    # Reference API convention: azimuth from South, westward
     y = sin_ha * cos_dec
     x = cos_ha * cos_dec * math.sin(lat_rad) - math.sin(dec_rad) * math.cos(lat_rad)
 
@@ -358,7 +358,7 @@ def azalt_rev(
     (azimuth and true altitude) to celestial coordinates (equatorial or ecliptic)
     for a given observer location and time.
 
-    Compatible with pyswisseph's swe.azalt_rev() function.
+    Compatible with the reference swe.azalt_rev() API.
 
     Note: This function is not precisely the reverse of azalt(). If only an
     apparent altitude is available, the true altitude must first be computed
@@ -488,7 +488,7 @@ def refrac(
     This function converts between true (geometric) altitude and apparent
     (observed) altitude by adding or removing the refraction correction.
 
-    Compatible with pyswisseph's swe.refrac() function.
+    Compatible with the reference swe.refrac() API.
 
     Args:
         altitude: Altitude in degrees. For SE_TRUE_TO_APP, this is the true
@@ -635,7 +635,7 @@ def refrac_extended(
     - Atmospheric lapse rate (temperature variation with altitude)
     - Dip of the horizon calculation
 
-    Compatible with pyswisseph's swe.refrac_extended() function.
+    Compatible with the reference swe.refrac_extended() API.
 
     Args:
         altitude: Altitude of object above geometric horizon in degrees.
@@ -727,7 +727,7 @@ def refrac_extended(
         # The refraction correction reduces the apparent dip (horizon appears
         # higher due to refraction).
         #
-        # Based on empirical fitting to Swiss Ephemeris results, the
+        # Based on empirical fitting to reference implementation results, the
         # refraction coefficient k follows:
         # k = 0.1117 + 3.5516 * lapse_rate
         # where observed_dip = -dip_geometric * (1 - k)
@@ -756,7 +756,7 @@ def cotrans(
     """
     Transform coordinates between ecliptic and equatorial systems.
 
-    Compatible with pyswisseph's swe.cotrans() function.
+    Compatible with the reference swe.cotrans() API.
 
     The direction of transformation depends on the sign of obliquity:
     - Positive obliquity: ecliptic (lon, lat) → equatorial (RA, Dec)
@@ -824,7 +824,7 @@ def degnorm(angle: float) -> float:
     """
     Normalize an angle to the range [0, 360).
 
-    Compatible with pyswisseph's swe.degnorm() function.
+    Compatible with the reference swe.degnorm() API.
     Equivalent to `angle % 360` but correctly handles negative numbers.
 
     Args:
@@ -857,7 +857,7 @@ def radnorm(angle: float) -> float:
     """
     Normalize an angle to the range [0, 2*pi).
 
-    Compatible with pyswisseph's swe.radnorm() function.
+    Compatible with the reference swe.radnorm() API.
     Equivalent to `angle % (2*pi)` but correctly handles negative numbers.
 
     Args:
@@ -888,7 +888,7 @@ def difdeg2n(p1: float, p2: float) -> float:
     """
     Calculate distance in degrees p1 - p2 normalized to [-180;180].
 
-    Compatible with pyswisseph's swe.difdeg2n() function.
+    Compatible with the reference swe.difdeg2n() API.
     Computes the signed angular difference, handling 360° wrapping.
 
     Args:
@@ -918,7 +918,7 @@ def difdegn(p1: float, p2: float) -> float:
     """
     Calculate distance in degrees p1 - p2 normalized to [0, 360).
 
-    Compatible with pyswisseph's swe.difdegn() function.
+    Compatible with the reference swe.difdegn() API.
     Computes the difference between two angles, always returning a positive
     value in the range [0, 360). Unlike difdeg2n() which returns [-180, 180],
     this function always returns a positive value.
@@ -991,7 +991,7 @@ def difcs2n(a: int, b: int) -> int:
     expressed in centiseconds (1/100 of an arcsecond), handling 360° wrapping.
     The result is normalized to the equivalent of [-180°, +180°] in centiseconds.
 
-    Compatible with pyswisseph's swe.difcs2n() function.
+    Compatible with the reference swe.difcs2n() API.
 
     Args:
         a: First angle in centiseconds
@@ -1005,7 +1005,7 @@ def difcs2n(a: int, b: int) -> int:
         - 1 centisecond = 1/100 arcsecond = 1/360000 degree
         - 360° = 129,600,000 centiseconds
         - 180° = 64,800,000 centiseconds
-        - When the difference is exactly 180°, returns -180° (matching pyswisseph)
+        - When the difference is exactly 180°, returns -180° (matching the reference API)
 
     Examples:
         >>> difcs2n(360000, 720000)  # 1° - 2° = -1° = -360000 cs
@@ -1014,7 +1014,7 @@ def difcs2n(a: int, b: int) -> int:
         -720000
         >>> difcs2n(360000, 129240000)  # 1° - 359° = 2° = 720000 cs (shorter path)
         720000
-        >>> difcs2n(64800000, 0)  # 180° - 0° = -180° (pyswisseph convention)
+        >>> difcs2n(64800000, 0)  # 180° - 0° = -180° (reference API convention)
         -64800000
     """
     diff = (a - b) % CS360
@@ -1032,7 +1032,7 @@ def difcsn(a: int, b: int) -> int:
     The result is normalized to the equivalent of [0, 360°) in centiseconds,
     always returning a non-negative value.
 
-    Compatible with pyswisseph's swe.difcsn() function.
+    Compatible with the reference swe.difcsn() API.
 
     Args:
         a: First angle in centiseconds
@@ -1069,7 +1069,7 @@ def csnorm(cs: int) -> int:
     arcsecond) to the equivalent of [0°, 360°) in centiseconds, i.e., the range
     [0, 129600000). Correctly handles negative numbers.
 
-    Compatible with pyswisseph's swe.csnorm() function.
+    Compatible with the reference swe.csnorm() API.
 
     Args:
         cs: Angle in centiseconds (any value)
@@ -1109,7 +1109,7 @@ def csroundsec(cs: int) -> int:
     returning the result still in centiseconds (i.e., rounded to the
     nearest multiple of 100).
 
-    Compatible with pyswisseph's swe.csroundsec() function.
+    Compatible with the reference swe.csroundsec() API.
 
     Args:
         cs: Angle in centiseconds (1/100 arcsecond)
@@ -1119,7 +1119,7 @@ def csroundsec(cs: int) -> int:
 
     Notes:
         - 1 centisecond = 1/100 arcsecond
-        - Uses C-style integer division (truncation toward zero) with +50 offset
+        - Uses truncation-toward-zero integer division with +50 offset
         - Special handling at degree boundaries (30° for positive, 90° for negative)
 
     Examples:
@@ -1136,13 +1136,13 @@ def csroundsec(cs: int) -> int:
         >>> csroundsec(-150) # -1.50 arcseconds -> -1 arcsecond = -100 cs
         -100
     """
-    # C-style integer division: truncates toward zero
-    # For cs + 50, we need to use truncation toward zero, not floor division
+    # Truncation-toward-zero integer division (not floor division):
+    # For cs + 50, we need truncation toward zero, not floor division
     cs_plus_50 = cs + 50
     if cs_plus_50 >= 0:
         result = (cs_plus_50 // 100) * 100
     else:
-        # C-style truncation toward zero for negative values
+        # Truncation toward zero for negative values
         result = -((-cs_plus_50) // 100) * 100
 
     # Special case for positive values at 30-degree boundaries (10800000 cs = 30°)
@@ -1170,7 +1170,7 @@ def cs2degstr(cs: int) -> str:
     degrees, M is arcminutes, S is arcseconds, and ss is centiseconds (hundredths
     of arcsecond).
 
-    Compatible with pyswisseph's swe.cs2degstr() function.
+    Compatible with the reference swe.cs2degstr() API.
 
     Args:
         cs: Angle in centiseconds (any integer value)
@@ -1217,7 +1217,7 @@ def cs2degstr(cs: int) -> str:
     if sign < 0:
         degrees = -degrees
 
-    # Format the string matching Swiss Ephemeris format
+    # Format the string matching reference API format
     # Format: "%3d°%2d'%2d.%02d"" with proper spacing
     return f"{degrees:3d}°{minutes:2d}'{seconds:2d}.{centisecs:02d}\""
 
@@ -1231,7 +1231,7 @@ def cs2lonlatstr(cs: int, plus_char: str, minus_char: str) -> str:
     The format is "D°M'S\" X" where D is degrees, M is arcminutes, S is arcseconds,
     and X is the directional character (e.g., N/S for latitude, E/W for longitude).
 
-    Compatible with pyswisseph's swe.cs2lonlatstr() function.
+    Compatible with the reference swe.cs2lonlatstr() API.
 
     Args:
         cs: Angle in centiseconds (any integer value)
@@ -1286,7 +1286,7 @@ def cs2lonlatstr(cs: int, plus_char: str, minus_char: str) -> str:
             minutes = 0
             degrees += 1
 
-    # Format the string matching Swiss Ephemeris format
+    # Format the string matching reference API format
     # Format: "%3d°%2d'%2d\" %c" with proper spacing
     return f"{degrees:3d}°{minutes:2d}'{seconds:2d}\" {direction}"
 
@@ -1299,7 +1299,7 @@ def cs2timestr(cs: int) -> str:
     to a human-readable string in the format "HH:MM:SS" where HH is hours, MM is
     minutes, and SS is seconds.
 
-    Compatible with pyswisseph's swe.cs2timestr() function.
+    Compatible with the reference swe.cs2timestr() API.
 
     Args:
         cs: Time in centiseconds (any integer value)
@@ -1356,7 +1356,7 @@ def cs2timestr(cs: int) -> str:
     if sign < 0:
         hours = -hours
 
-    # Format the string matching Swiss Ephemeris format
+    # Format the string matching reference API format
     # Format: "%2d:%02d:%02d" with proper spacing
     return f"{hours:2d}:{minutes:02d}:{seconds:02d}"
 
@@ -1460,9 +1460,9 @@ def d2l(value: float) -> int:
 
     This function rounds a floating-point number to the nearest integer using
     "round half away from zero" semantics (also known as commercial rounding).
-    This is the behavior used by the Swiss Ephemeris library internally.
+    This is the behavior used by the reference implementation internally.
 
-    Compatible with pyswisseph's swe.d2l() function.
+    Compatible with the reference swe.d2l() API.
 
     Args:
         value: A floating-point number to convert.
@@ -1474,7 +1474,7 @@ def d2l(value: float) -> int:
     Notes:
         - This differs from Python's built-in round() function, which uses
           "round half to even" (banker's rounding) for Python 3.
-        - Swiss Ephemeris uses this for internal conversions, but also exposes
+        - The reference implementation uses this for internal conversions, but also exposes
           it publicly for consistency.
 
     Examples:
@@ -1523,7 +1523,7 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
     its constituent parts: zodiac sign (or nakshatra), degrees within that sign,
     minutes, seconds, and fraction of second.
 
-    Compatible with pyswisseph's swe.split_deg() function.
+    Compatible with the reference swe.split_deg() API.
 
     Args:
         degrees: Position in decimal degrees (can be negative or > 360)
@@ -1579,9 +1579,9 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
     keep_sign = bool(roundflag & SPLIT_DEG_KEEP_SIGN)
     keep_deg = bool(roundflag & SPLIT_DEG_KEEP_DEG)
 
-    # For zodiacal/nakshatra modes, pyswisseph uses absolute value
+    # For zodiacal/nakshatra modes, the reference API uses absolute value
     if use_zodiacal or use_nakshatra:
-        # Use absolute value (pyswisseph behavior for negative values)
+        # Use absolute value (reference API behavior for negative values)
         deg_abs = abs(degrees)
 
         if use_nakshatra:
@@ -1622,7 +1622,7 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
             # Round to nearest second
             if secfr >= 0.5:
                 sec_part += 1
-            secfr = float(sec_part)  # pyswisseph copies sec value to secfr
+            secfr = float(sec_part)  # reference API copies sec value to secfr
 
             # Handle overflow: sec >= 60
             if sec_part >= 60:
@@ -1639,7 +1639,7 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
             total_sec = orig_sec_part + secfr
             if total_sec >= 30.0:
                 min_part += 1
-            # pyswisseph: sec = original sec, secfr = original sec
+            # reference behavior: sec = original sec, secfr = original sec
             sec_part = orig_sec_part
             secfr = float(orig_sec_part)
 
@@ -1654,7 +1654,7 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
             total_min = orig_min_part + (orig_sec_part + secfr) / 60.0
             if total_min >= 30.0:
                 deg_part += 1
-            # pyswisseph: min = 0 (not original), sec = original sec, secfr = original sec
+            # reference behavior: min = 0 (not original), sec = original sec, secfr = original sec
             min_part = 0
             sec_part = orig_sec_part
             secfr = float(orig_sec_part)

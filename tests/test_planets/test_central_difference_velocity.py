@@ -63,7 +63,7 @@ class TestCentralDifferenceVelocity:
         Test that libephemeris velocity matches pyswisseph within tolerance.
 
         The central difference method should provide velocities that closely
-        match the analytical derivatives used by Swiss Ephemeris.
+        match the analytical derivatives used by pyswisseph.
         """
         # Get libephemeris velocity
         lib_pos, _ = swe_calc_ut(JD_J2000, planet_id, SEFLG_SPEED)

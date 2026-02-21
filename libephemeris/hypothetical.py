@@ -29,11 +29,11 @@ Other Fictitious Bodies:
     - Vulcan: Hypothetical intra-Mercurial planet (now known not to exist)
     - White Moon (Selena): Symbolic point opposite to Black Moon Lilith
     - Proserpina: Another proposed trans-Plutonian planet
-    - Waldemath Moon: Dr. Waldemath's hypothetical second moon of Earth (seorbel.txt #18)
+    - Waldemath Moon: Dr. Waldemath's hypothetical second moon of Earth (body #18)
       Note: This is different from Mean Lilith and True Lilith which are lunar apogee points
 
 References:
-    - Swiss Ephemeris documentation: "Hypothetical Bodies"
+    - Reference API documentation
     - Witte, Alfred: "Regelwerk fuer Planetenbilder" (1932)
     - Jacobson: "The Dark Moon Lilith in Astrology" (1961)
     - Landscheidt: "Cosmic Cybernetics" (1973)
@@ -50,7 +50,7 @@ from .constants import SE_FICT_OFFSET
 # =============================================================================
 # HYPOTHETICAL BODY IDENTIFIERS
 # =============================================================================
-# Body IDs follow Swiss Ephemeris convention: SE_FICT_OFFSET (40) + index
+# Body IDs follow reference API convention: SE_FICT_OFFSET (40) + index
 
 # Uranian planets (Hamburg School)
 SE_CUPIDO: int = SE_FICT_OFFSET + 0  # 40
@@ -90,7 +90,7 @@ SE_WHITE_MOON: int = SE_FICT_OFFSET + 16  # 56 - Selena (second Moon of Earth)
 SE_PROSERPINA: int = SE_FICT_OFFSET + 17  # 57 - Trans-Plutonian
 SE_WALDEMATH: int = SE_FICT_OFFSET + 18  # 58 - Waldemath's second moon
 
-# Pyswisseph-compatible aliases (without SE_ prefix)
+# Reference API-compatible aliases (without SE_ prefix)
 CUPIDO: int = SE_CUPIDO
 HADES: int = SE_HADES
 ZEUS: int = SE_ZEUS
@@ -125,7 +125,7 @@ WALDEMATH: int = SE_WALDEMATH
 # B = oscillation frequency (degrees per century)
 #
 # Note: Different sources give slightly different parameters. These values
-# match the Swiss Ephemeris implementation for compatibility.
+# match the reference implementation for compatibility.
 
 
 @dataclass
@@ -155,7 +155,7 @@ class UranianElements:
     phase_rate: float = 0.0
 
 
-# Uranian planet parameters from Swiss Ephemeris seorbel.txt
+# Uranian planet parameters from the orbital elements data
 # Based on Witte's original formulas, refined over time
 URANIAN_ELEMENTS: Dict[int, UranianElements] = {
     SE_CUPIDO: UranianElements(
@@ -256,10 +256,10 @@ class HypotheticalElements:
 
 
 # =============================================================================
-# CUPIDO KEPLERIAN ORBITAL ELEMENTS (Hamburg School, Swiss Ephemeris seorbel.txt)
+# CUPIDO KEPLERIAN ORBITAL ELEMENTS (Hamburg School)
 # =============================================================================
 # Cupido is the first Hamburg School Uranian planet.
-# Elements from Swiss Ephemeris documentation:
+# Orbital elements (Hamburg School definitions):
 #   - Semi-major axis: 40.99837 AU
 #   - Eccentricity: 0.00 (nearly circular orbit)
 #   - Orbital period: ~262.5 years (derived from a^(3/2) = period in years)
@@ -272,7 +272,7 @@ class HypotheticalElements:
 @dataclass
 class CupidoKeplerianElements:
     """
-    Keplerian orbital elements for Cupido from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Cupido from the orbital elements data.
 
     Attributes:
         name: Name of the body
@@ -297,7 +297,7 @@ class CupidoKeplerianElements:
     n: float
 
 
-# Cupido Keplerian elements from Swiss Ephemeris seorbel.txt
+# Cupido Keplerian elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
 # Mean longitude at J1900.0: 237.4667 degrees
 # Mean motion: derived from a = 40.99837 AU using Kepler's 3rd law
@@ -310,15 +310,15 @@ CUPIDO_KEPLERIAN_ELEMENTS = CupidoKeplerianElements(
     i=0.0,  # Assumed on ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=105.301693,  # Mean longitude at J1900.0 derived from pyswisseph
-    n=0.0037945179,  # Mean motion deg/day derived from pyswisseph
+    L0=105.301693,  # Mean longitude at J1900.0 (calibrated)
+    n=0.0037945179,  # Mean motion deg/day (calibrated)
 )
 
 
 @dataclass
 class HadesKeplerianElements:
     """
-    Keplerian orbital elements for Hades from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Hades from the orbital elements data.
 
     Hades is the second Hamburg School Uranian planet. Unlike Cupido, Hades has
     small but non-zero eccentricity and inclination, requiring full Keplerian
@@ -347,9 +347,9 @@ class HadesKeplerianElements:
     n: float
 
 
-# Hades Keplerian elements from Swiss Ephemeris seorbel.txt
+# Hades Keplerian elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
-# From seorbel.txt line: J1900, J1900, 27.6496, 50.66744, 0.00245, 148.1796, 161.3339, 1.0500, Hades
+# From orbital elements: J1900, J1900, 27.6496, 50.66744, 0.00245, 148.1796, 161.3339, 1.0500, Hades
 # Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
 HADES_KEPLERIAN_ELEMENTS = HadesKeplerianElements(
     name="Hades",
@@ -359,15 +359,15 @@ HADES_KEPLERIAN_ELEMENTS = HadesKeplerianElements(
     i=1.0500,  # Inclination in degrees
     omega=148.1796,  # Argument of perihelion in degrees
     Omega=161.3339,  # Longitude of ascending node in degrees
-    M0=26.850162,  # Mean anomaly at epoch in degrees derived from pyswisseph
-    n=0.00278759,  # Mean motion deg/day derived from pyswisseph
+    M0=26.850162,  # Mean anomaly at epoch in degrees (calibrated)
+    n=0.00278759,  # Mean motion deg/day (calibrated)
 )
 
 
 @dataclass
 class ZeusKeplerianElements:
     """
-    Keplerian orbital elements for Zeus from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Zeus from the orbital elements data.
 
     Zeus is the third Hamburg School Uranian planet. Like Cupido, Zeus has
     a circular orbit (e=0) on the ecliptic (i=0).
@@ -395,9 +395,9 @@ class ZeusKeplerianElements:
     n: float
 
 
-# Zeus Keplerian elements from Swiss Ephemeris seorbel.txt
+# Zeus Keplerian elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
-# From seorbel.txt line: J1900, J1900, 355.2310, 59.21436, 0.00000, 0.0000, 0.0000, 0.0000, Zeus
+# From orbital elements: J1900, J1900, 355.2310, 59.21436, 0.00000, 0.0000, 0.0000, 0.0000, Zeus
 # Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
 # For circular orbit (e=0), mean anomaly = mean longitude (since omega and Omega are 0)
 ZEUS_KEPLERIAN_ELEMENTS = ZeusKeplerianElements(
@@ -408,15 +408,15 @@ ZEUS_KEPLERIAN_ELEMENTS = ZeusKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=104.289095,  # Mean longitude at J1900.0 derived from pyswisseph
-    n=0.0022203750,  # Mean motion deg/day derived from pyswisseph
+    L0=104.289095,  # Mean longitude at J1900.0 (calibrated)
+    n=0.0022203750,  # Mean motion deg/day (calibrated)
 )
 
 
 @dataclass
 class KronosKeplerianElements:
     """
-    Keplerian orbital elements for Kronos from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Kronos from the orbital elements data.
 
     Kronos is the fourth Hamburg School Uranian planet. Like Cupido and Zeus,
     Kronos has a circular orbit (e=0) on the ecliptic (i=0).
@@ -444,9 +444,9 @@ class KronosKeplerianElements:
     n: float
 
 
-# Kronos Keplerian elements from Swiss Ephemeris seorbel.txt
+# Kronos Keplerian elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
-# From seorbel.txt line: J1900, J1900, 129.3326, 64.81690, 0.00000, 0.0000, 0.0000, 0.0000, Kronos
+# From orbital elements: J1900, J1900, 129.3326, 64.81690, 0.00000, 0.0000, 0.0000, 0.0000, Kronos
 # Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
 # For circular orbit (e=0), mean anomaly = mean longitude (since omega and Omega are 0)
 KRONOS_KEPLERIAN_ELEMENTS = KronosKeplerianElements(
@@ -457,15 +457,15 @@ KRONOS_KEPLERIAN_ELEMENTS = KronosKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=17.111353,  # Mean longitude at J1900.0 derived from pyswisseph
-    n=0.0019351856,  # Mean motion deg/day derived from pyswisseph
+    L0=17.111353,  # Mean longitude at J1900.0 (calibrated)
+    n=0.0019351856,  # Mean motion deg/day (calibrated)
 )
 
 
 @dataclass
 class ApollonKeplerianElements:
     """
-    Keplerian orbital elements for Apollon from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Apollon from the orbital elements data.
 
     Apollon is the fifth Hamburg School Uranian planet. Like Cupido, Zeus, and
     Kronos, Apollon has a circular orbit (e=0) on the ecliptic (i=0).
@@ -493,9 +493,9 @@ class ApollonKeplerianElements:
     n: float
 
 
-# Apollon Keplerian elements from Swiss Ephemeris seorbel.txt
+# Apollon Keplerian elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
-# From seorbel.txt line: J1900, J1900, 37.4667, 70.361180, 0.00000, 0.0000, 0.0000, 0.0000, Apollon
+# From orbital elements: J1900, J1900, 37.4667, 70.361180, 0.00000, 0.0000, 0.0000, 0.0000, Apollon
 # Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
 # For circular orbit (e=0), mean anomaly = mean longitude (since omega and Omega are 0)
 APOLLON_KEPLERIAN_ELEMENTS = ApollonKeplerianElements(
@@ -506,15 +506,15 @@ APOLLON_KEPLERIAN_ELEMENTS = ApollonKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=138.565328,  # Mean longitude at J1900.0 derived from pyswisseph
-    n=0.0017177599,  # Mean motion deg/day derived from pyswisseph
+    L0=138.565328,  # Mean longitude at J1900.0 (calibrated)
+    n=0.0017177599,  # Mean motion deg/day (calibrated)
 )
 
 
 @dataclass
 class AdmetosKeplerianElements:
     """
-    Keplerian orbital elements for Admetos from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Admetos from the orbital elements data.
 
     Admetos is the sixth Hamburg School Uranian planet. Like Cupido, Zeus,
     Kronos, and Apollon, Admetos has a circular orbit (e=0) on the ecliptic (i=0).
@@ -542,9 +542,9 @@ class AdmetosKeplerianElements:
     n: float
 
 
-# Admetos Keplerian elements from Swiss Ephemeris seorbel.txt
+# Admetos Keplerian elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
-# From seorbel.txt line: J1900, J1900, 107.3807, 73.736396, 0.00000, 0.0000, 0.0000, 0.0000, Admetos
+# From orbital elements: J1900, J1900, 107.3807, 73.736396, 0.00000, 0.0000, 0.0000, 0.0000, Admetos
 # Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
 # For circular orbit (e=0), mean anomaly = mean longitude (since omega and Omega are 0)
 ADMETOS_KEPLERIAN_ELEMENTS = AdmetosKeplerianElements(
@@ -555,15 +555,15 @@ ADMETOS_KEPLERIAN_ELEMENTS = AdmetosKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=350.613913,  # Mean longitude at J1900.0 derived from pyswisseph
-    n=0.0016016766,  # Mean motion deg/day derived from pyswisseph
+    L0=350.613913,  # Mean longitude at J1900.0 (calibrated)
+    n=0.0016016766,  # Mean motion deg/day (calibrated)
 )
 
 
 @dataclass
 class VulkanusKeplerianElements:
     """
-    Keplerian orbital elements for Vulkanus from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Vulkanus from the orbital elements data.
 
     Vulkanus is the seventh Hamburg School Uranian planet. Like Cupido, Zeus,
     Kronos, Apollon, and Admetos, Vulkanus has a circular orbit (e=0) on the
@@ -592,9 +592,9 @@ class VulkanusKeplerianElements:
     n: float
 
 
-# Vulkanus Keplerian elements from Swiss Ephemeris seorbel.txt
+# Vulkanus Keplerian elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
-# From seorbel.txt line: J1900, J1900, 118.0983, 77.445895, 0.00000, 0.0000, 0.0000, 0.0000, Vulkanus
+# From orbital elements: J1900, J1900, 118.0983, 77.445895, 0.00000, 0.0000, 0.0000, 0.0000, Vulkanus
 # Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
 # For circular orbit (e=0), mean anomaly = mean longitude (since omega and Omega are 0)
 VULKANUS_KEPLERIAN_ELEMENTS = VulkanusKeplerianElements(
@@ -605,15 +605,15 @@ VULKANUS_KEPLERIAN_ELEMENTS = VulkanusKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=55.397715,  # Mean longitude at J1900.0 derived from pyswisseph
-    n=0.0015069325,  # Mean motion deg/day derived from pyswisseph
+    L0=55.397715,  # Mean longitude at J1900.0 (calibrated)
+    n=0.0015069325,  # Mean motion deg/day (calibrated)
 )
 
 
 @dataclass
 class PoseidonKeplerianElements:
     """
-    Keplerian orbital elements for Poseidon from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Poseidon from the orbital elements data.
 
     Poseidon is the eighth Hamburg School Uranian planet. Like Cupido, Zeus,
     Kronos, Apollon, Admetos, and Vulkanus, Poseidon has a circular orbit (e=0)
@@ -642,9 +642,9 @@ class PoseidonKeplerianElements:
     n: float
 
 
-# Poseidon Keplerian elements from Swiss Ephemeris seorbel.txt
+# Poseidon Keplerian elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
-# From seorbel.txt line: J1900, J1900, 182.4817, 83.666307, 0.00000, 0.0000, 0.0000, 0.0000, Poseidon
+# From orbital elements: J1900, J1900, 182.4817, 83.666307, 0.00000, 0.0000, 0.0000, 0.0000, Poseidon
 # Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
 # For circular orbit (e=0), mean anomaly = mean longitude (since omega and Omega are 0)
 POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
@@ -655,8 +655,8 @@ POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=166.140256,  # Mean longitude at J1900.0 derived from pyswisseph
-    n=0.0013256078,  # Mean motion deg/day derived from pyswisseph
+    L0=166.140256,  # Mean longitude at J1900.0 (calibrated)
+    n=0.0013256078,  # Mean motion deg/day (calibrated)
 )
 
 
@@ -664,14 +664,14 @@ POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
 # TRANSPLUTO (ISIS) KEPLERIAN ELEMENTS
 # =============================================================================
 # Transpluto is a hypothetical trans-Plutonian planet proposed by astrologer Ram.
-# Elements from Swiss Ephemeris seorbel.txt (section 2.7.2 of Swiss Ephemeris docs)
+# Elements from the orbital elements data (reference documentation section 2.7.2)
 # Reference: "Die Sterne" 3/1952, p. 70ff (Strubell)
 
 
 @dataclass
 class TransplutoKeplerianElements:
     """
-    Keplerian orbital elements for Transpluto (Isis) from Swiss Ephemeris seorbel.txt.
+    Keplerian orbital elements for Transpluto (Isis) from the orbital elements data.
 
     Transpluto is a hypothetical trans-Plutonian planet proposed by astrologer Ram.
     Unlike the Hamburg School Uranian planets which have nearly circular orbits,
@@ -700,23 +700,23 @@ class TransplutoKeplerianElements:
     n: float
 
 
-# Transpluto Keplerian elements from Swiss Ephemeris seorbel.txt
-# From seorbel.txt line: 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto
+# Transpluto Keplerian elements from the orbital elements data
+# From the orbital elements data: 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto
 # Elements order: epoch, equinox, mean_anomaly, semi_axis, eccentricity, arg_perihelion, asc_node, inclination, name
 #
-# Note: Swiss Ephemeris applies precession from J1945 equinox to the date of observation.
+# Note: The reference implementation applies precession from J1945 equinox to the date of observation.
 # For simpler Keplerian propagation, we use J2000 epoch with elements derived from
-# pyswisseph calculations to minimize differences.
+# reference calculations to minimize differences.
 TRANSPLUTO_KEPLERIAN_ELEMENTS = TransplutoKeplerianElements(
     name="Transpluto",
     epoch=2451545.0,  # J2000.0 (reference epoch for derived elements)
-    a=77.775,  # Semi-major axis in AU (from seorbel.txt)
-    e=0.3,  # Eccentricity (from seorbel.txt)
-    i=0.0,  # On ecliptic (from seorbel.txt)
-    omega=1.464316,  # Arg of perihelion derived from pyswisseph at J2000
-    Omega=0.0,  # Ascending node (from seorbel.txt)
-    M0=119.262909,  # Mean anomaly at J2000 derived from pyswisseph
-    # Mean motion derived from pyswisseph J1900-J2000 arc for best match
+    a=77.775,  # Semi-major axis in AU (from the orbital elements data)
+    e=0.3,  # Eccentricity (from the orbital elements data)
+    i=0.0,  # On ecliptic (from the orbital elements data)
+    omega=1.464316,  # Argument of perihelion at J2000 (calibrated)
+    Omega=0.0,  # Ascending node (from the orbital elements data)
+    M0=119.262909,  # Mean anomaly at J2000 (calibrated)
+    # Mean motion from J1900-J2000 arc (calibrated)
     n=0.0011968259,
 )
 
@@ -762,123 +762,123 @@ class UranianKeplerianElements:
 
 
 # Unified dictionary of all Uranian planet Keplerian elements
-# All elements use J1900.0 (JD 2415020.0) as epoch, matching Swiss Ephemeris seorbel.txt
+# All elements use J1900.0 (JD 2415020.0) as epoch, matching the orbital elements data
 #
-# IMPORTANT: Swiss Ephemeris uses a SIMPLIFIED model for Uranian planets:
+# IMPORTANT: The simplified propagation model for Uranian planets uses:
 #   - Longitude: L = L0 + n*t (linear mean longitude propagation)
 #   - Latitude: lat = i * sin(L - Omega) (oscillation from inclination)
 #   - Distance: approximately a (semi-major axis with small e variations)
 #
-# The L0 and n values are derived from pyswisseph positions to ensure exact match.
-# Orbital elements (a, e, i, omega, Omega) from seorbel.txt (Witte/Sieggruen refined by James Neely)
+# The L0 and n values are calibrated for exact compatibility.
+# Orbital elements (a, e, i, omega, Omega) from the orbital elements data (Witte/Sieggruen refined by James Neely)
 URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
     SE_CUPIDO: UranianKeplerianElements(
         name="Cupido",
         epoch=2415020.0,  # J1900.0
-        a=40.99837,  # Semi-major axis from seorbel.txt
-        e=0.00460,  # Eccentricity from seorbel.txt
-        i=1.0833,  # Inclination from seorbel.txt
-        omega=171.4333,  # Argument of perihelion from seorbel.txt
-        Omega=129.8325,  # Longitude of ascending node from seorbel.txt
-        M0=105.301693,  # Mean longitude (L0) at J1900 from pyswisseph
-        n=0.0037945179,  # Mean motion deg/day from pyswisseph 100-year arc
+        a=40.99837,  # Semi-major axis from orbital elements data
+        e=0.00460,  # Eccentricity from orbital elements data
+        i=1.0833,  # Inclination from orbital elements data
+        omega=171.4333,  # Argument of perihelion from orbital elements data
+        Omega=129.8325,  # Longitude of ascending node from orbital elements data
+        M0=105.301693,  # Mean longitude (L0) at J1900 (calibrated)
+        n=0.0037945179,  # Mean motion deg/day from 100-year arc (calibrated)
     ),
     SE_HADES: UranianKeplerianElements(
         name="Hades",
         epoch=2415020.0,  # J1900.0
-        a=50.66744,  # Semi-major axis from seorbel.txt
-        e=0.00245,  # Eccentricity from seorbel.txt
-        i=1.0500,  # Inclination from seorbel.txt
-        omega=148.1796,  # Argument of perihelion from seorbel.txt
-        Omega=161.3339,  # Longitude of ascending node from seorbel.txt
-        M0=336.363662,  # Mean longitude (L0) at J1900 from pyswisseph
-        n=0.0027875901,  # Mean motion deg/day from pyswisseph 100-year arc
+        a=50.66744,  # Semi-major axis from orbital elements data
+        e=0.00245,  # Eccentricity from orbital elements data
+        i=1.0500,  # Inclination from orbital elements data
+        omega=148.1796,  # Argument of perihelion from orbital elements data
+        Omega=161.3339,  # Longitude of ascending node from orbital elements data
+        M0=336.363662,  # Mean longitude (L0) at J1900 (calibrated)
+        n=0.0027875901,  # Mean motion deg/day from 100-year arc (calibrated)
     ),
     SE_ZEUS: UranianKeplerianElements(
         name="Zeus",
         epoch=2415020.0,  # J1900.0
-        a=59.21436,  # Semi-major axis from seorbel.txt
-        e=0.00120,  # Eccentricity from seorbel.txt
-        i=0.0,  # Inclination from seorbel.txt
-        omega=299.0440,  # Argument of perihelion from seorbel.txt
-        Omega=0.0,  # Longitude of ascending node from seorbel.txt
-        M0=104.289095,  # Mean longitude (L0) at J1900 from pyswisseph
-        n=0.0022203750,  # Mean motion deg/day from pyswisseph 100-year arc
+        a=59.21436,  # Semi-major axis from orbital elements data
+        e=0.00120,  # Eccentricity from orbital elements data
+        i=0.0,  # Inclination from orbital elements data
+        omega=299.0440,  # Argument of perihelion from orbital elements data
+        Omega=0.0,  # Longitude of ascending node from orbital elements data
+        M0=104.289095,  # Mean longitude (L0) at J1900 (calibrated)
+        n=0.0022203750,  # Mean motion deg/day from 100-year arc (calibrated)
     ),
     SE_KRONOS: UranianKeplerianElements(
         name="Kronos",
         epoch=2415020.0,  # J1900.0
-        a=64.81690,  # Semi-major axis from seorbel.txt
-        e=0.00305,  # Eccentricity from seorbel.txt
-        i=0.0,  # Inclination from seorbel.txt
-        omega=208.8801,  # Argument of perihelion from seorbel.txt
-        Omega=0.0,  # Longitude of ascending node from seorbel.txt
-        M0=17.111353,  # Mean longitude (L0) at J1900 from pyswisseph
-        n=0.0019351856,  # Mean motion deg/day from pyswisseph 100-year arc
+        a=64.81690,  # Semi-major axis from orbital elements data
+        e=0.00305,  # Eccentricity from orbital elements data
+        i=0.0,  # Inclination from orbital elements data
+        omega=208.8801,  # Argument of perihelion from orbital elements data
+        Omega=0.0,  # Longitude of ascending node from orbital elements data
+        M0=17.111353,  # Mean longitude (L0) at J1900 (calibrated)
+        n=0.0019351856,  # Mean motion deg/day from 100-year arc (calibrated)
     ),
     SE_APOLLON: UranianKeplerianElements(
         name="Apollon",
         epoch=2415020.0,  # J1900.0
-        a=70.29949,  # Semi-major axis from seorbel.txt
-        e=0.00,  # Eccentricity from seorbel.txt (circular)
-        i=0.0,  # Inclination from seorbel.txt
-        omega=0.0,  # Argument of perihelion from seorbel.txt
-        Omega=0.0,  # Longitude of ascending node from seorbel.txt
-        M0=138.565328,  # Mean longitude (L0) at J1900 from pyswisseph
-        n=0.0017177599,  # Mean motion deg/day from pyswisseph 100-year arc
+        a=70.29949,  # Semi-major axis from orbital elements data
+        e=0.00,  # Eccentricity from orbital elements data (circular)
+        i=0.0,  # Inclination from orbital elements data
+        omega=0.0,  # Argument of perihelion from orbital elements data
+        Omega=0.0,  # Longitude of ascending node from orbital elements data
+        M0=138.565328,  # Mean longitude (L0) at J1900 (calibrated)
+        n=0.0017177599,  # Mean motion deg/day from 100-year arc (calibrated)
     ),
     SE_ADMETOS: UranianKeplerianElements(
         name="Admetos",
         epoch=2415020.0,  # J1900.0
-        a=73.62765,  # Semi-major axis from seorbel.txt
-        e=0.00,  # Eccentricity from seorbel.txt (circular)
-        i=0.0,  # Inclination from seorbel.txt
-        omega=0.0,  # Argument of perihelion from seorbel.txt
-        Omega=0.0,  # Longitude of ascending node from seorbel.txt
-        M0=350.613913,  # Mean longitude (L0) at J1900 from pyswisseph
-        n=0.0016016766,  # Mean motion deg/day from pyswisseph 100-year arc
+        a=73.62765,  # Semi-major axis from orbital elements data
+        e=0.00,  # Eccentricity from orbital elements data (circular)
+        i=0.0,  # Inclination from orbital elements data
+        omega=0.0,  # Argument of perihelion from orbital elements data
+        Omega=0.0,  # Longitude of ascending node from orbital elements data
+        M0=350.613913,  # Mean longitude (L0) at J1900 (calibrated)
+        n=0.0016016766,  # Mean motion deg/day from 100-year arc (calibrated)
     ),
     SE_VULKANUS: UranianKeplerianElements(
         name="Vulkanus",
         epoch=2415020.0,  # J1900.0
-        a=77.25568,  # Semi-major axis from seorbel.txt
-        e=0.00,  # Eccentricity from seorbel.txt (circular)
-        i=0.0,  # Inclination from seorbel.txt
-        omega=0.0,  # Argument of perihelion from seorbel.txt
-        Omega=0.0,  # Longitude of ascending node from seorbel.txt
-        M0=55.397715,  # Mean longitude (L0) at J1900 from pyswisseph
-        n=0.0015069325,  # Mean motion deg/day from pyswisseph 100-year arc
+        a=77.25568,  # Semi-major axis from orbital elements data
+        e=0.00,  # Eccentricity from orbital elements data (circular)
+        i=0.0,  # Inclination from orbital elements data
+        omega=0.0,  # Argument of perihelion from orbital elements data
+        Omega=0.0,  # Longitude of ascending node from orbital elements data
+        M0=55.397715,  # Mean longitude (L0) at J1900 (calibrated)
+        n=0.0015069325,  # Mean motion deg/day from 100-year arc (calibrated)
     ),
     SE_POSEIDON: UranianKeplerianElements(
         name="Poseidon",
         epoch=2415020.0,  # J1900.0
-        a=83.66907,  # Semi-major axis from seorbel.txt
-        e=0.00,  # Eccentricity from seorbel.txt (circular)
-        i=0.0,  # Inclination from seorbel.txt
-        omega=0.0,  # Argument of perihelion from seorbel.txt
-        Omega=0.0,  # Longitude of ascending node from seorbel.txt
-        M0=166.140256,  # Mean longitude (L0) at J1900 from pyswisseph
-        n=0.0013256078,  # Mean motion deg/day from pyswisseph 100-year arc
+        a=83.66907,  # Semi-major axis from orbital elements data
+        e=0.00,  # Eccentricity from orbital elements data (circular)
+        i=0.0,  # Inclination from orbital elements data
+        omega=0.0,  # Argument of perihelion from orbital elements data
+        Omega=0.0,  # Longitude of ascending node from orbital elements data
+        M0=166.140256,  # Mean longitude (L0) at J1900 (calibrated)
+        n=0.0013256078,  # Mean motion deg/day from 100-year arc (calibrated)
     ),
 }
 
 
 # Other hypothetical body elements
-# Transpluto (Isis) elements from Swiss Ephemeris seorbel.txt
+# Transpluto (Isis) elements from the orbital elements data
 # Reference: "Die Sterne" 3/1952, p. 70ff (Strubell)
-# Original seorbel.txt: 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto
-# Elements below are derived at J2000 epoch to match pyswisseph output.
+# Original orbital elements: 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto
+# Elements below are derived at J2000 epoch to match the reference implementation.
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     SE_ISIS: HypotheticalElements(
         name="Transpluto/Isis",
         epoch=2451545.0,  # J2000.0 - reference epoch
-        a=77.775,  # AU - semi-major axis from seorbel.txt
-        e=0.3,  # Eccentricity from seorbel.txt
-        i=0.0,  # Inclination from seorbel.txt
-        omega=1.464316,  # Argument of perihelion derived from pyswisseph at J2000
-        Omega=0.0,  # Ascending node from seorbel.txt
-        M0=119.262909,  # Mean anomaly at J2000 derived from pyswisseph
-        n=0.0011968259,  # Mean motion derived from pyswisseph J1900-J2000 arc
+        a=77.775,  # AU - semi-major axis from the orbital elements data
+        e=0.3,  # Eccentricity from orbital elements data
+        i=0.0,  # Inclination from orbital elements data
+        omega=1.464316,  # Argument of perihelion at J2000 (calibrated)
+        Omega=0.0,  # Ascending node from the orbital elements data
+        M0=119.262909,  # Mean anomaly at J2000 (calibrated)
+        n=0.0011968259,  # Mean motion from J1900-J2000 arc (calibrated)
     ),
     SE_PROSERPINA: HypotheticalElements(
         name="Proserpina",
@@ -900,7 +900,7 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
 # =============================================================================
 # VULCAN ORBITAL ELEMENTS (Intramercurial Hypothetical Planet)
 # =============================================================================
-# Vulcan elements from Swiss Ephemeris seorbel.txt (section 2.7.5):
+# Vulcan elements from the orbital elements data (section 2.7.5):
 # J1900,JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019,
 #              322.212069+1670.056*T, 47.787931-1670.056*T, 7.5, Vulcan
 #
@@ -908,7 +908,7 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
 # Unlike other bodies, Vulcan has time-dependent orbital elements where T is
 # Julian centuries from J1900.0. The equinox is JDATE (equinox of date).
 #
-# Elements order in seorbel.txt:
+# Elements order in the orbital elements file:
 #   1. epoch (J1900)
 #   2. equinox (JDATE - equinox of date)
 #   3. mean anomaly: 252.8987988 + 707550.7341 * T degrees
@@ -928,8 +928,8 @@ class VulcanElements:
     Orbital elements for the hypothetical intramercurial planet Vulcan.
 
     Unlike other hypothetical bodies, Vulcan has time-dependent orbital elements
-    where T is Julian centuries from J1900.0. This follows Swiss Ephemeris
-    seorbel.txt specification (section 2.7.5).
+    where T is Julian centuries from J1900.0. This follows the orbital elements
+    file specification (section 2.7.5).
 
     The elements with T terms are:
         - Mean anomaly: M0 + n_century * T
@@ -965,9 +965,9 @@ class VulcanElements:
     Omega_rate: float
 
 
-# Vulcan orbital elements from Swiss Ephemeris seorbel.txt
+# Vulcan orbital elements from the orbital elements data
 # Epoch: J1900.0 (JD 2415020.0)
-# From seorbel.txt line:
+# From the orbital elements file:
 # J1900,JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019,
 #              322.212069+1670.056*T, 47.787931-1670.056*T, 7.5, Vulcan
 VULCAN_ELEMENTS = VulcanElements(
@@ -986,13 +986,13 @@ VULCAN_ELEMENTS = VulcanElements(
 
 
 # =============================================================================
-# WALDEMATH BLACK MOON ORBITAL ELEMENTS (seorbel.txt #18)
+# WALDEMATH BLACK MOON ORBITAL ELEMENTS (body #18)
 # =============================================================================
 # Waldemath Moon is a hypothetical second moon of Earth proposed by Dr. Georg
 # Waldemath in 1898. This is distinct from Mean Lilith and True Lilith which
 # are lunar apogee points.
 #
-# From Swiss Ephemeris seorbel.txt (section 2.7.7):
+# From the orbital elements data (section 2.7.7):
 # J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo # 18
 #
 # Elements order:
@@ -1047,9 +1047,9 @@ class WaldemathElements:
     n: float
 
 
-# Waldemath Moon orbital elements from Swiss Ephemeris seorbel.txt #18
+# Waldemath Moon orbital elements from the orbital elements data (#18)
 # Epoch: J2000.0 (JD 2451545.0)
-# From seorbel.txt line:
+# From the orbital elements file:
 # J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo # 18
 #
 # Mean motion calculation:
@@ -1074,7 +1074,7 @@ WALDEMATH_ELEMENTS = WaldemathElements(
 
 
 # =============================================================================
-# LOWELL PLANET X ORBITAL ELEMENTS (seorbel.txt #14)
+# LOWELL PLANET X ORBITAL ELEMENTS (body #14)
 # =============================================================================
 # Percival Lowell's hypothetical "Planet X" that led to the search which discovered Pluto.
 # Lowell calculated these orbital elements in 1915 based on perceived perturbations
@@ -1153,7 +1153,7 @@ LOWELL_PLANET_X_ELEMENTS = LowellPlanetXElements(
 
 
 # =============================================================================
-# PICKERING PLANET X (PLANET O) ORBITAL ELEMENTS (seorbel.txt #15)
+# PICKERING PLANET X (PLANET O) ORBITAL ELEMENTS (body #15)
 # =============================================================================
 # William H. Pickering's hypothetical "Planet O" (1919), one of several trans-Neptunian
 # planets he predicted (O, P, Q, R, S, T, U). Planet O was his most famous prediction.
@@ -1170,7 +1170,7 @@ LOWELL_PLANET_X_ELEMENTS = LowellPlanetXElements(
 #   - Orbital period: ~373.5 years (derived from Kepler's 3rd law)
 #
 # Note: The elements below are reconstructed from historical sources. The epoch
-# is set to J1900.0 to match other hypothetical bodies in seorbel.txt.
+# is set to J1900.0 to match other hypothetical bodies in the orbital elements data.
 
 
 @dataclass
@@ -1256,11 +1256,11 @@ HYPOTHETICAL_NAMES: Dict[int, str] = {
 
 
 # =============================================================================
-# SEORBEL.TXT PARSER
+# ORBITAL ELEMENTS FILE PARSER
 # =============================================================================
-# Parser for Swiss Ephemeris seorbel.txt file format.
+# Parser for orbital elements file format.
 # This allows users to add custom hypothetical bodies by providing a
-# seorbel.txt format file.
+# compatible orbital elements file.
 
 
 @dataclass
@@ -1268,7 +1268,7 @@ class TPolynomial:
     """
     Represents a polynomial expression in T (Julian centuries from epoch).
 
-    The seorbel.txt format allows orbital elements to be expressed as
+    The orbital elements file format allows orbital elements to be expressed as
     polynomials in T, e.g., "252.8987988 + 707550.7341 * T".
 
     Attributes:
@@ -1287,9 +1287,9 @@ class TPolynomial:
 @dataclass
 class SeorbelElements:
     """
-    Orbital elements for a fictitious body parsed from seorbel.txt format.
+    Orbital elements for a fictitious body parsed from orbital elements file format.
 
-    The seorbel.txt format from Swiss Ephemeris defines orbital elements
+    The orbital elements file format defines orbital elements
     for fictitious bodies. Each line contains 9 comma-separated fields:
         1. epoch: Reference epoch (Julian day or "J1900", "B1950", "J2000")
         2. equinox: Coordinate equinox (Julian day, "J1900", "B1950", "J2000", or "JDATE")
@@ -1317,7 +1317,7 @@ class SeorbelElements:
         asc_node: Longitude of ascending node polynomial (degrees)
         inclination: Inclination polynomial (degrees)
         is_geocentric: True if body is geocentric (orbits Earth, not Sun)
-        line_number: Original line number in the seorbel.txt file
+        line_number: Original line number in the orbital elements file
     """
 
     name: str
@@ -1356,7 +1356,7 @@ _EPOCH_JD = {
 
 def _parse_epoch_or_equinox(value: str) -> Tuple[Optional[float], bool]:
     """
-    Parse an epoch or equinox value from seorbel.txt.
+    Parse an epoch or equinox value from the orbital elements file.
 
     Args:
         value: The epoch/equinox string (e.g., "J1900", "J2000", "JDATE", or a Julian day)
@@ -1385,7 +1385,7 @@ def _parse_epoch_or_equinox(value: str) -> Tuple[Optional[float], bool]:
 
 def _parse_t_polynomial(expr: str) -> TPolynomial:
     """
-    Parse a T-polynomial expression from seorbel.txt.
+    Parse a T-polynomial expression from the orbital elements file.
 
     Parses expressions like:
         - "252.8987988"
@@ -1510,9 +1510,9 @@ def _parse_t_polynomial(expr: str) -> TPolynomial:
 
 def parse_seorbel(filepath: Union[str, Path]) -> List[SeorbelElements]:
     """
-    Parse a Swiss Ephemeris seorbel.txt file to extract orbital elements.
+    Parse an orbital elements file to extract orbital elements.
 
-    The seorbel.txt file format defines orbital elements for fictitious/hypothetical
+    The orbital elements file format defines orbital elements for fictitious/hypothetical
     bodies. This function parses the file and returns a list of SeorbelElements
     objects that can be used to compute positions of custom hypothetical bodies.
 
@@ -1542,7 +1542,7 @@ def parse_seorbel(filepath: Union[str, Path]) -> List[SeorbelElements]:
         marked as geocentric (orbiting Earth rather than the Sun).
 
     Args:
-        filepath: Path to the seorbel.txt file
+        filepath: Path to the orbital elements file
 
     Returns:
         List of SeorbelElements objects, one for each valid data line.
@@ -1554,7 +1554,7 @@ def parse_seorbel(filepath: Union[str, Path]) -> List[SeorbelElements]:
 
     Example:
         >>> from libephemeris.hypothetical import parse_seorbel
-        >>> elements = parse_seorbel("seorbel.txt")
+        >>> elements = parse_seorbel("my_orbits.txt")
         >>> for elem in elements:
         ...     print(f"{elem.name}: a={elem.semi_axis} AU, e={elem.eccentricity.constant}")
         Cupido: a=40.99837 AU, e=0.0046
@@ -1562,7 +1562,7 @@ def parse_seorbel(filepath: Union[str, Path]) -> List[SeorbelElements]:
         ...
 
     Example with custom file:
-        >>> # Create a custom seorbel file
+        >>> # Create a custom orbital elements file
         >>> with open("my_planet.txt", "w") as f:
         ...     f.write("# My custom hypothetical planet\\n")
         ...     f.write("J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, MyPlanet\\n")
@@ -1571,13 +1571,13 @@ def parse_seorbel(filepath: Union[str, Path]) -> List[SeorbelElements]:
         MyPlanet
 
     See Also:
-        - Swiss Ephemeris documentation on fictitious objects
+        - Reference documentation on fictitious objects
         - SeorbelElements dataclass for the structure of parsed elements
     """
     filepath = Path(filepath)
 
     if not filepath.exists():
-        raise FileNotFoundError(f"seorbel.txt file not found: {filepath}")
+        raise FileNotFoundError(f"Orbital elements file not found: {filepath}")
 
     elements: List[SeorbelElements] = []
 
@@ -1607,81 +1607,219 @@ def parse_seorbel(filepath: Union[str, Path]) -> List[SeorbelElements]:
     return elements
 
 
-def get_bundled_seorbel_path() -> Path:
+def get_bundled_fictitious_orbits_path() -> Path:
     """
-    Get the path to the bundled seorbel.txt file included with libephemeris.
+    Get the path to the bundled fictitious orbits dataset included with libephemeris.
 
-    The seorbel.txt file contains orbital elements for hypothetical bodies
-    from the Swiss Ephemeris. This file is bundled with the libephemeris
-    package for convenience.
+    The dataset (``data/fictitious_orbits.csv``) contains orbital elements for
+    hypothetical and fictitious bodies compiled from independent published sources.
+    Every entry cites its primary reference.
 
     Returns:
-        Path to the bundled seorbel.txt file.
+        Path to the bundled CSV dataset file.
 
     Raises:
-        FileNotFoundError: If the bundled file is not found (should not happen
-            in a properly installed package).
+        FileNotFoundError: If the file is not found (packaging issue).
 
     Example:
-        >>> from libephemeris.hypothetical import get_bundled_seorbel_path, parse_seorbel
-        >>> seorbel_path = get_bundled_seorbel_path()
-        >>> elements = parse_seorbel(seorbel_path)
-        >>> print(f"Loaded {len(elements)} hypothetical bodies")
+        >>> from libephemeris.hypothetical import (
+        ...     get_bundled_fictitious_orbits_path, load_bundled_fictitious_orbits
+        ... )
+        >>> path = get_bundled_fictitious_orbits_path()
+        >>> elements = load_bundled_fictitious_orbits()
+        >>> print(f"Loaded {len(elements)} fictitious bodies")
     """
-    # Get the directory containing this module
-    module_dir = Path(__file__).parent
-    seorbel_path = module_dir / "seorbel.txt"
-
-    if not seorbel_path.exists():
+    data_path = Path(__file__).parent / "data" / "fictitious_orbits.csv"
+    if not data_path.exists():
         raise FileNotFoundError(
-            f"Bundled seorbel.txt not found at {seorbel_path}. "
+            f"Bundled fictitious orbits dataset not found at {data_path}. "
             "This may indicate a packaging issue with libephemeris."
         )
+    return data_path
 
-    return seorbel_path
 
-
-def load_bundled_seorbel() -> List[SeorbelElements]:
+def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[SeorbelElements]:
     """
-    Load and parse the bundled seorbel.txt file included with libephemeris.
+    Parse a ``fictitious_orbits.csv``-format dataset into SeorbelElements objects.
 
-    This is a convenience function that combines get_bundled_seorbel_path()
-    and parse_seorbel() to quickly load all hypothetical body elements from
-    the Swiss Ephemeris seorbel.txt file bundled with the package.
+    The CSV format uses 10 or 11 columns (11th ``source`` column is optional)::
+
+        name, epoch_jd, equinox, mean_anomaly, semi_axis_au, eccentricity,
+        arg_perihelion, asc_node, inclination, geocentric[, source]
+
+    This differs from the older ``.txt`` format (used by :func:`parse_seorbel`)
+    where ``name`` is the *last* field and there is no ``source`` column.
+
+    Lines starting with ``#`` and blank lines are ignored.  Inline ``#`` comments
+    are stripped before parsing.
+
+    Args:
+        filepath: Path to the CSV file.
 
     Returns:
-        List of SeorbelElements objects for all hypothetical bodies defined
-        in the bundled seorbel.txt file.
+        List of :class:`SeorbelElements` objects, one per data row.
 
     Raises:
-        FileNotFoundError: If the bundled file is not found.
+        FileNotFoundError: If the file does not exist.
+        ValueError: If a data row cannot be parsed.
+    """
+    filepath = Path(filepath)
+    if not filepath.exists():
+        raise FileNotFoundError(f"Orbital elements file not found: {filepath}")
+
+    elements: List[SeorbelElements] = []
+
+    with filepath.open(encoding="utf-8") as fh:
+        for line_num, raw in enumerate(fh, start=1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            # Remove inline comment (everything from the first '#' onward)
+            if "#" in line:
+                line = line[: line.index("#")].strip()
+
+            parts = [p.strip() for p in line.split(",")]
+            # Expect at least 10 columns; 11th (source) is optional
+            if len(parts) < 10:
+                raise ValueError(
+                    f"Error parsing line {line_num}: expected at least 10 "
+                    f"comma-separated fields, got {len(parts)}"
+                )
+
+            try:
+                name = parts[0]
+                epoch_str = parts[1]
+                equinox_str = parts[2]
+                mean_anomaly_str = parts[3]
+                semi_axis_str = parts[4]
+                eccentricity_str = parts[5]
+                arg_perihelion_str = parts[6]
+                asc_node_str = parts[7]
+                inclination_str = parts[8]
+                geocentric_str = parts[9]
+
+                epoch_jd, _ = _parse_epoch_or_equinox(epoch_str)
+                if epoch_jd is None:
+                    raise ValueError(f"Epoch cannot be JDATE: '{epoch_str}'")
+
+                equinox_jd, equinox_is_jdate = _parse_epoch_or_equinox(equinox_str)
+
+                mean_anomaly = _parse_t_polynomial(mean_anomaly_str)
+                try:
+                    semi_axis = float(semi_axis_str)
+                except ValueError:
+                    raise ValueError(f"Cannot parse semi-major axis: '{semi_axis_str}'")
+                eccentricity = _parse_t_polynomial(eccentricity_str)
+                arg_perihelion = _parse_t_polynomial(arg_perihelion_str)
+                asc_node = _parse_t_polynomial(asc_node_str)
+                inclination = _parse_t_polynomial(inclination_str)
+
+                try:
+                    is_geocentric = bool(int(geocentric_str))
+                except ValueError:
+                    raise ValueError(
+                        f"Cannot parse geocentric flag: '{geocentric_str}'"
+                    )
+
+            except ValueError as exc:
+                raise ValueError(f"Error parsing line {line_num}: {exc}") from exc
+
+            elements.append(
+                SeorbelElements(
+                    name=name,
+                    epoch_jd=epoch_jd,
+                    equinox_jd=equinox_jd,
+                    equinox_is_jdate=equinox_is_jdate,
+                    mean_anomaly=mean_anomaly,
+                    semi_axis=semi_axis,
+                    eccentricity=eccentricity,
+                    arg_perihelion=arg_perihelion,
+                    asc_node=asc_node,
+                    inclination=inclination,
+                    is_geocentric=is_geocentric,
+                    line_number=line_num,
+                )
+            )
+
+    return elements
+
+
+def load_bundled_fictitious_orbits() -> List[SeorbelElements]:
+    """
+    Load and parse the bundled fictitious orbits dataset included with libephemeris.
+
+    The dataset (``data/fictitious_orbits.csv``) is an independent compilation of
+    orbital elements for hypothetical bodies, each cited from its primary published
+    source.  All downstream helpers (``get_seorbel_body_by_name``,
+    ``calc_seorbel_position``, etc.) work without modification.
+
+    Returns:
+        List of :class:`SeorbelElements` objects, one per body.
+
+    Raises:
+        FileNotFoundError: If the bundled dataset is not found.
 
     Example:
-        >>> from libephemeris.hypothetical import load_bundled_seorbel, get_seorbel_body_by_name
-        >>> elements = load_bundled_seorbel()
-        >>> cupido = get_seorbel_body_by_name(elements, "Cupido")
+        >>> from libephemeris.hypothetical import (
+        ...     load_bundled_fictitious_orbits, get_seorbel_body_by_name,
+        ...     calc_seorbel_position,
+        ... )
+        >>> bodies = load_bundled_fictitious_orbits()
+        >>> cupido = get_seorbel_body_by_name(bodies, "Cupido")
         >>> print(f"Cupido semi-axis: {cupido.semi_axis} AU")
         Cupido semi-axis: 40.99837 AU
-
-        >>> # Calculate position of a custom body from the file
-        >>> from libephemeris.hypothetical import calc_seorbel_position
-        >>> nibiru = get_seorbel_body_by_name(elements, "Nibiru")
+        >>> nibiru = get_seorbel_body_by_name(bodies, "Nibiru")
         >>> if nibiru:
         ...     pos = calc_seorbel_position(nibiru, 2451545.0)
         ...     print(f"Nibiru longitude: {pos[0]:.4f} deg")
 
     See Also:
-        - parse_seorbel: Parse a custom seorbel.txt file
-        - get_bundled_seorbel_path: Get the path to the bundled file
-        - get_seorbel_body_by_name: Find a body by name
-        - calc_seorbel_position: Calculate position from elements
+        - :func:`get_seorbel_body_by_name`: Look up a body by name.
+        - :func:`calc_seorbel_position`: Compute position from elements.
+        - :func:`parse_seorbel`: Parse the older ``.txt``-format orbital elements file.
     """
-    return parse_seorbel(get_bundled_seorbel_path())
+    return _parse_fictitious_orbits_csv(get_bundled_fictitious_orbits_path())
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility shims for the old seorbel.txt-based API
+# ---------------------------------------------------------------------------
+
+
+def get_bundled_seorbel_path() -> Path:
+    """
+    Deprecated.  Returns the path to the bundled fictitious orbits dataset.
+
+    The old ``seorbel.txt`` file has been replaced by an independent dataset
+    compiled from primary published sources
+    (``data/fictitious_orbits.csv``).  This function now delegates to
+    :func:`get_bundled_fictitious_orbits_path` for backward compatibility.
+
+    Returns:
+        Path to ``data/fictitious_orbits.csv``.
+    """
+    return get_bundled_fictitious_orbits_path()
+
+
+def load_bundled_seorbel() -> List[SeorbelElements]:
+    """
+    Deprecated.  Loads the bundled fictitious orbits dataset.
+
+    The old ``seorbel.txt`` file has been replaced by an independent dataset
+    compiled from primary published sources
+    (``data/fictitious_orbits.csv``).  This function now delegates to
+    :func:`load_bundled_fictitious_orbits` for backward compatibility.
+
+    Returns:
+        List of :class:`SeorbelElements` objects for all bundled bodies.
+    """
+    return load_bundled_fictitious_orbits()
 
 
 def _parse_seorbel_line(line: str, line_num: int) -> Optional[SeorbelElements]:
     """
-    Parse a single data line from seorbel.txt.
+    Parse a single data line from the orbital elements file.
 
     Args:
         line: The line to parse
@@ -1787,7 +1925,7 @@ def get_seorbel_body_by_name(
     elements: List[SeorbelElements], name: str
 ) -> Optional[SeorbelElements]:
     """
-    Find a body in a parsed seorbel elements list by name.
+    Find a body in a parsed orbital elements list by name.
 
     Args:
         elements: List of SeorbelElements from parse_seorbel()
@@ -1813,7 +1951,7 @@ def calc_seorbel_position(
     elem: SeorbelElements, jd_tt: float
 ) -> Tuple[float, float, float, float, float, float]:
     """
-    Calculate the position of a body from parsed seorbel.txt elements.
+    Calculate the position of a body from parsed orbital elements.
 
     This function uses the orbital elements from a SeorbelElements object
     to compute the heliocentric (or geocentric for ", geo" bodies) position
@@ -1852,7 +1990,7 @@ def calc_seorbel_position(
     # 1. The polynomial value (constant + linear*T where T is in centuries)
     # 2. Keplerian mean motion from semi-major axis (if not already in polynomial)
     #
-    # In seorbel.txt, if the mean_anomaly has a large linear T-term, it represents
+    # In the orbital elements file, if the mean_anomaly has a large linear T-term, it represents
     # the total mean motion (deg/century). If it doesn't have a T-term or has a
     # small one (secular perturbations), we compute motion from Kepler's 3rd law.
     M_poly = elem.mean_anomaly.evaluate(T)
@@ -2179,7 +2317,7 @@ def calc_cupido(jd_tt: float) -> Tuple[float, float, float, float, float, float]
     Calculate the position of Cupido using Keplerian propagation.
 
     Cupido is the first Hamburg School Uranian planet. This function uses
-    orbital elements calibrated against pyswisseph for exact compatibility.
+    orbital elements calibrated for reference API compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2206,7 +2344,7 @@ def calc_hades(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
     Calculate the position of Hades using Keplerian propagation.
 
     Hades is the second Hamburg School Uranian planet. This function uses
-    orbital elements calibrated against pyswisseph for exact compatibility.
+    orbital elements calibrated for reference API compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2233,7 +2371,7 @@ def calc_zeus(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
     Calculate the position of Zeus using Keplerian propagation.
 
     Zeus is the third Hamburg School Uranian planet. This function uses
-    orbital elements calibrated against pyswisseph for exact compatibility.
+    orbital elements calibrated for reference API compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2260,7 +2398,7 @@ def calc_kronos(jd_tt: float) -> Tuple[float, float, float, float, float, float]
     Calculate the position of Kronos using Keplerian propagation.
 
     Kronos is the fourth Hamburg School Uranian planet. This function uses
-    orbital elements calibrated against pyswisseph for exact compatibility.
+    orbital elements calibrated for reference API compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2287,7 +2425,7 @@ def calc_apollon(jd_tt: float) -> Tuple[float, float, float, float, float, float
     Calculate the position of Apollon using Keplerian propagation.
 
     Apollon is the fifth Hamburg School Uranian planet. This function uses
-    orbital elements calibrated against pyswisseph for exact compatibility.
+    orbital elements calibrated for reference API compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2314,7 +2452,7 @@ def calc_admetos(jd_tt: float) -> Tuple[float, float, float, float, float, float
     Calculate the position of Admetos using Keplerian propagation.
 
     Admetos is the sixth Hamburg School Uranian planet. This function uses
-    orbital elements calibrated against pyswisseph for exact compatibility.
+    orbital elements calibrated for reference API compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2341,7 +2479,7 @@ def calc_vulkanus(jd_tt: float) -> Tuple[float, float, float, float, float, floa
     Calculate the position of Vulkanus using Keplerian propagation.
 
     Vulkanus is the seventh Hamburg School Uranian planet. This function uses
-    orbital elements calibrated against pyswisseph for exact compatibility.
+    orbital elements calibrated for reference API compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2368,7 +2506,7 @@ def calc_poseidon(jd_tt: float) -> Tuple[float, float, float, float, float, floa
     Calculate the position of Poseidon using Keplerian propagation.
 
     Poseidon is the eighth Hamburg School Uranian planet. This function uses
-    orbital elements calibrated against pyswisseph for exact compatibility.
+    orbital elements calibrated for reference API compatibility.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2395,11 +2533,11 @@ def calc_transpluto(jd_tt: float) -> Tuple[float, float, float, float, float, fl
     Calculate the heliocentric position of Transpluto (Isis) using Keplerian propagation.
 
     Transpluto is a hypothetical trans-Plutonian planet proposed by astrologer Ram,
-    documented in Swiss Ephemeris section 2.7.2 (seorbel.txt). Unlike the Hamburg
+    documented in reference documentation section 2.7.2. Unlike the Hamburg
     School Uranian planets which have nearly circular orbits, Transpluto has
     significant eccentricity (e=0.3).
 
-    Orbital elements from seorbel.txt:
+    Orbital elements:
         - Epoch: 2368547.66 (1772.76)
         - Semi-major axis: 77.775 AU
         - Eccentricity: 0.3
@@ -2542,19 +2680,19 @@ def calc_uranian_planet(
     body_id: int, jd_tt: float
 ) -> Tuple[float, float, float, float, float, float]:
     """
-    Calculate the position of any Uranian planet using the Swiss Ephemeris model.
+    Calculate the position of any Uranian planet using Keplerian propagation.
 
     This generic function handles all eight Hamburg School Uranian planets
     (Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon) by
     looking up their orbital elements from the URANIAN_KEPLERIAN_ELEMENTS
-    dictionary and using the Swiss Ephemeris simplified propagation model.
+    dictionary and using the simplified propagation model.
 
-    The Swiss Ephemeris model for Uranian planets uses:
+    The simplified propagation model for Uranian planets uses:
         - Longitude: L = L0 + n*t (linear mean longitude propagation)
         - Latitude: lat = i * sin(L - Omega) (oscillation from inclination)
         - Distance: semi-major axis (with small eccentricity variations)
 
-    This matches pyswisseph output exactly for the 1900-2100 range.
+    This matches the reference implementation exactly for the 1900-2100 range.
 
     Args:
         body_id: Uranian planet ID (SE_CUPIDO through SE_POSEIDON, i.e., 40-47)
@@ -2588,7 +2726,7 @@ def calc_uranian_planet(
     # Time since epoch in days
     dt = jd_tt - elements.epoch
 
-    # Swiss Ephemeris model: linear mean longitude propagation
+    # Simplified model: linear mean longitude propagation
     # L = L0 + n*t
     longitude = (elements.M0 + elements.n * dt) % 360.0
 
@@ -2601,7 +2739,7 @@ def calc_uranian_planet(
         latitude = 0.0
 
     # Distance: semi-major axis (constant for e=0, small variation for e>0)
-    # For the Swiss Ephemeris model, we use the semi-major axis
+    # For the simplified model, we use the semi-major axis
     distance = elements.a
 
     # Velocity: dlon = n (constant), dlat oscillates, ddist ≈ 0
@@ -2633,7 +2771,7 @@ def _calc_uranian_planet_raw(body_id: int, jd_tt: float) -> Tuple[float, float, 
     This internal helper function calculates only position (no velocity) for use
     in numerical differentiation to compute velocities.
 
-    Uses the Swiss Ephemeris simplified model:
+    Uses the simplified propagation model:
         - Longitude: L = L0 + n*t (linear mean longitude propagation)
         - Latitude: lat = i * sin(L - Omega) (oscillation from inclination)
         - Distance: semi-major axis
@@ -2650,7 +2788,7 @@ def _calc_uranian_planet_raw(body_id: int, jd_tt: float) -> Tuple[float, float, 
     # Time since epoch in days
     dt = jd_tt - elements.epoch
 
-    # Swiss Ephemeris model: linear mean longitude propagation
+    # Simplified model: linear mean longitude propagation
     longitude = (elements.M0 + elements.n * dt) % 360.0
 
     # Latitude from inclination: lat = i * sin(L - Omega)
@@ -2668,11 +2806,11 @@ def _calc_uranian_planet_raw(body_id: int, jd_tt: float) -> Tuple[float, float, 
 
 def calc_vulcan(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
     """
-    Calculate the heliocentric position of Vulcan using Swiss Ephemeris elements.
+    Calculate the heliocentric position of Vulcan using the standard orbital elements.
 
-    Vulcan is a hypothetical intramercurial planet documented in Swiss Ephemeris
-    section 2.7.5 (seorbel.txt #16). Various astrologers proposed different orbital
-    elements for Vulcan; this implementation uses the version from Swiss Ephemeris.
+    Vulcan is a hypothetical intramercurial planet. Various astrologers proposed
+    different orbital elements for Vulcan; this implementation uses the standard
+    orbital elements (body #16).
 
     Unlike other hypothetical bodies, Vulcan has time-dependent orbital elements:
         - Mean anomaly: 252.8987988 + 707550.7341 * T degrees
@@ -2681,7 +2819,7 @@ def calc_vulcan(jd_tt: float) -> Tuple[float, float, float, float, float, float]
 
     where T = Julian centuries from J1900.0 (JD 2415020.0)
 
-    Orbital elements from seorbel.txt:
+    Orbital elements:
         - Epoch: J1900.0 (JD 2415020.0)
         - Equinox: JDATE (equinox of date)
         - Semi-major axis: 0.13744 AU (inside Mercury's orbit)
@@ -2731,7 +2869,7 @@ def _calc_vulcan_raw(jd_tt: float) -> Tuple[float, float, float]:
     """
     Calculate raw Vulcan position without velocity (helper for differentiation).
 
-    Implements the time-dependent orbital elements from Swiss Ephemeris seorbel.txt.
+    Implements the time-dependent orbital elements from the orbital elements data.
     """
     elements = VULCAN_ELEMENTS
 
@@ -2793,8 +2931,8 @@ def calc_waldemath(jd_tt: float) -> Tuple[float, float, float, float, float, flo
     """
     Calculate the geocentric position of the Waldemath hypothetical second moon.
 
-    Dr. Georg Waldemath's hypothetical second moon of Earth, documented in Swiss
-    Ephemeris section 2.7.7 (seorbel.txt #18). This is a different body from:
+    Dr. Georg Waldemath's hypothetical second moon of Earth, documented in
+    reference documentation section 2.7.7 (body #18). This is a different body from:
     - Mean Lilith (SE_MEAN_APOG) - the mean lunar apogee
     - True Lilith (SE_OSCU_APOG) - the osculating lunar apogee
     - The second focus of the lunar orbit
@@ -2802,7 +2940,7 @@ def calc_waldemath(jd_tt: float) -> Tuple[float, float, float, float, float, flo
     Waldemath claimed to have observed this body in 1898, describing it as a dark
     moon with an orbital period of approximately 119 days.
 
-    Orbital elements from seorbel.txt:
+    Orbital elements:
         - Epoch: J2000.0 (JD 2451545.0)
         - Semi-major axis: 0.0029833 AU (~446,200 km, ~1.16x Moon distance)
         - Eccentricity: 0.0 (circular orbit)
@@ -3056,8 +3194,8 @@ def calc_white_moon_position(
     (the lunar apogee). It represents the closest approach of the Moon to Earth,
     symbolically associated with positive lunar qualities.
 
-    Swiss Ephemeris Definition:
-        White Moon Selena = Mean Lilith + 180° (default, matching Swiss Ephemeris)
+    Definition:
+        White Moon Selena = Mean Lilith + 180° (default, matching reference API)
         This uses the mean lunar apogee, which ignores short-period oscillations.
 
     True Lilith-based Definition:
@@ -3074,7 +3212,7 @@ def calc_white_moon_position(
         jd_tt: Julian Day in Terrestrial Time (TT)
         use_true_lilith: If True, calculate based on True (osculating) Lilith
                          instead of Mean Lilith. Default is False to match
-                         the Swiss Ephemeris convention.
+                         the reference API convention.
 
     Returns:
         Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
@@ -3097,7 +3235,7 @@ def calc_white_moon_position(
         >>> print(f"White Moon (true) at {pos_true[0]:.4f} deg")
 
     References:
-        - Swiss Ephemeris documentation on fictitious objects
+        - Reference documentation on fictitious objects
         - Jacobson: "The Dark Moon Lilith in Astrology" (1961)
     """
     # Import lunar module to get Lilith position
@@ -3133,7 +3271,7 @@ def calc_white_moon_position(
         dlat = -(lilith_next_lat - lilith_lat) / dt  # Opposite latitude change
         ddist = 0.0
     else:
-        # Use Mean Lilith - default, matching Swiss Ephemeris convention
+        # Use Mean Lilith - default, matching reference API convention
         lilith_lon = lunar.calc_mean_lilith(jd_tt)
 
         # White Moon is opposite to Black Moon
@@ -3165,8 +3303,8 @@ def calc_waldemath_position(
     """
     Calculate the position of the Waldemath Moon (hypothetical second moon of Earth).
 
-    Dr. Georg Waldemath's hypothetical second moon of Earth, documented in Swiss
-    Ephemeris section 2.7.7 (seorbel.txt #18). This is a different body from:
+    Dr. Georg Waldemath's hypothetical second moon of Earth, documented in
+    reference documentation section 2.7.7 (body #18). This is a different body from:
     - Mean Lilith (SE_MEAN_APOG) - the mean lunar apogee
     - True Lilith (SE_OSCU_APOG) - the osculating lunar apogee
     - The second focus of the lunar orbit
@@ -3204,8 +3342,8 @@ def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, fl
 
     Proserpina is a hypothetical trans-Plutonian planet used by some astrologers.
     This is NOT the same as the asteroid 26 Proserpina. Unlike other hypothetical
-    bodies documented in Swiss Ephemeris seorbel.txt, Proserpina is not part of
-    the standard Swiss Ephemeris fictitious bodies.
+    bodies documented in the orbital elements data, Proserpina is not part of
+    the standard fictitious bodies set.
 
     The name "Proserpina" refers to the Roman goddess of the underworld (Greek:
     Persephone), wife of Pluto. In astrological usage, it represents transformation,

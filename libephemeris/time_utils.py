@@ -6,7 +6,7 @@ Implements standard astronomical time functions for conversions between:
 - Gregorian and Julian calendar systems
 - UT1 (Universal Time) and TT (Terrestrial Time)
 
-Functions match the Swiss Ephemeris API for compatibility.
+Functions match the reference API for compatibility.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 
@@ -193,7 +193,7 @@ def swe_deltat(tjd: float) -> float:
 
     ts = get_timescale()
     t = ts.ut1_jd(tjd)
-    # Skyfield returns delta_t in seconds, convert to days for Swiss Ephemeris API compatibility
+    # Skyfield returns delta_t in seconds, convert to days for reference API compatibility
     delta_t_seconds = float(t.delta_t)
     return delta_t_seconds / 86400.0
 
@@ -208,9 +208,9 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
     Args:
         tjd: Julian Day number in UT1
         ephe_flag: Ephemeris selection flag:
-            - SEFLG_SWIEPH (2): Use Swiss Ephemeris/Skyfield (default)
+            - SEFLG_SWIEPH (2): Use JPL/Skyfield ephemeris (default)
             - SEFLG_JPLEPH (1): Use JPL ephemeris
-            - SEFLG_MOSEPH (4): Use Moshier semi-analytical ephemeris (same Delta T)
+            - SEFLG_MOSEPH (4): Accepted for compatibility (same Delta T)
 
     Returns:
         tuple: (delta_t, serr) where:
@@ -237,7 +237,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
         SEFLG_SWIEPH and SEFLG_JPLEPH produce identical results.
 
         SEFLG_MOSEPH uses the same Skyfield Delta T model and returns the
-        default Delta T value (Moshier mode only affects position calculations,
+        default Delta T value (this flag only affects position calculations,
         not time conversions).
 
         If a user-defined Delta T has been set via set_delta_t_userdef(),
@@ -285,7 +285,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
 
     ts = get_timescale()
     t = ts.ut1_jd(tjd)
-    # Skyfield returns delta_t in seconds, convert to days for Swiss Ephemeris API compatibility
+    # Skyfield returns delta_t in seconds, convert to days for reference API compatibility
     delta_t_seconds = float(t.delta_t)
     delta_t = delta_t_seconds / 86400.0
 
@@ -567,7 +567,7 @@ def day_of_week(jd: float) -> int:
     Calculate the day of the week for a given Julian Day number.
 
     Uses the formula: floor(jd + 0.5) % 7 to get 0=Monday convention.
-    This matches pyswisseph's day_of_week function.
+    This matches the reference day_of_week function.
 
     Args:
         jd: Julian Day number
@@ -933,7 +933,7 @@ def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
 
     This is the sidereal time at Greenwich (longitude 0°) and is the base
     for calculating local sidereal time at any other longitude. Compatible
-    with Swiss Ephemeris swe_sidtime0().
+    with swe_sidtime0().
 
     The calculation uses the IAU formula for Greenwich Mean Sidereal Time (GMST)
     and applies the equation of equinoxes to get Greenwich Apparent Sidereal

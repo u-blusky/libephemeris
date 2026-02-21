@@ -43,9 +43,9 @@ from .planets import swe_calc_ut, swe_calc
 STATION_SPEED_THRESHOLD = 0.001  # degrees/day
 
 # Newton-Raphson convergence constants
-# 0.1 arcsecond tolerance for pyswisseph compatibility
+# 0.1 arcsecond tolerance for reference API compatibility
 NR_TOLERANCE = 0.1 / 3600.0  # 0.1 arcsecond in degrees
-# Tighter tolerance for Sun: pyswisseph achieves < 0.001 arcsec (sub-milliarcsecond)
+# Tighter tolerance for Sun: achieves < 0.001 arcsec (sub-milliarcsecond)
 NR_TOLERANCE_SUN = 0.001 / 3600.0  # 0.001 arcsecond in degrees
 # Moon tolerance: 0.05 arcsecond - sub-arcsecond precision with fast convergence
 # due to Moon's high speed (~13°/day). Tighter than generic planets.
@@ -786,7 +786,7 @@ def swe_mooncross_node_ut(
         if abs(lat) < NR_TOLERANCE_MOON:
             # Make sure we found a crossing that's actually in the future
             if jd > jd_ut + 0.001:  # At least ~1.4 minutes in future
-                # Return tuple (jd_cross, xlon, xlat) matching pyswisseph API
+                # Return tuple (jd_cross, xlon, xlat) matching reference API
                 return (jd, pos[0], lat)
             # If we found a crossing too close to start, look for next one
             jd = jd + HALF_NODAL_MONTH / 2
@@ -896,7 +896,7 @@ def swe_mooncross_node(
         # Check convergence (< 0.05 arcsecond for Moon)
         if abs(lat) < NR_TOLERANCE_MOON:
             if jd > jd_tt + 0.001:
-                # Return tuple (jd_cross, xlon, xlat) matching pyswisseph API
+                # Return tuple (jd_cross, xlon, xlat) matching reference API
                 return (jd, pos[0], lat)
             jd = jd + HALF_NODAL_MONTH / 2
             continue

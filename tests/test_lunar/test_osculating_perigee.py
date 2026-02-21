@@ -4,9 +4,9 @@ Tests for the osculating lunar perigee calculation.
 The osculating perigee is computed directly from the eccentricity vector,
 which naturally points toward perigee. This is different from the approach
 of computing apogee and adding 180 degrees, which is incorrect because
-according to Swiss Ephemeris documentation, apogee and perigee are NOT
-exactly opposite - they can deviate by up to 28 degrees depending on
-Sun-Moon geometry.
+apogee and perigee are NOT exactly opposite — they can deviate by up to
+28 degrees depending on Sun-Moon geometry (Chapront-Touzé & Chapront 1988;
+Meeus, Astronomical Algorithms ch. 47).
 
 These tests verify:
 1. Basic functionality of calc_osculating_perigee
@@ -71,8 +71,9 @@ class TestOsculatingPerigeeVsApogee:
     def test_perigee_approximately_opposite_apogee(self):
         """Perigee should be approximately 180 degrees from apogee.
 
-        According to Swiss Ephemeris docs, they are not exactly opposite
-        but should be roughly so when the Sun is in certain configurations.
+        According to established lunar mechanics (Chapront-Touzé & Chapront
+        1988), they are not exactly opposite but should be roughly so when
+        the Sun is in certain configurations.
         """
         jd = 2451545.0  # J2000.0
 
@@ -85,7 +86,7 @@ class TestOsculatingPerigeeVsApogee:
             diff = 360 - diff
 
         # Should be approximately 180 degrees (within 30 degrees)
-        # The 28-degree deviation mentioned in Swiss Ephemeris docs
+        # The up-to-28-degree deviation is a physical property of the Moon's orbit
         assert abs(diff - 180) < 30.0, (
             f"Apogee-perigee angular distance: {diff:.2f}°, "
             f"deviation from 180°: {abs(diff - 180):.2f}°"
@@ -96,8 +97,8 @@ class TestOsculatingPerigeeVsApogee:
 
         In a two-body problem, the eccentricity vector points toward perigee
         and apogee is exactly 180° opposite. This is by mathematical definition.
-        The deviation mentioned in Swiss Ephemeris docs applies to their
-        perturbation-corrected values, not pure osculating elements.
+        The deviation from 180° in perturbation-corrected values (vs pure osculating
+        elements) applies to the interpolated apsides, not the raw osculating values.
         """
         jd = 2451545.0
 
@@ -187,10 +188,10 @@ class TestInterpolatedPerigeeDeviation:
     def test_interpolated_deviation_varies_with_date(self):
         """The interpolated perigee should NOT be exactly opposite interpolated apogee.
 
-        According to Swiss Ephemeris docs, the interpolated apogee and perigee
-        have different oscillation amplitudes (5° vs 25°). When we interpolate
-        (smooth) these different oscillations, the resulting values differ by
-        more than 180°.
+        According to established lunar orbital mechanics (Chapront-Touzé &
+        Chapront 1988), the interpolated apogee and perigee have different
+        oscillation amplitudes (5° vs 25°). When we interpolate (smooth) these
+        different oscillations, the resulting values differ by more than 180°.
 
         This is the key improvement: even though osculating values are exactly
         opposite, the interpolation process produces different results because
@@ -229,11 +230,11 @@ class TestInterpolatedPerigeeDeviation:
         print(f"  Max: {max_dev:.2f}°")
         print(f"  Avg: {avg_dev:.2f}°")
 
-    def test_interpolated_perigee_closer_to_swiss_than_apogee_plus_180(self):
-        """Verify our interpolated perigee is closer to Swiss Ephemeris than apogee + 180.
+    def test_interpolated_perigee_closer_to_pyswisseph_than_apogee_plus_180(self):
+        """Verify our interpolated perigee is closer to pyswisseph than apogee + 180.
 
         This test confirms the fix works: computing perigee independently and
-        interpolating it should give better agreement with Swiss Ephemeris
+        interpolating it should give better agreement with pyswisseph
         than simply adding 180° to the interpolated apogee.
         """
         try:
@@ -243,7 +244,7 @@ class TestInterpolatedPerigeeDeviation:
 
         jd = 2451545.0
 
-        # Swiss Ephemeris interpolated perigee
+        # pyswisseph (via pyswisseph) interpolated perigee
         swe_perg, _ = swe.calc_ut(jd, swe.INTP_PERG, 0)
         swe_perg_lon = swe_perg[0]
 
@@ -267,7 +268,7 @@ class TestInterpolatedPerigeeDeviation:
         print(f"  Direct (independent) computation: {direct_error:.2f}°")
         print(f"  Derived (apogee + 180): {derived_error:.2f}°")
 
-        # Our direct computation should be closer to Swiss Ephemeris
+        # Our direct computation should be closer to pyswisseph
         assert direct_error < derived_error, (
             f"Direct perigee error ({direct_error:.2f}°) should be less than "
             f"derived error ({derived_error:.2f}°)"

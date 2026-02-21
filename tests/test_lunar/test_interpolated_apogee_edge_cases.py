@@ -368,8 +368,9 @@ class TestInterpolatedApogeeConsistency:
 
         Note: With the analytical ELP2000-82B implementation for apogee and the
         polynomial regression for perigee, there can be larger differences since
-        they use different computational approaches. Swiss Ephemeris notes that
-        apogee and perigee are NOT exactly opposite (can differ by up to ~28°).
+        they use different computational approaches. As established in lunar mechanics
+        literature (Chapront-Touzé & Chapront 1988), apogee and perigee are NOT
+        exactly opposite (can differ by up to ~28°).
         """
         min_jd, _ = lunar._get_ephemeris_range()
         jd_near_start = min_jd + 15.0
@@ -386,7 +387,7 @@ class TestInterpolatedApogeeConsistency:
         # The tolerance is larger because:
         # 1. Apogee uses fitted ELP2000-82B perturbations with 2D-2M' dominant term
         # 2. Perigee uses independent fitted perturbations
-        # 3. Swiss Ephemeris documentation notes up to 28° deviation is physical
+        # 3. Up to 28° deviation is a known physical property of the Moon's orbit
         assert abs(diff - 180) < 28.0, (
             f"Apogee ({apogee_lon}) and perigee ({perigee_lon}) "
             f"differ by {diff} degrees (expected ~180)"

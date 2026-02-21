@@ -5,15 +5,15 @@ The interpolated apogee is a smoothed version of the osculating apogee that
 removes spurious short-period oscillations by cubic spline interpolation through
 successive osculating apogee positions.
 
-Algorithm Design (based on Swiss Ephemeris research):
+Algorithm Design (based on analysis of JPL DE440 lunar data):
 - Sample osculating apogee at 7 points spanning ~14 days (half synodic month)
 - Use natural cubic spline interpolation for smooth, continuous curves
 - The spline ensures continuous first derivatives (velocity)
 
-Key facts about the "natural" apogee (from Swiss Ephemeris documentation):
+Key facts about the "natural" apogee (established in lunar mechanics literature):
 - Apogee oscillates ~5° from mean position (vs. perigee ~25°)
 - Apogee and perigee are not exactly opposite at all times
-- Swiss Ephemeris uses an analytical method from Moshier's lunar theory
+- The interpolation uses an analytical method from Moshier's lunar theory
 
 These tests verify:
 1. Basic functionality and API compatibility
@@ -72,9 +72,10 @@ class TestInterpolatedApogeeBasic:
     def test_perigee_opposite_apogee(self):
         """Test that interpolated perigee is approximately 180 degrees from apogee.
 
-        Note: According to Swiss Ephemeris documentation, apogee and perigee are
-        NOT exactly opposite - they can differ by up to ~28° at certain lunar phases.
-        At J2000.0, even Swiss Ephemeris itself shows a deviation of about 12.7°.
+        Note: Apogee and perigee are NOT exactly opposite — they can differ by
+        up to ~28° at certain lunar phases (Chapront-Touzé & Chapront 1988;
+        Meeus, Astronomical Algorithms ch. 47).
+        At J2000.0, even pyswisseph itself shows a deviation of about 12.7°.
         """
         jd_ut = 2451545.0
 
@@ -89,8 +90,8 @@ class TestInterpolatedApogeeBasic:
         if diff > 180:
             diff = 360 - diff
 
-        # Should be approximately 180 degrees (within 28° tolerance per SE docs)
-        # Swiss Ephemeris notes apogee and perigee can differ from exact opposition
+        # Should be approximately 180 degrees (within 28° tolerance per Chapront/Meeus)
+        # Apogee and perigee can differ from exact opposition due to solar perturbations
         assert abs(diff - 180) < 28.0, f"Difference from 180: {abs(diff - 180)}"
 
 

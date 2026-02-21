@@ -26,7 +26,7 @@ Algorithm:
 References:
     - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
     - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
-    - Swiss Ephemeris documentation
+    - Reference documentation
 """
 
 from __future__ import annotations
@@ -743,7 +743,7 @@ def _calculate_eclipse_phases_besselian(
     calculating exact contact times based on when the penumbral and umbral
     shadow boundaries cross Earth's limb.
 
-    Phase indices (matching pyswisseph tret array):
+    Phase indices (matching reference API tret array):
         [0]: Time of maximum eclipse (tret[0])
         [1]: Time of first contact - eclipse begins (tret[1])
         [2]: Time of second contact - total/annular begins, if central (tret[2])
@@ -760,7 +760,7 @@ def _calculate_eclipse_phases_besselian(
         eclipse_type: Eclipse type flags
 
     Returns:
-        Tuple of 10 floats with phase times (JD UT), matching pyswisseph format
+        Tuple of 10 floats with phase times (JD UT), matching reference API format
     """
     is_central = bool(eclipse_type & SE_ECL_CENTRAL)
     is_total = bool(eclipse_type & SE_ECL_TOTAL)
@@ -961,7 +961,7 @@ def _calculate_eclipse_phases(
 
     Uses Besselian elements for high-precision timing (< 10 seconds).
 
-    Phase indices (matching pyswisseph tret array):
+    Phase indices (matching reference API tret array):
         [0]: Time of maximum eclipse (tret[0])
         [1]: Time of first contact - eclipse begins (tret[1])
         [2]: Time of second contact - total/annular begins, if central (tret[2])
@@ -978,7 +978,7 @@ def _calculate_eclipse_phases(
         eclipse_type: Eclipse type flags
 
     Returns:
-        Tuple of 10 floats with phase times (JD UT), matching pyswisseph format
+        Tuple of 10 floats with phase times (JD UT), matching reference API format
     """
     # Use the high-precision Besselian element-based calculation
     return _calculate_eclipse_phases_besselian(jd_max, eclipse_type)
@@ -1067,7 +1067,7 @@ def sol_eclipse_max_time(
     References:
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
-        - Swiss Ephemeris documentation on Besselian elements
+        - Reference documentation on Besselian elements
     """
     # Validate that both lat and lon are provided or neither
     if (lat is None) != (lon is None):
@@ -1215,7 +1215,7 @@ def _calc_local_eclipse_max_time(
     return jd_max, min_separation
 
 
-# Alias for Swiss Ephemeris compatibility
+# Alias for reference API compatibility
 swe_sol_eclipse_max_time = sol_eclipse_max_time
 
 
@@ -1245,14 +1245,14 @@ def sol_eclipse_when_glob(
             - SE_ECL_ANNULAR_TOTAL (32): Hybrid eclipse
             - 0: Any eclipse type (default)
         search_direction: Direction to search for eclipses:
-            - "forward": Only search forward from jd_start (like pyswisseph)
+            - "forward": Only search forward from jd_start (per the reference API)
             - "backward": Only search backward from jd_start
             - "bidirectional" (default): Check ±15 days to ensure no eclipse
               is missed, returning the closest eclipse to jd_start that is
               >= jd_start (unless only found in backward direction)
 
     Returns:
-        Tuple containing (matching pyswisseph format):
+        Tuple containing (matching reference API format):
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
             - tret: Tuple of 10 floats with eclipse phase times (JD UT):
                 [0]: Time of maximum eclipse
@@ -1290,7 +1290,7 @@ def sol_eclipse_when_glob(
         >>> print(f"Total eclipse at JD {times[0]:.5f}")
 
     References:
-        - Swiss Ephemeris: swe_sol_eclipse_when_glob()
+        - Reference API: swe_sol_eclipse_when_glob()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     MAX_SEARCH_YEARS = 20  # Maximum search range
@@ -1807,7 +1807,7 @@ def sol_eclipse_when_loc(
         >>> print(f"Magnitude: {attr[0]:.3f}")
 
     References:
-        - Swiss Ephemeris: swe_sol_eclipse_when_loc()
+        - Reference API: swe_sol_eclipse_when_loc()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     MAX_SEARCH_YEARS = 50  # Maximum search range
@@ -1933,7 +1933,7 @@ def swe_sol_eclipse_when_loc(
     """
     Find the next solar eclipse visible from a specific geographic location.
 
-    This function matches the pyswisseph signature exactly. It searches forward
+    This function matches the reference API signature exactly. It searches forward
     (or backward if specified) in time from tjd_start to find the next solar
     eclipse visible from the observer's location specified by geopos.
 
@@ -1941,7 +1941,7 @@ def swe_sol_eclipse_when_loc(
         tjd_start: Julian Day (UT) to start search from
         ifl: Calculation flags (SEFLG_SWIEPH, etc.)
         geopos: Sequence of [longitude_degrees, latitude_degrees, altitude_meters]
-                NOTE: longitude comes first (this matches pyswisseph convention)
+                NOTE: longitude comes first (this matches reference API convention)
         backward: If True, search backward in time instead of forward
 
     Returns:
@@ -1993,7 +1993,7 @@ def swe_sol_eclipse_when_loc(
         >>> print(f"Obscuration: {attr[2]:.3f}")
 
     References:
-        - Swiss Ephemeris: swe_sol_eclipse_when_loc()
+        - Reference API: swe_sol_eclipse_when_loc()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     from typing import Sequence
@@ -2006,7 +2006,7 @@ def swe_sol_eclipse_when_loc(
     if len(geopos) < 3:
         raise ValueError("geopos must be a sequence of [longitude, latitude, altitude]")
 
-    # Extract geographic position (longitude first, then latitude - pyswisseph convention)
+    # Extract geographic position (longitude first, then latitude - reference API convention)
     lon = float(geopos[0])
     lat = float(geopos[1])
     altitude = float(geopos[2])
@@ -2479,7 +2479,7 @@ def swe_sol_eclipse_when_loc(
             ecl_type |= SE_ECL_4TH_VISIBLE
         ecl_type |= SE_ECL_MAX_VISIBLE
 
-        # Prepare tret tuple (7 elements matching pyswisseph)
+        # Prepare tret tuple (7 elements matching reference API)
         tret = (
             jd_local_max,  # [0] Maximum eclipse
             jd_first,  # [1] First contact
@@ -2490,7 +2490,7 @@ def swe_sol_eclipse_when_loc(
             jd_sunset,  # [6] Sunset during eclipse
         )
 
-        # Prepare attr tuple (8 elements matching pyswisseph)
+        # Prepare attr tuple (8 elements matching reference API)
         attr = (
             magnitude,  # [0] Fraction of solar diameter covered
             ratio,  # [1] Ratio of lunar to solar diameter
@@ -2517,7 +2517,7 @@ def sol_eclipse_where(
     """
     Calculate the geographic location where a solar eclipse is central at a given time.
 
-    This is the legacy function signature. For pyswisseph compatibility,
+    This is the legacy function signature. For reference API compatibility,
     use swe_sol_eclipse_where().
 
     Args:
@@ -2549,7 +2549,7 @@ def swe_sol_eclipse_where(
         Tuple containing:
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
                 Returns 0 if no central eclipse at this time
-            - geopos: Tuple of 10 floats with geographic position per pyswisseph:
+            - geopos: Tuple of 10 floats with geographic position per reference API:
                 [0]: Geographic longitude of central line (degrees, East positive)
                 [1]: Geographic latitude of central line (degrees, North positive)
                 [2]: Longitude of northern limit of umbra
@@ -2560,7 +2560,7 @@ def swe_sol_eclipse_where(
                 [7]: Latitude of northern limit of penumbra
                 [8]: Longitude of southern limit of penumbra
                 [9]: Latitude of southern limit of penumbra
-            - attr: Tuple of 20 floats with eclipse attributes per pyswisseph:
+            - attr: Tuple of 20 floats with eclipse attributes per reference API:
                 [0]: Fraction of solar diameter covered by Moon (magnitude)
                 [1]: Ratio of lunar diameter to solar diameter
                 [2]: Fraction of Sun's area obscured (obscuration)
@@ -2590,7 +2590,7 @@ def swe_sol_eclipse_where(
         >>> print(f"Central at lon={geopos[0]:.2f}, lat={geopos[1]:.2f}")
 
     References:
-        - Swiss Ephemeris: swe_sol_eclipse_where()
+        - Reference API: swe_sol_eclipse_where()
         - Meeus "Astronomical Algorithms" Ch. 54
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
     """
@@ -2971,8 +2971,8 @@ def swe_sol_eclipse_where(
             x_bes, y_bes, penumbra_radius, d_bes, mu_bes, north=False
         )
 
-    # Prepare return tuples (pyswisseph format)
-    # geopos: 10 floats per pyswisseph documentation
+    # Prepare return tuples (reference API format)
+    # geopos: 10 floats per reference API documentation
     # [0] longitude central line
     # [1] latitude central line
     # [2] lon northern limit umbra
@@ -2996,7 +2996,7 @@ def swe_sol_eclipse_where(
         penumbra_s_lat,  # [9] lat southern limit penumbra
     )
 
-    # attr: 20 floats per pyswisseph documentation
+    # attr: 20 floats per reference API documentation
     # [0] Fraction of solar diameter covered by Moon (magnitude)
     # [1] Ratio of lunar diameter to solar diameter
     # [2] Fraction of solar disc area obscured (obscuration)
@@ -3042,7 +3042,7 @@ def sol_eclipse_how(
     """
     Calculate the circumstances of a solar eclipse at a specific location and time.
 
-    This is the legacy function signature. For pyswisseph compatibility,
+    This is the legacy function signature. For reference API compatibility,
     use swe_sol_eclipse_how().
 
     Args:
@@ -3081,7 +3081,7 @@ def swe_sol_eclipse_how(
 
     Returns:
         Tuple containing:
-            - attr: Tuple of 20 floats with eclipse attributes per pyswisseph spec:
+            - attr: Tuple of 20 floats with eclipse attributes per reference API spec:
                 [0]: Fraction of solar diameter covered by Moon (magnitude)
                 [1]: Ratio of lunar diameter to solar diameter
                 [2]: Fraction of solar disc area obscured (obscuration)
@@ -3124,7 +3124,7 @@ def swe_sol_eclipse_how(
         >>> print(f"Obscuration: {attr[2]:.3f}")
 
     References:
-        - Swiss Ephemeris: swe_sol_eclipse_how()
+        - Reference API: swe_sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     from skyfield.api import wgs84
@@ -3161,7 +3161,7 @@ def swe_sol_eclipse_how(
         sun_app = observer_at.at(t).observe(sun).apparent()
         moon_app = observer_at.at(t).observe(moon).apparent()
     except Exception:
-        # If calculation fails, return zeros (20 elements per pyswisseph spec)
+        # If calculation fails, return zeros (20 elements per reference API spec)
         return 0, (
             0.0,
             0.0,
@@ -3204,7 +3204,7 @@ def swe_sol_eclipse_how(
     else:
         apparent_alt = sun_altitude
 
-    # If Sun is below horizon, no visible eclipse (20 elements per pyswisseph spec)
+    # If Sun is below horizon, no visible eclipse (20 elements per reference API spec)
     if sun_altitude < -1.0:  # Allow for refraction near horizon
         return 0, (
             0.0,
@@ -3249,7 +3249,7 @@ def swe_sol_eclipse_how(
     # Check if there's any eclipse (disks overlapping)
     sum_radii = sun_angular_radius + moon_angular_radius
     if separation >= sum_radii:
-        # No eclipse - Sun and Moon too far apart (20 elements per pyswisseph spec)
+        # No eclipse - Sun and Moon too far apart (20 elements per reference API spec)
         return 0, (
             0.0,  # [0] magnitude
             ratio,  # [1] ratio
@@ -3368,7 +3368,7 @@ def swe_sol_eclipse_how(
         # Partial eclipse
         eclipse_type |= SE_ECL_PARTIAL
 
-    # Prepare attributes tuple (20 elements matching pyswisseph format)
+    # Prepare attributes tuple (20 elements matching reference API format)
     attr = (
         magnitude,  # [0] Fraction of solar diameter covered
         ratio,  # [1] Ratio of lunar to solar diameter
@@ -3489,7 +3489,7 @@ def swe_sol_eclipse_how_details(
         >>> print(f"Duration of totality: {details['duration_total_minutes']:.1f} min")
 
     References:
-        - Swiss Ephemeris documentation
+        - Reference documentation
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     from skyfield.api import wgs84
@@ -3890,7 +3890,7 @@ def sol_eclipse_how_details(
     """
     Calculate comprehensive solar eclipse circumstances at a specific location.
 
-    This is the legacy function signature. For pyswisseph-style arguments,
+    This is the legacy function signature. For reference API-style arguments,
     use swe_sol_eclipse_how_details().
 
     Args:
@@ -4353,7 +4353,7 @@ def lun_eclipse_when(
             - 0: Any eclipse type (default)
 
     Returns:
-        Tuple containing (matching pyswisseph format):
+        Tuple containing (matching reference API format):
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
             - tret: Tuple of 8 floats with eclipse phase times (JD UT):
                 [0]: Time of maximum eclipse
@@ -4387,7 +4387,7 @@ def lun_eclipse_when(
         >>> print(f"Total lunar eclipse at JD {times[0]:.5f}")
 
     References:
-        - Swiss Ephemeris: swe_lun_eclipse_when()
+        - Reference API: swe_lun_eclipse_when()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     MAX_SEARCH_YEARS = 20  # Maximum search range
@@ -4537,7 +4537,7 @@ def lun_eclipse_when_loc(
         >>> print(f"Moon altitude: {attr[4]:.1f}°")
 
     References:
-        - Swiss Ephemeris: swe_lun_eclipse_when_loc()
+        - Reference API: swe_lun_eclipse_when_loc()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     MAX_SEARCH_YEARS = 50  # Maximum search range
@@ -4731,7 +4731,7 @@ def lun_eclipse_when_loc(
     )
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_lun_eclipse_when_loc = lun_eclipse_when_loc
 
 
@@ -4802,7 +4802,7 @@ def lun_eclipse_how(
         >>> print(f"Moon altitude: {attr[4]:.1f}°")
 
     References:
-        - Swiss Ephemeris: swe_lun_eclipse_how()
+        - Reference API: swe_lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     from skyfield.api import wgs84
@@ -4910,7 +4910,7 @@ def swe_lun_eclipse_how(
     """
     Calculate detailed circumstances of a lunar eclipse from a specific location.
 
-    This function matches the pyswisseph signature exactly. It calculates
+    This function matches the reference API signature exactly. It calculates
     the eclipse circumstances at a specific Julian Day and geographic location,
     including magnitudes, Moon position, and visibility flags.
 
@@ -4962,7 +4962,7 @@ def swe_lun_eclipse_how(
         7. Set visibility flags if Moon is above horizon
 
     Precision:
-        Eclipse magnitude accurate to ~0.01 compared to pyswisseph.
+        Eclipse magnitude accurate to ~0.01 compared to reference implementation.
         Moon altitude accurate to within ~1 degree.
 
     Example:
@@ -4975,7 +4975,7 @@ def swe_lun_eclipse_how(
         >>> print(f"Moon altitude: {attr[5]:.1f}°")
 
     References:
-        - Swiss Ephemeris: swe_lun_eclipse_how()
+        - Reference API: swe_lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     from skyfield.api import wgs84
@@ -5104,7 +5104,7 @@ def swe_lun_eclipse_how(
         if current_phase_type:
             eclipse_type |= SE_ECL_MAX_VISIBLE
 
-    # Prepare attributes tuple (11 elements matching pyswisseph format)
+    # Prepare attributes tuple (11 elements matching reference API format)
     attr = (
         max(0.0, umbral_mag),  # [0] Umbral magnitude
         max(0.0, penumbral_mag),  # [1] Penumbral magnitude
@@ -5137,7 +5137,7 @@ def lun_occult_when_glob(
     a planet or star as seen from Earth. This function searches forward
     (or backward) in time to find the next such event globally (somewhere on Earth).
 
-    This function matches the pyswisseph swe_lun_occult_when_glob() API exactly.
+    This function matches the reference swe_lun_occult_when_glob() API exactly.
 
     Args:
         tjdut: Julian Day (UT) to start search from
@@ -5196,7 +5196,7 @@ def lun_occult_when_glob(
         >>> print(f"Venus occultation at JD {tret[0]:.5f}")
 
     References:
-        - Swiss Ephemeris: swe_lun_occult_when_glob()
+        - Reference API: swe_lun_occult_when_glob()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
     from .state import get_planets, get_timescale
@@ -5564,7 +5564,7 @@ def lun_occult_when_glob(
                 if is_grazing:
                     ecl_type |= SE_ECL_GRAZING
 
-                # Build tret tuple with pyswisseph indices (10 elements):
+                # Build tret tuple with reference API indices (10 elements):
                 # [0]: time of maximum occultation
                 # [1]: time when occultation takes place at local apparent noon
                 # [2]: time of occultation begin
@@ -5620,7 +5620,7 @@ def lun_occult_when_glob(
     )
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_lun_occult_when_glob = lun_occult_when_glob
 
 
@@ -5643,7 +5643,7 @@ def lun_occult_when_loc(
     specific geographic location, where both the Moon and the target are
     above the horizon.
 
-    This function matches the pyswisseph swe_lun_occult_when_loc() API exactly.
+    This function matches the reference swe_lun_occult_when_loc() API exactly.
 
     Args:
         tjdut: Julian Day (UT) to start search from
@@ -5712,7 +5712,7 @@ def lun_occult_when_loc(
         >>> print(f"Moon altitude: {attr[5]:.1f}°")
 
     References:
-        - Swiss Ephemeris: swe_lun_occult_when_loc()
+        - Reference API: swe_lun_occult_when_loc()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
     from skyfield.api import wgs84
@@ -5858,7 +5858,7 @@ def lun_occult_when_loc(
                 f"within {MAX_SEARCH_YEARS} years of JD {jd_start}"
             )
 
-        # Extract times using pyswisseph indices:
+        # Extract times using reference API indices:
         # [0]: time of maximum, [2]: occultation begin, [3]: occultation end
         # [4]: totality begin, [5]: totality end
         jd_max = global_times[0]
@@ -6141,7 +6141,7 @@ def lun_occult_when_loc(
             0.0,  # [9] Reserved
         )
 
-        # Prepare attributes tuple (20 elements, pyswisseph compatible)
+        # Prepare attributes tuple (20 elements, reference API compatible)
         # Calculate ratio of diameters
         diameter_ratio = moon_diameter / target_diameter if target_diameter > 0 else 0.0
 
@@ -6187,7 +6187,7 @@ def swe_lun_occult_when_loc(
     """
     Find the next lunar occultation visible from a specific location.
 
-    This function matches the pyswisseph swe_lun_occult_when_loc() API exactly.
+    This function matches the reference swe_lun_occult_when_loc() API exactly.
 
     A lunar occultation occurs when the Moon passes in front of (occults)
     a planet or star as seen from Earth. This function searches forward
@@ -6200,7 +6200,7 @@ def swe_lun_occult_when_loc(
             For planets: SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN, etc.
             For stars: e.g., "Regulus", "Spica", "Aldebaran"
         geopos: Sequence of [longitude_degrees, latitude_degrees, altitude_meters]
-                NOTE: longitude comes first (this matches pyswisseph convention)
+                NOTE: longitude comes first (this matches reference API convention)
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward
 
@@ -6249,7 +6249,7 @@ def swe_lun_occult_when_loc(
         >>> print(f"Moon altitude: {attr[5]:.1f}°")
 
     References:
-        - Swiss Ephemeris: swe_lun_occult_when_loc()
+        - Reference API: swe_lun_occult_when_loc()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
     from typing import Sequence
@@ -6258,7 +6258,7 @@ def swe_lun_occult_when_loc(
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
 
-    # Extract geographic position (pyswisseph uses lon, lat, alt order)
+    # Extract geographic position (reference API uses lon, lat, alt order)
     lon = geopos[0]
     lat = geopos[1]
     altitude = geopos[2]
@@ -6276,7 +6276,7 @@ def swe_lun_occult_when_loc(
         tjdut, planet, star_name, lat, lon, altitude, flags, backwards
     )
 
-    # Return in pyswisseph order: (retflags, tret, attr)
+    # Return in reference API order: (retflags, tret, attr)
     return ecl_type, times, attr
 
 
@@ -6293,7 +6293,7 @@ def lun_occult_where(
     coordinates of the central line (where the occultation is most central)
     and attributes about the occultation geometry.
 
-    This function matches the pyswisseph swe_lun_occult_where() API exactly.
+    This function matches the reference swe_lun_occult_where() API exactly.
 
     Args:
         tjdut: Julian Day (UT) of the moment to calculate
@@ -6343,7 +6343,7 @@ def lun_occult_where(
         5. Calculate attributes at the central line location
 
     Example:
-        >>> # Find where Regulus occultation is visible (pyswisseph style)
+        >>> # Find where Regulus occultation is visible (reference API style)
         >>> from libephemeris import julday, lun_occult_where
         >>> jd = julday(2017, 6, 28, 10.0)  # During a known occultation
         >>> retflag, geopos, attr = lun_occult_where(jd, "Regulus")
@@ -6353,7 +6353,7 @@ def lun_occult_where(
         >>> retflag, geopos, attr = lun_occult_where(jd, SE_VENUS)
 
     References:
-        - Swiss Ephemeris: swe_lun_occult_where()
+        - Reference API: swe_lun_occult_where()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
     from skyfield.api import wgs84
@@ -6737,7 +6737,7 @@ def lun_occult_where(
     return eclipse_type, geopos, attr
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_lun_occult_where = lun_occult_where
 
 
@@ -6819,7 +6819,7 @@ def rise_trans(
         >>> print(f"Sunrise at JD {jd_rise:.5f}")
 
     References:
-        - Swiss Ephemeris: swe_rise_trans()
+        - Reference API: swe_rise_trans()
         - Meeus "Astronomical Algorithms" Ch. 15 (Rise, Set, Transit)
     """
     from skyfield.api import wgs84
@@ -6882,10 +6882,11 @@ def rise_trans(
         horizon_alt = 0.0
         use_refraction = not (rsmi & SE_BIT_NO_REFRACTION)
 
-    # Calculate horizon refraction matching Swiss Ephemeris standard
-    # SE uses 34 arcminutes (0.5667°) as the standard horizon refraction
-    # This is the conventional value for sunrise/sunset calculations
-    # (Bennett formula gives ~29' but SE uses the traditional 34')
+    # Calculate horizon refraction per reference API standard
+    # Standard horizon refraction is 34 arcminutes (0.5667°), the conventional
+    # value used in sunrise/sunset calculations (IAU/Meeus convention).
+    # The Bennett (1982) formula gives ~29' but the traditional 34' is retained
+    # for API compatibility with established ephemeris software.
     if use_refraction:
         # Standard horizon refraction: 34 arcminutes = 0.5667 degrees
         # Apply pressure and temperature correction (standard: 1010 mbar, 10°C = 283K)
@@ -6898,7 +6899,7 @@ def rise_trans(
         refraction = 0.0
 
     # Calculate semi-diameter dynamically based on body distance
-    # Swiss Ephemeris calculates actual angular size at observation time
+    # Calculate actual angular size at observation time
     # We need to compute this at an initial estimate time
     def _get_semi_diameter(jd: float, body: int) -> float:
         """Calculate semi-diameter of Sun or Moon at given JD in degrees."""
@@ -7163,7 +7164,7 @@ def _calculate_rise_set(
     assert jd_cross_end is not None
 
     # Bisection to narrow down the crossing
-    # Swiss Ephemeris uses tighter tolerance for better precision
+    # Use tighter tolerance for better precision
     # 0.0001° ≈ 0.36 arcsec ≈ 0.02 seconds of time
     for _ in range(50):  # More iterations for tighter convergence
         jd_mid = (jd_cross_start + jd_cross_end) / 2
@@ -7188,7 +7189,7 @@ def _calculate_rise_set(
     return (jd_cross_start + jd_cross_end) / 2, rsmi & 0x0F
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_rise_trans = rise_trans
 
 
@@ -7272,7 +7273,7 @@ def rise_trans_true_hor(
         >>> print(f"Sunrise at JD {jd_rise:.5f}")
 
     References:
-        - Swiss Ephemeris: swe_rise_trans_true_hor()
+        - Reference API: swe_rise_trans_true_hor()
         - Meeus "Astronomical Algorithms" Ch. 15 (Rise, Set, Transit)
     """
     from skyfield.api import wgs84
@@ -7402,7 +7403,7 @@ def rise_trans_true_hor(
     )
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_rise_trans_true_hor = rise_trans_true_hor
 
 
@@ -7487,7 +7488,7 @@ def heliacal_ut(
         >>> print(f"Heliacal rising at JD {jd_event:.5f}")
 
     References:
-        - Swiss Ephemeris: swe_heliacal_ut()
+        - Reference API: swe_heliacal_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
         - Ptolemy's criteria for heliacal visibility
     """
@@ -7889,7 +7890,7 @@ def heliacal_ut(
         return 0.0, -1  # Not found
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_heliacal_ut = heliacal_ut
 
 
@@ -7972,7 +7973,7 @@ def heliacal_pheno_ut(
         >>> print(f"Object altitude: {dret[0]:.2f}°, Sun altitude: {dret[4]:.2f}°")
 
     References:
-        - Swiss Ephemeris: swe_heliacal_pheno_ut()
+        - Reference API: swe_heliacal_pheno_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
     """
     import math
@@ -8279,7 +8280,7 @@ def heliacal_pheno_ut(
     return tuple(dret), flags
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_heliacal_pheno_ut = heliacal_pheno_ut
 
 
@@ -8385,7 +8386,7 @@ def vis_limit_mag(
         ...     print("Venus is not visible")
 
     References:
-        - Swiss Ephemeris: swe_vis_limit_mag()
+        - Reference API: swe_vis_limit_mag()
         - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
         - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
     """
@@ -8711,7 +8712,7 @@ def vis_limit_mag(
     return vision_type, dret
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_vis_limit_mag = vis_limit_mag
 
 
@@ -11918,7 +11919,7 @@ def calc_eclipse_path_width(
     return max(0.0, path_width_km)
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_calc_eclipse_path_width = calc_eclipse_path_width
 
 
@@ -12319,7 +12320,7 @@ def calc_eclipse_central_line(
     return tuple(times_list), tuple(latitudes_list), tuple(longitudes_list)
 
 
-# Alias for Swiss Ephemeris API naming convention
+# Alias for reference API naming convention
 swe_calc_eclipse_central_line = calc_eclipse_central_line
 
 
@@ -12511,7 +12512,7 @@ def calc_eclipse_northern_limit(
     return tuple(times_list), tuple(latitudes_list), tuple(longitudes_list)
 
 
-# Alias for Swiss Ephemeris API naming convention
+# Alias for reference API naming convention
 swe_calc_eclipse_northern_limit = calc_eclipse_northern_limit
 
 
@@ -12705,7 +12706,7 @@ def calc_eclipse_southern_limit(
     return tuple(times_list), tuple(latitudes_list), tuple(longitudes_list)
 
 
-# Alias for Swiss Ephemeris API naming convention
+# Alias for reference API naming convention
 swe_calc_eclipse_southern_limit = calc_eclipse_southern_limit
 
 
@@ -12771,7 +12772,7 @@ def sol_eclipse_magnitude_at_loc(
 
     References:
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Swiss Ephemeris documentation
+        - Reference documentation
     """
     from skyfield.api import wgs84
     from .state import get_planets, get_timescale
@@ -12851,7 +12852,7 @@ def swe_sol_eclipse_magnitude_at_loc(
     """
     Calculate the eclipse magnitude at a specific geographic location and time.
 
-    This function matches the pyswisseph naming convention. It is a convenience
+    This function matches the reference API naming convention. It is a convenience
     wrapper that returns just the eclipse magnitude (fraction of solar diameter
     covered by the Moon) without the full attribute array.
 
@@ -12881,14 +12882,14 @@ def swe_sol_eclipse_magnitude_at_loc(
         >>> print(f"Magnitude: {magnitude:.4f}")
 
     References:
-        - Swiss Ephemeris: swe_sol_eclipse_how()
+        - Reference API: swe_sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     # Validate geopos
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
 
-    # Extract geographic position (longitude first, then latitude - pyswisseph convention)
+    # Extract geographic position (longitude first, then latitude - reference API convention)
     lon = float(geopos[0])
     lat = float(geopos[1])
     altitude = float(geopos[2])
@@ -12968,7 +12969,7 @@ def sol_eclipse_obscuration_at_loc(
 
     References:
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Swiss Ephemeris documentation
+        - Reference documentation
         - Intersection of two circles formula (computational geometry)
     """
     from skyfield.api import wgs84
@@ -13082,7 +13083,7 @@ def swe_sol_eclipse_obscuration_at_loc(
     """
     Calculate the eclipse obscuration at a specific geographic location and time.
 
-    This function matches the pyswisseph naming convention. It is a convenience
+    This function matches the reference API naming convention. It is a convenience
     wrapper that returns just the eclipse obscuration (fraction of solar disc
     area covered by the Moon) without the full attribute array.
 
@@ -13116,14 +13117,14 @@ def swe_sol_eclipse_obscuration_at_loc(
         >>> print(f"Obscuration: {obs:.4f}")
 
     References:
-        - Swiss Ephemeris: swe_sol_eclipse_how()
+        - Reference API: swe_sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     # Validate geopos
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
 
-    # Extract geographic position (lon first, lat second - pyswisseph convention)
+    # Extract geographic position (lon first, lat second - reference API convention)
     lon = float(geopos[0])
     lat = float(geopos[1])
     altitude = float(geopos[2])
@@ -13193,7 +13194,7 @@ def lun_eclipse_umbral_magnitude(
 
     References:
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Swiss Ephemeris documentation
+        - Reference documentation
     """
     # Use the existing calculation function
     (
@@ -13216,7 +13217,7 @@ def swe_lun_eclipse_umbral_magnitude(
     """
     Calculate the umbral magnitude for a lunar eclipse at a specific time.
 
-    This function matches the pyswisseph naming convention. It is a convenience
+    This function matches the reference API naming convention. It is a convenience
     function that returns just the umbral magnitude (fraction of Moon's diameter
     within Earth's umbral shadow).
 
@@ -13242,7 +13243,7 @@ def swe_lun_eclipse_umbral_magnitude(
         >>> print(f"Umbral magnitude: {umbral_mag:.4f}")
 
     References:
-        - Swiss Ephemeris: swe_lun_eclipse_how()
+        - Reference API: swe_lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     return lun_eclipse_umbral_magnitude(tjd_ut, ifl)
@@ -13311,7 +13312,7 @@ def lun_eclipse_penumbral_magnitude(
 
     References:
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Swiss Ephemeris documentation
+        - Reference documentation
     """
     # Use the existing calculation function
     (
@@ -13334,7 +13335,7 @@ def swe_lun_eclipse_penumbral_magnitude(
     """
     Calculate the penumbral magnitude for a lunar eclipse at a specific time.
 
-    This function matches the pyswisseph naming convention. It is a convenience
+    This function matches the reference API naming convention. It is a convenience
     function that returns just the penumbral magnitude (fraction of Moon's diameter
     within Earth's penumbral shadow).
 
@@ -13360,7 +13361,7 @@ def swe_lun_eclipse_penumbral_magnitude(
         >>> print(f"Penumbral magnitude: {penumbral_mag:.4f}")
 
     References:
-        - Swiss Ephemeris: swe_lun_eclipse_how()
+        - Reference API: swe_lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     return lun_eclipse_penumbral_magnitude(tjd_ut, ifl)
@@ -13435,7 +13436,7 @@ def lun_eclipse_gamma(
     References:
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
-        - Swiss Ephemeris documentation
+        - Reference documentation
     """
     # Use the existing calculation function
     (
@@ -13457,7 +13458,7 @@ def swe_lun_eclipse_gamma(
     """
     Calculate the gamma parameter for a lunar eclipse at a specific time.
 
-    This function matches the pyswisseph naming convention. Gamma represents
+    This function matches the reference API naming convention. Gamma represents
     the distance of the Moon's center from Earth's shadow axis, measured in
     Earth radii.
 
@@ -13484,7 +13485,7 @@ def swe_lun_eclipse_gamma(
         >>> print(f"Gamma: {gamma:.4f}")
 
     References:
-        - Swiss Ephemeris: swe_lun_eclipse_how()
+        - Reference API: swe_lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     return lun_eclipse_gamma(tjd_ut, ifl)
@@ -13890,7 +13891,7 @@ def planet_occult_when_glob(
     )
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_planet_occult_when_glob = planet_occult_when_glob
 
 
@@ -14226,5 +14227,5 @@ def planet_occult_when_loc(
     )
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_planet_occult_when_loc = planet_occult_when_loc

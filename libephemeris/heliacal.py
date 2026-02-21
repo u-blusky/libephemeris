@@ -19,7 +19,7 @@ Historical Note:
     positions without modern instruments.
 
 References:
-    - Swiss Ephemeris documentation section 5.1
+    - Reference documentation
     - Schoch "Planets in Mesopotamian Astral Science"
     - Ptolemy's criteria for heliacal visibility
     - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
@@ -48,11 +48,10 @@ INNER_PLANETS = {SE_MERCURY, SE_VENUS}
 # SCHAEFER (1990) ATMOSPHERIC MODEL
 # =============================================================================
 #
-# Complete implementation of Schaefer's visibility model as used by
-# Swiss Ephemeris. Based on:
+# Complete implementation of Schaefer's visibility model. Based on:
 #   - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
 #   - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
-#   - Swiss Ephemeris swehel.c implementation
+#   - Reference implementation
 #
 # The model calculates:
 #   1. Atmospheric extinction (Rayleigh + Aerosol + Ozone)
@@ -66,7 +65,7 @@ class SchaeferConstants:
     """
     Constants for the Schaefer atmospheric model.
 
-    Based on Schaefer (1990) and Swiss Ephemeris implementation.
+    Based on Schaefer (1990).
     """
 
     # Rayleigh scattering coefficient at sea level (per airmass)
@@ -103,7 +102,7 @@ class SchaeferConstants:
     PERFECT_SKY_LIM_MAG = 6.5
 
     # Ptolemaic arcus visionis thresholds (degrees)
-    # Based on ancient observations and SE implementation
+    # Based on ancient observations and reference implementation
     ARCUS_VISIONIS = {
         "venus": 5.0,
         "mercury": 10.0,
@@ -156,7 +155,7 @@ class SchaeferModel:
     - Limiting visual magnitude
     - Visibility thresholds
 
-    The implementation follows the Swiss Ephemeris (swehel.c) closely
+    The implementation follows the reference approach closely
     to ensure compatibility for heliacal event calculations.
     """
 
@@ -290,7 +289,7 @@ class SchaeferModel:
         """
         Calculate sky brightness contribution from twilight.
 
-        Based on Schaefer (1990) and SE implementation.
+        Based on Schaefer (1990) and reference implementation.
         Returns log brightness in relative units.
 
         Args:
@@ -538,7 +537,7 @@ class SchaeferModel:
         """
         Determine if a celestial body is visible.
 
-        Based on Schaefer (1990) and SE visibility criteria.
+        Based on Schaefer (1990) and reference visibility criteria.
 
         Args:
             body_alt: Body altitude in degrees
@@ -796,7 +795,7 @@ def heliacal_ut(
         >>> print(f"Heliacal rising at JD {jd_event:.5f}")
 
     References:
-        - Swiss Ephemeris: swe_heliacal_ut()
+        - Reference API: swe_heliacal_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
         - Ptolemy's criteria for heliacal visibility
     """
@@ -1336,7 +1335,7 @@ def swe_heliacal_ut(
     """
     Calculate heliacal rising or setting time for a celestial body.
 
-    This function implements the Swiss Ephemeris swe_heliacal_ut() API,
+    This function implements the swe_heliacal_ut() API,
     finding the Julian day of the next heliacal phenomenon after a given
     start date. It works between geographic latitudes 60S - 60N.
 
@@ -1445,7 +1444,7 @@ def swe_heliacal_ut(
         - vis_limit_mag: Calculate limiting visual magnitude
 
     References:
-        - Swiss Ephemeris documentation section 8.17
+        - Reference documentation
         - Schoch "Planets in Mesopotamian Astral Science"
         - Ptolemy's criteria for heliacal visibility
     """
@@ -1474,7 +1473,7 @@ def swe_heliacal_ut(
     lat = geopos[1] if len(geopos) > 1 else 0.0
     altitude = geopos[2] if len(geopos) > 2 else 0.0
 
-    # Parse datm with defaults per Swiss Ephemeris documentation
+    # Parse datm with defaults per reference documentation
     pressure = datm[0] if len(datm) > 0 and datm[0] > 0 else 1013.25
     temperature = datm[1] if len(datm) > 1 else 15.0
     humidity_pct = datm[2] if len(datm) > 2 else 40.0
@@ -1500,7 +1499,7 @@ def swe_heliacal_ut(
         flags=hel_flag,
     )
 
-    # Build the result array (50 elements as per Swiss Ephemeris)
+    # Build the result array (50 elements as per reference API)
     dret = [0.0] * 50
 
     if jd_event > 0:
@@ -1680,7 +1679,7 @@ def heliacal_pheno_ut(
         >>> print(f"Object altitude: {dret[0]:.2f}, Sun altitude: {dret[4]:.2f}")
 
     References:
-        - Swiss Ephemeris: swe_heliacal_pheno_ut()
+        - Reference API: swe_heliacal_pheno_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
     """
     from .constants import (
@@ -2036,7 +2035,7 @@ def heliacal_pheno_ut(
     return tuple(dret), flags
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_heliacal_pheno_ut = heliacal_pheno_ut
 
 
@@ -2137,7 +2136,7 @@ def vis_limit_mag(
         ...     print("Venus is not visible")
 
     References:
-        - Swiss Ephemeris: swe_vis_limit_mag()
+        - Reference API: swe_vis_limit_mag()
         - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
         - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
     """
@@ -2410,5 +2409,5 @@ def vis_limit_mag(
     return vision_type, dret
 
 
-# Alias for Swiss Ephemeris API compatibility
+# Alias for reference API compatibility
 swe_vis_limit_mag = vis_limit_mag

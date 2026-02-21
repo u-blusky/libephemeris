@@ -2,7 +2,7 @@
 Tests for improved ayanamsa precision using IAU 2006 precession model.
 
 This test verifies that the precession rate used in ayanamsa calculations
-matches Swiss Ephemeris closely (using IAU 2006 precession model with
+matches pyswisseph closely (using IAU 2006 precession model with
 quadratic term: 5028.796273"/century linear + 1.105608"/century² quadratic).
 
 The expected precision is <0.01" (arcseconds) at all epochs from 1900-2100.
@@ -19,14 +19,14 @@ from libephemeris.constants import (
 
 
 class TestAyanamsaPrecession:
-    """Test that ayanamsa precession rate matches Swiss Ephemeris."""
+    """Test that ayanamsa precession rate matches pyswisseph."""
 
     # Test epochs (Julian Day)
     JD_J1900 = 2415020.0  # 1900-01-01 12:00 TT
     JD_J2000 = 2451545.0  # 2000-01-01 12:00 TT
     JD_J2100 = 2488070.0  # 2100-01-01 12:00 TT
 
-    # Swiss Ephemeris reference values (computed with pyswisseph)
+    # pyswisseph reference values (computed with pyswisseph)
     # Format: (JD, sid_mode, expected_ayanamsa)
     REFERENCE_VALUES = [
         # Lahiri
@@ -51,7 +51,7 @@ class TestAyanamsaPrecession:
     @pytest.mark.parametrize("jd,sid_mode,expected", REFERENCE_VALUES)
     def test_ayanamsa_matches_swisseph(self, jd, sid_mode, expected):
         """
-        Ayanamsa should match Swiss Ephemeris within 0.01 arcseconds.
+        Ayanamsa should match pyswisseph within 0.01 arcseconds.
 
         This tests the IAU 2006 precession model implementation with both
         linear rate (5028.796273"/century) and quadratic term (1.105608"/century²).

@@ -30,7 +30,7 @@ SPK File Sources:
 
 References:
     - JPL NAIF: https://naif.jpl.nasa.gov/naif/
-    - Swiss Ephemeris 2.10+ moon support
+    - Reference API 2.10+ moon support
 """
 
 import math
@@ -47,7 +47,7 @@ from .state import get_loader, get_planets, get_timescale
 # =============================================================================
 # PLANETARY MOON CONSTANTS
 # =============================================================================
-# Body IDs following Swiss Ephemeris 2.10+ convention
+# Body IDs following reference API 2.10+ convention
 # Moon IDs start at SE_MOON_OFFSET (9000) to avoid collision with other bodies
 
 SE_MOON_OFFSET: int = 9000

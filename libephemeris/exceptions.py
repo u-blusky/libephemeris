@@ -1,12 +1,12 @@
 """Exception classes for libephemeris.
 
 This module provides a comprehensive exception hierarchy for ephemeris calculations.
-The base Error class is pyswisseph-compatible, and specialized exceptions provide
+The base Error class is reference API-compatible, and specialized exceptions provide
 better categorization of error conditions.
 
 Exception Hierarchy
 -------------------
-Error (base, pyswisseph compatible)
+Error (base, reference API compatible)
 ├── InputValidationError (input data validation errors)
 │   ├── CoordinateError (invalid latitude/longitude)
 │   └── InvalidBodyError (body not valid for this operation)
@@ -39,7 +39,7 @@ from __future__ import annotations
 
 
 class Error(Exception):
-    """Swiss Ephemeris error.
+    """Ephemeris calculation error.
 
     This exception is raised for ephemeris-related errors such as:
     - Ephemeris files not found
@@ -48,8 +48,8 @@ class Error(Exception):
     - Fixed star not found
     - Calculation failures
 
-    This class is designed to be compatible with swisseph.Error (swe.Error)
-    from pyswisseph, allowing client code that catches swe.Error to work
+    This class is designed to be compatible with swe.Error from the reference API, allowing client code
+    that catches swe.Error to work
     unchanged with libephemeris.Error.
 
     Example:

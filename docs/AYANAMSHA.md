@@ -804,10 +804,10 @@ Nick Anthony Fiorenza's variant of the galactic equator-based ayanamsha, using a
 | Precession Rate | 5027.8 arcsec/century |
 
 **Historical Basis:**
-Named after Hipparchus of Nicaea (c. 190-120 BCE), the greatest astronomer of antiquity who discovered the precession of the equinoxes. Note: The zero epoch (~550 CE) is derived from the Swiss Ephemeris definition and differs from Hipparchus's historical era. The system is named in his honor as the discoverer of precession.
+Named after Hipparchus of Nicaea (c. 190-120 BCE), the greatest astronomer of antiquity who discovered the precession of the equinoxes. Note: The zero epoch (~550 CE) is a conventional astronomical definition and differs from Hipparchus's historical era. The system is named in his honor as the discoverer of precession.
 
 **Reference Point:**
-Based on Swiss Ephemeris reconstruction of an ancient zodiac reference frame.
+Based on a conventional reconstruction of an ancient zodiac reference frame (see Meeus, "Astronomical Algorithms", Ch. 27).
 
 ---
 
@@ -950,7 +950,7 @@ For "True" modes, the actual stellar position is calculated:
 ### Mean vs True Ayanamsha
 
 - **Mean Ayanamsha**: `swe_get_ayanamsa_ut()` returns the mean ayanamsha (without nutation)
-- **True Ayanamsha**: For sidereal planetary positions, LibEphemeris adds nutation in longitude to get the true ayanamsha, matching Swiss Ephemeris behavior
+- **True Ayanamsha**: For sidereal planetary positions, LibEphemeris adds nutation in longitude to get the true ayanamsha (IAU 2006/2000A model, consistent with pyswisseph's behavior)
 
 ### Time System
 
@@ -964,7 +964,7 @@ All calculations use:
 
 ### Primary Sources
 
-1. **Swiss Ephemeris Documentation** - Dieter Koch & Alois Treindl. "Ayanamsha: The Sidereal Zodiac" (Appendix)
+1. **Koch, Dieter & Treindl, Alois.** "Ayanamsha: The Sidereal Zodiac" (technical appendix on ayanamsha epoch definitions).
 
 2. **Indian Astronomical Ephemeris** - Government of India, Positional Astronomy Centre
 

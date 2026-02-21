@@ -126,7 +126,7 @@ class TestPackageImports:
     """Test that public API is correctly exported."""
 
     def test_core_functions_importable(self):
-        """Core Swiss Ephemeris compatible functions should be importable."""
+        """Core pyswisseph-compatible functions should be importable."""
         # Time functions
         assert hasattr(libephemeris, "swe_julday")
         assert hasattr(libephemeris, "julday")

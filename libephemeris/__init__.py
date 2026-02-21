@@ -8,7 +8,7 @@ from .logging_config import (
     LIBEPHEMERIS_LOG_LEVEL_ENV,
 )
 from .exceptions import (
-    # Base error class (pyswisseph compatible)
+    # Base error class (reference API compatible)
     Error,
     # Category: Input validation errors
     InputValidationError,
@@ -436,7 +436,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_poseidon,
     calc_transpluto,  # Transpluto (Isis) - hypothetical trans-Plutonian planet
     calc_vulcan,  # Vulcan - hypothetical intramercurial planet
-    calc_waldemath,  # Waldemath Moon - hypothetical second moon of Earth (seorbel.txt #18)
+    calc_waldemath,  # Waldemath Moon (hypothetical secondary satellite)
     calc_proserpina,  # Proserpina - hypothetical trans-Plutonian planet
     calc_planet_x_pickering,  # Pickering's Planet O/X prediction (1919)
     calc_white_moon_position,  # White Moon (Selena) - opposite to Black Moon Lilith
@@ -444,11 +444,14 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_hypothetical_position,
     URANIAN_KEPLERIAN_ELEMENTS,
     TRANSPLUTO_KEPLERIAN_ELEMENTS,
-    VULCAN_ELEMENTS,  # Vulcan orbital elements from seorbel.txt
-    WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements from seorbel.txt #18
+    VULCAN_ELEMENTS,  # Vulcan orbital elements
+    WALDEMATH_ELEMENTS,  # Waldemath Moon orbital elements
     PICKERING_PLANET_X_ELEMENTS,  # Pickering's Planet O/X orbital elements
-    # seorbel.txt parser for custom hypothetical bodies
+    # Orbital elements parser for custom hypothetical bodies
     parse_seorbel,
+    get_bundled_fictitious_orbits_path,
+    load_bundled_fictitious_orbits,
+    # Backward-compatibility shims (delegate to the functions above)
     get_bundled_seorbel_path,
     load_bundled_seorbel,
     SeorbelElements,
@@ -526,10 +529,10 @@ from .planetary_moons import (  # Planetary moons (Galilean moons, Titan, etc.)
 )
 
 # =============================================================================
-# PYSWISSEPH-COMPATIBLE FUNCTION ALIASES (without swe_ prefix)
+# REFERENCE API-COMPATIBLE FUNCTION ALIASES (without swe_ prefix)
 # =============================================================================
-# pyswisseph uses function names without the swe_ prefix
-# These aliases provide 100% API compatibility with pyswisseph
+# Reference API uses function names without the swe_ prefix
+# These aliases provide 100% API compatibility with the reference API
 
 # Time functions
 julday = swe_julday
@@ -557,7 +560,7 @@ houses_armc_ex2 = swe_houses_armc_ex2
 houses_ex = swe_houses_ex
 houses_ex2 = swe_houses_ex2
 house_name = swe_house_name
-# house_pos is already the main function name (matching pyswisseph)
+# house_pos is already the main function name (matching reference API)
 
 # Ayanamsa (sidereal)
 get_ayanamsa_ut = swe_get_ayanamsa_ut
@@ -1103,8 +1106,11 @@ __all__ = [
     "VULCAN_ELEMENTS",
     "WALDEMATH_ELEMENTS",  # Waldemath Moon orbital elements
     "PICKERING_PLANET_X_ELEMENTS",  # Pickering's Planet O/X orbital elements
-    # seorbel.txt parser for custom hypothetical bodies
+    # Orbital elements parser for custom hypothetical bodies
     "parse_seorbel",
+    "get_bundled_fictitious_orbits_path",
+    "load_bundled_fictitious_orbits",
+    # Backward-compatibility shims
     "get_bundled_seorbel_path",
     "load_bundled_seorbel",
     "SeorbelElements",

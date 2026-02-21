@@ -118,7 +118,7 @@ class TestFixstar2Mag:
         assert mag == pytest.approx(1.40, abs=0.01)
 
     def test_fixstar2_mag_hip_number_with_comma(self):
-        """Test lookup by HIP number with leading comma (Swiss Ephemeris format)."""
+        """Test lookup by HIP number with leading comma (pyswisseph format)."""
         name, mag, err = ephem.swe_fixstar2_mag(",65474")
 
         assert err == "", f"Unexpected error: {err}"

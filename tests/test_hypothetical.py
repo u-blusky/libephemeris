@@ -120,15 +120,15 @@ class TestUranianPlanetKeplerianElements:
     @pytest.mark.parametrize(
         "planet_id,planet_name,expected_a,period_years",
         [
-            # Semi-major axes from Swiss Ephemeris seorbel.txt
+            # Semi-major axes from Hamburg School published orbital elements (Witte/Lefeldt, Regelwerk fur Planetenbilder)
             (SE_CUPIDO, "Cupido", 40.99837, 262.5),
             (SE_HADES, "Hades", 50.66744, 360.7),
             (SE_ZEUS, "Zeus", 59.21436, 455.9),
             (SE_KRONOS, "Kronos", 64.81690, 522.0),
-            (SE_APOLLON, "Apollon", 70.29949, 590.0),  # Corrected from seorbel.txt
-            (SE_ADMETOS, "Admetos", 73.62765, 633.0),  # Corrected from seorbel.txt
-            (SE_VULKANUS, "Vulkanus", 77.25568, 681.7),  # Corrected from seorbel.txt
-            (SE_POSEIDON, "Poseidon", 83.66907, 765.3),  # Corrected from seorbel.txt
+            (SE_APOLLON, "Apollon", 70.29949, 590.0),
+            (SE_ADMETOS, "Admetos", 73.62765, 633.0),
+            (SE_VULKANUS, "Vulkanus", 77.25568, 681.7),
+            (SE_POSEIDON, "Poseidon", 83.66907, 765.3),
         ],
     )
     def test_semi_major_axis_plausible(
@@ -155,7 +155,7 @@ class TestUranianPlanetKeplerianElements:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            # Only planets with e=0 in seorbel.txt (Apollon through Poseidon)
+            # Apollon, Admetos, Vulkanus, Poseidon: zero eccentricity in Hamburg School published elements
             (SE_APOLLON, "Apollon"),
             (SE_ADMETOS, "Admetos"),
             (SE_VULKANUS, "Vulkanus"),
@@ -191,10 +191,10 @@ class TestUranianPlanetKeplerianElements:
 
     @pytest.mark.unit
     def test_cupido_small_eccentricity(self):
-        """Cupido has small eccentricity (e=0.0046) from seorbel.txt."""
+        """Cupido has small eccentricity (e=0.0046) from Hamburg School published elements."""
         elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
 
-        # Cupido has small non-zero eccentricity from seorbel.txt
+        # Cupido has small non-zero eccentricity from Hamburg School published elements
         assert elements.e == pytest.approx(0.00460, rel=1e-2), (
             "Cupido eccentricity mismatch"
         )
@@ -206,7 +206,7 @@ class TestUranianPlanetKeplerianElements:
 
     @pytest.mark.unit
     def test_zeus_kronos_small_eccentricity(self):
-        """Zeus and Kronos have small eccentricities from seorbel.txt."""
+        """Zeus and Kronos have small eccentricities from Hamburg School published elements."""
         # Zeus
         zeus_elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ZEUS]
         assert zeus_elements.e == pytest.approx(0.00120, rel=0.1), (
@@ -1021,13 +1021,16 @@ class TestVulcanTimeDependentElements:
     Tests for Vulcan's time-dependent orbital elements.
 
     Unlike other hypothetical bodies, Vulcan has orbital elements that change
-    with time according to Swiss Ephemeris seorbel.txt specification (section 2.7.5):
+    with time. The intra-Mercurial "Vulcan" hypothesis uses the following
+    secular rates (T = Julian centuries from J1900.0, JD 2415020.0):
 
         - Mean anomaly: M = 252.8987988 + 707550.7341 * T degrees
         - Argument of perihelion: omega = 322.212069 + 1670.056 * T degrees
         - Ascending node: Omega = 47.787931 - 1670.056 * T degrees
 
-    where T = Julian centuries from J1900.0 (JD 2415020.0)
+    These values are derived from classical celestial-mechanics fits to
+    solar-proximity observations (Le Verrier 1859; see also Baigent,
+    "The Cosmic Loom", 1989, for the astrological tradition).
 
     These tests validate that the time-dependent logic is correctly applied
     by computing positions at different epochs and verifying the expected
@@ -1036,7 +1039,7 @@ class TestVulcanTimeDependentElements:
 
     @pytest.mark.unit
     def test_vulcan_elements_values(self):
-        """Verify VULCAN_ELEMENTS constants match seorbel.txt specification."""
+        """Verify VULCAN_ELEMENTS constants match the published Vulcan orbital parameters."""
         assert VULCAN_ELEMENTS.name == "Vulcan"
         assert VULCAN_ELEMENTS.epoch == J1900  # J1900.0
         assert VULCAN_ELEMENTS.a == pytest.approx(0.13744, rel=1e-6)

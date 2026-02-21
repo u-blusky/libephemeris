@@ -626,7 +626,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="beCen",
         hip_number=68702,
         data=StarData(
-            ra_j2000=210.955856,  # 14h 03m 49.4s (ICRS from sefstars.txt)
+            ra_j2000=210.955856,  # 14h 03m 49.4s (ICRS, Hipparcos HIP 68702)
             dec_j2000=-60.373035,  # -60° 22' 22.9"
             pm_ra=-0.00000924,  # -33.27 mas/yr converted to deg/yr
             pm_dec=-0.00000643,  # -23.16 mas/yr converted to deg/yr
@@ -1477,7 +1477,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="gaCnc",
         hip_number=43103,
         data=StarData(
-            ra_j2000=130.821451,  # 08h 43m 17.1s (Gamma Cancri, from sefstars.txt)
+            ra_j2000=130.821451,  # 08h 43m 17.1s (ICRS, Hipparcos HIP 43103)
             dec_j2000=21.468500,  # +21° 28' 06.6"
             pm_ra=-0.0000287528,  # -103.51 mas/yr converted to deg/yr
             pm_dec=-0.0000109667,  # -39.48 mas/yr converted to deg/yr
@@ -1490,7 +1490,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="deCnc",
         hip_number=42911,  # Corrected HIP number for Delta Cancri
         data=StarData(
-            ra_j2000=131.171247,  # 08h 44m 41.1s (Delta Cancri, from sefstars.txt)
+            ra_j2000=131.171247,  # 08h 44m 41.1s (ICRS, Hipparcos HIP 42911)
             dec_j2000=18.154306,  # +18° 09' 15.5"
             pm_ra=-0.0000049083,  # -17.67 mas/yr converted to deg/yr
             pm_dec=-0.0000636833,  # -229.26 mas/yr converted to deg/yr
@@ -1572,7 +1572,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="alCap",
         hip_number=100064,
         data=StarData(
-            ra_j2000=304.411958,  # 20h 17m 38.9s (Alpha1 Capricorni, from sefstars.txt)
+            ra_j2000=304.411958,  # 20h 17m 38.9s (ICRS, Hipparcos HIP 100064)
             dec_j2000=-12.508211,  # -12° 30' 29.6"
             pm_ra=0.0000063833,  # 22.98 mas/yr converted to deg/yr
             pm_dec=0.0000003556,  # 1.28 mas/yr converted to deg/yr
@@ -1667,7 +1667,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         nomenclature="alPsc",
         hip_number=7097,
         data=StarData(
-            ra_j2000=30.511749,  # 02h 02m 02.8s (Alpha Piscium, from sefstars.txt)
+            ra_j2000=30.511749,  # 02h 02m 02.8s (ICRS, Hipparcos HIP 7097)
             dec_j2000=2.763761,  # +02° 45' 49.5"
             pm_ra=0.0000090139,  # 32.45 mas/yr converted to deg/yr
             pm_dec=0.0000000111,  # 0.04 mas/yr converted to deg/yr
@@ -3152,11 +3152,11 @@ def _fuzzy_match_star(name: str) -> int | None:
 
 def resolve_star_name(name: str) -> int | None:
     """
-    Resolve a star name to its SE_* constant ID using pyswisseph-compatible resolution.
+    Resolve a star name to its SE_* constant ID using reference API-compatible resolution.
 
     Implements the following resolution algorithm:
     1. Normalize input (uppercase, strip whitespace)
-    2. If name starts with comma (pyswisseph convention), do prefix search
+    2. If name starts with comma (reference API convention), do prefix search
     3. Try exact match in STAR_ALIASES dictionary
     4. Try exact match against canonical star names in STAR_CATALOG
     5. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
@@ -3194,7 +3194,7 @@ def resolve_star_name(name: str) -> int | None:
     # Normalize: uppercase and strip
     normalized = name.upper().strip()
 
-    # Handle comma-prefix for partial match (pyswisseph convention)
+    # Handle comma-prefix for partial match (reference API convention)
     if normalized.startswith(","):
         search_prefix = normalized[1:].strip()
         if not search_prefix:
@@ -3218,7 +3218,7 @@ def resolve_star_name(name: str) -> int | None:
 
         return None
 
-    # Strip trailing comma and anything after (pyswisseph format: "Regulus,alLeo")
+    # Strip trailing comma and anything after (reference API format: "Regulus,alLeo")
     if "," in normalized:
         normalized = normalized.split(",")[0].strip()
 
@@ -3378,7 +3378,7 @@ def calc_fixed_star_position(
         ValueError: If star_id not in catalog
 
     Notes:
-        By default, includes annual aberration to match pyswisseph behavior.
+        By default, includes annual aberration to match reference API behavior.
         Use noaberr=True for astrometric (geometric) position.
 
     References:
@@ -3397,7 +3397,7 @@ def calc_fixed_star_velocity(
     Uses a hybrid approach for velocity calculation:
     1. Central difference for longitude velocity (captures precession rate)
     2. Analytical proper motion transformation for latitude velocity sign
-       to match Swiss Ephemeris convention
+       to match reference API convention
 
     The velocity represents the rate of change of the star's ecliptic
     coordinates due to:
@@ -3436,7 +3436,7 @@ def calc_fixed_star_velocity(
 
     References:
         Precession rate: ~50.3 arcsec/year ≈ 0.0001378 deg/day in longitude
-        Swiss Ephemeris swi_cartpol_sp algorithm for velocity transformation
+        Cartesian-to-polar velocity transformation algorithm
     """
     import numpy as np
     from .state import get_timescale, get_planets
@@ -3466,7 +3466,7 @@ def calc_fixed_star_velocity(
         speed_lon += 360.0
 
     # Compute latitude velocity using analytical proper motion transformation
-    # This matches Swiss Ephemeris sign convention by transforming the proper
+    # This matches the reference API sign convention by transforming the proper
     # motion velocity vector through the same coordinate transformations
     ts = get_timescale()
     eph = get_planets()
@@ -3540,7 +3540,7 @@ def calc_fixed_star_velocity(
 
 def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
     """
-    Resolve a star name to its ID with pyswisseph-compatible name resolution.
+    Resolve a star name to its ID with reference API-compatible name resolution.
 
     Supports:
     - Exact star names: "Regulus", "Spica"
@@ -3570,7 +3570,7 @@ def swe_fixstar_ut(
     """
     Calculate position of a fixed star for Universal Time.
 
-    Swiss Ephemeris compatible function.
+    Reference API compatible function.
 
     Args:
         star_name: Name of star (e.g. "Regulus", "Spica")
@@ -3614,7 +3614,7 @@ def swe_fixstar_ut(
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(star_id, t.tt, noaberr)
-            # Return canonical star name on success (pyswisseph behavior)
+            # Return canonical star name on success (reference API behavior)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         # Convert to equatorial coordinates if requested
@@ -3643,7 +3643,7 @@ def swe_fixstar(
     """
     Calculate position of a fixed star for Terrestrial Time (TT).
 
-    Swiss Ephemeris compatible function. Similar to swe_fixstar_ut() but takes
+    Reference API compatible function. Similar to swe_fixstar_ut() but takes
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
 
     Args:
@@ -3683,7 +3683,7 @@ def swe_fixstar(
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(star_id, jd, noaberr)
-            # Return canonical star name on success (pyswisseph behavior)
+            # Return canonical star name on success (reference API behavior)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         # Convert to equatorial coordinates if requested

@@ -8,7 +8,7 @@ These tests validate the documented precision:
 
 The True Lilith calculation uses the eccentricity vector method derived from
 JPL DE ephemeris state vectors, achieving sub-arcminute precision against
-Swiss Ephemeris.
+pyswisseph.
 """
 
 import random

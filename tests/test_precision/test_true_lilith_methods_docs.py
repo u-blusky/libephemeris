@@ -153,12 +153,12 @@ class TestTrueLilithMethodsDocumentation:
         ), "Missing 500-date random sampling methodology description"
 
     @pytest.mark.precision
-    def test_swiss_ephemeris_compatibility_documented(self, true_lilith_methods_doc):
-        """Verify Swiss Ephemeris compatibility is documented."""
+    def test_pyswisseph_compatibility_documented(self, true_lilith_methods_doc):
+        """Verify pyswisseph compatibility is documented."""
         content = true_lilith_methods_doc
 
-        assert "Swiss Ephemeris" in content or "pyswisseph" in content, (
-            "Missing Swiss Ephemeris compatibility documentation"
+        assert "pyswisseph" in content or "SE_OSCU_APOG" in content, (
+            "Missing pyswisseph compatibility documentation"
         )
         assert "SE_OSCU_APOG" in content, (
             "Missing SE_OSCU_APOG constant reference for compatibility"
