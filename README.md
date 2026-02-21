@@ -46,13 +46,13 @@ Download all data files for your use case (ephemeris + SPK kernels):
 libephemeris download:medium      # recommended for most users
 ```
 
-See [CLI commands](#cli-commands) for all options and tiers.
+See [CLI commands](#cli-commands) for all download tiers.
 
 ### Optional extras
 
 ```bash
-pip install libephemeris[spk]    # Automatic SPK downloads from JPL Horizons
 pip install libephemeris[nbody]  # REBOUND/ASSIST n-body integration
+pip install libephemeris[stars]  # Star catalog building (astropy)
 pip install libephemeris[all]    # Everything
 ```
 
@@ -172,21 +172,21 @@ LibEphemeris corrects these to planet body centers automatically:
 
 1. Uses tier-specific SPK files (`planet_centers_{tier}.bsp`) downloaded by `libephemeris download:<tier>`
 2. Falls back to analytical satellite models when SPK coverage is not available:
-   - Jupiter: Galilean moon theory (E5/Meeus) — ~0.05 arcsec
-   - Saturn: TASS 1.7 (Titan-dominated) — ~0.02 arcsec
-   - Uranus: 5 major moons Keplerian — ~0.01 arcsec
-   - Neptune: Triton Keplerian — ~0.003 arcsec
-   - Pluto: Charon two-body — ~0.15 arcsec
+    - Jupiter: Galilean moon theory (E5/Meeus) — ~0.05 arcsec
+    - Saturn: TASS 1.7 (Titan-dominated) — ~0.02 arcsec
+    - Uranus: 5 major moons Keplerian — ~0.01 arcsec
+    - Neptune: Triton Keplerian — ~0.003 arcsec
+    - Pluto: Charon two-body — ~0.15 arcsec
 
 SPK coverage varies by tier:
 
-| Planet | base (1850-2150) | medium (1550-2650) | extended |
-|--------|------------------|--------------------|----------|
-| Jupiter | SPK | SPK | SPK 1600-2200, fallback outside |
-| Saturn | SPK | SPK | SPK -502 to +4500, fallback outside |
-| Uranus | SPK | SPK | SPK full (-12000 to +17000) |
-| Neptune | SPK | SPK | SPK full (-12000 to +17000) |
-| Pluto | SPK | SPK 1800-2200 | SPK 1800-2200, fallback outside |
+| Planet  | base (1850-2150) | medium (1550-2650) | extended                            |
+| ------- | ---------------- | ------------------ | ----------------------------------- |
+| Jupiter | SPK              | SPK                | SPK 1600-2200, fallback outside     |
+| Saturn  | SPK              | SPK                | SPK -502 to +4500, fallback outside |
+| Uranus  | SPK              | SPK                | SPK full (-12000 to +17000)         |
+| Neptune | SPK              | SPK                | SPK full (-12000 to +17000)         |
+| Pluto   | SPK              | SPK 1800-2200      | SPK 1800-2200, fallback outside     |
 
 Full technical details are in `docs/PRECISION.md`.
 
@@ -195,6 +195,7 @@ Full technical details are in `docs/PRECISION.md`.
 ## Minor bodies (SPK)
 
 For many asteroids and TNOs, high precision requires JPL SPK kernels.
+SPK kernels are downloaded automatically via `astroquery` (a core dependency).
 
 ```python
 import libephemeris as swe
@@ -211,20 +212,19 @@ print(pos[0])
 
 LibEphemeris has several optional dependencies for enhanced functionality:
 
-| Extra | Description | Dependencies |
-|-------|-------------|--------------|
-| `[spk]` | Automatic SPK downloads from JPL Horizons | `astroquery` |
-| `[stars]` | Star catalog access | `astropy` |
-| `[nbody]` | N-body integration | `rebound`, `reboundx` |
-| `[all]` | All optional features | All above |
+| Extra     | Description           | Dependencies        |
+| --------- | --------------------- | ------------------- |
+| `[stars]` | Star catalog building | `astropy`           |
+| `[nbody]` | N-body integration    | `rebound`, `assist` |
+| `[all]`   | All optional features | All above           |
 
 ```bash
-pip install libephemeris[spk]    # For auto-downloading SPK kernels from Horizons
-pip install libephemeris[stars]  # For accessing star catalogs via astropy
+pip install libephemeris[stars]  # For star catalog building via astropy
+pip install libephemeris[nbody]  # For REBOUND/ASSIST n-body fallback
 pip install libephemeris[all]    # Install all optional dependencies
 ```
 
-**Note:** `pyerfa` is a required dependency and provides IAU 2006/2000A precession-nutation models for high-precision calculations.
+**Note:** `pyerfa` and `astroquery` are required dependencies. `pyerfa` provides IAU 2006/2000A precession-nutation models; `astroquery` enables automatic SPK downloads from JPL Horizons.
 
 ---
 
@@ -255,6 +255,8 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 - `docs/TRUE_LILITH_METHODS.md` (True Lilith correction methods)
 - `docs/PLANET_CENTERS_SPK.md` (planet centers SPK system)
 - `docs/PRECISION_TUNING.md` (precision tuning guide)
+- `docs/PYERFA_BENEFITS.md` (pyerfa integration benefits)
+- `docs/REBOUND_BENEFITS.md` (REBOUND n-body integration benefits)
 
 ---
 
@@ -262,6 +264,25 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 
 LibEphemeris is pure Python; Swiss Ephemeris is C. Expect LibEphemeris to be slower.
 For batch workloads, use `EphemerisContext`, parallelism, and caching.
+
+---
+
+## CLI commands
+
+Download all required data for your precision tier:
+
+| Command                          | Ephemeris  | SPK range | Download |
+| -------------------------------- | ---------- | --------- | -------- |
+| `libephemeris download:base`     | de440s.bsp | 1850-2150 | ~35 MB   |
+| `libephemeris download:medium`   | de440.bsp  | 1900-2100 | ~130 MB  |
+| `libephemeris download:extended` | de441.bsp  | 1600-2500 | ~3.3 GB  |
+
+Other commands:
+
+| Command                  | Description                     |
+| ------------------------ | ------------------------------- |
+| `libephemeris status`    | Show installed data file status |
+| `libephemeris --version` | Show version information        |
 
 ---
 
@@ -277,75 +298,76 @@ All development tasks use [poethepoet](https://poethepoet.naberhaus.dev/) (`poe`
 
 ### Code quality
 
-| Command | Description |
-|---------|-------------|
-| `poe format` | Format code with Ruff |
-| `poe lint` | Lint and auto-fix with Ruff |
-| `poe typecheck` | Type-check with mypy |
+| Command         | Description                 |
+| --------------- | --------------------------- |
+| `poe format`    | Format code with Ruff       |
+| `poe lint`      | Lint and auto-fix with Ruff |
+| `poe typecheck` | Type-check with mypy        |
 
 ### Tests
 
-| Command | Description |
-|---------|-------------|
-| `poe test` | Fast tests (excludes `@pytest.mark.slow`) |
-| `poe test:full` | All tests including slow ones |
-| `poe test:fast` | Fast tests, parallel (`-n auto`) |
+| Command                   | Description                                               |
+| ------------------------- | --------------------------------------------------------- |
+| `poe test`                | Fast tests (excludes `@pytest.mark.slow`)                 |
+| `poe test:full`           | All tests including slow ones                             |
+| `poe test:fast`           | Fast tests, parallel (`-n auto`)                          |
 | `poe test:fast:essential` | Parallel essential subset (~670 tests, 1 file per module) |
-| `poe test:unit` | Unit tests only (`tests/`) |
-| `poe test:unit:fast` | Unit tests, parallel |
-| `poe test:compare` | Comparison tests vs pyswisseph (`compare_scripts/tests/`) |
-| `poe test:compare:fast` | Comparison tests, parallel |
-| `poe test:lunar` | All lunar tests (nodes, Lilith, perigee, apogee) |
-| `poe test:lunar:perigee` | Perigee tests (perturbations + interpolated + osculating) |
-| `poe test:lunar:apogee` | Apogee tests (perturbations + interpolated) |
-| `poe test:lunar:lilith` | Lilith tests (mean + true, all correction modules) |
-| `poe coverage` | Fast tests with coverage report |
-| `poe coverage:full` | All tests with coverage report |
+| `poe test:unit`           | Unit tests only (`tests/`)                                |
+| `poe test:unit:fast`      | Unit tests, parallel                                      |
+| `poe test:compare`        | Comparison tests vs pyswisseph (`compare_scripts/tests/`) |
+| `poe test:compare:fast`   | Comparison tests, parallel                                |
+| `poe test:lunar`          | All lunar tests (nodes, Lilith, perigee, apogee)          |
+| `poe test:lunar:perigee`  | Perigee tests (perturbations + interpolated + osculating) |
+| `poe test:lunar:apogee`   | Apogee tests (perturbations + interpolated)               |
+| `poe test:lunar:lilith`   | Lilith tests (mean + true, all correction modules)        |
+| `poe coverage`            | Fast tests with coverage report                           |
+| `poe coverage:full`       | All tests with coverage report                            |
 
 ### Tier diagnostics
 
 Run diagnostic tables showing all celestial bodies with coordinates, velocities, and data source for each precision tier:
 
-| Command | Description |
-|---------|-------------|
-| `poe diag:base` | Diagnostic for base tier (1850-2150) |
-| `poe diag:medium` | Diagnostic for medium tier (1550-2650) |
+| Command             | Description                                     |
+| ------------------- | ----------------------------------------------- |
+| `poe diag:base`     | Diagnostic for base tier (1850-2150)            |
+| `poe diag:medium`   | Diagnostic for medium tier (1550-2650)          |
 | `poe diag:extended` | Diagnostic for extended tier (-13200 to +17191) |
 
 ### SPK downloads (dev)
 
 Download SPK kernels for minor bodies directly (without the full CLI tier setup):
 
-| Command | Description |
-|---------|-------------|
-| `poe spk:download:base` | SPK for base tier range (1850-2150) |
-| `poe spk:download:medium` | SPK for medium tier range (1900-2100) |
+| Command                     | Description                                           |
+| --------------------------- | ----------------------------------------------------- |
+| `poe spk:download:base`     | SPK for base tier range (1850-2150)                   |
+| `poe spk:download:medium`   | SPK for medium tier range (1900-2100)                 |
 | `poe spk:download:extended` | Max-range SPK files (1600-2500, single file per body) |
 
 ### Data generation
 
 Generate `planet_centers_*.bsp` files for each precision tier. Requires `spiceypy >= 6.0.0`.
 
-| Command | Description | Download |
-|---------|-------------|----------|
-| `poe generate-planet-centers:base` | Generate for base tier (1850-2150) | ~500 MB |
-| `poe generate-planet-centers:medium` | Generate for medium tier (1550-2650) | ~4 GB |
-| `poe generate-planet-centers:extended` | Generate for extended tier (partial) | ~6.5 GB |
-| `poe generate-planet-centers:all` | Generate all 3 tiers | ~11 GB |
-| `poe generate-lunar-corrections` | Regenerate lunar correction tables (requires `de441.bsp`) | — |
+| Command                                | Description                                               | Download |
+| -------------------------------------- | --------------------------------------------------------- | -------- |
+| `poe generate-planet-centers:base`     | Generate for base tier (1850-2150)                        | ~500 MB  |
+| `poe generate-planet-centers:medium`   | Generate for medium tier (1550-2650)                      | ~4 GB    |
+| `poe generate-planet-centers:extended` | Generate for extended tier (partial)                      | ~6.5 GB  |
+| `poe generate-planet-centers:all`      | Generate all 3 tiers                                      | ~11 GB   |
+| `poe generate-lunar-corrections`       | Regenerate lunar correction tables (requires `de441.bsp`) | —        |
 
 ### Calibration
 
 Calibrate perturbation series coefficients against JPL DE441 ephemeris. See `docs/interpolated_perigee_methodology.md` for full details.
 
-| Command | Description |
-|---------|-------------|
-| `poe calibrate-perigee` | Full perigee calibration, 1500-2500 CE (~30 min, requires `de441.bsp`) |
-| `poe calibrate-perigee:quick` | Quick validation run, 100-year range (~2 min) |
+| Command                       | Description                                                            |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `poe calibrate-perigee`       | Full perigee calibration, 1500-2500 CE (~30 min, requires `de441.bsp`) |
+| `poe calibrate-perigee:quick` | Quick validation run, 100-year range (~2 min)                          |
 
 After calibration, update coefficients in `lunar.py`, sync `generate_lunar_corrections.py`, and run `poe generate-lunar-corrections` followed by `poe test:lunar:perigee`.
 
 Generated files are saved in the workspace root:
+
 - `planet_centers_base.bsp` (~15-20 MB)
 - `planet_centers_medium.bsp` (~40-50 MB)
 - `planet_centers_extended.bsp` (~80-100 MB)
