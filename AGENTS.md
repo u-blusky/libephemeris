@@ -1,7 +1,3 @@
-# AGENTS.md - Guide for AI Coding Agents
-
-This document provides essential information for AI agents working on the libephemeris codebase.
-
 ## Project Overview
 
 LibEphemeris is a high-precision astronomical ephemeris library for Python, providing Swiss Ephemeris-compatible API using NASA JPL DE440 ephemeris via Skyfield. The library focuses on scientific accuracy, maintainability, and clean code.
