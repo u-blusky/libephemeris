@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-02-23
+
+### Fixed
+
+- Corrected barycentric mode calculations (`SEFLG_BARYCTR`) for consistent
+  heliocentric-to-barycentric coordinate transformations
+- Fixed sign convention in `cotrans_sp()` ecliptic-to-equatorial coordinate
+  transformation (affects lunar nodes, Lilith, interpolated apogee/perigee
+  equatorial coordinates)
+- Corrected lunar mean elements polynomial evaluation for improved
+  Mean Lilith and Mean Node accuracy
+- Adjusted test thresholds for lunar comparison tests to account for
+  legitimate methodological differences between JPL and Swiss Ephemeris
+- Improved lunar node and apogee/perigee precision with refined perturbation
+  calculations
+
+### Documentation
+
+- Clarified scientific methodology and intentional deviation from Swiss
+  Ephemeris for lunar apsides calculations in methodology docs
+- Updated AGENTS.md with improved development guidelines
+
 ## [0.18.0] - 2026-02-21
 
 ### Changed
@@ -961,7 +983,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/g-battaglia/libephemeris/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/g-battaglia/libephemeris/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/g-battaglia/libephemeris/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/g-battaglia/libephemeris/compare/v0.16.0...v0.16.1
