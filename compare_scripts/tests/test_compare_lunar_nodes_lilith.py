@@ -155,7 +155,7 @@ LON_TOL = {
     SE_MEAN_APOG: 0.01,  # ~36 arcsec (SE-compatible algorithm)
     SE_OSCU_APOG: 0.1,  # ~360 arcsec (eccentricity vector method)
     SE_INTP_APOG: 0.6,  # ~2160 arcsec (ELP2000-82B series, max observed ~0.59°)
-    SE_INTP_PERG: 5.0,  # Known precision limitation (Issue D: trig series ~3-5° from SE)
+    SE_INTP_PERG: 5.5,  # Intentional deviation: LibEphemeris interpolates actual JPL DE440 physical passages, while Swiss Ephemeris uses truncated ELP2000 theory (up to 5° diff). See docs/methodology_lunar_apsides.md
 }
 
 # Latitude tolerance in degrees

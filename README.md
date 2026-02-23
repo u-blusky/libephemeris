@@ -22,13 +22,14 @@ A pure Python astronomical ephemeris library based on NASA JPL data. Designed as
 
 ## Why
 
-Swiss Ephemeris is fast and widely used. LibEphemeris makes a different trade-off:
+Swiss Ephemeris is fast and widely used, but relies heavily on analytical theories developed in the 1980s. LibEphemeris makes a different trade-off, prioritizing **scientific rigor and modern astronomical reality over legacy approximations**:
 
-- **Accuracy-first:** JPL numerical integrations (DE440/DE441) + IAU-standard precession/nutation
-- **Transparent:** pure Python, fully testable, and documented with references
-- **Slower than SwissEph:** Swiss is C; LibEphemeris is Python (see Performance)
+- **Accuracy-first:** 100% based on modern NASA JPL numerical integrations (DE440/DE441) and IAU-standard precession/nutation (via pyerfa).
+- **Physical Reality for Lunar Apsides:** For highly volatile points like the Interpolated Perigee (Natural Apse/Lilith), we compute a smooth curve through the *actual physical passages* of the Moon according to JPL data, rather than using the mathematically truncated 1988 analytical theory (ELP2000-82B) used by legacy software.
+- **Transparent:** Pure Python, fully testable, readable, and documented with explicit astronomical references.
+- **Slower than SwissEph:** Swiss is C; LibEphemeris is Python (see Performance).
 
-Precision details (models, term counts, measured comparisons, references): `docs/PRECISION.md`.
+Precision details (models, term counts, measured comparisons, references): `docs/PRECISION.md` and `docs/methodology_lunar_apsides.md`.
 
 ---
 
