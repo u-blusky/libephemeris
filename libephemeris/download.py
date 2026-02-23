@@ -31,6 +31,36 @@ from typing import Any, Callable, Optional, Union
 
 from .logging_config import get_logger
 
+
+def _is_valid_bsp(filepath: str) -> bool:
+    """Check if a BSP file can be opened and its segments enumerated by jplephem.
+
+    Uses jplephem.spk.SPK.open() which validates:
+    - DAF header (magic bytes, endianness)
+    - FTP corruption test string
+    - All segment summary records are readable
+
+    This catches truncated files where the header is intact but segment
+    records are missing deeper in the file.
+
+    Args:
+        filepath: Path to the BSP file to validate
+
+    Returns:
+        True if file can be opened and all segments enumerated, False otherwise
+    """
+    try:
+        from jplephem.spk import SPK
+
+        with SPK.open(filepath) as kernel:
+            # Force iteration through all segments to detect truncation
+            for segment in kernel.segments:
+                _ = segment.center, segment.target
+        return True
+    except Exception:
+        return False
+
+
 # GitHub Releases URL for data files
 # The release tag "data-v1" can be updated when new data files are generated
 GITHUB_RELEASES_BASE = (
@@ -71,15 +101,15 @@ DATA_FILES = {
 def get_data_dir() -> Path:
     """Get the data directory path.
 
-    Returns the path to libephemeris/data/ within the package installation.
+    Returns the path to ~/.libephemeris (or LIBEPHEMERIS_DATA_DIR env var).
     Creates the directory if it doesn't exist.
 
     Returns:
         Path to the data directory
     """
-    data_dir = Path(__file__).parent / "data"
-    data_dir.mkdir(exist_ok=True)
-    return data_dir
+    from .state import _get_data_dir
+
+    return Path(_get_data_dir())
 
 
 def _format_size(size_bytes: float) -> str:
@@ -307,13 +337,20 @@ def download_planet_centers(
     """
     file_info = DATA_FILES["planet_centers.bsp"]
     dest_path = get_data_dir() / "planet_centers.bsp"
+    logger = get_logger()
 
-    # Check if already exists
+    # Check if already exists and valid
     if dest_path.exists() and not force:
-        if not quiet:
-            print(f"planet_centers.bsp already exists at {dest_path}")
-            print("Use --force to re-download.")
-        return dest_path
+        if _is_valid_bsp(str(dest_path)):
+            if not quiet:
+                print(f"planet_centers.bsp already exists at {dest_path}")
+                print("Use --force to re-download.")
+            return dest_path
+        logger.warning("Cached file %s is corrupted, re-downloading", dest_path)
+        try:
+            os.remove(dest_path)
+        except OSError:
+            pass
 
     if not quiet:
         print(f"Downloading planet_centers.bsp (~{file_info['size_mb']:.1f} MB)...")
@@ -809,7 +846,7 @@ def _download_planet_centers_for_tier(
 ) -> Path:
     """Download planet_centers SPK file for a specific tier.
 
-    Saves to workspace root (same location as de440.bsp, de441.bsp).
+    Saves to data directory (~/.libephemeris).
 
     Args:
         tier_name: One of "base", "medium", "extended"
@@ -825,20 +862,26 @@ def _download_planet_centers_for_tier(
     """
     import urllib.request
 
+    logger = get_logger()
     filename = f"planet_centers_{tier_name}.bsp"
     file_info = DATA_FILES.get(filename)
 
     if file_info is None:
         raise ValueError(f"No planet_centers file for tier '{tier_name}'")
 
-    # Save to workspace root (parent of libephemeris package)
-    workspace_root = Path(__file__).parent.parent
-    dest_path = workspace_root / filename
+    dest_path = get_data_dir() / filename
 
     if dest_path.exists() and not force:
-        if not quiet:
-            print(f"  {filename} already exists at {dest_path}")
-        return dest_path
+        if _is_valid_bsp(str(dest_path)):
+            if not quiet:
+                print(f"  {filename} already exists at {dest_path}")
+            return dest_path
+        else:
+            logger.warning("Cached file %s is corrupted, re-downloading", dest_path)
+            try:
+                os.remove(dest_path)
+            except OSError:
+                pass
 
     url = file_info["url"]
     expected_size_mb = file_info.get("size_mb", 50)
@@ -846,44 +889,60 @@ def _download_planet_centers_for_tier(
     if not quiet:
         print(f"  Downloading {filename} (~{expected_size_mb:.0f} MB)...")
 
-    # Get file size
-    total_size = 0
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".download")
+
     try:
-        req = urllib.request.Request(url, method="HEAD")
-        with urllib.request.urlopen(req, timeout=30) as response:
-            total_size = int(response.headers.get("Content-Length", 0))
+        total_size = 0
+        try:
+            req = urllib.request.Request(url, method="HEAD")
+            with urllib.request.urlopen(req, timeout=30) as response:
+                total_size = int(response.headers.get("Content-Length", 0))
+        except Exception:
+            pass
+
+        downloaded = 0
+        chunk_size = 1024 * 1024
+
+        with urllib.request.urlopen(url, timeout=300) as response:
+            with os.fdopen(temp_fd, "wb") as f:
+                if show_progress and total_size > 0 and not quiet:
+                    progress = SimpleProgressBar(total_size, f"  {filename}")
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        progress.update(len(chunk))
+                    print()
+                else:
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if not quiet:
+                            print(
+                                f"\r  Downloaded {downloaded / 1024 / 1024:.1f} MB",
+                                end="",
+                            )
+
+        if not _is_valid_bsp(temp_path):
+            os.unlink(temp_path)
+            raise ValueError(
+                f"Downloaded file {filename} failed validation - corrupt or incomplete"
+            )
+
+        os.replace(temp_path, dest_path)
+
+        if not quiet:
+            print(f"  Downloaded to {dest_path}")
+
+        return dest_path
+
     except Exception:
-        pass
-
-    # Download with progress
-    downloaded = 0
-    chunk_size = 1024 * 1024
-
-    with urllib.request.urlopen(url, timeout=300) as response:
-        with open(dest_path, "wb") as f:
-            if show_progress and total_size > 0 and not quiet:
-                progress = SimpleProgressBar(total_size, f"  {filename}")
-                while True:
-                    chunk = response.read(chunk_size)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    progress.update(len(chunk))
-                print()  # Newline after progress bar
-            else:
-                while True:
-                    chunk = response.read(chunk_size)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if not quiet:
-                        print(
-                            f"\r  Downloaded {downloaded / 1024 / 1024:.1f} MB", end=""
-                        )
-
-    if not quiet:
-        print(f"  Downloaded to {dest_path}")
-
-    return dest_path
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        raise

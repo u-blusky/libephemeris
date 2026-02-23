@@ -229,12 +229,12 @@ def get_iers_auto_download() -> bool:
 
 def _get_cache_dir() -> str:
     """Get the IERS cache directory, creating it if necessary."""
-    from .state import get_library_path
+    from .state import _get_data_dir
 
     if _IERS_CACHE_DIR is not None:
         cache_path = os.path.abspath(_IERS_CACHE_DIR)
     else:
-        cache_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        cache_path = os.path.join(_get_data_dir(), DEFAULT_CACHE_DIR)
 
     if not os.path.exists(cache_path):
         os.makedirs(cache_path, exist_ok=True)

@@ -35,7 +35,7 @@ import threading
 from typing import Dict, Optional, Union
 
 from .logging_config import get_logger
-from .state import get_library_path
+from .download import _is_valid_bsp
 
 
 # =============================================================================
@@ -48,8 +48,8 @@ _AUTO_SPK_LOCK = threading.RLock()
 # Registry of auto-SPK configurations: {ipl: AutoSpkConfig}
 _AUTO_SPK_REGISTRY: dict[int, "AutoSpkConfig"] = {}
 
-# Default cache directory name within library path
-DEFAULT_CACHE_DIR = "spk_cache"
+# Default cache directory for SPK files
+DEFAULT_AUTO_SPK_DIR = os.path.join(os.path.expanduser("~"), ".libephemeris", "spk")
 
 # Default date range for auto-downloaded SPK files
 DEFAULT_START_DATE = "2000-01-01"
@@ -132,7 +132,7 @@ def get_cache_path(body_id: Union[int, str], cache_dir: Optional[str] = None) ->
     if cache_dir is not None:
         dir_path = os.path.abspath(cache_dir)
     else:
-        dir_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        dir_path = DEFAULT_AUTO_SPK_DIR
 
     # Sanitize body_id for filename
     body_str = str(body_id).lower()
@@ -172,7 +172,7 @@ def cache_info(
     if cache_dir is not None:
         dir_path = os.path.abspath(cache_dir)
     else:
-        dir_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        dir_path = DEFAULT_AUTO_SPK_DIR
 
     if not os.path.exists(dir_path):
         return {
@@ -240,7 +240,7 @@ class AutoSpkConfig:
         elif state.get_spk_cache_dir() is not None:
             cache_path = state.get_spk_cache_dir()  # type: ignore
         else:
-            cache_path = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+            cache_path = DEFAULT_AUTO_SPK_DIR
 
         if not os.path.exists(cache_path):
             os.makedirs(cache_path, exist_ok=True)
@@ -504,16 +504,26 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
     """
     from . import spk
 
+    logger = get_logger()
     cache_path = config.get_cache_path()
 
-    # Check if already cached
+    # Check if already cached and valid
     if os.path.exists(cache_path) and not force:
-        config.spk_path = cache_path
-    else:
-        # Download using astroquery
+        if _is_valid_bsp(cache_path):
+            config.spk_path = cache_path
+        else:
+            logger.warning(
+                "Cached SPK file %s is corrupted, re-downloading", cache_path
+            )
+            try:
+                os.remove(cache_path)
+            except OSError:
+                pass
+            force = True
+
+    if force or not os.path.exists(cache_path):
         with _AUTO_SPK_LOCK:
-            # Double-check after acquiring lock
-            if not os.path.exists(cache_path) or force:
+            if not os.path.exists(cache_path):
                 _download_spk_astroquery(
                     body_id=config.body_id,
                     start=config.start,
@@ -611,7 +621,7 @@ def get_cache_info() -> dict[str, Union[int, float, str, list[str]]]:
             - total_size_mb: Total size in MB
             - files: List of cached file names
     """
-    cache_dir = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+    cache_dir = DEFAULT_AUTO_SPK_DIR
 
     if not os.path.exists(cache_dir):
         return {
@@ -684,7 +694,7 @@ def list_cached_spk(
         from .state import get_spk_cache_dir
 
         resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
-        default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        default_cache = DEFAULT_AUTO_SPK_DIR
         dirs_to_check = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_check:
@@ -776,7 +786,7 @@ def clear_spk_cache(cache_dir: Optional[str] = None) -> int:
         from .state import get_spk_cache_dir
 
         resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
-        default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        default_cache = DEFAULT_AUTO_SPK_DIR
         dirs_to_clear = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_clear:
@@ -838,7 +848,7 @@ def get_cache_size(cache_dir: Optional[str] = None) -> float:
         from .state import get_spk_cache_dir
 
         resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
-        default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        default_cache = DEFAULT_AUTO_SPK_DIR
         dirs_to_check = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_check:
@@ -915,7 +925,7 @@ def prune_old_cache(
         from .state import get_spk_cache_dir
 
         resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
-        default_cache = os.path.join(get_library_path(), DEFAULT_CACHE_DIR)
+        default_cache = DEFAULT_AUTO_SPK_DIR
         dirs_to_prune = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_prune:
@@ -1035,14 +1045,6 @@ def disable_all() -> None:
     """
     with _AUTO_SPK_LOCK:
         _AUTO_SPK_REGISTRY.clear()
-
-
-# =============================================================================
-# DEFAULT CACHE DIRECTORY
-# =============================================================================
-
-# Default cache directory for auto_get_spk
-DEFAULT_AUTO_SPK_DIR = os.path.join(os.path.expanduser("~"), ".libephemeris", "spk")
 
 
 def _jd_to_iso_date(jd: float) -> str:
@@ -1198,7 +1200,13 @@ def _find_covering_spk(
                 # We compare truncated integer values since filenames use truncated JDs
                 # Add 1 to file_jd_end to account for the truncation (covers the full day)
                 if file_jd_start <= int(jd_start) and file_jd_end >= int(jd_end):
-                    return os.path.join(cache_dir, filename)
+                    filepath = os.path.join(cache_dir, filename)
+                    if _is_valid_bsp(filepath):
+                        return filepath
+                    logger = get_logger()
+                    logger.warning(
+                        "Cached SPK file %s is corrupted, skipping", filepath
+                    )
             except ValueError:
                 continue
 
@@ -1387,7 +1395,7 @@ def auto_get_spk(
     # Download using astroquery
     with _AUTO_SPK_LOCK:
         # Double-check after acquiring lock (another thread may have downloaded)
-        if os.path.exists(output_path):
+        if os.path.exists(output_path) and _is_valid_bsp(output_path):
             # Register if ipl is provided
             if ipl is not None:
                 _register_spk_after_download(output_path, body_id, ipl, naif_id)

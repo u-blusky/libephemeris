@@ -26,6 +26,33 @@ from .logging_config import get_logger
 
 
 # =============================================================================
+# DATA DIRECTORY CONFIGURATION
+# =============================================================================
+
+DEFAULT_DATA_DIR = os.path.join(os.path.expanduser("~"), ".libephemeris")
+_DATA_DIR_ENV_VAR = "LIBEPHEMERIS_DATA_DIR"
+
+
+def _get_data_dir() -> str:
+    """Get the base data directory for all downloaded/cached files.
+
+    Resolution order:
+        1. LIBEPHEMERIS_DATA_DIR environment variable
+        2. DEFAULT_DATA_DIR (~/.libephemeris)
+
+    The directory is created if it doesn't exist.
+
+    Returns:
+        str: Absolute path to the data directory.
+    """
+    env_value = os.environ.get(_DATA_DIR_ENV_VAR, "").strip()
+    data_dir = env_value if env_value else DEFAULT_DATA_DIR
+    data_dir = os.path.abspath(data_dir)
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
+
+
+# =============================================================================
 # PRECISION TIER SYSTEM
 # =============================================================================
 
@@ -136,12 +163,12 @@ def get_loader() -> Loader:
         Loader: Skyfield Loader instance for downloading/caching ephemeris files
 
     Note:
-        Data files are cached in the parent directory of this module by default.
+        Data files are cached in ~/.libephemeris by default (or
+        LIBEPHEMERIS_DATA_DIR environment variable if set).
     """
     global _LOADER
     if _LOADER is None:
-        data_dir = os.path.join(os.path.dirname(__file__), "..")
-        _LOADER = Loader(data_dir)
+        _LOADER = Loader(_get_data_dir())
     return _LOADER
 
 
@@ -322,7 +349,7 @@ def get_planets() -> SpiceKernel:
         2. LIBEPHEMERIS_EPHEMERIS environment variable (e.g., "de441.bsp")
         3. Default: "de440.bsp"
 
-        Searches in _EPHEMERIS_PATH if set, then workspace root, then downloads.
+        Searches in _EPHEMERIS_PATH if set, then ~/.libephemeris (downloads if missing).
     """
     global _PLANETS, _EPHEMERIS_FILE
     logger = get_logger()
@@ -340,20 +367,17 @@ def get_planets() -> SpiceKernel:
                 logger.info("Ephemeris loaded: %s", bsp_path)
                 return _PLANETS
 
-        # Try workspace root
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        bsp_path = os.path.join(base_dir, _EPHEMERIS_FILE)
+        # Load from data dir (downloads automatically if missing)
+        data_dir = _get_data_dir()
+        bsp_path = os.path.join(data_dir, _EPHEMERIS_FILE)
         if os.path.exists(bsp_path):
             logger.debug("Using cached ephemeris: %s", bsp_path)
             _PLANETS = load(bsp_path)
             logger.info("Ephemeris loaded: %s", bsp_path)
         else:
-            # Download from internet
             logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
             _PLANETS = load(_EPHEMERIS_FILE)
-            # Get the path where Skyfield downloaded the file
-            downloaded_path = os.path.join(base_dir, _EPHEMERIS_FILE)
-            logger.info("Ephemeris loaded: %s", downloaded_path)
+            logger.info("Ephemeris downloaded to: %s", data_dir)
     return _PLANETS
 
 
@@ -388,13 +412,11 @@ def get_planet_centers() -> Optional[SpiceKernel]:
         _PLANET_CENTERS = None
         _PLANET_CENTERS_TIER = None
 
-        workspace_root = os.path.join(os.path.dirname(__file__), "..")
-        data_dir = os.path.join(os.path.dirname(__file__), "data")
+        data_dir = _get_data_dir()
 
-        # Search order: tier-specific in workspace root → legacy in workspace root → bundled
+        # Search order: tier-specific → legacy
         candidates = [
-            os.path.join(workspace_root, f"planet_centers_{current_tier}.bsp"),
-            os.path.join(workspace_root, "planet_centers.bsp"),
+            os.path.join(data_dir, f"planet_centers_{current_tier}.bsp"),
             os.path.join(data_dir, "planet_centers.bsp"),
         ]
 
@@ -406,8 +428,10 @@ def get_planet_centers() -> Optional[SpiceKernel]:
                     _PLANET_CENTERS = load(path)
                     _PLANET_CENTERS_TIER = current_tier
                     break
-                except Exception:
-                    pass
+                except Exception as e:
+                    get_logger().warning(
+                        "Failed to load planet_centers file %s: %s", path, e
+                    )
 
     return _PLANET_CENTERS
 
@@ -879,27 +903,24 @@ def get_library_path() -> str:
     Returns:
         str: The absolute path to the directory containing ephemeris files.
              If set_ephe_path() was called, returns that custom path.
-             Otherwise returns the default data directory (parent of the
-             libephemeris package).
+             Otherwise returns the default data directory (~/.libephemeris).
 
     Note:
         - If a custom ephemeris path was set via set_ephe_path(), that path
           is returned regardless of whether files actually exist there.
-        - Otherwise, returns the workspace root directory where de440.bsp
-          and other data files are located by default.
+        - Otherwise, returns ~/.libephemeris (or LIBEPHEMERIS_DATA_DIR env var).
 
     Example:
         >>> from libephemeris import get_library_path, set_ephe_path
         >>> get_library_path()  # Returns default path
-        '/path/to/workspace'
+        '/home/user/.libephemeris'
         >>> set_ephe_path('/custom/ephemeris/path')
         >>> get_library_path()  # Returns custom path
         '/custom/ephemeris/path'
     """
     if _EPHEMERIS_PATH is not None:
         return os.path.abspath(_EPHEMERIS_PATH)
-    # Default: parent directory of this module (workspace root)
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    return _get_data_dir()
 
 
 def close() -> None:

@@ -66,6 +66,20 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
+
+def _is_valid_bsp(filepath: str) -> bool:
+    """Check if a BSP file can be opened and its segments enumerated by jplephem."""
+    try:
+        from jplephem.spk import SPK
+
+        with SPK.open(filepath) as kernel:
+            for segment in kernel.segments:
+                _ = segment.center, segment.target
+        return True
+    except Exception:
+        return False
+
+
 # =============================================================================
 # CONFIGURATION: TIER-SPECIFIC SOURCE FILES
 # =============================================================================
@@ -153,7 +167,11 @@ def download_file(
     ssl_ctx: ssl.SSLContext,
     fallback_ctx: Optional[ssl.SSLContext] = None,
 ) -> str:
-    """Download a file from URL with progress reporting."""
+    """Download a file from URL with progress reporting.
+
+    Uses atomic writes (tempfile + os.replace) to prevent partial files
+    from being left at the destination path if the download is interrupted.
+    """
     import urllib.request
 
     filename = os.path.basename(url)
@@ -176,49 +194,68 @@ def download_file(
             except Exception:
                 pass
 
-    # Download with progress
-    downloaded = 0
-    chunk_size = 1024 * 1024  # 1 MB chunks
-    ctx = ssl_ctx
+    # Download to temp file, then atomically move to dest
+    dest_dir = os.path.dirname(dest_path)
+    temp_fd, temp_path = tempfile.mkstemp(dir=dest_dir, suffix=".download")
 
     try:
-        with urllib.request.urlopen(url, timeout=300, context=ctx) as response:
-            with open(dest_path, "wb") as f:
-                while True:
-                    chunk = response.read(chunk_size)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total_size > 0:
-                        pct = downloaded / total_size * 100
-                        print(
-                            f"\r    {pct:5.1f}% ({downloaded / 1024 / 1024:.1f} MB)",
-                            end="",
-                        )
-                    else:
-                        print(f"\r    {downloaded / 1024 / 1024:.1f} MB", end="")
-    except Exception:
-        if fallback_ctx is None:
-            raise
-        print("    Warning: SSL verification failed; using permissive mode")
-        with urllib.request.urlopen(url, timeout=300, context=fallback_ctx) as response:
-            with open(dest_path, "wb") as f:
-                while True:
-                    chunk = response.read(chunk_size)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total_size > 0:
-                        pct = downloaded / total_size * 100
-                        print(
-                            f"\r    {pct:5.1f}% ({downloaded / 1024 / 1024:.1f} MB)",
-                            end="",
-                        )
+        downloaded = 0
+        chunk_size = 1024 * 1024  # 1 MB chunks
+        ctx = ssl_ctx
 
-    print(f"\r    100.0% ({downloaded / 1024 / 1024:.1f} MB) - Done")
-    return dest_path
+        try:
+            with urllib.request.urlopen(url, timeout=300, context=ctx) as response:
+                with os.fdopen(temp_fd, "wb") as f:
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            pct = downloaded / total_size * 100
+                            print(
+                                f"\r    {pct:5.1f}% ({downloaded / 1024 / 1024:.1f} MB)",
+                                end="",
+                            )
+                        else:
+                            print(f"\r    {downloaded / 1024 / 1024:.1f} MB", end="")
+        except Exception:
+            if fallback_ctx is None:
+                raise
+            print("    Warning: SSL verification failed; using permissive mode")
+            # temp_fd was already closed by os.fdopen above on error, reopen
+            temp_fd2, temp_path2 = tempfile.mkstemp(dir=dest_dir, suffix=".download")
+            # Clean up first temp file
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            temp_path = temp_path2
+            downloaded = 0
+            with urllib.request.urlopen(
+                url, timeout=300, context=fallback_ctx
+            ) as response:
+                with os.fdopen(temp_fd2, "wb") as f:
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            pct = downloaded / total_size * 100
+                            print(
+                                f"\r    {pct:5.1f}% ({downloaded / 1024 / 1024:.1f} MB)",
+                                end="",
+                            )
+
+        print(f"\r    100.0% ({downloaded / 1024 / 1024:.1f} MB) - Done")
+        os.replace(temp_path, dest_path)
+        return dest_path
+
+    except Exception:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+        raise
 
 
 def download_source_files(
@@ -254,8 +291,17 @@ def download_source_files(
             local_path = os.path.join(cache_dir, filename)
 
             if os.path.exists(local_path) and not force:
-                print(f"  {filename}: Already cached")
-                local_files[planet].append(local_path)
+                if _is_valid_bsp(local_path):
+                    print(f"  {filename}: Already cached")
+                    local_files[planet].append(local_path)
+                else:
+                    print(f"  {filename}: Cached file is corrupted, re-downloading")
+                    try:
+                        os.remove(local_path)
+                    except OSError:
+                        pass
+                    download_file(url, local_path, ssl_ctx, fallback_ctx)
+                    local_files[planet].append(local_path)
             else:
                 download_file(url, local_path, ssl_ctx, fallback_ctx)
                 local_files[planet].append(local_path)
@@ -386,6 +432,10 @@ def generate_tier_spk(
     leapseconds_path = os.path.join(cache_dir, "naif0012.tls")
     spice.furnsh(leapseconds_path)
 
+    # Remove existing output file (SPICE spkopn cannot overwrite)
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
     # Create output SPK
     ifname = f"Planet Centers SPK for libephemeris ({tier} tier)"
     output_handle = spice.spkopn(output_path, ifname, 0)
@@ -512,12 +562,12 @@ Examples:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        help="Output directory (default: repository root)",
+        help="Output directory (default: ~/.libephemeris)",
     )
     parser.add_argument(
         "--cache-dir",
         type=Path,
-        help="Cache directory for source files (default: temp directory)",
+        help="Cache directory for source files (default: ~/.libephemeris/tmp/planet_centers)",
     )
 
     args = parser.parse_args()
@@ -536,9 +586,8 @@ Examples:
         return 1
 
     # Determine paths
-    script_dir = Path(__file__).parent
-    repo_root = script_dir.parent
-    output_dir = args.output_dir or repo_root
+    default_output = Path.home() / ".libephemeris"
+    output_dir = args.output_dir or default_output
 
     print("=" * 70)
     print("PLANET CENTERS SPK GENERATOR")
@@ -558,12 +607,13 @@ Examples:
 
         if args.cache_dir:
             cache_dir = str(args.cache_dir)
-            os.makedirs(cache_dir, exist_ok=True)
-            generate_for_tier(tier, output_dir, cache_dir, args.force)
         else:
-            with tempfile.TemporaryDirectory(prefix="planet_centers_") as cache_dir:
-                print(f"Cache directory: {cache_dir}")
-                generate_for_tier(tier, output_dir, cache_dir, args.force)
+            cache_dir = os.path.join(
+                os.path.expanduser("~"), ".libephemeris", "tmp", "planet_centers"
+            )
+        os.makedirs(cache_dir, exist_ok=True)
+        print(f"Cache directory: {cache_dir}")
+        generate_for_tier(tier, output_dir, cache_dir, args.force)
 
     print("\n" + "=" * 70)
     print("COMPLETE")

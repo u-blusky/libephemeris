@@ -112,8 +112,9 @@ class EphemerisContext:
         if _SHARED_LOADER is None:
             with _SHARED_LOCK:
                 if _SHARED_LOADER is None:  # Double-checked locking
-                    data_dir = os.path.join(os.path.dirname(__file__), "..")
-                    _SHARED_LOADER = Loader(data_dir)
+                    from .state import _get_data_dir
+
+                    _SHARED_LOADER = Loader(_get_data_dir())
         return _SHARED_LOADER
 
     def get_timescale(self) -> Timescale:
@@ -158,15 +159,14 @@ class EphemerisContext:
                             _SHARED_PLANETS = load(bsp_path)
                             return _SHARED_PLANETS
 
-                    # Try workspace root
-                    base_dir = os.path.abspath(
-                        os.path.join(os.path.dirname(__file__), "..")
-                    )
-                    bsp_path = os.path.join(base_dir, _SHARED_EPHE_FILE)
+                    # Load from data dir (downloads automatically if missing)
+                    from .state import _get_data_dir
+
+                    data_dir = _get_data_dir()
+                    bsp_path = os.path.join(data_dir, _SHARED_EPHE_FILE)
                     if os.path.exists(bsp_path):
                         _SHARED_PLANETS = load(bsp_path)
                     else:
-                        # Download from internet
                         _SHARED_PLANETS = load(_SHARED_EPHE_FILE)
         return _SHARED_PLANETS
 

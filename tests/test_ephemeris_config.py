@@ -170,10 +170,8 @@ def test_get_library_path_returns_default():
     # Should return an absolute path
     assert os.path.isabs(path)
 
-    # Should be the parent directory of the libephemeris package
-    import libephemeris
-
-    expected_base = os.path.dirname(os.path.dirname(libephemeris.__file__))
+    # Should be ~/.libephemeris (or LIBEPHEMERIS_DATA_DIR if set)
+    expected_base = os.path.join(os.path.expanduser("~"), ".libephemeris")
     assert os.path.normpath(path) == os.path.normpath(expected_base)
 
 
@@ -237,8 +235,6 @@ def test_get_library_path_after_close():
 
         path = get_library_path()
 
-        # Should return default path, not the custom one
-        import libephemeris
-
-        expected_base = os.path.dirname(os.path.dirname(libephemeris.__file__))
+        # Should return default path (~/.libephemeris), not the custom one
+        expected_base = os.path.join(os.path.expanduser("~"), ".libephemeris")
         assert os.path.normpath(path) == os.path.normpath(expected_base)

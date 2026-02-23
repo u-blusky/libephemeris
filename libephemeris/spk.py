@@ -42,6 +42,7 @@ import os
 import re
 import ssl
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -53,10 +54,10 @@ import numpy as np
 
 from skyfield.framelib import ecliptic_frame
 
-from .download import SimpleProgressBar
+from .download import SimpleProgressBar, _is_valid_bsp
 from .exceptions import SPKNotFoundError
 from .logging_config import format_file_size, get_logger
-from .state import get_library_path, get_loader, get_timescale
+from .state import get_loader, get_timescale
 
 # Lazy import for spktype21 (optional dependency for type 21 support)
 _spktype21_module = None
@@ -349,7 +350,7 @@ def download_spk(
             - Combined: "2060 Chiron", "(136199) Eris"
         start: Start date in YYYY-MM-DD format
         end: End date in YYYY-MM-DD format
-        path: Directory to save the file. If None, uses get_library_path()
+        path: Directory to save the file. If None, uses ~/.libephemeris/spk/
         center: Reference center for ephemeris (default: "500@0" = SSB).
             Use "500@0" for compatibility with Skyfield/DE kernels.
         overwrite: If True, overwrite existing file. If False, skip if exists.
@@ -370,7 +371,9 @@ def download_spk(
     """
     # Determine output directory
     if path is None:
-        path = get_library_path()
+        from .state import _get_data_dir
+
+        path = os.path.join(_get_data_dir(), "spk")
 
     # Ensure directory exists
     os.makedirs(path, exist_ok=True)
@@ -382,11 +385,17 @@ def download_spk(
     filename = f"{body_safe}_{start_short}_{end_short}.bsp"
     filepath = os.path.join(path, filename)
 
-    # Check if already exists
-    if os.path.exists(filepath) and not overwrite:
-        return filepath
-
     logger = get_logger()
+
+    # Check if already exists and valid
+    if os.path.exists(filepath) and not overwrite:
+        if _is_valid_bsp(filepath):
+            return filepath
+        logger.warning("Cached SPK file %s is corrupted, re-downloading", filepath)
+        try:
+            os.remove(filepath)
+        except OSError:
+            pass
 
     # Deduce NAIF ID for logging (if possible)
     naif_id = _deduce_naif_id(body)
@@ -433,7 +442,6 @@ def download_spk(
 
             spk_data_b64 = data["spk"]
 
-            # The SPK data is returned as base64-encoded binary data
             import base64
 
             try:
@@ -443,9 +451,22 @@ def download_spk(
                     f"Failed to decode SPK data from Horizons response: {e}"
                 ) from e
 
-            # Write to file
-            with open(filepath, "wb") as f:
-                f.write(spk_data)
+            temp_fd, temp_path = tempfile.mkstemp(dir=path, suffix=".download")
+            try:
+                with os.fdopen(temp_fd, "wb") as f:
+                    f.write(spk_data)
+
+                if not _is_valid_bsp(temp_path):
+                    os.unlink(temp_path)
+                    raise ValueError(
+                        "Downloaded SPK data failed validation - corrupt or incomplete"
+                    )
+
+                os.replace(temp_path, filepath)
+            except Exception:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                raise
 
             size_str = format_file_size(len(spk_data))
             logger.info("SPK saved: %s (%s)", filepath, size_str)
@@ -542,20 +563,25 @@ def register_spk_body(
 
     # Resolve file path
     if not os.path.isabs(spk_file):
-        # Try library path
-        lib_path = get_library_path()
-        full_path = os.path.join(lib_path, spk_file)
-        if os.path.exists(full_path):
-            spk_file = full_path
-        elif not os.path.exists(spk_file):
-            # Get helpful info for error message
-            body_name = _get_body_name(ipl)
-            body_id = _get_horizons_id_for_body(ipl)
-            raise SPKNotFoundError.from_filepath(
-                filepath=spk_file,
-                body_name=body_name,
-                body_id=body_id,
-            )
+        from .state import _get_data_dir
+
+        data_dir = _get_data_dir()
+        # Try data dir and spk subdirectory
+        for search_dir in [os.path.join(data_dir, "spk"), data_dir]:
+            full_path = os.path.join(search_dir, spk_file)
+            if os.path.exists(full_path):
+                spk_file = full_path
+                break
+        else:
+            if not os.path.exists(spk_file):
+                # Get helpful info for error message
+                body_name = _get_body_name(ipl)
+                body_id = _get_horizons_id_for_body(ipl)
+                raise SPKNotFoundError.from_filepath(
+                    filepath=spk_file,
+                    body_name=body_name,
+                    body_id=body_id,
+                )
 
     if not os.path.exists(spk_file):
         # Get helpful info for error message
@@ -666,9 +692,14 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
 
     # Resolve path
     if not os.path.isabs(spk_file):
-        full_path = os.path.join(get_library_path(), spk_file)
-        if os.path.exists(full_path):
-            spk_file = full_path
+        from .state import _get_data_dir
+
+        data_dir = _get_data_dir()
+        for search_dir in [os.path.join(data_dir, "spk"), data_dir]:
+            full_path = os.path.join(search_dir, spk_file)
+            if os.path.exists(full_path):
+                spk_file = full_path
+                break
 
     if not os.path.exists(spk_file):
         return None
@@ -1062,7 +1093,7 @@ def download_and_register_spk(
         end: End date (YYYY-MM-DD)
         naif_id: NAIF ID in the kernel. If None, auto-detected from SPK file.
             JPL Horizons uses: asteroid_number + 20000000
-        path: Directory to save file (default: get_library_path())
+        path: Directory to save file (default: ~/.libephemeris/spk/)
         center: Reference center (default: "500@0" = SSB)
         overwrite: Overwrite existing file if True
         timeout: Request timeout in seconds

@@ -270,8 +270,8 @@ def register_moon_spk(
 
     # Resolve file path
     if not os.path.isabs(spk_file):
-        lib_path = state.get_library_path()
-        full_path = os.path.join(lib_path, spk_file)
+        data_dir = state._get_data_dir()
+        full_path = os.path.join(data_dir, spk_file)
         if os.path.exists(full_path):
             spk_file = full_path
         elif not os.path.exists(spk_file):

@@ -116,8 +116,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--output-dir",
-        default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        help="Output directory (default: repository root)",
+        default=os.path.join(os.path.expanduser("~"), ".libephemeris", "spk"),
+        help="Output directory (default: ~/.libephemeris/spk)",
     )
     parser.add_argument(
         "--force",
