@@ -1,34 +1,119 @@
-# Lunar Apsides: The Scientific Approach of LibEphemeris
+# Lunar Apsides: Computational Methodology
 
-One of the most complex challenges in computational astronomy is determining the position of the lunar apsides (the perigee and apogee, also known in astrology as True/Black Moon Lilith).
+## Background
 
-Unlike the planets, the Moon's orbit is heavily deformed by the Sun's gravity. This means the instantaneous (osculating) perigee is highly volatile, swinging wildly by up to ±30° over the course of a single month.
+The lunar apsides -- perigee (closest approach) and apogee (farthest point) --
+are among the most computationally challenging quantities in positional
+astronomy. The Moon's orbit is strongly perturbed by the Sun, causing the
+instantaneous (osculating) perigee to oscillate by approximately +/-30 degrees
+over a single anomalistic month.
 
-To provide a useful value for daily calculations, ephemeris software must compute an "Interpolated" or "Natural" perigee—a mathematically smoothed curve that removes this short-period volatility while remaining physically accurate to the Moon's actual orbital dynamics.
+For practical ephemeris use, this oscillation must be smoothed to produce an
+"interpolated" or "natural" apsidal position that reflects the genuine
+long-term motion of the apsidal line without the spurious short-period
+volatility inherent in the two-body approximation.
 
-Here, `libephemeris` deliberately departs from the legacy methodology used by Swiss Ephemeris (`pyswisseph`) to prioritize modern scientific and physical rigor.
+The choice of smoothing methodology constitutes the most significant
+computational difference between LibEphemeris and Swiss Ephemeris.
 
-## The Legacy Approach (Swiss Ephemeris)
+---
 
-In the 1990s, the authors of Swiss Ephemeris faced the challenge of computing this smoothed curve without the computing power available today.
+## Swiss Ephemeris Approach
 
-Their solution was based on **ELP2000-82B**, an analytical lunar theory developed by Chapront-Touzé and Chapront in the 1980s. ELP2000 uses thousands of trigonometric terms to approximate the Moon's position. To create a "smooth" perigee, the developers manually isolated specific terms in the theory and mathematically "switched off" any term that contained the mean lunar anomaly (the Moon's monthly motion).
+Swiss Ephemeris computes the interpolated apsides using the analytical method
+developed by S.L. Moshier, based on the ELP2000-82B lunar theory
+(Chapront-Touze & Chapront, 1988).
 
-While this creates a mathematically smooth curve, **it is an artificial mathematical construct**. Because it relies on a truncated analytical theory from 1988, this curve can deviate from the *actual physical geometry* of the Earth-Moon system by up to **5 degrees**.
+This approach works within the analytical framework of the lunar theory itself:
+the thousands of trigonometric terms in ELP2000-82B are classified by their
+physical origin, and terms associated with the mean anomaly (the Moon's monthly
+orbital cycle) are excluded. The remaining terms define the smoothed apsidal
+position.
 
-## The Modern Scientific Approach (LibEphemeris)
+This produces a mathematically coherent result within its theoretical framework.
+However, the output is constrained by the truncation level and fitting epoch of
+the analytical theory (1988). The resulting curve can differ from the physical
+geometry of the Earth-Moon system -- as represented by modern numerical
+integrations -- by several degrees.
 
-Instead of relying on truncated 1980s analytical theories, `libephemeris` leverages modern computing power and the **NASA JPL DE440/441** numerical integrations (the same models used to navigate spacecraft).
+---
 
-Our approach to the Interpolated Perigee is physically grounded:
+## LibEphemeris Approach
 
-1. **Physical Reality:** We calculate the exact moments in time when the Moon physically reaches its closest point to Earth (the actual perigee passage) using the JPL DE440/441 state vectors. At these exact moments, the volatile osculating perigee perfectly aligns with physical reality.
-2. **Mathematical Smoothing:** We use modern mathematical interpolation (splines and harmonic series fits calibrated over thousands of years) to draw a smooth, continuous curve directly through these true physical passages.
+LibEphemeris constructs the interpolated apsides from the physical geometry of
+the JPL DE440/DE441 numerical integrations:
 
-### The Result
+1. **Passage identification.** All perigee passages (local Earth-Moon distance
+   minima) are identified from JPL state vectors over a 1000-year calibration
+   span (1500-2500 CE). At each passage, the Moon's ecliptic longitude is an
+   unambiguous physical measurement of the perigee direction. Over 12,000
+   passages are used.
 
-The result is a Natural Perigee that accurately reflects the physical reality of the solar system as defined by modern space agencies, rather than an artifact of a truncated mathematical theory.
+2. **Spline interpolation.** A cubic spline is fitted through the passage
+   longitudes (with angle unwrapping) to produce a smooth, continuous perigee
+   longitude function at arbitrary times.
 
-**Because of this commitment to scientific accuracy, the `libephemeris` Interpolated Perigee (`SE_INTP_PERG`) will differ from the Swiss Ephemeris output by up to 5 degrees.**
+3. **Harmonic series calibration.** A 61-term trigonometric perturbation series,
+   constructed from the standard Delaunay arguments (D, M, M', F), is fitted to
+   the spline via least squares. Terms with amplitudes below 0.001 degrees are
+   discarded.
 
-This is not a bug or a lack of precision. It is a deliberate enhancement. We consider the JPL numerical integrations to be the absolute ground truth of the solar system, and we prioritize physical reality over backwards compatibility with legacy analytical approximations.
+4. **Residual correction.** A precomputed correction table (~15,000 entries)
+   absorbs the remaining difference between the harmonic model and the JPL
+   ground truth.
+
+The result is a smooth apsidal curve anchored to the physical distance extrema
+of the Moon as computed by modern numerical integration.
+
+---
+
+## Measured Discrepancy
+
+The interpolated perigee (`SE_INTP_PERG`) in LibEphemeris differs from Swiss
+Ephemeris by up to approximately 5 degrees. This is the largest single
+discrepancy between the two libraries.
+
+The difference arises from two distinct smoothing philosophies applied to the
+same underlying phenomenon:
+
+| Property                      | Swiss Ephemeris                 | LibEphemeris                            |
+| ----------------------------- | ------------------------------- | --------------------------------------- |
+| Ground truth                  | ELP2000-82B analytical theory   | JPL DE440/DE441 numerical integration   |
+| Smoothing method              | Analytical term selection       | Physical passage interpolation          |
+| Perigee oscillation amplitude | ~15 deg from mean               | ~25 deg from mean                       |
+| Apogee oscillation amplitude  | ~5 deg from mean                | ~5 deg from mean                        |
+| Date range                    | ~-5400 to +5400 CE              | 1550-2650 (DE440) / -13200 to +17191 (DE441) |
+
+The interpolated apogee (`SE_INTP_APOG`) shows a smaller discrepancy (~0.36
+degrees maximum), as both approaches produce similar results for the apogee
+where perturbation amplitudes are smaller.
+
+---
+
+## Rationale
+
+LibEphemeris adopts JPL numerical integrations as the primary reference for
+orbital geometry. The DE440/DE441 ephemerides incorporate lunar laser ranging
+data accurate to approximately 1 milliarcsecond and represent the current
+standard for planetary and lunar ephemeris computation (Park et al., 2021).
+
+The ELP2000-82B theory, while a significant achievement of 20th-century
+celestial mechanics, is a truncated analytical approximation fitted to an
+earlier generation of observations. Where the analytical smoothing and the
+physical passage interpolation disagree, the JPL-grounded approach more closely
+represents the actual state of the Earth-Moon system.
+
+This choice prioritises physical accuracy over backward compatibility with
+the analytical framework.
+
+---
+
+## References
+
+1. Park, R.S. et al. (2021). "The JPL Planetary and Lunar Ephemerides DE440 and DE441." *Astronomical Journal*, 161(3), 105.
+2. Chapront-Touze, M. & Chapront, J. (1988). "ELP 2000-82B: A semi-analytical lunar ephemeris." *Astronomy & Astrophysics*, 190, 342-352.
+3. Moshier, S.L. (1992). "Comparison of a 7000-year lunar ephemeris with analytical theory." *Astronomy & Astrophysics*, 262, 613-616.
+4. Meeus, J. (1998). *Astronomical Algorithms*, 2nd edition. Willmann-Bell.
+
+See also: `docs/interpolated_perigee_methodology.md` (calibration details),
+`docs/INTERPOLATED_APOGEE.md` (apogee-specific methodology).

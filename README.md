@@ -22,14 +22,20 @@ A pure Python astronomical ephemeris library based on NASA JPL data. Designed as
 
 ## Why
 
-Swiss Ephemeris is fast and widely used, but relies heavily on analytical theories developed in the 1980s. LibEphemeris makes a different trade-off, prioritizing **scientific rigor and modern astronomical reality over legacy approximations**:
+Swiss Ephemeris is fast and widely used, but its architecture reflects design
+decisions from the 1990s. LibEphemeris makes a different trade-off:
+**absolute consistency with current NASA JPL ephemerides and IAU standards**,
+at the cost of speed and strict numerical agreement with Swiss Ephemeris.
 
-- **Accuracy-first:** 100% based on modern NASA JPL numerical integrations (DE440/DE441) and IAU-standard precession/nutation (via pyerfa).
-- **Physical Reality for Lunar Apsides:** For highly volatile points like the Interpolated Perigee (Natural Apse/Lilith), we compute a smooth curve through the *actual physical passages* of the Moon according to JPL data, rather than using the mathematically truncated 1988 analytical theory (ELP2000-82B) used by legacy software.
-- **Transparent:** Pure Python, fully testable, readable, and documented with explicit astronomical references.
-- **Slower than SwissEph:** Swiss is C; LibEphemeris is Python (see Performance).
+- **Modern ephemeris, no fallback.** All calculations use JPL DE440/DE441 (2021) exclusively. The `SEFLG_MOSEPH` flag is accepted for compatibility but silently ignored -- there is no degradation to 1980s analytical theories.
+- **Physical planet positions.** Outer planet positions are automatically corrected from system barycenters to true planet body centers, using JPL satellite ephemerides and analytical moon theories. No extra flags or files required.
+- **JPL-grounded lunar apsides.** The interpolated perigee and apogee are derived from actual physical distance-extrema passages in JPL data, rather than from truncated analytical series.
+- **Current Delta T model.** Uses Stephenson, Morrison & Hohenkerk (2016) with optional IERS observational data -- the current astronomical standard for historical timescale conversion.
+- **Transparent.** Pure Python, fully testable, readable, and documented with explicit astronomical references.
+- **Slower than Swiss Ephemeris.** Swiss is C; LibEphemeris is Python (see Performance).
 
-Precision details (models, term counts, measured comparisons, references): `docs/PRECISION.md` and `docs/methodology_lunar_apsides.md`.
+Methodology and rationale: `docs/methodology.md`.
+Precision measurements: `docs/PRECISION.md`.
 
 ---
 
@@ -246,11 +252,13 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 
 ## Docs
 
+- `docs/methodology.md` (computational methodology, comparison with Swiss Ephemeris)
 - `docs/PRECISION.md` (scientific models, measured precision, references)
 - `docs/migration-guide.md` (pyswisseph -> libephemeris)
 - `docs/HOUSE_SYSTEMS.md`
 - `docs/AYANAMSHA.md`
 - `docs/testing.md`
+- `docs/methodology_lunar_apsides.md` (lunar apsides methodology)
 - `docs/interpolated_perigee_methodology.md` (perigee calibration method and precision)
 - `docs/INTERPOLATED_APOGEE.md` (apogee methodology)
 - `docs/TRUE_LILITH_METHODS.md` (True Lilith correction methods)
