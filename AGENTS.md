@@ -243,6 +243,35 @@ return _to_native_floats((lon, lat, dist, dlon, dlat, ddist)), iflag
 
 ### Ephemeris File Selection
 
-The `LIBEPHEMERIS_EPHEMERIS` environment variable controls which JPL ephemeris file is used. For example, set `LIBEPHEMERIS_EPHEMERIS=de441.bsp` to use DE441 for extended date range coverage. The default is DE440.
+LibEphemeris supports three precision tiers, each mapping to a different JPL ephemeris:
+
+| Tier | File | Date Range | Size | Use Case |
+|------|------|------------|------|----------|
+| `base` | de440s.bsp | 1849-2150 | ~31 MB | Lightweight, modern-era usage |
+| `medium` | de440.bsp | 1550-2650 | ~128 MB | General purpose **(DEFAULT)** |
+| `extended` | de441.bsp | -13200 to +17191 | ~3.1 GB | Historical/far-future research |
+
+**Resolution priority** (highest to lowest):
+1. `LIBEPHEMERIS_EPHEMERIS` environment variable
+2. `set_ephemeris_file()` / `set_jpl_file()` programmatic call
+3. Precision tier (`LIBEPHEMERIS_PRECISION` env var or `set_precision_tier()`)
+4. Default: `de440.bsp` (medium tier)
+
+```bash
+# Select by tier
+export LIBEPHEMERIS_PRECISION=extended   # uses de441.bsp
+
+# Or select ephemeris file directly
+export LIBEPHEMERIS_EPHEMERIS=de441.bsp
+```
+
+```python
+# Programmatic equivalents
+from libephemeris import set_precision_tier, set_ephemeris_file
+
+set_precision_tier("extended")       # uses de441.bsp
+# or
+set_ephemeris_file("de441.bsp")      # direct override (takes priority over tier)
+```
 
 *KEEP ALWAYS 1:1 Compatibility with PySwissEphemeris!*

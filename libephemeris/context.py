@@ -73,7 +73,10 @@ class EphemerisContext:
         Args:
             ephe_path: Optional path to directory containing ephemeris files.
                       If None, uses default workspace directory.
-            ephe_file: Ephemeris file to use (default: "de440.bsp")
+            ephe_file: Ephemeris file to use (default: "de440.bsp").
+                      Supported files: "de440s.bsp" (1849-2150, lightweight),
+                      "de440.bsp" (1550-2650, default), "de441.bsp" (-13200 to
+                      +17191, extended range).
         """
         # Instance-specific state (NOT shared between contexts)
         self.topo: Optional[Topos] = None

@@ -618,13 +618,9 @@ def set_ephemeris_file(filename: str) -> None:
         filename: Name of the JPL ephemeris file (e.g., "de440.bsp", "de441.bsp")
 
     Note:
-        This allows using different ephemeris files with varying date ranges:
-        - de421.bsp: 1900-2050 (legacy, 16 MB)
-        - de422.bsp: -3000-3000 (623 MB)
-        - de430.bsp: 1550-2650 (128 MB)
-        - de431.bsp: -13200-17191 (3.4 GB)
+        Supported ephemeris files:
+        - de440s.bsp: 1849-2150 (31 MB) - lightweight subset of DE440
         - de440.bsp: 1550-2650 (default, 128 MB) - recommended for most uses
-        - de440s.bsp: 1849-2150 (31 MB) - lightweight
         - de441.bsp: -13200-17191 (3.4 GB) - for extended historical work
 
         The file will be searched in:
@@ -655,16 +651,17 @@ def set_jpl_file(filename: str) -> None:
         filename: Name of the JPL ephemeris file (e.g., "de440.bsp", "de441.bsp")
 
     Note:
-        Skyfield/libephemeris uses JPL Development Ephemeris (DE) files:
-        - de421.bsp: 1900-2050 (legacy, 16 MB)
-        - de422.bsp: -3000-3000 (623 MB)
-        - de430.bsp: 1550-2650 (128 MB)
-        - de431.bsp: -13200-17191 (3.4 GB)
+        Supported ephemeris files:
+        - de440s.bsp: 1849-2150 (31 MB) - lightweight subset of DE440
         - de440.bsp: 1550-2650 (default, 128 MB) - recommended for most uses
         - de441.bsp: -13200-17191 (3.4 GB) - for extended historical work
 
         If the file is not found locally, Skyfield will attempt to download it.
         Use set_ephe_path() to specify a local directory containing the file.
+
+        Alternatively, use set_precision_tier() to select a tier (base/medium/
+        extended), which automatically selects the appropriate ephemeris file.
+        Note: set_ephemeris_file() takes priority over the tier setting.
 
     Example:
         >>> from libephemeris import set_jpl_file, set_ephe_path

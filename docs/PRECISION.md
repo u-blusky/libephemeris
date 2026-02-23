@@ -10,23 +10,46 @@ LibEphemeris is built on modern IAU standards and NASA JPL ephemerides. Every co
 
 LibEphemeris uses NASA JPL DE440 and DE441, the most recent planetary ephemerides produced by the Jet Propulsion Laboratory (Park et al. 2021). These are the same ephemerides used for Mars rover navigation and the James Webb Space Telescope.
 
-| Property | DE440 | DE441 |
-|----------|-------|-------|
-| Date range | 1550--2650 CE | -13200--+17191 CE |
-| File size | ~119 MB | ~3.4 GB |
-| Reference frame | ICRF 3.0 | ICRF 3.0 |
-| Lunar model | Numerically integrated | Numerically integrated |
-| Lunar Laser Ranging fit | ~1 milliarcsecond | ~1 milliarcsecond |
-| Planetary radar fit | ~10 m (inner planets) | ~10 m (inner planets) |
+| Property | DE440s | DE440 | DE441 |
+|----------|--------|-------|-------|
+| Date range | 1849--2150 CE | 1550--2650 CE | -13200--+17191 CE |
+| File size | ~31 MB | ~119 MB | ~3.4 GB |
+| Reference frame | ICRF 3.0 | ICRF 3.0 | ICRF 3.0 |
+| Lunar model | Numerically integrated | Numerically integrated | Numerically integrated |
+| Lunar Laser Ranging fit | ~1 milliarcsecond | ~1 milliarcsecond | ~1 milliarcsecond |
+| Planetary radar fit | ~10 m (inner planets) | ~10 m (inner planets) | ~10 m (inner planets) |
 
-DE440 is the default. To use DE441 for extended date coverage:
+DE440 and DE441 have identical precision -- DE441 is simply the extended-range version. DE440s is a reduced-size subset of DE440 with no loss of precision within its range.
+
+### Precision tiers
+
+LibEphemeris organises these files into three precision tiers:
+
+| Tier | File | Use Case |
+|------|------|----------|
+| `base` | de440s.bsp | Lightweight, modern-era usage |
+| `medium` | de440.bsp | General purpose **(DEFAULT)** |
+| `extended` | de441.bsp | Historical/far-future research |
+
+Select by tier or by file directly:
 
 ```python
 import libephemeris as eph
+
+# By tier
+eph.set_precision_tier("extended")   # uses de441.bsp
+
+# Or by file
 eph.set_ephemeris_file("de441.bsp")
 ```
 
-Or via environment variable: `LIBEPHEMERIS_EPHEMERIS=de441.bsp`.
+Environment variables: `LIBEPHEMERIS_PRECISION=extended` or `LIBEPHEMERIS_EPHEMERIS=de441.bsp`.
+
+Resolution priority (highest to lowest):
+1. `LIBEPHEMERIS_EPHEMERIS` environment variable
+2. `set_ephemeris_file()` / `set_jpl_file()` programmatic call
+3. Precision tier (`LIBEPHEMERIS_PRECISION` env var or `set_precision_tier()`)
+4. Default: `de440.bsp` (medium tier)
 
 ### Swiss Ephemeris comparison
 

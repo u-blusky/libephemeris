@@ -77,8 +77,11 @@ EphemerisContext
       :param ephe_path: Optional path to directory containing ephemeris files.
                         If None, uses default workspace directory.
       :type ephe_path: str, optional
-      :param ephe_file: Ephemeris file to use (default: "de440.bsp")
-      :type ephe_file: str
+       :param ephe_file: Ephemeris file to use (default: ``"de440.bsp"``).
+                         Supported files: ``"de440s.bsp"`` (1849--2150, lightweight),
+                         ``"de440.bsp"`` (1550--2650, default),
+                         ``"de441.bsp"`` (-13200 to +17191, extended range).
+       :type ephe_file: str
 
    .. method:: set_topo(lon, lat, alt)
 
@@ -1250,8 +1253,49 @@ swe_set_jpl_file / set_jpl_file
 
    Set the JPL ephemeris file to use.
 
-   :param filename: Ephemeris file name (e.g., "de440.bsp", "de441.bsp")
+   Supported files include ``"de440s.bsp"`` (1849--2150, lightweight),
+   ``"de440.bsp"`` (1550--2650, default), and ``"de441.bsp"`` (-13200 to +17191,
+   extended range). This takes priority over the precision tier setting; to
+   revert to tier-based selection, call ``close()``.
+
+   Alternatively, use :func:`set_precision_tier` to select a tier which
+   automatically picks the appropriate file.
+
+   :param filename: Ephemeris file name (e.g., ``"de440.bsp"``, ``"de441.bsp"``)
    :type filename: str
+
+
+set_precision_tier
+~~~~~~~~~~~~~~~~~~
+
+.. function:: set_precision_tier(tier)
+
+   Set the precision tier, which controls the ephemeris file and SPK date range.
+
+   Available tiers:
+
+   - ``"base"``: de440s.bsp (1849--2150, ~31 MB) -- lightweight, modern-era usage
+   - ``"medium"``: de440.bsp (1550--2650, ~128 MB) -- general purpose **(default)**
+   - ``"extended"``: de441.bsp (-13200 to +17191, ~3.1 GB) -- historical/far-future research
+
+   This overrides the ``LIBEPHEMERIS_PRECISION`` environment variable.
+   Note that ``set_ephemeris_file()`` and the ``LIBEPHEMERIS_EPHEMERIS`` env var
+   take priority over the tier setting.
+
+   :param tier: Tier name (``"base"``, ``"medium"``, or ``"extended"``)
+   :type tier: str
+   :raises ValueError: If tier name is not valid
+
+
+get_precision_tier
+~~~~~~~~~~~~~~~~~~
+
+.. function:: get_precision_tier()
+
+   Get the name of the current precision tier.
+
+   :returns: Current tier name (``"base"``, ``"medium"``, or ``"extended"``)
+   :rtype: str
 
 
 swe_set_tid_acc / set_tid_acc

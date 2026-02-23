@@ -151,22 +151,47 @@ pos, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_SIDEREAL
 
 ---
 
-## Choose the ephemeris (DE440 vs DE441)
+## Choose the ephemeris
 
-Default ephemeris: **DE440** (1550--2650 CE).
+LibEphemeris supports three precision tiers, each mapping to a different JPL ephemeris:
 
-To use **DE441** (extended range -13200 to +17191 CE):
+| Tier | File | Date Range | Size | Use Case |
+|------|------|------------|------|----------|
+| `base` | de440s.bsp | 1849--2150 | ~31 MB | Lightweight, modern-era usage |
+| `medium` | de440.bsp | 1550--2650 | ~128 MB | General purpose **(DEFAULT)** |
+| `extended` | de441.bsp | -13200 to +17191 | ~3.1 GB | Historical/far-future research |
+
+DE440 and DE441 have identical precision — DE441 is simply the extended-range version.
+DE440s is a reduced-size subset of DE440 with no loss of precision within its range.
+
+### Select by precision tier
+
+```python
+import libephemeris as swe
+swe.set_precision_tier("extended")   # uses de441.bsp
+```
+
+```bash
+export LIBEPHEMERIS_PRECISION=extended
+```
+
+### Select by ephemeris file directly
 
 ```python
 import libephemeris as swe
 swe.set_ephemeris_file("de441.bsp")
 ```
 
-Or via environment variable:
-
 ```bash
 export LIBEPHEMERIS_EPHEMERIS=de441.bsp
 ```
+
+### Resolution priority
+
+1. `LIBEPHEMERIS_EPHEMERIS` environment variable
+2. `set_ephemeris_file()` / `set_jpl_file()` programmatic call
+3. Precision tier (`LIBEPHEMERIS_PRECISION` env var or `set_precision_tier()`)
+4. Default: `de440.bsp` (medium tier)
 
 Dates outside the loaded kernel raise `EphemerisRangeError`.
 

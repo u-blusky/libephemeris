@@ -184,15 +184,35 @@ pos, _ = ephem.fixstar_ut("Aldebaran", jd, SEFLG_SPEED)
 
 libephemeris uses JPL DE ephemerides with specific date ranges:
 
-| Ephemeris | Date Range | Size |
-|-----------|-----------|------|
-| DE440 (default) | 1550-2650 | ~128 MB |
-| DE422 | -3000 to 3000 | ~623 MB |
-| DE430 | 1550-2650 | ~128 MB |
-| DE431 | -13200 to 17191 | ~3.4 GB |
-| DE441 | -13200 to 17191 | ~3.4 GB |
+| Ephemeris | Date Range | Size | Notes |
+|-----------|-----------|------|-------|
+| DE440s | 1849-2150 | ~31 MB | Lightweight subset of DE440 |
+| DE440 (default) | 1550-2650 | ~128 MB | ICRF 3.0, recommended |
+| DE441 | -13200 to 17191 | ~3.4 GB | Extended version of DE440 |
 
-To use a different ephemeris for extended date ranges:
+### Precision Tiers
+
+libephemeris organises the current-generation files into three precision tiers:
+
+| Tier | File | Use Case |
+|------|------|----------|
+| `base` | de440s.bsp | Lightweight, modern-era usage |
+| `medium` | de440.bsp | General purpose **(DEFAULT)** |
+| `extended` | de441.bsp | Historical/far-future research |
+
+```python
+from libephemeris import set_precision_tier
+
+set_precision_tier("extended")   # uses de441.bsp
+```
+
+```bash
+export LIBEPHEMERIS_PRECISION=extended
+```
+
+### Selecting an Ephemeris File Directly
+
+You can also bypass the tier system and select a specific file:
 
 ```python
 from libephemeris import set_ephemeris_file, set_ephe_path
@@ -210,7 +230,14 @@ You can also select the ephemeris file via the `LIBEPHEMERIS_EPHEMERIS` environm
 export LIBEPHEMERIS_EPHEMERIS=de441.bsp
 ```
 
-Priority: `set_ephemeris_file()` > `LIBEPHEMERIS_EPHEMERIS` env var > default `de440.bsp`.
+### Resolution Priority
+
+Resolution priority (highest to lowest):
+
+1. `LIBEPHEMERIS_EPHEMERIS` environment variable
+2. `set_ephemeris_file()` / `set_jpl_file()` programmatic call
+3. Precision tier (`LIBEPHEMERIS_PRECISION` env var or `set_precision_tier()`)
+4. Default: `de440.bsp` (medium tier)
 
 ---
 

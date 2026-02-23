@@ -220,13 +220,36 @@ Different JPL Development Ephemeris (DE) files provide different date ranges and
 
 | File | Date Range | Size | Notes |
 |------|------------|------|-------|
-| de422.bsp | -3000-3000 | ~623 MB | Extended historical range |
-| de430.bsp | 1550-2650 | ~128 MB | Previous generation |
-| de431.bsp | -13200-17191 | ~3.4 GB | Very long time span |
+| **de440s.bsp** | 1849-2150 | ~31 MB | Lightweight subset of DE440 |
 | **de440.bsp** | 1550-2650 | ~128 MB | **Default**, ICRF 3.0 |
-| de441.bsp | -13200-17191 | ~3.4 GB | Extended version of DE440 |
+| **de441.bsp** | -13200-17191 | ~3.4 GB | Extended version of DE440 |
+
+DE440 and DE441 have identical precision — DE441 is simply the extended-range version.
+DE440s is a reduced-size subset of DE440 with no loss of precision within its range.
+
+### Precision Tiers
+
+LibEphemeris organises the three current-generation files into precision tiers:
+
+| Tier | File | Use Case |
+|------|------|----------|
+| `base` | de440s.bsp | Lightweight, modern-era usage (1849-2150) |
+| `medium` | de440.bsp | General purpose **(DEFAULT)** (1550-2650) |
+| `extended` | de441.bsp | Historical/far-future research (-13200 to +17191) |
+
+```python
+from libephemeris import set_precision_tier
+
+set_precision_tier("extended")   # uses de441.bsp
+```
+
+```bash
+export LIBEPHEMERIS_PRECISION=extended
+```
 
 ### Selecting an Ephemeris File
+
+You can also select a specific file directly, bypassing the tier system:
 
 ```python
 from libephemeris import set_ephemeris_file, set_ephe_path
@@ -238,11 +261,18 @@ set_ephe_path("/path/to/jpl-kernels")
 set_ephemeris_file("de441.bsp")  # For extended date range
 ```
 
+### Resolution Priority
+
+1. `LIBEPHEMERIS_EPHEMERIS` environment variable
+2. `set_ephemeris_file()` / `set_jpl_file()` programmatic call
+3. Precision tier (`LIBEPHEMERIS_PRECISION` env var or `set_precision_tier()`)
+4. Default: `de440.bsp` (medium tier)
+
 ### When to Use Different Files
 
+- **de440s.bsp**: Lightweight option for modern dates (1849-2150), same precision as DE440
 - **de440.bsp (default)**: Best for most modern applications (1550-2650)
 - **de441.bsp**: For very ancient or far future dates
-- **de431.bsp**: Alternative for extended range if DE441 not available
 
 ---
 
@@ -375,7 +405,9 @@ clear_spk_cache()
 
 | Function | Purpose |
 |----------|---------|
-| `set_ephemeris_file(filename)` | Select JPL DE ephemeris file |
+| `set_precision_tier(tier)` | Select precision tier (`"base"`, `"medium"`, `"extended"`) |
+| `get_precision_tier()` | Get current precision tier name |
+| `set_ephemeris_file(filename)` | Select JPL DE ephemeris file (overrides tier) |
 | `set_ephe_path(path)` | Set ephemeris file directory |
 | `set_tid_acc(value)` | Set tidal acceleration for Delta T |
 | `set_delta_t_userdef(dt)` | Set user-defined Delta T value |
@@ -388,7 +420,8 @@ clear_spk_cache()
 
 | Variable | Purpose | Values |
 |----------|---------|--------|
-| `LIBEPHEMERIS_EPHEMERIS` | Select ephemeris file | e.g., `de441.bsp` |
+| `LIBEPHEMERIS_EPHEMERIS` | Select ephemeris file (highest priority) | e.g., `de441.bsp` |
+| `LIBEPHEMERIS_PRECISION` | Select precision tier | `base`, `medium`, `extended` |
 | `LIBEPHEMERIS_IERS_DELTA_T` | Enable IERS Delta T | `1`, `true`, `yes` |
 | `LIBEPHEMERIS_AUTO_SPK` | Enable auto SPK download | `1`, `true`, `yes` |
 | `LIBEPHEMERIS_IERS_AUTO_DOWNLOAD` | Auto-download IERS data | `1`, `true`, `yes` |

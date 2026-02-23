@@ -2398,12 +2398,9 @@ def _get_ephemeris_range() -> Tuple[float, float]:
         Tuple[float, float]: (min_jd, max_jd) Julian Date range in TT.
 
     Note:
-        For de421.bsp (default), the range is approximately 1899-07-29 to 2053-10-09.
-        For other ephemeris files, the range varies:
-        - de422.bsp: -3000 to 3000
-        - de430.bsp: 1550 to 2650
-        - de431.bsp: -13200 to 17191
-        - de440.bsp: 1550 to 2650
+        The range depends on the loaded ephemeris file:
+        - de440s.bsp: 1849 to 2150
+        - de440.bsp (default): 1550 to 2650
         - de441.bsp: -13200 to 17191 (split into two segments)
     """
     planets = get_planets()
