@@ -5,11 +5,20 @@ This provides comprehensive test infrastructure for verifying 1:1 compatibility
 with pyswisseph (Swiss Ephemeris).
 """
 
+from pathlib import Path
+
 import pytest
 import random
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
+
+# Set ephemeris data path for star-based ayanamsha calculations.
+# Without this, pyswisseph falls back to Moshier analytical ephemeris which
+# has a limited date range and crashes when star-based ayanamshas need to
+# compute star positions internally.
+_EPHE_PATH = str(Path(__file__).resolve().parents[2] / "swisseph" / "ephe")
+swe.set_ephe_path(_EPHE_PATH)
 
 
 # ============================================================================

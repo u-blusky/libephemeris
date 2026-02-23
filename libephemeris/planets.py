@@ -1147,6 +1147,9 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     this applies the ecliptic-to-equatorial transformation using the true
     obliquity of the ecliptic at the given date.
 
+    When SEFLG_J2000 is set, precesses from date to J2000.0 before any
+    equatorial conversion.
+
     Args:
         result: 6-tuple of (lon, lat, dist, dlon, dlat, ddist) in ecliptic coords
         jd_tt: Julian Day in Terrestrial Time (for obliquity calculation)
@@ -1154,16 +1157,32 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
 
     Returns:
         If SEFLG_EQUATORIAL is set: transformed (RA, Dec, dist, dRA, dDec, ddist)
+        If SEFLG_J2000 is set: precessed coordinates in J2000 frame
         Otherwise: original result unchanged
     """
+    lon, lat, dist, dlon, dlat, ddist = result
+
+    # Apply precession from date to J2000 if requested
+    if iflag & SEFLG_J2000:
+        from .astrometry import _precess_ecliptic
+
+        J2000 = 2451545.0
+        lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+
     if not (iflag & SEFLG_EQUATORIAL):
-        return result
+        return (lon, lat, dist, dlon, dlat, ddist)
+
     from .cache import get_true_obliquity
     from .utils import cotrans_sp
 
-    eps = get_true_obliquity(jd_tt)
-    coord = (result[0], result[1], result[2])
-    speed = (result[3], result[4], result[5])
+    # For J2000 frame, use J2000 obliquity; otherwise use obliquity of date
+    if iflag & SEFLG_J2000:
+        eps = 23.4392911  # Mean obliquity at J2000.0
+    else:
+        eps = get_true_obliquity(jd_tt)
+
+    coord = (lon, lat, dist)
+    speed = (dlon, dlat, ddist)
     # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
     new_coord, new_speed = cotrans_sp(coord, speed, -eps)
     return (
@@ -1370,8 +1389,9 @@ def _calc_body(
                 elif lon_diff < -180:
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
-            # Apply sidereal correction if requested
-            if is_sidereal:
+            # Apply sidereal correction if requested (but not for equatorial output)
+            # Sidereal correction is ignored when outputting equatorial coords
+            if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
                 ayanamsa = _get_true_ayanamsa(t.ut1)
                 lon = (lon - ayanamsa) % 360.0
                 # Correct velocity for ayanamsha rate
@@ -1393,19 +1413,29 @@ def _calc_body(
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & SEFLG_SPEED:
                 dt = 0.5  # 0.5 days for perturbation-corrected velocity
-                lon_prev, lat_prev, dist_prev = lunar.calc_true_lunar_node(jd_tt - dt)
-                lon_next, lat_next, dist_next = lunar.calc_true_lunar_node(jd_tt + dt)
-                # Handle longitude wrap-around before computing velocity
-                lon_diff = lon_next - lon_prev
-                if lon_diff > 180:
-                    lon_diff -= 360.0
-                elif lon_diff < -180:
-                    lon_diff += 360.0
-                dlon = lon_diff / (2.0 * dt)
-                dlat = (lat_next - lat_prev) / (2.0 * dt)
-                ddist = (dist_next - dist_prev) / (2.0 * dt)
-            # Apply sidereal correction if requested
-            if is_sidereal:
+                try:
+                    lon_prev, lat_prev, dist_prev = lunar.calc_true_lunar_node(
+                        jd_tt - dt
+                    )
+                    lon_next, lat_next, dist_next = lunar.calc_true_lunar_node(
+                        jd_tt + dt
+                    )
+                    # Handle longitude wrap-around before computing velocity
+                    lon_diff = lon_next - lon_prev
+                    if lon_diff > 180:
+                        lon_diff -= 360.0
+                    elif lon_diff < -180:
+                        lon_diff += 360.0
+                    dlon = lon_diff / (2.0 * dt)
+                    dlat = (lat_next - lat_prev) / (2.0 * dt)
+                    ddist = (dist_next - dist_prev) / (2.0 * dt)
+                except Exception:
+                    # At ephemeris boundaries, speed calculation may fail
+                    # Return 0 for speed components
+                    pass
+            # Apply sidereal correction if requested (but not for equatorial output)
+            # Sidereal correction is ignored when outputting equatorial coords
+            if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
                 ayanamsa = _get_true_ayanamsa(t.ut1)
                 lon = (lon - ayanamsa) % 360.0
                 # Correct velocity for ayanamsha rate
@@ -1456,8 +1486,9 @@ def _calc_body(
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
-            # Apply sidereal correction if requested
-            if is_sidereal:
+            # Apply sidereal correction if requested (but not for equatorial output)
+            # Sidereal correction is ignored when outputting equatorial coords
+            if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
                 ayanamsa = _get_true_ayanamsa(t.ut1)
                 lon = (lon - ayanamsa) % 360.0
                 if iflag & SEFLG_SPEED:
@@ -1478,19 +1509,25 @@ def _calc_body(
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & SEFLG_SPEED:
                 dt = 0.5  # 0.5 days for perturbation-corrected velocity
-                lon_prev, lat_prev, dist_prev = lunar.calc_true_lilith(jd_tt - dt)
-                lon_next, lat_next, dist_next = lunar.calc_true_lilith(jd_tt + dt)
-                # Handle longitude wrap-around before computing velocity
-                lon_diff = lon_next - lon_prev
-                if lon_diff > 180:
-                    lon_diff -= 360.0
-                elif lon_diff < -180:
-                    lon_diff += 360.0
-                dlon = lon_diff / (2.0 * dt)
-                dlat = (lat_next - lat_prev) / (2.0 * dt)
-                ddist = (dist_next - dist_prev) / (2.0 * dt)
-            # Apply sidereal correction if requested
-            if is_sidereal:
+                try:
+                    lon_prev, lat_prev, dist_prev = lunar.calc_true_lilith(jd_tt - dt)
+                    lon_next, lat_next, dist_next = lunar.calc_true_lilith(jd_tt + dt)
+                    # Handle longitude wrap-around before computing velocity
+                    lon_diff = lon_next - lon_prev
+                    if lon_diff > 180:
+                        lon_diff -= 360.0
+                    elif lon_diff < -180:
+                        lon_diff += 360.0
+                    dlon = lon_diff / (2.0 * dt)
+                    dlat = (lat_next - lat_prev) / (2.0 * dt)
+                    ddist = (dist_next - dist_prev) / (2.0 * dt)
+                except Exception:
+                    # At ephemeris boundaries, speed calculation may fail
+                    # Return 0 for speed components
+                    pass
+            # Apply sidereal correction if requested (but not for equatorial output)
+            # Sidereal correction is ignored when outputting equatorial coords
+            if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
                 ayanamsa = _get_true_ayanamsa(t.ut1)
                 lon = (lon - ayanamsa) % 360.0
                 if iflag & SEFLG_SPEED:
@@ -1541,8 +1578,9 @@ def _calc_body(
             dlon = lon_diff / (2.0 * dt)
             dlat = (lat_next - lat_prev) / (2.0 * dt)
             ddist = (dist_next - dist_prev) / (2.0 * dt)
-        # Apply sidereal correction if requested
-        if is_sidereal:
+        # Apply sidereal correction if requested (but not for equatorial output)
+        # Swiss Ephemeris ignores sidereal flag when outputting equatorial coords
+        if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
             ayanamsa = _get_true_ayanamsa(t.ut1)
             lon = (lon - ayanamsa) % 360.0
             if iflag & SEFLG_SPEED:

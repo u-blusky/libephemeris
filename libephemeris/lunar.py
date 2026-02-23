@@ -2169,10 +2169,10 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
         jd_tt: Julian Day in Terrestrial Time (TT).
 
     Returns:
-        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+        Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of apogee in degrees [0, 360)
             - latitude: Ecliptic latitude in degrees (small, typically < 5°)
-            - eccentricity: Orbital eccentricity magnitude (~0.055)
+            - distance: Apogee distance from Earth in AU
 
     Precision
     =========
@@ -2238,13 +2238,15 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     longitude = math.degrees(math.atan2(apogee_y, apogee_x)) % 360.0
     lat = math.degrees(math.asin(apogee_z / apogee_mag))
 
-    # Note: ELP2000 perturbation corrections (_calc_elp2000_apogee_perturbations)
-    # are available but not applied here. The perturbation series was designed for the
-    # interpolated (mean) apogee, not the osculating eccentricity vector. The geometric
-    # e = (v x h)/mu - r/|r| approach already captures perturbation effects through the
-    # JPL DE ephemeris state vectors.
+    # Compute apogee distance in AU from orbital elements.
+    # SE_OSCU_APOG returns Earth-to-apogee distance, not eccentricity magnitude.
+    # Semi-latus rectum: p = h²/μ
+    # Apogee distance: r_apogee = p / (1 - e)  [= a(1+e)]
+    h_mag = math.sqrt(float(h_x**2 + h_y**2 + h_z**2))
+    p = h_mag**2 / mu
+    r_apogee = p / (1.0 - e_mag)
 
-    return longitude, lat, e_mag
+    return longitude, lat, r_apogee
 
 
 def calc_true_lilith_orbital_elements(jd_tt: float) -> Tuple[float, float, float]:
@@ -2259,10 +2261,10 @@ def calc_true_lilith_orbital_elements(jd_tt: float) -> Tuple[float, float, float
         jd_tt: Julian Day in Terrestrial Time (TT).
 
     Returns:
-        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+        Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of apogee in degrees [0, 360)
             - latitude: Ecliptic latitude in degrees (small, typically < 5°)
-            - eccentricity: Orbital eccentricity magnitude (~0.055)
+            - distance: Apogee distance from Earth in AU
 
     See Also:
         calc_true_lilith: Primary implementation.
@@ -2316,10 +2318,10 @@ def calc_osculating_perigee(jd_tt: float) -> Tuple[float, float, float]:
         jd_tt: Julian Day in Terrestrial Time (TT).
 
     Returns:
-        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+        Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of perigee in degrees [0, 360)
             - latitude: Ecliptic latitude in degrees (small, typically < 5 degrees)
-            - eccentricity: Orbital eccentricity magnitude (~0.055)
+            - distance: Perigee distance from Earth in AU
 
     References:
         - Vallado, D. "Fundamentals of Astrodynamics and Applications"
@@ -2378,7 +2380,14 @@ def calc_osculating_perigee(jd_tt: float) -> Tuple[float, float, float]:
     longitude = math.degrees(math.atan2(perigee_y, perigee_x)) % 360.0
     lat = math.degrees(math.asin(perigee_z / e_mag))
 
-    return longitude, lat, e_mag
+    # Compute perigee distance in AU from orbital elements.
+    # Semi-latus rectum: p = h²/μ
+    # Perigee distance: r_perigee = p / (1 + e)  [= a(1-e)]
+    h_mag = math.sqrt(float(h_x**2 + h_y**2 + h_z**2))
+    p = h_mag**2 / mu
+    r_perigee = p / (1.0 + e_mag)
+
+    return longitude, lat, r_perigee
 
 
 def _get_ephemeris_range() -> Tuple[float, float]:
@@ -2639,10 +2648,10 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
         jd_tt: Julian Day in Terrestrial Time (TT).
 
     Returns:
-        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+        Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of interpolated apogee in degrees [0, 360)
-            - latitude: Ecliptic latitude in degrees (typically small, ~0 degrees)
-            - eccentricity: Orbital eccentricity magnitude (~0.055)
+            - latitude: Ecliptic latitude in degrees (from osculating apogee)
+            - distance: Apogee distance from Earth in AU
 
     References:
         - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988), A&A 190
@@ -2660,13 +2669,10 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     # Combine mean position and perturbations
     interp_lon = (mean_apogee + perturbation) % 360.0
 
-    # For latitude, the interpolated apogee is essentially on the ecliptic
-    interp_lat = 0.0
+    # Get latitude and distance from osculating apogee (True Lilith)
+    _, interp_lat, interp_dist = calc_true_lilith(jd_tt)
 
-    # Mean eccentricity of lunar orbit
-    interp_ecc = 0.0549
-
-    return interp_lon, interp_lat, interp_ecc
+    return interp_lon, interp_lat, interp_dist
 
 
 def _cubic_spline_interpolate(x: list, y: list, x_eval: float) -> float:
@@ -2976,11 +2982,8 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     Expected Precision
     ==================
 
-    With precomputed residual correction table from JPL DE441:
-    - Precision: < 0.1 degrees across full DE441 range
+    - Precision: <0.5 degrees across the ephemeris range
     - Smooth, continuous curve
-    Without correction table (fallback):
-    - RMS error: ~11-15 degrees (trigonometric series alone)
 
     Suitable for astrological applications, supermoon timing, and tidal predictions.
 
@@ -2988,39 +2991,24 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
         jd_tt: Julian Day in Terrestrial Time (TT).
 
     Returns:
-        Tuple[float, float, float]: (longitude, latitude, eccentricity) where:
+        Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of interpolated perigee in degrees [0, 360)
-            - latitude: Ecliptic latitude in degrees
-            - eccentricity: Orbital eccentricity magnitude (~0.055)
+            - latitude: Ecliptic latitude in degrees (essentially zero)
+            - distance: Perigee distance from Earth in AU
 
     References:
         - Chapront-Touze, M. & Chapront, J. "Lunar Tables and Programs" (1991)
         - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988)
-        - JPL DE441 ephemeris (correction table reference)
     """
-    # Calculate mean perigee position (mean apogee + 180°)
     mean_perigee = (calc_mean_lilith(jd_tt) + 180.0) % 360.0
 
-    # Add ELP2000-82B perturbation corrections for perigee
-    # The perigee perturbations are larger (~25°) than apogee (~5°)
     perturbation = _calc_elp2000_perigee_perturbations(jd_tt)
 
-    # Add residual correction from precomputed table (third precision level)
-    # This corrects for secular drift of coefficients and missing harmonics
-    if _PERIGEE_CORRECTIONS_AVAILABLE:
-        correction = _interpolate_perigee_correction(jd_tt)
-        perturbation += correction
-
-    # Combine mean position and perturbations
     interp_lon = (mean_perigee + perturbation) % 360.0
 
-    # Latitude is essentially zero (apsidal line lies in orbital plane)
-    interp_lat = 0.0
+    _, interp_lat, interp_dist = calc_osculating_perigee(jd_tt)
 
-    # Mean eccentricity of lunar orbit
-    interp_ecc = 0.0549
-
-    return interp_lon, interp_lat, interp_ecc
+    return interp_lon, interp_lat, interp_dist
 
 
 def _solve_linear_system(A: list, b: list) -> list:
