@@ -3378,7 +3378,7 @@ def calc_fixed_star_position(
         ValueError: If star_id not in catalog
 
     Notes:
-        By default, includes annual aberration to match reference API behavior.
+        By default, includes annual aberration as is standard practice.
         Use noaberr=True for astrometric (geometric) position.
 
     References:
@@ -3431,7 +3431,7 @@ def calc_fixed_star_velocity(
         1. Calculate position at jd_tt (for return value)
         2. Use central difference for longitude velocity (captures precession)
         3. Compute latitude velocity analytically from proper motion vector
-           transformation to match SE sign convention
+           transformation to match the pyswisseph sign convention
         4. speed_dist = 0 (stellar distances don't measurably change)
 
     References:
@@ -3466,7 +3466,7 @@ def calc_fixed_star_velocity(
         speed_lon += 360.0
 
     # Compute latitude velocity using analytical proper motion transformation
-    # This matches the reference API sign convention by transforming the proper
+    # This matches the pyswisseph sign convention by transforming the proper
     # motion velocity vector through the same coordinate transformations
     ts = get_timescale()
     eph = get_planets()
@@ -3626,8 +3626,8 @@ def swe_fixstar_ut(
             pos = result[:3]
             vel = result[3:]
 
-            # Transform from ecliptic to equatorial (rotate by eps)
-            pos_eq, vel_eq = cotrans_sp(pos, vel, eps)
+            # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
+            pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
 
             # Merge back
             result = pos_eq + vel_eq
@@ -3695,8 +3695,8 @@ def swe_fixstar(
             pos = result[:3]
             vel = result[3:]
 
-            # Transform from ecliptic to equatorial (rotate by eps)
-            pos_eq, vel_eq = cotrans_sp(pos, vel, eps)
+            # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
+            pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
 
             # Merge back
             result = pos_eq + vel_eq
@@ -3931,8 +3931,8 @@ def swe_fixstar2_ut(
             pos = result[:3]
             vel = result[3:]
 
-            # Transform from ecliptic to equatorial (rotate by eps)
-            pos_eq, vel_eq = cotrans_sp(pos, vel, eps)
+            # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
+            pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
 
             # Merge back
             result = pos_eq + vel_eq
@@ -4015,8 +4015,8 @@ def swe_fixstar2(
             pos = result[:3]
             vel = result[3:]
 
-            # Transform from ecliptic to equatorial (rotate by eps)
-            pos_eq, vel_eq = cotrans_sp(pos, vel, eps)
+            # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
+            pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
 
             # Merge back
             result = pos_eq + vel_eq

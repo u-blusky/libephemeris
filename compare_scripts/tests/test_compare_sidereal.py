@@ -343,10 +343,16 @@ class TestJ2000Mode:
         ayan_2000 = ephem.swe_get_ayanamsa_ut(2451545.0)
         ayan_2100 = ephem.swe_get_ayanamsa_ut(2488069.5)
 
-        # Should be negative before J2000, positive after
-        assert ayan_1900 < 0, f"J2000 at 1900 should be negative, got {ayan_1900}"
+        ayan_1900_swe = swe.get_ayanamsa_ut(2415020.5)
+        ayan_2100_swe = swe.get_ayanamsa_ut(2488069.5)
+
+        assert abs(ayan_1900 - ayan_1900_swe) < 0.001, (
+            f"J2000 at 1900: lib={ayan_1900}, swe={ayan_1900_swe}"
+        )
         assert abs(ayan_2000) < 0.001, f"J2000 at 2000 should be ~0, got {ayan_2000}"
-        assert ayan_2100 > 0, f"J2000 at 2100 should be positive, got {ayan_2100}"
+        assert abs(ayan_2100 - ayan_2100_swe) < 0.001, (
+            f"J2000 at 2100: lib={ayan_2100}, swe={ayan_2100_swe}"
+        )
 
 
 class TestUserDefinedAyanamsha:

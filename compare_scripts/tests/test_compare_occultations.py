@@ -152,7 +152,7 @@ class TestLunOccultWhenLoc:
 
         # LibEphemeris (API: tjdut, body, geopos, flags, backwards) - 1:1 compatible
         try:
-            ret_py = pyephem.lun_occult_when_loc(
+            ret_py = pyephem.swe_lun_occult_when_loc(
                 jd_2024, body_id, geopos, SEFLG_SWIEPH, False
             )
             if ret_py[0] == 0:

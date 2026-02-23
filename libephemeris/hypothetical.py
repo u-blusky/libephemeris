@@ -125,7 +125,7 @@ WALDEMATH: int = SE_WALDEMATH
 # B = oscillation frequency (degrees per century)
 #
 # Note: Different sources give slightly different parameters. These values
-# match the reference implementation for compatibility.
+# are from the Hamburg School tradition for pyswisseph compatibility.
 
 
 @dataclass
@@ -707,7 +707,7 @@ class TransplutoKeplerianElements:
 # Source: Strubell, "Die Sterne" 3/1952, p. 70ff
 # Original elements: epoch JD 2368547.66, equinox JD 2431456.5, a=77.775 AU, e=0.3
 #
-# Note: The reference implementation applies precession from J1945 equinox to the date of observation.
+# Note: Precession is applied from J1945 equinox to the date of observation.
 # For simpler Keplerian propagation, we use J2000 epoch with elements derived from
 # reference calculations to minimize differences.
 TRANSPLUTO_KEPLERIAN_ELEMENTS = TransplutoKeplerianElements(
@@ -869,7 +869,7 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
 # Transpluto (Isis) elements
 # Source: Strubell, "Die Sterne" 3/1952, p. 70ff
 # Original elements: epoch JD 2368547.66, equinox JD 2431456.5, a=77.775 AU, e=0.3
-# Elements below are derived at J2000 epoch to match the reference implementation.
+# Elements below are derived at J2000 epoch for pyswisseph compatibility.
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     SE_ISIS: HypotheticalElements(
         name="Transpluto/Isis",
@@ -2675,7 +2675,7 @@ def calc_uranian_planet(
         - Latitude: lat = i * sin(L - Omega) (oscillation from inclination)
         - Distance: semi-major axis (with small eccentricity variations)
 
-    This matches the reference implementation exactly for the 1900-2100 range.
+    This produces accurate results for the 1900-2100 range.
 
     Args:
         body_id: Uranian planet ID (SE_CUPIDO through SE_POSEIDON, i.e., 40-47)
@@ -3253,7 +3253,7 @@ def calc_white_moon_position(
         dlat = -(lilith_next_lat - lilith_lat) / dt  # Opposite latitude change
         ddist = 0.0
     else:
-        # Use Mean Lilith - default, matching reference API convention
+        # Use Mean Lilith - default, standard approach
         lilith_lon = lunar.calc_mean_lilith(jd_tt)
 
         # White Moon is opposite to Black Moon

@@ -376,25 +376,25 @@ class TestKeplerianPrecisionVsSwisseph:
         assert diff_far < 10.0, f"Error far from epoch {diff_far:.2f}° too large"
 
 
-class TestKeplerianVelocityNotProvided:
-    """Test that Keplerian fallback does not provide velocity data."""
+class TestKeplerianVelocityProvided:
+    """Test that Keplerian fallback provides velocity data via numerical differentiation."""
 
     @pytest.mark.parametrize("body_id,ast_num,name", TEST_BODIES[:3])
-    def test_keplerian_fallback_velocity_is_zero(self, body_id, ast_num, name):
-        """Keplerian fallback should return zero velocities."""
-        # Unregister any SPK to force Keplerian
+    def test_keplerian_fallback_velocity_is_computed(self, body_id, ast_num, name):
+        """Keplerian fallback should compute velocities via numerical differentiation."""
         unregister_spk_body(body_id)
 
         jd = 2451545.0
         pos, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
 
-        # Keplerian fallback returns (lon, lat, dist, 0, 0, 0) - no velocity
+        # Keplerian fallback returns (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         assert len(pos) >= 6, "Should return 6-element tuple"
 
-        # Velocity components should be zero for Keplerian fallback
-        assert pos[3] == 0.0, f"{name}: lon velocity should be 0 for Keplerian"
-        assert pos[4] == 0.0, f"{name}: lat velocity should be 0 for Keplerian"
-        assert pos[5] == 0.0, f"{name}: dist velocity should be 0 for Keplerian"
+        # Velocity components should be non-zero (computed via numerical differentiation)
+        # Main belt asteroids have typical speeds of 0.1-0.3 deg/day
+        assert abs(pos[3]) > 0.0, f"{name}: lon velocity should be computed"
+        assert abs(pos[3]) < 1.0, f"{name}: lon velocity should be reasonable"
+        assert abs(pos[4]) < 0.5, f"{name}: lat velocity should be reasonable"
 
 
 class TestPrecisionDocumentation:

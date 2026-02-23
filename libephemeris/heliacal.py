@@ -51,7 +51,6 @@ INNER_PLANETS = {SE_MERCURY, SE_VENUS}
 # Complete implementation of Schaefer's visibility model. Based on:
 #   - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
 #   - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
-#   - Reference implementation
 #
 # The model calculates:
 #   1. Atmospheric extinction (Rayleigh + Aerosol + Ozone)
@@ -102,7 +101,7 @@ class SchaeferConstants:
     PERFECT_SKY_LIM_MAG = 6.5
 
     # Ptolemaic arcus visionis thresholds (degrees)
-    # Based on ancient observations and reference implementation
+    # Based on ancient observations and Schaefer (1990) visibility model
     ARCUS_VISIONIS = {
         "venus": 5.0,
         "mercury": 10.0,
@@ -289,7 +288,7 @@ class SchaeferModel:
         """
         Calculate sky brightness contribution from twilight.
 
-        Based on Schaefer (1990) and reference implementation.
+        Based on Schaefer (1990).
         Returns log brightness in relative units.
 
         Args:

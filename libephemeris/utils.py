@@ -34,14 +34,14 @@ def cotrans_sp(
     using analytical derivatives of the coordinate transformation equations.
 
     The direction of transformation depends on the sign of obliquity:
-    - Positive obliquity: ecliptic (lon, lat) -> equatorial (RA, Dec)
-    - Negative obliquity: equatorial (RA, Dec) -> ecliptic (lon, lat)
+    - Negative obliquity: ecliptic (lon, lat) -> equatorial (RA, Dec)
+    - Positive obliquity: equatorial (RA, Dec) -> ecliptic (lon, lat)
 
     Args:
         coord: Tuple of (longitude/RA, latitude/Dec, distance) in degrees
         speed: Tuple of (lon_speed, lat_speed, dist_speed) in degrees/day
         obliquity: Obliquity of the ecliptic in degrees.
-                   Positive for ecliptic->equatorial, negative for equatorial->ecliptic.
+                   Negative for ecliptic->equatorial, positive for equatorial->ecliptic.
 
     Returns:
         Tuple of (coord_transformed, speed_transformed) where:
@@ -50,8 +50,8 @@ def cotrans_sp(
         Distance and distance speed are unchanged by the transformation.
 
     Examples:
-        >>> # Ecliptic to equatorial (positive obliquity)
-        >>> coord, speed = cotrans_sp((90.0, 0.0, 1.0), (1.0, 0.0, 0.0), 23.4)
+        >>> # Ecliptic to equatorial (negative obliquity)
+        >>> coord, speed = cotrans_sp((90.0, 0.0, 1.0), (1.0, 0.0, 0.0), -23.4)
         >>> # Returns transformed position and velocity
     """
     lon = coord[0]
@@ -62,9 +62,10 @@ def cotrans_sp(
     dist_speed = speed[2]
 
     # Convert to radians
+    # Negate obliquity to match the pyswisseph API convention
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
-    eps_rad = math.radians(obliquity)
+    eps_rad = math.radians(-obliquity)
 
     # Precompute trig values
     cos_eps = math.cos(eps_rad)
@@ -242,8 +243,8 @@ def azalt(
         dist = coord[2]
 
         # Convert ecliptic to equatorial
-        # cotrans convention: positive obliquity = ecliptic→equatorial
-        eq_coord = cotrans((ecl_lon, ecl_lat, dist), eps)
+        # cotrans convention: negative obliquity = ecliptic→equatorial
+        eq_coord = cotrans((ecl_lon, ecl_lat, dist), -eps)
         ra = eq_coord[0]
         dec = eq_coord[1]
     else:
@@ -282,7 +283,7 @@ def azalt(
     cos_dec = math.cos(dec_rad)
 
     # Numerator and denominator for azimuth calculation
-    # Reference API convention: azimuth from South, westward
+    # Standard convention: azimuth from South, westward
     y = sin_ha * cos_dec
     x = cos_ha * cos_dec * math.sin(lat_rad) - math.sin(dec_rad) * math.cos(lat_rad)
 
@@ -467,7 +468,7 @@ def azalt_rev(
         return (ra, dec)
     else:
         # SE_HOR2ECL: Convert equatorial to ecliptic
-        # cotrans with negative obliquity converts equatorial to ecliptic
+        # cotrans with positive obliquity converts equatorial to ecliptic
         ecl_coord = cotrans((ra, dec, 1.0), eps)
         return (ecl_coord[0], ecl_coord[1])
 
@@ -770,34 +771,35 @@ def cotrans(
     Compatible with the reference swe.cotrans() API.
 
     The direction of transformation depends on the sign of obliquity:
-    - Positive obliquity: ecliptic (lon, lat) → equatorial (RA, Dec)
-    - Negative obliquity: equatorial (RA, Dec) → ecliptic (lon, lat)
+    - Negative obliquity: ecliptic (lon, lat) → equatorial (RA, Dec)
+    - Positive obliquity: equatorial (RA, Dec) → ecliptic (lon, lat)
 
     Args:
         coord: Tuple of (longitude/RA, latitude/Dec, distance) in degrees
         obliquity: Obliquity of the ecliptic in degrees.
-                   Positive for ecliptic→equatorial, negative for equatorial→ecliptic.
+                   Negative for ecliptic→equatorial, positive for equatorial→ecliptic.
 
     Returns:
         Tuple of (transformed_lon/RA, transformed_lat/Dec, distance)
         Distance is unchanged by the transformation.
 
     Examples:
-        >>> # Ecliptic to equatorial (positive obliquity)
-        >>> cotrans((0.0, 0.0, 1.0), 23.4)
-        (0.0, 0.0, 1.0)
-        >>> # Equatorial to ecliptic (negative obliquity)
-        >>> cotrans((0.0, 0.0, 1.0), -23.4)
-        (0.0, 0.0, 1.0)
+        >>> # Ecliptic to equatorial (negative obliquity)
+        >>> cotrans((90.0, 0.0, 1.0), -23.4)
+        (90.0, 23.4, 1.0)
+        >>> # Equatorial to ecliptic (positive obliquity)
+        >>> cotrans((90.0, 23.4, 1.0), 23.4)
+        (90.0, 0.0, 1.0)
     """
     lon = coord[0]
     lat = coord[1]
     dist = coord[2]
 
     # Convert to radians
+    # Negate obliquity to match the pyswisseph API convention
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
-    eps_rad = math.radians(obliquity)
+    eps_rad = math.radians(-obliquity)
 
     cos_eps = math.cos(eps_rad)
     sin_eps = math.sin(eps_rad)
@@ -1476,9 +1478,9 @@ def d2l(value: float) -> int:
 
     This function rounds a floating-point number to the nearest integer using
     "round half away from zero" semantics (also known as commercial rounding).
-    This is the behavior used by the reference implementation internally.
+    This is standard practice in astronomical computation software.
 
-    Compatible with the reference swe.d2l() API.
+    Compatible with the pyswisseph swe.d2l() API.
 
     Args:
         value: A floating-point number to convert.
@@ -1490,8 +1492,8 @@ def d2l(value: float) -> int:
     Notes:
         - This differs from Python's built-in round() function, which uses
           "round half to even" (banker's rounding) for Python 3.
-        - The reference implementation uses this for internal conversions, but also exposes
-          it publicly for consistency.
+        - Used internally for coordinate conversions and also exposed
+          publicly for consistency with the pyswisseph API.
 
     Examples:
         >>> d2l(1.4)

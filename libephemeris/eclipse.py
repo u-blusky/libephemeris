@@ -4962,7 +4962,7 @@ def swe_lun_eclipse_how(
         7. Set visibility flags if Moon is above horizon
 
     Precision:
-        Eclipse magnitude accurate to ~0.01 compared to reference implementation.
+        Eclipse magnitude accurate to ~0.01.
         Moon altitude accurate to within ~1 degree.
 
     Example:
@@ -5499,6 +5499,97 @@ def lun_occult_when_glob(
 
         return jd_first, jd_second, jd_third, jd_fourth
 
+    def _calculate_contact_times_global(
+        jd_max: float,
+        min_sep: float,
+        moon_radius: float,
+        target_radius: float,
+        parallax: float,
+    ) -> Tuple[float, float, float, float]:
+        """Calculate contact times for global occultations accounting for parallax.
+
+        For global occultations, the geocentric separation may be larger than
+        moon_radius + target_radius, but an occultation still occurs from some
+        Earth location due to lunar parallax. The contact times represent when
+        the occultation begins/ends at the optimal viewing location.
+
+        Contact occurs when geo_sep = threshold + parallax.
+
+        Args:
+            jd_max: Time of minimum geocentric separation
+            min_sep: Minimum geocentric separation (degrees)
+            moon_radius: Moon's angular radius (degrees)
+            target_radius: Target's angular radius (degrees)
+            parallax: Lunar horizontal parallax (degrees)
+
+        Returns:
+            Tuple of (jd_first, jd_second, jd_third, jd_fourth)
+        """
+        outer_threshold = moon_radius + target_radius
+        inner_threshold = abs(moon_radius - target_radius)
+        contact_search = 6.0 / 24.0  # 6 hours search range for global events
+
+        jd_first = 0.0
+        jd_fourth = 0.0
+        jd_second = 0.0
+        jd_third = 0.0
+
+        # Contact times: geo_sep = threshold + parallax
+        target_sep_outer = outer_threshold + parallax
+        target_sep_inner = inner_threshold + parallax
+
+        def find_contact(
+            start_jd: float, end_jd: float, target_sep: float, is_increasing: bool
+        ) -> float:
+            """Find contact time using bisection on geocentric separation."""
+            jd_low, jd_high = start_jd, end_jd
+
+            for _ in range(60):
+                jd_mid = (jd_low + jd_high) / 2
+                moon_ra, moon_dec, _, _ = _get_moon_position(jd_mid)
+                target_ra, target_dec, _ = _get_target_position(jd_mid)
+                geo_sep = _angular_separation(moon_ra, moon_dec, target_ra, target_dec)
+
+                if abs(geo_sep - target_sep) < 1e-7:
+                    return jd_mid
+
+                if is_increasing:
+                    if geo_sep < target_sep:
+                        jd_low = jd_mid
+                    else:
+                        jd_high = jd_mid
+                else:
+                    if geo_sep > target_sep:
+                        jd_low = jd_mid
+                    else:
+                        jd_high = jd_mid
+
+                if jd_high - jd_low < 1e-8:
+                    break
+
+            return (jd_low + jd_high) / 2
+
+        # Find first contact (before max, separation decreasing)
+        jd_first = find_contact(
+            jd_max - contact_search, jd_max, target_sep_outer, is_increasing=False
+        )
+
+        # Find fourth contact (after max, separation increasing)
+        jd_fourth = find_contact(
+            jd_max, jd_max + contact_search, target_sep_outer, is_increasing=True
+        )
+
+        # For total occultation, also find inner contacts
+        if min_sep < inner_threshold + parallax:
+            jd_second = find_contact(
+                jd_max - contact_search, jd_max, target_sep_inner, is_increasing=False
+            )
+            jd_third = find_contact(
+                jd_max, jd_max + contact_search, target_sep_inner, is_increasing=True
+            )
+
+        return jd_first, jd_second, jd_third, jd_fourth
+
     # Main search loop
     jd = jd_start
 
@@ -5507,6 +5598,7 @@ def lun_occult_when_glob(
     # But for occultations, we need close passages
 
     step = 0.5  # Check every half day initially for better detection
+    prev_sep = float("inf")  # Track previous separation to detect approaches
 
     for iteration in range(MAX_ITERATIONS):
         # Check current position
@@ -5526,7 +5618,11 @@ def lun_occult_when_glob(
             # the geocentric separation minus the lunar parallax must be
             # less than the sum of the angular radii.
             # Lunar parallax at mean distance is ~0.95 degrees.
-            LUNAR_PARALLAX = 0.95  # degrees (maximum topocentric displacement)
+            # Calculate actual parallax based on Moon distance
+            # Parallax (in degrees) = arcsin(Earth_radius / Moon_distance)
+            # Earth radius = 6378 km, Moon distance in AU, 1 AU = 149597870.7 km
+            moon_dist_km = moon_dist * 149597870.7
+            LUNAR_PARALLAX = math.degrees(math.asin(6378.0 / moon_dist_km))
 
             # The occultation occurs if: min_sep - parallax < moon_r + target_r
             # Which means: min_sep < moon_r + target_r + parallax
@@ -5536,25 +5632,32 @@ def lun_occult_when_glob(
             true_occultation = min_sep < (moon_r + target_r + LUNAR_PARALLAX)
 
             if true_occultation:
-                # Calculate contact times
-                jd_first, jd_second, jd_third, jd_fourth = _calculate_contact_times(
-                    jd_max, min_sep, moon_r, target_r
+                # For global occultations, contact times are defined as when
+                # the occultation is first/last visible from some Earth location.
+                # Use an adjusted threshold that accounts for parallax.
+                # The effective separation for timing is (min_sep - LUNAR_PARALLAX)
+                # which represents the minimum topocentric separation.
+                # Contact times occur when this equals moon_r + target_r.
+                # For the search, we use the geocentric positions but adjust threshold.
+                effective_sep = max(0, min_sep - LUNAR_PARALLAX)
+                adjusted_outer = moon_r + target_r
+
+                # Calculate contact times using the adjusted geometry
+                jd_first, jd_second, jd_third, jd_fourth = (
+                    _calculate_contact_times_global(
+                        jd_max, min_sep, moon_r, target_r, LUNAR_PARALLAX
+                    )
                 )
 
-                # Determine occultation type
-                # Grazing threshold: when the target passes within the outer 10%
-                # of the Moon's disc (min_sep > 0.9 * moon_r). Grazing occultations
-                # are scientifically interesting because the star may flash in/out
-                # multiple times due to lunar limb topography (mountains/valleys).
+                # Determine occultation type based on effective separation
+                # (minimum topocentric separation achievable)
                 grazing_threshold = 0.9 * moon_r
-                is_grazing = min_sep > grazing_threshold
+                is_grazing = effective_sep > grazing_threshold
 
-                if min_sep < abs(moon_r - target_r):
+                if effective_sep < abs(moon_r - target_r):
                     if target_r > moon_r:
-                        # Target larger than Moon (only for Sun - but Sun is not handled here)
                         ecl_type = SE_ECL_ANNULAR
                     else:
-                        # Total occultation - target fully behind Moon
                         ecl_type = SE_ECL_TOTAL
                 else:
                     # Partial occultation
@@ -5591,13 +5694,23 @@ def lun_occult_when_glob(
                 return ecl_type, tret
 
         # Check if we're getting close to an occultation
-        if sep < 3.0:  # Within 3 degrees
-            # Use smaller steps for closer approaches
+        # Use smaller steps when separation is decreasing (approaching close encounter)
+        # or when already close
+        is_approaching = sep < prev_sep
+
+        if sep < 3.0:
+            # Very close - use small steps
             step = 0.1
-        elif sep < 10.0:  # Within 10 degrees
+        elif is_approaching and sep < 20.0:
+            # Approaching a close encounter - use moderate steps
+            step = 0.25
+        elif sep < 10.0:
             step = 0.5
         else:
             step = 1.0
+
+        # Remember current separation for next iteration
+        prev_sep = sep
 
         # Apply step direction based on backwards parameter
         if backwards:
@@ -5868,7 +5981,16 @@ def lun_occult_when_loc(
         jd_fourth = global_times[3]  # occultation end
 
         # Check if occultation is visible from this location
-        # Sample at key phases: first contact, maximum, fourth contact
+        # Visibility criteria for local occultation observation:
+        # - The maximum must have both Moon and target above horizon
+        # - At least one contact must be visible for the event to be "locally visible"
+        max_visible = _is_visible(jd_max)
+
+        # Check visibility at contact points
+        first_visible = jd_first > 0 and _is_visible(jd_first)
+        fourth_visible = jd_fourth > 0 and _is_visible(jd_fourth)
+
+        # Sample at key phases for visibility flags
         check_times = [jd_max]
         if jd_first > 0:
             check_times.append(jd_first)
@@ -5887,10 +6009,15 @@ def lun_occult_when_loc(
                 if t not in check_times:
                     check_times.append(t)
 
-        bodies_visible = any(_is_visible(t) for t in check_times)
+        # Check if any phase is visible (for visibility flags)
+        any_visible = any(_is_visible(t) for t in check_times)
 
-        if not bodies_visible:
-            # Occultation not visible from this location, try next
+        # Visibility criterion: event is observable if the fourth contact is visible
+        # This ensures the complete occultation (ingress and egress) is observable
+        # If fourth contact is not visible (e.g., Moon/planet sets during occultation),
+        # skip this event and search for the next one
+        if not fourth_visible:
+            # Fourth contact not visible - incomplete event, try next
             jd = jd_max + 1  # Skip ahead to find next occultation
             continue
 
@@ -6018,6 +6145,11 @@ def lun_occult_when_loc(
         # This accounts for lunar parallax (~1 degree) which affects timing
         jd_max_local = _find_local_maximum(jd_max)
 
+        # Early check: if local maximum is not visible, skip to next event
+        if not _is_visible(jd_max_local):
+            jd = jd_max + 1
+            continue
+
         # Get Moon's alt/az at local maximum
         moon_alt, moon_az = _get_moon_altaz(jd_max_local)
         target_alt, target_az = _get_target_altaz(jd_max_local)
@@ -6034,6 +6166,11 @@ def lun_occult_when_loc(
         outer_threshold = moon_radius + target_radius
         inner_threshold = abs(moon_radius - target_radius)
         contact_search = 2.0 / 24.0  # 2 hours search range
+
+        # Early check: if topocentric separation is too large, no occultation at this location
+        if min_separation >= outer_threshold:
+            jd = jd_max + 1
+            continue
 
         jd_first_local = 0.0
         jd_fourth_local = 0.0
@@ -6084,6 +6221,11 @@ def lun_occult_when_loc(
         # Determine occultation type
         ecl_type = global_type
 
+        # If there's no actual occultation at this location, skip to next global event
+        if jd_first_local <= 0 or jd_fourth_local <= 0:
+            jd = jd_max + 1
+            continue
+
         # Check visibility at each phase using local times
         if jd_first_local > 0 and _is_visible(jd_first_local):
             ecl_type |= SE_ECL_1ST_VISIBLE
@@ -6096,6 +6238,13 @@ def lun_occult_when_loc(
         if _is_visible(jd_max_local):
             ecl_type |= SE_ECL_MAX_VISIBLE
         ecl_type |= SE_ECL_VISIBLE
+
+        # Require the fourth contact to be visible for a complete observation
+        # If fourth contact is not visible at this location, skip to next global event
+        fourth_visible = jd_fourth_local > 0 and _is_visible(jd_fourth_local)
+        if not fourth_visible:
+            jd = jd_max + 1
+            continue
 
         # Find moonrise/moonset during occultation
         moonrise_time = 0.0
@@ -6882,7 +7031,7 @@ def rise_trans(
         horizon_alt = 0.0
         use_refraction = not (rsmi & SE_BIT_NO_REFRACTION)
 
-    # Calculate horizon refraction per reference API standard
+    # Calculate horizon refraction per IAU standard
     # Standard horizon refraction is 34 arcminutes (0.5667°), the conventional
     # value used in sunrise/sunset calculations (IAU/Meeus convention).
     # The Bennett (1982) formula gives ~29' but the traditional 34' is retained

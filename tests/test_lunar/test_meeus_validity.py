@@ -83,8 +83,8 @@ class TestMeanLunarNodeValidityWarnings:
             assert len(meeus_warnings) == 0
             assert 0 <= result < 360
 
-    def test_no_warning_outside_valid_range(self):
-        """No warning for dates outside ±1000 years - corrections are applied."""
+    def test_warning_outside_valid_range(self):
+        """Warning emitted for dates outside ±20 centuries from J2000."""
         jd_0ce = 2451545.0 - 20.0 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
@@ -93,7 +93,9 @@ class TestMeanLunarNodeValidityWarnings:
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            assert len(meeus_warnings) == 0
+            # At exactly T=20, boundary is > 20, so no warning at exactly 20
+            # but this JD is at T=-20.0 which triggers the > 10 warning
+            assert len(meeus_warnings) >= 1
             assert 0 <= result < 360
 
     def test_no_exception_outside_max_range(self):
@@ -152,8 +154,8 @@ class TestMeanLilithValidityWarnings:
             assert len(meeus_warnings) == 0
             assert 0 <= result < 360
 
-    def test_no_warning_outside_valid_range(self):
-        """No warning for dates outside ±1000 years - corrections are applied."""
+    def test_warning_outside_valid_range(self):
+        """Warning emitted for dates outside ±20 centuries from J2000."""
         jd_0ce = 2451545.0 - 20.0 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
@@ -162,7 +164,8 @@ class TestMeanLilithValidityWarnings:
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            assert len(meeus_warnings) == 0
+            # At T=-20.0 which triggers the > 10 warning
+            assert len(meeus_warnings) >= 1
             assert 0 <= result < 360
 
     def test_no_exception_outside_max_range(self):
@@ -238,7 +241,7 @@ class TestMeeusPolynomialAccuracyDocumentation:
             assert len(meeus_warnings) == 0
 
     def test_just_outside_valid_range(self):
-        """No warning just outside valid range - corrections are applied."""
+        """Warning emitted just outside valid range (>10 centuries)."""
         jd_just_outside = 2451545.0 - 10.01 * 36525.0
 
         with warnings.catch_warnings(record=True) as w:
@@ -247,5 +250,6 @@ class TestMeeusPolynomialAccuracyDocumentation:
             meeus_warnings = [
                 x for x in w if issubclass(x.category, MeeusPolynomialWarning)
             ]
-            assert len(meeus_warnings) == 0
+            # T=-10.01 is outside optimal range, warning expected
+            assert len(meeus_warnings) >= 1
             assert 0 <= result < 360
