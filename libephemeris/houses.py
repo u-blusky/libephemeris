@@ -43,7 +43,7 @@ Expected Accuracy by System:
 - Complex (Campanus, Regiomontanus, Topocentric): ~0.01°
 - Horizontal: ~0.01° (with convergence fallback to Porphyry)
 
-Comparison with reference implementation:
+Comparison with pyswisseph:
 - Typical agreement: 0.001-0.1° depending on system and location
 - Test suite validates against 130+ reference cases with tolerances 0.1-1.0°
 
@@ -4849,7 +4849,7 @@ def gauquelin_sector(
         )
 
     # Methods 0-1: Use house_pos with Gauquelin house system ('G')
-    # This matches reference API behavior exactly
+    # This computes Gauquelin sectors from house position
     from .planets import swe_calc_ut
     from .cache import get_true_obliquity
 
@@ -4928,7 +4928,7 @@ def swe_gauquelin_sector(
         >>> sector = swe_gauquelin_sector(2451545.0, SE_MARS, 0, geopos)
     """
     lon, lat, altitude = geopos
-    # Use defaults if 0 is passed (matching reference API behavior)
+    # Use defaults if 0 is passed (standard API behavior)
     pressure = atpress if atpress != 0.0 else 1013.25
     temperature = attemp if attemp != 0.0 else 15.0
 

@@ -394,7 +394,7 @@ class TestDocumentedReferences:
         doc = calc_interpolated_apogee.__doc__
         assert "Chapront" in doc
 
-    def test_lunar_theory_referenced(self):
+    def test_elp2000_theory_referenced(self):
         """Verify ELP2000 lunar theory is referenced."""
         doc = calc_interpolated_apogee.__doc__
         assert "ELP" in doc or "Lunar Tables" in doc or "Lilith" in doc

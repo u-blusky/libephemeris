@@ -6,7 +6,7 @@ Implements standard astronomical time functions for conversions between:
 - Gregorian and Julian calendar systems
 - UT1 (Universal Time) and TT (Terrestrial Time)
 
-Functions match the reference API for compatibility.
+Functions provide pyswisseph-compatible API signatures.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 

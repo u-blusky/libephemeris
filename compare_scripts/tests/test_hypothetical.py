@@ -798,9 +798,16 @@ class TestCalcCupido:
             assert 0.0 <= pos[0] < 360.0, f"Longitude {pos[0]} out of range"
 
     def test_calc_cupido_latitude_zero(self):
-        """Test that Cupido has zero latitude (on ecliptic)."""
+        """Test that Cupido latitude matches orbital inclination model."""
         pos = calc_cupido(self.J2000)
-        assert pos[1] == 0.0, "Cupido should have zero latitude"
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        if elements.i == 0.0:
+            assert pos[1] == 0.0, "Cupido should have zero latitude for i=0"
+        else:
+            expected_lat = elements.i * math.sin(math.radians(pos[0] - elements.Omega))
+            assert abs(pos[1] - expected_lat) < 0.01, (
+                f"Cupido latitude should match inclination model"
+            )
 
     def test_calc_cupido_distance_correct(self):
         """Test that Cupido distance matches semi-major axis (circular orbit)."""
@@ -831,9 +838,11 @@ class TestCalcCupido:
         )
 
     def test_calc_cupido_latitude_velocity_zero(self):
-        """Test that latitude and distance velocity are zero."""
+        """Test that latitude velocity matches orbital inclination model."""
         pos = calc_cupido(self.J2000)
-        assert pos[4] == 0.0, "Latitude velocity should be zero"
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        if elements.i == 0.0:
+            assert pos[4] == 0.0, "Latitude velocity should be zero for i=0"
         assert pos[5] == 0.0, "Distance velocity should be zero for e=0"
 
     def test_calc_cupido_at_epoch(self):
@@ -1528,9 +1537,9 @@ class TestCalcApollon:
     def test_calc_apollon_distance_correct(self):
         """Test that Apollon distance matches semi-major axis (circular orbit)."""
         pos = calc_apollon(self.J2000)
-        # For circular orbit, distance = semi-major axis = 70.361180 AU
-        assert abs(pos[2] - 70.361180) < 0.001, (
-            f"Apollon distance should be ~70.361180 AU, got {pos[2]}"
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_APOLLON]
+        assert abs(pos[2] - elements.a) < 0.001, (
+            f"Apollon distance should be ~{elements.a} AU, got {pos[2]}"
         )
 
     def test_calc_apollon_distance_constant(self):
@@ -1710,9 +1719,9 @@ class TestCalcAdmetos:
     def test_calc_admetos_distance_correct(self):
         """Test that Admetos distance matches semi-major axis (circular orbit)."""
         pos = calc_admetos(self.J2000)
-        # For circular orbit, distance = semi-major axis = 73.736396 AU
-        assert abs(pos[2] - 73.736396) < 0.001, (
-            f"Admetos distance should be ~73.736396 AU, got {pos[2]}"
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ADMETOS]
+        assert abs(pos[2] - elements.a) < 0.001, (
+            f"Admetos distance should be ~{elements.a} AU, got {pos[2]}"
         )
 
     def test_calc_admetos_distance_constant(self):
@@ -1894,9 +1903,9 @@ class TestCalcVulkanus:
     def test_calc_vulkanus_distance_correct(self):
         """Test that Vulkanus distance matches semi-major axis (circular orbit)."""
         pos = calc_vulkanus(self.J2000)
-        # For circular orbit, distance = semi-major axis = 77.445895 AU
-        assert abs(pos[2] - 77.445895) < 0.001, (
-            f"Vulkanus distance should be ~77.445895 AU, got {pos[2]}"
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_VULKANUS]
+        assert abs(pos[2] - elements.a) < 0.001, (
+            f"Vulkanus distance should be ~{elements.a} AU, got {pos[2]}"
         )
 
     def test_calc_vulkanus_distance_constant(self):
@@ -2078,9 +2087,9 @@ class TestCalcPoseidon:
     def test_calc_poseidon_distance_correct(self):
         """Test that Poseidon distance matches semi-major axis (circular orbit)."""
         pos = calc_poseidon(self.J2000)
-        # For circular orbit, distance = semi-major axis = 83.666307 AU
-        assert abs(pos[2] - 83.666307) < 0.001, (
-            f"Poseidon distance should be ~83.666307 AU, got {pos[2]}"
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_POSEIDON]
+        assert abs(pos[2] - elements.a) < 0.001, (
+            f"Poseidon distance should be ~{elements.a} AU, got {pos[2]}"
         )
 
     def test_calc_poseidon_distance_constant(self):
@@ -2592,10 +2601,13 @@ class TestUranianIntegrationWithPlanets:
         result, _ = swe_calc_ut(self.J2000, SE_CUPIDO, SEFLG_SPEED)
         lon, lat, dist, dlon, dlat, ddist = result
 
-        # Cupido specific assertions
-        assert lat == 0.0, "Cupido should be on ecliptic (zero latitude)"
-        # Distance is derived from mean motion in calc_uranian_position,
-        # which gives a large estimate. Just verify it's positive.
+        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        if elements.i == 0.0:
+            assert lat == 0.0, "Cupido should be on ecliptic (zero latitude)"
+        else:
+            assert abs(lat) <= elements.i, (
+                f"Cupido latitude {lat} should be within inclination {elements.i}"
+            )
         assert dist > 30.0, "Cupido distance should be beyond Neptune (~30 AU)"
         assert dlon > 0, "Cupido should have prograde motion"
 

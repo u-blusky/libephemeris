@@ -149,24 +149,6 @@ from .state import get_timescale, get_planets
 
 try:
     from .lunar_corrections import (
-        MEAN_NODE_CORRECTIONS,
-        MEAN_APSE_CORRECTIONS,
-        CORRECTION_START_YEAR,
-        CORRECTION_END_YEAR,
-        CORRECTION_STEP_YEARS,
-    )
-
-    _CORRECTIONS_AVAILABLE = True
-except ImportError:
-    _CORRECTIONS_AVAILABLE = False
-    MEAN_NODE_CORRECTIONS = ()
-    MEAN_APSE_CORRECTIONS = ()
-    CORRECTION_START_YEAR = 0
-    CORRECTION_END_YEAR = 0
-    CORRECTION_STEP_YEARS = 10
-
-try:
-    from .lunar_corrections import (
         PERIGEE_PERTURBATION_CORRECTIONS,
         PERIGEE_CORRECTION_START_YEAR,
         PERIGEE_CORRECTION_END_YEAR,
@@ -193,41 +175,6 @@ MEEUS_MAX_CENTURIES = 20.0  # ±2000 years: error grows significantly beyond
 def _jd_to_year(jd_tt: float) -> float:
     """Convert Julian Day (TT) to year (floating point)."""
     return (jd_tt - 2451545.0) / 365.25 + 2000.0
-
-
-def _interpolate_correction(jd_tt: float, table: Tuple[float, ...]) -> float:
-    """
-    Interpolate correction from precomputed table.
-
-    Uses linear interpolation between table entries.
-
-    Args:
-        jd_tt: Julian Day in TT
-        table: Tuple of correction values (node or apse)
-
-    Returns:
-        Interpolated correction in degrees, or 0.0 if outside table range
-    """
-    if not _CORRECTIONS_AVAILABLE or not table:
-        return 0.0
-
-    year = _jd_to_year(jd_tt)
-
-    if year < CORRECTION_START_YEAR or year > CORRECTION_END_YEAR:
-        return 0.0
-
-    idx_float = (year - CORRECTION_START_YEAR) / CORRECTION_STEP_YEARS
-    idx_low = int(idx_float)
-
-    if idx_low < 0:
-        return 0.0
-    if idx_low >= len(table) - 1:
-        return float(table[-1]) if table else 0.0
-
-    frac = idx_float - idx_low
-    return float(table[idx_low]) + frac * (
-        float(table[idx_low + 1]) - float(table[idx_low])
-    )
 
 
 def _interpolate_perigee_correction(jd_tt: float) -> float:
@@ -271,51 +218,6 @@ def _interpolate_perigee_correction(jd_tt: float) -> float:
     )
 
 
-def _calc_mean_node_analytical(jd_tt: float) -> float:
-    """
-    Calculate mean lunar node using analytical polynomial formula.
-
-    Uses the geometric relationship: Mean Node = L' - F
-    where L' is the Moon's mean longitude and F is the mean argument of latitude.
-    The polynomial coefficients are derived from JPL DE440/DE441 ephemeris data.
-
-    Args:
-        jd_tt: Julian Day in TT
-
-    Returns:
-        Mean node longitude in degrees [0, 360)
-
-    References:
-        - Simon, J.L. et al. (1994) A&A 282, 663-683
-        - Chapront, J. et al. (2002) A&A 387, 700-708
-    """
-    T = (jd_tt - 2451545.0) / 36525.0
-    T2 = T * T
-    fracT = T % 1.0
-
-    z_F_T2 = -1.312045233711e01
-    z_F_T3 = -1.138215912580e-03
-    z_F_T4 = -9.646018347184e-06
-    z_LP_T2 = -5.663161722088e00
-    z_LP_T3 = 5.722859298199e-03
-    z_LP_T4 = -8.466472828815e-05
-
-    NF = 1739232000.0 * fracT + 295263.0983 * T - 0.2079419901760 * T + 335779.55755
-    NF = NF % 1296000.0
-    NF += ((z_F_T4 * T + z_F_T3) * T + z_F_T2) * T2
-
-    LP = 1731456000.0 * fracT + 1108372.83264 * T - 0.6784914260953 * T + 785939.95571
-    LP = LP % 1296000.0
-    LP += ((z_LP_T4 * T + z_LP_T3) * T + z_LP_T2) * T2
-
-    STR = math.pi / (180.0 * 3600.0)
-
-    node_rad = (LP - NF) * STR
-    node_rad = node_rad % (2.0 * math.pi)
-
-    return math.degrees(node_rad)
-
-
 def _calc_mean_apse_analytical(jd_tt: float) -> float:
     """
     Calculate mean lunar apogee using analytical polynomial formula.
@@ -335,6 +237,7 @@ def _calc_mean_apse_analytical(jd_tt: float) -> float:
         - Chapront, J. et al. (2002) A&A 387, 700-708
     """
     T = (jd_tt - 2451545.0) / 36525.0
+    _check_meeus_range(T)
     T2 = T * T
     fracT = T % 1.0
 
@@ -1909,12 +1812,39 @@ class MeeusRangeError(ValueError):
     pass
 
 
+def _check_meeus_range(T: float) -> None:
+    """Check if T (centuries from J2000) is within valid/optimal range and emit warnings.
+
+    Args:
+        T: Centuries from J2000.0
+
+    Emits:
+        MeeusPolynomialWarning if outside optimal (±10) or valid (±20) range
+    """
+    abs_T = abs(T)
+    if abs_T > 20.0:
+        warnings.warn(
+            f"Date is {abs_T:.1f} centuries from J2000.0, outside the valid range "
+            f"(±20 centuries). Error may exceed 1 degree. "
+            f"Results should be used with caution.",
+            MeeusPolynomialWarning,
+            stacklevel=3,
+        )
+    elif abs_T > 10.0:
+        warnings.warn(
+            f"Date is {abs_T:.1f} centuries from J2000.0, outside the optimal range "
+            f"(±10 centuries). Precision is degraded but still usable.",
+            MeeusPolynomialWarning,
+            stacklevel=3,
+        )
+
+
 def calc_mean_lunar_node(jd_tt: float) -> float:
     """
     Calculate Mean Lunar Node (ascending node of lunar orbit on ecliptic).
 
-    Uses analytical polynomial formula with precomputed corrections from
-    JPL ephemeris for high precision across the full date range.
+    Uses the Meeus polynomial formula (Chapter 47) for the mean longitude
+    of the ascending node.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -1923,14 +1853,9 @@ def calc_mean_lunar_node(jd_tt: float) -> float:
         float: Ecliptic longitude of mean ascending node in degrees (0-360)
 
     Precision:
-        With precomputed corrections from JPL ephemeris:
-        - Within DE440/DE441 range: <0.001 degree error
-        - Outside correction range: falls back to analytical polynomial
-
-        The analytical polynomial alone is optimized for dates near J2000.0:
-        - Within +/-200 years (1800-2200): <0.01 degree error
-        - Within +/-1000 years (1000-3000): ~0.02 degree error
-        - Beyond +/-2000 years: error grows rapidly
+        - Within +/-200 years (1800-2200): <0.01 degree precision
+        - Within +/-1000 years (1000-3000): ~0.02 degree precision
+        - Beyond +/-2000 years: error grows rapidly (warning emitted)
 
     Note:
         The mean node is a smoothed average that ignores short-period perturbations.
@@ -1941,16 +1866,9 @@ def calc_mean_lunar_node(jd_tt: float) -> float:
         - Simon, J.L. et al. (1994) "Numerical expressions for precession formulae", A&A 282
         - Chapront, J. et al. (2002) "A new determination of lunar orbital parameters", A&A 387
     """
-    mean_analytical = _calc_mean_node_analytical(jd_tt)
+    T = (jd_tt - 2451545.0) / 36525.0
+    _check_meeus_range(T)
 
-    if _CORRECTIONS_AVAILABLE:
-        correction = _interpolate_correction(jd_tt, MEAN_NODE_CORRECTIONS)
-        return (mean_analytical + correction) % 360.0
-
-    return mean_analytical
-
-    # Meeus polynomial for mean longitude of ascending node
-    # Valid range: optimized for ±10 centuries from J2000, usable for ±20 centuries
     Omega = (
         125.0445479
         - 1934.1362891 * T
@@ -2129,8 +2047,9 @@ def calc_mean_lilith(jd_tt: float) -> float:
     """
     Calculate Mean Lilith (Mean Lunar Apogee, also called Black Moon Lilith).
 
-    Uses analytical polynomial formula with precomputed corrections from
-    JPL ephemeris for high precision across the full date range.
+    Uses the analytical polynomial formula from Simon et al. (1994) and
+    Chapront et al. (2002) with DE404-fitted coefficients for the mean
+    longitude of the lunar apse.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -2139,14 +2058,9 @@ def calc_mean_lilith(jd_tt: float) -> float:
         float: Ecliptic longitude of mean lunar apogee in degrees (0-360)
 
     Precision:
-        With precomputed corrections from JPL ephemeris:
-        - Within DE440/DE441 range: <0.001 degree error
-        - Outside correction range: falls back to analytical polynomial
-
-        The analytical polynomial alone is optimized for dates near J2000.0:
-        - Within +/-200 years (1800-2200): <0.01 degree error
-        - Within +/-1000 years (1000-3000): ~0.02 degree error
-        - Beyond +/-2000 years: error grows rapidly
+        - Within +/-200 years (1800-2200): <0.01 degree precision
+        - Within +/-1000 years (1000-3000): ~0.02 degree precision
+        - Beyond +/-2000 years: error grows rapidly (warning emitted)
 
     Note:
         Mean Lilith is the time-averaged apogee, ignoring short-period variations.
@@ -2157,13 +2071,7 @@ def calc_mean_lilith(jd_tt: float) -> float:
         - Simon, J.L. et al. (1994) "Numerical expressions for precession formulae", A&A 282
         - Chapront, J. et al. (2002) "A new determination of lunar orbital parameters", A&A 387
     """
-    mean_analytical = _calc_mean_apse_analytical(jd_tt)
-
-    if _CORRECTIONS_AVAILABLE:
-        correction = _interpolate_correction(jd_tt, MEAN_APSE_CORRECTIONS)
-        return (mean_analytical + correction) % 360.0
-
-    return mean_analytical
+    return _calc_mean_apse_analytical(jd_tt)
 
 
 def calc_mean_lilith_with_latitude(jd_tt: float) -> Tuple[float, float]:

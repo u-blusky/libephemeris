@@ -29,3 +29,4 @@ de440s.bsp
 *.bsp
 implementation_plans
 .opencode/plans
+compare_scripts_tests.log
