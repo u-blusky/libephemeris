@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-02-24
+
+### Changed
+
+- Uploaded planet_centers tier-specific SPK files to GitHub release:
+  - `planet_centers_base.bsp` (25.4 MB, 1850-2150)
+  - `planet_centers_medium.bsp` (72.6 MB, 1550-2650)
+  - `planet_centers_extended.bsp` (222.6 MB, -12000 to +17000)
+- Updated `download.py` with SHA256 hashes for integrity verification
+- Modified `release_planet_centers.py` to find BSP files in `~/.libephemeris`
+
 ## [0.19.0] - 2026-02-23
 
 ### Fixed
