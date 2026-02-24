@@ -40,8 +40,46 @@ TIER_FILES = {
     "legacy": "planet_centers.bsp",
 }
 
+DEFAULT_TIERS = ["base", "medium", "extended"]
+
 RELEASE_TAG = "data-v1"
 REPO = "g-battaglia/libephemeris"
+
+
+def get_data_dir() -> Path:
+    """Get the libephemeris data directory.
+
+    Checks LIBEPHEMERIS_DATA_DIR env var, falls back to ~/.libephemeris.
+    """
+    env_dir = os.environ.get("LIBEPHEMERIS_DATA_DIR")
+    if env_dir:
+        return Path(env_dir)
+    return Path.home() / ".libephemeris"
+
+
+def find_bsp_file(filename: str) -> Path | None:
+    """Find a BSP file in data dir or repo root.
+
+    Search order:
+        1. Data directory (~/.libephemeris or LIBEPHEMERIS_DATA_DIR)
+        2. Repository root (fallback)
+
+    Args:
+        filename: BSP filename to find.
+
+    Returns:
+        Path to the file, or None if not found.
+    """
+    data_path = get_data_dir() / filename
+    if data_path.exists():
+        return data_path
+
+    repo_root = Path(__file__).parent.parent
+    repo_path = repo_root / filename
+    if repo_path.exists():
+        return repo_path
+
+    return None
 
 
 def calculate_sha256(filepath: Path) -> str:
@@ -159,22 +197,19 @@ Examples:
         return 1
 
     # Determine files to upload
-    script_dir = Path(__file__).parent
-    repo_root = script_dir.parent
-
     if args.tier == "all":
-        tiers = list(TIER_FILES.keys())
+        tiers = DEFAULT_TIERS
     else:
         tiers = [args.tier]
 
     files_to_upload = []
     for tier in tiers:
         filename = TIER_FILES[tier]
-        filepath = repo_root / filename
-        if filepath.exists():
+        filepath = find_bsp_file(filename)
+        if filepath is not None:
             files_to_upload.append((tier, filepath))
         else:
-            print(f"[SKIP] {filename} not found at {filepath}")
+            print(f"[SKIP] {filename} not found in {get_data_dir()} or repo root")
 
     if not files_to_upload:
         print("ERROR: No files found to upload.")

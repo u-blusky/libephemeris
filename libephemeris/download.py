@@ -79,20 +79,20 @@ DATA_FILES = {
     # Tier-specific files
     "planet_centers_base.bsp": {
         "url": f"{GITHUB_RELEASES_BASE}/planet_centers_base.bsp",
-        "sha256": None,
-        "size_mb": 18.0,
+        "sha256": "a9ec744ff412b095129166587ea0814f81c850faebf92586a738cb5dc103c92a",
+        "size_mb": 25.4,
         "description": "Planet centers for 'base' tier (1850-2150)",
     },
     "planet_centers_medium.bsp": {
         "url": f"{GITHUB_RELEASES_BASE}/planet_centers_medium.bsp",
-        "sha256": None,
-        "size_mb": 45.0,
+        "sha256": "b4fd366f2d00958ee3dd4a8884164d339674d5f7f2ea25c5f6959705c2b66852",
+        "size_mb": 72.6,
         "description": "Planet centers for 'medium' tier (1550-2650)",
     },
     "planet_centers_extended.bsp": {
         "url": f"{GITHUB_RELEASES_BASE}/planet_centers_extended.bsp",
-        "sha256": None,
-        "size_mb": 90.0,
+        "sha256": "a07b046b89a9992fc7fda445b00e656341a3bab66a035adb8108de7d4bd69edc",
+        "size_mb": 222.6,
         "description": "Planet centers for 'extended' tier (partial -12000 to +17000)",
     },
 }
