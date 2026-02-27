@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import multiprocessing
 import os
 import shutil
 import struct
@@ -246,6 +247,18 @@ _ASTEROID_NAIF = {
     18: 2000002,  # Pallas
     19: 2000003,  # Juno
     20: 2000004,  # Vesta
+}
+
+# Body groups for independent generation + merge workflow.
+# Each group can be generated as a standalone .leb file and later merged.
+BODY_GROUPS: dict[str, List[int]] = {
+    "planets": sorted(_PLANET_MAP.keys()),  # 11 ICRS planets (vectorized Skyfield)
+    "asteroids": sorted(_ASTEROID_NAIF.keys()),  # 5 ICRS asteroids (spktype21)
+    "analytical": sorted(
+        bid
+        for bid in BODY_PARAMS
+        if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF
+    ),  # 15 ecliptic/helio analytical bodies
 }
 
 
@@ -1473,7 +1486,11 @@ def assemble_leb(
             enabled=verbose,
         )
         done = 0
-        with ProcessPoolExecutor(max_workers=workers) as executor:
+        # Use "spawn" context on macOS to avoid fork deadlocks with
+        # C extensions (numpy, erfa).  "fork" copies the parent's locked
+        # mutexes which can permanently hang child processes.
+        mp_ctx = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx) as executor:
             futures = {
                 executor.submit(_worker_generate_body, args): args[0]
                 for args in args_list
@@ -1698,6 +1715,261 @@ def assemble_leb(
 
 
 # =============================================================================
+# MERGE PARTIAL LEB FILES
+# =============================================================================
+
+
+def merge_leb_files(
+    inputs: List[str],
+    output: str,
+    verbose: bool = True,
+) -> None:
+    """Merge multiple partial .leb files into a single complete file.
+
+    Each input file must cover the same JD range but contain different bodies.
+    Nutation, Delta-T, and star catalog are taken from the first input file
+    that contains them.
+
+    This allows generating body groups independently (e.g. planets, asteroids,
+    analytical) and combining them afterward, which avoids the fork-deadlock
+    issues of multiprocessing on macOS and gives finer control over
+    regeneration.
+
+    Args:
+        inputs: List of paths to partial .leb files.
+        output: Output path for the merged file.
+        verbose: Print progress.
+
+    Raises:
+        ValueError: If inputs have mismatched JD ranges or overlapping bodies.
+    """
+    from libephemeris.leb_format import (
+        read_body_entry,
+        read_header,
+        read_nutation_header,
+        read_section_dir,
+        read_star_entry,
+    )
+
+    if not inputs:
+        raise ValueError("No input files provided")
+
+    if verbose:
+        print(f"Merging {len(inputs)} LEB files -> {output}")
+
+    # -------------------------------------------------------------------------
+    # 1. Read all input files
+    # -------------------------------------------------------------------------
+    all_bodies: dict[int, tuple[str, int]] = {}  # body_id -> (source_file, idx_in_file)
+    ref_jd_start: Optional[float] = None
+    ref_jd_end: Optional[float] = None
+
+    # Parsed data from each input
+    input_data: List[dict] = []
+
+    for path in inputs:
+        with open(path, "rb") as f:
+            data = f.read()
+
+        hdr = read_header(data, 0)
+        if hdr.magic != MAGIC:
+            raise ValueError(f"Invalid LEB magic in {path}")
+        if hdr.version != VERSION:
+            raise ValueError(f"Unsupported LEB version {hdr.version} in {path}")
+
+        # Validate JD range consistency
+        if ref_jd_start is None:
+            ref_jd_start = hdr.jd_start
+            ref_jd_end = hdr.jd_end
+        else:
+            assert ref_jd_start is not None and ref_jd_end is not None
+            if (
+                abs(hdr.jd_start - ref_jd_start) > 0.5
+                or abs(hdr.jd_end - ref_jd_end) > 0.5
+            ):
+                raise ValueError(
+                    f"JD range mismatch: {path} has "
+                    f"[{hdr.jd_start:.1f}, {hdr.jd_end:.1f}] but expected "
+                    f"[{ref_jd_start:.1f}, {ref_jd_end:.1f}]"
+                )
+
+        # Parse sections
+        sections: dict[int, SectionEntry] = {}
+        for i in range(hdr.section_count):
+            offset = HEADER_SIZE + i * SECTION_DIR_SIZE
+            sec = read_section_dir(data, offset)
+            sections[sec.section_id] = sec
+
+        # Parse bodies
+        bodies: dict[int, BodyEntry] = {}
+        if SECTION_BODY_INDEX in sections:
+            sec = sections[SECTION_BODY_INDEX]
+            for i in range(hdr.body_count):
+                off = sec.offset + i * BODY_ENTRY_SIZE
+                entry = read_body_entry(data, off)
+                bodies[entry.body_id] = entry
+
+                # Check for duplicates
+                if entry.body_id in all_bodies:
+                    src, _ = all_bodies[entry.body_id]
+                    raise ValueError(
+                        f"Body {entry.body_id} ({BODY_NAMES.get(entry.body_id, '?')}) "
+                        f"found in both {src} and {path}"
+                    )
+                all_bodies[entry.body_id] = (path, i)
+
+        info = {
+            "path": path,
+            "data": data,
+            "header": hdr,
+            "sections": sections,
+            "bodies": bodies,
+        }
+        input_data.append(info)
+
+        if verbose:
+            body_names = [
+                BODY_NAMES.get(bid, str(bid)) for bid in sorted(bodies.keys())
+            ]
+            print(f"  {path}: {len(bodies)} bodies ({', '.join(body_names)})")
+
+    assert ref_jd_start is not None and ref_jd_end is not None
+
+    # -------------------------------------------------------------------------
+    # 2. Collect body coefficient data (raw bytes)
+    # -------------------------------------------------------------------------
+    merged_bodies = sorted(all_bodies.keys())
+    body_entries: List[BodyEntry] = []
+    body_coeff_blobs: List[bytes] = []  # raw coefficient bytes per body
+
+    for bid in merged_bodies:
+        # Find the source file
+        for info in input_data:
+            if bid in info["bodies"]:
+                entry = info["bodies"][bid]
+                data = info["data"]
+                seg_size = segment_byte_size(entry.degree, entry.components)
+                total_bytes = entry.segment_count * seg_size
+                blob = data[entry.data_offset : entry.data_offset + total_bytes]
+                body_entries.append(entry)
+                body_coeff_blobs.append(blob)
+                break
+
+    # -------------------------------------------------------------------------
+    # 3. Collect nutation from first file that has it
+    # -------------------------------------------------------------------------
+    nutation_blob: Optional[bytes] = None
+    for info in input_data:
+        if SECTION_NUTATION in info["sections"]:
+            sec = info["sections"][SECTION_NUTATION]
+            nutation_blob = info["data"][sec.offset : sec.offset + sec.size]
+            break
+
+    # -------------------------------------------------------------------------
+    # 4. Collect delta-T from first file that has it
+    # -------------------------------------------------------------------------
+    delta_t_blob: Optional[bytes] = None
+    for info in input_data:
+        if SECTION_DELTA_T in info["sections"]:
+            sec = info["sections"][SECTION_DELTA_T]
+            delta_t_blob = info["data"][sec.offset : sec.offset + sec.size]
+            break
+
+    # -------------------------------------------------------------------------
+    # 5. Collect star catalog from first file that has it
+    # -------------------------------------------------------------------------
+    star_blob: Optional[bytes] = None
+    for info in input_data:
+        if SECTION_STARS in info["sections"]:
+            sec = info["sections"][SECTION_STARS]
+            star_blob = info["data"][sec.offset : sec.offset + sec.size]
+            break
+
+    # -------------------------------------------------------------------------
+    # 6. Calculate layout and write merged file
+    # -------------------------------------------------------------------------
+    body_count = len(merged_bodies)
+    body_index_size = body_count * BODY_ENTRY_SIZE
+    chebyshev_size = sum(len(b) for b in body_coeff_blobs)
+    nut_size = len(nutation_blob) if nutation_blob else 0
+    dt_size = len(delta_t_blob) if delta_t_blob else 0
+    star_size = len(star_blob) if star_blob else 0
+
+    section_dir_total = NUM_SECTIONS * SECTION_DIR_SIZE
+    body_index_offset = HEADER_SIZE + section_dir_total
+    chebyshev_offset = body_index_offset + body_index_size
+    nutation_offset = chebyshev_offset + chebyshev_size
+    delta_t_offset = nutation_offset + nut_size
+    star_offset = delta_t_offset + dt_size
+    total_size = star_offset + star_size
+
+    buf = bytearray(total_size)
+
+    # Header
+    now_jd = J2000 + (time.time() / 86400.0 - 10957.5)
+    header = FileHeader(
+        magic=MAGIC,
+        version=VERSION,
+        section_count=NUM_SECTIONS,
+        body_count=body_count,
+        jd_start=ref_jd_start,
+        jd_end=ref_jd_end,
+        generation_epoch=now_jd,
+        flags=0,
+    )
+    write_header(buf, header)
+
+    # Section directory
+    sections_list = [
+        SectionEntry(SECTION_BODY_INDEX, body_index_offset, body_index_size),
+        SectionEntry(SECTION_CHEBYSHEV, chebyshev_offset, chebyshev_size),
+        SectionEntry(SECTION_NUTATION, nutation_offset, nut_size),
+        SectionEntry(SECTION_DELTA_T, delta_t_offset, dt_size),
+        SectionEntry(SECTION_STARS, star_offset, star_size),
+    ]
+    for i, sec in enumerate(sections_list):
+        write_section_dir(buf, HEADER_SIZE + i * SECTION_DIR_SIZE, sec)
+
+    # Body index + coefficient data
+    coeff_write_offset = chebyshev_offset
+    for idx, (entry, blob) in enumerate(zip(body_entries, body_coeff_blobs)):
+        new_entry = BodyEntry(
+            body_id=entry.body_id,
+            coord_type=entry.coord_type,
+            segment_count=entry.segment_count,
+            jd_start=entry.jd_start,
+            jd_end=entry.jd_end,
+            interval_days=entry.interval_days,
+            degree=entry.degree,
+            components=entry.components,
+            data_offset=coeff_write_offset,
+        )
+        write_body_entry(buf, body_index_offset + idx * BODY_ENTRY_SIZE, new_entry)
+        buf[coeff_write_offset : coeff_write_offset + len(blob)] = blob
+        coeff_write_offset += len(blob)
+
+    # Nutation, Delta-T, stars (copy raw blobs)
+    if nutation_blob:
+        buf[nutation_offset : nutation_offset + len(nutation_blob)] = nutation_blob
+    if delta_t_blob:
+        buf[delta_t_offset : delta_t_offset + len(delta_t_blob)] = delta_t_blob
+    if star_blob:
+        buf[star_offset : star_offset + len(star_blob)] = star_blob
+
+    with open(output, "wb") as f:
+        f.write(buf)
+
+    if verbose:
+        print(f"\n  Merged file: {output}")
+        print(f"  Size: {total_size:,} bytes ({total_size / (1024 * 1024):.1f} MB)")
+        print(f"  Bodies: {body_count}")
+        print(f"  JD range: {ref_jd_start:.1f} to {ref_jd_end:.1f}")
+        body_list = [BODY_NAMES.get(b, str(b)) for b in merged_bodies]
+        print(f"  Body list: {', '.join(body_list)}")
+        print()
+
+
+# =============================================================================
 # VERIFICATION
 # =============================================================================
 
@@ -1802,9 +2074,59 @@ def verify_leb(
 # =============================================================================
 
 
+def _resolve_tier(args) -> Tuple[float, float, str]:
+    """Resolve tier/start/end/output from CLI args.
+
+    Returns:
+        (jd_start, jd_end, output_path)
+    """
+    if args.tier:
+        ephem_file, tier_start, tier_end, tier_output = TIER_CONFIGS[args.tier]
+
+        from libephemeris import set_jpl_file
+
+        set_jpl_file(ephem_file)
+
+        start_year = args.start if args.start is not None else tier_start
+        end_year = args.end if args.end is not None else tier_end
+
+        if args.output is None:
+            os.makedirs(DEFAULT_LEB_DIR, exist_ok=True)
+            output = os.path.join(DEFAULT_LEB_DIR, tier_output)
+        else:
+            output = args.output
+    else:
+        if args.output is None:
+            raise SystemExit("--output is required when --tier is not specified")
+        output = args.output
+        start_year = args.start if args.start is not None else DEFAULT_START_YEAR
+        end_year = args.end if args.end is not None else DEFAULT_END_YEAR
+
+    jd_start = _year_to_jd(start_year)
+    jd_end = _year_to_jd(end_year)
+    return jd_start, jd_end, output
+
+
+def _group_output_path(base_output: str, group: str) -> str:
+    """Derive the partial-file path for a body group.
+
+    Example: ``data/leb/ephemeris_base.leb`` + ``planets``
+             -> ``data/leb/ephemeris_base_planets.leb``
+    """
+    root, ext = os.path.splitext(base_output)
+    return f"{root}_{group}{ext}"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate LEB binary ephemeris file",
+        epilog=(
+            "Body groups for --group:\n"
+            "  planets    : Sun, Moon, Mercury-Pluto, Earth (vectorized Skyfield)\n"
+            "  asteroids  : Chiron, Ceres, Pallas, Juno, Vesta (spktype21)\n"
+            "  analytical : Lunar nodes, Lilith variants, Uranians, Transpluto\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--output",
@@ -1837,7 +2159,8 @@ def main():
         "--workers",
         type=int,
         default=os.cpu_count() or 1,
-        help=f"Number of parallel workers (default: {os.cpu_count() or 1}, auto-detected CPU count)",
+        help=f"Number of parallel workers (default: {os.cpu_count() or 1}, "
+        "auto-detected CPU count)",
     )
     parser.add_argument(
         "--verify",
@@ -1857,6 +2180,22 @@ def main():
         help="Comma-separated list of body IDs (default: all)",
     )
     parser.add_argument(
+        "--group",
+        choices=["planets", "asteroids", "analytical"],
+        default=None,
+        help="Generate only a specific body group (partial file). "
+        "Use --merge to combine partial files afterward.",
+    )
+    parser.add_argument(
+        "--merge",
+        nargs="+",
+        metavar="FILE",
+        default=None,
+        help="Merge multiple partial .leb files into one. "
+        "Requires --output (or --tier for auto path). "
+        "Example: --merge planets.leb asteroids.leb analytical.leb",
+    )
+    parser.add_argument(
         "--quiet",
         "-q",
         action="store_true",
@@ -1865,41 +2204,57 @@ def main():
 
     args = parser.parse_args()
 
-    # Resolve tier configuration
-    if args.tier:
-        ephem_file, tier_start, tier_end, tier_output = TIER_CONFIGS[args.tier]
-
-        # Set the ephemeris file for this tier
-        from libephemeris import set_jpl_file
-
-        set_jpl_file(ephem_file)
-        if not args.quiet:
-            print(f"  Tier: {args.tier} (ephemeris: {ephem_file})")
-
-        # Use tier defaults for start/end unless explicitly overridden
-        start_year = args.start if args.start is not None else tier_start
-        end_year = args.end if args.end is not None else tier_end
-
-        # Auto-generate output path if not specified
-        if args.output is None:
-            os.makedirs(DEFAULT_LEB_DIR, exist_ok=True)
-            output = os.path.join(DEFAULT_LEB_DIR, tier_output)
-        else:
+    # ------------------------------------------------------------------
+    # Mode 1: Merge existing partial files
+    # ------------------------------------------------------------------
+    if args.merge:
+        if args.tier:
+            _, _, output = _resolve_tier(args)
+        elif args.output:
             output = args.output
-    else:
-        # No tier: require --output, use default years
-        if args.output is None:
-            parser.error("--output is required when --tier is not specified")
-        output = args.output
-        start_year = args.start if args.start is not None else DEFAULT_START_YEAR
-        end_year = args.end if args.end is not None else DEFAULT_END_YEAR
+        else:
+            parser.error("--output (or --tier) is required with --merge")
+            return  # unreachable
 
-    jd_start = _year_to_jd(start_year)
-    jd_end = _year_to_jd(end_year)
+        t0 = time.time()
+        merge_leb_files(args.merge, output, verbose=not args.quiet)
+        elapsed = time.time() - t0
+        if not args.quiet:
+            print(f"  Merge time: {elapsed:.1f}s")
 
+        if args.verify:
+            print()
+            ok = verify_leb(
+                output,
+                n_samples=args.verify_samples,
+                verbose=not args.quiet,
+            )
+            if not ok:
+                sys.exit(1)
+        return
+
+    # ------------------------------------------------------------------
+    # Mode 2: Generate (full or group)
+    # ------------------------------------------------------------------
+    jd_start, jd_end, output = _resolve_tier(args)
+
+    if not args.quiet and args.tier:
+        ephem_file = TIER_CONFIGS[args.tier][0]
+        print(f"  Tier: {args.tier} (ephemeris: {ephem_file})")
+
+    # Resolve body list
     bodies = None
     if args.bodies:
         bodies = [int(b.strip()) for b in args.bodies.split(",")]
+    elif args.group:
+        if args.group not in BODY_GROUPS:
+            parser.error(f"Unknown group: {args.group}")
+        bodies = BODY_GROUPS[args.group]
+        # Auto-suffix the output path when using --group without explicit --output
+        if args.output is None:
+            output = _group_output_path(output, args.group)
+        if not args.quiet:
+            print(f"  Group: {args.group} ({len(bodies)} bodies)")
 
     t0 = time.time()
     assemble_leb(

@@ -14,6 +14,7 @@
 4. [Reader (`leb_reader.py`)](#4-reader)
 5. [Calculation Pipelines (`fast_calc.py`)](#5-calculation-pipelines)
 6. [Generator (`scripts/generate_leb.py`)](#6-generator)
+   - [6.15 Group Generation & Merge](#615-group-generation--merge)
 7. [Integration with LibEphemeris](#7-integration-with-libephemeris)
 8. [Thread Safety and `EphemerisContext`](#8-thread-safety-and-ephemeriscontext)
 9. [Body Catalog](#9-body-catalog)
@@ -836,6 +837,121 @@ The `assemble_leb()` function (line 1328):
    Delta-T, and star catalog
 9. Write buffer to file in one `f.write(buf)` call
 
+### 6.15 Group Generation & Merge
+
+Generating all 31 bodies in a single process can be slow and prone to macOS
+fork-deadlock issues when `ProcessPoolExecutor` uses the default `fork` start
+method with C extensions (numpy, erfa). The **group workflow** splits generation
+into three independent runs — one per body group — then merges the partial
+files into a single `.leb`.
+
+#### Body Groups
+
+The `BODY_GROUPS` dict in `generate_leb.py` maps group names to body ID lists:
+
+```python
+BODY_GROUPS: dict[str, List[int]] = {
+    "planets":    sorted(_PLANET_MAP.keys()),     # 11 ICRS bodies (vectorized Skyfield)
+    "asteroids":  sorted(_ASTEROID_NAIF.keys()),  # 5 ICRS asteroids (spktype21)
+    "analytical": sorted(                         # 15 ecliptic/helio analytical bodies
+        bid for bid in BODY_PARAMS
+        if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF
+    ),
+}
+```
+
+| Group | Bodies | Method | Typical time (base) |
+|---|---|---|---|
+| `planets` | Sun, Moon, Mercury–Pluto, Earth | Vectorized Skyfield | ~1 s |
+| `asteroids` | Chiron, Pholus, Ceres, Pallas, Vesta | spktype21 (scalar) | ~15–60 s |
+| `analytical` | Mean/true nodes, mean/true Lilith, 8 Uranians, mean apogee/perigee, osc. apogee | ProcessPoolExecutor (spawn) | ~8–20 s |
+
+#### CLI: `--group`
+
+```bash
+# Generate only the planets group (partial file)
+python scripts/generate_leb.py --tier base --group planets
+
+# Output: data/leb/ephemeris_base_planets.leb  (auto-suffixed)
+```
+
+When `--group` is used without an explicit `--output`, the output path is
+auto-suffixed by `_group_output_path()`:
+
+```
+data/leb/ephemeris_base.leb  +  planets  →  data/leb/ephemeris_base_planets.leb
+```
+
+Each partial file is a valid `.leb` with the standard header, section directory,
+and body index — it just contains fewer bodies. Nutation, Delta-T, and star
+catalog are only generated when their respective bodies are present (nutation
+is generated in every group run; stars likewise).
+
+#### CLI: `--merge`
+
+```bash
+# Merge three partial files into one complete file
+python scripts/generate_leb.py --tier base --merge \
+  data/leb/ephemeris_base_planets.leb \
+  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_analytical.leb \
+  --verify
+```
+
+The `merge_leb_files()` function:
+
+1. **Validates JD range consistency** — all inputs must cover the same
+   `[jd_start, jd_end]` range (tolerance: 0.5 days).
+2. **Checks for duplicate bodies** — raises `ValueError` if any body ID
+   appears in more than one input file.
+3. **Copies raw coefficient blobs** — zero re-computation; each body's
+   Chebyshev coefficients are copied verbatim from the source file.
+4. **Takes auxiliary sections from first provider** — nutation, Delta-T,
+   and star catalog are taken from the first input file that contains them.
+5. **Writes merged file** — single `bytearray` allocation, one `f.write()`.
+
+#### Complete Group Workflow
+
+The recommended workflow for regenerating a tier:
+
+```bash
+# Step by step
+python scripts/generate_leb.py --tier base --group planets
+python scripts/generate_leb.py --tier base --group asteroids
+python scripts/generate_leb.py --tier base --group analytical
+python scripts/generate_leb.py --tier base --merge \
+  data/leb/ephemeris_base_planets.leb \
+  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_analytical.leb \
+  --verify
+
+# Or all at once via poe
+poe leb:generate:base:groups
+```
+
+#### Regenerating a Single Group
+
+If only one group needs to be regenerated (e.g. after updating asteroid SPK
+files), regenerate just that group and re-merge:
+
+```bash
+python scripts/generate_leb.py --tier base --group asteroids
+python scripts/generate_leb.py --tier base --merge \
+  data/leb/ephemeris_base_planets.leb \
+  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_analytical.leb \
+  --verify
+```
+
+#### macOS Fork Deadlock Mitigation
+
+The analytical group uses `ProcessPoolExecutor` for parallel generation of
+15 bodies. On macOS, the default `fork` start method causes deadlocks when
+child processes use C extensions (numpy, erfa). The generator uses
+`multiprocessing.get_context("spawn")` as the `mp_context` parameter to
+avoid this. The `spawn` method starts fresh Python interpreters, which is
+slightly slower but deadlock-free.
+
 ---
 
 ## 7. Integration with LibEphemeris
@@ -1140,11 +1256,30 @@ generating. Use `_spk_covers_range()` to verify.
 ### 12.1 poe Tasks
 
 ```bash
-# Generation
+# Full generation (all bodies at once)
 poe leb:generate:base       # Base tier (de440s, 1850-2150) with verification
 poe leb:generate:medium     # Medium tier (de440, 1550-2650) with verification
 poe leb:generate:extended   # Extended tier (de441, -5000 to 5000) with verification
 poe leb:generate:all        # All three tiers sequentially
+
+# Group generation (recommended — avoids fork-deadlock, allows partial regen)
+poe leb:generate:base:planets     # Planets group only → ephemeris_base_planets.leb
+poe leb:generate:base:asteroids   # Asteroids group only → ephemeris_base_asteroids.leb
+poe leb:generate:base:analytical  # Analytical group only → ephemeris_base_analytical.leb
+poe leb:generate:base:merge       # Merge partial files → ephemeris_base.leb (with --verify)
+poe leb:generate:base:groups      # All three groups + merge in one command
+
+poe leb:generate:medium:planets     # Medium tier planets group
+poe leb:generate:medium:asteroids   # Medium tier asteroids group
+poe leb:generate:medium:analytical  # Medium tier analytical group
+poe leb:generate:medium:merge       # Merge → ephemeris_medium.leb
+poe leb:generate:medium:groups      # All three groups + merge
+
+poe leb:generate:extended:planets     # Extended tier planets group
+poe leb:generate:extended:asteroids   # Extended tier asteroids group
+poe leb:generate:extended:analytical  # Extended tier analytical group
+poe leb:generate:extended:merge       # Merge → ephemeris_extended.leb
+poe leb:generate:extended:groups      # All three groups + merge
 
 # Testing
 poe test:leb                # All LEB tests (excludes @slow)
@@ -1184,6 +1319,24 @@ python scripts/generate_leb.py \
   --start 2000 --end 2030 \
   --bodies 0,1,2,3,4 \
   --workers 4
+
+# Group generation (recommended for base tier)
+python scripts/generate_leb.py --tier base --group planets
+python scripts/generate_leb.py --tier base --group asteroids
+python scripts/generate_leb.py --tier base --group analytical
+python scripts/generate_leb.py --tier base --merge \
+  data/leb/ephemeris_base_planets.leb \
+  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_analytical.leb \
+  --verify
+
+# Regenerate only the asteroids group, then re-merge
+python scripts/generate_leb.py --tier base --group asteroids
+python scripts/generate_leb.py --tier base --merge \
+  data/leb/ephemeris_base_planets.leb \
+  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_analytical.leb \
+  --verify
 
 # Quick validation after regeneration
 python3 -c "

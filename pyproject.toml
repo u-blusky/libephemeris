@@ -216,7 +216,7 @@ cmd = "python scripts/calibrate_perigee_perturbations.py --quick --output /tmp/p
 help = "Quick perigee calibration (100-year range, ~2 min, for validation)"
 envfile = ".env"
 
-# LEB (binary ephemeris) generation
+# LEB (binary ephemeris) generation — full (all bodies at once)
 [tool.poe.tasks."leb:generate:base"]
 cmd = "python scripts/generate_leb.py --tier base --verify"
 help = "Generate base tier LEB file (de440s, 1850-2150)"
@@ -234,6 +234,104 @@ cmd = """python scripts/generate_leb.py --tier base --verify && \
 python scripts/generate_leb.py --tier medium --verify && \
 python scripts/generate_leb.py --tier extended --verify"""
 help = "Generate LEB files for all three tiers"
+
+# LEB group generation — generate each body group independently, then merge.
+# This avoids macOS fork-deadlock issues with multiprocessing and allows
+# regenerating a single group without redoing everything.
+[tool.poe.tasks."leb:generate:base:planets"]
+cmd = "python scripts/generate_leb.py --tier base --group planets"
+help = "Generate base tier planets group (Sun-Pluto, Earth)"
+
+[tool.poe.tasks."leb:generate:base:asteroids"]
+cmd = "python scripts/generate_leb.py --tier base --group asteroids"
+help = "Generate base tier asteroids group (Chiron, Ceres-Vesta)"
+
+[tool.poe.tasks."leb:generate:base:analytical"]
+cmd = "python scripts/generate_leb.py --tier base --group analytical"
+help = "Generate base tier analytical group (nodes, Lilith, Uranians)"
+
+[tool.poe.tasks."leb:generate:base:merge"]
+cmd = """python scripts/generate_leb.py --tier base --merge \
+data/leb/ephemeris_base_planets.leb \
+data/leb/ephemeris_base_asteroids.leb \
+data/leb/ephemeris_base_analytical.leb \
+--verify"""
+help = "Merge base tier partial files into ephemeris_base.leb"
+
+[tool.poe.tasks."leb:generate:base:groups"]
+cmd = """python scripts/generate_leb.py --tier base --group planets && \
+python scripts/generate_leb.py --tier base --group asteroids && \
+python scripts/generate_leb.py --tier base --group analytical && \
+python scripts/generate_leb.py --tier base --merge \
+data/leb/ephemeris_base_planets.leb \
+data/leb/ephemeris_base_asteroids.leb \
+data/leb/ephemeris_base_analytical.leb \
+--verify"""
+help = "Generate base tier via groups (planets + asteroids + analytical) then merge"
+
+# Medium tier group generation
+[tool.poe.tasks."leb:generate:medium:planets"]
+cmd = "python scripts/generate_leb.py --tier medium --group planets"
+help = "Generate medium tier planets group (Sun-Pluto, Earth)"
+
+[tool.poe.tasks."leb:generate:medium:asteroids"]
+cmd = "python scripts/generate_leb.py --tier medium --group asteroids"
+help = "Generate medium tier asteroids group (Chiron, Ceres-Vesta)"
+
+[tool.poe.tasks."leb:generate:medium:analytical"]
+cmd = "python scripts/generate_leb.py --tier medium --group analytical"
+help = "Generate medium tier analytical group (nodes, Lilith, Uranians)"
+
+[tool.poe.tasks."leb:generate:medium:merge"]
+cmd = """python scripts/generate_leb.py --tier medium --merge \
+data/leb/ephemeris_medium_planets.leb \
+data/leb/ephemeris_medium_asteroids.leb \
+data/leb/ephemeris_medium_analytical.leb \
+--verify"""
+help = "Merge medium tier partial files into ephemeris_medium.leb"
+
+[tool.poe.tasks."leb:generate:medium:groups"]
+cmd = """python scripts/generate_leb.py --tier medium --group planets && \
+python scripts/generate_leb.py --tier medium --group asteroids && \
+python scripts/generate_leb.py --tier medium --group analytical && \
+python scripts/generate_leb.py --tier medium --merge \
+data/leb/ephemeris_medium_planets.leb \
+data/leb/ephemeris_medium_asteroids.leb \
+data/leb/ephemeris_medium_analytical.leb \
+--verify"""
+help = "Generate medium tier via groups (planets + asteroids + analytical) then merge"
+
+# Extended tier group generation
+[tool.poe.tasks."leb:generate:extended:planets"]
+cmd = "python scripts/generate_leb.py --tier extended --group planets"
+help = "Generate extended tier planets group (Sun-Pluto, Earth)"
+
+[tool.poe.tasks."leb:generate:extended:asteroids"]
+cmd = "python scripts/generate_leb.py --tier extended --group asteroids"
+help = "Generate extended tier asteroids group (Chiron, Ceres-Vesta)"
+
+[tool.poe.tasks."leb:generate:extended:analytical"]
+cmd = "python scripts/generate_leb.py --tier extended --group analytical"
+help = "Generate extended tier analytical group (nodes, Lilith, Uranians)"
+
+[tool.poe.tasks."leb:generate:extended:merge"]
+cmd = """python scripts/generate_leb.py --tier extended --merge \
+data/leb/ephemeris_extended_planets.leb \
+data/leb/ephemeris_extended_asteroids.leb \
+data/leb/ephemeris_extended_analytical.leb \
+--verify"""
+help = "Merge extended tier partial files into ephemeris_extended.leb"
+
+[tool.poe.tasks."leb:generate:extended:groups"]
+cmd = """python scripts/generate_leb.py --tier extended --group planets && \
+python scripts/generate_leb.py --tier extended --group asteroids && \
+python scripts/generate_leb.py --tier extended --group analytical && \
+python scripts/generate_leb.py --tier extended --merge \
+data/leb/ephemeris_extended_planets.leb \
+data/leb/ephemeris_extended_asteroids.leb \
+data/leb/ephemeris_extended_analytical.leb \
+--verify"""
+help = "Generate extended tier via groups (planets + asteroids + analytical) then merge"
 
 [tool.mypy]
 python_version = "3.9"
