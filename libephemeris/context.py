@@ -19,12 +19,17 @@ Thread Safety:
     threads without interference. Each context has isolated state.
 """
 
+from __future__ import annotations
+
 import os
 import threading
-from typing import Literal, Optional, Tuple, Union, overload
+from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
+
+if TYPE_CHECKING:
+    from .leb_reader import LEBReader
 
 
 # =============================================================================
@@ -87,6 +92,10 @@ class EphemerisContext:
         self._spk_body_map: dict[
             int, tuple[str, int]
         ] = {}  # Context-local SPK mappings
+
+        # LEB binary ephemeris configuration (per-context)
+        self._leb_file: Optional[str] = None
+        self._leb_reader: Optional["LEBReader"] = None
 
         # Ephemeris configuration (for this context)
         self._ephe_path = ephe_path
@@ -169,6 +178,48 @@ class EphemerisContext:
                     else:
                         _SHARED_PLANETS = load(_SHARED_EPHE_FILE)
         return _SHARED_PLANETS
+
+    def set_leb_file(self, filepath: Optional[str]) -> None:
+        """Set the .leb file path for binary ephemeris mode.
+
+        When a .leb file is configured, calc_ut() and calc() will attempt
+        to use precomputed Chebyshev polynomials for fast evaluation before
+        falling back to the Skyfield pipeline.
+
+        Args:
+            filepath: Path to a .leb file, or None to disable binary mode.
+        """
+        if self._leb_reader is not None:
+            try:
+                self._leb_reader.close()
+            except Exception:
+                pass
+        self._leb_file = filepath
+        self._leb_reader = None
+
+    def get_leb_reader(self) -> Optional["LEBReader"]:
+        """Get the active LEBReader for this context, if any.
+
+        If the .leb file path is invalid or the file is corrupted,
+        logs a warning and returns None (silent fallback to Skyfield).
+
+        Returns:
+            LEBReader instance if a .leb file is configured and valid,
+            None otherwise.
+        """
+        if self._leb_reader is None and self._leb_file is not None:
+            try:
+                from .leb_reader import LEBReader
+
+                self._leb_reader = LEBReader(self._leb_file)
+            except (FileNotFoundError, ValueError, OSError) as e:
+                from .logging_config import get_logger
+
+                get_logger().warning(
+                    "Failed to open LEB file %s: %s", self._leb_file, e
+                )
+                return None
+        return self._leb_reader
 
     def set_topo(self, lon: float, lat: float, alt: float) -> None:
         """
@@ -401,6 +452,10 @@ class EphemerisContext:
 
         Thread-safe calculation using this context's state.
 
+        If a .leb file is configured (via set_leb_file()), uses the fast
+        binary ephemeris path first, falling back to Skyfield when the body
+        is not in the .leb file or the JD is out of range.
+
         Args:
             tjd_ut: Julian Day in Universal Time (UT1)
             ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
@@ -416,6 +471,32 @@ class EphemerisContext:
             >>> pos, retflag = ctx.calc_ut(2451545.0, SE_MARS, SEFLG_SPEED)
             >>> lon, lat, dist = pos[0], pos[1], pos[2]
         """
+        # --- LEB fast path: try binary ephemeris first ---
+        reader = self.get_leb_reader()
+        if reader is None:
+            # Fall back to global reader if context has no .leb
+            from . import state
+
+            reader = state.get_leb_reader()
+
+        if reader is not None:
+            try:
+                from . import fast_calc
+
+                # Pass sidereal params explicitly (thread-safe, no global swap)
+                return fast_calc.fast_calc_ut(
+                    reader,
+                    tjd_ut,
+                    ipl,
+                    iflag,
+                    sid_mode=self.sidereal_mode,
+                    sid_t0=self.sidereal_t0,
+                    sid_ayan_t0=self.sidereal_ayan_t0,
+                )
+            except (KeyError, ValueError):
+                pass  # Body not in .leb or JD out of range, fall through
+        # --- END LEB fast path ---
+
         from .planets import _calc_body_with_context
 
         ts = self.get_timescale()
@@ -429,6 +510,10 @@ class EphemerisContext:
         Calculate planetary position for Ephemeris Time (ET/TT).
 
         Thread-safe calculation using this context's state.
+
+        If a .leb file is configured (via set_leb_file()), uses the fast
+        binary ephemeris path first, falling back to Skyfield when the body
+        is not in the .leb file or the JD is out of range.
 
         Args:
             tjd: Julian Day in Terrestrial Time (TT/ET)
@@ -445,6 +530,31 @@ class EphemerisContext:
             TT differs from UT by Delta T (~32s for year 2000).
             For most astrological applications, use calc_ut() instead.
         """
+        # --- LEB fast path: try binary ephemeris first ---
+        reader = self.get_leb_reader()
+        if reader is None:
+            from . import state
+
+            reader = state.get_leb_reader()
+
+        if reader is not None:
+            try:
+                from . import fast_calc
+
+                # Pass sidereal params explicitly (thread-safe, no global swap)
+                return fast_calc.fast_calc_tt(
+                    reader,
+                    tjd,
+                    ipl,
+                    iflag,
+                    sid_mode=self.sidereal_mode,
+                    sid_t0=self.sidereal_t0,
+                    sid_ayan_t0=self.sidereal_ayan_t0,
+                )
+            except (KeyError, ValueError):
+                pass  # Body not in .leb or JD out of range, fall through
+        # --- END LEB fast path ---
+
         from .planets import _calc_body_with_context
 
         ts = self.get_timescale()

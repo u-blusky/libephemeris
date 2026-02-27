@@ -120,6 +120,9 @@ from .state import (
     get_library_path as swe_get_library_path,
     get_current_file_data as swe_get_current_file_data,
     close as swe_close,
+    # LEB binary ephemeris mode
+    set_leb_file,
+    get_leb_reader,
     set_auto_spk_download,
     get_auto_spk_download,
     set_spk_cache_dir,

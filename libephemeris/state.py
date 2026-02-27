@@ -17,7 +17,7 @@ compatible with pyswisseph's threading model (thread-unsafe by design).
 import os
 import threading
 from dataclasses import dataclass
-from typing import Dict, List, Literal, Optional, Tuple, Union, overload
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
@@ -153,6 +153,68 @@ _SPK_DATE_PADDING: int = 0
 # IERS Delta T configuration
 # When enabled, uses observed Delta T values from IERS for recent dates
 _IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
+
+# LEB (binary ephemeris) configuration
+_LEB_FILE: Optional[str] = None  # Path to .leb file
+_LEB_READER: Optional["LEBReader"] = None  # Cached LEBReader instance
+
+if TYPE_CHECKING:
+    from .leb_reader import LEBReader
+
+
+def set_leb_file(filepath: Optional[str]) -> None:
+    """Set the .leb file path for binary ephemeris mode.
+
+    When a .leb file is configured, swe_calc_ut() and swe_calc() will
+    attempt to use precomputed Chebyshev polynomials for fast evaluation
+    before falling back to the Skyfield pipeline.
+
+    Args:
+        filepath: Path to a .leb file, or None to disable binary mode.
+
+    Example:
+        >>> from libephemeris import set_leb_file, calc_ut, SE_SUN
+        >>> set_leb_file("/path/to/ephemeris.leb")
+        >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # uses .leb fast path
+        >>> set_leb_file(None)  # disable binary mode
+    """
+    global _LEB_FILE, _LEB_READER
+    if _LEB_READER is not None:
+        try:
+            _LEB_READER.close()
+        except Exception:
+            pass
+    _LEB_FILE = filepath
+    _LEB_READER = None  # force re-creation on next access
+
+
+def get_leb_reader() -> Optional["LEBReader"]:
+    """Get the active LEBReader, if any.
+
+    If a .leb file is configured (via set_leb_file() or the
+    LIBEPHEMERIS_LEB environment variable), returns a LEBReader
+    instance. Otherwise returns None.
+
+    If the .leb file path is invalid or the file is corrupted,
+    logs a warning and returns None (silent fallback to Skyfield).
+
+    Returns:
+        LEBReader instance if a .leb file is configured and valid,
+        None otherwise.
+    """
+    global _LEB_READER
+    if _LEB_READER is None:
+        path = _LEB_FILE or os.environ.get("LIBEPHEMERIS_LEB")
+        if path is not None:
+            try:
+                from .leb_reader import LEBReader
+
+                _LEB_READER = LEBReader(path)
+            except (FileNotFoundError, ValueError, OSError) as e:
+                logger = get_logger()
+                logger.warning("Failed to open LEB file %s: %s", path, e)
+                return None
+    return _LEB_READER
 
 
 def get_loader() -> Loader:
@@ -953,6 +1015,16 @@ def close() -> None:
     global _SPK_KERNELS, _SPK_BODY_MAP, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
     global _PRECISION_TIER
+    global _LEB_FILE, _LEB_READER
+
+    # Close the LEB reader if loaded
+    if _LEB_READER is not None:
+        try:
+            _LEB_READER.close()
+        except Exception:
+            pass
+    _LEB_FILE = None
+    _LEB_READER = None
 
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:

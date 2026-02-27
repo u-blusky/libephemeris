@@ -1,0 +1,1444 @@
+# LEB (LibEphemeris Binary) — Complete Technical Guide
+
+> **Version:** 1.0 — February 2026
+> **Status:** Production-ready (format version 1)
+> **Source of truth:** This document. See also `docs/LEB_PLAN.md` for the original implementation plan.
+
+---
+
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Architecture](#2-architecture)
+3. [Binary File Format](#3-binary-file-format)
+4. [Reader (`leb_reader.py`)](#4-reader)
+5. [Calculation Pipelines (`fast_calc.py`)](#5-calculation-pipelines)
+6. [Generator (`scripts/generate_leb.py`)](#6-generator)
+7. [Integration with LibEphemeris](#7-integration-with-libephemeris)
+8. [Thread Safety and `EphemerisContext`](#8-thread-safety-and-ephemeriscontext)
+9. [Body Catalog](#9-body-catalog)
+10. [Precision and Validation](#10-precision-and-validation)
+11. [Performance](#11-performance)
+12. [Commands Reference](#12-commands-reference)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Internals Deep-Dive](#14-internals-deep-dive)
+
+---
+
+## 1. Overview
+
+### What is LEB?
+
+LEB is a precomputed binary ephemeris format that stores Chebyshev polynomial
+approximations of celestial body positions. When activated, it replaces the
+default Skyfield/JPL pipeline as the primary data source for `swe_calc_ut()`
+and `swe_calc()`, providing approximately **14x speedup** for typical
+astrological chart calculations.
+
+### Design Principles
+
+- **Zero new runtime dependencies.** The reader uses only `mmap`, `struct`,
+  `math`, and `dataclasses` (all stdlib). `numpy`, `erfa`, and `spktype21`
+  are only needed at generation time.
+- **Silent transparent fallback.** If a body is not in the `.leb` file, or
+  the Julian Day is out of range, or an unsupported flag combination is
+  requested, the system silently falls back to the full Skyfield pipeline.
+  Callers never need to know whether LEB is active.
+- **API-transparent.** The public API (`swe_calc_ut`, `swe_calc`, `calc_ut`,
+  `calc`, `EphemerisContext.calc_ut`, etc.) remains unchanged. LEB is
+  activated by setting a file path; no code changes are needed.
+- **Immutable after init.** Once a `LEBReader` is constructed, all its data
+  structures are read-only. This makes it inherently thread-safe.
+
+### Two Modes of Operation
+
+| Mode | Data Source | Activation | Speed |
+|------|------------|------------|-------|
+| **Skyfield mode** (default) | JPL DE440/DE441 via Skyfield | Always available | ~120 us/eval |
+| **Binary mode** (LEB) | Precomputed `.leb` file | `set_leb_file()` or `LIBEPHEMERIS_LEB` env var | ~8 us/eval |
+
+---
+
+## 2. Architecture
+
+### Module Map
+
+```
+libephemeris/
+  leb_format.py    Format constants, struct layouts, dataclasses, serialization helpers
+  leb_reader.py    LEBReader class: mmap, Clenshaw evaluation, delta-T, star catalog
+  fast_calc.py     Three calculation pipelines (A/B/C), flag dispatch, sidereal/ayanamsa
+
+scripts/
+  generate_leb.py  CLI generator: Chebyshev fitting, vectorized evaluation, binary assembly
+
+data/leb/
+  ephemeris_base.leb      Base tier (de440s, 1850-2150, ~56 MB)
+  ephemeris_medium.leb    Medium tier (de440, 1550-2650)
+  ephemeris_extended.leb  Extended tier (de441, -5000 to 5000)
+
+tests/test_leb/
+  test_leb_format.py      Format constants and serialization
+  test_leb_reader.py      Reader, Clenshaw, segment lookup
+  test_fast_calc.py       Pipeline A/B/C, flags, sidereal
+  test_generate_leb.py    Generator functions, fitting, verification
+  test_leb_precision.py   Full precision comparison vs Skyfield (slow)
+  test_context_leb.py     EphemerisContext LEB integration
+  conftest.py             Shared fixtures
+```
+
+### Data Flow
+
+```
+User calls swe_calc_ut(jd, SE_MARS, SEFLG_SPEED)
+  |
+  v
+planets.py: swe_calc_ut()
+  |-- state.get_leb_reader() -> LEBReader or None
+  |
+  |-- [LEB active] fast_calc.fast_calc_ut(reader, jd, ipl, iflag)
+  |     |-- Delta-T lookup: reader.delta_t(jd) -> jd_tt
+  |     |-- Body lookup: reader._bodies[ipl] -> BodyEntry
+  |     |-- Pipeline dispatch by coord_type:
+  |     |     COORD_ICRS_BARY  -> _pipeline_icrs()   [Pipeline A]
+  |     |     COORD_ECLIPTIC   -> _pipeline_ecliptic() [Pipeline B]
+  |     |     COORD_HELIO_ECL  -> _pipeline_helio()   [Pipeline C]
+  |     |-- Sidereal correction (if SEFLG_SIDEREAL)
+  |     |-- Return (lon, lat, dist, dlon, dlat, ddist), iflag
+  |     |
+  |     |-- [KeyError/ValueError] -> fall through to Skyfield
+  |
+  |-- [Skyfield fallback] _calc_body(t, ipl, iflag)
+```
+
+### Activation
+
+```python
+# Method 1: Programmatic
+from libephemeris import set_leb_file
+set_leb_file("/path/to/ephemeris.leb")   # enable
+set_leb_file(None)                        # disable
+
+# Method 2: Environment variable
+export LIBEPHEMERIS_LEB=/path/to/ephemeris.leb
+
+# Method 3: Per-context (thread-safe)
+ctx = EphemerisContext()
+ctx.set_leb_file("/path/to/ephemeris.leb")
+```
+
+**Resolution priority** (highest to lowest):
+1. `EphemerisContext._leb_file` (per-context)
+2. Global `set_leb_file()` call
+3. `LIBEPHEMERIS_LEB` environment variable
+
+---
+
+## 3. Binary File Format
+
+**Source file:** `libephemeris/leb_format.py` (358 lines)
+
+### Magic and Version
+
+```
+Magic:   b"LEB1" (4 bytes)
+Version: 1 (uint32)
+```
+
+### Overall Layout
+
+```
+Offset      Content                          Size
+────────────────────────────────────────────────────
+0x0000      File Header                      64 bytes
+0x0040      Section Directory                N × 24 bytes (N=5 currently)
+variable    Section 0: Body Index            body_count × 52 bytes
+variable    Section 1: Chebyshev Data        variable (bulk of the file)
+variable    Section 2: Nutation Data         header(40B) + segments
+variable    Section 3: Delta-T Table         header(8B) + entries(16B each)
+variable    Section 4: Star Catalog          n_stars × 64 bytes
+(reserved)  Section 5: Orbital Elements      not yet used
+```
+
+### 3.1 File Header (64 bytes)
+
+```c
+// Struct format: "<4sIIIdddI20s" (little-endian)
+struct FileHeader {
+    char     magic[4];           // b"LEB1"
+    uint32_t version;            // 1
+    uint32_t section_count;      // Number of sections (currently 5)
+    uint32_t body_count;         // Number of bodies in the file
+    float64  jd_start;           // Start of date coverage (JD TT)
+    float64  jd_end;             // End of date coverage (JD TT)
+    float64  generation_epoch;   // JD when file was generated
+    uint32_t flags;              // Reserved (0)
+    char     reserved[20];       // Padding to 64 bytes
+};
+```
+
+**Python dataclass:** `leb_format.FileHeader`
+**Constant:** `HEADER_SIZE = 64`
+
+### 3.2 Section Directory Entry (24 bytes)
+
+```c
+// Struct format: "<IIQQ"
+struct SectionEntry {
+    uint32_t section_id;    // SECTION_BODY_INDEX=0, ..., SECTION_STARS=4
+    uint32_t reserved;      // Padding
+    uint64_t offset;        // Absolute byte offset from file start
+    uint64_t size;          // Section size in bytes
+};
+```
+
+**Python dataclass:** `leb_format.SectionEntry`
+**Constant:** `SECTION_DIR_SIZE = 24`
+
+### 3.3 Body Index Entry (52 bytes)
+
+```c
+// Struct format: "<iIIdddIIQ"
+struct BodyEntry {
+    int32_t  body_id;        // SE_* constant (0=Sun, 1=Moon, ...)
+    uint32_t coord_type;     // 0=ICRS_BARY, 1=ECLIPTIC, 2=HELIO_ECL
+    uint32_t segment_count;  // Number of Chebyshev segments
+    float64  jd_start;       // Body coverage start (JD TT)
+    float64  jd_end;         // Body coverage end (JD TT)
+    float64  interval_days;  // Segment width in days
+    uint32_t degree;         // Chebyshev polynomial degree
+    uint32_t components;     // Always 3 (x/y/z or lon/lat/dist)
+    uint64_t data_offset;    // Absolute byte offset to first coefficient
+};
+```
+
+**Python dataclass:** `leb_format.BodyEntry`
+**Constant:** `BODY_ENTRY_SIZE = 52`
+
+### 3.4 Chebyshev Coefficient Storage
+
+Coefficients are stored as contiguous `float64` arrays in **component-major**
+order. For a body with `degree=13` and `components=3`:
+
+```
+Segment layout (3 × 14 × 8 = 336 bytes per segment):
+  [c0_x, c1_x, ..., c13_x,     ← 14 coefficients for component 0 (x or lon)
+   c0_y, c1_y, ..., c13_y,     ← 14 coefficients for component 1 (y or lat)
+   c0_z, c1_z, ..., c13_z]     ← 14 coefficients for component 2 (z or dist)
+```
+
+The byte size of one segment is computed by:
+```python
+segment_byte_size(degree, components) = components * (degree + 1) * 8
+```
+
+### 3.5 Nutation Section
+
+**Header (40 bytes):**
+```c
+// Struct format: "<dddIIII"
+struct NutationHeader {
+    float64  jd_start;
+    float64  jd_end;
+    float64  interval_days;   // 32.0 days
+    uint32_t degree;          // 16
+    uint32_t components;      // 2 (dpsi, deps in radians)
+    uint32_t segment_count;
+    uint32_t reserved;
+};
+```
+
+Followed by `segment_count` segments, each containing `2 × 17 × 8 = 272 bytes`
+of Chebyshev coefficients for dpsi and deps (IAU 2006/2000A nutation).
+
+### 3.6 Delta-T Section
+
+**Header (8 bytes):**
+```c
+// Struct format: "<II"
+struct DeltaTHeader {
+    uint32_t n_entries;
+    uint32_t reserved;
+};
+```
+
+**Entries (16 bytes each):**
+```c
+// Struct format: "<dd"
+struct DeltaTEntry {
+    float64 jd;          // Julian Day
+    float64 delta_t;     // TT - UT1 in days
+};
+```
+
+Sampled every 30 days. The reader uses linear interpolation between entries.
+
+### 3.7 Star Catalog Entry (64 bytes)
+
+```c
+// Struct format: "<iddddddd4s"
+struct StarEntry {
+    int32_t  star_id;
+    float64  ra_j2000;     // Right ascension (degrees)
+    float64  dec_j2000;    // Declination (degrees)
+    float64  pm_ra;        // Proper motion RA (deg/yr, includes cos(dec))
+    float64  pm_dec;       // Proper motion Dec (deg/yr)
+    float64  parallax;     // Parallax (arcsec)
+    float64  rv;           // Radial velocity (km/s)
+    float64  magnitude;    // Visual magnitude
+    char     reserved[4];
+};
+```
+
+### 3.8 Coordinate Types
+
+| Value | Constant | Meaning | Bodies |
+|-------|----------|---------|--------|
+| 0 | `COORD_ICRS_BARY` | ICRS barycentric (x, y, z) in AU | Sun, Moon, Mercury-Pluto, Earth, Chiron, Ceres-Vesta |
+| 1 | `COORD_ECLIPTIC` | Ecliptic of date (lon, lat, dist) in deg/deg/AU | Mean/True Node, Mean/Oscu Apogee, Interp Apogee/Perigee |
+| 2 | `COORD_HELIO_ECL` | Heliocentric ecliptic (lon, lat, dist) | Cupido-Poseidon, Transpluto |
+
+---
+
+## 4. Reader
+
+**Source file:** `libephemeris/leb_reader.py` (459 lines)
+
+### 4.1 LEBReader Class
+
+```python
+class LEBReader:
+    def __init__(self, path: str) -> None
+    def __enter__(self) -> "LEBReader"
+    def __exit__(self, *args) -> None
+    def has_body(self, body_id: int) -> bool
+    def eval_body(self, body_id: int, jd: float) -> ((pos), (vel))
+    def eval_nutation(self, jd_tt: float) -> (dpsi, deps)
+    def delta_t(self, jd: float) -> float
+    def get_star(self, star_id: int) -> StarEntry
+    def close(self) -> None
+
+    # Properties
+    path -> str
+    jd_range -> (jd_start, jd_end)
+```
+
+### 4.2 Memory Mapping
+
+The file is opened read-only via `mmap.mmap(fd, 0, access=mmap.ACCESS_READ)`.
+All struct reads use `struct.unpack_from()` which operates directly on the
+mmap'd buffer — **zero-copy** for coefficient access.
+
+**Resource safety:** The `__init__` wraps `_parse()` in try/except. If parsing
+fails, `close()` is called to release the mmap and file handle before
+re-raising the exception (`leb_reader.py:181-186`).
+
+### 4.3 Parsing (at construction time)
+
+1. **Header** — Validates magic (`b"LEB1"`) and version (1).
+2. **Section directory** — Builds `_sections: Dict[int, SectionEntry]`.
+3. **Body index** — Builds `_bodies: Dict[int, BodyEntry]`.
+4. **Nutation header** — Stores `_nutation: NutationHeader` and data offset.
+5. **Delta-T table** — Loads into two Python lists: `_delta_t_jds` and
+   `_delta_t_vals`.
+6. **Star catalog** — Builds `_stars: Dict[int, StarEntry]`.
+
+### 4.4 Body Evaluation (`eval_body`)
+
+The core evaluation path (the hot path, ~1.5 us per call):
+
+```python
+def eval_body(self, body_id: int, jd: float):
+    body = self._bodies[body_id]
+
+    # 1. O(1) segment lookup (no binary search needed)
+    seg_idx = int((jd - body.jd_start) / body.interval_days)
+    seg_idx = clamp(seg_idx, 0, body.segment_count - 1)
+
+    # 2. Map JD to normalized tau in [-1, 1]
+    seg_start = body.jd_start + seg_idx * body.interval_days
+    seg_mid = seg_start + 0.5 * body.interval_days
+    tau = 2.0 * (jd - seg_mid) / body.interval_days
+    tau = clamp(tau, -1.0, 1.0)
+
+    # 3. Zero-copy coefficient read from mmap
+    byte_offset = body.data_offset + seg_idx * n_coeffs * 8
+    coeffs = struct.unpack_from(f"<{n_coeffs}d", self._mm, byte_offset)
+
+    # 4. Clenshaw evaluation per component (value + derivative)
+    for c in range(3):
+        comp_coeffs = coeffs[c * deg1 : (c + 1) * deg1]
+        val, deriv = _clenshaw_with_derivative(comp_coeffs, tau)
+        pos.append(val)
+        vel.append(deriv * 2.0 / body.interval_days)
+
+    # 5. Longitude wrapping for ecliptic bodies
+    if coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL):
+        pos[0] = pos[0] % 360.0
+
+    return tuple(pos), tuple(vel)
+```
+
+**Key design choices:**
+
+- **O(1) segment lookup** via integer division (not binary search). This is
+  possible because all segments for a given body have equal width
+  (`interval_days`).
+
+- **Clenshaw algorithm** for Chebyshev evaluation (not Horner). Clenshaw is
+  numerically stable for Chebyshev polynomials and requires only 2 temporary
+  variables. Implementation at `leb_reader.py:58-79`.
+
+- **Analytical derivative** via the Chebyshev derivative recurrence relation
+  (`_deriv_coeffs` at `leb_reader.py:82-112`). The recurrence computes
+  derivative coefficients d_k from the original coefficients c_k:
+  ```
+  d_{n-1} = 2n * c_n
+  d_k     = d_{k+2} + 2(k+1) * c_{k+1}    for k = n-2, ..., 1
+  d_0     = d_2/2 + c_1
+  ```
+  Then evaluates the derivative polynomial via Clenshaw. The derivative is
+  in d/d(tau) units; it is scaled by `2 / interval_days` to get d/d(jd).
+
+### 4.5 Delta-T Interpolation
+
+```python
+def delta_t(self, jd: float) -> float:
+    # Binary search (bisect_right) for the interval
+    idx = bisect_right(jds, jd) - 1
+    # Linear interpolation (sufficient for 30-day spacing)
+    t = (jd - jds[idx]) / (jds[idx+1] - jds[idx])
+    return vals[idx] + t * (vals[idx+1] - vals[idx])
+```
+
+Values are clamped at boundaries (returns first/last value for out-of-range JDs).
+
+### 4.6 Nutation Evaluation
+
+Same pattern as body evaluation: O(1) segment lookup, tau mapping, Clenshaw
+on 2 components (dpsi, deps). Returns values in **radians**.
+
+---
+
+## 5. Calculation Pipelines
+
+**Source file:** `libephemeris/fast_calc.py` (849 lines)
+
+### 5.1 Entry Points
+
+```python
+def fast_calc_ut(reader, tjd_ut, ipl, iflag, *,
+                 sid_mode=None, sid_t0=None, sid_ayan_t0=None)
+    -> ((lon, lat, dist, dlon, dlat, ddist), iflag)
+
+def fast_calc_tt(reader, tjd_tt, ipl, iflag, *,
+                 sid_mode=None, sid_t0=None, sid_ayan_t0=None)
+    -> ((lon, lat, dist, dlon, dlat, ddist), iflag)
+```
+
+Both functions:
+1. Check for unsupported flags and raise `KeyError` to trigger fallback.
+2. Snapshot sidereal state at entry (thread-safe).
+3. Convert UT to TT (or TT to approximate UT) via `reader.delta_t()`.
+4. Delegate to `_fast_calc_core()`.
+
+### 5.2 Flag Handling
+
+**Flags that trigger immediate Skyfield fallback (raise KeyError):**
+
+| Flag | Reason |
+|------|--------|
+| `SEFLG_TOPOCTR` | Requires geographic coordinates not stored in LEB |
+| `SEFLG_XYZ` | Cartesian output not yet implemented |
+| `SEFLG_RADIANS` | Radian output not yet implemented |
+| `SEFLG_NONUT` | No-nutation mode not yet implemented |
+
+**Flags handled natively by LEB:**
+
+| Flag | Effect |
+|------|--------|
+| `SEFLG_SPEED` | Compute velocities (central difference for ICRS, Chebyshev derivative for ecliptic) |
+| `SEFLG_HELCTR` | Use Sun as observer instead of Earth; skip aberration |
+| `SEFLG_BARYCTR` | Use SSB as observer; skip aberration |
+| `SEFLG_TRUEPOS` | Skip light-time correction and aberration |
+| `SEFLG_NOABERR` | Skip aberration only |
+| `SEFLG_EQUATORIAL` | Output in equatorial coordinates instead of ecliptic |
+| `SEFLG_J2000` | Output in J2000 frame instead of of-date |
+| `SEFLG_SIDEREAL` | Apply ayanamsa correction |
+| `SEFLG_MOSEPH` | Silently stripped (always uses JPL data) |
+
+### 5.3 Pipeline A: ICRS Barycentric Bodies
+
+**Bodies:** Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune,
+Pluto, Earth, Chiron, Ceres, Pallas, Juno, Vesta (16 bodies)
+
+**Stored as:** (x, y, z) in AU, ICRS barycentric frame
+
+**Algorithm (`_pipeline_icrs`, line 414):**
+
+1. **Body position:** `reader.eval_body(ipl, jd_tt)` -> (x, y, z) in AU
+2. **Observer selection:**
+   - Geocentric (default): Earth position from LEB
+   - Heliocentric (`SEFLG_HELCTR`): Sun position from LEB
+   - Barycentric (`SEFLG_BARYCTR`): origin (0, 0, 0)
+3. **Geometric vector:** target - observer
+4. **Light-time correction** (unless `SEFLG_TRUEPOS`):
+   - 3 fixed-point iterations
+   - `lt = dist / C_LIGHT_AU_DAY` (173.14 AU/day)
+   - Re-evaluate body at `jd_tt - lt`
+5. **Aberration** (unless disabled or helio/bary/truepos):
+   - Classical first-order formula using Earth velocity
+   - `u' = u + v/c - u*(u.v/c)`, renormalize
+6. **Coordinate transform** (one of four paths):
+   - **True ecliptic of date** (default, most common):
+     - Precess ICRS -> equatorial of date via `erfa.pnm06a()` matrix
+     - Rotate equatorial -> ecliptic using true obliquity (mean + nutation deps)
+   - **J2000 ecliptic** (`SEFLG_J2000`):
+     - Rotate ICRS -> ecliptic J2000 using J2000 obliquity (23.4392911 deg)
+   - **True equatorial of date** (`SEFLG_EQUATORIAL`):
+     - Precess ICRS -> equatorial of date via precession-nutation matrix
+   - **J2000 equatorial** (`SEFLG_EQUATORIAL | SEFLG_J2000`):
+     - ICRS is already ~J2000 equatorial, just convert to spherical
+
+**Velocity** is computed via central difference (not Chebyshev derivative),
+because the ICRS-to-ecliptic transform chain is nonlinear:
+```python
+dt = 1/86400  # 1 second
+lon_prev = pipeline(jd_tt - dt)
+lon_next = pipeline(jd_tt + dt)
+dlon = (lon_next - lon_prev) / (2 * dt)
+```
+This adds 2 extra pipeline evaluations per body when `SEFLG_SPEED` is set.
+
+### 5.4 Pipeline B: Ecliptic Direct Bodies
+
+**Bodies:** Mean Node, True Node, Mean Apogee, Osculating Apogee,
+Interpolated Apogee, Interpolated Perigee (6 bodies)
+
+**Stored as:** (lon, lat, dist) in degrees/degrees/AU, ecliptic of date
+
+**Algorithm (`_pipeline_ecliptic`, line 508):**
+
+1. **Direct read:** `reader.eval_body(ipl, jd_tt)` -> (lon, lat, dist) and
+   (dlon, dlat, ddist) from Chebyshev analytical derivative
+2. **Coordinate transforms** (if requested):
+   - **True equatorial of date** (`SEFLG_EQUATORIAL`):
+     - Rotate ecliptic -> equatorial using true obliquity
+     - Velocity via finite difference on the ecliptic coords (dt=0.001 days)
+   - **J2000 equatorial** (`SEFLG_EQUATORIAL | SEFLG_J2000`):
+     - Precess ecliptic-of-date -> J2000 ecliptic, then rotate to J2000 equatorial
+     - Velocity via finite difference
+   - **J2000 ecliptic** (`SEFLG_J2000`):
+     - Precess ecliptic-of-date -> J2000 ecliptic
+     - Velocity via finite difference
+
+**No light-time or aberration** is applied to these bodies (they are
+Earth-relative analytical quantities).
+
+### 5.5 Pipeline C: Heliocentric Bodies
+
+**Bodies:** Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus,
+Poseidon, Transpluto (9 bodies)
+
+**Stored as:** (lon, lat, dist) in degrees/degrees/AU, heliocentric ecliptic
+
+**Algorithm:** Delegates entirely to Pipeline B (`_pipeline_ecliptic`).
+The coordinate type distinction only matters at generation time; at
+evaluation time, the same Chebyshev read + optional coordinate transforms
+apply.
+
+### 5.6 Sidereal Correction
+
+Applied after the pipeline, for any body, when `SEFLG_SIDEREAL` is set and
+the output is ecliptic (not equatorial):
+
+```python
+aya = _calc_ayanamsa_from_leb(reader, jd_tt, sid_mode, sid_t0, sid_ayan_t0)
+lon = (lon - aya) % 360.0
+
+# Speed correction: subtract IAU 2006 general precession rate
+T = (jd_tt - J2000) / 36525.0
+prec_rate = (5028.796195 + 2 * 1.1054348 * T) / (3600.0 * 36525.0)  # deg/day
+dlon -= prec_rate
+```
+
+**Ayanamsa computation** (`_calc_ayanamsa_from_leb`, line 335):
+
+- Supports **29 formula-based sidereal modes** (stored in `_AYANAMSHA_J2000` dict)
+- Supports `SE_SIDM_USER` (mode 255) with custom t0/ayan_t0
+- **Star-based modes** (17, 27-36, 39-40, 42) raise `KeyError` to trigger
+  Skyfield fallback
+- True ayanamsa = mean ayanamsa + nutation in longitude (from LEB nutation data)
+
+### 5.7 Utility Functions
+
+| Function | Purpose | Location |
+|----------|---------|----------|
+| `_mean_obliquity_iau2006(jd_tt)` | IAU 2006 mean obliquity polynomial | line 68 |
+| `_vec3_sub(a, b)` | 3-vector subtraction | line 86 |
+| `_vec3_dist(v)` | Euclidean distance | line 91 |
+| `_cartesian_to_spherical(x, y, z)` | Cartesian -> (lon, lat, dist) deg | line 96 |
+| `_rotate_equatorial_to_ecliptic(x, y, z, eps)` | Frame rotation | line 110 |
+| `_rotate_icrs_to_ecliptic_j2000(x, y, z)` | ICRS -> ecliptic J2000 | line 131 |
+| `_apply_aberration(geo, earth_vel)` | Classical aberration formula | line 138 |
+| `_precession_nutation_matrix(jd_tt)` | erfa.pnm06a() with fallback | line 186 |
+| `_mat3_vec3(mat, vec)` | 3x3 matrix * 3-vector | line 221 |
+| `_cotrans(lon, lat, eps)` | Ecliptic <-> equatorial spherical | line 233 |
+| `_precess_ecliptic(lon, lat, from_jd, to_jd)` | Ecliptic precession | line 270 |
+
+---
+
+## 6. Generator
+
+**Source file:** `scripts/generate_leb.py` (1930 lines)
+
+### 6.1 Overview
+
+The generator creates `.leb` files by:
+1. Evaluating celestial body positions at Chebyshev nodes
+2. Fitting Chebyshev polynomials to the sampled values
+3. Verifying the fit against intermediate test points
+4. Assembling all data into the binary format
+
+### 6.2 CLI Usage
+
+```bash
+# Tier-based (recommended)
+python scripts/generate_leb.py --tier base --verify
+python scripts/generate_leb.py --tier medium --verify
+python scripts/generate_leb.py --tier extended --verify
+
+# Custom range
+python scripts/generate_leb.py --output custom.leb --start 1900 --end 2100
+
+# Options
+  --tier {base,medium,extended}   Preset configuration
+  --output PATH                   Output file path
+  --start YEAR                    Start year
+  --end YEAR                      End year
+  --workers N                     Parallel workers (default: CPU count)
+  --verify                        Run post-generation validation
+  --verify-samples N              Samples per body for verification (default: 500)
+  --bodies 0,1,2                  Comma-separated body IDs (default: all)
+  --quiet                         Suppress progress output
+```
+
+### 6.3 Tier Configurations
+
+| Tier | Ephemeris | Years | Output | Approx Size |
+|------|-----------|-------|--------|-------------|
+| `base` | de440s.bsp | 1850-2150 | `ephemeris_base.leb` | ~56 MB |
+| `medium` | de440.bsp | 1550-2650 | `ephemeris_medium.leb` | ~120 MB |
+| `extended` | de441.bsp | -5000 to 5000 | `ephemeris_extended.leb` | ~1.1 GB |
+
+### 6.4 Chebyshev Fitting
+
+**Node computation** (`chebyshev_nodes`, line 257):
+```python
+# Type I Chebyshev nodes on [-1, 1]
+nodes = cos(pi * (arange(n) + 0.5) / n)
+```
+
+**Segment fitting** (`fit_segment`, line 262):
+1. Map Chebyshev nodes from [-1, 1] to [jd_start, jd_end]
+2. Evaluate body function at each node
+3. Fit using `numpy.polynomial.chebyshev.chebfit(nodes, values, degree)`
+
+**Verification** (`verify_segment`, line 297):
+- 10 uniform test points per segment (not on Chebyshev nodes)
+- Compare fitted polynomial vs reference function
+- Track maximum error across all components
+
+### 6.5 Vectorized Evaluation (Key Optimization)
+
+The major performance optimization is **batching all JDs across all segments
+into a single Skyfield evaluation call**:
+
+**Step 1 — Precompute all JDs** (`_compute_all_segment_jds`, line 333):
+```
+For each segment i:
+  - (degree+1) Chebyshev fit nodes
+  - N_VERIFY (10) uniform verification points
+Total: n_segments * (degree + 1 + 10) JDs
+```
+
+**Step 2 — Single vectorized Skyfield call** (`_eval_body_icrs_vectorized`, line 598):
+```python
+# For inner planets (Sun, Moon, Mercury, Venus, Earth):
+target = planets[target_name]
+t_arr = ts.tt_jd(all_jds)                    # vectorized Time
+positions = target.at(t_arr).position.au.T    # (N, 3) in one call
+
+# For outer planets (Mars, Jupiter, Saturn, Uranus, Neptune, Pluto):
+# Barycenter + SPK center offset or COB correction
+bary_vals = barycenter.at(t_arr).position.au.T
+offset_vals = center_segment.at(t_arr).position.au.T
+positions = bary_vals + offset_vals
+```
+
+**Step 3 — Batch fit and verify** (`_fit_and_verify_from_values`, line 374):
+```
+For each segment:
+  - Extract pre-evaluated values at Chebyshev nodes
+  - chebfit() per component
+  - Compare pre-evaluated verification values against fitted polynomial
+```
+
+This eliminates the per-JD overhead of Skyfield's time conversion, SPK
+evaluation, and Python function call overhead. Speedup: **~150x for planets**.
+
+### 6.6 SPK Boundary Overshoot
+
+**Problem:** The last Chebyshev segment may extend its fit nodes beyond
+`jd_end`. For example, Uranus with 128-day intervals: if the last segment
+starts at JD X, its nodes extend to X+128. If de440s.bsp ends at JD 2506352.5
+(~2150-01-22), nodes can overshoot by up to 128 days.
+
+**Solution: Linear extrapolation** (`_eval_target_vectorized`, line 517):
+- Identify which JDs are outside the SPK valid range (with 1-day safety margin)
+- For in-range JDs: vectorized Skyfield evaluation
+- For out-of-range JDs: evaluate position + velocity at the boundary, then
+  extrapolate: `pos(jd) = pos(boundary) + vel(boundary) * (jd - boundary)`
+
+**Why not clamp?** Clamping (replacing out-of-range JDs with the boundary
+value) would move the Chebyshev nodes, corrupting the polynomial fit for
+the entire segment. Linear extrapolation preserves the node positions and
+produces smooth, reasonable values for the short extrapolation distance
+(up to ~128 days).
+
+### 6.7 Asteroid Generation
+
+**Two paths** (`generate_body_icrs_asteroid`, line 722):
+
+**Path 1 — spktype21 (preferred, ~36x faster than old path):**
+1. Open the SPK type 21 file via `spktype21.SPKType21.open()`
+2. Verify it covers `[jd_start, jd_end]`
+3. Get Sun barycentric positions via vectorized Skyfield
+4. For each JD (scalar loop, ~65 us/eval):
+   ```python
+   pos_km, _ = kernel.compute_type21(center_id, target_id, jd)
+   pos_au = pos_km / 149597870.7  # km -> AU
+   bary_pos = pos_au + sun_bary   # helio -> SSB barycentric
+   ```
+5. Fit and verify from the collected values
+
+**Path 2 — Scalar fallback (slow, ~2365 us/eval):**
+- Uses `swe_calc()` per-point
+- Converts geocentric ecliptic -> equatorial -> adds Earth position
+- Only used when SPK file is unavailable or doesn't cover the range
+
+### 6.8 Full-Range Asteroid SPK Download
+
+**Problem:** `auto_download_asteroid_spk()` defaults to ±10 years from the
+current date. For the base tier (1850-2150), this means the SPK file only
+covers ~2016-2036, and the generator falls back to the slow scalar path
+for dates outside that range.
+
+**Solution** (`assemble_leb`, line 1358):
+1. Pass tier `jd_start`/`jd_end` to `auto_download_asteroid_spk()`
+2. Check cached SPKs with `_spk_covers_range()` — opens the SPK file,
+   finds segments for the target NAIF ID, and checks if they span the
+   full requested range
+3. If cached SPK is too narrow, force re-download with `force=True`
+
+```python
+# In assemble_leb():
+for bid in asteroid_bodies:
+    if bid in _SPK_BODY_MAP:
+        cached_file, _ = _SPK_BODY_MAP[bid]
+        if not _spk_covers_range(cached_file, bid, jd_start, jd_end):
+            need_force = True  # re-download with full range
+    auto_download_asteroid_spk(bid, jd_start=jd_start, jd_end=jd_end, force=need_force)
+```
+
+JPL Horizons supports 1600-2500 for minor bodies, which covers the base
+and medium tiers. The extended tier (-5000 to 5000) exceeds this range;
+asteroids will fall back to the scalar path for dates outside 1600-2500.
+
+### 6.9 Ecliptic Body Generation
+
+**Longitude unwrapping** (`_generate_segments_unwrap`, line 1041):
+
+Ecliptic bodies (lunar nodes, Lilith) have longitude that can wrap around
+0/360 degrees. Fitting a polynomial across a 359->1 discontinuity would
+produce wildly wrong results.
+
+Solution:
+1. Evaluate at Chebyshev nodes
+2. `numpy.unwrap(radians(lon))` -> removes 2pi jumps
+3. Convert back to degrees and fit
+4. Verification re-wraps with `% 360`
+
+### 6.10 Analytical Body Functions
+
+| Body ID | Function | Source |
+|---------|----------|--------|
+| 10 (Mean Node) | `calc_mean_lunar_node(jd)` | `lunar.py` |
+| 11 (True Node) | `calc_true_lunar_node(jd)` | `lunar.py` |
+| 12 (Mean Apogee) | `calc_mean_lilith_with_latitude(jd)` | `lunar.py` |
+| 13 (Oscu Apogee) | `calc_true_lilith(jd)` | `lunar.py` |
+| 21 (Interp Apogee) | `calc_interpolated_apogee(jd)` | `lunar.py` |
+| 22 (Interp Perigee) | `calc_interpolated_perigee(jd)` | `lunar.py` |
+| 40-47 (Uranians) | `calc_uranian_planet(body_id, jd)` | `hypothetical.py` |
+| 48 (Transpluto) | `calc_transpluto(jd)` | `hypothetical.py` |
+
+These are pure-Python analytical functions (~315 us/eval). They cannot be
+vectorized (no numpy path) so they are **parallelized across bodies** using
+`ProcessPoolExecutor`.
+
+### 6.11 Nutation Generation
+
+Uses vectorized `erfa.nut06a()` (IAU 2006/2000A):
+```python
+jd1 = np.full_like(all_jds, 2451545.0)  # J2000 epoch
+jd2 = all_jds - 2451545.0               # offset
+dpsi, deps = erfa.nut06a(jd1, jd2)      # radians, vectorized
+```
+Parameters: interval=32 days, degree=16, 2 components.
+
+### 6.12 Progress Bars
+
+Lightweight `ProgressBar` class (stdlib only, line 38):
+- Throttled to 100ms redraws to avoid terminal flicker
+- Terminal width detection via `shutil.get_terminal_size()`
+- Per-body bars for sequential generation
+- Aggregate bar for parallel analytical bodies
+- Output goes to `sys.stdout`
+- Workers disable their bars (verbose=False) to avoid interleaved output
+
+### 6.13 Parallel Execution Strategy
+
+```
+Phase 1: ICRS planets (11 bodies)
+  Sequential, vectorized Skyfield -> very fast (~seconds for 300yr)
+
+Phase 2: ICRS asteroids (5 bodies)
+  Sequential, spktype21 scalar loop -> moderate (~tens of seconds)
+
+Phase 3: Analytical bodies (15 bodies)
+  Parallel via ProcessPoolExecutor (N workers)
+  Each worker generates one body's segments independently
+```
+
+Workers default to `os.cpu_count()`. The `--workers` flag overrides this.
+
+### 6.14 File Assembly
+
+The `assemble_leb()` function (line 1328):
+1. Pre-download asteroid SPKs with full-range coverage
+2. Generate body coefficients (phases 1-3 above)
+3. Generate nutation coefficients
+4. Generate Delta-T sparse table
+5. Generate star catalog (from `STAR_CATALOG` in `fixed_stars.py`)
+6. Calculate section sizes and offsets
+7. Allocate single `bytearray(total_size)`
+8. Write header, section directory, body index, coefficients, nutation,
+   Delta-T, and star catalog
+9. Write buffer to file in one `f.write(buf)` call
+
+---
+
+## 7. Integration with LibEphemeris
+
+### 7.1 Global State (`state.py`)
+
+```python
+# state.py globals (line 157-159)
+_LEB_FILE: Optional[str] = None      # Path to .leb file
+_LEB_READER: Optional["LEBReader"] = None  # Cached reader instance
+```
+
+**`set_leb_file(filepath)`** (line 165):
+- Closes existing reader if any
+- Sets `_LEB_FILE` and clears `_LEB_READER` (lazy re-creation)
+
+**`get_leb_reader()`** (line 191):
+- Returns cached `_LEB_READER` if available
+- Otherwise checks `_LEB_FILE` and `LIBEPHEMERIS_LEB` env var
+- Creates `LEBReader(path)` on first access
+- Returns `None` if no LEB configured (silent — no exception)
+- Logs warning and returns `None` if file is invalid/corrupt
+
+### 7.2 Dispatch in `swe_calc_ut()` (`planets.py:772-782`)
+
+```python
+def swe_calc_ut(tjd_ut, ipl, iflag):
+    # ... SE_ECL_NUT handling, MOSEPH stripping ...
+
+    # --- LEB fast path ---
+    reader = get_leb_reader()
+    if reader is not None:
+        try:
+            return fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
+        except (KeyError, ValueError):
+            pass  # fall through to Skyfield
+    # --- END LEB fast path ---
+
+    # Full Skyfield pipeline
+    return _calc_body(t, ipl, iflag)
+```
+
+The same pattern is used in `swe_calc()` (line 835-845), dispatching to
+`fast_calc.fast_calc_tt()`.
+
+### 7.3 Ayanamsa in LEB Mode
+
+When `swe_get_ayanamsa_ut()` or `swe_get_ayanamsa_ex_ut()` is called:
+```python
+# planets.py line 2250
+reader = get_leb_reader()
+if reader is not None:
+    try:
+        from .fast_calc import _calc_ayanamsa_from_leb
+        return _calc_ayanamsa_from_leb(reader, jd_tt, sid_mode)
+    except KeyError:
+        pass  # star-based mode, fall back to Skyfield
+```
+
+### 7.4 Exported API
+
+```python
+# __init__.py
+from .state import set_leb_file, get_leb_reader
+```
+
+Both are accessible as `libephemeris.set_leb_file()` and
+`libephemeris.get_leb_reader()`.
+
+---
+
+## 8. Thread Safety and EphemerisContext
+
+### 8.1 LEBReader Thread Safety
+
+`LEBReader` is **inherently thread-safe** because:
+- All data structures are populated at construction time and never mutated
+- `mmap` read access is safe from multiple threads
+- `struct.unpack_from()` is a pure function
+- Clenshaw evaluation uses only local variables
+
+### 8.2 EphemerisContext LEB Integration (`context.py`)
+
+`EphemerisContext` provides per-context LEB support:
+
+```python
+class EphemerisContext:
+    def __init__(self):
+        self._leb_file: Optional[str] = None
+        self._leb_reader: Optional["LEBReader"] = None
+        self.sidereal_mode: int = 1   # Lahiri
+        self.sidereal_t0: float = 2451545.0
+        self.sidereal_ayan_t0: float = 0.0
+
+    def set_leb_file(self, filepath)   # Per-context LEB
+    def get_leb_reader(self)           # Per-context reader (falls back to global)
+
+    def calc_ut(self, tjd_ut, ipl, iflag):
+        reader = self.get_leb_reader()
+        if reader is None:
+            reader = state.get_leb_reader()  # global fallback
+        if reader is not None:
+            return fast_calc.fast_calc_ut(
+                reader, tjd_ut, ipl, iflag,
+                sid_mode=self.sidereal_mode,        # thread-safe
+                sid_t0=self.sidereal_t0,             # thread-safe
+                sid_ayan_t0=self.sidereal_ayan_t0,   # thread-safe
+            )
+        # ... Skyfield fallback ...
+```
+
+**Critical:** Sidereal parameters are passed as **keyword arguments** to
+`fast_calc_ut()` / `fast_calc_tt()`, not read from global state. This
+prevents race conditions when multiple threads use different sidereal modes.
+
+The sidereal state snapshot happens once at the entry point (`fast_calc_ut`
+line 662-667 for global API, or passed explicitly by `EphemerisContext`).
+
+---
+
+## 9. Body Catalog
+
+### 9.1 BODY_PARAMS Table
+
+**Source:** `leb_format.py:149-185`
+
+This is the **single source of truth** for all Chebyshev parameters:
+
+```python
+BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
+    # body_id: (interval_days, degree, coord_type, components)
+    ...
+}
+```
+
+| Body ID | Name | Interval | Degree | Coord Type | Components |
+|---------|------|----------|--------|------------|------------|
+| 0 | Sun | 32 | 13 | ICRS_BARY | 3 |
+| 1 | Moon | 8 | 13 | ICRS_BARY | 3 |
+| 2 | Mercury | 16 | 15 | ICRS_BARY | 3 |
+| 3 | Venus | 32 | 13 | ICRS_BARY | 3 |
+| 4 | Mars | 32 | 13 | ICRS_BARY | 3 |
+| 5 | Jupiter | 64 | 11 | ICRS_BARY | 3 |
+| 6 | Saturn | 64 | 11 | ICRS_BARY | 3 |
+| 7 | Uranus | 128 | 9 | ICRS_BARY | 3 |
+| 8 | Neptune | 128 | 9 | ICRS_BARY | 3 |
+| 9 | Pluto | 128 | 9 | ICRS_BARY | 3 |
+| 10 | Mean Node | 8 | 13 | ECLIPTIC | 3 |
+| 11 | True Node | 8 | 13 | ECLIPTIC | 3 |
+| 12 | Mean Apogee | 8 | 13 | ECLIPTIC | 3 |
+| 13 | Oscu Apogee | 8 | 13 | ECLIPTIC | 3 |
+| 14 | Earth | 8 | 13 | ICRS_BARY | 3 |
+| 15 | Chiron | 32 | 13 | ICRS_BARY | 3 |
+| 17 | Ceres | 32 | 13 | ICRS_BARY | 3 |
+| 18 | Pallas | 32 | 13 | ICRS_BARY | 3 |
+| 19 | Juno | 32 | 13 | ICRS_BARY | 3 |
+| 20 | Vesta | 32 | 13 | ICRS_BARY | 3 |
+| 21 | Interp Apogee | 8 | 13 | ECLIPTIC | 3 |
+| 22 | Interp Perigee | 8 | 13 | ECLIPTIC | 3 |
+| 40 | Cupido | 64 | 11 | HELIO_ECL | 3 |
+| 41 | Hades | 64 | 11 | HELIO_ECL | 3 |
+| 42 | Zeus | 64 | 11 | HELIO_ECL | 3 |
+| 43 | Kronos | 64 | 11 | HELIO_ECL | 3 |
+| 44 | Apollon | 64 | 11 | HELIO_ECL | 3 |
+| 45 | Admetos | 64 | 11 | HELIO_ECL | 3 |
+| 46 | Vulkanus | 64 | 11 | HELIO_ECL | 3 |
+| 47 | Poseidon | 64 | 11 | HELIO_ECL | 3 |
+| 48 | Transpluto | 64 | 11 | HELIO_ECL | 3 |
+
+**Total: 30 bodies.**
+
+### 9.2 Parameter Design Rationale
+
+- **Moon (interval=8, degree=13):** Fast-moving (~13 deg/day), needs short
+  segments and high degree for sub-arcsecond accuracy.
+- **Mercury (interval=16, degree=15):** Eccentric orbit, highest degree to
+  capture orbital variations.
+- **Outer planets (interval=64-128, degree=9-11):** Slow-moving, longer
+  segments with lower degree are sufficient.
+- **Analytical bodies (interval=8, degree=13):** Short segments match the
+  Moon's parameters since nodes/apsides have similar variability timescales.
+
+### 9.3 Bodies NOT in LEB (trigger Skyfield fallback)
+
+- Pholus (SE_PHOLUS = 16)
+- Any asteroid beyond the major 5
+- TNOs (Eris, Sedna, etc.)
+- Fixed stars (use the star catalog section instead)
+- House cusps and angles
+- Arabic parts
+- SE_ECL_NUT (-1)
+
+---
+
+## 10. Precision and Validation
+
+### 10.1 Generation-Time Verification
+
+Every body is verified during generation. For each Chebyshev segment,
+10 uniformly-spaced test points are evaluated and compared against the
+reference function. The maximum error across all segments is reported.
+
+Typical generation-time errors:
+
+| Body | Max Error | Unit |
+|------|-----------|------|
+| Sun | <1e-12 | AU (~0.00002") |
+| Moon | <5e-11 | AU (~0.001") |
+| Mercury | <1e-11 | AU |
+| Venus | <1e-12 | AU |
+| Mars | <1e-12 | AU |
+| Jupiter | <1e-12 | AU |
+| Mean Node | <1e-12 | degrees |
+| True Node | <1e-9 | degrees (~0.004") |
+| Interp Apogee | <1e-7 | degrees (~0.4") |
+
+### 10.2 End-to-End Precision (vs Skyfield Reference)
+
+The precision test suite (`tests/test_leb/test_leb_precision.py`) compares
+`fast_calc_ut()` output against `swe_calc_ut()` for multiple dates.
+
+Expected results with properly generated LEB files:
+
+| Body | Position Error | Speed Error | Notes |
+|------|---------------|-------------|-------|
+| Sun | <0.07" | <0.001"/day | Excellent |
+| Moon | <0.05" | <14"/day | Speed error from Chebyshev derivative |
+| Mercury | <0.01" | <0.001"/day | |
+| Mars | <0.05" | <0.001"/day | |
+| Jupiter | <0.05" | <0.001"/day | |
+| Mean Node | <0.001" | <0.001"/day | Perfect |
+| True Node | <0.001" | <1"/day | Analytical, speed acceptable |
+| Chiron | <1" | <0.1"/day | Requires SPK-generated LEB |
+| Ceres | <1" | <0.1"/day | Requires SPK-generated LEB |
+| Cupido | <0.001" | <0.001"/day | Perfect |
+
+### 10.3 Moon Speed Error
+
+The Moon's speed can show errors up to ~14"/day at certain dates. This is
+~0.03% of the total speed (~47000"/day). The error comes from the Chebyshev
+derivative approximation: while the position polynomial is fitted to
+sub-arcsecond accuracy, the derivative of a degree-13 polynomial over an
+8-day interval inherently loses some precision compared to the analytical
+Skyfield velocity.
+
+This is acceptable for astrological applications.
+
+### 10.4 Asteroid Precision Caveat
+
+Asteroid precision depends entirely on how the LEB file was generated:
+
+- **With spktype21 SPK:** Position errors <1" — excellent
+- **With scalar swe_calc() fallback:** Position errors can reach ~1500" — unacceptable
+- **With Keplerian fallback (no SPK):** Even worse
+
+Always ensure asteroid SPK files cover the full tier date range before
+generating. Use `_spk_covers_range()` to verify.
+
+---
+
+## 11. Performance
+
+### 11.1 Per-Evaluation Costs
+
+| Operation | Time |
+|-----------|------|
+| Clenshaw evaluation (1 component, degree 13) | ~0.5 us |
+| `eval_body()` (3 components + derivatives) | ~1.5 us |
+| `eval_nutation()` | ~0.8 us |
+| `delta_t()` | ~0.3 us |
+| Pipeline A full (ICRS -> ecliptic of date, with speed) | ~8 us |
+| Pipeline B full (ecliptic direct, with speed) | ~2 us |
+| Skyfield swe_calc_ut() for comparison | ~120 us |
+| **Speedup (Pipeline A)** | **~14x** |
+
+### 11.2 Generation Performance
+
+| Configuration | Time |
+|---------------|------|
+| Old scalar (1 worker, 300yr) | ~18 min |
+| Vectorized (10yr, 1 worker) | 18.0s |
+| Vectorized (10yr, 4 workers) | 6.4s |
+| Vectorized (5yr, 4 workers) | 3.8s |
+| Vectorized (300yr, no asteroids, 4 workers) | 170s (~2.8 min) |
+| Vectorized (300yr, with spktype21, 4 workers) | ~3-4 min (estimated) |
+
+### 11.3 Vectorization Speedups
+
+| Method | Scalar Cost | Vectorized Cost | Speedup |
+|--------|------------|-----------------|---------|
+| Skyfield `target.at(t)` (Sun) | 61 us | 0.4 us | **150x** |
+| Skyfield `target.at(t)` (Moon) | 121 us | 0.7 us | **170x** |
+| `erfa.nut06a()` (nutation) | 32 us | ~0.5 us | **~50x** |
+| `spktype21.compute_type21()` | 65 us | N/A (scalar) | 36x vs swe_calc |
+| True lunar node (pure Python) | 315 us | N/A | not vectorizable |
+| Interp perigee (pure Python) | 329 us | N/A | not vectorizable |
+
+---
+
+## 12. Commands Reference
+
+### 12.1 poe Tasks
+
+```bash
+# Generation
+poe leb:generate:base       # Base tier (de440s, 1850-2150) with verification
+poe leb:generate:medium     # Medium tier (de440, 1550-2650) with verification
+poe leb:generate:extended   # Extended tier (de441, -5000 to 5000) with verification
+poe leb:generate:all        # All three tiers sequentially
+
+# Testing
+poe test:leb                # All LEB tests (excludes @slow)
+poe test:leb:precision      # Full precision suite (slow, all tiers)
+poe test:leb:precision:quick # Precision tests for medium tier only
+```
+
+### 12.2 Direct pytest
+
+```bash
+# By file
+pytest tests/test_leb/test_leb_format.py -v
+pytest tests/test_leb/test_leb_reader.py -v
+pytest tests/test_leb/test_fast_calc.py -v
+pytest tests/test_leb/test_generate_leb.py -v
+pytest tests/test_leb/test_leb_precision.py -v
+pytest tests/test_leb/test_context_leb.py -v
+
+# By marker
+pytest tests/test_leb/ -v -m "not slow"
+pytest tests/test_leb/ -v -m "precision"
+```
+
+### 12.3 Manual Generation
+
+```bash
+# Generate with custom options
+python scripts/generate_leb.py \
+  --tier base \
+  --workers 8 \
+  --verify \
+  --verify-samples 1000
+
+# Generate specific bodies only
+python scripts/generate_leb.py \
+  --output test.leb \
+  --start 2000 --end 2030 \
+  --bodies 0,1,2,3,4 \
+  --workers 4
+
+# Quick validation after regeneration
+python3 -c "
+from libephemeris.leb_reader import LEBReader
+reader = LEBReader('data/leb/ephemeris_base.leb')
+pos, vel = reader.eval_body(0, 2451545.0)  # Sun at J2000
+print(f'Sun ICRS: x={pos[0]:.10f} y={pos[1]:.10f} z={pos[2]:.10f} AU')
+reader.close()
+"
+```
+
+---
+
+## 13. Troubleshooting
+
+### 13.1 "Body X not in LEB file"
+
+The body is not one of the 30 bodies in `BODY_PARAMS`. LEB silently falls
+back to Skyfield. This is expected behavior, not an error.
+
+### 13.2 "JD outside range"
+
+The requested date is outside the LEB file's coverage. Falls back to
+Skyfield silently. Check `reader.jd_range` to see the file's coverage.
+
+### 13.3 Large Asteroid Errors (~1500")
+
+The LEB file was generated without proper SPK coverage for asteroids.
+Regenerate with:
+```bash
+export LIBEPHEMERIS_AUTO_SPK=1
+poe leb:generate:base
+```
+
+### 13.4 "Failed to open LEB file"
+
+- Check the file path exists and is readable
+- Check the file is a valid LEB file (magic bytes = `b"LEB1"`)
+- Check the file was not truncated during generation
+
+### 13.5 Performance Not Improved
+
+- Ensure `set_leb_file()` is called before any `swe_calc_ut()` calls
+- Check that `get_leb_reader()` returns a non-None value
+- Verify the body you're computing is in the LEB file
+- If using `SEFLG_TOPOCTR`, `SEFLG_XYZ`, `SEFLG_RADIANS`, or `SEFLG_NONUT`,
+  LEB always falls back to Skyfield
+
+---
+
+## 14. Internals Deep-Dive
+
+### 14.1 Outer Planet Position Computation
+
+LibEphemeris supports three strategies for outer planet centers:
+
+1. **Direct target** — Inner planets (Sun, Moon, Mercury, Venus, Earth) have
+   direct segments in DE440. `planets["sun"]` works directly.
+
+2. **SpkCenterTarget** — Outer planets use a separate `planet_centers.bsp`
+   file with NAIF IDs 599 (Jupiter), 699 (Saturn), 799 (Uranus), 899
+   (Neptune), 999 (Pluto). Position = barycenter + center offset from SPK.
+   Precision: <0.001".
+
+3. **CobCorrectedTarget** — Analytical Center-of-Body corrections from
+   moon theory. Position = barycenter + analytical offset. Precision: <0.01".
+   Used as fallback when `planet_centers.bsp` is unavailable.
+
+The generator uses strategy 2 or 3 transparently via
+`_eval_body_icrs_vectorized()`. For vectorized evaluation, the COB path
+requires a scalar loop for `get_cob_offset()` (the offset function is
+pure Python and not vectorizable), but the expensive barycenter evaluation
+is still vectorized.
+
+### 14.2 _PLANET_FALLBACK Map
+
+```python
+# planets.py:131-138
+_PLANET_FALLBACK = {
+    "mars": "mars barycenter",
+    "jupiter": "jupiter barycenter",
+    "saturn": "saturn barycenter",
+    "uranus": "uranus barycenter",
+    "neptune": "neptune barycenter",
+    "pluto": "pluto barycenter",
+}
+```
+
+Used when `planets[target_name]` raises `KeyError` (outer planets don't
+have direct segments in DE440).
+
+### 14.3 Asteroid NAIF IDs
+
+```python
+# generate_leb.py:243-249
+_ASTEROID_NAIF = {
+    15: 2060,      # Chiron
+    17: 2000001,   # Ceres
+    18: 2000002,   # Pallas
+    19: 2000003,   # Juno
+    20: 2000004,   # Vesta
+}
+```
+
+SPK files from JPL Horizons use the `20000000 + N` convention for small
+bodies, where N is the asteroid number. The `_spk_covers_range()` function
+checks both conventions when searching for segments.
+
+### 14.4 _SPK_BODY_MAP
+
+```python
+# state.py:135-137
+_SPK_BODY_MAP: dict[int, tuple[str, int]] = {}
+# Maps: body_id -> (spk_file_path, naif_id)
+```
+
+Populated by `auto_download_asteroid_spk()` and `download_and_register_spk()`.
+The generator reads this to find the SPK file for each asteroid.
+
+### 14.5 Precession-Nutation Matrix
+
+`fast_calc.py` uses `erfa.pnm06a()` for the precession-nutation matrix,
+with a fallback to `astrometry._precession_nutation_matrix()`. The matrix
+is a 3x3 rotation from ICRS to equatorial of date. It incorporates both
+IAU 2006 precession and IAU 2000A nutation.
+
+```python
+# fast_calc.py:186-218
+def _precession_nutation_matrix(jd_tt):
+    try:
+        import erfa
+        mat = erfa.pnm06a(J2000, jd_tt - J2000)
+        return ((mat[0][0], ...), (mat[1][0], ...), (mat[2][0], ...))
+    except ImportError:
+        from .astrometry import _precession_nutation_matrix as _pnm
+        return _pnm(jd_tt)
+```
+
+### 14.6 IAU 2006 General Precession (for Sidereal)
+
+Used in both `_calc_ayanamsa_from_leb()` and the speed correction:
+
+```python
+# fast_calc.py:294
+_PREC_COEFFS = (5028.796195, 1.1054348, 0.00007964, -0.000023857, -0.0000000383)
+# arcsec/century polynomial: P(T) = sum(c_i * T^(i+1))
+```
+
+The sidereal speed correction subtracts the instantaneous precession rate:
+```
+dP/dT = c0 + 2*c1*T + 3*c2*T^2 + ...  (arcsec/century)
+```
+converted to deg/day and subtracted from dlon.
+
+### 14.7 Aberration Formula
+
+Classical first-order stellar aberration (`fast_calc.py:138-183`):
+
+```
+u = geo / |geo|                  # unit vector to body
+v = earth_vel / c                # Earth velocity in units of c
+u' = u + v - u*(u.v)            # aberrated unit vector
+result = normalize(u') * |geo|   # scale back to original distance
+```
+
+This matches the pyswisseph implementation and provides ~0.01" accuracy
+(sufficient for astrological purposes; the rigorous formula differs by
+<1 milliarcsecond).
+
+### 14.8 Full Segment Width Invariant
+
+**Critical implementation detail:** All segments have the same width
+(`interval_days`), including the last segment. The last segment may extend
+beyond `jd_end` by up to `interval_days` worth. This is necessary because
+the reader's O(1) segment lookup assumes uniform width:
+
+```python
+seg_idx = int((jd - body.jd_start) / body.interval_days)
+```
+
+If the last segment were truncated, the tau mapping would be wrong for all
+dates in that segment. The generator handles this by:
+- Using full-width segments for fitting (nodes extend beyond jd_end)
+- Verifying only within `[seg_start, min(seg_end, jd_end)]`
+- Using linear extrapolation for SPK overshoot
+
+---
+
+## Appendix A: File Size Estimation
+
+```
+For body with interval I, degree D, components C, over range R days:
+
+segments = ceil(R / I)
+bytes_per_segment = C * (D + 1) * 8
+body_total = segments * bytes_per_segment + 52 (index entry)
+
+Example: Moon, base tier (300yr = 109,573 days):
+  segments = ceil(109573 / 8) = 13,697
+  bytes/seg = 3 * 14 * 8 = 336
+  total = 13,697 * 336 + 52 = 4,602,144 bytes (~4.4 MB)
+
+Example: Uranus, base tier:
+  segments = ceil(109573 / 128) = 856
+  bytes/seg = 3 * 10 * 8 = 240
+  total = 856 * 240 + 52 = 205,492 bytes (~0.2 MB)
+```
+
+## Appendix B: Adding a New Body to LEB
+
+1. Add entry to `BODY_PARAMS` in `leb_format.py`:
+   ```python
+   NEW_BODY_ID: (interval_days, degree, coord_type, components),
+   ```
+
+2. Add name to `BODY_NAMES` in `generate_leb.py`:
+   ```python
+   NEW_BODY_ID: "Body Name",
+   ```
+
+3. Add evaluation function:
+   - For ICRS: add to `_PLANET_MAP` or `_ASTEROID_NAIF`
+   - For ecliptic: add to `eval_funcs` in `generate_body_ecliptic()`
+   - For heliocentric: add to `generate_body_helio()`
+
+4. Regenerate LEB files:
+   ```bash
+   poe leb:generate:base
+   ```
+
+5. Run precision tests:
+   ```bash
+   poe test:leb:precision:quick
+   ```
+
+## Appendix C: Key Constants
+
+```python
+# leb_format.py
+MAGIC = b"LEB1"
+VERSION = 1
+HEADER_SIZE = 64
+SECTION_DIR_SIZE = 24
+BODY_ENTRY_SIZE = 52
+STAR_ENTRY_SIZE = 64
+NUTATION_HEADER_SIZE = 40
+
+# fast_calc.py
+C_LIGHT_AU_DAY = 173.1446326846693
+J2000 = 2451545.0
+OBLIQUITY_J2000_DEG = 23.4392911
+
+# generate_leb.py
+NUTATION_INTERVAL = 32.0   # days
+NUTATION_DEGREE = 16
+DELTA_T_INTERVAL = 30.0    # days
+N_VERIFY = 10              # verification points per segment
+```

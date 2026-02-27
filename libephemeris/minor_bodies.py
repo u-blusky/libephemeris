@@ -2172,11 +2172,14 @@ SPK_DOWNLOADABLE_ASTEROIDS: dict[int, tuple[int, str, int, str]] = {
 }
 
 # Combined info for all major asteroids (for backward compatibility and info lookup)
+# Note: Ceres/Pallas/Juno/Vesta use "Name;" syntax to bypass JPL's major body index.
+# Bare numeric IDs ("1", "2", "3", "4") collide with planet barycenter IDs and cause
+# "SPK creation is not available for pre-computed objects" errors from Horizons.
 MAJOR_ASTEROID_SPK_INFO: dict[int, tuple[int, str, int, str]] = {
-    SE_CERES: (1, "1", NAIF_CERES, "Ceres"),
-    SE_PALLAS: (2, "2", NAIF_PALLAS, "Pallas"),
-    SE_JUNO: (3, "3", NAIF_JUNO, "Juno"),
-    SE_VESTA: (4, "4", NAIF_VESTA, "Vesta"),
+    SE_CERES: (1, "Ceres;", NAIF_CERES, "Ceres"),
+    SE_PALLAS: (2, "Pallas;", NAIF_PALLAS, "Pallas"),
+    SE_JUNO: (3, "Juno;", NAIF_JUNO, "Juno"),
+    SE_VESTA: (4, "Vesta;", NAIF_VESTA, "Vesta"),
     SE_CHIRON: (2060, "2060", NAIF_CHIRON, "Chiron"),
 }
 

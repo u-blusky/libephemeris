@@ -769,6 +769,19 @@ def swe_calc_ut(
     # Strip SEFLG_MOSEPH bit — accepted for compatibility, always uses JPL
     iflag = iflag & ~SEFLG_MOSEPH
 
+    # --- LEB fast path: use precomputed binary ephemeris if available ---
+    from .state import get_leb_reader
+
+    reader = get_leb_reader()
+    if reader is not None:
+        try:
+            from . import fast_calc
+
+            return fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
+        except (KeyError, ValueError):
+            pass  # body not in .leb or JD out of range, fall through
+    # --- END LEB fast path ---
+
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
         validate_jd_range(tjd_ut, ipl, "swe_calc_ut")
@@ -818,6 +831,19 @@ def swe_calc(
 
     # Strip SEFLG_MOSEPH bit — accepted for compatibility, always uses JPL
     iflag = iflag & ~SEFLG_MOSEPH
+
+    # --- LEB fast path: use precomputed binary ephemeris if available ---
+    from .state import get_leb_reader
+
+    reader = get_leb_reader()
+    if reader is not None:
+        try:
+            from . import fast_calc
+
+            return fast_calc.fast_calc_tt(reader, tjd, ipl, iflag)
+        except (KeyError, ValueError):
+            pass  # body not in .leb or JD out of range, fall through
+    # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
@@ -2214,6 +2240,22 @@ def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
     sid_mode = get_sid_mode()
     # get_sid_mode() without full=True always returns int
     assert isinstance(sid_mode, int)
+
+    # --- LEB fast path: compute ayanamsa from precomputed data ---
+    from .state import get_leb_reader
+
+    reader = get_leb_reader()
+    if reader is not None:
+        try:
+            from .fast_calc import _calc_ayanamsa_from_leb
+
+            delta_t = reader.delta_t(tjd_ut)
+            jd_tt = tjd_ut + delta_t
+            return _calc_ayanamsa_from_leb(reader, jd_tt, sid_mode=sid_mode)
+        except (KeyError, ValueError):
+            pass  # star-based mode or out of range, fall through
+    # --- END LEB fast path ---
+
     return _calc_ayanamsa(tjd_ut, sid_mode)
 
 

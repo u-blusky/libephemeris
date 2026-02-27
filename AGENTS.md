@@ -275,3 +275,56 @@ set_ephemeris_file("de441.bsp")      # direct override (takes priority over tier
 ```
 
 *KEEP ALWAYS 1:1 Compatibility with PySwissEphemeris!*
+
+### Binary Ephemeris Mode (LEB)
+
+LibEphemeris supports a precomputed binary ephemeris mode (`.leb` files) that
+stores Chebyshev polynomial approximations of planetary positions. This provides
+~14x speedup over the default Skyfield pipeline.
+
+**Architecture:**
+- `libephemeris/leb_format.py` — Binary format constants, dataclasses, struct helpers
+- `libephemeris/leb_reader.py` — mmap reader + Clenshaw evaluation (pure Python)
+- `libephemeris/fast_calc.py` — Three calculation pipelines (ICRS, ecliptic-direct, heliocentric)
+- `scripts/generate_leb.py` — CLI generator for `.leb` files
+
+**Two modes (transparent to callers):**
+1. **Skyfield mode (default):** Full Skyfield/JPL pipeline, unchanged
+2. **Binary mode:** Read precomputed `.leb` files, automatic silent fallback to Skyfield for unsupported bodies/flags
+
+**Activation:**
+```python
+from libephemeris import set_leb_file
+set_leb_file("/path/to/ephemeris.leb")  # enables binary mode
+set_leb_file(None)                       # disables binary mode
+```
+Or via environment variable: `LIBEPHEMERIS_LEB=/path/to/ephemeris.leb`
+
+**Flags that trigger Skyfield fallback:**
+`SEFLG_TOPOCTR`, `SEFLG_XYZ`, `SEFLG_RADIANS`, `SEFLG_NONUT`
+
+**LEB Test Commands:**
+```bash
+poe test:leb                  # LEB unit tests (excludes slow)
+poe test:leb:precision        # Full precision test suite (slow)
+poe test:leb:precision:quick  # Precision tests for medium tier only
+```
+
+**LEB Generation Commands:**
+```bash
+poe leb:generate:base         # Generate base tier LEB
+poe leb:generate:medium       # Generate medium tier LEB
+poe leb:generate:extended     # Generate extended tier LEB
+poe leb:generate:all          # Generate all three tiers
+```
+
+**Key implementation details:**
+- Zero new runtime dependencies (only `mmap`, `struct`, `math`, `dataclasses`)
+- `numpy` only needed by the generator script (already a dev dependency)
+- Thread-safe: sidereal params passed explicitly through call chain
+- `EphemerisContext` passes sidereal config via keyword-only args (no global swap)
+- `LEBReader.__init__` uses try/except around parse to prevent resource leaks
+- Pipeline A defers Earth position fetch for `SEFLG_HELCTR`/`SEFLG_BARYCTR`
+- Sidereal speed correction subtracts IAU 2006 general precession rate from `dlon`
+
+**Reference:** See `docs/LEB_PLAN.md` for the full implementation plan (1612 lines).

@@ -30,3 +30,6 @@ de440s.bsp
 implementation_plans
 .opencode/plans
 compare_scripts_tests.log
+
+# LEB binary ephemeris files (generated, large)
+data/leb/*.leb

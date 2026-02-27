@@ -196,6 +196,11 @@ typecheck = "mypy libephemeris"
     tests/test_lunar/test_true_lilith_solar_perturbation.py \
     tests/test_lunar/test_true_lilith_variation.py"""
 
+# LEB test suites
+"test:leb" = "pytest tests/test_leb/ -v -m \"not slow\""
+"test:leb:precision" = "pytest tests/test_leb/test_leb_precision.py -v"
+"test:leb:precision:quick" = "pytest tests/test_leb/test_leb_precision.py -v -k \"medium\""
+
 # Lunar corrections and calibration
 [tool.poe.tasks.generate-lunar-corrections]
 cmd = "python scripts/generate_lunar_corrections.py --force"
@@ -210,6 +215,25 @@ envfile = ".env"
 cmd = "python scripts/calibrate_perigee_perturbations.py --quick --output /tmp/perigee_calibration_quick.json"
 help = "Quick perigee calibration (100-year range, ~2 min, for validation)"
 envfile = ".env"
+
+# LEB (binary ephemeris) generation
+[tool.poe.tasks."leb:generate:base"]
+cmd = "python scripts/generate_leb.py --tier base --verify"
+help = "Generate base tier LEB file (de440s, 1850-2150)"
+
+[tool.poe.tasks."leb:generate:medium"]
+cmd = "python scripts/generate_leb.py --tier medium --verify"
+help = "Generate medium tier LEB file (de440, 1550-2650)"
+
+[tool.poe.tasks."leb:generate:extended"]
+cmd = "python scripts/generate_leb.py --tier extended --verify"
+help = "Generate extended tier LEB file (de441, -5000 to 5000)"
+
+[tool.poe.tasks."leb:generate:all"]
+cmd = """python scripts/generate_leb.py --tier base --verify && \
+python scripts/generate_leb.py --tier medium --verify && \
+python scripts/generate_leb.py --tier extended --verify"""
+help = "Generate LEB files for all three tiers"
 
 [tool.mypy]
 python_version = "3.9"
