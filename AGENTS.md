@@ -168,10 +168,18 @@ libephemeris/
 ├── context.py            # Thread-safe EphemerisContext
 ├── astrometry.py         # IAU precession/nutation/aberration utilities
 ├── state.py              # Global state management
-└── time_utils.py         # Julian day conversions
+├── time_utils.py         # Julian day conversions
+├── leb_format.py         # LEB binary format constants, dataclasses, struct helpers
+├── leb_reader.py         # LEB mmap reader + Clenshaw polynomial evaluation
+└── fast_calc.py          # LEB calculation pipelines (ICRS, ecliptic, heliocentric)
+data/
+└── leb/                  # Precomputed LEB binary ephemeris files
+    └── ephemeris_*.leb   # Per-tier merged files (base, medium, extended)
+scripts/
+└── generate_leb.py       # LEB binary ephemeris generator (group/merge workflow)
 tests/
 ├── conftest.py           # Shared fixtures and markers
-└── test_*/               # Test subdirectories by feature
+└── test_*/               # Test subdirectories by feature (includes test_leb/)
 ```
 
 ## Scripts & Calibration
@@ -180,6 +188,7 @@ The `scripts/` directory contains data generation and calibration tools:
 
 ```
 scripts/
+├── generate_leb.py                     # LEB binary ephemeris generator (group/merge workflow)
 ├── calibrate_perigee_perturbations.py  # Perigee perturbation series calibration (v2.2)
 ├── generate_lunar_corrections.py       # Lunar correction table generation
 ├── generate_planet_centers_spk.py      # Planet centers SPK file generation
@@ -311,12 +320,41 @@ poe test:leb:precision:quick  # Precision tests for medium tier only
 ```
 
 **LEB Generation Commands:**
+
+The generator supports two workflows: full (all bodies at once) and group-based
+(generate each body group independently, then merge). The group workflow is
+**recommended** — it avoids macOS multiprocessing deadlocks and allows
+regenerating a single group without redoing everything.
+
 ```bash
+# Full generation (all bodies at once)
 poe leb:generate:base         # Generate base tier LEB
 poe leb:generate:medium       # Generate medium tier LEB
 poe leb:generate:extended     # Generate extended tier LEB
 poe leb:generate:all          # Generate all three tiers
+
+# Group generation + merge (RECOMMENDED)
+poe leb:generate:base:groups      # All 3 groups + merge for base tier
+poe leb:generate:medium:groups    # All 3 groups + merge for medium tier
+poe leb:generate:extended:groups  # All 3 groups + merge for extended tier
+
+# Individual groups (for targeted regeneration)
+poe leb:generate:base:planets     # Planets only (Sun-Pluto, Earth)
+poe leb:generate:base:asteroids   # Asteroids only (Chiron, Ceres-Vesta)
+poe leb:generate:base:analytical  # Analytical bodies (nodes, Lilith, Uranians)
+poe leb:generate:base:merge       # Merge partial files into final .leb
 ```
+
+**Body groups:**
+- `planets` — Sun, Moon, Mercury-Pluto, Earth (body IDs 0-9, 14)
+- `asteroids` — Chiron, Ceres, Pallas, Juno, Vesta (body IDs 15, 17-20)
+- `analytical` — Mean/True/Osculating Node, Mean/True Lilith, 8 Uranians (body IDs 10-13, 16, 40-47)
+
+**Group workflow details:**
+- Each `--group` run produces a partial `.leb` file (e.g. `ephemeris_base_planets.leb`)
+- `--merge` combines partial files into one complete file (zero re-computation)
+- Partial files are generation-time intermediates only; **runtime always uses a single merged file**
+- No auto-discovery or multi-file reader at runtime
 
 **Key implementation details:**
 - Zero new runtime dependencies (only `mmap`, `struct`, `math`, `dataclasses`)
@@ -326,5 +364,7 @@ poe leb:generate:all          # Generate all three tiers
 - `LEBReader.__init__` uses try/except around parse to prevent resource leaks
 - Pipeline A defers Earth position fetch for `SEFLG_HELCTR`/`SEFLG_BARYCTR`
 - Sidereal speed correction subtracts IAU 2006 general precession rate from `dlon`
+- Analytical bodies run sequentially in main process (no `ProcessPoolExecutor` — removed due to macOS deadlocks with numpy/BLAS/Accelerate)
+- Asteroid generation uses `spktype21` for SPK type 21 files (~36x faster than scalar fallback)
 
-**Reference:** See `docs/LEB_PLAN.md` for the full implementation plan (1612 lines).
+**Reference:** See `docs/LEB_PLAN.md` for the implementation plan and `docs/LEB_GUIDE.md` for the comprehensive technical guide.
