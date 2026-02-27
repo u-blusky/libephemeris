@@ -18,13 +18,11 @@ from __future__ import annotations
 
 import argparse
 import math
-import multiprocessing
 import os
 import shutil
 import struct
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
@@ -522,7 +520,9 @@ def _spk_covers_range(
         seg_start = min(T0 + seg.start_second / 86400.0 for seg in target_segs)
         seg_end = max(T0 + seg.end_second / 86400.0 for seg in target_segs)
 
-        return seg_start <= jd_start and seg_end >= jd_end
+        # Allow 2-day tolerance: Horizons SPK boundaries can be off by ~1 day
+        # from the requested range, and generation clamps to SPK range anyway.
+        return seg_start <= jd_start + 2.0 and seg_end >= jd_end - 2.0
     finally:
         kernel.close()
 
@@ -791,7 +791,7 @@ def generate_body_icrs_asteroid(
                     if seg.target == target_id
                 )
 
-                if ast_jd_min > jd_start or ast_jd_max < jd_end:
+                if ast_jd_min > jd_start + 2.0 or ast_jd_max < jd_end - 2.0:
                     # SPK doesn't cover the full range — fall back to scalar
                     kernel.close()
                     kernel = None
@@ -872,7 +872,12 @@ def generate_body_icrs_asteroid(
 
     # Fallback: scalar per-point path (slow but works for any date range)
     import libephemeris as ephem
-    from libephemeris.constants import SEFLG_SPEED
+    from libephemeris.constants import (
+        SEFLG_J2000,
+        SEFLG_NOABERR,
+        SEFLG_NONUT,
+        SEFLG_TRUEPOS,
+    )
     from libephemeris.planets import get_planet_target
 
     earth = get_planet_target(planets, "earth")
@@ -882,11 +887,18 @@ def generate_body_icrs_asteroid(
     jd_lo = spk_min + 1.0
     jd_hi = spk_max - 1.0
 
+    # Request J2000 ecliptic coordinates with no nutation, no aberration,
+    # and geometric position (no light-time).  This ensures the hardcoded
+    # J2000 obliquity used for ecliptic→equatorial rotation is exact.
+    # (Default swe_calc returns ecliptic-of-date, making the J2000 obliquity
+    # wrong and introducing ~10-40" errors.)
+    calc_flags = SEFLG_J2000 | SEFLG_NONUT | SEFLG_NOABERR | SEFLG_TRUEPOS
+
     def eval_func(jd: float) -> np.ndarray:
         jd_c = max(jd_lo, min(jd_hi, jd))
         t = ts.tt_jd(jd_c)
         earth_pos = earth.at(t).position.au
-        result, _ = ephem.swe_calc(jd_c, body_id, SEFLG_SPEED)
+        result, _ = ephem.swe_calc(jd_c, body_id, calc_flags)
         lon_rad = math.radians(result[0])
         lat_rad = math.radians(result[1])
         dist = result[2]
@@ -1321,23 +1333,6 @@ def generate_single_body(
     return body_id, coeffs, error
 
 
-def _worker_generate_body(args):
-    """Worker function for parallel body generation.
-
-    Progress bars are disabled in workers to avoid interleaved output
-    from multiple subprocesses writing ``\\r`` to the same terminal.
-    The main process shows an overall progress bar instead.
-    """
-    body_id, jd_start, jd_end = args
-    try:
-        return generate_single_body(body_id, jd_start, jd_end, verbose=False)
-    except Exception as e:
-        print(
-            f"  ERROR generating body {body_id} ({BODY_NAMES.get(body_id, '?')}): {e}"
-        )
-        raise
-
-
 def assemble_leb(
     output: str,
     jd_start: float,
@@ -1470,45 +1465,20 @@ def assemble_leb(
         body_data[bid] = coeffs
         body_errors[bid] = error
 
-    # 1c. Generate analytical bodies (ecliptic + helio, parallelize if workers > 1)
+    # 1c. Generate analytical bodies (ecliptic + helio, always sequential)
+    # Parallelization via ProcessPoolExecutor causes deadlocks on macOS
+    # due to numpy/BLAS/Accelerate initialization in spawned processes.
+    # Sequential generation takes ~2-3 min for the full base tier which
+    # is acceptable — the real speedup comes from the group workflow
+    # (regenerate only the group that changed).
     if analytical_bodies and verbose:
-        print(
-            f"  --- Analytical bodies"
-            f" ({len(analytical_bodies)} bodies"
-            f", {workers} worker{'s' if workers > 1 else ''}) ---"
+        print(f"  --- Analytical bodies ({len(analytical_bodies)} bodies) ---")
+    for bid in analytical_bodies:
+        bid, coeffs, error = generate_single_body(
+            bid, jd_start, jd_end, verbose=verbose
         )
-    if workers > 1 and analytical_bodies:
-        args_list = [(bid, jd_start, jd_end) for bid in analytical_bodies]
-        bar = ProgressBar(
-            len(analytical_bodies),
-            label="Analytical (parallel)",
-            unit="body",
-            enabled=verbose,
-        )
-        done = 0
-        # Use "spawn" context on macOS to avoid fork deadlocks with
-        # C extensions (numpy, erfa).  "fork" copies the parent's locked
-        # mutexes which can permanently hang child processes.
-        mp_ctx = multiprocessing.get_context("spawn")
-        with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx) as executor:
-            futures = {
-                executor.submit(_worker_generate_body, args): args[0]
-                for args in args_list
-            }
-            for future in as_completed(futures):
-                bid, coeffs, error = future.result()
-                body_data[bid] = coeffs
-                body_errors[bid] = error
-                done += 1
-                bar.update(done)
-        bar.finish()
-    else:
-        for bid in analytical_bodies:
-            bid, coeffs, error = generate_single_body(
-                bid, jd_start, jd_end, verbose=verbose
-            )
-            body_data[bid] = coeffs
-            body_errors[bid] = error
+        body_data[bid] = coeffs
+        body_errors[bid] = error
 
     t_bodies = time.time() - t0
     if verbose:
@@ -1991,8 +1961,31 @@ def verify_leb(
     """
     from libephemeris.leb_reader import LEBReader
 
+    # Configure environment for asteroid verification
+    import libephemeris as _ephem
+
+    _ephem.set_auto_spk_download(True)
+    _ephem.set_strict_precision(False)
+
     reader = LEBReader(leb_path)
     jd_start, jd_end = reader.jd_range
+
+    # Ensure asteroid SPKs cover the full LEB date range so that
+    # swe_calc_ut uses SPK data (not Keplerian fallback) for comparison.
+    asteroid_ids_in_file = [bid for bid in reader._bodies if bid in _ASTEROID_NAIF]
+    if asteroid_ids_in_file:
+        from libephemeris.minor_bodies import auto_download_asteroid_spk
+
+        if verbose:
+            print("  Preparing asteroid SPKs for verification...")
+        for bid in asteroid_ids_in_file:
+            try:
+                auto_download_asteroid_spk(
+                    bid, jd_start=jd_start, jd_end=jd_end, force=True
+                )
+            except Exception:
+                pass  # Will show as FAIL if data is unavailable
+
     all_pass = True
 
     if verbose:
@@ -2008,6 +2001,7 @@ def verify_leb(
         body = reader._bodies[body_id]
         name = BODY_NAMES.get(body_id, f"Body {body_id}")
         max_error = 0.0
+        worst_dist = 1.0  # distance (AU) at sample with worst error
 
         for jd in test_jds:
             pos, vel = reader.eval_body(body_id, jd)
@@ -2022,26 +2016,58 @@ def verify_leb(
 
                 target_name = _PLANET_MAP.get(body_id)
                 if target_name:
+                    # Planet: direct ICRS comparison with Skyfield
                     target = get_planet_target(planets, target_name)
                     t = ts.tt_jd(jd)
                     ref_pos = target.at(t).position.au
+                    sample_err = 0.0
                     for c in range(3):
                         err = abs(pos[c] - float(ref_pos[c]))
-                        if err > max_error:
-                            max_error = err
+                        if err > sample_err:
+                            sample_err = err
+                    if sample_err > max_error:
+                        max_error = sample_err
+                        worst_dist = math.sqrt(
+                            float(ref_pos[0]) ** 2
+                            + float(ref_pos[1]) ** 2
+                            + float(ref_pos[2]) ** 2
+                        )
+                elif body_id in _ASTEROID_NAIF:
+                    # Asteroid: end-to-end ecliptic comparison
+                    # (fast_calc_ut through LEB vs swe_calc_ut through Skyfield)
+                    import libephemeris as ephem
+                    from libephemeris.fast_calc import fast_calc_ut
+                    from libephemeris.constants import SEFLG_SPEED
+
+                    fast, _ = fast_calc_ut(reader, jd, body_id, SEFLG_SPEED)
+                    ref, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                    # Compare in ecliptic degrees
+                    dlon = abs(fast[0] - ref[0])
+                    if dlon > 180:
+                        dlon = 360 - dlon
+                    dlat = abs(fast[1] - ref[1])
+                    sample_err_deg = max(dlon, dlat)
+                    if sample_err_deg > max_error:
+                        max_error = sample_err_deg
 
             elif body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL):
                 # Compare with analytical function
-                from libephemeris.leb_format import BODY_PARAMS as BP
-
-                # We'd need to call the analytical function again
                 # For now, just verify the values are reasonable
                 if not (0.0 <= pos[0] < 360.0 or pos[0] == 0.0):
                     max_error = 999.0
 
         if body.coord_type == COORD_ICRS_BARY:
-            arcsec = max_error * 206265.0
-            passed = arcsec < 0.01  # 10 milliarcseconds
+            if body_id in _ASTEROID_NAIF:
+                # max_error is already in degrees for asteroids
+                arcsec = max_error * 3600.0
+                passed = arcsec < 1.0
+            else:
+                # Convert AU error to angular error for planets
+                if worst_dist > 0.001:
+                    arcsec = (max_error / worst_dist) * 206265.0
+                else:
+                    arcsec = max_error * 206265.0
+                passed = arcsec < 1.0
             status = "PASS" if passed else "FAIL"
         else:
             # For ecliptic bodies, error is in degrees

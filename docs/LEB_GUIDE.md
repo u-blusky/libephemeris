@@ -807,7 +807,7 @@ Lightweight `ProgressBar` class (stdlib only, line 38):
 - Output goes to `sys.stdout`
 - Workers disable their bars (verbose=False) to avoid interleaved output
 
-### 6.13 Parallel Execution Strategy
+### 6.13 Execution Strategy
 
 ```
 Phase 1: ICRS planets (11 bodies)
@@ -817,11 +817,14 @@ Phase 2: ICRS asteroids (5 bodies)
   Sequential, spktype21 scalar loop -> moderate (~tens of seconds)
 
 Phase 3: Analytical bodies (15 bodies)
-  Parallel via ProcessPoolExecutor (N workers)
-  Each worker generates one body's segments independently
+  Sequential, per-body progress bars -> ~2-3 min for 300yr
 ```
 
-Workers default to `os.cpu_count()`. The `--workers` flag overrides this.
+All three phases run sequentially in the main process.
+Parallelization via `ProcessPoolExecutor` was removed because it caused
+deadlocks on macOS due to numpy/BLAS/Accelerate initialization in spawned
+processes. The group workflow (Section 6.15) provides the primary speedup
+mechanism: regenerate only the group that changed.
 
 ### 6.14 File Assembly
 
@@ -943,14 +946,17 @@ python scripts/generate_leb.py --tier base --merge \
   --verify
 ```
 
-#### macOS Fork Deadlock Mitigation
+#### macOS Deadlock History
 
-The analytical group uses `ProcessPoolExecutor` for parallel generation of
-15 bodies. On macOS, the default `fork` start method causes deadlocks when
-child processes use C extensions (numpy, erfa). The generator uses
-`multiprocessing.get_context("spawn")` as the `mp_context` parameter to
-avoid this. The `spawn` method starts fresh Python interpreters, which is
-slightly slower but deadlock-free.
+Early versions used `ProcessPoolExecutor` to parallelize analytical body
+generation across multiple workers. This caused persistent deadlocks on
+macOS due to numpy/BLAS/Accelerate initialization in spawned child
+processes. Switching to the `spawn` start method (via
+`multiprocessing.get_context("spawn")`) partially helped but still hung
+intermittently. The parallelization was ultimately **removed entirely** —
+analytical bodies now run sequentially in the main process. The group
+workflow (generate each group independently, then merge) provides the
+primary mechanism for selective regeneration without redoing everything.
 
 ---
 
