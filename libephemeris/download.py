@@ -95,6 +95,25 @@ DATA_FILES = {
         "size_mb": 222.6,
         "description": "Planet centers for 'extended' tier (partial -12000 to +17000)",
     },
+    # LEB (LibEphemeris Binary) precomputed ephemeris files
+    "ephemeris_base.leb": {
+        "url": f"{GITHUB_RELEASES_BASE}/ephemeris_base.leb",
+        "sha256": "0313211cabd17b398a1182673f164d333a24500314c2bd2e979b5a1a40f5b0fd",
+        "size_mb": 53.1,
+        "description": "LEB binary ephemeris for 'base' tier (1850-2150, ~14x speedup)",
+    },
+    "ephemeris_medium.leb": {
+        "url": f"{GITHUB_RELEASES_BASE}/ephemeris_medium.leb",
+        "sha256": "3cf0665f06e175ed1f8b07febbdd47bf273e1d00527f14cb6e20cc58fd810791",
+        "size_mb": 174.6,
+        "description": "LEB binary ephemeris for 'medium' tier (1550-2650, ~14x speedup)",
+    },
+    "ephemeris_extended.leb": {
+        "url": f"{GITHUB_RELEASES_BASE}/ephemeris_extended.leb",
+        "sha256": None,  # Not yet generated
+        "size_mb": None,
+        "description": "LEB binary ephemeris for 'extended' tier (-5000 to +5000, ~14x speedup)",
+    },
 }
 
 
@@ -836,6 +855,171 @@ def download_for_tier(
                 print(f"  SPK errors:   {summary['errors']}")
 
     return results
+
+
+def _is_valid_leb(filepath: str) -> bool:
+    """Check if a LEB file can be opened and parsed by LEBReader.
+
+    Validates magic bytes, version, section directory, and body index.
+
+    Args:
+        filepath: Path to the LEB file to validate
+
+    Returns:
+        True if file can be opened and parsed, False otherwise
+    """
+    try:
+        from .leb_reader import LEBReader
+
+        reader = LEBReader(filepath)
+        reader.close()
+        return True
+    except Exception:
+        return False
+
+
+def get_leb_dir() -> Path:
+    """Get the LEB data directory path.
+
+    Returns the path to ~/.libephemeris/leb/ (or under LIBEPHEMERIS_DATA_DIR).
+    Creates the directory if it doesn't exist.
+
+    Returns:
+        Path to the LEB data directory
+    """
+    leb_dir = get_data_dir() / "leb"
+    leb_dir.mkdir(parents=True, exist_ok=True)
+    return leb_dir
+
+
+def get_leb_path_for_tier(tier_name: str) -> Path:
+    """Get the expected LEB file path for a tier.
+
+    Args:
+        tier_name: One of "base", "medium", "extended"
+
+    Returns:
+        Path where the LEB file should be stored
+    """
+    return get_leb_dir() / f"ephemeris_{tier_name}.leb"
+
+
+def download_leb_for_tier(
+    tier_name: str,
+    force: bool = False,
+    show_progress: bool = True,
+    quiet: bool = False,
+    activate: bool = True,
+) -> Path:
+    """Download the precomputed LEB binary ephemeris file for a specific tier.
+
+    Downloads the .leb file from GitHub Releases to ~/.libephemeris/leb/.
+    After a successful download, optionally activates it via set_leb_file().
+
+    LEB files contain precomputed Chebyshev polynomial approximations for
+    all celestial bodies, providing ~14x speedup over the Skyfield pipeline.
+
+    Args:
+        tier_name: One of "base", "medium", "extended"
+        force: If True, re-download even if file already exists
+        show_progress: If True, show progress bar during download
+        quiet: If True, suppress all output except errors
+        activate: If True, call set_leb_file() after successful download
+
+    Returns:
+        Path to the downloaded LEB file
+
+    Raises:
+        ValueError: If tier_name is invalid or hash verification fails
+        urllib.error.URLError: If download fails
+        RuntimeError: If the extended tier LEB is not yet available
+    """
+    logger = get_logger()
+    filename = f"ephemeris_{tier_name}.leb"
+    file_info = DATA_FILES.get(filename)
+
+    if file_info is None:
+        valid_tiers = ["base", "medium", "extended"]
+        raise ValueError(
+            f"Unknown tier '{tier_name}'. Valid tiers: {', '.join(valid_tiers)}"
+        )
+
+    # Extended tier is not yet generated
+    if file_info.get("sha256") is None:
+        raise RuntimeError(
+            f"LEB file for '{tier_name}' tier is not yet available for download. "
+            f"You can generate it locally with: poe leb:generate:{tier_name}:groups"
+        )
+
+    dest_path = get_leb_path_for_tier(tier_name)
+
+    # Check if already exists and valid
+    if dest_path.exists() and not force:
+        if _is_valid_leb(str(dest_path)):
+            if not quiet:
+                print(f"  {filename} already exists at {dest_path}")
+                print("  Use --force to re-download.")
+            # Activate if requested
+            if activate:
+                from .state import set_leb_file
+
+                set_leb_file(str(dest_path))
+            return dest_path
+        else:
+            logger.warning("Cached LEB file %s is corrupted, re-downloading", dest_path)
+            try:
+                os.remove(dest_path)
+            except OSError:
+                pass
+
+    size_mb = file_info.get("size_mb", 0)
+    if not quiet:
+        print(f"  Downloading {filename} (~{size_mb:.0f} MB)...")
+        print(f"  {file_info['description']}")
+        print()
+
+    try:
+        download_file(
+            url=str(file_info["url"]),
+            dest_path=dest_path,
+            description=filename,
+            expected_sha256=str(file_info["sha256"]),
+            show_progress=show_progress,
+        )
+    except Exception:
+        # Clean up partial file
+        if dest_path.exists():
+            try:
+                os.remove(dest_path)
+            except OSError:
+                pass
+        raise
+
+    # Validate the downloaded file
+    if not _is_valid_leb(str(dest_path)):
+        try:
+            os.remove(dest_path)
+        except OSError:
+            pass
+        raise ValueError(
+            f"Downloaded {filename} failed LEB validation — corrupt or incompatible"
+        )
+
+    if not quiet:
+        print()
+        print(f"  Downloaded to: {dest_path}")
+        print(f"  LEB binary ephemeris for '{tier_name}' tier is now available.")
+        if activate:
+            print("  Activated automatically for this session.")
+
+    # Activate if requested
+    if activate:
+        from .state import set_leb_file
+
+        set_leb_file(str(dest_path))
+        logger.info("Activated LEB file: %s", dest_path)
+
+    return dest_path
 
 
 def _download_planet_centers_for_tier(

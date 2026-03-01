@@ -771,15 +771,22 @@ def swe_calc_ut(
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
+    from .logging_config import get_logger
 
     reader = get_leb_reader()
     if reader is not None:
         try:
             from . import fast_calc
 
-            return fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
+            result = fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
+            get_logger().debug("body=%d jd=%.1f source=LEB", ipl, tjd_ut)
+            return result
         except (KeyError, ValueError):
-            pass  # body not in .leb or JD out of range, fall through
+            get_logger().debug(
+                "body=%d jd=%.1f source=LEB->fallback (not in LEB or out of range)",
+                ipl,
+                tjd_ut,
+            )
     # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
@@ -789,7 +796,12 @@ def swe_calc_ut(
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
     try:
-        return _calc_body(t, ipl, iflag)
+        result = _calc_body(t, ipl, iflag)
+        # _calc_body logs the specific source (SPK, ASSIST, Keplerian)
+        # for minor bodies; for standard planets it's always Skyfield
+        if ipl in _PLANET_MAP:
+            get_logger().debug("body=%d jd=%.1f source=Skyfield", ipl, tjd_ut)
+        return result
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjd_ut, ipl) from e
 
@@ -834,15 +846,22 @@ def swe_calc(
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
+    from .logging_config import get_logger
 
     reader = get_leb_reader()
     if reader is not None:
         try:
             from . import fast_calc
 
-            return fast_calc.fast_calc_tt(reader, tjd, ipl, iflag)
+            result = fast_calc.fast_calc_tt(reader, tjd, ipl, iflag)
+            get_logger().debug("body=%d jd=%.1f source=LEB", ipl, tjd)
+            return result
         except (KeyError, ValueError):
-            pass  # body not in .leb or JD out of range, fall through
+            get_logger().debug(
+                "body=%d jd=%.1f source=LEB->fallback (not in LEB or out of range)",
+                ipl,
+                tjd,
+            )
     # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
@@ -852,7 +871,10 @@ def swe_calc(
     ts = get_timescale()
     t = ts.tt_jd(tjd)
     try:
-        return _calc_body(t, ipl, iflag)
+        result = _calc_body(t, ipl, iflag)
+        if ipl in _PLANET_MAP:
+            get_logger().debug("body=%d jd=%.1f source=Skyfield", ipl, tjd)
+        return result
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
 
@@ -1647,9 +1669,11 @@ def _calc_body(
         from .state import get_auto_spk_download, get_strict_precision
         from .exceptions import SPKRequiredError
         from .constants import SPK_BODY_NAME_MAP
+        from .logging_config import get_logger
 
         spk_result = spk.calc_spk_body_position(t, ipl, iflag)
         if spk_result is not None:
+            get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
             spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
             return _to_native_floats(spk_result), iflag
 
@@ -1659,6 +1683,11 @@ def _calc_body(
             try:
                 spk_result = _try_auto_spk_download(t, ipl, iflag)
                 if spk_result is not None:
+                    get_logger().debug(
+                        "body=%d jd=%.1f source=SPK (auto-downloaded)",
+                        ipl,
+                        t.tt,
+                    )
                     spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
                     return _to_native_floats(spk_result), iflag
             except Exception:
@@ -1701,6 +1730,7 @@ def _calc_body(
                     if speed_lon < -180.0 / (2.0 * dt):
                         speed_lon += 360.0 / (2.0 * dt)
 
+                get_logger().debug("body=%d jd=%.1f source=ASSIST (n-body)", ipl, jd_tt)
                 return _to_native_floats(
                     _maybe_equatorial_convert(
                         (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
@@ -1710,6 +1740,7 @@ def _calc_body(
             pass
 
         # Keplerian as last resort
+        get_logger().debug("body=%d jd=%.1f source=Keplerian (fallback)", ipl, jd_tt)
         lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
 
         speed_lon = 0.0

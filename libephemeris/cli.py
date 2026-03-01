@@ -7,6 +7,9 @@ Usage:
     libephemeris download:base         Download data for 'base' tier (1850-2150)
     libephemeris download:medium       Download data for 'medium' tier (1550-2650)
     libephemeris download:extended     Download data for 'extended' tier (-13200 to +17191)
+    libephemeris download:leb:base     Download LEB binary ephemeris for 'base' (~53 MB)
+    libephemeris download:leb:medium   Download LEB binary ephemeris for 'medium' (~175 MB)
+    libephemeris download:leb:extended Download LEB binary ephemeris for 'extended'
     libephemeris download:assist       Download ASSIST n-body data files (~714 MB)
     libephemeris status                Show data file status
     libephemeris --version             Show version
@@ -89,6 +92,47 @@ def cmd_download_medium(args: argparse.Namespace) -> int:
 def cmd_download_extended(args: argparse.Namespace) -> int:
     """Download data for the 'extended' tier."""
     return _cmd_download("extended", args)
+
+
+def _cmd_download_leb(tier_name: str, args: argparse.Namespace) -> int:
+    """Handle a download:leb:<tier> command."""
+    from .download import download_leb_for_tier
+
+    try:
+        download_leb_for_tier(
+            tier_name=tier_name,
+            force=args.force,
+            show_progress=not args.no_progress,
+            quiet=args.quiet,
+            activate=False,  # CLI context — no active session to activate
+        )
+        return 0
+    except KeyboardInterrupt:
+        print("\nDownload cancelled.")
+        return 130
+    except RuntimeError as e:
+        if not args.quiet:
+            print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        if not args.quiet:
+            print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_download_leb_base(args: argparse.Namespace) -> int:
+    """Download LEB binary ephemeris for the 'base' tier."""
+    return _cmd_download_leb("base", args)
+
+
+def cmd_download_leb_medium(args: argparse.Namespace) -> int:
+    """Download LEB binary ephemeris for the 'medium' tier."""
+    return _cmd_download_leb("medium", args)
+
+
+def cmd_download_leb_extended(args: argparse.Namespace) -> int:
+    """Download LEB binary ephemeris for the 'extended' tier."""
+    return _cmd_download_leb("extended", args)
 
 
 def cmd_download_assist(args: argparse.Namespace) -> int:
@@ -191,6 +235,8 @@ Examples:
   libephemeris download:medium       Download data for the default tier
   libephemeris download:base         Lightweight, modern-era data
   libephemeris download:extended     Full range (-13200 to +17191 CE)
+  libephemeris download:leb:base     LEB binary ephemeris (~53 MB, ~14x speedup)
+  libephemeris download:leb:medium   LEB binary ephemeris (~175 MB, ~14x speedup)
   libephemeris download:assist       ASSIST n-body data (~714 MB)
   libephemeris status                Show installed data files
   libephemeris --version             Show version information
@@ -241,6 +287,69 @@ For more information, visit: https://github.com/g-battaglia/libephemeris
     )
     _add_download_flags(dl_extended)
     dl_extended.set_defaults(func=cmd_download_extended)
+
+    # download:leb:base
+    dl_leb_base = subparsers.add_parser(
+        "download:leb:base",
+        help="Download LEB binary ephemeris for 'base' tier (~53 MB)",
+        description="""\
+Download the precomputed LEB binary ephemeris for the 'base' tier.
+
+LEB files contain Chebyshev polynomial approximations for all celestial bodies,
+providing ~14x speedup over the Skyfield/JPL pipeline.
+
+  Tier:       base (1850-2150 CE)
+  File:       ephemeris_base.leb (~53 MB)
+  Bodies:     31 (Sun, Moon, planets, nodes, apsides, asteroids)
+
+Files are saved to ~/.libephemeris/leb/ by default.
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_download_flags(dl_leb_base)
+    dl_leb_base.set_defaults(func=cmd_download_leb_base)
+
+    # download:leb:medium
+    dl_leb_medium = subparsers.add_parser(
+        "download:leb:medium",
+        help="Download LEB binary ephemeris for 'medium' tier (~175 MB)",
+        description="""\
+Download the precomputed LEB binary ephemeris for the 'medium' tier.
+
+LEB files contain Chebyshev polynomial approximations for all celestial bodies,
+providing ~14x speedup over the Skyfield/JPL pipeline.
+
+  Tier:       medium (1550-2650 CE)
+  File:       ephemeris_medium.leb (~175 MB)
+  Bodies:     31 (Sun, Moon, planets, nodes, apsides, asteroids)
+
+Files are saved to ~/.libephemeris/leb/ by default.
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_download_flags(dl_leb_medium)
+    dl_leb_medium.set_defaults(func=cmd_download_leb_medium)
+
+    # download:leb:extended
+    dl_leb_extended = subparsers.add_parser(
+        "download:leb:extended",
+        help="Download LEB binary ephemeris for 'extended' tier",
+        description="""\
+Download the precomputed LEB binary ephemeris for the 'extended' tier.
+
+LEB files contain Chebyshev polynomial approximations for all celestial bodies,
+providing ~14x speedup over the Skyfield/JPL pipeline.
+
+  Tier:       extended (-5000 to +5000 CE)
+  File:       ephemeris_extended.leb (not yet available)
+
+NOTE: The extended tier LEB file has not been generated yet.
+You can generate it locally with: poe leb:generate:extended:groups
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_download_flags(dl_leb_extended)
+    dl_leb_extended.set_defaults(func=cmd_download_leb_extended)
 
     # download:assist
     dl_assist = subparsers.add_parser(

@@ -444,9 +444,11 @@ REBOUND/ASSIST e installato con i file dati, lo usa prima del Keplerian.
 - `linux_p1550p2650.440` — effemeridi planetarie (~98 MB)
 - `sb441-n16.bsp` — 16 asteroidi massicci (~616 MB)
 
-#### 4.5 Caching dei risultati REBOUND per asteroidi
+#### ~~4.5 Caching dei risultati REBOUND per asteroidi~~ DEPRIORITIZZATO
 
-**Priorita:** Bassa — ottimizzazione di performance.
+**Priorita:** Bassa — ottimizzazione di performance. Deprioritizzato: il sistema
+LEB precompilato + download automatico copre gia il caso d'uso principale.
+Il fallback REBOUND/ASSIST e adeguato per query sporadiche.
 
 **File:** nuovo modulo o estensione di `rebound_integration.py`
 
@@ -506,8 +508,8 @@ I task 4.1-4.3 mirano a ridurre questi errori.
 11. ~~**Task 3.3** — LIBEPHEMERIS_MODE~~ ✓
 12. ~~**Task 4.4** — Attivazione REBOUND/ASSIST~~ ✓
 13. ~~**Task 4.2** — Perturbazioni a breve periodo~~ DEPRIORITIZZATO
-14. **Task 3.5** — Distribuzione file LEB pre-generati
-15. **Task 4.5** — Caching REBOUND
+14. ~~**Task 3.5** — Distribuzione file LEB pre-generati~~ ✓
+15. ~~**Task 4.5** — Caching REBOUND~~ DEPRIORITIZZATO
 
 ### File principali coinvolti
 

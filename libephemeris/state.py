@@ -259,6 +259,23 @@ def set_leb_file(filepath: Optional[str]) -> None:
     _LEB_READER = None  # force re-creation on next access
 
 
+def _discover_leb_file() -> Optional[str]:
+    """Auto-discover a downloaded LEB file for the active precision tier.
+
+    Checks ``~/.libephemeris/leb/ephemeris_{tier}.leb`` where ``{tier}``
+    is the currently active precision tier (base, medium, or extended).
+
+    Returns:
+        Path to the discovered LEB file, or None if not found.
+    """
+    tier = get_precision_tier()
+    leb_dir = os.path.join(_get_data_dir(), "leb")
+    candidate = os.path.join(leb_dir, f"ephemeris_{tier}.leb")
+    if os.path.isfile(candidate):
+        return candidate
+    return None
+
+
 def get_leb_reader() -> Optional["LEBReader"]:
     """Get the active LEBReader, if any.
 
@@ -267,11 +284,14 @@ def get_leb_reader() -> Optional["LEBReader"]:
 
     - ``"skyfield"``: Always returns None (LEB disabled).
     - ``"leb"``: Returns LEBReader or raises RuntimeError if unavailable.
-    - ``"auto"`` (default): Returns LEBReader if configured, else None.
+    - ``"auto"`` (default): Returns LEBReader if configured or
+      auto-discovered, else None.
 
-    If a .leb file is configured (via set_leb_file() or the
-    LIBEPHEMERIS_LEB environment variable), returns a LEBReader
-    instance. Otherwise returns None.
+    Resolution order for the .leb file path:
+
+    1. Explicit path via ``set_leb_file()``
+    2. ``LIBEPHEMERIS_LEB`` environment variable
+    3. Auto-discovery: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
 
     If the .leb file path is invalid or the file is corrupted,
     logs a warning and returns None (silent fallback to Skyfield),
@@ -294,6 +314,14 @@ def get_leb_reader() -> Optional["LEBReader"]:
 
     if _LEB_READER is None:
         path = _LEB_FILE or os.environ.get("LIBEPHEMERIS_LEB")
+
+        # Auto-discover if no explicit path configured
+        if path is None:
+            path = _discover_leb_file()
+            if path is not None:
+                logger = get_logger()
+                logger.debug("Auto-discovered LEB file: %s", path)
+
         if path is not None:
             try:
                 from .leb_reader import LEBReader

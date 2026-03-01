@@ -484,7 +484,7 @@ class EphemerisContext:
                 from . import fast_calc
 
                 # Pass sidereal params explicitly (thread-safe, no global swap)
-                return fast_calc.fast_calc_ut(
+                result = fast_calc.fast_calc_ut(
                     reader,
                     tjd_ut,
                     ipl,
@@ -493,8 +493,18 @@ class EphemerisContext:
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
                 )
+                from .logging_config import get_logger
+
+                get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd_ut)
+                return result
             except (KeyError, ValueError):
-                pass  # Body not in .leb or JD out of range, fall through
+                from .logging_config import get_logger
+
+                get_logger().debug(
+                    "body=%d jd=%.1f source=LEB->fallback (context)",
+                    ipl,
+                    tjd_ut,
+                )
         # --- END LEB fast path ---
 
         from .planets import _calc_body_with_context
@@ -542,7 +552,7 @@ class EphemerisContext:
                 from . import fast_calc
 
                 # Pass sidereal params explicitly (thread-safe, no global swap)
-                return fast_calc.fast_calc_tt(
+                result = fast_calc.fast_calc_tt(
                     reader,
                     tjd,
                     ipl,
@@ -551,8 +561,18 @@ class EphemerisContext:
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
                 )
+                from .logging_config import get_logger
+
+                get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd)
+                return result
             except (KeyError, ValueError):
-                pass  # Body not in .leb or JD out of range, fall through
+                from .logging_config import get_logger
+
+                get_logger().debug(
+                    "body=%d jd=%.1f source=LEB->fallback (context)",
+                    ipl,
+                    tjd,
+                )
         # --- END LEB fast path ---
 
         from .planets import _calc_body_with_context

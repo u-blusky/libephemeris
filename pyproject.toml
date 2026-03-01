@@ -167,6 +167,11 @@ test = "pytest -m \"not slow\""
 # ASSIST data download (REBOUND/ASSIST n-body integration)
 "download:assist" = "python -m libephemeris.cli download:assist"
 
+# LEB binary ephemeris download (precomputed Chebyshev polynomials, ~14x speedup)
+"download:leb:base" = "python -m libephemeris.cli download:leb:base"
+"download:leb:medium" = "python -m libephemeris.cli download:leb:medium"
+"download:leb:extended" = "python -m libephemeris.cli download:leb:extended"
+
 # Planet centers SPK generation (requires spiceypy, downloads source satellite SPKs)
 "generate-planet-centers:base" = "python scripts/generate_planet_centers_spk.py --tier base"
 "generate-planet-centers:medium" = "python scripts/generate_planet_centers_spk.py --tier medium"
