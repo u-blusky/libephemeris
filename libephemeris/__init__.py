@@ -414,7 +414,7 @@ from .spk_auto import (
     discover_local_spks,
     ensure_all_ephemerides,
 )
-from .download import download_for_tier
+from .download import download_for_tier, download_leb_for_tier
 from .minor_bodies import (  # Generic asteroid lookup by number
     calc_asteroid_by_number,
     fetch_orbital_elements_from_sbdb,
@@ -1024,6 +1024,7 @@ __all__ = [
     "spk_auto",
     # Tier-aware download
     "download_for_tier",
+    "download_leb_for_tier",
     # Auto SPK download configuration
     "set_auto_spk_download",
     "get_auto_spk_download",
