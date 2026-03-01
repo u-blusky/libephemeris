@@ -119,17 +119,60 @@ class ReboundIntegrator(Enum):
     """
 
 
+_ASSIST_PLANETS_FILENAMES = [
+    "linux_p1550p2650.440",
+    "linux_m13000p17000.441",
+]
+
+_ASSIST_ASTEROIDS_FILENAMES = [
+    "sb441-n16.bsp",
+]
+
+# URLs for downloading ASSIST data files
+_ASSIST_PLANETS_URL = (
+    "https://ssd.jpl.nasa.gov/ftp/eph/planets/Linux/de440/linux_p1550p2650.440"
+)
+_ASSIST_ASTEROIDS_URL = (
+    "https://ssd.jpl.nasa.gov/ftp/eph/small_bodies/asteroids_de441/sb441-n16.bsp"
+)
+
+# Default directory for ASSIST data
+_ASSIST_DEFAULT_DIR = Path(os.path.expanduser("~/.libephemeris/assist"))
+
+
+def _search_assist_file(
+    filenames: list[str],
+    search_dirs: list[Path],
+) -> Optional[str]:
+    """Search for an ASSIST data file in multiple directories."""
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        for fname in filenames:
+            path = d / fname
+            if path.exists():
+                return str(path)
+    return None
+
+
 @dataclass
 class AssistEphemConfig:
     """Configuration for ASSIST ephemeris data files.
 
     ASSIST requires two ephemeris data files:
-    1. Planet ephemeris (DE440/DE441): ~400 MB - 2.6 GB
-    2. Asteroid perturber ephemeris: ~600 MB
+    1. Planet ephemeris (DE440/DE441 in JPL Linux binary format): ~98 MB
+    2. Asteroid perturber ephemeris (optional): ~616 MB
 
-    These files can be downloaded from:
-    - https://ssd.jpl.nasa.gov/ftp/eph/planets/Linux/de440/
-    - https://ssd.jpl.nasa.gov/ftp/eph/small_bodies/asteroids_de441/
+    Files are searched in this order:
+    1. Explicit paths (planets_file, asteroids_file)
+    2. data_dir parameter
+    3. ASSIST_DIR environment variable
+    4. ~/.libephemeris/assist/
+    5. ./data/
+
+    Download with:
+        from libephemeris.rebound_integration import download_assist_data
+        download_assist_data()  # Downloads to ~/.libephemeris/assist/
 
     Attributes:
         planets_file: Path to planet ephemeris file (e.g., linux_p1550p2650.440)
@@ -141,34 +184,272 @@ class AssistEphemConfig:
     asteroids_file: Optional[str] = None
     data_dir: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Resolve file paths from environment or defaults."""
-        # Try environment variable
-        env_dir = os.environ.get("ASSIST_DIR")
+        # Build search directories list
+        search_dirs: list[Path] = []
 
-        if self.data_dir is None and env_dir:
-            self.data_dir = env_dir
-
-        # Set default filenames if not provided
         if self.data_dir:
-            base = Path(self.data_dir)
-            if self.planets_file is None:
-                # Try different planet ephemeris files in order of preference
-                for fname in [
-                    "de441.bsp",
-                    "de440.bsp",
-                    "linux_m13000p17000.441",
-                    "linux_p1550p2650.440",
-                ]:
-                    if (base / fname).exists():
-                        self.planets_file = str(base / fname)
-                        break
+            search_dirs.append(Path(self.data_dir))
 
-            if self.asteroids_file is None:
-                for fname in ["sb441-n16.bsp"]:
-                    if (base / fname).exists():
-                        self.asteroids_file = str(base / fname)
+        env_dir = os.environ.get("ASSIST_DIR")
+        if env_dir:
+            search_dirs.append(Path(env_dir))
+
+        search_dirs.append(_ASSIST_DEFAULT_DIR)
+        search_dirs.append(Path("data"))
+
+        # Search for planet ephemeris
+        if self.planets_file is None:
+            self.planets_file = _search_assist_file(
+                _ASSIST_PLANETS_FILENAMES, search_dirs
+            )
+
+        # Search for asteroid perturber ephemeris
+        if self.asteroids_file is None:
+            self.asteroids_file = _search_assist_file(
+                _ASSIST_ASTEROIDS_FILENAMES, search_dirs
+            )
+
+
+# Expected sizes for ASSIST data files (bytes).
+# Used for basic integrity verification after download.
+_ASSIST_EXPECTED_SIZES = {
+    "linux_p1550p2650.440": 102272352,  # ~98 MB
+    "sb441-n16.bsp": 645727232,  # ~616 MB
+}
+
+# Minimum acceptable file size (90% of expected) to catch truncated downloads.
+_ASSIST_MIN_SIZE_RATIO = 0.90
+
+
+def _verify_assist_file(path: Path) -> bool:
+    """Verify that an ASSIST data file looks valid.
+
+    Checks that the file exists and its size is within the expected range.
+    For BSP files, also attempts structural validation via jplephem.
+
+    Args:
+        path: Path to the file to verify.
+
+    Returns:
+        True if the file passes verification, False otherwise.
+    """
+    if not path.exists():
+        return False
+
+    actual_size = path.stat().st_size
+    if actual_size == 0:
+        return False
+
+    expected = _ASSIST_EXPECTED_SIZES.get(path.name)
+    if expected is not None:
+        min_size = int(expected * _ASSIST_MIN_SIZE_RATIO)
+        if actual_size < min_size:
+            return False
+
+    # For BSP files, try structural validation
+    if path.suffix == ".bsp":
+        try:
+            from jplephem.spk import SPK
+
+            with SPK.open(str(path)) as kernel:
+                for segment in kernel.segments:
+                    _ = segment.center, segment.target
+        except Exception:
+            return False
+
+    return True
+
+
+def _create_ssl_context():
+    """Create an SSL context using certifi certificates.
+
+    Returns:
+        ssl.SSLContext configured with certifi CA bundle.
+    """
+    import ssl
+
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+def _download_single_file(
+    url: str,
+    dest: Path,
+    description: str,
+    show_progress: bool = True,
+    quiet: bool = False,
+) -> None:
+    """Download a single file with progress, atomic write, and SSL support.
+
+    Args:
+        url: URL to download from.
+        dest: Destination file path.
+        description: Human-readable description for progress output.
+        show_progress: Whether to show a progress bar.
+        quiet: Suppress all non-error output.
+    """
+    import hashlib
+    import ssl
+    import tempfile
+    import urllib.request
+
+    ssl_context = _create_ssl_context()
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    temp_fd, temp_path = tempfile.mkstemp(dir=dest.parent, suffix=".download")
+
+    try:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "libephemeris-download/1.0"}
+        )
+
+        with urllib.request.urlopen(req, timeout=300, context=ssl_context) as response:
+            total_size = int(response.headers.get("Content-Length", 0))
+
+            if not quiet and total_size > 0:
+                size_mb = total_size / (1024 * 1024)
+                print(f"  {description}: {size_mb:.0f} MB")
+
+            # Progress bar
+            progress = None
+            if show_progress and not quiet and total_size > 0:
+                from .download import _get_progress_bar
+
+                progress = _get_progress_bar(total_size, f"  {description}")
+
+            sha256 = hashlib.sha256()
+            chunk_size = 256 * 1024  # 256 KB chunks for large files
+
+            with os.fdopen(temp_fd, "wb") as f:
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
                         break
+                    f.write(chunk)
+                    sha256.update(chunk)
+                    if progress:
+                        progress.update(len(chunk))
+
+            if progress:
+                progress.close()
+
+        # Atomic move to final destination
+        os.replace(temp_path, dest)
+
+        if not quiet:
+            actual_mb = dest.stat().st_size / (1024 * 1024)
+            print(f"  Done ({actual_mb:.1f} MB, sha256: {sha256.hexdigest()[:16]}...)")
+
+    except Exception:
+        # Clean up temp file on error
+        try:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+
+
+def download_assist_data(
+    target_dir: Optional[str] = None,
+    planets: bool = True,
+    asteroids: bool = True,
+    force: bool = False,
+    show_progress: bool = True,
+    quiet: bool = False,
+) -> Path:
+    """Download ASSIST ephemeris data files from JPL.
+
+    Downloads the JPL planet ephemeris and optionally the asteroid
+    perturber file needed by ASSIST for ephemeris-quality integration.
+
+    Files are downloaded atomically (temp file + rename) with SSL
+    certificate verification via certifi. Existing files are verified
+    for integrity before skipping.
+
+    Args:
+        target_dir: Directory to save files (default: ~/.libephemeris/assist/).
+        planets: Download planet ephemeris (~98 MB).
+        asteroids: Download asteroid perturbers (~616 MB).
+        force: Re-download even if files exist and are valid.
+        show_progress: Show download progress bar.
+        quiet: Suppress all non-error output.
+
+    Returns:
+        Path to the data directory.
+
+    Raises:
+        urllib.error.URLError: If download fails.
+        OSError: If file system operations fail.
+
+    Example:
+        >>> from libephemeris.rebound_integration import download_assist_data
+        >>> data_dir = download_assist_data()
+        >>> # Now ASSIST will find files automatically
+    """
+    if target_dir is None:
+        data_dir = _ASSIST_DEFAULT_DIR
+    else:
+        data_dir = Path(target_dir)
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    if not quiet:
+        print(f"ASSIST data directory: {data_dir}")
+
+    _ASSIST_FILES = [
+        (planets, _ASSIST_PLANETS_URL, "linux_p1550p2650.440", "Planet ephemeris"),
+        (asteroids, _ASSIST_ASTEROIDS_URL, "sb441-n16.bsp", "Asteroid perturbers"),
+    ]
+
+    downloaded = 0
+    skipped = 0
+
+    for enabled, url, filename, description in _ASSIST_FILES:
+        if not enabled:
+            continue
+
+        dest = data_dir / filename
+
+        if not force and dest.exists():
+            if _verify_assist_file(dest):
+                if not quiet:
+                    size_mb = dest.stat().st_size / (1024 * 1024)
+                    print(f"  {description} already exists ({size_mb:.1f} MB): {dest}")
+                skipped += 1
+                continue
+            else:
+                if not quiet:
+                    print(
+                        f"  {description} exists but failed verification, re-downloading"
+                    )
+                dest.unlink()
+
+        _download_single_file(
+            url=url,
+            dest=dest,
+            description=description,
+            show_progress=show_progress,
+            quiet=quiet,
+        )
+        downloaded += 1
+
+    if not quiet:
+        if downloaded == 0 and skipped > 0:
+            print("All files already present and verified.")
+        elif downloaded > 0:
+            print(f"Downloaded {downloaded} file(s).")
+
+    # Reset the cached availability check so it picks up the new files
+    reset_assist_data_cache()
+
+    return data_dir
 
 
 @dataclass
@@ -243,6 +524,50 @@ def check_assist_available() -> bool:
         return False
 
 
+# Cached result of ASSIST data file availability check.
+# None = not checked yet, True/False = cached result.
+_assist_data_available: Optional[bool] = None
+
+
+def check_assist_data_available() -> bool:
+    """Check if ASSIST is installed AND its required data files are present.
+
+    This is the recommended check before attempting ASSIST integration in
+    hot paths. The result is cached after the first call to avoid repeated
+    filesystem probes.
+
+    The cache is cleared by ``reset_assist_data_cache()`` or
+    ``libephemeris.close()``.
+
+    Returns:
+        bool: True if ASSIST is importable and the planet ephemeris file
+              can be located, False otherwise.
+    """
+    global _assist_data_available
+    if _assist_data_available is not None:
+        return _assist_data_available
+
+    if not check_assist_available():
+        _assist_data_available = False
+        return False
+
+    # Check that at least the planet ephemeris file exists
+    config = AssistEphemConfig()
+    _assist_data_available = config.planets_file is not None
+    return _assist_data_available
+
+
+def reset_assist_data_cache() -> None:
+    """Reset the cached ASSIST data availability check.
+
+    Call this after downloading ASSIST data files or changing
+    ``ASSIST_DIR`` so the next ``check_assist_data_available()``
+    re-probes the filesystem.
+    """
+    global _assist_data_available
+    _assist_data_available = None
+
+
 def get_rebound_version() -> Optional[str]:
     """Get the installed REBOUND version.
 
@@ -292,17 +617,64 @@ def elements_to_rebound_orbit(
     from .minor_bodies import apply_secular_perturbations
 
     # Get perturbed elements at target time
-    omega, Omega, M, n = apply_secular_perturbations(
+    omega, Omega, M, n, e_pert, i_pert = apply_secular_perturbations(
         elements, jd_tt, include_perturbations=True
     )
 
     return {
         "a": elements.a,  # Semi-major axis in AU
-        "e": elements.e,  # Eccentricity
-        "inc": math.radians(elements.i),  # Inclination in radians
+        "e": e_pert,  # Perturbed eccentricity
+        "inc": math.radians(i_pert),  # Perturbed inclination in radians
         "omega": math.radians(omega),  # Argument of perihelion in radians
         "Omega": math.radians(Omega),  # Longitude of ascending node in radians
         "M": math.radians(M),  # Mean anomaly in radians
+    }
+
+
+def _elements_to_cartesian(
+    elements: "OrbitalElements",
+    jd_tt: float,
+) -> dict:
+    """Convert OrbitalElements to Cartesian state vector for ASSIST.
+
+    ASSIST manages the Sun internally, so particles must be added with
+    Cartesian coordinates (x, y, z, vx, vy, vz) rather than orbital
+    elements.  This function creates a temporary REBOUND simulation with
+    a unit-mass Sun, adds the particle via orbital elements, extracts
+    the resulting Cartesian state, and returns it.
+
+    The coordinates are heliocentric ecliptic J2000, in AU and AU/day.
+
+    Args:
+        elements: OrbitalElements from minor_bodies module.
+        jd_tt: Julian Date (TT) at which to evaluate elements.
+
+    Returns:
+        dict with keys ``x, y, z, vx, vy, vz`` suitable for
+        ``rebound.Simulation.add(m=0, ...)``.
+    """
+    import rebound
+
+    # Gaussian gravitational constant squared -> G*M_sun in AU^3/day^2
+    k_squared = 0.00029591220828559
+
+    tmp = rebound.Simulation()
+    tmp.units = ("day", "AU", "Msun")
+    tmp.G = k_squared
+    tmp.add(m=1.0)  # Sun
+
+    orb = elements_to_rebound_orbit(elements, jd_tt)
+    tmp.add(m=0.0, primary=tmp.particles[0], **orb)
+    tmp.move_to_hel()
+
+    p = tmp.particles[1]
+    return {
+        "x": p.x,
+        "y": p.y,
+        "z": p.z,
+        "vx": p.vx,
+        "vy": p.vy,
+        "vz": p.vz,
     }
 
 
@@ -516,14 +888,14 @@ def propagate_orbit_assist(
             "A3": A3,
         }
 
-    # Convert orbital elements to Cartesian state
-    orb_params = elements_to_rebound_orbit(elements, jd_start)
+    # Convert orbital elements to heliocentric Cartesian state.
+    # ASSIST manages the Sun internally, so we must supply Cartesian
+    # coordinates — orbital-element keywords require a massive primary
+    # which does not exist in the ASSIST simulation.
+    cart = _elements_to_cartesian(elements, jd_start)
 
-    # Add test particle
-    sim.add(
-        m=0.0,  # Test particle
-        **orb_params,
-    )
+    # Add test particle with Cartesian state
+    sim.add(m=0.0, **cart)
 
     # Set initial time (JD - reference JD)
     sim.t = jd_start - ephem.jd_ref
@@ -604,8 +976,8 @@ def propagate_trajectory(
                 sim = rebound.Simulation()
                 extras = assist.Extras(sim, ephem)
 
-                orb_params = elements_to_rebound_orbit(elements, jd_start)
-                sim.add(m=0.0, **orb_params)
+                cart = _elements_to_cartesian(elements, jd_start)
+                sim.add(m=0.0, **cart)
 
                 sim.t = jd_start - ephem.jd_ref
 

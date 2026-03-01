@@ -1,6 +1,6 @@
 [project]
 name = "libephemeris"
-version = "0.20.0"
+version = "0.21.0"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -163,6 +163,9 @@ test = "pytest -m \"not slow\""
 "spk:download:base" = "python -c \"import libephemeris as eph; eph.set_precision_tier('base'); eph.ensure_all_ephemerides(show_progress=True)\""
 "spk:download:medium" = "python -c \"import libephemeris as eph; eph.set_precision_tier('medium'); eph.ensure_all_ephemerides(show_progress=True)\""
 "spk:download:extended" = "python scripts/download_max_range_spk.py"
+
+# ASSIST data download (REBOUND/ASSIST n-body integration)
+"download:assist" = "python -m libephemeris.cli download:assist"
 
 # Planet centers SPK generation (requires spiceypy, downloads source satellite SPKs)
 "generate-planet-centers:base" = "python scripts/generate_planet_centers_spk.py --tier base"

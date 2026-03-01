@@ -447,6 +447,600 @@ def _fit_and_verify_from_values(
     return all_coeffs, max_error
 
 
+def _fit_and_verify_from_values_unwrap(
+    all_values: np.ndarray,
+    jd_start: float,
+    jd_end: float,
+    interval_days: float,
+    degree: int,
+    components: int,
+    n_segments: int,
+    pts_per_seg: int,
+    n_verify: int = N_VERIFY,
+    label: str = "",
+    verbose: bool = False,
+) -> Tuple[List[np.ndarray], float]:
+    """Fit Chebyshev segments with longitude unwrapping from pre-evaluated values.
+
+    Same as _fit_and_verify_from_values but unwraps component 0 (longitude)
+    before fitting and re-wraps during verification. Used for ecliptic and
+    heliocentric bodies.
+
+    Args:
+        all_values: shape (n_total, components) with pre-evaluated function values.
+            Layout: [seg0_node0, ..., seg0_nodeN, seg0_verify0, ..., seg0_verifyM,
+                     seg1_node0, ...]
+
+    Returns:
+        (list_of_coefficient_arrays, max_error)
+    """
+    nodes_01 = chebyshev_nodes(degree + 1)
+    all_coeffs: List[np.ndarray] = []
+    max_error = 0.0
+    bar = ProgressBar(n_segments, label=label or "fit+verify", enabled=verbose)
+
+    for i in range(n_segments):
+        seg_start = jd_start + i * interval_days
+        seg_end = seg_start + interval_days
+        offset = i * pts_per_seg
+
+        # Extract fitting values (Chebyshev nodes)
+        fit_values = all_values[offset : offset + degree + 1].copy()
+
+        # Unwrap longitude (component 0) to remove 360-degree jumps
+        fit_values[:, 0] = np.unwrap(np.radians(fit_values[:, 0]))
+        fit_values[:, 0] = np.degrees(fit_values[:, 0])
+
+        # Fit each component
+        coeffs = np.zeros((components, degree + 1))
+        for c in range(components):
+            coeffs[c] = chebfit(nodes_01, fit_values[:, c], degree)
+
+        # Verify using pre-computed verification points (with re-wrapping)
+        verify_end = min(seg_end, jd_end)
+        mid = 0.5 * (seg_start + seg_end)
+        half = 0.5 * (seg_end - seg_start)
+
+        for v in range(n_verify):
+            frac = (v + 0.5) / n_verify
+            jd_v = seg_start + frac * (verify_end - seg_start)
+            tau = (jd_v - mid) / half
+
+            ref = all_values[offset + degree + 1 + v]
+            for c in range(components):
+                fitted = float(chebval(tau, coeffs[c]))
+                if c == 0:
+                    # Re-wrap longitude for comparison
+                    fitted = fitted % 360.0
+                    ref_val = ref[c] % 360.0
+                    error = abs(fitted - ref_val)
+                    if error > 180.0:
+                        error = 360.0 - error
+                else:
+                    error = abs(fitted - ref[c])
+                if error > max_error:
+                    max_error = error
+
+        all_coeffs.append(coeffs)
+        bar.update(i + 1)
+
+    bar.finish()
+    return all_coeffs, max_error
+
+
+# =============================================================================
+# VECTORIZED ECLIPTIC BODY BATCH EVALUATION
+# =============================================================================
+
+
+def _calc_mean_lilith_batch(all_jds: np.ndarray, T: np.ndarray) -> np.ndarray:
+    """Vectorized version of calc_mean_lilith / _calc_mean_apse_analytical.
+
+    Args:
+        all_jds: Array of Julian Days (TT).
+        T: Array of Julian centuries from J2000 (pre-computed).
+
+    Returns:
+        Array of mean apogee longitudes in degrees [0, 360).
+    """
+    T2 = T * T
+    fracT = T % 1.0
+
+    z_F_T2 = -1.312045233711e01
+    z_F_T3 = -1.138215912580e-03
+    z_F_T4 = -9.646018347184e-06
+    z_MP_T2 = 3.146734198839e01
+    z_MP_T3 = 4.768357585780e-02
+    z_MP_T4 = -3.421689790404e-04
+    z_LP_T2 = -5.663161722088e00
+    z_LP_T3 = 5.722859298199e-03
+    z_LP_T4 = -8.466472828815e-05
+
+    NF = 1739232000.0 * fracT + 295263.0983 * T - 0.2079419901760 * T + 335779.55755
+    NF = NF % 1296000.0
+    NF += ((z_F_T4 * T + z_F_T3) * T + z_F_T2) * T2
+
+    MP = 1717200000.0 * fracT + 715923.4728 * T - 0.2035946368532 * T + 485868.28096
+    MP = MP % 1296000.0
+    MP += ((z_MP_T4 * T + z_MP_T3) * T + z_MP_T2) * T2
+
+    LP = 1731456000.0 * fracT + 1108372.83264 * T - 0.6784914260953 * T + 785939.95571
+    LP = LP % 1296000.0
+    LP += ((z_LP_T4 * T + z_LP_T3) * T + z_LP_T2) * T2
+
+    STR = np.pi / (180.0 * 3600.0)
+
+    apogee_rad = (LP - MP) * STR + np.pi
+    apogee_rad = apogee_rad % (2.0 * np.pi)
+
+    node_rad = (LP - NF) * STR
+    node_rad = node_rad % (2.0 * np.pi)
+
+    MOON_MEAN_INCL = 5.1453964
+    lon_from_node = apogee_rad - node_rad
+
+    x = np.cos(lon_from_node)
+    y = np.sin(lon_from_node)
+
+    incl_rad = -np.radians(MOON_MEAN_INCL)
+    cos_incl = np.cos(incl_rad)
+    # z=0 so y_new = y * cos_incl, x stays the same
+    y_new = y * cos_incl
+
+    lon_from_node_proj = np.arctan2(y_new, x)
+
+    apogee_projected = (lon_from_node_proj + node_rad) % (2.0 * np.pi)
+    return np.degrees(apogee_projected)
+
+
+def _calc_lunar_fundamental_arguments_batch(
+    all_jds: np.ndarray, T: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Vectorized version of _calc_lunar_fundamental_arguments.
+
+    Args:
+        all_jds: Array of Julian Days (TT).
+        T: Array of Julian centuries from J2000.
+
+    Returns:
+        (D, M, M_prime, F) arrays in radians.
+    """
+    T2 = T * T
+    T3 = T2 * T
+    T4 = T3 * T
+    T5 = T4 * T
+
+    D = (
+        297.8501921
+        + 445267.1114034 * T
+        - 0.0018819 * T2
+        + T3 / 545868.0
+        - T4 / 113065000.0
+        + T5 / 18999000000.0
+    )
+
+    M = (
+        357.5291092
+        + 35999.0502909 * T
+        - 0.0001536 * T2
+        + T3 / 24490000.0
+        - T4 / 992300000.0
+        + T5 / 189900000000.0
+    )
+
+    M_prime = (
+        134.9633964
+        + 477198.8675055 * T
+        + 0.0087414 * T2
+        + T3 / 69699.0
+        - T4 / 14712000.0
+        + T5 / 2520410000.0
+    )
+
+    F = (
+        93.2720950
+        + 483202.0175233 * T
+        - 0.0036539 * T2
+        - T3 / 3526000.0
+        + T4 / 863310000.0
+        - T5 / 142650000000.0
+    )
+
+    D = np.radians(D % 360.0)
+    M = np.radians(M % 360.0)
+    M_prime = np.radians(M_prime % 360.0)
+    F = np.radians(F % 360.0)
+
+    return D, M, M_prime, F
+
+
+def _calc_elp2000_apogee_perturbations_batch(
+    all_jds: np.ndarray, T: np.ndarray
+) -> np.ndarray:
+    """Vectorized version of _calc_elp2000_apogee_perturbations.
+
+    Returns array of perturbation corrections in degrees.
+    """
+    D, M, M_prime, F = _calc_lunar_fundamental_arguments_batch(all_jds, T)
+
+    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
+    E2 = E * E
+
+    p = np.zeros_like(T)
+
+    # Primary evection harmonics
+    p += 0.1892 * np.sin(D - M_prime)
+    p += 4.6921 * np.sin(2.0 * D - 2.0 * M_prime)
+    p += -0.0127 * np.sin(3.0 * D - 3.0 * M_prime)
+    p += 0.7854 * np.sin(4.0 * D - 4.0 * M_prime)
+    p += 0.0089 * np.sin(5.0 * D - 5.0 * M_prime)
+    p += 0.1634 * np.sin(6.0 * D - 6.0 * M_prime)
+    p += -0.0056 * np.sin(7.0 * D - 7.0 * M_prime)
+    p += 0.0412 * np.sin(8.0 * D - 8.0 * M_prime)
+    p += 0.0023 * np.sin(9.0 * D - 9.0 * M_prime)
+    p += 0.0108 * np.sin(10.0 * D - 10.0 * M_prime)
+
+    # Solar anomaly coupling
+    p += 0.3847 * E * np.sin(M)
+    p += 0.0198 * E2 * np.sin(2.0 * M)
+    p += 0.5123 * E * np.sin(2.0 * D - 2.0 * M_prime - M)
+    p += 0.1287 * E * np.sin(2.0 * D - 2.0 * M_prime + M)
+    p += -0.0523 * E * np.sin(D - M_prime - M)
+    p += 0.0412 * E * np.sin(D - M_prime + M)
+    p += 0.0876 * E * np.sin(4.0 * D - 4.0 * M_prime - M)
+    p += 0.0234 * E * np.sin(4.0 * D - 4.0 * M_prime + M)
+    p += 0.0187 * E * np.sin(6.0 * D - 6.0 * M_prime - M)
+
+    # Double solar anomaly coupling
+    p += 0.0312 * E2 * np.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
+    p += 0.0156 * E2 * np.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+
+    # Lunar anomaly harmonics
+    p += -0.0234 * np.sin(M_prime)
+    p += 0.0087 * np.sin(2.0 * M_prime)
+    p += -0.0034 * np.sin(3.0 * M_prime)
+
+    # Latitude coupling
+    p += 0.2634 * np.sin(2.0 * F - 2.0 * M_prime)
+    p += 0.0423 * np.sin(2.0 * F - 2.0 * D)
+    p += -0.0289 * np.sin(2.0 * F)
+    p += 0.0156 * np.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
+    p += -0.0098 * np.sin(2.0 * F + 2.0 * M_prime - 2.0 * D)
+
+    # Cross-coupling
+    p += 0.0723 * np.sin(2.0 * D - M_prime)
+    p += -0.0567 * np.sin(2.0 * D - 3.0 * M_prime)
+    p += 0.0234 * np.sin(4.0 * D - 3.0 * M_prime)
+    p += -0.0178 * np.sin(4.0 * D - 5.0 * M_prime)
+    p += 0.0112 * np.sin(2.0 * D)
+    p += -0.0089 * np.sin(4.0 * D)
+
+    # Solar-lunar-latitude coupling
+    p += 0.0178 * E * np.sin(2.0 * F - 2.0 * M_prime + M)
+    p += -0.0134 * E * np.sin(2.0 * F - 2.0 * M_prime - M)
+    p += 0.0089 * E * np.sin(2.0 * F - 2.0 * D + M)
+    p += -0.0067 * E * np.sin(2.0 * F - 2.0 * D - M)
+
+    # Secular corrections
+    p += 0.0012 * T * np.sin(2.0 * D - 2.0 * M_prime)
+    p += -0.0008 * T * np.sin(M)
+
+    return p
+
+
+def _calc_elp2000_perigee_perturbations_batch(
+    all_jds: np.ndarray, T: np.ndarray
+) -> np.ndarray:
+    """Vectorized version of _calc_elp2000_perigee_perturbations.
+
+    Returns array of perturbation corrections in degrees.
+    """
+    D, M, M_prime, F = _calc_lunar_fundamental_arguments_batch(all_jds, T)
+
+    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
+    E2 = E * E
+
+    p = np.zeros_like(T)
+
+    # Polynomial mean perigee corrections
+    p += -0.1749
+    p += -0.1411 * T
+    p += -0.0140 * T * T
+    p += +0.0168 * T * T * T
+
+    # Primary evection harmonics sin(kD - kM')
+    p += +0.3002 * np.sin(D - M_prime)
+    p += -22.2062 * np.sin(2.0 * D - 2.0 * M_prime)
+    p += -0.1594 * np.sin(3.0 * D - 3.0 * M_prime)
+    p += +6.4536 * np.sin(4.0 * D - 4.0 * M_prime)
+    p += +0.0938 * np.sin(5.0 * D - 5.0 * M_prime)
+    p += -2.2814 * np.sin(6.0 * D - 6.0 * M_prime)
+    p += -0.0375 * np.sin(7.0 * D - 7.0 * M_prime)
+    p += +0.4792 * np.sin(8.0 * D - 8.0 * M_prime)
+    p += +0.0075 * np.sin(9.0 * D - 9.0 * M_prime)
+    p += -0.0598 * np.sin(10.0 * D - 10.0 * M_prime)
+    p += +0.0114 * np.sin(12.0 * D - 12.0 * M_prime)
+    p += -0.0031 * np.sin(14.0 * D - 14.0 * M_prime)
+    p += +0.0011 * np.sin(16.0 * D - 16.0 * M_prime)
+
+    # Evection phase corrections cos(kD - kM')
+    p += -0.0750 * np.cos(2.0 * D - 2.0 * M_prime)
+    p += -0.0013 * np.cos(3.0 * D - 3.0 * M_prime)
+    p += +0.0393 * np.cos(4.0 * D - 4.0 * M_prime)
+    p += -0.0061 * np.cos(8.0 * D - 8.0 * M_prime)
+    p += +0.0039 * np.cos(10.0 * D - 10.0 * M_prime)
+    p += -0.0023 * np.cos(6.0 * D - 6.0 * M_prime)
+    p += -0.0011 * np.cos(9.0 * D - 9.0 * M_prime)
+
+    # Solar anomaly coupling
+    p += +0.4684 * E * np.sin(M)
+    p += -0.9747 * E * np.sin(2.0 * D - 2.0 * M_prime - M)
+    p += +0.0935 * E * np.sin(2.0 * D - 2.0 * M_prime + M)
+    p += -0.0266 * E * np.sin(D - M_prime - M)
+    p += -0.0580 * E * np.sin(D - M_prime + M)
+    p += +0.5348 * E * np.sin(4.0 * D - 4.0 * M_prime - M)
+    p += -0.0829 * E * np.sin(4.0 * D - 4.0 * M_prime + M)
+    p += -0.2059 * E * np.sin(6.0 * D - 6.0 * M_prime - M)
+    p += +0.0586 * E * np.sin(6.0 * D - 6.0 * M_prime + M)
+
+    # Solar double coupling (E² terms)
+    p += +0.0016 * E2 * np.sin(2.0 * M)
+    p += -0.0390 * E2 * np.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
+    p += +0.0707 * E2 * np.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+    p += +0.0284 * E2 * np.sin(4.0 * D - 4.0 * M_prime - 2.0 * M)
+
+    # Lunar anomaly harmonics
+    p += +0.0106 * np.sin(M_prime)
+    p += +0.0013 * np.sin(2.0 * M_prime)
+
+    # Latitude coupling
+    p += +0.1695 * np.sin(2.0 * F - 2.0 * M_prime)
+    p += -0.0539 * np.sin(2.0 * F - 2.0 * D)
+    p += -0.0258 * np.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
+
+    # Cross-coupling
+    p += -0.0354 * np.sin(2.0 * D - M_prime)
+    p += +0.0039 * np.sin(2.0 * D - 3.0 * M_prime)
+    p += +0.1551 * np.sin(4.0 * D - 3.0 * M_prime)
+    p += +0.0067 * np.sin(4.0 * D - 5.0 * M_prime)
+    p += -0.0024 * np.sin(2.0 * D)
+    p += -0.4541 * np.sin(6.0 * D - 5.0 * M_prime)
+    p += -0.0010 * np.sin(3.0 * D - 2.0 * M_prime)
+
+    # Solar-latitude cross-coupling
+    p += -0.0017 * E * np.sin(2.0 * F - 2.0 * M_prime + M)
+    p += -0.0098 * E * np.sin(2.0 * F - 2.0 * M_prime - M)
+    p += +0.0095 * E * np.sin(2.0 * F - 2.0 * D - M)
+
+    # Higher-order evection-solar coupling
+    p += +0.0376 * E * np.sin(8.0 * D - 8.0 * M_prime - M)
+    p += -0.0209 * E * np.sin(8.0 * D - 8.0 * M_prime + M)
+    p += -0.0066 * E * np.sin(10.0 * D - 10.0 * M_prime - M)
+
+    # Secular and long-period corrections
+    p += +0.0013 * T * np.sin(M)
+    p += -0.0014 * T * np.sin(D - M_prime)
+    p += -0.0042 * T * np.cos(2.0 * D - 2.0 * M_prime)
+
+    # Cosine phase corrections
+    p += +0.0168 * np.cos(M)
+    p += +0.0217 * np.cos(2.0 * F - 2.0 * M_prime)
+
+    # Sun-Moon anomaly coupling
+    p += -0.0021 * E * np.sin(M - M_prime)
+    p += -0.0012 * E * np.sin(2.0 * D + M - M_prime)
+
+    return p
+
+
+def _eval_ecliptic_bodies_batch(
+    all_jds: np.ndarray,
+    body_ids: List[int],
+    verbose: bool = False,
+) -> dict:
+    """Evaluate all ecliptic bodies at all JDs in a single vectorized pass.
+
+    Uses ONE Skyfield call for all bodies that need Moon ephemeris data,
+    then computes each body's values vectorially with numpy.
+
+    Args:
+        all_jds: Array of Julian Days (TT) for evaluation.
+        body_ids: List of ecliptic body IDs to evaluate (subset of [10-13, 21, 22]).
+        verbose: Print progress.
+
+    Returns:
+        dict mapping body_id -> (N, 3) array of [lon, lat, dist].
+    """
+    N = len(all_jds)
+    T = (all_jds - 2451545.0) / 36525.0
+    T2 = T * T
+    T3 = T2 * T
+    T4 = T3 * T
+
+    results: dict[int, np.ndarray] = {}
+
+    # Bodies needing Skyfield: 11 (true node), 13 (oscu apogee),
+    # 21 (interp apogee lat/dist), 22 (interp perigee lat/dist)
+    skyfield_bodies = {11, 13, 21, 22}
+    need_skyfield = bool(skyfield_bodies.intersection(body_ids))
+
+    if need_skyfield:
+        from skyfield.framelib import ecliptic_frame
+
+        planets, ts = _init_skyfield()
+        earth = planets["earth"]
+        moon = planets["moon"]
+
+        if verbose:
+            print("    Vectorized Skyfield call for Moon ecliptic state...")
+        t = ts.tt_jd(all_jds)
+        moon_pos = (moon - earth).at(t)
+        r = moon_pos.frame_xyz(ecliptic_frame).au  # (3, N)
+        _, v_obj = moon_pos.frame_xyz_and_velocity(ecliptic_frame)
+        v = v_obj.au_per_d  # (3, N)
+
+        # Angular momentum h = r × v  (component-wise on (3, N) arrays)
+        h_x = r[1] * v[2] - r[2] * v[1]
+        h_y = r[2] * v[0] - r[0] * v[2]
+        h_z = r[0] * v[1] - r[1] * v[0]
+        h_mag = np.sqrt(h_x**2 + h_y**2 + h_z**2)
+
+        # |r| for eccentricity vector
+        r_mag = np.sqrt(r[0] ** 2 + r[1] ** 2 + r[2] ** 2)
+
+        # Gravitational parameter μ for Earth-Moon system in AU³/day²
+        gm_earth = 398600.435436  # km³/s²
+        earth_moon_mass_ratio = 81.3005691
+        gm_moon = gm_earth / earth_moon_mass_ratio
+        gm_earth_moon = gm_earth + gm_moon
+        mu = gm_earth_moon / (149597870.7**3) * (86400**2)
+
+        # v × h (for eccentricity vector)
+        vxh_x = v[1] * h_z - v[2] * h_y
+        vxh_y = v[2] * h_x - v[0] * h_z
+        vxh_z = v[0] * h_y - v[1] * h_x
+
+        # Eccentricity vector e = (v×h)/μ - r/|r|
+        e_x = vxh_x / mu - r[0] / r_mag
+        e_y = vxh_y / mu - r[1] / r_mag
+        e_z = vxh_z / mu - r[2] / r_mag
+        e_mag = np.sqrt(e_x**2 + e_y**2 + e_z**2)
+
+        # Semi-latus rectum
+        p = h_mag**2 / mu
+
+    # --- Body 10: Mean Node (pure polynomial) ---
+    if 10 in body_ids:
+        Omega = (
+            125.0445479
+            - 1934.1362891 * T
+            + 0.0020754 * T2
+            + T3 / 467441.0
+            - T4 / 60616000.0
+        ) % 360.0
+        results[10] = np.column_stack([Omega, np.zeros(N), np.zeros(N)])
+
+    # --- Body 11: True Node (from angular momentum) ---
+    if 11 in body_ids:
+        node_lon = np.degrees(np.arctan2(h_x, -h_y)) % 360.0
+        node_dist = h_mag * 1000.0
+        results[11] = np.column_stack([node_lon, np.zeros(N), node_dist])
+
+    # --- Body 12: Mean Lilith with latitude ---
+    if 12 in body_ids:
+        mean_lilith = _calc_mean_lilith_batch(all_jds, T)
+        # Mean node (same formula as body 10)
+        mean_node = (
+            125.0445479
+            - 1934.1362891 * T
+            + 0.0020754 * T2
+            + T3 / 467441.0
+            - T4 / 60616000.0
+        ) % 360.0
+        omega = (mean_lilith - mean_node) % 360.0
+        mean_lilith_lat = 5.145 * np.sin(np.radians(omega))
+        results[12] = np.column_stack([mean_lilith, mean_lilith_lat, np.zeros(N)])
+    else:
+        # Still need mean_lilith for bodies 21 and 22
+        mean_lilith = None
+
+    # --- Body 13: Oscu Apogee / True Lilith (from eccentricity vector) ---
+    if 13 in body_ids:
+        apogee_lon = np.degrees(np.arctan2(-e_y, -e_x)) % 360.0
+        apogee_lat = np.degrees(np.arcsin(-e_z / e_mag))
+        apogee_dist = p / (1.0 - e_mag)
+        results[13] = np.column_stack([apogee_lon, apogee_lat, apogee_dist])
+
+    # --- Body 21: Interpolated Apogee ---
+    if 21 in body_ids:
+        if mean_lilith is None:
+            mean_lilith = _calc_mean_lilith_batch(all_jds, T)
+        apogee_pert = _calc_elp2000_apogee_perturbations_batch(all_jds, T)
+        interp_apogee_lon = (mean_lilith + apogee_pert) % 360.0
+        # Lat/dist from osculating apogee (True Lilith)
+        ia_lat = np.degrees(np.arcsin(-e_z / e_mag))
+        ia_dist = p / (1.0 - e_mag)
+        results[21] = np.column_stack([interp_apogee_lon, ia_lat, ia_dist])
+
+    # --- Body 22: Interpolated Perigee ---
+    if 22 in body_ids:
+        if mean_lilith is None:
+            mean_lilith = _calc_mean_lilith_batch(all_jds, T)
+        mean_perigee = (mean_lilith + 180.0) % 360.0
+        perigee_pert = _calc_elp2000_perigee_perturbations_batch(all_jds, T)
+        interp_perigee_lon = (mean_perigee + perigee_pert) % 360.0
+        # Lat/dist from osculating perigee (+e direction)
+        ip_lat = np.degrees(np.arcsin(e_z / e_mag))
+        ip_dist = p / (1.0 + e_mag)
+        results[22] = np.column_stack([interp_perigee_lon, ip_lat, ip_dist])
+
+    return results
+
+
+def generate_ecliptic_bodies_vectorized(
+    body_ids: List[int],
+    jd_start: float,
+    jd_end: float,
+    verbose: bool = False,
+) -> dict:
+    """Generate Chebyshev coefficients for all ecliptic bodies in one vectorized pass.
+
+    Uses a single Skyfield call for all bodies, then numpy for all post-processing.
+    This is ~100x faster than the scalar per-body path for bodies that need Skyfield.
+
+    Args:
+        body_ids: List of ecliptic body IDs to generate (subset of [10-13, 21, 22]).
+        jd_start: Start Julian Day.
+        jd_end: End Julian Day.
+        verbose: Print progress.
+
+    Returns:
+        dict mapping body_id -> (body_id, coefficients_list, max_error)
+    """
+    # All ecliptic bodies use the same parameters (interval=8, degree=13)
+    interval_days = 8.0
+    degree = 13
+    components = 3
+
+    if verbose:
+        print(f"    Vectorized ecliptic generation: {len(body_ids)} bodies")
+
+    # 1. Precompute all JDs
+    all_jds, n_segments, pts_per_seg = _compute_all_segment_jds(
+        jd_start, jd_end, interval_days, degree
+    )
+
+    if verbose:
+        print(
+            f"    Total JDs: {len(all_jds):,} ({n_segments} segments × {pts_per_seg} pts)"
+        )
+
+    # 2. Evaluate all bodies at all JDs in one batch
+    body_values = _eval_ecliptic_bodies_batch(all_jds, body_ids, verbose=verbose)
+
+    # 3. Fit and verify each body
+    results = {}
+    for bid in body_ids:
+        if bid not in body_values:
+            continue
+        label = BODY_NAMES.get(bid, f"Body {bid}")
+        coeffs, error = _fit_and_verify_from_values_unwrap(
+            body_values[bid],
+            jd_start,
+            jd_end,
+            interval_days,
+            degree,
+            components,
+            n_segments,
+            pts_per_seg,
+            label=label,
+            verbose=verbose,
+        )
+        results[bid] = (bid, coeffs, error)
+
+    return results
+
+
 # =============================================================================
 # BODY GENERATORS
 # =============================================================================
@@ -523,6 +1117,57 @@ def _spk_covers_range(
         # Allow 2-day tolerance: Horizons SPK boundaries can be off by ~1 day
         # from the requested range, and generation clamps to SPK range anyway.
         return seg_start <= jd_start + 2.0 and seg_end >= jd_end - 2.0
+    finally:
+        kernel.close()
+
+
+def _get_asteroid_spk_range(
+    spk_file: str,
+    body_id: int,
+) -> Optional[Tuple[float, float]]:
+    """Get the JD coverage range of an asteroid SPK type 21 file.
+
+    Opens the SPK, finds the target NAIF ID, and returns the full coverage
+    range as (jd_start, jd_end).
+
+    Args:
+        spk_file: Path to the SPK type 21 file.
+        body_id: Internal body ID (SE_* constant) for NAIF lookup.
+
+    Returns:
+        (jd_start, jd_end) or None if the file cannot be read.
+    """
+    try:
+        from spktype21 import SPKType21
+
+        kernel = SPKType21.open(spk_file)
+    except Exception:
+        return None
+
+    try:
+        naif_id = _ASTEROID_NAIF.get(body_id)
+        if naif_id is None:
+            return None
+
+        T0 = 2451545.0
+        # Find segments matching this target (try both NAIF conventions)
+        target_segs = [
+            seg
+            for seg in kernel.segments
+            if seg.target == naif_id
+            or seg.target == naif_id + 18000000  # Horizons 20000000+N convention
+        ]
+        if not target_segs:
+            # Try any non-center segment
+            target_segs = [seg for seg in kernel.segments if seg.target not in (0, 10)]
+
+        if not target_segs:
+            return None
+
+        seg_start = min(T0 + seg.start_second / 86400.0 for seg in target_segs)
+        seg_end = max(T0 + seg.end_second / 86400.0 for seg in target_segs)
+
+        return (seg_start, seg_end)
     finally:
         kernel.close()
 
@@ -748,8 +1393,9 @@ def generate_body_icrs_asteroid(
     (center=10/Sun), so the Sun's barycentric position is added via a single
     vectorized Skyfield call.
 
-    Falls back to scalar per-point evaluation if SPK file is not available
-    or does not cover the full requested date range.
+    Raises RuntimeError if the SPK file is not available or does not cover
+    the requested date range. Never falls back to Keplerian — that would
+    produce errors of degrees over decades.
 
     Returns:
         (list_of_coefficient_arrays, max_error_au)
@@ -761,172 +1407,127 @@ def generate_body_icrs_asteroid(
 
     # Check if we have an SPK file for this asteroid
     spk_info = _SPK_BODY_MAP.get(body_id)
+    ast_name = BODY_NAMES.get(body_id, f"Body {body_id}")
 
-    if spk_info is not None:
-        spk_file, naif_id = spk_info
-        try:
-            from spktype21 import SPKType21
-
-            kernel = SPKType21.open(spk_file)
-        except Exception:
-            kernel = None
-
-        if kernel is not None:
-            try:
-                # Find the center ID and target from the kernel segments
-                center_id = kernel.segments[0].center  # typically 10 (Sun)
-                target_id = kernel.segments[0].target
-
-                # Check if the asteroid SPK covers the full requested range
-                # (with some margin for last-segment overshoot)
-                T0_SPK = 2451545.0
-                ast_jd_min = min(
-                    T0_SPK + seg.start_second / 86400.0
-                    for seg in kernel.segments
-                    if seg.target == target_id
-                )
-                ast_jd_max = max(
-                    T0_SPK + seg.end_second / 86400.0
-                    for seg in kernel.segments
-                    if seg.target == target_id
-                )
-
-                if ast_jd_min > jd_start + 2.0 or ast_jd_max < jd_end - 2.0:
-                    # SPK doesn't cover the full range — fall back to scalar
-                    kernel.close()
-                    kernel = None
-            except Exception:
-                kernel.close()
-                kernel = None
-
-        if kernel is not None:
-            try:
-                center_id = kernel.segments[0].center
-                target_id = kernel.segments[0].target
-
-                # Recompute asteroid SPK range for clamping
-                T0_SPK2 = 2451545.0
-                ast_jd_lo = min(
-                    T0_SPK2 + seg.start_second / 86400.0
-                    for seg in kernel.segments
-                    if seg.target == target_id
-                )
-                ast_jd_hi = max(
-                    T0_SPK2 + seg.end_second / 86400.0
-                    for seg in kernel.segments
-                    if seg.target == target_id
-                )
-
-                # Precompute all JDs
-                all_jds, n_segments, pts_per_seg = _compute_all_segment_jds(
-                    jd_start, jd_end, interval_days, degree
-                )
-
-                # Get Sun barycentric positions with extrapolation for overshoot
-                spk_min, spk_max = _get_spk_jd_range(planets)
-                sun = planets["sun"]
-                sun_bary = _eval_target_vectorized(
-                    sun, all_jds, ts, spk_min, spk_max
-                )  # (N, 3)
-
-                # Clamp to asteroid SPK range for spktype21 calls
-                ast_clamped = np.clip(all_jds, ast_jd_lo + 0.01, ast_jd_hi - 0.01)
-
-                # Compute asteroid heliocentric positions via spktype21 (scalar loop)
-                AU_KM = 149597870.7
-                all_values = np.empty((len(all_jds), 3))
-                spk_bar = ProgressBar(
-                    len(all_jds),
-                    label=label + " (spk21)" if label else "spk21 eval",
-                    unit="pt",
-                    enabled=verbose,
-                )
-                for i in range(len(all_jds)):
-                    pos_km, _ = kernel.compute_type21(
-                        center_id, target_id, float(ast_clamped[i])
-                    )
-                    # helio km -> helio AU -> + Sun bary = SSB bary (ICRS)
-                    all_values[i, 0] = pos_km[0] / AU_KM + sun_bary[i, 0]
-                    all_values[i, 1] = pos_km[1] / AU_KM + sun_bary[i, 1]
-                    all_values[i, 2] = pos_km[2] / AU_KM + sun_bary[i, 2]
-                    spk_bar.update(i + 1)
-                spk_bar.finish()
-
-                kernel.close()
-
-                return _fit_and_verify_from_values(
-                    all_values,
-                    jd_start,
-                    jd_end,
-                    interval_days,
-                    degree,
-                    3,
-                    n_segments,
-                    pts_per_seg,
-                    label=label,
-                    verbose=verbose,
-                )
-            except Exception:
-                kernel.close()
-                # Fall through to scalar fallback
-
-    # Fallback: scalar per-point path (slow but works for any date range)
-    import libephemeris as ephem
-    from libephemeris.constants import (
-        SEFLG_J2000,
-        SEFLG_NOABERR,
-        SEFLG_NONUT,
-        SEFLG_TRUEPOS,
-    )
-    from libephemeris.planets import get_planet_target
-
-    earth = get_planet_target(planets, "earth")
-
-    # Clamp JDs to SPK range for last-segment overshoot
-    spk_min, spk_max = _get_spk_jd_range(planets)
-    jd_lo = spk_min + 1.0
-    jd_hi = spk_max - 1.0
-
-    # Request J2000 ecliptic coordinates with no nutation, no aberration,
-    # and geometric position (no light-time).  This ensures the hardcoded
-    # J2000 obliquity used for ecliptic→equatorial rotation is exact.
-    # (Default swe_calc returns ecliptic-of-date, making the J2000 obliquity
-    # wrong and introducing ~10-40" errors.)
-    calc_flags = SEFLG_J2000 | SEFLG_NONUT | SEFLG_NOABERR | SEFLG_TRUEPOS
-
-    def eval_func(jd: float) -> np.ndarray:
-        jd_c = max(jd_lo, min(jd_hi, jd))
-        t = ts.tt_jd(jd_c)
-        earth_pos = earth.at(t).position.au
-        result, _ = ephem.swe_calc(jd_c, body_id, calc_flags)
-        lon_rad = math.radians(result[0])
-        lat_rad = math.radians(result[1])
-        dist = result[2]
-        x_geo = dist * math.cos(lat_rad) * math.cos(lon_rad)
-        y_geo = dist * math.cos(lat_rad) * math.sin(lon_rad)
-        z_geo = dist * math.sin(lat_rad)
-        eps = math.radians(23.4392911)
-        x_eq = x_geo
-        y_eq = y_geo * math.cos(eps) - z_geo * math.sin(eps)
-        z_eq = y_geo * math.sin(eps) + z_geo * math.cos(eps)
-        return np.array(
-            [
-                x_eq + float(earth_pos[0]),
-                y_eq + float(earth_pos[1]),
-                z_eq + float(earth_pos[2]),
-            ]
+    if spk_info is None:
+        raise RuntimeError(
+            f"No SPK kernel registered for {ast_name} (body {body_id}). "
+            f"Cannot generate LEB data without SPK — Keplerian fallback "
+            f"produces errors of degrees over decades. Use "
+            f"auto_download_asteroid_spk() first or exclude this body."
         )
 
-    return _generate_segments(
-        eval_func,
-        jd_start,
-        jd_end,
-        interval_days,
-        degree,
-        3,
-        label=label + " (scalar)" if label else "scalar",
-        verbose=verbose,
-    )
+    spk_file, naif_id = spk_info
+    try:
+        from spktype21 import SPKType21
+
+        kernel = SPKType21.open(spk_file)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Cannot open SPK file for {ast_name}: {spk_file}: {exc}"
+        ) from exc
+
+    try:
+        # Find the center ID and target from the kernel segments
+        center_id = kernel.segments[0].center  # typically 10 (Sun)
+        target_id = kernel.segments[0].target
+
+        # Check if the asteroid SPK covers the full requested range
+        # (with some margin for last-segment overshoot)
+        T0_SPK = 2451545.0
+        ast_jd_min = min(
+            T0_SPK + seg.start_second / 86400.0
+            for seg in kernel.segments
+            if seg.target == target_id
+        )
+        ast_jd_max = max(
+            T0_SPK + seg.end_second / 86400.0
+            for seg in kernel.segments
+            if seg.target == target_id
+        )
+
+        if ast_jd_min > jd_start + 2.0 or ast_jd_max < jd_end - 2.0:
+            kernel.close()
+            raise RuntimeError(
+                f"SPK for {ast_name} covers JD {ast_jd_min:.1f}–{ast_jd_max:.1f} "
+                f"but requested range is JD {jd_start:.1f}–{jd_end:.1f}. "
+                f"Cannot generate LEB data — SPK coverage is insufficient. "
+                f"Use a narrower date range or exclude this body."
+            )
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        kernel.close()
+        raise RuntimeError(f"Error reading SPK segments for {ast_name}: {exc}") from exc
+
+    try:
+        center_id = kernel.segments[0].center
+        target_id = kernel.segments[0].target
+
+        # Recompute asteroid SPK range for clamping
+        T0_SPK2 = 2451545.0
+        ast_jd_lo = min(
+            T0_SPK2 + seg.start_second / 86400.0
+            for seg in kernel.segments
+            if seg.target == target_id
+        )
+        ast_jd_hi = max(
+            T0_SPK2 + seg.end_second / 86400.0
+            for seg in kernel.segments
+            if seg.target == target_id
+        )
+
+        # Precompute all JDs
+        all_jds, n_segments, pts_per_seg = _compute_all_segment_jds(
+            jd_start, jd_end, interval_days, degree
+        )
+
+        # Get Sun barycentric positions with extrapolation for overshoot
+        spk_min, spk_max = _get_spk_jd_range(planets)
+        sun = planets["sun"]
+        sun_bary = _eval_target_vectorized(sun, all_jds, ts, spk_min, spk_max)  # (N, 3)
+
+        # Clamp to asteroid SPK range for spktype21 calls
+        ast_clamped = np.clip(all_jds, ast_jd_lo + 0.01, ast_jd_hi - 0.01)
+
+        # Compute asteroid heliocentric positions via spktype21 (scalar loop)
+        AU_KM = 149597870.7
+        all_values = np.empty((len(all_jds), 3))
+        spk_bar = ProgressBar(
+            len(all_jds),
+            label=label + " (spk21)" if label else "spk21 eval",
+            unit="pt",
+            enabled=verbose,
+        )
+        for i in range(len(all_jds)):
+            pos_km, _ = kernel.compute_type21(
+                center_id, target_id, float(ast_clamped[i])
+            )
+            # helio km -> helio AU -> + Sun bary = SSB bary (ICRS)
+            all_values[i, 0] = pos_km[0] / AU_KM + sun_bary[i, 0]
+            all_values[i, 1] = pos_km[1] / AU_KM + sun_bary[i, 1]
+            all_values[i, 2] = pos_km[2] / AU_KM + sun_bary[i, 2]
+            spk_bar.update(i + 1)
+        spk_bar.finish()
+
+        return _fit_and_verify_from_values(
+            all_values,
+            jd_start,
+            jd_end,
+            interval_days,
+            degree,
+            3,
+            n_segments,
+            pts_per_seg,
+            label=label,
+            verbose=verbose,
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"SPK evaluation failed for {ast_name} (body {body_id}): {exc}"
+        ) from exc
+    finally:
+        kernel.close()
 
 
 def generate_body_ecliptic(
@@ -1364,10 +1965,23 @@ def assemble_leb(
         print()
 
     # -------------------------------------------------------------------------
-    # 0. Ensure SPK kernels for asteroids covering the full date range
+    # 0. Ensure SPK kernels for asteroids; discover per-body date ranges
     # -------------------------------------------------------------------------
+    # Asteroids may have SPK coverage narrower than the tier range.
+    # Instead of excluding them, we include them with their actual SPK range.
+    # The LEB format already supports per-body jd_start/jd_end, and the
+    # reader raises ValueError for out-of-range JDs, which swe_calc_ut()
+    # catches to fall through to Skyfield.
     asteroid_bodies = [b for b in bodies if b in _ASTEROID_NAIF]
-    skipped_asteroids: List[int] = []
+    excluded_asteroids: List[int] = []
+    # Per-body date ranges: body_id -> (jd_start, jd_end)
+    # Non-asteroids use the global range; asteroids use their SPK range.
+    body_jd_ranges: dict[int, Tuple[float, float]] = {}
+
+    # Minimum useful SPK coverage (years). Asteroids with less than this
+    # are excluded — too narrow to be worth including.
+    MIN_ASTEROID_COVERAGE_DAYS = 365.25 * 20  # 20 years
+
     if asteroid_bodies:
         import libephemeris as ephem
         from libephemeris.minor_bodies import (
@@ -1376,15 +1990,13 @@ def assemble_leb(
         )
         from libephemeris.state import _SPK_BODY_MAP
 
-        # Enable auto-download and disable strict precision for generation
+        # Enable auto-download for SPK acquisition
         os.environ["LIBEPHEMERIS_AUTO_SPK"] = "1"
-        os.environ["LIBEPHEMERIS_STRICT_PRECISION"] = "0"
         ephem.set_auto_spk_download(True)
-        ephem.set_strict_precision(False)
 
         if verbose:
             print("  Preparing asteroid SPK kernels...")
-            print(f"    Required coverage: JD {jd_start:.1f} to {jd_end:.1f}")
+            print(f"    Tier range: JD {jd_start:.1f} to {jd_end:.1f}")
 
         for bid in asteroid_bodies:
             name = BODY_NAMES.get(bid, f"Body {bid}")
@@ -1409,20 +2021,72 @@ def assemble_leb(
                     jd_end=jd_end,
                     force=need_force,
                 )
-            except Exception:
-                pass  # Download may fail; we check availability below
+            except Exception as exc:
+                if verbose:
+                    print(f"    {name}: SPK download failed: {exc}")
 
-            if is_spk_available_for_body(bid):
+            if not is_spk_available_for_body(bid) or bid not in _SPK_BODY_MAP:
+                excluded_asteroids.append(bid)
                 if verbose:
-                    print(f"    {name}: SPK ready")
-            else:
-                skipped_asteroids.append(bid)
+                    print(f"    {name}: no SPK available (EXCLUDED)")
+                continue
+
+            spk_file, _ = _SPK_BODY_MAP[bid]
+
+            # Full coverage?
+            if _spk_covers_range(spk_file, bid, jd_start, jd_end):
+                body_jd_ranges[bid] = (jd_start, jd_end)
                 if verbose:
-                    print(f"    {name}: no SPK available, SKIPPING")
+                    print(f"    {name}: SPK covers full tier range (spk21)")
+                continue
+
+            # Partial coverage — discover the actual SPK range
+            spk_range = _get_asteroid_spk_range(spk_file, bid)
+            if spk_range is None:
+                excluded_asteroids.append(bid)
+                if verbose:
+                    print(f"    {name}: cannot read SPK range (EXCLUDED)")
+                continue
+
+            spk_jd_start, spk_jd_end = spk_range
+            # Intersect SPK range with tier range
+            eff_start = max(spk_jd_start, jd_start)
+            eff_end = min(spk_jd_end, jd_end)
+            eff_days = eff_end - eff_start
+
+            if eff_days < MIN_ASTEROID_COVERAGE_DAYS:
+                excluded_asteroids.append(bid)
+                if verbose:
+                    eff_years = eff_days / 365.25
+                    print(
+                        f"    {name}: SPK range JD {spk_jd_start:.1f}–{spk_jd_end:.1f} "
+                        f"overlaps only {eff_years:.0f} years with tier (EXCLUDED)"
+                    )
+                continue
+
+            # Use per-body range (with 1-day inward margin for SPK boundary safety)
+            body_jd_ranges[bid] = (eff_start + 1.0, eff_end - 1.0)
+            if verbose:
+                eff_start_yr = 2000.0 + (eff_start - 2451545.0) / 365.25
+                eff_end_yr = 2000.0 + (eff_end - 2451545.0) / 365.25
+                print(
+                    f"    {name}: per-body range JD {eff_start:.1f}–{eff_end:.1f} "
+                    f"(~{eff_start_yr:.0f}–{eff_end_yr:.0f} CE)"
+                )
 
         # Remove unavailable asteroids from the body list
-        if skipped_asteroids:
-            bodies = [b for b in bodies if b not in skipped_asteroids]
+        if excluded_asteroids:
+            bodies = [b for b in bodies if b not in excluded_asteroids]
+            if verbose:
+                excluded_names = [BODY_NAMES.get(b, str(b)) for b in excluded_asteroids]
+                print(
+                    f"\n  WARNING: {len(excluded_asteroids)} asteroid(s) excluded "
+                    f"(no SPK available): {', '.join(excluded_names)}"
+                )
+                print(
+                    "  Excluded asteroids will NOT be in the LEB file. "
+                    "They will use live Skyfield/SPK at runtime."
+                )
 
         if verbose:
             print()
@@ -1456,29 +2120,53 @@ def assemble_leb(
         body_errors[bid] = error
 
     # 1b. Generate asteroids (vectorized via SPK, fast)
+    # Each asteroid uses its own date range (from body_jd_ranges) which may
+    # be narrower than the tier range when SPK coverage is partial.
     if icrs_asteroid_bodies and verbose:
         print("  --- ICRS asteroids ---")
     for bid in icrs_asteroid_bodies:
+        ast_start, ast_end = body_jd_ranges.get(bid, (jd_start, jd_end))
         bid, coeffs, error = generate_single_body(
-            bid, jd_start, jd_end, verbose=verbose
+            bid, ast_start, ast_end, verbose=verbose
         )
         body_data[bid] = coeffs
         body_errors[bid] = error
 
-    # 1c. Generate analytical bodies (ecliptic + helio, always sequential)
-    # Parallelization via ProcessPoolExecutor causes deadlocks on macOS
-    # due to numpy/BLAS/Accelerate initialization in spawned processes.
-    # Sequential generation takes ~2-3 min for the full base tier which
-    # is acceptable — the real speedup comes from the group workflow
-    # (regenerate only the group that changed).
-    if analytical_bodies and verbose:
-        print(f"  --- Analytical bodies ({len(analytical_bodies)} bodies) ---")
-    for bid in analytical_bodies:
-        bid, coeffs, error = generate_single_body(
-            bid, jd_start, jd_end, verbose=verbose
+    # 1c. Generate analytical bodies
+    # Split into ecliptic (vectorized) and heliocentric (scalar, already fast).
+    ecliptic_body_ids = [
+        b for b in analytical_bodies if BODY_PARAMS[b][2] == COORD_ECLIPTIC
+    ]
+    helio_body_ids = [
+        b for b in analytical_bodies if BODY_PARAMS[b][2] == COORD_HELIO_ECL
+    ]
+
+    # Ecliptic bodies (10-13, 21, 22): single vectorized Skyfield call + numpy
+    # This replaces ~328K scalar Skyfield calls per body with ONE array call.
+    if ecliptic_body_ids:
+        if verbose:
+            print(
+                f"  --- Ecliptic bodies ({len(ecliptic_body_ids)} bodies, vectorized) ---"
+            )
+        vec_results = generate_ecliptic_bodies_vectorized(
+            ecliptic_body_ids, jd_start, jd_end, verbose=verbose
         )
-        body_data[bid] = coeffs
-        body_errors[bid] = error
+        for bid, (_, coeffs, error) in vec_results.items():
+            body_data[bid] = coeffs
+            body_errors[bid] = error
+
+    # Heliocentric bodies (Uranians 40-48, Transpluto): scalar but pure math, fast
+    if helio_body_ids:
+        if verbose:
+            print(
+                f"  --- Heliocentric bodies ({len(helio_body_ids)} bodies, scalar) ---"
+            )
+        for bid in helio_body_ids:
+            bid, coeffs, error = generate_single_body(
+                bid, jd_start, jd_end, verbose=verbose
+            )
+            body_data[bid] = coeffs
+            body_errors[bid] = error
 
     t_bodies = time.time() - t0
     if verbose:
@@ -1586,6 +2274,7 @@ def assemble_leb(
         write_section_dir(buf, HEADER_SIZE + i * SECTION_DIR_SIZE, sec)
 
     # Write body index and coefficient data
+    # Asteroids may have per-body date ranges narrower than the global range.
     coeff_write_offset = chebyshev_offset
     for idx, bid in enumerate(sorted(bodies)):
         params = BODY_PARAMS[bid]
@@ -1593,12 +2282,16 @@ def assemble_leb(
         seg_size = segment_byte_size(degree, components)
         n_segments = len(body_data[bid])
 
+        # Use per-body range if available (asteroids with partial SPK coverage),
+        # otherwise use global tier range.
+        bid_jd_start, bid_jd_end = body_jd_ranges.get(bid, (jd_start, jd_end))
+
         entry = BodyEntry(
             body_id=bid,
             coord_type=coord_type,
             segment_count=n_segments,
-            jd_start=jd_start,
-            jd_end=jd_end,
+            jd_start=bid_jd_start,
+            jd_end=bid_jd_end,
             interval_days=interval_days,
             degree=degree,
             components=components,
@@ -1672,14 +2365,22 @@ def assemble_leb(
             error = body_errors[bid]
             params = BODY_PARAMS[bid]
             coord_type = params[2]
+            # Show per-body range annotation if different from global
+            range_note = ""
+            if bid in body_jd_ranges:
+                br_start, br_end = body_jd_ranges[bid]
+                if abs(br_start - jd_start) > 1.0 or abs(br_end - jd_end) > 1.0:
+                    yr_s = 2000.0 + (br_start - 2451545.0) / 365.25
+                    yr_e = 2000.0 + (br_end - 2451545.0) / 365.25
+                    range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
             if coord_type == COORD_ICRS_BARY:
                 # Convert AU error to arcseconds (rough: 1 AU at 1 AU distance = 206265")
                 arcsec = error * 206265.0
-                print(f'    {name:20s}: {error:.2e} AU ({arcsec:.4f}")')
+                print(f'    {name:20s}: {error:.2e} AU ({arcsec:.4f}"){range_note}')
             else:
                 # Already in degrees, convert to arcseconds
                 arcsec = error * 3600.0
-                print(f'    {name:20s}: {error:.2e} deg ({arcsec:.4f}")')
+                print(f'    {name:20s}: {error:.2e} deg ({arcsec:.4f}"){range_note}')
         nut_arcsec = math.degrees(nutation_error) * 3600.0
         print(f'    {"Nutation":20s}: {nutation_error:.2e} rad ({nut_arcsec:.4f}")')
 
@@ -1951,6 +2652,12 @@ def verify_leb(
 ) -> bool:
     """Post-generation validation of a .leb file.
 
+    Compares every body in the LEB file against its reference source:
+    - ICRS planets: direct Skyfield comparison (sub-arcsecond)
+    - ICRS asteroids: spktype21 comparison (sub-arcsecond)
+    - Ecliptic bodies: analytical function comparison (sub-arcsecond)
+    - Heliocentric bodies: analytical function comparison (sub-arcsecond)
+
     Args:
         leb_path: Path to the .leb file.
         n_samples: Number of random JDs to test per body.
@@ -1961,17 +2668,16 @@ def verify_leb(
     """
     from libephemeris.leb_reader import LEBReader
 
-    # Configure environment for asteroid verification
+    # Enable auto-download for asteroid SPK acquisition during verification
     import libephemeris as _ephem
 
     _ephem.set_auto_spk_download(True)
-    _ephem.set_strict_precision(False)
 
     reader = LEBReader(leb_path)
     jd_start, jd_end = reader.jd_range
 
-    # Ensure asteroid SPKs cover the full LEB date range so that
-    # swe_calc_ut uses SPK data (not Keplerian fallback) for comparison.
+    # Ensure asteroid SPKs cover each asteroid's actual date range in the LEB
+    # (which may be narrower than the global file range for per-body coverage).
     asteroid_ids_in_file = [bid for bid in reader._bodies if bid in _ASTEROID_NAIF]
     if asteroid_ids_in_file:
         from libephemeris.minor_bodies import auto_download_asteroid_spk
@@ -1979,9 +2685,10 @@ def verify_leb(
         if verbose:
             print("  Preparing asteroid SPKs for verification...")
         for bid in asteroid_ids_in_file:
+            body = reader._bodies[bid]
             try:
                 auto_download_asteroid_spk(
-                    bid, jd_start=jd_start, jd_end=jd_end, force=True
+                    bid, jd_start=body.jd_start, jd_end=body.jd_end, force=True
                 )
             except Exception:
                 pass  # Will show as FAIL if data is unavailable
@@ -1997,90 +2704,100 @@ def verify_leb(
     rng = np.random.default_rng(42)
     test_jds = rng.uniform(jd_start + 1, jd_end - 1, n_samples)
 
+    # Build ecliptic/helio eval functions (same as used during generation)
+    ecliptic_eval_funcs = _build_ecliptic_eval_funcs()
+    helio_eval_funcs = _build_helio_eval_funcs()
+
     for body_id in sorted(reader._bodies.keys()):
         body = reader._bodies[body_id]
         name = BODY_NAMES.get(body_id, f"Body {body_id}")
         max_error = 0.0
         worst_dist = 1.0  # distance (AU) at sample with worst error
+        error_unit = "AU"  # tracking what unit max_error is in
 
-        for jd in test_jds:
+        # Use body-specific JD range if available
+        body_jd_start = body.jd_start if hasattr(body, "jd_start") else jd_start
+        body_jd_end = body.jd_end if hasattr(body, "jd_end") else jd_end
+        body_test_jds = test_jds[
+            (test_jds >= body_jd_start + 1) & (test_jds <= body_jd_end - 1)
+        ]
+        if len(body_test_jds) == 0:
+            body_test_jds = rng.uniform(
+                body_jd_start + 1, body_jd_end - 1, min(n_samples, 100)
+            )
+
+        for jd in body_test_jds:
             pos, vel = reader.eval_body(body_id, jd)
 
             if body.coord_type == COORD_ICRS_BARY:
-                # Compare with Skyfield
-                from libephemeris.state import get_planets, get_timescale
-                from libephemeris.planets import get_planet_target
-
-                planets = get_planets()
-                ts = get_timescale()
-
-                target_name = _PLANET_MAP.get(body_id)
-                if target_name:
+                if body_id in _PLANET_MAP:
                     # Planet: direct ICRS comparison with Skyfield
-                    target = get_planet_target(planets, target_name)
-                    t = ts.tt_jd(jd)
-                    ref_pos = target.at(t).position.au
-                    sample_err = 0.0
-                    for c in range(3):
-                        err = abs(pos[c] - float(ref_pos[c]))
-                        if err > sample_err:
-                            sample_err = err
+                    sample_err, dist = _verify_icrs_planet(body_id, jd, pos)
                     if sample_err > max_error:
                         max_error = sample_err
-                        worst_dist = math.sqrt(
-                            float(ref_pos[0]) ** 2
-                            + float(ref_pos[1]) ** 2
-                            + float(ref_pos[2]) ** 2
-                        )
+                        worst_dist = dist
+                    error_unit = "AU"
                 elif body_id in _ASTEROID_NAIF:
-                    # Asteroid: end-to-end ecliptic comparison
-                    # (fast_calc_ut through LEB vs swe_calc_ut through Skyfield)
-                    import libephemeris as ephem
-                    from libephemeris.fast_calc import fast_calc_ut
-                    from libephemeris.constants import SEFLG_SPEED
+                    # Asteroid: ICRS comparison via spktype21
+                    sample_err, dist = _verify_icrs_asteroid(body_id, jd, pos)
+                    if sample_err > max_error:
+                        max_error = sample_err
+                        worst_dist = dist
+                    error_unit = "AU"
 
-                    fast, _ = fast_calc_ut(reader, jd, body_id, SEFLG_SPEED)
-                    ref, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-                    # Compare in ecliptic degrees
-                    dlon = abs(fast[0] - ref[0])
-                    if dlon > 180:
-                        dlon = 360 - dlon
-                    dlat = abs(fast[1] - ref[1])
-                    sample_err_deg = max(dlon, dlat)
-                    if sample_err_deg > max_error:
-                        max_error = sample_err_deg
-
-            elif body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL):
-                # Compare with analytical function
-                # For now, just verify the values are reasonable
-                if not (0.0 <= pos[0] < 360.0 or pos[0] == 0.0):
-                    max_error = 999.0
-
-        if body.coord_type == COORD_ICRS_BARY:
-            if body_id in _ASTEROID_NAIF:
-                # max_error is already in degrees for asteroids
-                arcsec = max_error * 3600.0
-                passed = arcsec < 1.0
-            else:
-                # Convert AU error to angular error for planets
-                if worst_dist > 0.001:
-                    arcsec = (max_error / worst_dist) * 206265.0
+            elif body.coord_type == COORD_ECLIPTIC:
+                # Ecliptic body: compare with analytical function
+                eval_func = ecliptic_eval_funcs.get(body_id)
+                if eval_func is not None:
+                    sample_err = _verify_ecliptic_body(eval_func, jd, pos)
+                    if sample_err > max_error:
+                        max_error = sample_err
+                    error_unit = "deg"
                 else:
-                    arcsec = max_error * 206265.0
-                passed = arcsec < 1.0
-            status = "PASS" if passed else "FAIL"
-        else:
-            # For ecliptic bodies, error is in degrees
-            arcsec = max_error * 3600.0
-            passed = True  # Already verified during generation
-            status = "PASS"
+                    # No eval function — just check range
+                    if not (0.0 <= pos[0] < 360.0 or pos[0] == 0.0):
+                        max_error = 999.0
+                    error_unit = "deg"
 
+            elif body.coord_type == COORD_HELIO_ECL:
+                # Heliocentric body: compare with analytical function
+                eval_func = helio_eval_funcs.get(body_id)
+                if eval_func is not None:
+                    sample_err = _verify_ecliptic_body(eval_func, jd, pos)
+                    if sample_err > max_error:
+                        max_error = sample_err
+                    error_unit = "deg"
+                else:
+                    if not (0.0 <= pos[0] < 360.0 or pos[0] == 0.0):
+                        max_error = 999.0
+                    error_unit = "deg"
+
+        # Convert to arcseconds and determine pass/fail
+        if error_unit == "AU":
+            # Convert AU error to angular error
+            if worst_dist > 0.001:
+                arcsec = (max_error / worst_dist) * 206265.0
+            else:
+                arcsec = max_error * 206265.0
+            passed = arcsec < 1.0
+        else:
+            # Error is in degrees
+            arcsec = max_error * 3600.0
+            passed = arcsec < 1.0
+
+        status = "PASS" if passed else "FAIL"
         if not passed:
             all_pass = False
 
         if verbose:
+            # Show per-body range annotation if narrower than global
+            range_note = ""
+            if abs(body.jd_start - jd_start) > 1.0 or abs(body.jd_end - jd_end) > 1.0:
+                yr_s = 2000.0 + (body.jd_start - 2451545.0) / 365.25
+                yr_e = 2000.0 + (body.jd_end - 2451545.0) / 365.25
+                range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
             print(
-                f'  {name:20s}: max error = {max_error:.2e} ({arcsec:.4f}") [{status}]'
+                f'  {name:20s}: max error = {max_error:.2e} ({arcsec:.4f}") [{status}]{range_note}'
             )
 
     reader.close()
@@ -2093,6 +2810,137 @@ def verify_leb(
             print("  SOME BODIES FAILED")
 
     return all_pass
+
+
+def _build_ecliptic_eval_funcs() -> dict:
+    """Build evaluation functions for ecliptic bodies (used by verify_leb)."""
+    from libephemeris.lunar import (
+        calc_mean_lunar_node,
+        calc_true_lunar_node,
+        calc_mean_lilith_with_latitude,
+        calc_true_lilith,
+        calc_interpolated_apogee,
+        calc_interpolated_perigee,
+    )
+
+    return {
+        10: lambda jd: np.array([calc_mean_lunar_node(jd), 0.0, 0.0]),
+        11: lambda jd: np.array(calc_true_lunar_node(jd)),
+        12: lambda jd: np.array([*calc_mean_lilith_with_latitude(jd), 0.0]),
+        13: lambda jd: np.array(calc_true_lilith(jd)),
+        21: lambda jd: np.array(calc_interpolated_apogee(jd)),
+        22: lambda jd: np.array(calc_interpolated_perigee(jd)),
+    }
+
+
+def _build_helio_eval_funcs() -> dict:
+    """Build evaluation functions for heliocentric bodies (used by verify_leb)."""
+    from libephemeris.hypothetical import calc_uranian_planet, calc_transpluto
+
+    funcs: dict = {}
+    # Uranian planets (body IDs 40-47)
+    for bid in range(40, 48):
+        _bid = bid  # capture for closure
+        funcs[_bid] = lambda jd, b=_bid: np.array(calc_uranian_planet(b, jd)[:3])
+    # Transpluto (body ID 48)
+    funcs[48] = lambda jd: np.array(calc_transpluto(jd)[:3])
+    return funcs
+
+
+def _verify_icrs_planet(body_id: int, jd: float, leb_pos: tuple) -> Tuple[float, float]:
+    """Verify an ICRS planet against Skyfield. Returns (max_err_au, dist_au)."""
+    from libephemeris.state import get_planets, get_timescale
+    from libephemeris.planets import get_planet_target
+
+    planets = get_planets()
+    ts = get_timescale()
+
+    target_name = _PLANET_MAP[body_id]
+    target = get_planet_target(planets, target_name)
+    t = ts.tt_jd(jd)
+    ref_pos = target.at(t).position.au
+    sample_err = 0.0
+    for c in range(3):
+        err = abs(leb_pos[c] - float(ref_pos[c]))
+        if err > sample_err:
+            sample_err = err
+    dist = math.sqrt(
+        float(ref_pos[0]) ** 2 + float(ref_pos[1]) ** 2 + float(ref_pos[2]) ** 2
+    )
+    return sample_err, dist
+
+
+def _verify_icrs_asteroid(
+    body_id: int, jd: float, leb_pos: tuple
+) -> Tuple[float, float]:
+    """Verify an ICRS asteroid against spktype21. Returns (max_err_au, dist_au)."""
+    from libephemeris.state import get_planets, get_timescale, _SPK_BODY_MAP
+
+    planets = get_planets()
+    ts = get_timescale()
+
+    spk_info = _SPK_BODY_MAP.get(body_id)
+    if spk_info is None:
+        # No SPK available — report large error
+        return 1.0, 1.0
+
+    spk_file, naif_id = spk_info
+    try:
+        from spktype21 import SPKType21
+
+        kernel = SPKType21.open(spk_file)
+    except Exception:
+        return 1.0, 1.0
+
+    try:
+        center_id = kernel.segments[0].center  # typically 10 (Sun)
+        target_id = kernel.segments[0].target
+
+        AU_KM = 149597870.7
+        pos_km, _ = kernel.compute_type21(center_id, target_id, jd)
+
+        # Get Sun barycentric position via Skyfield
+        sun = planets["sun"]
+        t = ts.tt_jd(jd)
+        sun_bary = sun.at(t).position.au
+
+        # helio km -> helio AU -> + Sun bary = SSB bary (ICRS)
+        ref_x = pos_km[0] / AU_KM + float(sun_bary[0])
+        ref_y = pos_km[1] / AU_KM + float(sun_bary[1])
+        ref_z = pos_km[2] / AU_KM + float(sun_bary[2])
+
+        err_x = abs(leb_pos[0] - ref_x)
+        err_y = abs(leb_pos[1] - ref_y)
+        err_z = abs(leb_pos[2] - ref_z)
+        sample_err = max(err_x, err_y, err_z)
+        dist = math.sqrt(ref_x**2 + ref_y**2 + ref_z**2)
+        return sample_err, dist
+    except Exception:
+        return 1.0, 1.0
+    finally:
+        kernel.close()
+
+
+def _verify_ecliptic_body(
+    eval_func: Callable[[float], np.ndarray], jd: float, leb_pos: tuple
+) -> float:
+    """Verify an ecliptic/helio body against its analytical function.
+
+    Returns max error in degrees.
+    """
+    ref = eval_func(jd)
+
+    # Longitude comparison (handle 0/360 wrap)
+    dlon = abs(float(leb_pos[0]) - float(ref[0]))
+    if dlon > 180.0:
+        dlon = 360.0 - dlon
+
+    # Latitude comparison (no wrapping)
+    dlat = abs(float(leb_pos[1]) - float(ref[1]))
+
+    # Distance comparison (if available, convert to angular equivalent)
+    # For ecliptic bodies, distance is typically small or zero
+    return max(dlon, dlat)
 
 
 # =============================================================================

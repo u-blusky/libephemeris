@@ -7,6 +7,237 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-03-01
+
+### Added
+
+#### Binary Ephemeris Mode (LEB) — Complete Implementation
+
+Full implementation of the LibEphemeris Binary (LEB) precomputed ephemeris system,
+providing ~14x runtime speedup over Skyfield/JPL pipeline via Chebyshev polynomial
+approximations stored in `.leb` files.
+
+##### Per-body date ranges for asteroids (Tasks 1.1-1.4)
+
+Asteroid SPK kernels from JPL Horizons cover only ~1600-2500 CE, while planetary
+ephemerides (DE440/DE441) span much wider ranges. LEB now stores per-body
+`jd_start`/`jd_end` in each `BodyEntry` header, allowing asteroids to have narrower
+coverage than planets within the same file. When a query falls outside an asteroid's
+LEB range, the library transparently falls back to Skyfield.
+
+- `assemble_leb()` computes per-body date ranges from actual SPK coverage
+- `eval_body()` in `leb_reader.py` raises `ValueError` for out-of-range JDs
+- `swe_calc_ut()`/`swe_calc()` catch both `KeyError` and `ValueError` for fallback
+- Keplerian fallback removed from asteroid generation — only SPK data is used
+
+##### Vectorized analytical body generation (Tasks 2.1-2.7, ~10x speedup)
+
+The 6 ecliptic bodies (True Node, True Lilith, Osculating Apogee, Interpolated
+Apogee, Interpolated Perigee, Mean Apogee) previously made ~328,000 scalar Skyfield
+calls each. A single vectorized Skyfield call now computes all shared Moon ephemeris
+data, then each body's values are derived with numpy.
+
+New vectorized functions in `generate_leb.py`:
+- `_calc_mean_lilith_batch()` — vectorized mean apse analytical calculation
+- `_calc_lunar_fundamental_arguments_batch()` — vectorized Delaunay arguments
+- `_calc_elp2000_apogee_perturbations_batch()` — vectorized 40+ term perturbation series
+- `_calc_elp2000_perigee_perturbations_batch()` — vectorized 61-term perturbation series
+- `_eval_ecliptic_bodies_batch()` — single Skyfield call, all 6 bodies from shared r,v
+- `generate_ecliptic_bodies_vectorized()` — orchestrates batch eval + Chebyshev fitting
+- `_fit_and_verify_from_values_unwrap()` — fits with longitude unwrapping
+
+**Result:** Analytical group generation went from ~5-8 minutes to ~38 seconds for base tier.
+
+##### Group generation and merge workflow (Task 1.7)
+
+New `--group {planets,asteroids,analytical}` and `--merge FILE [FILE ...]` CLI
+options for `generate_leb.py`. Partial group files are generation-time artifacts;
+at runtime only the single merged file is used. This avoids macOS
+`ProcessPoolExecutor` deadlocks that occurred when child processes used C extensions
+(numpy, erfa, Skyfield).
+
+New `poe` tasks for all three tiers:
+```
+poe leb:generate:base:groups       # All 3 groups + merge for base tier
+poe leb:generate:medium:groups     # All 3 groups + merge for medium tier
+poe leb:generate:extended:groups   # All 3 groups + merge for extended tier
+```
+
+##### LEB verification rewrite (Task 1.6)
+
+`verify_leb()` rewritten with proper per-body verification against Skyfield
+reference values. Reports per-body max error in arcseconds with PASS/FAIL status.
+
+##### Calculation mode control (Task 3.3)
+
+New `LIBEPHEMERIS_MODE` environment variable and programmatic API for controlling
+the calculation backend:
+
+```python
+from libephemeris import set_calc_mode, get_calc_mode
+
+set_calc_mode("auto")      # Use LEB if configured, otherwise Skyfield (default)
+set_calc_mode("skyfield")  # Always use Skyfield, even if LEB is configured
+set_calc_mode("leb")       # Require LEB; raises RuntimeError if unavailable
+```
+
+- `get_leb_reader()` respects mode: `"skyfield"` returns `None`, `"leb"` raises if missing
+- `close()` resets `_CALC_MODE` to `None`
+- Environment variable `LIBEPHEMERIS_MODE` sets default (overridden by programmatic call)
+- 18 new tests in `TestCalcMode` class
+
+#### Keplerian Precision Improvements
+
+##### Laplace-Lagrange secular perturbations for eccentricity and inclination (Task 4.1)
+
+Implemented the (h,k)/(p,q) vector formalism for secular evolution of eccentricity
+and inclination under gravitational perturbations from Jupiter, Saturn, Uranus, and
+Neptune:
+
+- Eccentricity vector `(h, k) = (e sin varpi, e cos varpi)` decomposes into forced + free
+- Inclination vector `(p, q) = (sin(i/2) sin Omega, sin(i/2) cos Omega)` similarly
+- Free component rotates at the body's proper frequency
+- Uses Laplace coefficients `b_{3/2}^{(1)}` and `b_{3/2}^{(2)}` for coupling terms
+- `_calc_forced_elements()` function (~120 lines) in `minor_bodies.py`
+- `apply_secular_perturbations()` now returns 6-tuple `(omega, Omega, M, n, e_pert, i_pert)`
+
+##### Multi-epoch orbital elements (Task 4.3)
+
+Generated Keplerian elements from SPK Type 21 state vectors at 50-year intervals
+from 1650-2450 CE for 6 bodies (Chiron, Pholus, Ceres, Pallas, Juno, Vesta).
+`_get_closest_epoch_elements()` selects the element set with the smallest time
+offset from the query date, dramatically improving long-term accuracy:
+
+| Offset   | Before    | After     | Improvement |
+|----------|-----------|-----------|-------------|
+| 25 years | 3.3 deg   | 2.6'      | ~75x        |
+| 50 years | 5.3 deg   | 3.6 deg   | ~1.5x       |
+| 100 years| 10.7 deg  | 3.5 deg   | ~3x         |
+
+- `MINOR_BODY_ELEMENTS_MULTI` dictionary (~600 lines, 17 epochs per body)
+- State-to-Keplerian conversion via ICRS to ecliptic J2000 rotation
+- Original single-epoch element always considered as candidate (preserves near-epoch accuracy)
+
+##### Keplerian precision benchmark (Task 4.6)
+
+New `tests/test_keplerian_precision_benchmark.py` with systematic comparison of
+Keplerian vs SPK positions across 11 time offsets for 5 asteroids. Regression
+tests enforce: epoch < 1", 1 month < 60", 1 year < 5'.
+
+#### REBOUND/ASSIST N-body Integration (Task 4.4)
+
+Complete integration of REBOUND/ASSIST as a fallback for ephemeris-quality asteroid
+orbit propagation, including planetary perturbations from all major bodies.
+
+##### End-to-end ASSIST pipeline
+
+- `propagate_orbit_assist()` — ephemeris-quality integration with Sun, Moon, 8 planets,
+  16 massive asteroids, J2/J3/J4 harmonics, and GR corrections
+- Fixed critical bug: ASSIST manages the Sun internally, so particles must be added with
+  Cartesian coordinates (not orbital elements). New `_elements_to_cartesian()` helper
+  converts via temporary REBOUND simulation
+- `propagate_trajectory()` ASSIST path also fixed with Cartesian conversion
+- Fallback chain in `planets.py`: SPK > auto-download > ASSIST > Keplerian
+
+##### Cached ASSIST availability check
+
+- `check_assist_data_available()` — cached check for both ASSIST import and data file presence
+- `reset_assist_data_cache()` — clears cache (called by `close()`)
+- Replaces uncached `check_assist_available()` in the fallback chain
+
+##### ASSIST data download
+
+New `download_assist_data()` function with production-quality download pipeline:
+- SSL certificate handling via `certifi`
+- Atomic downloads (temp file + `os.replace()`)
+- Progress bar integration via existing `_get_progress_bar()`
+- File integrity verification: size validation + BSP structural check via `jplephem`
+- Existing file detection with verification before skipping
+- `--force` flag for re-download
+- SHA256 hash reporting on completion
+
+##### CLI command
+
+New `libephemeris download:assist` CLI command:
+```bash
+libephemeris download:assist                    # Download both files (~714 MB)
+libephemeris download:assist --no-asteroids     # Planet ephemeris only (~98 MB)
+libephemeris download:assist --target-dir /path # Custom directory
+libephemeris download:assist --force            # Re-download even if present
+```
+
+New `poe` task: `poe download:assist`
+
+Required data files (saved to `~/.libephemeris/assist/`):
+- `linux_p1550p2650.440` — JPL DE440 planet ephemeris in Linux binary format (~98 MB)
+- `sb441-n16.bsp` — 16 massive asteroid perturbers (~616 MB)
+
+##### Conditional test suite
+
+- `TestAssistDataAvailability` (6 tests): cached check, reset, import failure, missing files, close resets cache
+- `TestAssistEndToEnd` (9 tests): Ceres/Vesta/Chiron propagation, ASSIST vs REBOUND comparison,
+  backward integration, trajectory, compare_with_keplerian, error handling
+- Tests automatically skip when ASSIST data files are not present
+- All 55 REBOUND/ASSIST tests pass (1 skipped for "without rebound" test)
+
+### Changed
+
+#### LEB Generator Performance
+
+- Removed `ProcessPoolExecutor` entirely from `generate_leb.py` (macOS deadlock fix
+  with numpy/erfa/Skyfield C extensions)
+- Vectorized Skyfield ICRS evaluations (~150x speedup for individual body calls)
+- Vectorized nutation computation via direct `erfa.nut06a()` (~50x speedup)
+- Batched verification (fit + verify in single JD array allocation)
+- `spktype21` integration for asteroid SPK evaluation (~36x vs `swe_calc`)
+- Linear extrapolation for SPK boundary overshoot (smooth Chebyshev fitting at edges)
+
+#### Minor Bodies
+
+- `apply_secular_perturbations()` signature changed from 4-tuple to 6-tuple return:
+  `(omega_pert, Omega_pert, M_pert, n_pert, e_pert, i_pert)`
+- All callers updated: `calc_minor_body_position()`, `_elements_to_rebound_params()`,
+  test unpacking in `test_secular_perturbations.py`
+
+#### State Management
+
+- `close()` now resets `_CALC_MODE` and calls `reset_assist_data_cache()`
+- `get_leb_reader()` respects calculation mode setting
+
+#### Naming
+
+- Removed Swiss Ephemeris naming/references from generator labels and comments
+  (replaced with LibEphemeris-native terminology)
+
+### Documentation
+
+- New comprehensive `docs/LEB_GUIDE.md` (~1668 lines): architecture, binary format,
+  generation workflow, group/merge, verification, state management, exported API
+- New comprehensive `TODO.md` (~530 lines): full implementation roadmap with status
+- Updated `docs/LEB_PLAN.md` with implementation notes
+- Updated `README.md`:
+  - New "Binary Ephemeris Mode (LEB)" section with activation, mode control, LEB_GUIDE link
+  - New "N-body fallback (REBOUND/ASSIST)" section with install/download/usage instructions
+- Updated `docs/LEB_GUIDE.md`:
+  - Section 1: "Calculation Mode (`LIBEPHEMERIS_MODE`)" subsection
+  - Section 7.1: Mode variables and functions in global state docs
+  - Section 7.4: `set_calc_mode`, `get_calc_mode` in exported API
+
+### Removed
+
+- `docs/KEPLERIAN_TODO.md` — superseded by `TODO.md`
+- `ProcessPoolExecutor` from LEB generator (macOS deadlock)
+- Keplerian fallback from asteroid LEB generation (SPK-only)
+
+### Tests
+
+- 18 new `TestCalcMode` tests in `test_context_leb.py`
+- 6 new `TestAssistDataAvailability` tests in `test_rebound_integration.py`
+- 9 new `TestAssistEndToEnd` tests in `test_rebound_integration.py`
+- 5 new Keplerian precision benchmark tests (marked slow)
+- Updated 3 callers of `apply_secular_perturbations()` in `test_secular_perturbations.py`
+- All 155 LEB tests pass, 55 REBOUND tests pass, 46 secular perturbation tests pass, 29 context tests pass
+
 ## [0.20.0] - 2026-02-24
 
 ### Changed
@@ -994,7 +1225,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/g-battaglia/libephemeris/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/g-battaglia/libephemeris/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/g-battaglia/libephemeris/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/g-battaglia/libephemeris/compare/v0.17.0...v0.18.0

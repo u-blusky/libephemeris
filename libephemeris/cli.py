@@ -7,6 +7,7 @@ Usage:
     libephemeris download:base         Download data for 'base' tier (1850-2150)
     libephemeris download:medium       Download data for 'medium' tier (1550-2650)
     libephemeris download:extended     Download data for 'extended' tier (-13200 to +17191)
+    libephemeris download:assist       Download ASSIST n-body data files (~714 MB)
     libephemeris status                Show data file status
     libephemeris --version             Show version
     libephemeris --help                Show help
@@ -90,6 +91,36 @@ def cmd_download_extended(args: argparse.Namespace) -> int:
     return _cmd_download("extended", args)
 
 
+def cmd_download_assist(args: argparse.Namespace) -> int:
+    """Download ASSIST n-body integration data files."""
+    from .rebound_integration import download_assist_data
+
+    try:
+        download_assist_data(
+            target_dir=args.target_dir if hasattr(args, "target_dir") else None,
+            planets=not args.no_planets,
+            asteroids=not args.no_asteroids,
+            force=args.force,
+            show_progress=not args.no_progress,
+            quiet=args.quiet,
+        )
+        return 0
+    except KeyboardInterrupt:
+        print("\nDownload cancelled.")
+        return 130
+    except ImportError as e:
+        if not args.quiet:
+            print(
+                f"Error: {e}\nInstall the nbody extra: pip install libephemeris[nbody]",
+                file=sys.stderr,
+            )
+        return 1
+    except Exception as e:
+        if not args.quiet:
+            print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     """Handle the status command."""
     from .download import print_data_status
@@ -160,6 +191,7 @@ Examples:
   libephemeris download:medium       Download data for the default tier
   libephemeris download:base         Lightweight, modern-era data
   libephemeris download:extended     Full range (-13200 to +17191 CE)
+  libephemeris download:assist       ASSIST n-body data (~714 MB)
   libephemeris status                Show installed data files
   libephemeris --version             Show version information
 
@@ -209,6 +241,47 @@ For more information, visit: https://github.com/g-battaglia/libephemeris
     )
     _add_download_flags(dl_extended)
     dl_extended.set_defaults(func=cmd_download_extended)
+
+    # download:assist
+    dl_assist = subparsers.add_parser(
+        "download:assist",
+        help="Download ASSIST n-body data files (~714 MB)",
+        description="""\
+Download data files required by ASSIST for ephemeris-quality n-body integration.
+
+ASSIST provides sub-arcsecond precision for asteroid orbit propagation by
+including gravitational perturbations from the Sun, Moon, 8 planets, and
+16 massive asteroids.
+
+Downloads:
+  1. Planet ephemeris (linux_p1550p2650.440, ~98 MB)
+     JPL DE440 in Linux binary format, 1550-2650 CE
+  2. Asteroid perturbers (sb441-n16.bsp, ~616 MB)
+     16 massive asteroids for gravitational perturbation modeling
+
+Files are saved to ~/.libephemeris/assist/ by default.
+Requires: pip install libephemeris[nbody]
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_download_flags(dl_assist)
+    dl_assist.add_argument(
+        "--no-planets",
+        action="store_true",
+        help="Skip planet ephemeris download",
+    )
+    dl_assist.add_argument(
+        "--no-asteroids",
+        action="store_true",
+        help="Skip asteroid perturbers download",
+    )
+    dl_assist.add_argument(
+        "--target-dir",
+        type=str,
+        default=None,
+        help="Directory to save files (default: ~/.libephemeris/assist/)",
+    )
+    dl_assist.set_defaults(func=cmd_download_assist)
 
     # status
     status_parser = subparsers.add_parser(

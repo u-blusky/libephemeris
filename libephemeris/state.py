@@ -158,8 +158,79 @@ _IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
 _LEB_FILE: Optional[str] = None  # Path to .leb file
 _LEB_READER: Optional["LEBReader"] = None  # Cached LEBReader instance
 
+# Calculation mode: "auto" (default), "skyfield", or "leb"
+_CALC_MODE: Optional[str] = None  # None = check env var
+_CALC_MODE_ENV_VAR = "LIBEPHEMERIS_MODE"
+_VALID_CALC_MODES = ("auto", "skyfield", "leb")
+
 if TYPE_CHECKING:
     from .leb_reader import LEBReader
+
+
+def set_calc_mode(mode: Optional[str]) -> None:
+    """Set the calculation mode for the library.
+
+    Controls how swe_calc_ut() and swe_calc() resolve positions:
+
+    - ``"auto"`` (default): Use LEB if a .leb file is configured,
+      otherwise fall back to Skyfield. This is the standard behavior.
+    - ``"skyfield"``: Always use Skyfield, even if a .leb file is
+      configured. Useful for benchmarking or validation.
+    - ``"leb"``: Require LEB. Raises RuntimeError if no .leb file is
+      configured or if the file cannot be opened. Bodies not in the
+      .leb file still fall through to Skyfield.
+
+    Args:
+        mode: One of ``"auto"``, ``"skyfield"``, ``"leb"``, or None
+              to reset to environment variable / default.
+
+    Raises:
+        ValueError: If mode is not a valid mode string.
+
+    Environment Variable:
+        LIBEPHEMERIS_MODE: Same values as the ``mode`` argument.
+        Case-insensitive. Default is ``"auto"``.
+
+    Example:
+        >>> from libephemeris import set_calc_mode, get_calc_mode
+        >>> set_calc_mode("skyfield")  # Force Skyfield path
+        >>> get_calc_mode()
+        'skyfield'
+        >>> set_calc_mode(None)  # Reset to env var / default
+    """
+    global _CALC_MODE
+    if mode is not None:
+        mode = mode.lower().strip()
+        if mode not in _VALID_CALC_MODES:
+            raise ValueError(
+                f"Invalid mode: {mode!r}. Must be one of: {list(_VALID_CALC_MODES)}"
+            )
+    _CALC_MODE = mode
+
+
+def get_calc_mode() -> str:
+    """Get the current calculation mode.
+
+    Resolution order:
+        1. Programmatic override via set_calc_mode()
+        2. LIBEPHEMERIS_MODE environment variable
+        3. Default: ``"auto"``
+
+    Returns:
+        str: The active calculation mode (``"auto"``, ``"skyfield"``,
+             or ``"leb"``).
+
+    Example:
+        >>> from libephemeris import get_calc_mode
+        >>> get_calc_mode()  # Default
+        'auto'
+    """
+    if _CALC_MODE is not None:
+        return _CALC_MODE
+    env_value = os.environ.get(_CALC_MODE_ENV_VAR, "").lower().strip()
+    if env_value in _VALID_CALC_MODES:
+        return env_value
+    return "auto"
 
 
 def set_leb_file(filepath: Optional[str]) -> None:
@@ -191,18 +262,36 @@ def set_leb_file(filepath: Optional[str]) -> None:
 def get_leb_reader() -> Optional["LEBReader"]:
     """Get the active LEBReader, if any.
 
+    Respects the calculation mode set via set_calc_mode() or the
+    LIBEPHEMERIS_MODE environment variable:
+
+    - ``"skyfield"``: Always returns None (LEB disabled).
+    - ``"leb"``: Returns LEBReader or raises RuntimeError if unavailable.
+    - ``"auto"`` (default): Returns LEBReader if configured, else None.
+
     If a .leb file is configured (via set_leb_file() or the
     LIBEPHEMERIS_LEB environment variable), returns a LEBReader
     instance. Otherwise returns None.
 
     If the .leb file path is invalid or the file is corrupted,
-    logs a warning and returns None (silent fallback to Skyfield).
+    logs a warning and returns None (silent fallback to Skyfield),
+    unless mode is ``"leb"`` in which case RuntimeError is raised.
 
     Returns:
         LEBReader instance if a .leb file is configured and valid,
         None otherwise.
+
+    Raises:
+        RuntimeError: If mode is ``"leb"`` and no valid .leb file is
+                      available.
     """
     global _LEB_READER
+    mode = get_calc_mode()
+
+    # In skyfield mode, never use LEB
+    if mode == "skyfield":
+        return None
+
     if _LEB_READER is None:
         path = _LEB_FILE or os.environ.get("LIBEPHEMERIS_LEB")
         if path is not None:
@@ -211,9 +300,18 @@ def get_leb_reader() -> Optional["LEBReader"]:
 
                 _LEB_READER = LEBReader(path)
             except (FileNotFoundError, ValueError, OSError) as e:
+                if mode == "leb":
+                    raise RuntimeError(
+                        f"LIBEPHEMERIS_MODE=leb but failed to open LEB file {path}: {e}"
+                    ) from e
                 logger = get_logger()
                 logger.warning("Failed to open LEB file %s: %s", path, e)
                 return None
+        elif mode == "leb":
+            raise RuntimeError(
+                "LIBEPHEMERIS_MODE=leb but no .leb file configured. "
+                "Use set_leb_file() or set LIBEPHEMERIS_LEB env var."
+            )
     return _LEB_READER
 
 
@@ -1015,7 +1113,7 @@ def close() -> None:
     global _SPK_KERNELS, _SPK_BODY_MAP, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
     global _PRECISION_TIER
-    global _LEB_FILE, _LEB_READER
+    global _LEB_FILE, _LEB_READER, _CALC_MODE
 
     # Close the LEB reader if loaded
     if _LEB_READER is not None:
@@ -1025,6 +1123,7 @@ def close() -> None:
             pass
     _LEB_FILE = None
     _LEB_READER = None
+    _CALC_MODE = None
 
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:
@@ -1090,6 +1189,14 @@ def close() -> None:
     from . import planetary_moons
 
     planetary_moons.close_moon_kernels()
+
+    # Reset ASSIST data availability cache
+    try:
+        from .rebound_integration import reset_assist_data_cache
+
+        reset_assist_data_cache()
+    except ImportError:
+        pass
 
 
 def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:

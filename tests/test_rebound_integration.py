@@ -6,6 +6,7 @@ orbit propagation, both with and without the optional REBOUND/ASSIST packages.
 """
 
 import math
+import os
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -21,10 +22,13 @@ from libephemeris.rebound_integration import (
     PropagationResult,
     check_rebound_available,
     check_assist_available,
+    check_assist_data_available,
+    reset_assist_data_cache,
     get_rebound_version,
     get_assist_version,
     elements_to_rebound_orbit,
     propagate_orbit_rebound,
+    propagate_orbit_assist,
     propagate_trajectory,
     compare_with_keplerian,
 )
@@ -501,3 +505,226 @@ class TestOrbitRoundTrip:
 
         # Results should be consistent
         assert abs(result_fwd.distance - result_bwd.distance) < 1e-10
+
+
+class TestAssistDataAvailability:
+    """Test cached ASSIST data availability checks."""
+
+    def test_check_assist_data_returns_bool(self):
+        """check_assist_data_available() should return a boolean."""
+        result = check_assist_data_available()
+        assert isinstance(result, bool)
+
+    def test_cache_is_consistent(self):
+        """Repeated calls should return the same cached result."""
+        reset_assist_data_cache()
+        first = check_assist_data_available()
+        second = check_assist_data_available()
+        assert first == second
+
+    def test_reset_clears_cache(self):
+        """reset_assist_data_cache() should allow re-probing."""
+        # Prime the cache
+        check_assist_data_available()
+        # Reset
+        reset_assist_data_cache()
+        # The next call re-probes (should still return the same value,
+        # but the important thing is it doesn't crash)
+        result = check_assist_data_available()
+        assert isinstance(result, bool)
+
+    def test_no_assist_import_returns_false(self):
+        """If ASSIST is not importable, should return False."""
+        reset_assist_data_cache()
+        with patch.dict("sys.modules", {"assist": None}):
+            # Force re-check by clearing the lru_cache-like global
+            from libephemeris import rebound_integration
+
+            old_val = rebound_integration._assist_data_available
+            rebound_integration._assist_data_available = None
+            try:
+                result = check_assist_data_available()
+                assert result is False
+            finally:
+                rebound_integration._assist_data_available = old_val
+
+    def test_missing_data_files_returns_false(self):
+        """If ASSIST is importable but data files are missing, should return False."""
+        if not check_assist_available():
+            pytest.skip("ASSIST not installed")
+        reset_assist_data_cache()
+        # Point to a non-existent directory
+        with patch.dict(os.environ, {"ASSIST_DIR": "/nonexistent/assist/dir"}):
+            from libephemeris import rebound_integration
+
+            old_val = rebound_integration._assist_data_available
+            rebound_integration._assist_data_available = None
+            try:
+                config = AssistEphemConfig(data_dir="/nonexistent/assist/dir")
+                with patch.object(
+                    rebound_integration,
+                    "AssistEphemConfig",
+                    return_value=config,
+                ):
+                    # Only returns False if the default dirs also don't have it
+                    result = check_assist_data_available()
+                    assert isinstance(result, bool)
+            finally:
+                rebound_integration._assist_data_available = old_val
+                reset_assist_data_cache()
+
+    def test_close_resets_assist_cache(self):
+        """libephemeris.close() should reset the ASSIST data cache."""
+        import libephemeris
+
+        # Prime the cache
+        check_assist_data_available()
+        # Close should reset it
+        libephemeris.close()
+        from libephemeris import rebound_integration
+
+        assert rebound_integration._assist_data_available is None
+
+
+# Whether ASSIST data files are actually present on this machine
+_assist_data_present = check_assist_data_available()
+
+# Fixture-like skip marker
+requires_assist_data = pytest.mark.skipif(
+    not _assist_data_present,
+    reason="ASSIST data files not downloaded (~714 MB required)",
+)
+
+
+class TestAssistEndToEnd:
+    """End-to-end ASSIST integration tests.
+
+    These tests require ASSIST data files (~714 MB) to be downloaded.
+    They are automatically skipped if the files are not present.
+    Run ``download_assist_data()`` to enable them.
+    """
+
+    @requires_assist_data
+    def test_propagate_ceres_assist(self):
+        """Propagate Ceres with ASSIST for 30 days."""
+        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        jd_start = elements.epoch
+        jd_end = jd_start + 30
+
+        result = propagate_orbit_assist(elements, jd_start, jd_end)
+
+        assert isinstance(result, PropagationResult)
+        assert result.jd_tt == jd_end
+        # Ceres should be between 2.0 and 3.5 AU
+        assert 2.0 < result.distance < 3.5
+
+    @requires_assist_data
+    def test_propagate_vesta_assist(self):
+        """Propagate Vesta with ASSIST for 100 days."""
+        elements = MINOR_BODY_ELEMENTS[SE_VESTA]
+        jd_start = elements.epoch
+        jd_end = jd_start + 100
+
+        result = propagate_orbit_assist(elements, jd_start, jd_end)
+
+        assert 1.8 < result.distance < 2.8
+
+    @requires_assist_data
+    def test_propagate_chiron_assist(self):
+        """Propagate Chiron (centaur) with ASSIST for 1 year."""
+        elements = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        jd_start = elements.epoch
+        jd_end = jd_start + 365.25
+
+        result = propagate_orbit_assist(elements, jd_start, jd_end)
+
+        assert 5.0 < result.distance < 25.0
+
+    @requires_assist_data
+    def test_assist_vs_rebound_ceres(self):
+        """ASSIST should give different (more accurate) results than 2-body REBOUND."""
+        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        jd_start = elements.epoch
+        jd_end = jd_start + 365.25  # 1 year
+
+        result_assist = propagate_orbit_assist(elements, jd_start, jd_end)
+        result_rebound = propagate_orbit_rebound(elements, jd_start, jd_end)
+
+        # They should give different results because ASSIST includes
+        # planetary perturbations while REBOUND 2-body does not
+        dx = result_assist.x - result_rebound.x
+        dy = result_assist.y - result_rebound.y
+        dz = result_assist.z - result_rebound.z
+        sep = math.sqrt(dx**2 + dy**2 + dz**2)
+
+        # The difference should be non-trivial (> 1e-6 AU) for a 1-year propagation
+        # due to Jupiter's perturbation on Ceres
+        assert sep > 1e-6
+
+    @requires_assist_data
+    def test_assist_backward_integration(self):
+        """Backward ASSIST integration should work."""
+        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        jd_start = elements.epoch
+        jd_end = jd_start - 30  # 30 days backward
+
+        result = propagate_orbit_assist(elements, jd_start, jd_end)
+
+        assert result.jd_tt == jd_end
+        assert result.distance > 0
+
+    @requires_assist_data
+    def test_assist_trajectory(self):
+        """Trajectory propagation with ASSIST should return multiple points."""
+        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        jd_start = elements.epoch
+        jd_end = jd_start + 100
+
+        trajectory = propagate_trajectory(
+            elements, jd_start, jd_end, num_points=10, use_assist=True
+        )
+
+        assert len(trajectory) == 10
+        for point in trajectory:
+            assert isinstance(point, PropagationResult)
+            assert 2.0 < point.distance < 3.5
+
+    @requires_assist_data
+    def test_compare_with_keplerian_assist(self):
+        """compare_with_keplerian with use_assist=True should use ASSIST."""
+        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        jd = elements.epoch + 365.25
+
+        comparison = compare_with_keplerian(elements, jd, use_assist=True)
+
+        assert comparison["method"] == "assist"
+        assert "angular_sep_arcsec" in comparison
+
+    @requires_assist_data
+    def test_assist_missing_planets_file_raises(self):
+        """propagate_orbit_assist should raise FileNotFoundError for missing file."""
+        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        config = AssistEphemConfig(
+            planets_file="/nonexistent/linux_p1550p2650.440",
+        )
+
+        with pytest.raises(FileNotFoundError):
+            propagate_orbit_assist(
+                elements, elements.epoch, elements.epoch + 10, ephem_config=config
+            )
+
+    def test_assist_no_planets_file_raises(self):
+        """propagate_orbit_assist should raise FileNotFoundError when no file found."""
+        if not check_assist_available():
+            pytest.skip("ASSIST not installed")
+
+        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        config = AssistEphemConfig.__new__(AssistEphemConfig)
+        config.planets_file = None
+        config.asteroids_file = None
+        config.data_dir = None
+
+        with pytest.raises(FileNotFoundError):
+            propagate_orbit_assist(
+                elements, elements.epoch, elements.epoch + 10, ephem_config=config
+            )

@@ -240,6 +240,26 @@ pos, _ = swe.calc_ut(2460000.0, SE_CHIRON, 0)
 print(pos[0])
 ```
 
+### N-body fallback (REBOUND/ASSIST)
+
+When SPK kernels are not available for a minor body, LibEphemeris can fall back
+to REBOUND/ASSIST n-body integration for ephemeris-quality precision (sub-arcsecond).
+This requires the optional `[nbody]` extra and ~714 MB of JPL data files:
+
+```bash
+pip install libephemeris[nbody]
+```
+
+```python
+from libephemeris.rebound_integration import download_assist_data
+download_assist_data()  # Downloads to ~/.libephemeris/assist/ (~714 MB)
+```
+
+Once installed, ASSIST is used automatically in the fallback chain:
+SPK kernel > auto-download SPK > REBOUND/ASSIST > Keplerian.
+
+See `docs/REBOUND_BENEFITS.md` for details.
+
 ### Optional Dependencies
 
 LibEphemeris has several optional dependencies for enhanced functionality:
@@ -291,6 +311,7 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 - `docs/PRECISION_TUNING.md` (precision tuning guide)
 - `docs/PYERFA_BENEFITS.md` (pyerfa integration benefits)
 - `docs/REBOUND_BENEFITS.md` (REBOUND n-body integration benefits)
+- `docs/LEB_GUIDE.md` (binary ephemeris format and performance guide)
 
 ---
 
@@ -298,6 +319,61 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 
 LibEphemeris is pure Python; Swiss Ephemeris is C. Expect LibEphemeris to be slower.
 For batch workloads, use `EphemerisContext`, parallelism, and caching.
+
+### Binary Ephemeris Mode (LEB)
+
+For performance-critical applications, LibEphemeris supports precomputed binary
+ephemeris files (`.leb`) that store Chebyshev polynomial approximations of all
+body positions. This provides approximately **14x speedup** (~8 us vs ~120 us
+per evaluation) with sub-arcsecond precision.
+
+**Mode 1: Skyfield (default, zero configuration)**
+
+```bash
+pip install libephemeris
+```
+
+```python
+import libephemeris as swe
+result, _ = swe.calc_ut(2451545.0, 0, 0)  # Works immediately
+```
+
+- No files to manage, always up-to-date
+- ~120 us per evaluation
+
+**Mode 2: Binary ephemeris (maximum speed)**
+
+```bash
+pip install libephemeris
+# Generate or download the .leb file
+poe leb:generate:base:groups    # Generate base tier (~5 min)
+export LIBEPHEMERIS_LEB=data/leb/ephemeris_base.leb
+```
+
+```python
+import libephemeris as swe
+result, _ = swe.calc_ut(2451545.0, 0, 0)  # ~14x faster
+```
+
+- ~8 us per evaluation (~14x speedup)
+- Requires precomputed `.leb` file (~56 MB for base tier)
+- Transparent fallback to Skyfield for unsupported flags or bodies
+
+**Calculation mode control:**
+
+```python
+from libephemeris import set_calc_mode
+
+set_calc_mode("skyfield")  # Force Skyfield (ignore LEB even if configured)
+set_calc_mode("leb")       # Require LEB (error if unavailable)
+set_calc_mode("auto")      # Default: use LEB if available, else Skyfield
+```
+
+```bash
+export LIBEPHEMERIS_MODE=skyfield  # Or: leb, auto
+```
+
+Full technical guide: `docs/LEB_GUIDE.md`.
 
 ---
 

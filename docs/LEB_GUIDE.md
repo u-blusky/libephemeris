@@ -133,6 +133,37 @@ ctx.set_leb_file("/path/to/ephemeris.leb")
 2. Global `set_leb_file()` call
 3. `LIBEPHEMERIS_LEB` environment variable
 
+### Calculation Mode (`LIBEPHEMERIS_MODE`)
+
+The calculation mode controls how `swe_calc_ut()` and `swe_calc()` resolve
+positions. Set via `set_calc_mode()` or the `LIBEPHEMERIS_MODE` environment
+variable.
+
+| Mode | Behavior |
+|------|----------|
+| `auto` (default) | Use LEB if configured, otherwise Skyfield |
+| `skyfield` | Always use Skyfield, even if a `.leb` file is configured |
+| `leb` | Require LEB; raises `RuntimeError` if no `.leb` file is available |
+
+```python
+from libephemeris import set_calc_mode, get_calc_mode
+
+set_calc_mode("skyfield")  # Force Skyfield for benchmarking/validation
+set_calc_mode("leb")       # Require LEB (error if unavailable)
+set_calc_mode("auto")      # Default behavior
+set_calc_mode(None)        # Reset to env var / default
+```
+
+```bash
+export LIBEPHEMERIS_MODE=skyfield   # Force Skyfield
+export LIBEPHEMERIS_MODE=leb        # Require LEB
+export LIBEPHEMERIS_MODE=auto       # Default (same as unset)
+```
+
+In `leb` mode, bodies not present in the `.leb` file still fall through to
+Skyfield (the mode only requires that a valid `.leb` file is loaded, not
+that every body is in it).
+
 ---
 
 ## 3. Binary File Format
@@ -709,11 +740,11 @@ produces smooth, reasonable values for the short extrapolation distance
 
 ### 6.7 Asteroid Generation
 
-**Two paths** (`generate_body_icrs_asteroid`, line 722):
+**Single path** (`generate_body_icrs_asteroid`, line ~1329):
 
-**Path 1 — spktype21 (preferred, ~36x faster than old path):**
+Uses `spktype21` exclusively (~36x faster than old scalar path):
 1. Open the SPK type 21 file via `spktype21.SPKType21.open()`
-2. Verify it covers `[jd_start, jd_end]`
+2. Verify it covers the requested date range (raises `RuntimeError` if not)
 3. Get Sun barycentric positions via vectorized Skyfield
 4. For each JD (scalar loop, ~65 us/eval):
    ```python
@@ -723,38 +754,50 @@ produces smooth, reasonable values for the short extrapolation distance
    ```
 5. Fit and verify from the collected values
 
-**Path 2 — Scalar fallback (slow, ~2365 us/eval):**
-- Uses `swe_calc()` per-point
-- Converts geocentric ecliptic -> equatorial -> adds Earth position
-- Only used when SPK file is unavailable or doesn't cover the range
+**No Keplerian fallback.** If the SPK file is unavailable or doesn't cover
+the requested range, the function raises `RuntimeError`. The generator
+excludes asteroids without SPK rather than producing inaccurate data.
 
-### 6.8 Full-Range Asteroid SPK Download
+### 6.8 Per-Body Date Ranges for Asteroids
 
-**Problem:** `auto_download_asteroid_spk()` defaults to ±10 years from the
-current date. For the base tier (1850-2150), this means the SPK file only
-covers ~2016-2036, and the generator falls back to the slow scalar path
-for dates outside that range.
+**Problem:** JPL Horizons SPK files for minor bodies cover approximately
+1600-2500 CE. For the base tier (1850-2150), this is sufficient. For the
+medium tier (1550-2650), SPK coverage may be slightly narrower at the edges.
+For the extended tier (-5000 to 5000), asteroids cannot cover the full range.
 
-**Solution** (`assemble_leb`, line 1358):
-1. Pass tier `jd_start`/`jd_end` to `auto_download_asteroid_spk()`
-2. Check cached SPKs with `_spk_covers_range()` — opens the SPK file,
-   finds segments for the target NAIF ID, and checks if they span the
-   full requested range
-3. If cached SPK is too narrow, force re-download with `force=True`
+Previously, asteroids were excluded entirely if their SPK didn't cover the
+full tier range. Now, the generator uses **per-body date ranges**: each
+asteroid covers only its actual SPK range, while planets and analytical
+bodies cover the full tier range.
+
+**How it works** (`assemble_leb`, step 0):
+
+1. For each asteroid, attempt to download SPK for the full tier range
+2. If the SPK covers the full range → use global `jd_start`/`jd_end`
+3. If the SPK is narrower → discover actual range via `_get_asteroid_spk_range()`
+4. Intersect SPK range with tier range (with 1-day safety margin)
+5. If overlap is less than 20 years → exclude the asteroid
+6. Otherwise → generate with the per-body range and write it to `BodyEntry`
 
 ```python
-# In assemble_leb():
-for bid in asteroid_bodies:
-    if bid in _SPK_BODY_MAP:
-        cached_file, _ = _SPK_BODY_MAP[bid]
-        if not _spk_covers_range(cached_file, bid, jd_start, jd_end):
-            need_force = True  # re-download with full range
-    auto_download_asteroid_spk(bid, jd_start=jd_start, jd_end=jd_end, force=need_force)
+# Per-body range discovery:
+spk_range = _get_asteroid_spk_range(spk_file, bid)
+eff_start = max(spk_jd_start, jd_start) + 1.0  # safety margin
+eff_end = min(spk_jd_end, jd_end) - 1.0
+body_jd_ranges[bid] = (eff_start, eff_end)
 ```
 
-JPL Horizons supports 1600-2500 for minor bodies, which covers the base
-and medium tiers. The extended tier (-5000 to 5000) exceeds this range;
-asteroids will fall back to the scalar path for dates outside 1600-2500.
+**At runtime:** when a body's JD is outside its per-body range, `eval_body()`
+raises `ValueError`, which `swe_calc_ut()`/`swe_calc()` catches to fall
+through to Skyfield. This is transparent to the caller.
+
+**Coverage by tier:**
+
+| Tier | Planets | Asteroids | Analytical |
+|------|---------|-----------|------------|
+| Base (1850-2150) | Full | Full (SPK covers) | Full |
+| Medium (1550-2650) | Full | ~1600-2500 (per-body) | Full |
+| Extended (-5000 to 5000) | Full | ~1600-2500 (per-body) | Full |
 
 ### 6.9 Ecliptic Body Generation
 
@@ -783,9 +826,8 @@ Solution:
 | 40-47 (Uranians) | `calc_uranian_planet(body_id, jd)` | `hypothetical.py` |
 | 48 (Transpluto) | `calc_transpluto(jd)` | `hypothetical.py` |
 
-These are pure-Python analytical functions (~315 us/eval). They cannot be
-vectorized (no numpy path) so they are **parallelized across bodies** using
-`ProcessPoolExecutor`.
+These are pure-Python analytical functions (~315 us/eval). They are evaluated
+**sequentially** — one body at a time with per-body progress bars.
 
 ### 6.11 Nutation Generation
 
@@ -803,9 +845,7 @@ Lightweight `ProgressBar` class (stdlib only, line 38):
 - Throttled to 100ms redraws to avoid terminal flicker
 - Terminal width detection via `shutil.get_terminal_size()`
 - Per-body bars for sequential generation
-- Aggregate bar for parallel analytical bodies
 - Output goes to `sys.stdout`
-- Workers disable their bars (verbose=False) to avoid interleaved output
 
 ### 6.13 Execution Strategy
 
@@ -842,11 +882,10 @@ The `assemble_leb()` function (line 1328):
 
 ### 6.15 Group Generation & Merge
 
-Generating all 31 bodies in a single process can be slow and prone to macOS
-fork-deadlock issues when `ProcessPoolExecutor` uses the default `fork` start
-method with C extensions (numpy, erfa). The **group workflow** splits generation
-into three independent runs — one per body group — then merges the partial
-files into a single `.leb`.
+Generating all 31 bodies in a single process can be slow. The **group workflow**
+splits generation into three independent runs — one per body group — then merges
+the partial files into a single `.leb`. This allows regenerating only the group
+that changed (e.g. after updating asteroid SPK files).
 
 #### Body Groups
 
@@ -867,7 +906,7 @@ BODY_GROUPS: dict[str, List[int]] = {
 |---|---|---|---|
 | `planets` | Sun, Moon, Mercury–Pluto, Earth | Vectorized Skyfield | ~1 s |
 | `asteroids` | Chiron, Pholus, Ceres, Pallas, Vesta | spktype21 (scalar) | ~15–60 s |
-| `analytical` | Mean/true nodes, mean/true Lilith, 8 Uranians, mean apogee/perigee, osc. apogee | ProcessPoolExecutor (spawn) | ~8–20 s |
+| `analytical` | Mean/true nodes, mean/true Lilith, 8 Uranians, mean apogee/perigee, osc. apogee | Sequential (scalar) | ~2–3 min |
 
 #### CLI: `--group`
 
@@ -965,21 +1004,34 @@ primary mechanism for selective regeneration without redoing everything.
 ### 7.1 Global State (`state.py`)
 
 ```python
-# state.py globals (line 157-159)
+# state.py globals (line 157-163)
 _LEB_FILE: Optional[str] = None      # Path to .leb file
 _LEB_READER: Optional["LEBReader"] = None  # Cached reader instance
+_CALC_MODE: Optional[str] = None     # None = check env var
+_CALC_MODE_ENV_VAR = "LIBEPHEMERIS_MODE"
+_VALID_CALC_MODES = ("auto", "skyfield", "leb")
 ```
 
-**`set_leb_file(filepath)`** (line 165):
+**`set_calc_mode(mode)`** (line 170):
+- Sets the calculation mode (`"auto"`, `"skyfield"`, `"leb"`, or `None`)
+- `None` resets to environment variable / default
+
+**`get_calc_mode()`** (line 209):
+- Returns the effective mode: programmatic override > env var > `"auto"`
+
+**`set_leb_file(filepath)`** (line 231):
 - Closes existing reader if any
 - Sets `_LEB_FILE` and clears `_LEB_READER` (lazy re-creation)
 
-**`get_leb_reader()`** (line 191):
+**`get_leb_reader()`** (line 256):
+- Respects `get_calc_mode()`:
+  - `"skyfield"` → always returns `None`
+  - `"leb"` → returns reader or raises `RuntimeError`
+  - `"auto"` → returns reader if configured, else `None`
 - Returns cached `_LEB_READER` if available
 - Otherwise checks `_LEB_FILE` and `LIBEPHEMERIS_LEB` env var
 - Creates `LEBReader(path)` on first access
-- Returns `None` if no LEB configured (silent — no exception)
-- Logs warning and returns `None` if file is invalid/corrupt
+- Logs warning and returns `None` if file is invalid/corrupt (in `auto` mode)
 
 ### 7.2 Dispatch in `swe_calc_ut()` (`planets.py:772-782`)
 
@@ -1021,11 +1073,12 @@ if reader is not None:
 
 ```python
 # __init__.py
-from .state import set_leb_file, get_leb_reader
+from .state import set_leb_file, get_leb_reader, set_calc_mode, get_calc_mode
 ```
 
-Both are accessible as `libephemeris.set_leb_file()` and
-`libephemeris.get_leb_reader()`.
+All four are accessible as `libephemeris.set_leb_file()`,
+`libephemeris.get_leb_reader()`, `libephemeris.set_calc_mode()`, and
+`libephemeris.get_calc_mode()`.
 
 ---
 
@@ -1365,8 +1418,11 @@ back to Skyfield. This is expected behavior, not an error.
 
 ### 13.2 "JD outside range"
 
-The requested date is outside the LEB file's coverage. Falls back to
-Skyfield silently. Check `reader.jd_range` to see the file's coverage.
+The requested date is outside the body's coverage range in the LEB file.
+Falls back to Skyfield silently. Note that different bodies may have
+different date ranges — asteroids typically cover ~1600-2500 CE (limited
+by JPL Horizons SPK availability), while planets cover the full tier range.
+Check `reader._bodies[body_id].jd_start` and `.jd_end` for per-body ranges.
 
 ### 13.3 Large Asteroid Errors (~1500")
 

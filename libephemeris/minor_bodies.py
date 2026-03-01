@@ -905,16 +905,209 @@ def calc_secular_perturbation_rates(
     return d_omega, d_Omega, d_n
 
 
+def _calc_forced_elements(
+    elements: OrbitalElements,
+) -> Tuple[float, float, float, float, float, float]:
+    """Calculate forced eccentricity/inclination vectors and proper frequencies.
+
+    Uses Laplace-Lagrange secular theory (Murray & Dermott Ch. 7) to compute
+    the forced response of a test particle's eccentricity and inclination
+    vectors due to Jupiter, Saturn, Uranus, and Neptune.
+
+    In secular theory, the eccentricity vector (h, k) = (e sin ϖ, e cos ϖ)
+    decomposes into a forced component (driven by planets) and a free
+    component (oscillating at the proper frequency). The actual eccentricity
+    oscillates around the forced value with the proper period.
+
+    Similarly, the inclination vector (p, q) = (sin(i/2) sin Ω, sin(i/2) cos Ω)
+    decomposes into forced + free components.
+
+    Args:
+        elements: Orbital elements of the test particle
+
+    Returns:
+        Tuple of (g, h_forced, k_forced, s, p_forced, q_forced):
+        - g: Proper frequency for eccentricity (ϖ precession, rad/day, positive)
+        - h_forced: Forced e·sin(ϖ) component
+        - k_forced: Forced e·cos(ϖ) component
+        - s: Proper frequency for inclination (|Ω regression|, rad/day, positive)
+        - p_forced: Forced sin(i/2)·sin(Ω) component
+        - q_forced: Forced sin(i/2)·cos(Ω) component
+
+    Algorithm:
+        For each perturbing planet j with mass ratio μ_j, semi-major axis a_j:
+
+        Eccentricity proper frequency (diagonal):
+            A_j = (n/4) · μ_j · α · b_{3/2}^{(1)}(α) · correction(e)
+            g = Σ A_j
+
+        Eccentricity coupling (off-diagonal, uses b_{3/2}^{(2)}):
+            ν_j = (n/4) · μ_j · α · b_{3/2}^{(2)}(α)
+            h_f = Σ ν_j · e_j · sin(ϖ_j) / g
+            k_f = Σ ν_j · e_j · cos(ϖ_j) / g
+
+        Inclination proper frequency (diagonal):
+            s_j = (n/4) · μ_j · α · b_{3/2}^{(1)}(α) · cos(i)/√(1-e²)
+            s = Σ s_j
+
+        Inclination coupling (off-diagonal, uses b_{3/2}^{(1)}):
+            σ_j = (n/4) · μ_j · α · b_{3/2}^{(1)}(α)
+            p_f = Σ σ_j · sin(i_j/2) · sin(Ω_j) / s
+            q_f = Σ σ_j · sin(i_j/2) · cos(Ω_j) / s
+
+    References:
+        Murray & Dermott "Solar System Dynamics" §7.3-7.5, eq. 7.10, 7.25-7.26
+        Brouwer & Clemence "Methods of Celestial Mechanics" Ch. XVI
+    """
+    a = elements.a
+    e = elements.e
+    i_rad = math.radians(elements.i)
+    n_rad = math.radians(elements.n)
+    e2 = e * e
+    denom_e = max(0.01, 1.0 - e2)
+
+    # Accumulate proper frequencies and forced vector numerators
+    g = 0.0  # eccentricity proper frequency (rad/day)
+    s = 0.0  # inclination regression frequency (rad/day, positive)
+    h_forced_num = 0.0
+    k_forced_num = 0.0
+    p_forced_num = 0.0
+    q_forced_num = 0.0
+
+    # Planet data: (a_planet, mu, e_planet, omega_deg, node_deg, i_deg, a_threshold)
+    # omega_deg is argument of perihelion (ω), node_deg is Ω
+    # Longitude of perihelion: ϖ = ω + Ω
+    _planets = [
+        (
+            JUPITER_A,
+            MASS_RATIO_JUPITER,
+            JUPITER_E,
+            JUPITER_OMEGA,
+            JUPITER_NODE,
+            JUPITER_I,
+            0.0,
+        ),
+        (
+            SATURN_A,
+            MASS_RATIO_SATURN,
+            SATURN_E,
+            SATURN_OMEGA,
+            SATURN_NODE,
+            SATURN_I,
+            0.0,
+        ),
+        (
+            URANUS_A,
+            MASS_RATIO_URANUS,
+            URANUS_E,
+            URANUS_OMEGA,
+            URANUS_NODE,
+            URANUS_I,
+            0.0,
+        ),
+        (
+            NEPTUNE_A,
+            MASS_RATIO_NEPTUNE,
+            NEPTUNE_E,
+            NEPTUNE_OMEGA,
+            NEPTUNE_NODE,
+            NEPTUNE_I,
+            20.0,
+        ),
+    ]
+
+    for a_p, mu_p, e_p, omega_p_deg, node_p_deg, i_p_deg, a_thresh in _planets:
+        # Apply threshold (Neptune only for a > 20 AU)
+        if a_thresh > 0.0 and a < a_thresh:
+            continue
+        # Skip if asteroid is essentially co-orbital with planet
+        if abs(a - a_p) < 0.1:
+            continue
+
+        # Semi-major axis ratio (always < 1)
+        if a < a_p:
+            alpha = a / a_p
+        else:
+            alpha = a_p / a
+
+        if alpha >= 1.0 or alpha <= 0.0:
+            continue
+
+        # Laplace coefficients
+        b32_1 = _calc_laplace_coefficients(alpha, 1.5, 1)
+        b32_2 = _calc_laplace_coefficients(alpha, 1.5, 2)
+
+        base = n_rad * mu_p * alpha
+
+        # --- Eccentricity proper frequency (diagonal, with e-correction) ---
+        A_j = base * b32_1 * (1.0 / 4.0) * (2.0 + 1.5 * e2) / denom_e
+        g += A_j
+
+        # --- Inclination regression frequency (diagonal, with i,e correction) ---
+        s_j = base * b32_1 * (1.0 / 4.0) * math.cos(i_rad) / math.sqrt(denom_e)
+        s += s_j
+
+        # --- Off-diagonal eccentricity coupling (uses b_{3/2}^{(2)}) ---
+        nu_j = base * b32_2 * (1.0 / 4.0)
+
+        # --- Off-diagonal inclination coupling (uses b_{3/2}^{(1)}) ---
+        sigma_j = base * b32_1 * (1.0 / 4.0)
+
+        # Planet longitude of perihelion: ϖ = ω + Ω
+        varpi_p_rad = math.radians(omega_p_deg + node_p_deg)
+        i_p_rad = math.radians(i_p_deg)
+        Omega_p_rad = math.radians(node_p_deg)
+
+        # Planet eccentricity vector (h_j, k_j)
+        h_j = e_p * math.sin(varpi_p_rad)
+        k_j = e_p * math.cos(varpi_p_rad)
+
+        # Planet inclination vector (p_j, q_j)
+        p_j = math.sin(i_p_rad / 2.0) * math.sin(Omega_p_rad)
+        q_j = math.sin(i_p_rad / 2.0) * math.cos(Omega_p_rad)
+
+        # Accumulate forced vector numerators
+        # From the secular equations: h_f = Σ ν_j h_j / g, k_f = Σ ν_j k_j / g
+        h_forced_num += nu_j * h_j
+        k_forced_num += nu_j * k_j
+        # From inclination equations: p_f = Σ σ_j p_j / s, q_f = Σ σ_j q_j / s
+        p_forced_num += sigma_j * p_j
+        q_forced_num += sigma_j * q_j
+
+    # Divide by proper frequencies to get forced vectors
+    h_forced = 0.0
+    k_forced = 0.0
+    if abs(g) > 1e-20:
+        h_forced = h_forced_num / g
+        k_forced = k_forced_num / g
+
+    p_forced = 0.0
+    q_forced = 0.0
+    if abs(s) > 1e-20:
+        p_forced = p_forced_num / s
+        q_forced = q_forced_num / s
+
+    return g, h_forced, k_forced, s, p_forced, q_forced
+
+
 def apply_secular_perturbations(
     elements: OrbitalElements, jd_tt: float, include_perturbations: bool = True
-) -> Tuple[float, float, float, float]:
+) -> Tuple[float, float, float, float, float, float]:
     """
     Apply secular perturbations to orbital elements and return perturbed values.
 
-    Takes the osculating orbital elements at epoch and applies first-order
+    Takes the osculating orbital elements at epoch and applies Laplace-Lagrange
     secular perturbation corrections to propagate them to the target time.
-    This accounts for the long-term drift in ω and Ω due to Jupiter, Saturn, Uranus,
-    and Neptune (for TNOs with a > 20 AU).
+    This accounts for:
+    - Long-term drift in ω and Ω (linear precession rates)
+    - Oscillation of eccentricity e around the forced value from planets
+    - Oscillation of inclination i around the forced value from planets
+
+    The eccentricity and inclination evolution uses the (h,k)/(p,q) vector
+    formalism from Murray & Dermott Ch. 7. The eccentricity vector
+    (h, k) = (e sin ϖ, e cos ϖ) decomposes into a forced component (driven
+    by planetary eccentricities) and a free component (oscillating at the
+    proper frequency). Similarly for the inclination vector (p, q).
 
     WARNING: For bodies in mean motion resonance with Neptune (e.g., plutinos
     like Ixion and Orcus in 2:3 resonance, twotinos in 1:2 resonance), the
@@ -929,11 +1122,13 @@ def apply_secular_perturbations(
         include_perturbations: If True, apply secular corrections; if False, return unperturbed
 
     Returns:
-        Tuple[float, float, float, float]: (omega_pert, Omega_pert, M_pert, n_pert)
+        Tuple of (omega_pert, Omega_pert, M_pert, n_pert, e_pert, i_pert):
             - omega_pert: Perturbed argument of perihelion (degrees)
             - Omega_pert: Perturbed longitude of ascending node (degrees)
             - M_pert: Perturbed mean anomaly at target time (degrees)
             - n_pert: Perturbed mean motion (degrees/day)
+            - e_pert: Perturbed eccentricity (dimensionless, 0 < e < 1)
+            - i_pert: Perturbed inclination (degrees)
 
     See Also:
         detect_mean_motion_resonance: Check if a body is in Neptune resonance
@@ -944,12 +1139,12 @@ def apply_secular_perturbations(
     if not include_perturbations or abs(dt) < 1.0:
         # For very short propagation times, perturbations are negligible
         M = (elements.M0 + elements.n * dt) % 360.0
-        return elements.omega, elements.Omega, M, elements.n
+        return elements.omega, elements.Omega, M, elements.n, elements.e, elements.i
 
-    # Calculate secular perturbation rates
+    # Calculate secular perturbation rates for ω, Ω (linear precession)
     d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
 
-    # Apply secular corrections
+    # Apply linear secular corrections for angular elements
     omega_pert = (elements.omega + d_omega * dt) % 360.0
     Omega_pert = (elements.Omega + d_Omega * dt) % 360.0
     n_pert = elements.n + d_n
@@ -957,7 +1152,64 @@ def apply_secular_perturbations(
     # Propagate mean anomaly with perturbed mean motion
     M_pert = (elements.M0 + n_pert * dt) % 360.0
 
-    return omega_pert, Omega_pert, M_pert, n_pert
+    # --- Eccentricity and inclination evolution via (h,k)/(p,q) vectors ---
+    g, h_forced, k_forced, s_freq, p_forced, q_forced = _calc_forced_elements(elements)
+
+    # Eccentricity vector evolution
+    e0 = elements.e
+    varpi0_rad = math.radians(elements.omega + elements.Omega)
+
+    # Osculating eccentricity vector at epoch
+    h0 = e0 * math.sin(varpi0_rad)
+    k0 = e0 * math.cos(varpi0_rad)
+
+    # Free eccentricity vector = osculating - forced
+    dh = h0 - h_forced
+    dk = k0 - k_forced
+    e_free = math.sqrt(dh * dh + dk * dk)
+
+    if e_free > 1e-15:
+        beta = math.atan2(dh, dk)
+    else:
+        beta = 0.0
+
+    # Evolve free vector: rotates at proper frequency g
+    h_t = h_forced + e_free * math.sin(g * dt + beta)
+    k_t = k_forced + e_free * math.cos(g * dt + beta)
+
+    e_pert = math.sqrt(h_t * h_t + k_t * k_t)
+    # Clamp to physical range [0.001, 0.999] to prevent numerical issues
+    e_pert = max(0.001, min(e_pert, 0.999))
+
+    # Inclination vector evolution
+    i0_rad = math.radians(elements.i)
+    Omega0_rad = math.radians(elements.Omega)
+
+    # Osculating inclination vector at epoch
+    sin_half_i0 = math.sin(i0_rad / 2.0)
+    p0 = sin_half_i0 * math.sin(Omega0_rad)
+    q0 = sin_half_i0 * math.cos(Omega0_rad)
+
+    # Free inclination vector = osculating - forced
+    dp = p0 - p_forced
+    dq = q0 - q_forced
+    i_free = math.sqrt(dp * dp + dq * dq)
+
+    if i_free > 1e-15:
+        gamma = math.atan2(dp, dq)
+    else:
+        gamma = 0.0
+
+    # Evolve free vector: rotates at frequency -s (retrograde precession)
+    p_t = p_forced + i_free * math.sin(-s_freq * dt + gamma)
+    q_t = q_forced + i_free * math.cos(-s_freq * dt + gamma)
+
+    sin_half_i_t = math.sqrt(p_t * p_t + q_t * q_t)
+    # Clamp to valid range for asin
+    sin_half_i_t = max(0.0, min(sin_half_i_t, 1.0))
+    i_pert = math.degrees(2.0 * math.asin(sin_half_i_t))
+
+    return omega_pert, Omega_pert, M_pert, n_pert, e_pert, i_pert
 
 
 # =============================================================================
@@ -1386,6 +1638,1188 @@ MINOR_BODY_ELEMENTS = {
 }
 
 
+# =============================================================================
+# MULTI-EPOCH ORBITAL ELEMENTS (generated from JPL SPK type 21 kernels)
+# =============================================================================
+# For bodies with SPK data covering ~1600-2500 CE, we store osculating elements
+# at 50-year intervals. calc_minor_body_position() selects the epoch closest
+# to the target date, reducing maximum propagation time from ~500 years to ~25
+# years and dramatically improving Keplerian accuracy.
+#
+# Source: State vectors from JPL Horizons SPK type 21, converted to Keplerian
+# elements via state-to-Keplerian transformation in ecliptic J2000 frame.
+# Elements computed at Jan 1.5 of each 50-year interval.
+
+MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
+    SE_CHIRON: [
+        OrbitalElements(
+            name="Chiron",
+            epoch=2323707.5,
+            a=13.371427142908754,
+            e=0.3729836199204646,
+            i=6.9202332318448,
+            omega=334.5763624285319,
+            Omega=211.8280509266455,
+            M0=344.6748068295784,
+            n=0.02015753536481070,
+        ),  # ~1650
+        OrbitalElements(
+            name="Chiron",
+            epoch=2341970.0,
+            a=13.252464193382810,
+            e=0.3699080069756250,
+            i=7.0070054859955,
+            omega=335.5548728480483,
+            Omega=211.2962230338703,
+            M0=356.3575718818896,
+            n=0.02042956477540767,
+        ),  # ~1700
+        OrbitalElements(
+            name="Chiron",
+            epoch=2360232.5,
+            a=13.233855122832752,
+            e=0.3678274913374165,
+            i=7.0128603763446,
+            omega=335.2810099317701,
+            Omega=211.1486924393837,
+            M0=10.4558239859311,
+            n=0.02047267112936903,
+        ),  # ~1750
+        OrbitalElements(
+            name="Chiron",
+            epoch=2378495.0,
+            a=13.350117646645547,
+            e=0.3710125567797580,
+            i=6.9889720395001,
+            omega=336.2141532482605,
+            Omega=210.7538147202335,
+            M0=19.0107885296746,
+            n=0.02020581789325071,
+        ),  # ~1800
+        OrbitalElements(
+            name="Chiron",
+            epoch=2396757.5,
+            a=13.427618017493229,
+            e=0.3746043351096295,
+            i=6.9841427657452,
+            omega=336.8023458802815,
+            Omega=210.6534082226185,
+            M0=26.5075882150415,
+            n=0.02003113724992856,
+        ),  # ~1850
+        OrbitalElements(
+            name="Chiron",
+            epoch=2415020.0,
+            a=13.700410694890047,
+            e=0.3837760894927312,
+            i=6.9364542490515,
+            omega=337.8503629700682,
+            Omega=210.2450310092896,
+            M0=33.4775653319764,
+            n=0.01943585698416176,
+        ),  # ~1900
+        OrbitalElements(
+            name="Chiron",
+            epoch=2433282.5,
+            a=13.709097657818338,
+            e=0.3814134994805318,
+            i=6.9255343800951,
+            omega=339.8696713299134,
+            Omega=209.4907629379391,
+            M0=30.4304671260673,
+            n=0.01941738620398121,
+        ),  # ~1950
+        OrbitalElements(
+            name="Chiron",
+            epoch=2451545.0,
+            a=13.605072955058390,
+            e=0.3793438805625098,
+            i=6.9415664797868,
+            omega=339.1420137976555,
+            Omega=209.3966703011663,
+            M0=27.9972209670263,
+            n=0.01964051002948430,
+        ),  # ~2000
+        OrbitalElements(
+            name="Chiron",
+            epoch=2469807.5,
+            a=13.656099940687845,
+            e=0.3804275263587618,
+            i=6.9373524344924,
+            omega=339.5363930100605,
+            Omega=209.2362205253281,
+            M0=24.3612183244945,
+            n=0.01953053068881489,
+        ),  # ~2050
+        OrbitalElements(
+            name="Chiron",
+            epoch=2488070.0,
+            a=13.651895767635807,
+            e=0.3806086146825555,
+            i=6.9481669854207,
+            omega=340.6234469032037,
+            Omega=208.8355649379521,
+            M0=20.9634315614981,
+            n=0.01953955317771511,
+        ),  # ~2100
+        OrbitalElements(
+            name="Chiron",
+            epoch=2506332.5,
+            a=13.511008314184116,
+            e=0.3741886779285624,
+            i=6.9658041191284,
+            omega=340.9422323615457,
+            Omega=208.6393779735981,
+            M0=24.6379999624543,
+            n=0.01984597463954793,
+        ),  # ~2150
+        OrbitalElements(
+            name="Chiron",
+            epoch=2524595.0,
+            a=13.512439443611973,
+            e=0.3755675636022468,
+            i=6.9869871539775,
+            omega=341.4037487670838,
+            Omega=208.4667347772124,
+            M0=29.9519454353909,
+            n=0.01984282183286146,
+        ),  # ~2200
+        OrbitalElements(
+            name="Chiron",
+            epoch=2542857.5,
+            a=13.164487308093229,
+            e=0.3649071402857848,
+            i=7.1776522580494,
+            omega=344.6726230278963,
+            Omega=205.2969840271221,
+            M0=34.7894850810330,
+            n=0.02063469949953810,
+        ),  # ~2250
+        OrbitalElements(
+            name="Chiron",
+            epoch=2561120.0,
+            a=13.151666638145512,
+            e=0.3642709828408062,
+            i=7.1835994289174,
+            omega=344.5344691466646,
+            Omega=204.8505525958187,
+            M0=52.2772338648861,
+            n=0.02066487991032186,
+        ),  # ~2300
+        OrbitalElements(
+            name="Chiron",
+            epoch=2579382.5,
+            a=13.209165378177971,
+            e=0.3635790830406080,
+            i=7.1814222379429,
+            omega=345.1602747972780,
+            Omega=204.7148072636926,
+            M0=68.1706148251205,
+            n=0.02053009729489152,
+        ),  # ~2350
+        OrbitalElements(
+            name="Chiron",
+            epoch=2597645.0,
+            a=13.237014526949849,
+            e=0.3611359609796514,
+            i=7.1804054640954,
+            omega=345.4057237507995,
+            Omega=204.6574403157222,
+            M0=84.7130198829974,
+            n=0.02046534195612889,
+        ),  # ~2400
+        OrbitalElements(
+            name="Chiron",
+            epoch=2615907.5,
+            a=13.160884916811554,
+            e=0.3591384860618776,
+            i=7.1845310923304,
+            omega=344.8790941458294,
+            Omega=204.6521905535668,
+            M0=102.8889559220092,
+            n=0.02064317225974760,
+        ),  # ~2450
+    ],
+    SE_PHOLUS: [
+        OrbitalElements(
+            name="Pholus",
+            epoch=2323707.5,
+            a=20.262591613083572,
+            e=0.5703755185491293,
+            i=24.6409005353753,
+            omega=354.5155116099161,
+            Omega=119.6695162665015,
+            M0=86.8643398186893,
+            n=0.01080591598826363,
+        ),  # ~1650
+        OrbitalElements(
+            name="Pholus",
+            epoch=2341970.0,
+            a=20.262582219317235,
+            e=0.5677221630457447,
+            i=24.6155471145124,
+            omega=354.1131948218626,
+            Omega=119.5357588958216,
+            M0=285.6839197782801,
+            n=0.01080592350272505,
+        ),  # ~1700
+        OrbitalElements(
+            name="Pholus",
+            epoch=2360232.5,
+            a=20.297697816408551,
+            e=0.5706345286344382,
+            i=24.6469152215855,
+            omega=354.3381842698585,
+            Omega=119.5915140968865,
+            M0=123.2703566359442,
+            n=0.01077789379996965,
+        ),  # ~1750
+        OrbitalElements(
+            name="Pholus",
+            epoch=2378495.0,
+            a=20.394461786966787,
+            e=0.5734412354209162,
+            i=24.6940030506598,
+            omega=354.1600567748060,
+            Omega=119.6416854791070,
+            M0=320.2854158878927,
+            n=0.01070127934152877,
+        ),  # ~1800
+        OrbitalElements(
+            name="Pholus",
+            epoch=2396757.5,
+            a=20.220258512455647,
+            e=0.5713875095216020,
+            i=24.7318560115142,
+            omega=354.5472656798194,
+            Omega=119.4529233724381,
+            M0=157.4476183859812,
+            n=0.01083986861601136,
+        ),  # ~1850
+        OrbitalElements(
+            name="Pholus",
+            epoch=2415020.0,
+            a=20.122865506363279,
+            e=0.5687482065510462,
+            i=24.7017907878754,
+            omega=354.6202430769039,
+            Omega=119.4734051758445,
+            M0=355.6166002049613,
+            n=0.01091865986243673,
+        ),  # ~1900
+        OrbitalElements(
+            name="Pholus",
+            epoch=2433282.5,
+            a=20.223910656836654,
+            e=0.5667760637918864,
+            i=24.6225989795592,
+            omega=354.5629405933474,
+            Omega=119.4226595273923,
+            M0=194.3661018678293,
+            n=0.01083693246444905,
+        ),  # ~1950
+        OrbitalElements(
+            name="Pholus",
+            epoch=2451545.0,
+            a=20.239107872746917,
+            e=0.5724788139940934,
+            i=24.6985351938904,
+            omega=354.4986569043102,
+            Omega=119.3246008548964,
+            M0=32.7453085327420,
+            n=0.01082472884235898,
+        ),  # ~2000
+        OrbitalElements(
+            name="Pholus",
+            epoch=2469807.5,
+            a=20.300493637132092,
+            e=0.5742283493848723,
+            i=24.7537354121968,
+            omega=354.8021215885981,
+            Omega=119.3717759885387,
+            M0=229.2336305701616,
+            n=0.01077566735007178,
+        ),  # ~2050
+        OrbitalElements(
+            name="Pholus",
+            epoch=2488070.0,
+            a=20.430276226383775,
+            e=0.5724320996077970,
+            i=24.6829772817788,
+            omega=355.2296654049131,
+            Omega=119.2375302600234,
+            M0=65.2332389189328,
+            n=0.01067315253335202,
+        ),  # ~2100
+        OrbitalElements(
+            name="Pholus",
+            epoch=2506332.5,
+            a=20.336455967687584,
+            e=0.5709236822124538,
+            i=24.6435196002428,
+            omega=354.7615919959516,
+            Omega=119.2273773919839,
+            M0=262.3329807727256,
+            n=0.01074709697802657,
+        ),  # ~2150
+        OrbitalElements(
+            name="Pholus",
+            epoch=2524595.0,
+            a=20.359839975819895,
+            e=0.5715925495489237,
+            i=24.6278677890650,
+            omega=354.7533022927344,
+            Omega=119.3153714668018,
+            M0=98.9951351209190,
+            n=0.01072858715452759,
+        ),  # ~2200
+        OrbitalElements(
+            name="Pholus",
+            epoch=2542857.5,
+            a=20.427843518108347,
+            e=0.5738394799835308,
+            i=24.6945859865615,
+            omega=354.6117338729745,
+            Omega=119.2646056068390,
+            M0=295.0527546168547,
+            n=0.01067505915453846,
+        ),  # ~2250
+        OrbitalElements(
+            name="Pholus",
+            epoch=2561120.0,
+            a=20.266126144110903,
+            e=0.5738844923046665,
+            i=24.7718656923824,
+            omega=354.8594708791895,
+            Omega=119.0500226480427,
+            M0=131.1752822283087,
+            n=0.01080308918902398,
+        ),  # ~2300
+        OrbitalElements(
+            name="Pholus",
+            epoch=2579382.5,
+            a=20.229391408548413,
+            e=0.5721603747086387,
+            i=24.6756058502265,
+            omega=355.0427763702127,
+            Omega=119.0618672669334,
+            M0=328.4759997172601,
+            n=0.01083252868542541,
+        ),  # ~2350
+        OrbitalElements(
+            name="Pholus",
+            epoch=2597645.0,
+            a=19.632615467629744,
+            e=0.5533115184316881,
+            i=24.7906219955761,
+            omega=355.2705296409631,
+            Omega=118.5657931761312,
+            M0=174.8218721195175,
+            n=0.01133018062200617,
+        ),  # ~2400
+        OrbitalElements(
+            name="Pholus",
+            epoch=2615907.5,
+            a=19.410667842420100,
+            e=0.5544498524931567,
+            i=24.8924561315057,
+            omega=355.0528672545693,
+            Omega=118.4228842420934,
+            M0=23.2283877996455,
+            n=0.01152506429732882,
+        ),  # ~2450
+    ],
+    SE_CERES: [
+        OrbitalElements(
+            name="Ceres",
+            epoch=2323707.5,
+            a=2.767178079298890,
+            e=0.0770571198039838,
+            i=10.6584141830259,
+            omega=62.0067214628473,
+            Omega=85.7605548882826,
+            M0=4.8076010141346,
+            n=0.21411564963522811,
+        ),  # ~1650
+        OrbitalElements(
+            name="Ceres",
+            epoch=2341970.0,
+            a=2.766863666965052,
+            e=0.0807257950206105,
+            i=10.6360690747319,
+            omega=63.0538254117462,
+            Omega=85.0126692964290,
+            M0=314.2663934193109,
+            n=0.21415214719438150,
+        ),  # ~1700
+        OrbitalElements(
+            name="Ceres",
+            epoch=2360232.5,
+            a=2.767465599297072,
+            e=0.0775350012794987,
+            i=10.6290795938059,
+            omega=65.5922265060157,
+            Omega=84.1621185292642,
+            M0=261.9532452194380,
+            n=0.21408228286156092,
+        ),  # ~1750
+        OrbitalElements(
+            name="Ceres",
+            epoch=2378495.0,
+            a=2.765628318813691,
+            e=0.0803048591673192,
+            i=10.6325449696062,
+            omega=65.8095841530648,
+            Omega=83.6298660637145,
+            M0=212.2880458374045,
+            n=0.21429564912357574,
+        ),  # ~1800
+        OrbitalElements(
+            name="Ceres",
+            epoch=2396757.5,
+            a=2.767770026846838,
+            e=0.0768451659886332,
+            i=10.6192745577945,
+            omega=66.9046985460492,
+            Omega=82.7970996629228,
+            M0=161.8256787365532,
+            n=0.21404696340651064,
+        ),  # ~1850
+        OrbitalElements(
+            name="Ceres",
+            epoch=2415020.0,
+            a=2.767269307260053,
+            e=0.0782868690579479,
+            i=10.6224677478602,
+            omega=70.6675601413493,
+            Omega=81.9691816626031,
+            M0=108.4456349013486,
+            n=0.21410506166690349,
+        ),  # ~1900
+        OrbitalElements(
+            name="Ceres",
+            epoch=2433282.5,
+            a=2.765672693219279,
+            e=0.0793634054563688,
+            i=10.5952488771632,
+            omega=69.7775501699188,
+            Omega=81.3803862735392,
+            M0=60.1788336381184,
+            n=0.21429049167819364,
+        ),  # ~1950
+        OrbitalElements(
+            name="Ceres",
+            epoch=2451545.0,
+            a=2.766496019978305,
+            e=0.0783756264663112,
+            i=10.5833604598912,
+            omega=73.9228628020595,
+            Omega=80.4943574143021,
+            M0=6.1766545136400,
+            n=0.21419483748205975,
+        ),  # ~2000
+        OrbitalElements(
+            name="Ceres",
+            epoch=2469807.5,
+            a=2.768371594177004,
+            e=0.0784327517919063,
+            i=10.5970434064988,
+            omega=72.8222059904183,
+            Omega=79.8820471638073,
+            M0=317.8584468044261,
+            n=0.21397719856791234,
+        ),  # ~2050
+        OrbitalElements(
+            name="Ceres",
+            epoch=2488070.0,
+            a=2.767867366185008,
+            e=0.0752443643687728,
+            i=10.5796101722946,
+            omega=75.8402928671805,
+            Omega=79.0684586061343,
+            M0=265.3232153091167,
+            n=0.21403567221884701,
+        ),  # ~2100
+        OrbitalElements(
+            name="Ceres",
+            epoch=2506332.5,
+            a=2.765823622335132,
+            e=0.0786449278166767,
+            i=10.5723551830858,
+            omega=78.2524099172182,
+            Omega=78.2311720207646,
+            M0=213.4035626368535,
+            n=0.21427295138769023,
+        ),  # ~2150
+        OrbitalElements(
+            name="Ceres",
+            epoch=2524595.0,
+            a=2.769596097735250,
+            e=0.0758834122461500,
+            i=10.5537398954636,
+            omega=77.9106065040377,
+            Omega=77.6543353780289,
+            M0=164.3096925781195,
+            n=0.21383530772779924,
+        ),  # ~2200
+        OrbitalElements(
+            name="Ceres",
+            epoch=2542857.5,
+            a=2.766977521494038,
+            e=0.0781891763286589,
+            i=10.5457791287797,
+            omega=80.8625337748124,
+            Omega=76.8415070679777,
+            M0=111.6602192442330,
+            n=0.21413892955482258,
+        ),  # ~2250
+        OrbitalElements(
+            name="Ceres",
+            epoch=2561120.0,
+            a=2.766587160099717,
+            e=0.0752100853435622,
+            i=10.5514693877989,
+            omega=80.8782635311018,
+            Omega=76.0544828943908,
+            M0=62.1850465792073,
+            n=0.21418425318726647,
+        ),  # ~2300
+        OrbitalElements(
+            name="Ceres",
+            epoch=2579382.5,
+            a=2.767406715114749,
+            e=0.0746039931576421,
+            i=10.5459711285757,
+            omega=85.1920351958228,
+            Omega=75.2962517985510,
+            M0=8.3409752904721,
+            n=0.21408911568116284,
+        ),  # ~2350
+        OrbitalElements(
+            name="Ceres",
+            epoch=2597645.0,
+            a=2.766800052642710,
+            e=0.0778983059248015,
+            i=10.5226645384698,
+            omega=85.0887611154552,
+            Omega=74.5416766038115,
+            M0=319.1673076679401,
+            n=0.21415953292253406,
+        ),  # ~2400
+        OrbitalElements(
+            name="Ceres",
+            epoch=2615907.5,
+            a=2.766275038706054,
+            e=0.0752671083853882,
+            i=10.5194992740449,
+            omega=88.7643186185145,
+            Omega=73.6586526976466,
+            M0=265.6209056063307,
+            n=0.21422050412346955,
+        ),  # ~2450
+    ],
+    SE_PALLAS: [
+        OrbitalElements(
+            name="Pallas",
+            epoch=2323707.5,
+            a=2.773425809576743,
+            e=0.2505669360885390,
+            i=34.3067958818279,
+            omega=307.3498466310298,
+            Omega=176.9143983141922,
+            M0=40.9275898472998,
+            n=0.21339254583589054,
+        ),  # ~1650
+        OrbitalElements(
+            name="Pallas",
+            epoch=2341970.0,
+            a=2.769600058506544,
+            e=0.2491391199860031,
+            i=34.4487542559720,
+            omega=307.9771435188438,
+            Omega=176.3351493262407,
+            M0=341.2720939692182,
+            n=0.21383484902306146,
+        ),  # ~1700
+        OrbitalElements(
+            name="Pallas",
+            epoch=2360232.5,
+            a=2.774740783534321,
+            e=0.2435566472629853,
+            i=34.4950045314467,
+            omega=308.0409106952849,
+            Omega=175.7991173044933,
+            M0=284.0858289178198,
+            n=0.21324087091501887,
+        ),  # ~1750
+        OrbitalElements(
+            name="Pallas",
+            epoch=2378495.0,
+            a=2.768410839020772,
+            e=0.2453015553264559,
+            i=34.5899337283850,
+            omega=308.7561367313956,
+            Omega=175.2311334415200,
+            M0=225.7429595926801,
+            n=0.21397264859007925,
+        ),  # ~1800
+        OrbitalElements(
+            name="Pallas",
+            epoch=2396757.5,
+            a=2.772350271340209,
+            e=0.2399764558806155,
+            i=34.6097741790928,
+            omega=308.6275690173610,
+            Omega=174.8062068232944,
+            M0=167.2833882403104,
+            n=0.21351673690758910,
+        ),  # ~1850
+        OrbitalElements(
+            name="Pallas",
+            epoch=2415020.0,
+            a=2.773119049999420,
+            e=0.2372685843354388,
+            i=34.6654404141387,
+            omega=309.3172966707089,
+            Omega=174.2452924304225,
+            M0=110.1508136206120,
+            n=0.21342795471100701,
+        ),  # ~1900
+        OrbitalElements(
+            name="Pallas",
+            epoch=2433282.5,
+            a=2.769319022335843,
+            e=0.2354177070683326,
+            i=34.8148371045849,
+            omega=309.9506750322337,
+            Omega=173.7226228480928,
+            M0=50.5517872907754,
+            n=0.21386740044704181,
+        ),  # ~1950
+        OrbitalElements(
+            name="Pallas",
+            epoch=2451545.0,
+            a=2.772322475083151,
+            e=0.2296435321665796,
+            i=34.8461400222899,
+            omega=310.2656378956753,
+            Omega=173.1977991244588,
+            M0=352.9602856373664,
+            n=0.21351994810381636,
+        ),  # ~2000
+        OrbitalElements(
+            name="Pallas",
+            epoch=2469807.5,
+            a=2.767917719650727,
+            e=0.2318556322942670,
+            i=34.9495387892765,
+            omega=310.8832950200608,
+            Omega=172.6583925805253,
+            M0=294.7519732309893,
+            n=0.21402983169722034,
+        ),  # ~2050
+        OrbitalElements(
+            name="Pallas",
+            epoch=2488070.0,
+            a=2.773032442020559,
+            e=0.2262340585702797,
+            i=34.9525878872793,
+            omega=310.7142302107801,
+            Omega=172.2445716362670,
+            M0=236.0673713803704,
+            n=0.21343795353458958,
+        ),  # ~2100
+        OrbitalElements(
+            name="Pallas",
+            epoch=2506332.5,
+            a=2.771967742227604,
+            e=0.2242434037405014,
+            i=35.0102474372487,
+            omega=311.4017375205468,
+            Omega=171.6679732277944,
+            M0=178.8689834146113,
+            n=0.21356093611546770,
+        ),  # ~2150
+        OrbitalElements(
+            name="Pallas",
+            epoch=2524595.0,
+            a=2.768513683545607,
+            e=0.2221350498903325,
+            i=35.1460697905857,
+            omega=312.0445681974738,
+            Omega=171.2038944493594,
+            M0=119.3242761067097,
+            n=0.21396072574256020,
+        ),  # ~2200
+        OrbitalElements(
+            name="Pallas",
+            epoch=2542857.5,
+            a=2.772976466449795,
+            e=0.2166472455234512,
+            i=35.1651344624575,
+            omega=312.5380024320297,
+            Omega=170.6922591980725,
+            M0=61.5121165400914,
+            n=0.21344441628591940,
+        ),  # ~2250
+        OrbitalElements(
+            name="Pallas",
+            epoch=2561120.0,
+            a=2.768881413161208,
+            e=0.2189311779260392,
+            i=35.2728883297126,
+            omega=313.1616629939311,
+            Omega=170.1643481451179,
+            M0=3.4150972054470,
+            n=0.21391810361218880,
+        ),  # ~2300
+        OrbitalElements(
+            name="Pallas",
+            epoch=2579382.5,
+            a=2.773057295046971,
+            e=0.2130023090571612,
+            i=35.2609064612225,
+            omega=313.0070713768686,
+            Omega=169.7594441167760,
+            M0=304.5017857128942,
+            n=0.21343508419221038,
+        ),  # ~2350
+        OrbitalElements(
+            name="Pallas",
+            epoch=2597645.0,
+            a=2.771345243805071,
+            e=0.2116061710228307,
+            i=35.3279924916944,
+            omega=313.7492259414161,
+            Omega=169.1947082939210,
+            M0=247.2798471800065,
+            n=0.21363289510966282,
+        ),  # ~2400
+        OrbitalElements(
+            name="Pallas",
+            epoch=2615907.5,
+            a=2.768721827258460,
+            e=0.2090418972509210,
+            i=35.4424814457494,
+            omega=314.3858540472293,
+            Omega=168.7593840115007,
+            M0=187.6672151193455,
+            n=0.21393659886436336,
+        ),  # ~2450
+    ],
+    SE_JUNO: [
+        OrbitalElements(
+            name="Juno",
+            epoch=2323707.5,
+            a=2.672564036541057,
+            e=0.2539782765307201,
+            i=13.0915145774723,
+            omega=237.6906954514816,
+            Omega=176.7169020022884,
+            M0=158.1045162178971,
+            n=0.22558587030040067,
+        ),  # ~1650
+        OrbitalElements(
+            name="Juno",
+            epoch=2341970.0,
+            a=2.668716752159806,
+            e=0.2553235976766334,
+            i=13.0537797046225,
+            omega=239.6983535087190,
+            Omega=175.6467479889665,
+            M0=323.7547519915645,
+            n=0.22607386085615486,
+        ),  # ~1700
+        OrbitalElements(
+            name="Juno",
+            epoch=2360232.5,
+            a=2.670236328608048,
+            e=0.2548514261690777,
+            i=13.0407424852248,
+            omega=241.1457213730441,
+            Omega=174.7107176720893,
+            M0=130.0152544698674,
+            n=0.22588090735350991,
+        ),  # ~1750
+        OrbitalElements(
+            name="Juno",
+            epoch=2378495.0,
+            a=2.669979630033350,
+            e=0.2541735956003749,
+            i=13.0329294568743,
+            omega=242.4859181348231,
+            Omega=173.8136233292624,
+            M0=296.1473544839018,
+            n=0.22591348327653935,
+        ),  # ~1800
+        OrbitalElements(
+            name="Juno",
+            epoch=2396757.5,
+            a=2.671614463552025,
+            e=0.2545367741060513,
+            i=13.0341156937239,
+            omega=243.5713956782588,
+            Omega=172.9725743187225,
+            M0=102.2786199679069,
+            n=0.22570615109979086,
+        ),  # ~1850
+        OrbitalElements(
+            name="Juno",
+            epoch=2415020.0,
+            a=2.668473875937135,
+            e=0.2570467053847793,
+            i=13.0138782382272,
+            omega=244.7458767580244,
+            Omega=172.1241757222398,
+            M0=268.3401928510311,
+            n=0.22610472637177806,
+        ),  # ~1900
+        OrbitalElements(
+            name="Juno",
+            epoch=2433282.5,
+            a=2.669038829826899,
+            e=0.2581292943135189,
+            i=12.9865656144813,
+            omega=246.3039326862436,
+            Omega=171.1838326227640,
+            M0=74.2968806161333,
+            n=0.22603294098780652,
+        ),  # ~1950
+        OrbitalElements(
+            name="Juno",
+            epoch=2451545.0,
+            a=2.668034901637456,
+            e=0.2584434725376836,
+            i=12.9674254304436,
+            omega=248.0317243454051,
+            Omega=170.1725855193558,
+            M0=240.2686465732295,
+            n=0.22616053050293972,
+        ),  # ~2000
+        OrbitalElements(
+            name="Juno",
+            epoch=2469807.5,
+            a=2.669596555162219,
+            e=0.2576090587025507,
+            i=12.9658826666136,
+            omega=249.6096600817545,
+            Omega=169.1683871758680,
+            M0=46.4091226952899,
+            n=0.22596211134517313,
+        ),  # ~2050
+        OrbitalElements(
+            name="Juno",
+            epoch=2488070.0,
+            a=2.668180003126033,
+            e=0.2573524143366536,
+            i=12.9732983251075,
+            omega=250.5918139915804,
+            Omega=168.2871142830709,
+            M0=212.8753996664834,
+            n=0.22614208209422884,
+        ),  # ~2100
+        OrbitalElements(
+            name="Juno",
+            epoch=2506332.5,
+            a=2.669475030066724,
+            e=0.2578841705864878,
+            i=12.9655415540318,
+            omega=251.6817697997741,
+            Omega=167.4270855153874,
+            M0=19.1040176683931,
+            n=0.22597754155862554,
+        ),  # ~2150
+        OrbitalElements(
+            name="Juno",
+            epoch=2524595.0,
+            a=2.667797720818692,
+            e=0.2592949433437564,
+            i=12.9538381447397,
+            omega=252.8997615617450,
+            Omega=166.5416895468570,
+            M0=185.2501349684191,
+            n=0.22619069140959247,
+        ),  # ~2200
+        OrbitalElements(
+            name="Juno",
+            epoch=2542857.5,
+            a=2.668022605128054,
+            e=0.2608493498985353,
+            i=12.9329293040060,
+            omega=254.5601100618055,
+            Omega=165.5506823178155,
+            M0=351.2722616631319,
+            n=0.22616209401384599,
+        ),  # ~2250
+        OrbitalElements(
+            name="Juno",
+            epoch=2561120.0,
+            a=2.666839989096661,
+            e=0.2601439729137539,
+            i=12.9327933977377,
+            omega=256.2513612127259,
+            Omega=164.4720414414643,
+            M0=157.4182991298890,
+            n=0.22631254880419557,
+        ),  # ~2300
+        OrbitalElements(
+            name="Juno",
+            epoch=2579382.5,
+            a=2.668596654309983,
+            e=0.2588370529187777,
+            i=12.9432318712141,
+            omega=257.6235536451163,
+            Omega=163.4941497329453,
+            M0=323.6906356656714,
+            n=0.22608912241133611,
+        ),  # ~2350
+        OrbitalElements(
+            name="Juno",
+            epoch=2597645.0,
+            a=2.668187450770907,
+            e=0.2583189189483628,
+            i=12.9520271873288,
+            omega=258.7231525917977,
+            Omega=162.5991495276816,
+            M0=129.9367687299982,
+            n=0.22614113525778592,
+        ),  # ~2400
+        OrbitalElements(
+            name="Juno",
+            epoch=2615907.5,
+            a=2.668922185746392,
+            e=0.2590465792593691,
+            i=12.9523118130108,
+            omega=259.7341983908170,
+            Omega=161.7277565849065,
+            M0=296.3002087229165,
+            n=0.22604775915641592,
+        ),  # ~2450
+    ],
+    SE_VESTA: [
+        OrbitalElements(
+            name="Vesta",
+            epoch=2323707.5,
+            a=2.361549864375658,
+            e=0.0881297974693652,
+            i=7.1096067049305,
+            omega=142.7003125502699,
+            Omega=107.1247458406169,
+            M0=188.6140656190074,
+            n=0.27158663467088712,
+        ),  # ~1650
+        OrbitalElements(
+            name="Vesta",
+            epoch=2341970.0,
+            a=2.361103411139086,
+            e=0.0881941714700705,
+            i=7.1160438972886,
+            omega=143.2933593884974,
+            Omega=106.6983930583963,
+            M0=107.9116972116122,
+            n=0.27166366844016054,
+        ),  # ~1700
+        OrbitalElements(
+            name="Vesta",
+            epoch=2360232.5,
+            a=2.361262763396941,
+            e=0.0872921983919888,
+            i=7.1204600710690,
+            omega=144.6032525317081,
+            Omega=106.2661626499735,
+            M0=26.3909866634754,
+            n=0.27163616864900975,
+        ),  # ~1750
+        OrbitalElements(
+            name="Vesta",
+            epoch=2378495.0,
+            a=2.361195092942943,
+            e=0.0887063512548879,
+            i=7.1304656606110,
+            omega=147.0024989182491,
+            Omega=105.7402907314308,
+            M0=303.7829698188855,
+            n=0.27164784613043308,
+        ),  # ~1800
+        OrbitalElements(
+            name="Vesta",
+            epoch=2396757.5,
+            a=2.361062753273185,
+            e=0.0896039271366581,
+            i=7.1331784681095,
+            omega=147.5888679471515,
+            Omega=105.2971937792397,
+            M0=223.1448926761275,
+            n=0.27167068560597063,
+        ),  # ~1850
+        OrbitalElements(
+            name="Vesta",
+            epoch=2415020.0,
+            a=2.361698224963693,
+            e=0.0891790775207868,
+            i=7.1333687258595,
+            omega=148.4913906127970,
+            Omega=104.8178706815224,
+            M0=142.1615593439045,
+            n=0.27156104368750217,
+        ),  # ~1900
+        OrbitalElements(
+            name="Vesta",
+            epoch=2433282.5,
+            a=2.361973263416727,
+            e=0.0902068943120832,
+            i=7.1338759824269,
+            omega=149.4885137640174,
+            Omega=104.3870162130261,
+            M0=61.0815417595835,
+            n=0.27151361244250755,
+        ),  # ~1950
+        OrbitalElements(
+            name="Vesta",
+            epoch=2451545.0,
+            a=2.361534934725459,
+            e=0.0900224456143175,
+            i=7.1339358257437,
+            omega=149.5866680477808,
+            Omega=103.9514369983294,
+            M0=341.0238343828154,
+            n=0.27158921013555831,
+        ),  # ~2000
+        OrbitalElements(
+            name="Vesta",
+            epoch=2469807.5,
+            a=2.362142975448974,
+            e=0.0884843861216332,
+            i=7.1372343832534,
+            omega=151.1496511683981,
+            Omega=103.5302425148793,
+            M0=259.2432908223840,
+            n=0.27148435195758253,
+        ),  # ~2050
+        OrbitalElements(
+            name="Vesta",
+            epoch=2488070.0,
+            a=2.361544425744228,
+            e=0.0890782138133498,
+            i=7.1408926409205,
+            omega=152.6163913529251,
+            Omega=103.0997236285397,
+            M0=177.5882144521720,
+            n=0.27158757286652824,
+        ),  # ~2100
+        OrbitalElements(
+            name="Vesta",
+            epoch=2506332.5,
+            a=2.361354873768660,
+            e=0.0891143003400342,
+            i=7.1473831489361,
+            omega=153.3487100353903,
+            Omega=102.6501540089512,
+            M0=96.7317814323995,
+            n=0.27162027506303521,
+        ),  # ~2150
+        OrbitalElements(
+            name="Vesta",
+            epoch=2524595.0,
+            a=2.361299385823339,
+            e=0.0889542613682113,
+            i=7.1510687632448,
+            omega=154.9626900856719,
+            Omega=102.2099615148172,
+            M0=14.9101703426192,
+            n=0.27162984928704259,
+        ),  # ~2200
+        OrbitalElements(
+            name="Vesta",
+            epoch=2542857.5,
+            a=2.361001782363434,
+            e=0.0912560945798420,
+            i=7.1539479901134,
+            omega=156.1091081416017,
+            Omega=101.6845581471479,
+            M0=293.6820655581142,
+            n=0.27168120917857980,
+        ),  # ~2250
+        OrbitalElements(
+            name="Vesta",
+            epoch=2561120.0,
+            a=2.361352302640912,
+            e=0.0912581833019293,
+            i=7.1542566482585,
+            omega=156.4123669824611,
+            Omega=101.2606774577953,
+            M0=213.4254877795697,
+            n=0.27162071868846255,
+        ),  # ~2300
+        OrbitalElements(
+            name="Vesta",
+            epoch=2579382.5,
+            a=2.361670319169864,
+            e=0.0905414738369713,
+            i=7.1509135016431,
+            omega=157.5612839183030,
+            Omega=100.8028613801271,
+            M0=132.1891533517870,
+            n=0.27156585690094365,
+        ),  # ~2350
+        OrbitalElements(
+            name="Vesta",
+            epoch=2597645.0,
+            a=2.361535507317598,
+            e=0.0911601535086748,
+            i=7.1525978622457,
+            omega=158.2608196342332,
+            Omega=100.3873125713090,
+            M0=51.3570365164127,
+            n=0.27158911135882796,
+        ),  # ~2400
+        OrbitalElements(
+            name="Vesta",
+            epoch=2615907.5,
+            a=2.361650423122057,
+            e=0.0902280415528131,
+            i=7.1524669367817,
+            omega=159.0316895227045,
+            Omega=99.9709933350514,
+            M0=330.4960776638464,
+            n=0.27156928867386737,
+        ),  # ~2450
+    ],
+}
+
+
+def _get_closest_epoch_elements(body_id: int, jd_tt: float) -> OrbitalElements:
+    """Select the closest-epoch orbital elements for a minor body.
+
+    If multi-epoch elements are available (from SPK-derived data), selects
+    the epoch closest to the target JD. This reduces the propagation time
+    and dramatically improves Keplerian accuracy.
+
+    Falls back to the single-epoch elements in MINOR_BODY_ELEMENTS if no
+    multi-epoch data is available for the body.
+
+    Args:
+        body_id: Minor body identifier (SE_CERES, SE_CHIRON, etc.)
+        jd_tt: Target Julian Day in Terrestrial Time
+
+    Returns:
+        The OrbitalElements instance with the closest epoch to jd_tt
+    """
+    # Start with the original single-epoch elements as the default best
+    best = MINOR_BODY_ELEMENTS[body_id]
+    best_dt = abs(jd_tt - best.epoch)
+
+    if body_id in MINOR_BODY_ELEMENTS_MULTI:
+        # Also consider all multi-epoch entries
+        for elem in MINOR_BODY_ELEMENTS_MULTI[body_id]:
+            dt = abs(jd_tt - elem.epoch)
+            if dt < best_dt:
+                best = elem
+                best_dt = dt
+
+    return best
+
+
 def solve_kepler_equation_elliptic(M: float, e: float, tol: float = 1e-8) -> float:
     """
     Solve Kepler's equation M = E - e·sin(E) for eccentric anomaly E (elliptic orbits).
@@ -1629,17 +3063,23 @@ def calc_minor_body_position(
     dt = jd_tt - elements.epoch
 
     # Apply secular perturbations to get perturbed orbital elements
+    # Now includes eccentricity and inclination evolution via (h,k)/(p,q) vectors
     if include_perturbations and abs(e - 1.0) > 1e-10 and e < 1.0:
         # Only apply perturbations for elliptic orbits
-        omega_pert, Omega_pert, M_deg, n_pert = apply_secular_perturbations(
-            elements, jd_tt, include_perturbations=True
+        omega_pert, Omega_pert, M_deg, n_pert, e_pert, i_pert = (
+            apply_secular_perturbations(elements, jd_tt, include_perturbations=True)
         )
     else:
         # Parabolic or hyperbolic orbits, or perturbations disabled
         omega_pert = elements.omega
         Omega_pert = elements.Omega
         M_deg = elements.M0 + elements.n * dt
+        e_pert = e
+        i_pert = elements.i
         # n_pert not used for non-elliptic orbits
+
+    # Use perturbed eccentricity for orbit computation
+    e_use = e_pert if (abs(e - 1.0) > 1e-10 and e < 1.0) else e
 
     # Propagate mean anomaly (handle differently for each orbit type)
     if abs(e - 1.0) < 1e-10:
@@ -1663,8 +3103,8 @@ def calc_minor_body_position(
         # Hyperbolic orbit: no wrapping needed
         M = math.radians(elements.M0 + elements.n * dt)
 
-    # Solve the appropriate Kepler equation
-    anomaly = solve_kepler_equation(M, e)
+    # Solve the appropriate Kepler equation (using perturbed eccentricity)
+    anomaly = solve_kepler_equation(M, e_use)
 
     # Calculate true anomaly and distance based on orbit type
     if abs(e - 1.0) < 1e-10:
@@ -1676,13 +3116,13 @@ def calc_minor_body_position(
         p = 2.0 * elements.a  # elements.a is perihelion distance q for parabolic orbits
         r = p / (1.0 + math.cos(nu))
     elif e < 1.0:
-        # Elliptic orbit: anomaly is eccentric anomaly E
+        # Elliptic orbit: anomaly is eccentric anomaly E, use perturbed e
         E = anomaly
         nu = 2.0 * math.atan2(
-            math.sqrt(1 + e) * math.sin(E / 2),
-            math.sqrt(1 - e) * math.cos(E / 2),
+            math.sqrt(1 + e_use) * math.sin(E / 2),
+            math.sqrt(1 - e_use) * math.cos(E / 2),
         )
-        r = elements.a * (1 - e * math.cos(E))
+        r = elements.a * (1 - e_use * math.cos(E))
     else:
         # Hyperbolic orbit: anomaly is hyperbolic anomaly H
         H = anomaly
@@ -1705,7 +3145,7 @@ def calc_minor_body_position(
     else:
         omega_rad = math.radians(elements.omega)
         Omega_rad = math.radians(elements.Omega)
-    i_rad = math.radians(elements.i)
+    i_rad = math.radians(i_pert)
 
     # Precompute trig functions
     cos_omega = math.cos(omega_rad)
@@ -1797,8 +3237,9 @@ def calc_minor_body_heliocentric(
             pass
 
     # Fall back to Keplerian calculation
+    # Use multi-epoch elements if available for better accuracy
     # Pass body_id to enable resonant libration correction for plutinos
-    elements = MINOR_BODY_ELEMENTS[body_id]
+    elements = _get_closest_epoch_elements(body_id, jd_tt)
     x, y, z = calc_minor_body_position(elements, jd_tt, body_id=body_id)
 
     # Convert Cartesian to spherical coordinates

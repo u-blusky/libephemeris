@@ -1676,9 +1676,9 @@ def _calc_body(
 
         # Try ASSIST N-body integration fallback if available
         try:
-            from .rebound_integration import check_assist_available
+            from .rebound_integration import check_assist_data_available
 
-            if check_assist_available():
+            if check_assist_data_available():
                 lon, lat, dist = _assist_position_at(jd_tt, ipl, iflag, planets)
 
                 speed_lon = 0.0

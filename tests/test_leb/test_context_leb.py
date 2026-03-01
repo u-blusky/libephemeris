@@ -216,3 +216,212 @@ class TestContextLEBGlobalFallthrough:
             assert abs(result[3]) > 0.5  # Sun speed confirms it worked
         finally:
             ephem.set_leb_file(old_leb)
+
+
+class TestCalcMode:
+    """Tests for set_calc_mode() / get_calc_mode() and LIBEPHEMERIS_MODE."""
+
+    def setup_method(self):
+        """Reset calc mode before each test."""
+        from libephemeris.state import set_calc_mode
+
+        set_calc_mode(None)
+
+    def teardown_method(self):
+        """Clean up after each test."""
+        import os
+
+        from libephemeris.state import set_calc_mode
+
+        set_calc_mode(None)
+        os.environ.pop("LIBEPHEMERIS_MODE", None)
+
+    def test_default_mode_is_auto(self):
+        """Default calc mode should be 'auto'."""
+        from libephemeris.state import get_calc_mode
+
+        assert get_calc_mode() == "auto"
+
+    def test_set_mode_skyfield(self):
+        """set_calc_mode('skyfield') should be respected."""
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        set_calc_mode("skyfield")
+        assert get_calc_mode() == "skyfield"
+
+    def test_set_mode_leb(self):
+        """set_calc_mode('leb') should be respected."""
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        set_calc_mode("leb")
+        assert get_calc_mode() == "leb"
+
+    def test_set_mode_auto(self):
+        """set_calc_mode('auto') should be respected."""
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        set_calc_mode("auto")
+        assert get_calc_mode() == "auto"
+
+    def test_set_mode_none_resets(self):
+        """set_calc_mode(None) should reset to env var / default."""
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        set_calc_mode("skyfield")
+        set_calc_mode(None)
+        assert get_calc_mode() == "auto"
+
+    def test_invalid_mode_raises(self):
+        """set_calc_mode with invalid mode should raise ValueError."""
+        from libephemeris.state import set_calc_mode
+
+        with pytest.raises(ValueError, match="Invalid mode"):
+            set_calc_mode("invalid")
+
+    def test_mode_case_insensitive(self):
+        """set_calc_mode should be case-insensitive."""
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        set_calc_mode("SKYFIELD")
+        assert get_calc_mode() == "skyfield"
+
+    def test_env_var_mode(self):
+        """LIBEPHEMERIS_MODE env var should set the mode."""
+        import os
+
+        from libephemeris.state import get_calc_mode
+
+        os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
+        assert get_calc_mode() == "skyfield"
+
+    def test_env_var_case_insensitive(self):
+        """LIBEPHEMERIS_MODE env var should be case-insensitive."""
+        import os
+
+        from libephemeris.state import get_calc_mode
+
+        os.environ["LIBEPHEMERIS_MODE"] = "LEB"
+        assert get_calc_mode() == "leb"
+
+    def test_env_var_invalid_ignored(self):
+        """Invalid LIBEPHEMERIS_MODE env var should fall back to auto."""
+        import os
+
+        from libephemeris.state import get_calc_mode
+
+        os.environ["LIBEPHEMERIS_MODE"] = "bogus"
+        assert get_calc_mode() == "auto"
+
+    def test_programmatic_overrides_env_var(self):
+        """Programmatic set_calc_mode should override env var."""
+        import os
+
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        os.environ["LIBEPHEMERIS_MODE"] = "leb"
+        set_calc_mode("skyfield")
+        assert get_calc_mode() == "skyfield"
+
+    def test_skyfield_mode_returns_none_reader(self, test_leb_file):
+        """In skyfield mode, get_leb_reader() should return None."""
+        from libephemeris.state import get_leb_reader, set_calc_mode
+
+        old_leb = ephem.state._LEB_FILE
+        try:
+            ephem.set_leb_file(test_leb_file)
+            set_calc_mode("skyfield")
+            assert get_leb_reader() is None
+        finally:
+            set_calc_mode(None)
+            ephem.set_leb_file(old_leb)
+
+    def test_leb_mode_without_file_raises(self):
+        """In leb mode, get_leb_reader() should raise if no file configured."""
+        from libephemeris.state import get_leb_reader, set_calc_mode
+
+        old_leb = ephem.state._LEB_FILE
+        try:
+            ephem.set_leb_file(None)
+            set_calc_mode("leb")
+            with pytest.raises(RuntimeError, match="LIBEPHEMERIS_MODE=leb"):
+                get_leb_reader()
+        finally:
+            set_calc_mode(None)
+            ephem.set_leb_file(old_leb)
+
+    def test_leb_mode_with_invalid_file_raises(self):
+        """In leb mode, invalid .leb file should raise RuntimeError."""
+        from libephemeris.state import get_leb_reader, set_calc_mode
+
+        old_leb = ephem.state._LEB_FILE
+        try:
+            ephem.set_leb_file("/nonexistent/path/fake.leb")
+            set_calc_mode("leb")
+            with pytest.raises(RuntimeError, match="failed to open LEB file"):
+                get_leb_reader()
+        finally:
+            set_calc_mode(None)
+            ephem.set_leb_file(old_leb)
+
+    @pytest.mark.integration
+    def test_skyfield_mode_calc_works(self, test_leb_file):
+        """In skyfield mode, swe_calc_ut should use Skyfield (not LEB)."""
+        from libephemeris.state import set_calc_mode
+
+        old_leb = ephem.state._LEB_FILE
+        try:
+            ephem.set_leb_file(test_leb_file)
+            set_calc_mode("skyfield")
+
+            jd = 2451545.0  # J2000
+            result, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            assert 0.0 <= result[0] < 360.0
+            assert abs(result[3]) > 0.5
+        finally:
+            set_calc_mode(None)
+            ephem.set_leb_file(old_leb)
+
+    @pytest.mark.integration
+    def test_auto_mode_uses_leb(self, test_leb_file):
+        """In auto mode with LEB configured, should use LEB fast path."""
+        from libephemeris.state import get_leb_reader, set_calc_mode
+
+        old_leb = ephem.state._LEB_FILE
+        try:
+            ephem.set_leb_file(test_leb_file)
+            set_calc_mode("auto")
+
+            reader = get_leb_reader()
+            assert reader is not None
+        finally:
+            set_calc_mode(None)
+            ephem.set_leb_file(old_leb)
+
+    @pytest.mark.integration
+    def test_close_resets_calc_mode(self):
+        """close() should reset calc mode to auto."""
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        set_calc_mode("skyfield")
+        assert get_calc_mode() == "skyfield"
+        ephem.close()
+        assert get_calc_mode() == "auto"
+
+    @pytest.mark.integration
+    def test_context_respects_global_skyfield_mode(self, test_leb_file):
+        """EphemerisContext should respect global skyfield mode."""
+        from libephemeris.state import set_calc_mode
+
+        old_leb = ephem.state._LEB_FILE
+        try:
+            ephem.set_leb_file(test_leb_file)
+            set_calc_mode("skyfield")
+
+            # Context without own LEB should pick up global mode
+            ctx = EphemerisContext()
+            jd = 2451545.0
+            result, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            assert 0.0 <= result[0] < 360.0
+        finally:
+            set_calc_mode(None)
+            ephem.set_leb_file(old_leb)

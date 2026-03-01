@@ -123,6 +123,8 @@ from .state import (
     # LEB binary ephemeris mode
     set_leb_file,
     get_leb_reader,
+    set_calc_mode,
+    get_calc_mode,
     set_auto_spk_download,
     get_auto_spk_download,
     set_spk_cache_dir,

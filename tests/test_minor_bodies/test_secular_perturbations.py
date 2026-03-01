@@ -128,7 +128,9 @@ class TestApplySecularPerturbations:
         epoch = elements.epoch
 
         # Propagate for 0.5 days
-        omega_p, Omega_p, M_p, n_p = apply_secular_perturbations(elements, epoch + 0.5)
+        omega_p, Omega_p, M_p, n_p, e_p, i_p = apply_secular_perturbations(
+            elements, epoch + 0.5
+        )
 
         # omega and Omega should be very close to original
         assert abs(omega_p - elements.omega) < 0.01, (
@@ -145,7 +147,9 @@ class TestApplySecularPerturbations:
 
         # Propagate for 10 years (3652.5 days)
         dt = 10 * 365.25
-        omega_p, Omega_p, M_p, n_p = apply_secular_perturbations(elements, epoch + dt)
+        omega_p, Omega_p, M_p, n_p, e_p, i_p = apply_secular_perturbations(
+            elements, epoch + dt
+        )
 
         # omega and Omega should have drifted measurably
         d_omega = omega_p - elements.omega
@@ -170,7 +174,7 @@ class TestApplySecularPerturbations:
         epoch = elements.epoch
 
         # Propagate for 1000 days without perturbations
-        omega_p, Omega_p, M_p, n_p = apply_secular_perturbations(
+        omega_p, Omega_p, M_p, n_p, e_p, i_p = apply_secular_perturbations(
             elements, epoch + 1000, include_perturbations=False
         )
 
