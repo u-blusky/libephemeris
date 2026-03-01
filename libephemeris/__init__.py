@@ -1,3 +1,26 @@
+"""LibEphemeris -- high-precision astronomical ephemeris library.
+
+Pure Python, API-compatible with PySwissEphemeris, using NASA JPL
+DE440/DE441 ephemerides via Skyfield and IAU 2006/2000A standards via pyerfa.
+
+Calculation backend:
+    By default all calculations use JPL DE440 via Skyfield (no configuration
+    needed). For ~14x faster batch evaluation, configure a precomputed ``.leb``
+    binary ephemeris file with ``set_leb_file()`` or the ``LIBEPHEMERIS_LEB``
+    environment variable.
+
+    The calculation mode (``set_calc_mode()`` / ``LIBEPHEMERIS_MODE``) controls
+    backend selection:
+
+    - ``"auto"`` (default): use LEB if configured, otherwise Skyfield.
+    - ``"skyfield"``: always use Skyfield, even if a ``.leb`` file is present.
+    - ``"leb"``: require LEB; raises ``RuntimeError`` if unavailable.
+
+    With no ``.leb`` file configured, ``"auto"`` is equivalent to ``"skyfield"``.
+"""
+
+from __future__ import annotations
+
 from .constants import *
 from .logging_config import (
     get_logger,

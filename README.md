@@ -69,6 +69,8 @@ pip install libephemeris[all]    # Everything
 
 ## Quick start
 
+By default, all calculations use **JPL DE440 via Skyfield** -- no extra files or configuration needed. For faster batch workloads, see [Calculation backend](#calculation-backend).
+
 ```python
 import libephemeris as swe
 from libephemeris.constants import SE_SUN, SE_MOON, SEFLG_SPEED
@@ -194,6 +196,46 @@ export LIBEPHEMERIS_EPHEMERIS=de441.bsp
 4. Default: `de440.bsp` (medium tier)
 
 Dates outside the loaded kernel raise `EphemerisRangeError`.
+
+---
+
+## Calculation backend
+
+LibEphemeris supports two calculation backends. **By default it uses Skyfield (pure JPL) -- no configuration needed.** LEB is an opt-in accelerated mode.
+
+| Backend | Speed | Configuration |
+|---------|-------|---------------|
+| **Skyfield** (default) | ~120 us/eval | None -- works out of the box |
+| **LEB** (binary ephemeris) | ~8 us/eval | Requires a `.leb` file ([see Performance](#binary-ephemeris-mode-leb)) |
+
+If you never configure a `.leb` file, the library always uses Skyfield regardless of any other setting.
+
+### Calculation mode
+
+The `LIBEPHEMERIS_MODE` setting (or `set_calc_mode()`) controls backend selection:
+
+| Mode | Behavior |
+|------|----------|
+| `"auto"` **(default)** | Use LEB if a `.leb` file is configured, otherwise Skyfield |
+| `"skyfield"` | Always Skyfield, even if a `.leb` file is configured |
+| `"leb"` | Require LEB; raises `RuntimeError` if no `.leb` file is available |
+
+```python
+from libephemeris import set_calc_mode
+
+set_calc_mode("skyfield")  # Force pure JPL/Skyfield
+set_calc_mode("leb")       # Require LEB (error if unavailable)
+set_calc_mode("auto")      # Default: LEB if available, else Skyfield
+set_calc_mode(None)        # Reset to env var / default
+```
+
+```bash
+export LIBEPHEMERIS_MODE=skyfield  # Or: leb, auto
+```
+
+> [!NOTE]
+> In practice, `"auto"` with no `.leb` file configured is identical to `"skyfield"`.
+> The default out-of-the-box experience is always pure JPL/Skyfield.
 
 ---
 
@@ -327,51 +369,16 @@ ephemeris files (`.leb`) that store Chebyshev polynomial approximations of all
 body positions. This provides approximately **14x speedup** (~8 us vs ~120 us
 per evaluation) with sub-arcsecond precision.
 
-**Mode 1: Skyfield (default, zero configuration)**
+To enable LEB, download a pre-generated `.leb` file:
 
 ```bash
-pip install libephemeris
+libephemeris download:leb:base      # ~53 MB, 1849-2150
+libephemeris download:leb:medium    # ~175 MB, 1550-2650
 ```
 
-```python
-import libephemeris as swe
-result, _ = swe.calc_ut(2451545.0, 0, 0)  # Works immediately
-```
+Once downloaded, the file is auto-discovered from `~/.libephemeris/leb/` -- no code changes needed. You can also generate locally: `poe leb:generate:base:groups` (~5 min).
 
-- No files to manage, always up-to-date
-- ~120 us per evaluation
-
-**Mode 2: Binary ephemeris (maximum speed)**
-
-```bash
-pip install libephemeris
-# Download the pre-generated .leb file (~53 MB for base, ~175 MB for medium)
-libephemeris download:leb:base      # or: download:leb:medium
-```
-
-```python
-import libephemeris as swe
-result, _ = swe.calc_ut(2451545.0, 0, 0)  # ~14x faster, auto-discovered
-```
-
-- ~8 us per evaluation (~14x speedup)
-- Auto-discovered from `~/.libephemeris/leb/` — no configuration needed
-- Or generate locally: `poe leb:generate:base:groups` (~5 min)
-- Transparent fallback to Skyfield for unsupported flags or bodies
-
-**Calculation mode control:**
-
-```python
-from libephemeris import set_calc_mode
-
-set_calc_mode("skyfield")  # Force Skyfield (ignore LEB even if configured)
-set_calc_mode("leb")       # Require LEB (error if unavailable)
-set_calc_mode("auto")      # Default: use LEB if available, else Skyfield
-```
-
-```bash
-export LIBEPHEMERIS_MODE=skyfield  # Or: leb, auto
-```
+LEB transparently falls back to Skyfield for unsupported flags or bodies not in the `.leb` file. See [Calculation backend](#calculation-backend) for mode control.
 
 Full technical guide: `docs/LEB_GUIDE.md`.
 

@@ -376,6 +376,34 @@ pos, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SPEED)
 
 ---
 
+## Calculation Backend
+
+Unlike Swiss Ephemeris (which selects between JPL, Swiss, and Moshier backends via flags), libephemeris always uses **JPL DE440/DE441 via Skyfield** by default. No ephemeris path or data file configuration is required -- kernels are managed automatically.
+
+For performance-critical workloads, libephemeris also supports an optional **LEB** (LibEphemeris Binary) backend that provides ~14x faster evaluation using precomputed Chebyshev approximations. LEB is entirely opt-in and not needed for correctness.
+
+The calculation mode controls which backend is used:
+
+| Mode | Behavior |
+|------|----------|
+| `"auto"` **(default)** | Use LEB if a `.leb` file is configured, otherwise Skyfield |
+| `"skyfield"` | Always Skyfield, even if a `.leb` file is configured |
+| `"leb"` | Require LEB; raises `RuntimeError` if no `.leb` file is available |
+
+```python
+from libephemeris import set_calc_mode
+
+set_calc_mode("skyfield")  # Force pure JPL/Skyfield
+set_calc_mode("leb")       # Require LEB (error if unavailable)
+set_calc_mode("auto")      # Default: LEB if available, else Skyfield
+```
+
+With no `.leb` file configured (the default), `"auto"` and `"skyfield"` are functionally identical -- both use pure JPL/Skyfield.
+
+See `docs/LEB_GUIDE.md` for the full LEB technical guide.
+
+---
+
 ## Migration Checklist
 
 - [ ] Replace `import swisseph as swe` with `import libephemeris as swe`

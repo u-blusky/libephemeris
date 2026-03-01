@@ -216,6 +216,40 @@ libephemeris status               # verify installed data
 
 ---
 
+## [Calculation Backend]
+
+### Headline
+
+Pure JPL by default. Accelerated when you need it.
+
+### Description
+
+Out of the box, every calculation uses NASA JPL DE440/DE441 via Skyfield --
+no configuration required. For performance-critical batch workloads,
+enable the optional LEB (LibEphemeris Binary) backend for ~14x faster
+evaluation (~8 us vs ~120 us) with sub-arcsecond precision. LEB is entirely
+opt-in: if you never configure a `.leb` file, the library always uses
+pure JPL/Skyfield.
+
+### Mode table
+
+| Mode | Behavior |
+| --- | --- |
+| `"auto"` (default) | Use LEB if configured, otherwise Skyfield |
+| `"skyfield"` | Always Skyfield, even if LEB is configured |
+| `"leb"` | Require LEB; error if unavailable |
+
+### Code snippet
+
+```python
+from libephemeris import set_calc_mode
+
+set_calc_mode("skyfield")  # Force pure JPL/Skyfield
+set_calc_mode("auto")      # Default: LEB if available, else Skyfield
+```
+
+---
+
 ## [Thread Safety]
 
 ### Headline
