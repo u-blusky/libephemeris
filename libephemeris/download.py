@@ -454,9 +454,11 @@ def check_data_status() -> dict[str, dict]:
     status = {}
 
     for filename, info in DATA_FILES.items():
-        # Tier-specific files are in workspace root, legacy in data dir
+        # Resolve path based on file type
         if filename.startswith("planet_centers_"):
             path = workspace_root / filename
+        elif filename.endswith(".leb"):
+            path = data_dir / "leb" / filename
         else:
             path = data_dir / filename
 
@@ -502,6 +504,29 @@ def print_data_status():
             print(f"  [--] {filename} (not installed){marker}")
             print(f"        {info['description']}")
 
+    # Show LEB binary ephemeris files
+    leb_files = [
+        "ephemeris_base.leb",
+        "ephemeris_medium.leb",
+        "ephemeris_extended.leb",
+    ]
+    print()
+    print("LEB binary ephemeris (~14x speedup):")
+    for filename in leb_files:
+        if filename not in status:
+            continue
+        info = status[filename]
+        tier_name = filename.replace("ephemeris_", "").replace(".leb", "")
+        marker = " *" if tier_name == current_tier else ""
+        if info["exists"]:
+            size_str = _format_size(info["size"])
+            print(f"  [OK] {filename} ({size_str}){marker}")
+        else:
+            available = (
+                " (not yet generated)" if info["expected_size_mb"] is None else ""
+            )
+            print(f"  [--] {filename} (not installed){marker}{available}")
+
     # Show legacy planet_centers.bsp
     legacy_file = "planet_centers.bsp"
     if legacy_file in status:
@@ -517,7 +542,10 @@ def print_data_status():
     print()
     print(f"Current tier: {current_tier}")
     print()
-    print("Run 'libephemeris download:<tier>' to download all data files.")
+    print("Commands:")
+    print("  libephemeris download:<tier>       Download SPK + planet centers data")
+    print("  libephemeris download:leb:<tier>    Download LEB binary ephemeris")
+    print("  libephemeris download:assist        Download ASSIST n-body data")
     print("Available tiers: base, medium, extended")
 
 

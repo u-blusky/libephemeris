@@ -114,6 +114,13 @@ planets.py: swe_calc_ut()
 
 ### Activation
 
+```bash
+# Method 0: Download pre-generated LEB file (easiest)
+libephemeris download:leb:base       # ~53 MB, 1850-2150
+libephemeris download:leb:medium     # ~175 MB, 1550-2650
+# Auto-discovered from ~/.libephemeris/leb/ — no further configuration needed
+```
+
 ```python
 # Method 1: Programmatic
 from libephemeris import set_leb_file
@@ -132,6 +139,7 @@ ctx.set_leb_file("/path/to/ephemeris.leb")
 1. `EphemerisContext._leb_file` (per-context)
 2. Global `set_leb_file()` call
 3. `LIBEPHEMERIS_LEB` environment variable
+4. Auto-discovery: `~/.libephemeris/leb/ephemeris_{tier}.leb`
 
 ### Calculation Mode (`LIBEPHEMERIS_MODE`)
 

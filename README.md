@@ -345,18 +345,18 @@ result, _ = swe.calc_ut(2451545.0, 0, 0)  # Works immediately
 
 ```bash
 pip install libephemeris
-# Generate or download the .leb file
-poe leb:generate:base:groups    # Generate base tier (~5 min)
-export LIBEPHEMERIS_LEB=data/leb/ephemeris_base.leb
+# Download the pre-generated .leb file (~53 MB for base, ~175 MB for medium)
+libephemeris download:leb:base      # or: download:leb:medium
 ```
 
 ```python
 import libephemeris as swe
-result, _ = swe.calc_ut(2451545.0, 0, 0)  # ~14x faster
+result, _ = swe.calc_ut(2451545.0, 0, 0)  # ~14x faster, auto-discovered
 ```
 
 - ~8 us per evaluation (~14x speedup)
-- Requires precomputed `.leb` file (~56 MB for base tier)
+- Auto-discovered from `~/.libephemeris/leb/` — no configuration needed
+- Or generate locally: `poe leb:generate:base:groups` (~5 min)
 - Transparent fallback to Skyfield for unsupported flags or bodies
 
 **Calculation mode control:**
@@ -389,10 +389,13 @@ Download all required data for your precision tier:
 
 Other commands:
 
-| Command                  | Description                     |
-| ------------------------ | ------------------------------- |
-| `libephemeris status`    | Show installed data file status |
-| `libephemeris --version` | Show version information        |
+| Command                            | Description                              |
+| ---------------------------------- | ---------------------------------------- |
+| `libephemeris download:leb:base`   | Download LEB binary ephemeris (~53 MB)   |
+| `libephemeris download:leb:medium` | Download LEB binary ephemeris (~175 MB)  |
+| `libephemeris download:assist`     | Download ASSIST n-body data (~714 MB)    |
+| `libephemeris status`              | Show installed data file status          |
+| `libephemeris --version`           | Show version information                 |
 
 ---
 
