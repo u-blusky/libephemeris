@@ -631,7 +631,7 @@ from .arabic_parts import calc_all_arabic_parts
 # Constants (planet IDs, flags, sidereal modes)
 from .constants import *
 
-__version__ = "0.19.0"
+__version__ = "0.22.0"
 __author__ = "Giacomo Battaglia"
 __license__ = "LGPL-3.0"
 

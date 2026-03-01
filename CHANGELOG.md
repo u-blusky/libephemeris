@@ -7,75 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-#### Data source logging
-
-Added `logger.debug()` calls at all calculation dispatch points, enabling runtime
-visibility into which backend serves each request. Activate with
-`set_log_level('DEBUG')` or `LIBEPHEMERIS_LOG_LEVEL=DEBUG`.
-
-Sources logged:
-- `LEB` — precomputed binary ephemeris (fast path)
-- `LEB->fallback` — LEB miss, falling back to Skyfield
-- `Skyfield` — standard Skyfield/JPL pipeline
-- `SPK` — JPL Horizons SPK kernel (cached)
-- `SPK (auto-downloaded)` — SPK kernel downloaded on-demand
-- `ASSIST (n-body)` — REBOUND/ASSIST n-body integration
-- `Keplerian (fallback)` — analytical orbital elements
-
-Log format: `[libephemeris] DEBUG: body=<id> jd=<jd> source=<SOURCE>`
-
-Dispatch points instrumented:
-- `planets.py`: `swe_calc_ut()`, `swe_calc()`, `_calc_body()`
-- `context.py`: `calc_ut()`, `calc()`
-
-#### LEB binary ephemeris download commands (Task 3.5)
-
-New CLI commands and Python API to download pre-generated LEB files from
-GitHub Releases, eliminating the need to generate them locally:
-
-```bash
-libephemeris download:leb:base       # ~53 MB, 1850-2150 CE
-libephemeris download:leb:medium     # ~175 MB, 1550-2650 CE
-libephemeris download:leb:extended   # not yet available
-```
-
-Or via `poe`:
-```bash
-poe download:leb:base
-poe download:leb:medium
-poe download:leb:extended
-```
-
-Python API:
-```python
-from libephemeris.download import download_leb_for_tier
-download_leb_for_tier("medium")  # downloads + activates
-```
-
-Features:
-- Atomic downloads with SHA256 integrity verification
-- Progress bar (rich if available, simple fallback)
-- `--force` flag to re-download existing files
-- Post-download LEB validation (magic bytes, version, body index)
-- Optional auto-activation via `set_leb_file()` after download
-
-#### LEB auto-discovery
-
-`get_leb_reader()` now automatically discovers downloaded LEB files without
-requiring explicit `set_leb_file()` or `LIBEPHEMERIS_LEB` configuration.
-
-Resolution order:
-1. Explicit path via `set_leb_file()`
-2. `LIBEPHEMERIS_LEB` environment variable
-3. Auto-discovery: `~/.libephemeris/leb/ephemeris_{tier}.leb`
-
-The tier is determined by the active precision tier (base/medium/extended).
-This means `download:leb:medium` followed by any `swe_calc_ut()` call will
-automatically use the LEB fast path — zero configuration needed.
-
-## [0.21.0] - 2026-03-01
+## [0.22.0] - 2026-03-02
 
 ### Added
 
@@ -153,6 +85,57 @@ set_calc_mode("leb")       # Require LEB; raises RuntimeError if unavailable
 - `close()` resets `_CALC_MODE` to `None`
 - Environment variable `LIBEPHEMERIS_MODE` sets default (overridden by programmatic call)
 - 18 new tests in `TestCalcMode` class
+
+##### LEB binary ephemeris download commands (Task 3.5)
+
+New CLI commands and Python API to download pre-generated LEB files from
+GitHub Releases, eliminating the need to generate them locally:
+
+```bash
+libephemeris download:leb:base       # ~53 MB, 1850-2150 CE
+libephemeris download:leb:medium     # ~175 MB, 1550-2650 CE
+libephemeris download:leb:extended   # not yet available
+```
+
+Python API:
+```python
+from libephemeris import download_leb_for_tier
+download_leb_for_tier("medium")  # downloads + activates
+```
+
+- Atomic downloads with SHA256 integrity verification
+- Progress bar (rich if available, simple fallback)
+- `--force` flag to re-download existing files
+- Post-download LEB validation (magic bytes, version, body index)
+- Optional auto-activation via `set_leb_file()` after download
+- New `poe` tasks: `download:leb:base`, `download:leb:medium`, `download:leb:extended`
+
+##### LEB auto-discovery
+
+`get_leb_reader()` now automatically discovers downloaded LEB files without
+requiring explicit `set_leb_file()` or `LIBEPHEMERIS_LEB` configuration.
+
+Resolution order:
+1. Explicit path via `set_leb_file()`
+2. `LIBEPHEMERIS_LEB` environment variable
+3. Auto-discovery: `~/.libephemeris/leb/ephemeris_{tier}.leb`
+
+This means `libephemeris download:leb:medium` followed by any `swe_calc_ut()`
+call will automatically use the LEB fast path — zero configuration needed.
+
+##### Data source logging
+
+Added `logger.debug()` calls at all calculation dispatch points, enabling runtime
+visibility into which backend serves each request. Activate with
+`set_log_level('DEBUG')` or `LIBEPHEMERIS_LOG_LEVEL=DEBUG`.
+
+Sources logged: `LEB`, `LEB->fallback`, `Skyfield`, `SPK`, `SPK (auto-downloaded)`,
+`ASSIST (n-body)`, `Keplerian (fallback)`.
+
+Log format: `[libephemeris] DEBUG: body=<id> jd=<jd> source=<SOURCE>`
+
+Dispatch points: `swe_calc_ut()`, `swe_calc()`, `_calc_body()` in `planets.py`;
+`calc_ut()`, `calc()` in `context.py`.
 
 #### Keplerian Precision Improvements
 
@@ -271,6 +254,7 @@ Required data files (saved to `~/.libephemeris/assist/`):
 
 - `close()` now resets `_CALC_MODE` and calls `reset_assist_data_cache()`
 - `get_leb_reader()` respects calculation mode setting
+- `get_leb_reader()` auto-discovers LEB files in `~/.libephemeris/leb/` based on active tier
 
 #### Naming
 
