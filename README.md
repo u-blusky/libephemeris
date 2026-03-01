@@ -201,14 +201,14 @@ Dates outside the loaded kernel raise `EphemerisRangeError`.
 
 ## Calculation backend
 
-LibEphemeris supports two calculation backends. **By default it uses Skyfield (pure JPL) -- no configuration needed.** LEB is an opt-in accelerated mode.
+LibEphemeris supports two calculation backends. **By default it uses Skyfield (pure JPL) -- no configuration needed.** LEB is an opt-in accelerated mode that serves the same JPL positions from a compact precomputed cache.
 
 | Backend | Speed | Configuration |
 |---------|-------|---------------|
 | **Skyfield** (default) | ~120 us/eval | None -- works out of the box |
 | **LEB** (binary ephemeris) | ~8 us/eval | Requires a `.leb` file ([see Performance](#binary-ephemeris-mode-leb)) |
 
-If you never configure a `.leb` file, the library always uses Skyfield regardless of any other setting.
+Both backends produce the same positions: LEB files are generated from JPL DE440/DE441 via Skyfield and store the results as Chebyshev polynomial fits (sub-arcsecond approximation error). If you never configure a `.leb` file, the library always uses Skyfield regardless of any other setting.
 
 ### Calculation mode
 
@@ -365,9 +365,11 @@ For batch workloads, use `EphemerisContext`, parallelism, and caching.
 ### Binary Ephemeris Mode (LEB)
 
 For performance-critical applications, LibEphemeris supports precomputed binary
-ephemeris files (`.leb`) that store Chebyshev polynomial approximations of all
-body positions. This provides approximately **14x speedup** (~8 us vs ~120 us
-per evaluation) with sub-arcsecond precision.
+ephemeris files (`.leb`). These files are generated from the same JPL DE440/DE441
+data used by Skyfield, compressed into Chebyshev polynomial fits for fast
+evaluation. The underlying positions are identical -- LEB is a cache, not a
+different data source. Approximation error is sub-arcsecond. This provides
+approximately **14x speedup** (~8 us vs ~120 us per evaluation).
 
 To enable LEB, download a pre-generated `.leb` file:
 
