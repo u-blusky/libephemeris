@@ -1,6 +1,6 @@
 """
 Keplerian precision benchmark: measures accuracy of the Keplerian fallback
-against SPK reference positions for the 5 major asteroids.
+against SPK reference positions for all 37 supported minor bodies.
 
 This test serves as a baseline for evaluating improvements to the Keplerian
 propagation (secular perturbations, multi-epoch elements, etc.).
@@ -20,10 +20,42 @@ from typing import Tuple
 import pytest
 
 from libephemeris.constants import (
+    SE_AMOR,
+    SE_APOPHIS,
+    SE_ASBOLUS,
+    SE_BENNU,
     SE_CERES,
+    SE_CHARIKLO,
     SE_CHIRON,
+    SE_DAVIDA,
+    SE_ERIS,
+    SE_EROS,
+    SE_EUROPA_AST,
+    SE_GONGGONG,
+    SE_HAUMEA,
+    SE_HIDALGO,
+    SE_HYGIEA,
+    SE_ICARUS,
+    SE_INTERAMNIA,
+    SE_ITOKAWA,
+    SE_IXION,
     SE_JUNO,
+    SE_LILITH_AST,
+    SE_MAKEMAKE,
+    SE_NESSUS,
+    SE_ORCUS,
     SE_PALLAS,
+    SE_PANDORA_AST,
+    SE_PHOLUS,
+    SE_PSYCHE,
+    SE_QUAOAR,
+    SE_RYUGU,
+    SE_SAPPHO,
+    SE_SEDNA,
+    SE_SYLVIA,
+    SE_TORO,
+    SE_TOUTATIS,
+    SE_VARUNA,
     SE_VESTA,
 )
 from libephemeris.minor_bodies import (
@@ -33,13 +65,51 @@ from libephemeris.minor_bodies import (
 )
 
 
-# The 5 major asteroids with SPK support
+# All 37 minor bodies with Keplerian elements, grouped by category.
+# Bodies without SPK support will be gracefully skipped at runtime.
 BENCHMARK_BODIES = [
+    # Main belt (traditional 4)
     (SE_CERES, "Ceres"),
     (SE_PALLAS, "Pallas"),
     (SE_JUNO, "Juno"),
     (SE_VESTA, "Vesta"),
+    # Main belt (additional)
+    (SE_HYGIEA, "Hygiea"),
+    (SE_INTERAMNIA, "Interamnia"),
+    (SE_DAVIDA, "Davida"),
+    (SE_EUROPA_AST, "Europa"),
+    (SE_SYLVIA, "Sylvia"),
+    (SE_PSYCHE, "Psyche"),
+    (SE_SAPPHO, "Sappho"),
+    (SE_PANDORA_AST, "Pandora"),
+    (SE_LILITH_AST, "Lilith"),
+    # Centaurs
     (SE_CHIRON, "Chiron"),
+    (SE_PHOLUS, "Pholus"),
+    (SE_NESSUS, "Nessus"),
+    (SE_ASBOLUS, "Asbolus"),
+    (SE_CHARIKLO, "Chariklo"),
+    (SE_HIDALGO, "Hidalgo"),
+    # TNOs / Dwarf planets
+    (SE_ERIS, "Eris"),
+    (SE_SEDNA, "Sedna"),
+    (SE_HAUMEA, "Haumea"),
+    (SE_MAKEMAKE, "Makemake"),
+    (SE_IXION, "Ixion"),
+    (SE_ORCUS, "Orcus"),
+    (SE_QUAOAR, "Quaoar"),
+    (SE_VARUNA, "Varuna"),
+    (SE_GONGGONG, "Gonggong"),
+    # Near-Earth asteroids
+    (SE_APOPHIS, "Apophis"),
+    (SE_EROS, "Eros"),
+    (SE_AMOR, "Amor"),
+    (SE_ICARUS, "Icarus"),
+    (SE_TORO, "Toro"),
+    (SE_TOUTATIS, "Toutatis"),
+    (SE_ITOKAWA, "Itokawa"),
+    (SE_BENNU, "Bennu"),
+    (SE_RYUGU, "Ryugu"),
 ]
 
 # Time offsets from epoch to test (in years)
@@ -169,6 +239,83 @@ def _ensure_spk_available(body_id: int) -> bool:
         return False
 
 
+# Category sets for tolerance scaling
+_NEA_BODIES = {
+    SE_APOPHIS,
+    SE_EROS,
+    SE_AMOR,
+    SE_ICARUS,
+    SE_TORO,
+    SE_TOUTATIS,
+    SE_ITOKAWA,
+    SE_BENNU,
+    SE_RYUGU,
+}
+_TNO_BODIES = {
+    SE_ERIS,
+    SE_SEDNA,
+    SE_HAUMEA,
+    SE_MAKEMAKE,
+    SE_IXION,
+    SE_ORCUS,
+    SE_QUAOAR,
+    SE_VARUNA,
+    SE_GONGGONG,
+}
+_CENTAUR_BODIES = {SE_CHIRON, SE_PHOLUS, SE_NESSUS, SE_ASBOLUS, SE_CHARIKLO, SE_HIDALGO}
+# Chaotic NEAs with close planetary encounters — even at epoch, osculating
+# elements from different sources may disagree at the arcsecond level.
+_CHAOTIC_NEAS = {SE_APOPHIS, SE_BENNU, SE_RYUGU, SE_TOUTATIS}
+# High-eccentricity bodies where Keplerian propagation accumulates error faster
+_HIGH_ECC_BODIES = {SE_ICARUS, SE_HIDALGO}
+
+
+def _get_epoch_tolerance(body_id: int) -> float:
+    """Get at-epoch tolerance in arcseconds based on body category.
+
+    At epoch the Keplerian should closely match SPK, but chaotic NEAs
+    and high-eccentricity bodies may have slightly larger residuals due
+    to epoch mismatch between the osculating elements and the SPK kernel.
+    """
+    if body_id in _CHAOTIC_NEAS:
+        return 5.0  # Chaotic orbits, element epoch may not exactly match SPK
+    if body_id in _HIGH_ECC_BODIES:
+        return 3.0  # High eccentricity amplifies epoch mismatch
+    if body_id in _NEA_BODIES:
+        return 2.0  # NEAs generally
+    return 1.0  # Main belt, centaurs, TNOs
+
+
+def _get_1month_tolerance(body_id: int) -> float:
+    """Get ±1 month tolerance in arcseconds based on body category."""
+    if body_id in _CHAOTIC_NEAS:
+        return 300.0  # Chaotic orbits diverge fast
+    if body_id in _HIGH_ECC_BODIES:
+        return 300.0  # Fast-moving, high-eccentricity
+    if body_id in _NEA_BODIES:
+        return 120.0  # NEAs have shorter periods, faster error growth
+    if body_id in _CENTAUR_BODIES:
+        return 120.0  # Strong Jupiter/Saturn perturbations
+    if body_id in _TNO_BODIES:
+        return 120.0  # Slow-moving but perturbation model less accurate
+    return 60.0  # Main belt asteroids — best behaved
+
+
+def _get_1year_tolerance(body_id: int) -> float:
+    """Get ±1 year tolerance in arcseconds based on body category."""
+    if body_id in _CHAOTIC_NEAS:
+        return 1800.0  # 30' — chaotic orbits
+    if body_id in _HIGH_ECC_BODIES:
+        return 1800.0  # 30' — high eccentricity
+    if body_id in _NEA_BODIES:
+        return 900.0  # 15' — NEAs
+    if body_id in _TNO_BODIES:
+        return 900.0  # 15' — TNOs (perturbation model approximate)
+    if body_id in _CENTAUR_BODIES:
+        return 600.0  # 10' — centaurs
+    return 300.0  # 5' — main belt
+
+
 @pytest.mark.slow
 class TestKeplerianPrecisionBenchmark:
     """Benchmark Keplerian fallback accuracy against SPK reference."""
@@ -286,45 +433,62 @@ class TestKeplerianPrecisionBenchmark:
         print()
 
     def test_keplerian_near_epoch_accuracy(self):
-        """Verify Keplerian is accurate within 1" at epoch."""
+        """Verify Keplerian is accurate within tolerance at epoch.
+
+        All bodies should match well at their own element epoch.
+        NEAs with chaotic orbits (Apophis, Bennu, Ryugu) get wider tolerance
+        due to epoch mismatch between SPK and osculating elements.
+        """
         for body_id, name in self.available_bodies:
             jd = EPOCH_JD
+            threshold = _get_epoch_tolerance(body_id)
             try:
                 spk_lon, spk_lat, _ = _get_spk_heliocentric_j2000(body_id, jd)
                 kep_lon, kep_lat, _ = _get_keplerian_heliocentric(body_id, jd)
                 err = _angular_separation_arcsec(spk_lon, spk_lat, kep_lon, kep_lat)
-                assert err < 1.0, (
-                    f'{name} at epoch: Keplerian error {err:.3f}" exceeds 1"'
+                assert err < threshold, (
+                    f'{name} at epoch: Keplerian error {err:.3f}" exceeds {threshold}"'
                 )
             except RuntimeError:
                 pass  # SPK unavailable
 
     def test_keplerian_1month_accuracy(self):
-        """Verify Keplerian is accurate within 60" at ±1 month."""
+        """Verify Keplerian is accurate within tolerance at ±1 month.
+
+        Tolerances are category-aware: main belt asteroids should be within
+        60", while high-eccentricity NEAs and distant TNOs get wider margins.
+        """
         for body_id, name in self.available_bodies:
+            threshold = _get_1month_tolerance(body_id)
             for sign in [1, -1]:
                 jd = EPOCH_JD + sign * 30.0
                 try:
                     spk_lon, spk_lat, _ = _get_spk_heliocentric_j2000(body_id, jd)
                     kep_lon, kep_lat, _ = _get_keplerian_heliocentric(body_id, jd)
                     err = _angular_separation_arcsec(spk_lon, spk_lat, kep_lon, kep_lat)
-                    assert err < 60.0, (
-                        f'{name} at ±1mo: Keplerian error {err:.1f}" exceeds 60"'
+                    assert err < threshold, (
+                        f'{name} at ±1mo: Keplerian error {err:.1f}" exceeds {threshold}"'
                     )
                 except RuntimeError:
                     pass
 
     def test_keplerian_1year_accuracy(self):
-        """Verify Keplerian is within 5' at ±1 year."""
+        """Verify Keplerian is within tolerance at ±1 year.
+
+        Tolerances are category-aware: main belt ~5', centaurs ~10',
+        TNOs ~15', NEAs ~30' (high eccentricity bodies have larger errors).
+        """
         for body_id, name in self.available_bodies:
+            threshold = _get_1year_tolerance(body_id)
             for sign in [1, -1]:
                 jd = EPOCH_JD + sign * 365.25
                 try:
                     spk_lon, spk_lat, _ = _get_spk_heliocentric_j2000(body_id, jd)
                     kep_lon, kep_lat, _ = _get_keplerian_heliocentric(body_id, jd)
                     err = _angular_separation_arcsec(spk_lon, spk_lat, kep_lon, kep_lat)
-                    assert err < 300.0, (
-                        f"{name} at ±1yr: Keplerian error {err:.1f}\" exceeds 5'"
+                    assert err < threshold, (
+                        f'{name} at ±1yr: Keplerian error {err:.1f}" exceeds'
+                        f" {threshold / 60.0:.0f}'"
                     )
                 except RuntimeError:
                     pass

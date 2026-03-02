@@ -224,6 +224,15 @@ cmd = "python scripts/calibrate_perigee_perturbations.py --quick --output /tmp/p
 help = "Quick perigee calibration (100-year range, ~2 min, for validation)"
 envfile = ".env"
 
+# Keplerian fallback — multi-epoch element generation
+[tool.poe.tasks."keplerian:generate-multi-epoch"]
+cmd = "python scripts/generate_multi_epoch_elements.py"
+help = "Generate multi-epoch Keplerian elements from SPK files (20-year intervals, all bodies)"
+
+[tool.poe.tasks."keplerian:generate-multi-epoch:dry-run"]
+cmd = "python scripts/generate_multi_epoch_elements.py --dry-run"
+help = "Show available SPK files and epoch grid without generating (Keplerian fallback)"
+
 # LEB (binary ephemeris) generation — full (all bodies at once)
 [tool.poe.tasks."leb:generate:base"]
 cmd = "python scripts/generate_leb.py --tier base --verify"
