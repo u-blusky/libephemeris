@@ -3244,9 +3244,14 @@ def _get_closest_epoch_elements(body_id: int, jd_tt: float) -> OrbitalElements:
             break
 
     # Also check if single-epoch element is closer than any multi-epoch
-    if best_dt < min(abs(jd_tt - epochs[idx]), abs(jd_tt - epochs[idx + 1])):
-        # Single-epoch is closer; still use Hermite if multi-epoch brackets
-        pass  # Continue with Hermite anyway for smoothness
+    # When the single-epoch element (from JPL SBDB at the "official" epoch)
+    # is closer to the target time than either bracketing multi-epoch entry,
+    # prefer it. The single-epoch osculating elements are more precise near
+    # their epoch than Hermite-interpolated multi-epoch elements.
+    # Only use multi-epoch Hermite when we're far from the single-epoch.
+    dist_to_bracket = min(abs(jd_tt - epochs[idx]), abs(jd_tt - epochs[idx + 1]))
+    if best_dt < dist_to_bracket:
+        return best
 
     e0 = multi[idx]
     e1 = multi[idx + 1]
@@ -3350,18 +3355,26 @@ def _get_closest_epoch_elements(body_id: int, jd_tt: float) -> OrbitalElements:
         )
         % 360.0
     )
-    M0_interp = (
-        _hermite_interp(
-            jd_tt,
-            t0,
-            t1,
-            all_M0[idx],
-            all_M0[idx + 1],
-            _angle_deriv(all_M0, idx),
-            _angle_deriv(all_M0, idx + 1),
-        )
-        % 360.0
-    )
+    # M0 (mean anomaly) CANNOT be Hermite-interpolated directly because it
+    # wraps around 360° hundreds of times over the 50-year intervals between
+    # multi-epoch entries. Instead, propagate M0 from each bracketing epoch
+    # to jd_tt using mean motion, then blend the two predictions smoothly.
+    # This gives C1-continuous M0 across epoch boundaries while respecting
+    # the rapid angular evolution of mean anomaly.
+    M0_prop0 = (e0.M0 + e0.n * (jd_tt - t0)) % 360.0
+    M0_prop1 = (e1.M0 + e1.n * (jd_tt - t1)) % 360.0
+
+    # Smooth blending weight: Hermite smoothstep (3s² - 2s³) for C1 continuity
+    s_blend = (jd_tt - t0) / (t1 - t0)
+    w_blend = s_blend * s_blend * (3.0 - 2.0 * s_blend)
+
+    # Unwrap angle difference for correct circular averaging
+    diff_M0 = M0_prop1 - M0_prop0
+    while diff_M0 > 180.0:
+        diff_M0 -= 360.0
+    while diff_M0 < -180.0:
+        diff_M0 += 360.0
+    M0_interp = (M0_prop0 + w_blend * diff_M0) % 360.0
 
     # Clamp eccentricity to physical range
     e_interp = max(0.001, min(e_interp, 0.999))
@@ -3854,9 +3867,15 @@ def calc_minor_body_position(
 
         # Apply resonant libration correction for plutinos
         # This corrects for the oscillatory perturbation from the 2:3 Neptune resonance
-        # that is not captured by secular perturbation theory
+        # that is not captured by secular perturbation theory.
+        # The correction must be DIFFERENTIAL: subtract the value at epoch so that
+        # the correction is exactly zero at the element epoch. The osculating elements
+        # already encode the resonant state at epoch — we only need the *change*
+        # in the libration angle from epoch to target time.
         if body_id is not None and body_id in PLUTINO_LIBRATION_PARAMS:
-            libration_correction = calc_libration_correction(body_id, jd_tt)
+            libration_at_target = calc_libration_correction(body_id, jd_tt)
+            libration_at_epoch = calc_libration_correction(body_id, elements.epoch)
+            libration_correction = libration_at_target - libration_at_epoch
             # Apply correction to mean anomaly (libration affects mean longitude λ = Ω + ω + M)
             # Since Ω and ω are already perturbed, we apply the correction to M
             M_corrected = M_deg + libration_correction
@@ -3932,30 +3951,6 @@ def calc_minor_body_position(
     x = P11 * x_orb + P12 * y_orb
     y = P21 * x_orb + P22 * y_orb
     z = P31 * x_orb + P32 * y_orb
-
-    # M1: Analytical short-period perturbation corrections
-    # Apply first-order short-period corrections from Jupiter and Saturn.
-    # These are the dominant error source at 1 month to 5 year timescales.
-    #
-    # From Brouwer & Clemence (1961) Ch. 15, the first-order short-period
-    # perturbation to heliocentric coordinates is:
-    #   Δx ≈ Σ_j (μ_j / r_j³) * [x_j * (3·(r·r_j)/(r_j²) - 1) - x] * Δt²/2
-    # But this requires planetary positions. Instead, we use the analytical
-    # disturbing function approach with the dominant synodic terms.
-    #
-    # The dominant short-period correction to longitude for a main-belt asteroid
-    # perturbed by Jupiter is approximately:
-    #   Δλ ≈ -2·μ_J·α·b_{1/2}^{(1)}(α)·sin(M - M_J) / (n - n_J)
-    # where M, M_J are the mean anomalies of the asteroid and Jupiter.
-    #
-    # This captures the ~300" amplitude oscillation at the synodic period.
-    if include_perturbations and e < 1.0 and abs(dt) > 1.0:
-        dx_sp, dy_sp, dz_sp = _calc_short_period_correction(
-            elements, jd_tt, omega_rad, Omega_rad, i_rad
-        )
-        x += dx_sp
-        y += dy_sp
-        z += dz_sp
 
     return x, y, z
 
