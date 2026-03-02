@@ -33,3 +33,12 @@ compare_scripts_tests.log
 
 # LEB binary ephemeris files (generated, large)
 data/leb/*.leb
+
+# Environment files (may contain local paths/config)
+.env
+.env.*
+
+# Secrets / certificates (defense-in-depth)
+*.pem
+*.key
+*.p12

@@ -252,15 +252,18 @@ export LIBEPHEMERIS_MODE=auto      # Default: usa LEB se disponibile, altrimenti
 - Test esistenti: `TestContextLEBGracefulError` in `test_context_leb.py`
   verifica il fallback con path invalido
 
-#### 3.5 Distribuzione file LEB pre-generati
+#### 3.5 Distribuzione file LEB pre-generati ✅ COMPLETATO
 
-Valutare se distribuire file `.leb` pre-generati:
-- Come asset di GitHub release
-- Come pacchetto PyPI separato (`libephemeris-data`)
-- Come download on-demand (simile a come Skyfield scarica i file DE)
+~~Valutare se distribuire file `.leb` pre-generati.~~
 
-Questo e a bassa priorita ma migliorerebbe l'esperienza utente per chi
-vuole la modalita LEB senza dover generare il file localmente.
+Implementato con:
+- **GitHub Releases** (`data-v1`): file `.leb` ospitati come asset
+- **Release script**: `scripts/release_leb.py` + comandi `poe release:leb:*`
+- **CLI download**: `libephemeris download:leb:{base,medium,extended}`
+- **Auto-discovery runtime**: `~/.libephemeris/leb/ephemeris_{tier}.leb`
+- **Download programmatico**: `libephemeris.download_leb_for_tier("medium")`
+
+Tier disponibili: `base` (~53 MB), `medium` (~175 MB). `extended` non ancora generato.
 
 ---
 

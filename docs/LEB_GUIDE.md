@@ -1348,6 +1348,18 @@ poe leb:generate:extended:analytical  # Extended tier analytical group
 poe leb:generate:extended:merge       # Merge → ephemeris_extended.leb
 poe leb:generate:extended:groups      # All three groups + merge
 
+# Download (convenience wrappers for libephemeris CLI)
+poe download:leb:base       # Download base tier LEB (~53 MB)
+poe download:leb:medium     # Download medium tier LEB (~175 MB)
+poe download:leb:extended   # Download extended tier LEB (not yet available)
+
+# Release — upload to GitHub Releases (requires: gh auth login)
+poe release:leb 0.22.0            # Upload all tiers + update hashes in download.py
+poe release:leb:base 0.22.0       # Upload base tier only
+poe release:leb:medium 0.22.0     # Upload medium tier only
+poe release:leb:extended 0.22.0   # Upload extended tier only
+poe release:leb:dry-run 0.22.0    # Show what would be uploaded (no changes)
+
 # Testing
 poe test:leb                # All LEB tests (excludes @slow)
 poe test:leb:precision      # Full precision suite (slow, all tiers)
@@ -1413,6 +1425,80 @@ pos, vel = reader.eval_body(0, 2451545.0)  # Sun at J2000
 print(f'Sun ICRS: x={pos[0]:.10f} y={pos[1]:.10f} z={pos[2]:.10f} AU')
 reader.close()
 "
+```
+
+### 12.4 Release Workflow
+
+LEB files are hosted as assets on the GitHub release tagged `data-v1`.
+The release script (`scripts/release_leb.py`) handles upload and hash updates.
+
+**Prerequisites:**
+
+- `gh` CLI installed and authenticated (`gh auth login`)
+- LEB files generated locally (in `data/leb/` or `~/.libephemeris/leb/`)
+
+**Full workflow (generate + release):**
+
+```bash
+# 1. Generate LEB file(s)
+poe leb:generate:medium:groups    # recommended group workflow
+
+# 2. Dry run — verify what would be uploaded
+poe release:leb:dry-run 0.22.0
+
+# 3. Upload to GitHub Releases + auto-update hashes in download.py
+poe release:leb:medium 0.22.0
+
+# 4. Commit the updated download.py
+git add libephemeris/download.py
+git commit -m "update LEB medium tier hash after regeneration"
+```
+
+**Release all tiers at once:**
+
+```bash
+poe release:leb 0.22.0           # uploads all found .leb files
+```
+
+**What the release script does:**
+
+1. Searches for `.leb` files in `data/leb/` (repo) and `~/.libephemeris/leb/`
+2. Computes SHA256 hash and file size for each file
+3. Uploads to GitHub release `data-v1` via `gh release upload --clobber`
+4. With `--update-hashes`: updates `DATA_FILES` in `libephemeris/download.py`
+   with the new SHA256 and size_mb values
+
+**Direct script usage (without poe):**
+
+```bash
+python scripts/release_leb.py --version 0.22.0 --tier medium --update-hashes
+python scripts/release_leb.py --version 0.22.0 --dry-run
+python scripts/release_leb.py --version 0.22.0 --tier base --tag data-v1
+```
+
+### 12.5 User Download
+
+End users download pre-generated LEB files via the library CLI (no `poe` needed):
+
+```bash
+# Install the library
+pip install libephemeris
+
+# Download LEB for the desired tier
+libephemeris download:leb:base       # ~53 MB, 1850-2150
+libephemeris download:leb:medium     # ~175 MB, 1550-2650
+libephemeris download:leb:extended   # not yet available
+```
+
+Files are saved to `~/.libephemeris/leb/` and auto-discovered at runtime
+based on the active precision tier — no further configuration needed.
+
+Programmatic download is also available:
+
+```python
+from libephemeris import download_leb_for_tier
+
+download_leb_for_tier("medium")  # downloads + activates
 ```
 
 ---

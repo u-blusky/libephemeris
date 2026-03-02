@@ -350,6 +350,33 @@ data/leb/ephemeris_extended_analytical.leb \
 --verify"""
 help = "Generate extended tier via groups (planets + asteroids + analytical) then merge"
 
+# LEB release — upload generated .leb files to GitHub Releases (data-v1)
+# Requires: gh CLI authenticated (gh auth login)
+[tool.poe.tasks."release:leb"]
+cmd = "python scripts/release_leb.py --version ${version} --update-hashes"
+help = "Upload all LEB files to GitHub release and update hashes"
+args = [{name = "version", positional = true, required = true, help = "Version string (e.g. 0.22.0)"}]
+
+[tool.poe.tasks."release:leb:base"]
+cmd = "python scripts/release_leb.py --version ${version} --tier base --update-hashes"
+help = "Upload base tier LEB to GitHub release and update hashes"
+args = [{name = "version", positional = true, required = true, help = "Version string (e.g. 0.22.0)"}]
+
+[tool.poe.tasks."release:leb:medium"]
+cmd = "python scripts/release_leb.py --version ${version} --tier medium --update-hashes"
+help = "Upload medium tier LEB to GitHub release and update hashes"
+args = [{name = "version", positional = true, required = true, help = "Version string (e.g. 0.22.0)"}]
+
+[tool.poe.tasks."release:leb:extended"]
+cmd = "python scripts/release_leb.py --version ${version} --tier extended --update-hashes"
+help = "Upload extended tier LEB to GitHub release and update hashes"
+args = [{name = "version", positional = true, required = true, help = "Version string (e.g. 0.22.0)"}]
+
+[tool.poe.tasks."release:leb:dry-run"]
+cmd = "python scripts/release_leb.py --version ${version} --dry-run"
+help = "Dry run: show what LEB files would be uploaded"
+args = [{name = "version", positional = true, required = true, help = "Version string (e.g. 0.22.0)"}]
+
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = false

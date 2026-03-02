@@ -6,8 +6,7 @@ This script calculates SHA256 hashes and uploads planet_centers files
 to a GitHub release using the gh CLI.
 
 Requirements:
-    - gh CLI authenticated (gh auth login)
-    - GITHUB_TOKEN environment variable (for uploads)
+    - gh CLI installed and authenticated (gh auth login)
 
 Usage:
     # Upload all planet_centers files
