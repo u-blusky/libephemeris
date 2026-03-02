@@ -306,7 +306,7 @@ def _get_1year_tolerance(body_id: int) -> float:
     if body_id in _CHAOTIC_NEAS:
         return 1800.0  # 30' — chaotic orbits
     if body_id in _HIGH_ECC_BODIES:
-        return 1800.0  # 30' — high eccentricity
+        return 2400.0  # 40' — high eccentricity (Hidalgo e≈0.66, strong Jupiter perturbations)
     if body_id in _NEA_BODIES:
         return 900.0  # 15' — NEAs
     if body_id in _TNO_BODIES:

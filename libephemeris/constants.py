@@ -263,6 +263,22 @@ NAIF_HYGIEA: int = (
     2000010  # 10 Hygiea (fourth largest asteroid, dwarf planet candidate)
 )
 NAIF_EROS: int = 2000433  # 433 Eros (near-Earth asteroid, NEAR Shoemaker mission)
+NAIF_PSYCHE: int = 2000016  # 16 Psyche (metallic M-type asteroid)
+NAIF_EUROPA_AST: int = 2000052  # 52 Europa (main belt asteroid)
+NAIF_PANDORA_AST: int = 2000055  # 55 Pandora (main belt asteroid)
+NAIF_SAPPHO: int = 2000080  # 80 Sappho (main belt asteroid)
+NAIF_SYLVIA: int = 2000087  # 87 Sylvia (triple asteroid system)
+NAIF_DAVIDA: int = 2000511  # 511 Davida (main belt asteroid)
+NAIF_INTERAMNIA: int = 2000704  # 704 Interamnia (main belt asteroid)
+NAIF_HIDALGO: int = 2000944  # 944 Hidalgo (centaur-class asteroid)
+NAIF_LILITH_AST: int = 2001181  # 1181 Lilith (main belt asteroid)
+NAIF_AMOR: int = 2001221  # 1221 Amor (near-Earth asteroid)
+NAIF_ICARUS: int = 2001566  # 1566 Icarus (Apollo asteroid)
+NAIF_TORO: int = 2001685  # 1685 Toro (Apollo asteroid)
+NAIF_TOUTATIS: int = 2004179  # 4179 Toutatis (Apollo PHA)
+NAIF_ITOKAWA: int = 2025143  # 25143 Itokawa (Apollo asteroid)
+NAIF_BENNU: int = 2101955  # 101955 Bennu (Apollo asteroid)
+NAIF_RYUGU: int = 2162173  # 162173 Ryugu (Apollo asteroid)
 
 # =============================================================================
 # SPK BODY NAME MAPPING
@@ -313,6 +329,31 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
         NAIF_HYGIEA,
     ),  # 10 Hygiea (fourth largest asteroid) - use name; to bypass major body index
     SE_EROS: ("433", NAIF_EROS),  # 433 Eros (near-Earth asteroid, NEAR Shoemaker)
+    SE_PSYCHE: ("16", NAIF_PSYCHE),  # 16 Psyche (metallic M-type asteroid)
+    SE_EUROPA_AST: ("52", NAIF_EUROPA_AST),  # 52 Europa (main belt asteroid)
+    SE_PANDORA_AST: ("55", NAIF_PANDORA_AST),  # 55 Pandora (main belt asteroid)
+    SE_SAPPHO: ("80", NAIF_SAPPHO),  # 80 Sappho (main belt asteroid)
+    SE_SYLVIA: ("87", NAIF_SYLVIA),  # 87 Sylvia (triple asteroid system)
+    SE_DAVIDA: (
+        "Davida;",
+        NAIF_DAVIDA,
+    ),  # 511 Davida (main belt asteroid) - use name; to bypass major body index
+    SE_INTERAMNIA: (
+        "Interamnia;",
+        NAIF_INTERAMNIA,
+    ),  # 704 Interamnia (main belt asteroid) - use name; to bypass major body index
+    SE_HIDALGO: ("944", NAIF_HIDALGO),  # 944 Hidalgo (centaur-class asteroid)
+    SE_LILITH_AST: ("1181", NAIF_LILITH_AST),  # 1181 Lilith (main belt asteroid)
+    SE_AMOR: ("1221", NAIF_AMOR),  # 1221 Amor (near-Earth asteroid)
+    SE_ICARUS: ("1566", NAIF_ICARUS),  # 1566 Icarus (Apollo asteroid)
+    SE_TORO: ("1685", NAIF_TORO),  # 1685 Toro (Apollo asteroid)
+    SE_TOUTATIS: ("4179", NAIF_TOUTATIS),  # 4179 Toutatis (Apollo PHA)
+    SE_ITOKAWA: ("25143", NAIF_ITOKAWA),  # 25143 Itokawa (Apollo asteroid)
+    SE_BENNU: (
+        "Bennu;",
+        NAIF_BENNU,
+    ),  # 101955 Bennu (Apollo asteroid) - use name; to bypass major body index
+    SE_RYUGU: ("162173", NAIF_RYUGU),  # 162173 Ryugu (Apollo asteroid)
 }
 
 

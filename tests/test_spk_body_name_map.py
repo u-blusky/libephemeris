@@ -27,6 +27,9 @@ from libephemeris.constants import (
     SE_QUAOAR,
     SE_VARUNA,
     SE_HYGIEA,
+    SE_DAVIDA,
+    SE_INTERAMNIA,
+    SE_BENNU,
     # NAIF IDs
     NAIF_CHIRON,
     NAIF_PHOLUS,
@@ -315,7 +318,16 @@ class TestModuleExports:
 class TestHorizonsIdFormat:
     """Test that Horizons IDs are in the expected format for JPL Horizons API."""
 
-    _MAJOR_BODY_INDEX_ASTEROIDS = {SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA, SE_HYGIEA}
+    _MAJOR_BODY_INDEX_ASTEROIDS = {
+        SE_CERES,
+        SE_PALLAS,
+        SE_JUNO,
+        SE_VESTA,
+        SE_HYGIEA,
+        SE_DAVIDA,
+        SE_INTERAMNIA,
+        SE_BENNU,
+    }
 
     def test_horizons_ids_are_numeric_strings(self):
         """All Horizons IDs are numeric strings, except major body index asteroids.

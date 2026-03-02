@@ -323,47 +323,65 @@ def _get_spk_state_vector(
 def _find_spk_file(body_name: str, horizons_id: str) -> Optional[str]:
     """Find an existing wide-range SPK file for a body.
 
-    Searches the project root and spk/ subdirectory for BSP files
-    matching the body's Horizons ID.
+    Searches the project root, spk/ subdirectory, and the libephemeris
+    SPK cache (~/.libephemeris/spk/) for BSP files matching the body's
+    Horizons ID. Prefers the widest-range file available.
     """
     project_root = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     search_dirs = [project_root, project_root / "spk"]
+
+    # Also search the libephemeris SPK cache directory
+    cache_dir = Path.home() / ".libephemeris" / "spk"
+    if cache_dir.exists():
+        search_dirs.append(cache_dir)
 
     # Normalize horizons_id for filename matching
     safe_id = "".join(
         c if c.isalnum() or c in "-_" else "_" for c in horizons_id.lower()
     ).rstrip("_")
 
+    # Collect all matching files across all directories, prefer widest range
+    all_matches: list[Path] = []
+
     for search_dir in search_dirs:
         if not search_dir.exists():
             continue
 
-        # Try wide-range files first (e.g., 2060_160001_250001.bsp)
+        # Try ID-based files (e.g., 2060_160001_250001.bsp)
         for pattern in [f"{safe_id}_*.bsp", f"{horizons_id}_*.bsp"]:
-            matches = sorted(search_dir.glob(pattern))
-            if matches:
-                # Prefer widest range file
-                return str(matches[-1])
+            all_matches.extend(search_dir.glob(pattern))
 
-        # Try name-based files (e.g., chiron_*.bsp)
+        # Try name-based files (e.g., chiron_*.bsp, ceres_*.bsp)
         name_lower = body_name.lower()
-        for pattern in [f"{name_lower}_*.bsp", f"*{name_lower}*.bsp"]:
-            matches = sorted(search_dir.glob(pattern))
-            if matches:
-                return str(matches[-1])
+        for pattern in [f"{name_lower}_*.bsp"]:
+            all_matches.extend(search_dir.glob(pattern))
 
-    return None
+    if not all_matches:
+        return None
+
+    # Deduplicate and prefer widest range (largest file typically = widest range)
+    unique = list({str(p): p for p in all_matches}.values())
+    # Sort by file size descending — widest-range SPK files are largest
+    unique.sort(key=lambda p: p.stat().st_size, reverse=True)
+    return str(unique[0])
 
 
 def _get_spk_jd_range(spk_file: str) -> Optional[tuple[float, float]]:
-    """Get the JD coverage range of an SPK file."""
+    """Get the JD coverage range of an SPK file.
+
+    Scans ALL segments and returns the overall min/max JD range,
+    since SPK files often contain many consecutive segments.
+    """
     try:
         from spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
         try:
-            seg = kernel.segments[0]
-            return seg.start_jd, seg.end_jd
+            if not kernel.segments:
+                return None
+            jd_min = min(seg.start_jd for seg in kernel.segments)
+            jd_max = max(seg.end_jd for seg in kernel.segments)
+            return jd_min, jd_max
         finally:
             kernel.close()
     except Exception:
