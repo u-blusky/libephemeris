@@ -182,7 +182,7 @@ def update_download_py(
     for filename, sha256, size_mb in updates:
         # Update sha256 value (handles both None and quoted string)
         sha256_pattern = re.compile(
-            rf'("{filename}":\s*\{{[^}}]*?"sha256":\s*)'
+            rf'("{filename}":\s*\{{[\s\S]*?"sha256":\s*)'
             rf'(None|"[a-f0-9]+")'
         )
         match = sha256_pattern.search(content)
@@ -195,7 +195,7 @@ def update_download_py(
 
         # Update size_mb value (handles both None and float)
         size_pattern = re.compile(
-            rf'("{filename}":\s*\{{[^}}]*?"size_mb":\s*)'
+            rf'("{filename}":\s*\{{[\s\S]*?"size_mb":\s*)'
             rf"(None|[\d.]+)"
         )
         match = size_pattern.search(content)
