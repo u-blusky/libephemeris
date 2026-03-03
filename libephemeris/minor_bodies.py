@@ -3212,6 +3212,25 @@ def auto_download_asteroid_spk(
         if jd_end is None:
             jd_end = current_jd + 3652.5  # ~10 years after
 
+        # JPL Horizons only supports SPK generation for minor bodies in the
+        # range ~1600-01-01 to ~2500-01-01 (empirically verified).  Clamp the
+        # requested range so that callers (e.g. extended-tier LEB generation)
+        # don't produce date strings that Horizons cannot parse (negative
+        # years) or that fall outside the supported window.
+        HORIZONS_SPK_JD_MIN = 2305448.5  # 1600-01-01 UTC
+        HORIZONS_SPK_JD_MAX = 2634167.5  # 2500-01-01 UTC
+
+        if jd_start < HORIZONS_SPK_JD_MIN or jd_end > HORIZONS_SPK_JD_MAX:
+            jd_start = max(jd_start, HORIZONS_SPK_JD_MIN)
+            jd_end = min(jd_end, HORIZONS_SPK_JD_MAX)
+            if jd_start >= jd_end:
+                logger.warning(
+                    "Requested date range for %s is entirely outside "
+                    "Horizons SPK limits (1600-2500); skipping download",
+                    body_name,
+                )
+                return None
+
         # Convert JD to calendar dates
         from skyfield.api import load
 
