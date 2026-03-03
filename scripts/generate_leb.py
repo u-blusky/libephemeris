@@ -988,6 +988,10 @@ def generate_ecliptic_bodies_vectorized(
     Uses a single Skyfield call for all bodies, then numpy for all post-processing.
     This is ~100x faster than the scalar per-body path for bodies that need Skyfield.
 
+    For large date ranges (e.g. extended tier, 10,000 years) the evaluation is
+    split into chunks to keep peak memory bounded (~1 GB per chunk instead of
+    ~8 GB for 11M JDs at once).
+
     Args:
         body_ids: List of ecliptic body IDs to generate (subset of [10-13, 21, 22]).
         jd_start: Start Julian Day.
@@ -1002,6 +1006,10 @@ def generate_ecliptic_bodies_vectorized(
     degree = 13
     components = 3
 
+    # Maximum JDs per evaluation chunk.  Each JD consumes ~500 bytes of peak
+    # memory in the vectorized Skyfield call, so 2M JDs ≈ 1 GB peak.
+    max_chunk_jds = 2_000_000
+
     if verbose:
         print(f"    Vectorized ecliptic generation: {len(body_ids)} bodies")
 
@@ -1015,8 +1023,40 @@ def generate_ecliptic_bodies_vectorized(
             f"    Total JDs: {len(all_jds):,} ({n_segments} segments × {pts_per_seg} pts)"
         )
 
-    # 2. Evaluate all bodies at all JDs in one batch
-    body_values = _eval_ecliptic_bodies_batch(all_jds, body_ids, verbose=verbose)
+    # 2. Evaluate all bodies — chunked if needed to avoid OOM
+    if len(all_jds) <= max_chunk_jds:
+        body_values = _eval_ecliptic_bodies_batch(all_jds, body_ids, verbose=verbose)
+    else:
+        # Split into chunks aligned to segment boundaries (pts_per_seg points each)
+        chunk_segs = max_chunk_jds // pts_per_seg
+        chunk_jds = chunk_segs * pts_per_seg
+        n_chunks = math.ceil(len(all_jds) / chunk_jds)
+        if verbose:
+            print(
+                f"    Chunked evaluation: {n_chunks} chunks "
+                f"of ~{chunk_segs:,} segments ({chunk_jds:,} JDs)"
+            )
+
+        accumulated: dict[int, list] = {bid: [] for bid in body_ids}
+        for ci in range(n_chunks):
+            start_idx = ci * chunk_jds
+            end_idx = min(start_idx + chunk_jds, len(all_jds))
+            jds_chunk = all_jds[start_idx:end_idx]
+            if verbose:
+                print(f"      Chunk {ci + 1}/{n_chunks}: {len(jds_chunk):,} JDs...")
+            chunk_results = _eval_ecliptic_bodies_batch(
+                jds_chunk, body_ids, verbose=False
+            )
+            for bid in body_ids:
+                if bid in chunk_results:
+                    accumulated[bid].append(chunk_results[bid])
+            # Free chunk intermediates
+            del chunk_results, jds_chunk
+
+        body_values = {
+            bid: np.concatenate(parts) for bid, parts in accumulated.items() if parts
+        }
+        del accumulated
 
     # 3. Fit and verify each body
     results = {}
