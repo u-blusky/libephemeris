@@ -1,6 +1,19 @@
-# Migration Guide: pyswisseph to libephemeris
+# Migration Guide: pyswisseph to LibEphemeris
 
 This guide helps users migrate from `pyswisseph` (Python bindings to Swiss Ephemeris) to `libephemeris`.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Quick Migration](#quick-migration)
+- [API Differences](#api-differences)
+- [Precision Differences](#precision-differences)
+- [Features Not Yet Implemented](#features-not-yet-implemented)
+- [Thread Safety with EphemerisContext](#thread-safety-with-ephemeriscontext)
+- [SEFLG_MOSEPH (Moshier Ephemeris Flag)](#seflg_moseph-moshier-ephemeris-flag)
+- [Calculation Backend](#calculation-backend)
+- [Migration Checklist](#migration-checklist)
+- [Reporting Issues](#reporting-issues)
 
 ## Overview
 
@@ -57,7 +70,7 @@ from libephemeris.constants import SE_SUN, SEFLG_SPEED
 
 Most functions are available with **both** the `swe_` prefix and without:
 
-| pyswisseph | libephemeris |
+| pyswisseph | LibEphemeris |
 |------------|--------------|
 | `swe.calc_ut()` | `swe.calc_ut()` or `swe.swe_calc_ut()` |
 | `swe.houses()` | `swe.houses()` or `swe.swe_houses()` |
@@ -67,9 +80,9 @@ Most functions are available with **both** the `swe_` prefix and without:
 
 ### Constant Names
 
-libephemeris uses `SE_` and `SEFLG_` prefixes consistently:
+LibEphemeris uses `SE_` and `SEFLG_` prefixes consistently:
 
-| pyswisseph | libephemeris |
+| pyswisseph | LibEphemeris |
 |------------|--------------|
 | `swe.SUN` | `SE_SUN` (0) |
 | `swe.MOON` | `SE_MOON` (1) |
@@ -96,7 +109,7 @@ cusp1 = cusps[0]  # First house cusp
 
 ## Precision Differences
 
-libephemeris uses NASA JPL DE ephemerides (via Skyfield) instead of Swiss Ephemeris data files. Here are the validated precision differences:
+LibEphemeris uses NASA JPL DE ephemerides (via Skyfield) instead of Swiss Ephemeris data files. Here are the validated precision differences:
 
 ### Planetary Positions
 
@@ -149,13 +162,13 @@ The True Node (osculating node) shows larger differences due to different algori
 | Mean Apogee (Mean Lilith) | < 0.01 degrees | High precision |
 | Osculating Apogee (True Lilith) | ~0.015° mean, ~0.065° max | Sub-arcminute precision |
 
-**Note**: True Lilith (SE_OSCU_APOG, body ID 13) now achieves excellent precision (~0.015° mean difference from pyswisseph) through calibrated perturbation corrections applied to osculating orbital elements derived from JPL DE440 state vectors. See `TRUE_LILITH_METHODS.md` for details.
+**Note**: True Lilith (SE_OSCU_APOG, body ID 13) now achieves excellent precision (~0.015° mean difference from pyswisseph) through calibrated perturbation corrections applied to osculating orbital elements derived from JPL DE440 state vectors. See [True Lilith Methods](../methodology/true-lilith.md) for details.
 
 ---
 
 ## Features Not Yet Implemented
 
-The following features are present in pyswisseph but **not yet fully implemented** in libephemeris:
+The following features are present in pyswisseph but **not yet fully implemented** in LibEphemeris:
 
 ### Eclipse Functions (Partial)
 
@@ -182,7 +195,7 @@ pos, _ = ephem.fixstar_ut("Aldebaran", jd, SEFLG_SPEED)
 
 ### Date Range Limitations
 
-libephemeris uses JPL DE ephemerides with specific date ranges:
+LibEphemeris uses JPL DE ephemerides with specific date ranges:
 
 | Ephemeris | Date Range | Size | Notes |
 |-----------|-----------|------|-------|
@@ -192,7 +205,7 @@ libephemeris uses JPL DE ephemerides with specific date ranges:
 
 ### Precision Tiers
 
-libephemeris organises the current-generation files into three precision tiers:
+LibEphemeris organizes the current-generation files into three precision tiers:
 
 | Tier | File | Use Case |
 |------|------|----------|
@@ -245,7 +258,7 @@ Resolution priority (highest to lowest):
 
 **This is a major difference from pyswisseph.**
 
-The Swiss Ephemeris (and pyswisseph) uses global state and is **NOT thread-safe**. libephemeris provides the same behavior for the module-level API, but also offers a **thread-safe alternative** via `EphemerisContext`.
+The Swiss Ephemeris (and pyswisseph) uses global state and is **NOT thread-safe**. LibEphemeris provides the same behavior for the module-level API, but also offers a **thread-safe alternative** via `EphemerisContext`.
 
 ### Global API (pyswisseph-compatible, NOT thread-safe)
 
@@ -365,7 +378,7 @@ ctx3.set_sid_mode(27) # True Citra
 
 ## SEFLG_MOSEPH (Moshier Ephemeris Flag)
 
-The `SEFLG_MOSEPH` flag is accepted for API compatibility but **silently ignored**. All calculations in libephemeris always use JPL DE440/DE441 via Skyfield, regardless of whether `SEFLG_MOSEPH` is passed. Code that previously used `SEFLG_MOSEPH` to select the Moshier semi-analytical ephemeris will continue to work without errors, but will use the JPL ephemeris instead.
+The `SEFLG_MOSEPH` flag is accepted for API compatibility but **silently ignored**. All calculations in LibEphemeris always use JPL DE440/DE441 via Skyfield, regardless of whether `SEFLG_MOSEPH` is passed. Code that previously used `SEFLG_MOSEPH` to select the Moshier semi-analytical ephemeris will continue to work without errors, but will use the JPL ephemeris instead.
 
 ```python
 # This still works, but SEFLG_MOSEPH is silently ignored:
@@ -378,9 +391,9 @@ pos, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SPEED)
 
 ## Calculation Backend
 
-Unlike Swiss Ephemeris (which selects between JPL, Swiss, and Moshier backends via flags), libephemeris always uses **JPL DE440/DE441 via Skyfield** by default. No ephemeris path or data file configuration is required -- kernels are managed automatically.
+Unlike Swiss Ephemeris (which selects between JPL, Swiss, and Moshier backends via flags), LibEphemeris always uses **JPL DE440/DE441 via Skyfield** by default. No ephemeris path or data file configuration is required -- kernels are managed automatically.
 
-For performance-critical workloads, libephemeris also supports an optional **LEB** (LibEphemeris Binary) backend that provides ~14x faster evaluation using precomputed Chebyshev approximations. LEB is entirely opt-in and not needed for correctness.
+For performance-critical workloads, LibEphemeris also supports an optional **LEB** (LibEphemeris Binary) backend that provides ~14x faster evaluation using precomputed Chebyshev approximations. LEB is entirely opt-in and not needed for correctness.
 
 The calculation mode controls which backend is used:
 
@@ -400,7 +413,7 @@ set_calc_mode("auto")      # Default: LEB if available, else Skyfield
 
 With no `.leb` file configured (the default), `"auto"` and `"skyfield"` are functionally identical -- both use pure JPL/Skyfield.
 
-See `docs/LEB_GUIDE.md` for the full LEB technical guide.
+See the [LEB Technical Guide](../leb/guide.md) for details.
 
 ---
 
@@ -408,7 +421,7 @@ See `docs/LEB_GUIDE.md` for the full LEB technical guide.
 
 - [ ] Replace `import swisseph as swe` with `import libephemeris as swe`
 - [ ] Update constant names if using unprefixed versions (`SUN` -> `SE_SUN`)
-- [ ] Check house cusp array indexing (0-based in libephemeris)
+- [ ] Check house cusp array indexing (0-based in LibEphemeris)
 - [ ] Verify date range is within ephemeris coverage (1550-2650 for DE440)
 - [ ] For multi-threaded apps: migrate to `EphemerisContext` API
 - [ ] Update tests for relaxed tolerances on star-based ayanamshas (< 0.06 degrees)
@@ -427,5 +440,5 @@ https://github.com/g-battaglia/libephemeris/issues
 Include:
 1. Your pyswisseph code that doesn't work
 2. The expected result from pyswisseph
-3. The actual result from libephemeris
-4. Python version and libephemeris version
+3. The actual result from LibEphemeris
+4. Python version and LibEphemeris version

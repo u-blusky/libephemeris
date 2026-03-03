@@ -229,7 +229,7 @@ DE440s is a reduced-size subset of DE440 with no loss of precision within its ra
 
 ### Precision Tiers
 
-LibEphemeris organises the three current-generation files into precision tiers:
+LibEphemeris organizes the three current-generation files into precision tiers:
 
 | Tier | File | Use Case |
 |------|------|----------|

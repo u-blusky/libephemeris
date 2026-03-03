@@ -2,7 +2,7 @@
 
 > **Version:** 1.0 — February 2026
 > **Status:** Production-ready (format version 1)
-> **Source of truth:** This document. See also `docs/LEB_PLAN.md` for the original implementation plan.
+> **Source of truth:** This document. See also [LEB Design](design.md) for the original implementation plan.
 
 ---
 

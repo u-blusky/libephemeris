@@ -4,6 +4,17 @@ This document catalogs every known improvement opportunity for the Keplerian
 fallback pipeline in `libephemeris/minor_bodies.py`. Items are organized by
 estimated cost and expected precision gain.
 
+## Table of Contents
+
+- [Current precision (measured)](#current-precision-measured)
+- [Current implementation summary](#current-implementation-summary)
+- [Low-cost improvements](#low-cost-improvements)
+- [Medium-cost improvements](#medium-cost-improvements)
+- [High-cost improvements](#high-cost-improvements)
+- [Structural issues (not precision improvements)](#structural-issues-not-precision-improvements)
+- [Priority recommendations](#priority-recommendations)
+- [References](#references)
+
 The Keplerian fallback is the last resort in the minor body calculation chain:
 
 ```

@@ -1,8 +1,21 @@
 # Testing Guide
 
+This document describes the test infrastructure, verification methodology, and test results for LibEphemeris.
+
+## Table of Contents
+
+- [Test Results Overview](#test-results-overview)
+- [Expected Failures (xfail)](#expected-failures-xfail)
+- [Running All Tests (Without Skips)](#running-all-tests-without-skips)
+- [Full Test Command](#full-test-command)
+- [Categories of Skipped Tests](#categories-of-skipped-tests)
+- [Considerations](#considerations)
+- [Quick Reference](#quick-reference)
+- [Testing with SPK Kernels (Downstream Projects)](#testing-with-spk-kernels-downstream-projects)
+
 ## Test Results Overview
 
-When running `pytest`, you may see results like:
+When running `pytest`, the output may show results like:
 
 ```
 6336 passed
@@ -39,7 +52,7 @@ These tests are marked as "expected to fail" for documented reasons:
 
 ## Running All Tests (Without Skips)
 
-To run the complete test suite without skips, you need to satisfy several dependencies.
+To run the complete test suite without skips, the following conditions must be satisfied.
 
 ### 1. Install pyswisseph
 
@@ -86,7 +99,7 @@ LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1 \
 pytest
 ```
 
-Or set the variables permanently in your shell:
+Or set the variables permanently in the shell:
 
 ```bash
 export LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD=1
@@ -100,7 +113,7 @@ pytest
 
 ### pyswisseph-dependent (majority of skips)
 
-Tests that compare libephemeris results against pyswisseph:
+Tests that compare LibEphemeris results against pyswisseph:
 
 - `test_lunar/test_true_lilith_latitude.py`
 - `test_lunar/test_true_lilith_precision.py`
@@ -154,11 +167,11 @@ These tests skip dynamically based on available data:
 
 ## Testing with SPK Kernels (Downstream Projects)
 
-Projects that depend on libephemeris (e.g., kerykeion) often need high-precision asteroid calculations using SPK kernels. This section provides ready-to-use pytest fixtures for configuring SPK auto-download in your test suite.
+Projects that depend on LibEphemeris (e.g., kerykeion) often need high-precision asteroid calculations using SPK kernels. This section provides ready-to-use pytest fixtures for configuring SPK auto-download in a test suite.
 
 ### The Problem
 
-By default, libephemeris uses Keplerian orbital elements for minor bodies like Chiron, Ceres, Vesta, etc. This provides ~10-30 arcsecond accuracy. For sub-arcsecond precision, SPK kernels must be downloaded from JPL Horizons.
+By default, LibEphemeris uses Keplerian orbital elements for minor bodies like Chiron, Ceres, Vesta, etc. This provides ~10-30 arcsecond accuracy. For sub-arcsecond precision, SPK kernels must be downloaded from JPL Horizons.
 
 Without proper test configuration:
 - First test run downloads SPK files (slow, network-dependent)
@@ -168,7 +181,7 @@ Without proper test configuration:
 
 ### Recommended Fixture Pattern
 
-Add this fixture to your project's `conftest.py`:
+Add this fixture to the project's `conftest.py`:
 
 ```python
 import pytest
@@ -211,7 +224,7 @@ def setup_spk_for_tests():
 
 ### Minimal Fixture (Chiron Only)
 
-If you only need Chiron (the most commonly used minor body):
+For projects that only need Chiron (the most commonly used minor body):
 
 ```python
 import pytest
@@ -386,5 +399,5 @@ Other bodies (TNOs like Eris, Sedna, etc.) require manual SPK download using `do
 - Consider using `pytest-xdist` for parallel test execution
 
 **Different results between runs:**
-- Ensure `set_strict_precision(False)` if you accept Keplerian fallback
-- Check that SPK coverage includes your test dates (default: 10 years around current date)
+- Ensure `set_strict_precision(False)` when accepting Keplerian fallback
+- Check that SPK coverage includes the test dates (default: 10 years around current date)

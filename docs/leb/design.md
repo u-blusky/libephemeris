@@ -2,7 +2,7 @@
 
 > **STATUS: APPROVED IMPLEMENTATION PLAN**
 > This document is the authoritative reference for implementing the `.leb` binary
-> ephemeris mode. It supersedes the design notes in `PERFORMANCE_AND_LEB.md`.
+> ephemeris mode. It supersedes the early design notes now archived in [Architecture Overview](../development/architecture-overview.md).
 
 ---
 
@@ -28,7 +28,7 @@
 
 ### 1.1 Objective
 
-Add a **binary ephemeris mode** to libephemeris that delivers 10-20x speedup over
+Add a **binary ephemeris mode** to LibEphemeris that delivers 10-20x speedup over
 the current Skyfield-based pipeline while maintaining:
 
 - **Identical public API** -- `swe_calc_ut()`, `swe_houses()`, etc. unchanged
@@ -48,7 +48,7 @@ velocity). The `.leb` approach:
 2. **Evaluates** those polynomials directly with Clenshaw algorithm (~1.5us per eval)
 3. **Gets velocity for free** via analytical Chebyshev derivative (eliminates 3x overhead)
 
-This is the same technique JPL uses internally -- we're just creating a
+This is the same technique JPL uses internally -- the process creates a
 purpose-built cache of the results.
 
 ### 1.3 Implementation Strategy
@@ -482,7 +482,7 @@ For planets (SE_SUN through SE_PLUTO), Earth, Chiron, Ceres-Vesta:
       t = ts.tt_jd(jd_node)
       pos = target.at(t).position.au  # [x, y, z] ICRS barycentric
       ```
-      Note: For outer planets, we must get the **planet center** (not barycenter).
+      Note: For outer planets, the generator must get the **planet center** (not barycenter).
       Use `get_planet_target(planets, name)` which resolves to `_SpkCenterTarget`
       or `_CobCorrectedTarget` as appropriate.
    c. Fit Chebyshev coefficients using `numpy.polynomial.chebyshev.chebfit()`
@@ -492,12 +492,12 @@ For planets (SE_SUN through SE_PLUTO), Earth, Chiron, Ceres-Vesta:
 
 The Skyfield `target.at(t).position.au` gives the ICRS barycentric position
 directly from the SPK kernel, with no observer, no light-time, no aberration.
-This is exactly what we want -- the raw position vector.
+This is the desired result -- the raw position vector.
 
-For the Earth, we need `planets["earth"].at(t).position.au`. This gives the
+For the Earth, the calculation requires `planets["earth"].at(t).position.au`. This gives the
 geocenter position in ICRS barycentric coordinates.
 
-For outer planets (Jupiter-Pluto), we need the planet **center**, not the
+For outer planets (Jupiter-Pluto), the generator needs the planet **center**, not the
 system barycenter. The current code in `planets.py:567-618` handles this via
 `get_planet_target()` which uses `planet_centers.bsp` or analytical COB
 corrections. The generator must use the same logic to get accurate planet

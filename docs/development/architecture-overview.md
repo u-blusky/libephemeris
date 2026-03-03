@@ -1,12 +1,8 @@
-# Performance Analysis & Precomputed Ephemeris (.leb) Design
+# Architecture Overview
 
-> **STATUS: DESIGN PROPOSAL** -- This document describes a potential future feature.
-> The `.leb` format and Rust/PyO3 port are **NOT yet implemented**.
-> It serves as a design reference for future development.
-
-This document summarizes a comprehensive analysis of the libephemeris codebase,
-its performance bottlenecks, and the design for a precomputed binary ephemeris
-format (`.leb`) with a Python-first implementation followed by a Rust port via PyO3.
+Codebase metrics, performance bottleneck analysis, and future development vision
+for LibEphemeris. For the implemented LEB binary ephemeris system, see the
+[LEB Technical Guide](../leb/guide.md) and [LEB Design](../leb/design.md).
 
 ---
 
@@ -14,10 +10,8 @@ format (`.leb`) with a Python-first implementation followed by a Rust port via P
 
 1. [Codebase Overview](#1-codebase-overview)
 2. [Performance Bottleneck Analysis](#2-performance-bottleneck-analysis)
-3. [Precomputed Binary Format (.leb)](#3-precomputed-binary-format-leb)
-4. [Python-First Implementation Plan](#4-python-first-implementation-plan)
-5. [Future Rust Port via PyO3](#5-future-rust-port-via-pyo3)
-6. [Appendix: Full Module Inventory](#appendix-full-module-inventory)
+3. [Future Rust Port via PyO3](#3-future-rust-port-via-pyo3)
+4. [Appendix: Full Module Inventory](#appendix-full-module-inventory)
 
 ---
 
@@ -41,7 +35,7 @@ format (`.leb`) with a Python-first implementation followed by a Rust port via P
 
 ### Architecture Summary
 
-libephemeris does NOT implement its own orbital integrator. It delegates
+LibEphemeris does NOT implement its own orbital integrator. It delegates
 all positional astronomy to **Skyfield** (which reads JPL DE440/DE441 SPK
 kernels via **jplephem**). The library provides:
 
@@ -178,7 +172,7 @@ calculations. Cache hit: ~0.0001ms (200x speedup).
 ### 2.3 Existing Caching Infrastructure
 
 | Cached function              | Cache size | Underlying call    | Speedup |
-|------------------------------|------------|--------------------|---------|
+|------------------------------|------------|--------------------|---------| 
 | `get_cached_nutation(jd_tt)` | 128 entries| `erfa.nut06a()`    | 200x    |
 | `get_cached_obliquity(jd_tt)`| 128 entries| `erfa.obl06()` + nutation | 200x |
 
@@ -196,326 +190,21 @@ in the critical path.
 
 ---
 
-## 3. Precomputed Binary Format (.leb)
+## 3. Future Rust Port via PyO3
 
-### 3.1 Core Concept
+> **Note:** The LEB-reader-only Rust port strategy is also documented in
+> [LEB Design](../leb/design.md).
 
-Instead of calling Skyfield at runtime (slow), precompute all necessary
-data using Skyfield once, store as Chebyshev polynomial coefficients in a
-compact binary file, and evaluate with a fast Clenshaw algorithm at runtime.
+This section describes a vision for porting the full library (~7,800 lines)
+to Rust, beyond just the LEB reader.
 
-```
-             OFFLINE (once)                       RUNTIME (every call)
-             ==============                       ====================
-
-Skyfield/DE441 --> Generator --> .leb file --> Reader + Clenshaw eval
-(slow, precise)   (minutes)    (16MB-2.4GB)   (~1-25us per call)
-```
-
-Key insight: **velocities are free**. The analytical derivative of the
-Chebyshev polynomial gives exact velocity without central difference:
-
-```
-If P(x) = sum(c_k * T_k(x))          (position)
-Then P'(x) = sum(c_k * T'_k(x))      (velocity, T'_k = k * U_{k-1})
-```
-
-This eliminates the current 3x overhead from recursive `_calc_body()` calls.
-
-### 3.2 Body Coordinate Categories
-
-Bodies fall into 3 categories with different storage strategies:
-
-| Category          | Bodies                                   | Stored as              | Why                                          |
-|-------------------|------------------------------------------|------------------------|----------------------------------------------|
-| ICRS barycentric  | Sun, Moon, Mercury-Pluto, Earth, Chiron, Ceres-Vesta | (x,y,z) AU ICRS | Reader applies geocentric, light-time, aberration, precession, nutation at runtime |
-| Ecliptic direct   | Mean/True Node, Mean/True/Osculating Lilith, Interpolated Apogee/Perigee | (lon,lat,dist) degrees/AU | Already final coordinates; reader applies sidereal/equatorial if needed |
-| Heliocentric ecliptic | Uranians (40-47), Transpluto (48)   | (lon,lat,dist) helio ecliptic | Already in final frame; `_calc_body()` returns heliocentric today too |
-
-**Rationale for ICRS barycentric (planets):** A single dataset of (x,y,z)
-barycentric ICRS coordinates supports ALL output combinations (geocentric
-ecliptic, equatorial, heliocentric, J2000, sidereal) through coordinate
-transforms at runtime. This avoids storing 5x redundant datasets.
-
-**Rationale for ecliptic direct (nodes/Lilith):** These bodies are computed
-by analytical formulas (Meeus polynomials, ELP2000 perturbation series,
-or Skyfield h=rxv) that already produce ecliptic coordinates. Storing the
-final ecliptic values is simpler and the Chebyshev derivative gives direct
-dlon/dt velocity without central difference.
-
-### 3.3 Nutation, Delta-T, and Stars
-
-| Data              | Storage method                | Size (200yr) |
-|-------------------|-------------------------------|-------------|
-| Nutation (dpsi, deps) | Chebyshev segments (interval=32d, degree=16) | ~700 KB |
-| Delta-T           | Sparse table (jd, delta_t) every 30 days, cubic interpolation | ~20 KB |
-| Star catalog      | 102 records × (id, ra, dec, pm_ra, pm_dec, parallax, rv, mag) | ~8 KB |
-
-Stars do NOT need Chebyshev precomputation. They are 102 records with
-J2000 positions and proper motion rates. Proper motion is linear and can
-be extrapolated at runtime with 4 arithmetic operations.
-
-### 3.4 File Layout
-
-```
-Byte offset  Content
------------  ----------------------------------------
-0x0000       File Header (64 bytes)
-0x0040       Section Directory (N x 24 bytes)
-variable     Section 0: Body Index
-variable     Section 1: Chebyshev Data (bulk, 95%+ of file)
-variable     Section 2: Nutation Chebyshev
-variable     Section 3: Delta-T Table
-variable     Section 4: Star Catalog
-variable     Section 5: Orbital Elements (hypotheticals)
-```
-
-#### File Header (64 bytes)
-
-| Offset | Type     | Field              |
-|--------|----------|--------------------|
-| 0      | `[u8;4]` | magic = `b"LEB1"`  |
-| 4      | `u32`    | version = 1        |
-| 8      | `u32`    | section_count      |
-| 12     | `u32`    | body_count         |
-| 16     | `f64`    | jd_start           |
-| 24     | `f64`    | jd_end             |
-| 32     | `f64`    | generation_epoch   |
-| 40     | `u32`    | flags              |
-| 44     | 20 bytes | reserved           |
-
-#### Body Index Entry (48 bytes per body)
-
-| Offset | Type  | Field          |
-|--------|-------|----------------|
-| 0      | `i32` | body_id        |
-| 4      | `u32` | coord_type     | (0=ICRS_BARY, 1=ECLIPTIC, 2=HELIO_ECL)
-| 8      | `u32` | segment_count  |
-| 12     | `f64` | jd_start       |
-| 20     | `f64` | jd_end         |
-| 28     | `f64` | interval_days  |
-| 36     | `u32` | degree         |
-| 40     | `u32` | components     | (3 for xyz/lonlatdist, 2 for lon+lat, 1 for lon)
-| 44     | `u64` | data_offset    |
-
-#### O(1) Segment Lookup
-
-Given a Julian Day `t` and a body `b`, the correct Chebyshev segment is
-found with a single integer division (no binary search):
-
-```
-idx = floor((t - body.jd_start) / body.interval_days)
-offset = body.data_offset + idx * components * (degree+1) * 8
-```
-
-### 3.5 Chebyshev Parameters Per Body
-
-| Body       | Interval (days) | Degree | Bytes/segment | Segments (200yr) | Total    |
-|------------|-----------------|--------|---------------|-------------------|----------|
-| Moon       | 8               | 13     | 336           | 9,125             | 3.1 MB   |
-| Mercury    | 16              | 15     | 384           | 4,563             | 1.8 MB   |
-| Venus      | 32              | 13     | 336           | 2,282             | 767 KB   |
-| Sun (EMB)  | 32              | 13     | 336           | 2,282             | 767 KB   |
-| Earth      | 8               | 13     | 336           | 9,125             | 3.1 MB   |
-| Mars       | 32              | 13     | 336           | 2,282             | 767 KB   |
-| Jupiter    | 64              | 11     | 288           | 1,141             | 329 KB   |
-| Saturn     | 64              | 11     | 288           | 1,141             | 329 KB   |
-| Uranus     | 128             | 9      | 240           | 571               | 137 KB   |
-| Neptune    | 128             | 9      | 240           | 571               | 137 KB   |
-| Pluto      | 128             | 9      | 240           | 571               | 137 KB   |
-| Chiron     | 32              | 13     | 336           | 2,282             | 767 KB   |
-| Ceres-Vesta (4) | 32         | 13     | 336           | 4 x 2,282        | 3.1 MB   |
-| Nutation   | 32              | 16     | 272           | 2,282             | 621 KB   |
-| **Total (200yr)** |          |        |               |                   | **~16 MB** |
-
-For 30,000 years the file scales linearly to ~2.4 GB.
-
-### 3.6 Longitude Wrap-Around Handling
-
-Ecliptic longitude has a discontinuity at 0/360 degrees. The generator
-must handle this for bodies stored in ecliptic coordinates:
-
-1. Before Chebyshev fitting: **unwrap** the longitude series (remove 360-degree jumps)
-2. Fit Chebyshev to the unwrapped series
-3. After evaluation: **re-wrap** with `degnorm()` (modulo 360)
-
-The generator detects segments that cross 0/360 and verifies the unwrapped
-fit produces correct results.
-
----
-
-## 4. Python-First Implementation Plan
-
-### 4.1 New Files
-
-| File                        | LOC est. | Purpose                                   |
-|-----------------------------|----------|-------------------------------------------|
-| `libephemeris/leb_format.py`| ~150     | Format constants, struct definitions       |
-| `scripts/generate_leb.py`   | ~600     | CLI generator using Skyfield               |
-| `libephemeris/leb_reader.py`| ~400     | mmap reader + Clenshaw evaluation          |
-| `libephemeris/fast_calc.py` | ~800     | Calculation pipeline using leb_reader      |
-| `tests/test_leb_*.py`       | ~650     | Validation and benchmark tests             |
-| **Total new code**          | **~2,600**| **Zero new dependencies**                 |
-
-### 4.2 Modified Files
-
-| File                     | Changes                                        |
-|--------------------------|------------------------------------------------|
-| `libephemeris/state.py`  | Add `set_leb_file()`, `get_leb_reader()`       |
-| `libephemeris/planets.py`| Add fallback to `fast_calc` when .leb available|
-| `libephemeris/__init__.py`| Export new functions                           |
-
-### 4.3 Phase 1: Format + Generator
-
-**`leb_format.py`** defines:
-- `MAGIC = b"LEB1"`, `VERSION = 1`
-- Coordinate type constants: `COORD_ICRS_BARY=0`, `COORD_ECLIPTIC=1`, `COORD_HELIO_ECL=2`
-- Dataclasses: `FileHeader`, `BodyEntry`, `NutationEntry`, `StarEntry`, `DeltaTEntry`
-- Functions: `write_header()`, `write_body_index()`, `read_header()`, `read_body_index()`
-- `BODY_PARAMS` dict mapping each body_id to `(interval, degree, coord_type, components)`
-
-**`generate_leb.py`** implements:
-
-1. **`generate_body_icrs(body_id, jd_start, jd_end, params)`** -
-   For Sun through Pluto, Earth, Chiron, Ceres-Vesta. Samples barycentric
-   ICRS positions at Chebyshev nodes using Skyfield, fits with
-   `numpy.polynomial.chebyshev.chebfit()`, verifies error < 0.001 arcsec.
-
-2. **`generate_body_ecliptic(body_id, jd_start, jd_end, params)`** -
-   For nodes, Lilith, hypotheticals. Calls the existing libephemeris
-   functions (`calc_mean_lunar_node`, `calc_true_lunar_node`,
-   `calc_true_lilith`, etc.) at Chebyshev nodes.
-
-3. **`generate_nutation(jd_start, jd_end)`** -
-   Samples `erfa.nut06a()` at Chebyshev nodes (interval=32d, degree=16).
-
-4. **`generate_delta_t(jd_start, jd_end)`** -
-   Sparse table of `swe_deltat()` every 30 days.
-
-5. **`generate_star_catalog()`** -
-   Extracts 102 star records from `STAR_CATALOG` in `fixed_stars.py`.
-
-6. **`verify_leb()`** -
-   Post-generation validation vs Skyfield on random dates.
-
-**Estimated generation time (200 years):** ~10 minutes (parallelizable per body).
-
-### 4.4 Phase 2: Reader
-
-**`leb_reader.py`** provides:
-
-```python
-class LebReader:
-    def __init__(self, path: str)
-        # Opens file with mmap.mmap (READ_ONLY)
-        # Parses header, body index, nutation/delta-t/star sections
-
-    def eval_body(self, body_id: int, jd: float) -> tuple[tuple, tuple]
-        # O(1) lookup: idx = (jd - body.jd_start) / body.interval_days
-        # Reads coefficients from mmap (zero-copy via struct.unpack_from)
-        # Clenshaw evaluation: position + analytical derivative (velocity)
-        # Returns ((x,y,z), (vx,vy,vz)) or ((lon,lat,dist), (dlon,dlat,ddist))
-
-    def eval_nutation(self, jd_tt: float) -> tuple[float, float]
-        # Same Chebyshev lookup for (dpsi, deps) in radians
-
-    def delta_t(self, jd: float) -> float
-        # Bisect + cubic interpolation in sparse table
-
-    def get_star(self, star_id: int) -> StarEntry
-        # Direct lookup in catalog
-```
-
-The Clenshaw algorithm is implemented in pure Python (no numpy) for
-single-point evaluation, because numpy array creation overhead (~5us)
-dominates the ~1.5us Clenshaw loop for degree-13 polynomials.
-
-### 4.5 Phase 3: Fast Calculation Pipeline
-
-**`fast_calc.py`** reimplements the Skyfield pipeline in pure Python:
-
-#### Pipeline A: ICRS Barycentric Bodies (planets, asteroids)
-
-```
-1. delta_t = reader.delta_t(jd_ut) -> jd_tt
-2. (earth_pos, earth_vel) = reader.eval_body(SE_EARTH, jd_tt)
-3. (target_pos, target_vel) = reader.eval_body(ipl, jd_tt)
-4. Observer selection (geocentric / heliocentric / barycentric)
-5. geo = target - observer (geometric vector)
-6. Light-time iteration (3 iterations, ~50 lines):
-     dist = |geo|; lt = dist / 173.1446; retarded = eval_body(ipl, jd_tt - lt)
-7. Annual aberration (if not SEFLG_NOABERR)
-8. Coordinate transform:
-   - Ecliptic J2000: fixed obliquity rotation (23.4392911 deg)
-   - Ecliptic of date: IAU 2006 precession + nutation from .leb
-   - Equatorial of date: precession + nutation (no ecliptic rotation)
-9. Sidereal correction (if SEFLG_SIDEREAL): lon -= ayanamsha
-10. Velocity: central difference on final coordinates (now ~25us per eval
-    instead of ~350us, so 3x overhead is ~75us total instead of ~1050us)
-```
-
-#### Pipeline B: Ecliptic Direct Bodies (nodes, Lilith)
-
-```
-1. (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
-   # Already in final ecliptic coordinates
-2. If SEFLG_EQUATORIAL: cotrans(lon, lat, obliquity)
-3. If SEFLG_SIDEREAL: lon -= ayanamsha
-4. Velocity from Chebyshev derivative (no central difference needed!)
-```
-
-#### Pipeline C: Heliocentric Bodies (hypotheticals)
-
-Identical to Pipeline B. No additional transforms needed.
-
-### 4.6 Phase 4: Integration
-
-Minimal changes to existing code:
-
-```python
-# In planets.py swe_calc_ut():
-reader = state.get_leb_reader()
-if reader is not None:
-    try:
-        return fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
-    except (KeyError, ValueError):
-        pass  # body not in .leb, fall through to Skyfield
-# ... existing Skyfield code unchanged ...
-```
-
-### 4.7 Expected Python-Only Speedup
-
-| Operation                | Skyfield (current) | .leb Python | Speedup    |
-|--------------------------|--------------------|-------------|------------|
-| `swe_calc_ut()` no speed | ~350us             | ~25us       | **~14x**   |
-| `swe_calc_ut()` + speed  | ~1050us            | ~75us       | **~14x**   |
-| `swe_calc_ut()` mean node| ~100us             | ~5us        | **~20x**   |
-| Eclipse search           | ~1s                | ~100ms      | **~10x**   |
-| `swe_houses()` Placidus  | ~500us             | ~400us      | ~1.3x (*)  |
-
-(*) Houses don't benefit much because they're already pure math. The
-bottleneck is `t.gast` from Skyfield and obliquity, which still requires
-reimplementation of GAST/GMST for full benefit.
-
-### 4.8 Implementation Timeline
-
-| Week | Deliverable                                                    |
-|------|----------------------------------------------------------------|
-| 1    | `leb_format.py`, `generate_leb.py` (planets only), `leb_reader.py`, validate Sun |
-| 2    | Generator (all bodies + nutation + delta-t + stars), `fast_calc.py` Pipeline A |
-| 3    | `fast_calc.py` Pipelines B+C, all flags, integration, full test suite + benchmark |
-
----
-
-## 5. Future Rust Port via PyO3
-
-### 5.1 Strategy
+### 3.1 Strategy
 
 Once the Python implementation is validated, port the **reader + pipeline**
 to Rust. The same `.leb` file format works for both Python and Rust. The
 generator stays in Python (it runs once, not performance-critical).
 
-### 5.2 Rust Crate Structure
+### 3.2 Rust Crate Structure
 
 ```
 engine/
@@ -548,7 +237,7 @@ engine/
 │   Total: ~7,800 lines Rust
 ```
 
-### 5.3 Rust Dependencies
+### 3.3 Rust Dependencies
 
 ```toml
 [dependencies]
@@ -565,7 +254,7 @@ criterion = "0.5"            # Benchmarks
 
 Zero math dependencies: all trigonometry uses `f64::sin()`, `f64::cos()`, etc.
 
-### 5.4 Expected Speedup After Rust Port
+### 3.4 Expected Speedup After Rust Port
 
 | Operation                     | Python .leb | Rust .leb  | Total vs Skyfield |
 |-------------------------------|-------------|------------|-------------------|
@@ -575,7 +264,7 @@ Zero math dependencies: all trigonometry uses `f64::sin()`, `f64::cos()`, etc.
 | Eclipse search                | ~100ms      | ~0.5-2ms   | **500-2000x**     |
 | Full chart (10 planets+houses)| ~1ms        | ~20-50us   | **240-600x**      |
 
-### 5.5 Python Integration (Transparent Fallback)
+### 3.5 Python Integration (Transparent Fallback)
 
 ```python
 # libephemeris/planets.py
@@ -600,7 +289,7 @@ Three tiers of performance:
 2. **Python .leb reader** (~25-75us) - if .leb file is configured
 3. **Skyfield** (~350-1050us) - fallback, always available
 
-### 5.6 Rust Port Timeline (After Python Validation)
+### 3.6 Rust Port Timeline (After Python Validation)
 
 | Phase | Weeks | Deliverable                                        |
 |-------|-------|----------------------------------------------------|

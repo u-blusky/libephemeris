@@ -67,7 +67,7 @@ poe leb:generate:medium:groups    # All 3 groups + merge for medium tier
 poe leb:generate:extended:groups  # All 3 groups + merge for extended tier
 ```
 
-Runtime always uses a **single merged file**. See `docs/LEB_PLAN.md` and `docs/LEB_GUIDE.md` for details.
+Runtime always uses a **single merged file**. See `docs/leb/design.md` and `docs/leb/guide.md` for details.
 
 ## Lunar Calibration Workflow
 
@@ -76,4 +76,4 @@ Runtime always uses a **single merged file**. See `docs/LEB_PLAN.md` and `docs/L
 3. `poe generate-lunar-corrections` (regenerates `lunar_corrections.py`)
 4. `poe test:lunar:perigee`
 
-See `docs/interpolated_perigee_methodology.md` for the full methodology.
+See `docs/methodology/interpolated-perigee.md` for the full methodology.

@@ -4,6 +4,20 @@
 > Each section is marked with its role in the page layout. Code blocks, tables,
 > and copy are ready to be dropped into the final implementation.
 
+## Table of Contents
+
+- [Header](#header)
+- [Hero](#hero)
+- [Code Comparison](#code-comparison)
+- [Why LibEphemeris](#why-libephemeris-4-cards)
+- [Features](#features-grid)
+- [Precision Tiers](#precision-tiers)
+- [Calculation Backend](#calculation-backend)
+- [Thread Safety](#thread-safety)
+- [By the Numbers](#by-the-numbers)
+- [Getting Started](#getting-started)
+- [Footer](#footer)
+
 ---
 
 ## [Header]
@@ -311,7 +325,7 @@ libephemeris status
 ### Links (inline or as buttons)
 
 - Quick Start Guide
-- Migration from pyswisseph _(docs/migration-guide.md)_
+- Migration from pyswisseph _(docs/guides/migration-guide.md)_
 - API Reference _(docs/api_reference.rst)_
 - Examples _(examples/)_
 

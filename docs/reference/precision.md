@@ -2,6 +2,28 @@
 
 LibEphemeris is built on modern IAU standards and NASA JPL ephemerides. Every component -- from nutation to planet center corrections -- uses the most accurate models available in the astronomical literature. This document describes the scientific foundations, the specific models chosen, and measured precision for every calculation.
 
+## Table of Contents
+
+- [1. Ephemeris Foundation](#1-ephemeris-foundation)
+- [2. Nutation Model](#2-nutation-model)
+- [3. Precession Model](#3-precession-model)
+- [4. Aberration and Light Deflection](#4-aberration-and-light-deflection)
+- [5. Planet Center Corrections](#5-planet-center-corrections)
+- [6. Velocity Computation](#6-velocity-computation)
+- [7. True Ecliptic Coordinates](#7-true-ecliptic-coordinates)
+- [8. House Calculations](#8-house-calculations)
+- [9. Lunar Points](#9-lunar-points)
+- [10. Delta T (TT − UT1)](#10-delta-t-tt--ut1)
+- [11. Fixed Stars](#11-fixed-stars)
+- [12. Ayanamsha (Sidereal Modes)](#12-ayanamsha-sidereal-modes)
+- [13. Eclipses and Occultations](#13-eclipses-and-occultations)
+- [14. Rise, Set, and Transit](#14-rise-set-and-transit)
+- [15. Heliacal Events](#15-heliacal-events)
+- [16. Planetary Positions -- Measured Precision](#16-planetary-positions----measured-precision)
+- [17. Minor Bodies](#17-minor-bodies)
+- [18. Thread-safe Context API](#18-thread-safe-context-api)
+- [References](#references)
+
 ---
 
 ## 1. Ephemeris Foundation
@@ -23,7 +45,7 @@ DE440 and DE441 have identical precision -- DE441 is simply the extended-range v
 
 ### Precision tiers
 
-LibEphemeris organises these files into three precision tiers:
+LibEphemeris organizes these files into three precision tiers:
 
 | Tier | File | Use Case |
 |------|------|----------|
@@ -385,9 +407,9 @@ The True Node is where the Moon's **instantaneous orbital plane** intersects the
 
 This computes **exactly** what the True Node is by definition: the intersection of the orbital plane with the ecliptic. Deriving the node directly from the state vectors avoids the approximation errors inherent in analytical series — the geometric construction is exact by definition.
 
-**Stage 2: ELP2000-82B perturbation corrections (120+ terms)**
+**ELP2000-82B perturbation series (available but not applied)**
 
-The raw geometric node is refined with perturbation terms from the ELP2000-82B lunar theory:
+The codebase contains a comprehensive ELP2000-82B perturbation series (~170 terms, ~900 lines) organized into the following categories:
 
 | Category | Terms | Dominant amplitude |
 |----------|-------|-------------------|
@@ -407,6 +429,8 @@ The raw geometric node is refined with perturbation terms from the ELP2000-82B l
 | Secular terms | 3+ | T-dependent corrections to T⁵ |
 
 The Earth eccentricity factor E = 1.0 − 0.002516·T − 0.0000074·T² is applied to Sun-dependent terms per Meeus convention.
+
+> **Note:** These perturbation corrections are **not currently applied** to the True Node calculation. Investigation revealed that the ELP2000-82B series was designed for the *mean* lunar node, not the geometric node derived from state vectors via `h = r × v`. Applying the series to the geometric node produced errors of tens of degrees, confirming the two approaches are incompatible. The geometric method from Stage 1 is used alone. The residual vs Swiss Ephemeris (~8.9 arcsec mean, ~0.14° max) reflects the fundamental methodological difference. See [Precision History](../development/precision-history.md) for the full investigation record.
 
 ### Mean Node
 

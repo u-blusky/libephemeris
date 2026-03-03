@@ -34,8 +34,8 @@ at the cost of speed and strict numerical agreement with Swiss Ephemeris.
 - **Transparent.** Pure Python, fully testable, readable, and documented with explicit astronomical references.
 - **Slower than Swiss Ephemeris.** Swiss is C; LibEphemeris is Python (see Performance).
 
-Methodology and rationale: `docs/methodology.md`.
-Precision measurements: `docs/PRECISION.md`.
+Methodology and rationale: `docs/methodology/overview.md`.
+Precision measurements: `docs/reference/precision.md`.
 
 ---
 
@@ -262,7 +262,7 @@ SPK coverage varies by tier:
 | Neptune | SPK              | SPK                | SPK full (-12000 to +17000)         |
 | Pluto   | SPK              | SPK 1800-2200      | SPK 1800-2200, fallback outside     |
 
-Full technical details are in `docs/PRECISION.md`.
+Full technical details are in `docs/reference/precision.md`.
 
 ---
 
@@ -300,7 +300,7 @@ download_assist_data()  # Downloads to ~/.libephemeris/assist/ (~714 MB)
 Once installed, ASSIST is used automatically in the fallback chain:
 SPK kernel > auto-download SPK > REBOUND/ASSIST > Keplerian.
 
-See `docs/REBOUND_BENEFITS.md` for details.
+See `docs/methodology/rebound-integration.md` for details.
 
 ### Optional Dependencies
 
@@ -339,21 +339,21 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 
 ## Docs
 
-- `docs/methodology.md` (computational methodology, comparison with Swiss Ephemeris)
-- `docs/PRECISION.md` (scientific models, measured precision, references)
-- `docs/migration-guide.md` (pyswisseph -> libephemeris)
-- `docs/HOUSE_SYSTEMS.md`
-- `docs/AYANAMSHA.md`
-- `docs/testing.md`
-- `docs/methodology_lunar_apsides.md` (lunar apsides methodology)
-- `docs/interpolated_perigee_methodology.md` (perigee calibration method and precision)
-- `docs/INTERPOLATED_APOGEE.md` (apogee methodology)
-- `docs/TRUE_LILITH_METHODS.md` (True Lilith correction methods)
-- `docs/PLANET_CENTERS_SPK.md` (planet centers SPK system)
-- `docs/PRECISION_TUNING.md` (precision tuning guide)
-- `docs/PYERFA_BENEFITS.md` (pyerfa integration benefits)
-- `docs/REBOUND_BENEFITS.md` (REBOUND n-body integration benefits)
-- `docs/LEB_GUIDE.md` (binary ephemeris format and performance guide)
+- `docs/methodology/overview.md` (computational methodology, comparison with Swiss Ephemeris)
+- `docs/reference/precision.md` (scientific models, measured precision, references)
+- `docs/guides/migration-guide.md` (pyswisseph -> libephemeris)
+- `docs/reference/house-systems.md`
+- `docs/reference/ayanamsha.md`
+- `docs/development/testing.md`
+- `docs/methodology/lunar-apsides.md` (lunar apsides methodology)
+- `docs/methodology/interpolated-perigee.md` (perigee calibration method and precision)
+- `docs/methodology/interpolated-apogee.md` (apogee methodology)
+- `docs/methodology/true-lilith.md` (True Lilith correction methods)
+- `docs/methodology/planet-centers-spk.md` (planet centers SPK system)
+- `docs/guides/precision-tuning.md` (precision tuning guide)
+- `docs/methodology/pyerfa-integration.md` (pyerfa integration benefits)
+- `docs/methodology/rebound-integration.md` (REBOUND n-body integration benefits)
+- `docs/leb/guide.md` (binary ephemeris format and performance guide)
 
 ---
 
@@ -382,7 +382,7 @@ Once downloaded, the file is auto-discovered from `~/.libephemeris/leb/` -- no c
 
 LEB transparently falls back to Skyfield for unsupported flags or bodies not in the `.leb` file. See [Calculation backend](#calculation-backend) for mode control.
 
-Full technical guide: `docs/LEB_GUIDE.md`.
+Full technical guide: `docs/leb/guide.md`.
 
 ---
 
@@ -479,7 +479,7 @@ Generate `planet_centers_*.bsp` files for each precision tier. Requires `spiceyp
 
 ### Calibration
 
-Calibrate perturbation series coefficients against JPL DE441 ephemeris. See `docs/interpolated_perigee_methodology.md` for full details.
+Calibrate perturbation series coefficients against JPL DE441 ephemeris. See `docs/methodology/interpolated-perigee.md` for full details.
 
 | Command                       | Description                                                            |
 | ----------------------------- | ---------------------------------------------------------------------- |

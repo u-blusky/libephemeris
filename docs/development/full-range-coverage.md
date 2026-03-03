@@ -1,7 +1,17 @@
-# Full DE441 Range Coverage for Minor Bodies
+# Full Range Coverage
 
-Implementation plan for extending minor body coverage across the entire DE441
-ephemeris range (-13200 to +17191 CE).
+Plan for extending minor body coverage across the full DE441 ephemeris range
+(-13200 to +17191 CE).
+
+## Table of Contents
+
+- [Problem Statement](#problem-statement)
+- [Current Situation](#current-situation)
+- [Target Coverage](#target-coverage)
+- [Bugs Found During Investigation](#bugs-found-during-investigation)
+- [Implementation Steps](#implementation-steps)
+- [Verification](#verification)
+- [JPL Horizons SPK Limits](#jpl-horizons-spk-limits)
 
 ## Problem Statement
 
@@ -9,7 +19,7 @@ The extended precision tier uses DE441 which covers -13200 to +17191 for major
 planets, but minor bodies (asteroids, TNOs, centaurs) fall back to low-precision
 Keplerian propagation (~10-30 arcsec error) outside a narrow SPK window.
 
-### Current situation
+## Current Situation
 
 | Source | Range | Precision | Status |
 |--------|-------|-----------|--------|
@@ -19,7 +29,7 @@ Keplerian propagation (~10-30 arcsec error) outside a narrow SPK window.
 | ASSIST (n-body, with DE441) | -13000 to +17000 | Sub-arcsecond | **Not configured** |
 | Keplerian fallback | Unlimited | 10-30 arcsec | Active everywhere else |
 
-### Target coverage
+## Target Coverage
 
 ```
 DE441 range:   -13200 ==============================================> +17191
@@ -39,6 +49,8 @@ files exist for the same body (e.g. `2060_190001_210001.bsp` and
 `2060_185001_215001.bsp`), whichever file is listed first gets registered.
 The wider-range file may be silently ignored.
 
+**Status:** Pending fix
+
 ### 2. `spk_date_range` for extended tier is wrong
 
 **File:** `libephemeris/state.py`, line 64
@@ -48,17 +60,23 @@ SPK requests in the range **1600-01-01 to 2500-01-01** (verified empirically).
 This causes `_try_auto_spk_download()` to request impossible ranges, which fail
 silently and fall through to Keplerian.
 
+**Status:** Pending fix
+
 ### 3. Diagnostic `_get_source()` was lying about data source
 
 **File:** `scripts/_tier_diagnostic.py`
 
 Was reporting "SPK" for all minor bodies regardless of whether the date was
-actually covered by the SPK file. **Already fixed** - now checks actual SPK
-file coverage via `get_spk_coverage()`.
+actually covered by the SPK file. Now checks actual SPK file coverage via
+`get_spk_coverage()`.
+
+**Status:** Fixed
 
 ## Implementation Steps
 
 ### Step 1: Fix `discover_local_spks` to prefer widest SPK
+
+**Status:** Pending
 
 **File:** `libephemeris/spk_auto.py`
 
@@ -82,6 +100,8 @@ if ipl in state._SPK_BODY_MAP:
 
 ### Step 2: Update `spk_date_range` for tiers
 
+**Status:** Pending
+
 **File:** `libephemeris/state.py`
 
 Update the extended tier to reflect the actual JPL Horizons maximum:
@@ -96,10 +116,12 @@ Update the extended tier to reflect the actual JPL Horizons maximum:
 ```
 
 Also update base and medium tiers if their ranges exceed what Horizons accepts:
-- **base:** `("1850-01-01", "2150-01-01")` - OK, within 1600-2500
-- **medium:** `("1900-01-01", "2100-01-01")` - OK, within 1600-2500
+- **base:** `("1850-01-01", "2150-01-01")` — OK, within 1600-2500
+- **medium:** `("1900-01-01", "2100-01-01")` — OK, within 1600-2500
 
 ### Step 3: Create max-range SPK download script
+
+**Status:** Pending
 
 **File:** new `scripts/download_max_range_spk.py`
 
@@ -116,6 +138,8 @@ Bodies (from `libephemeris/constants.py`):
 
 ### Step 4: Add poe task for max-range download
 
+**Status:** Pending
+
 **File:** `pyproject.toml`
 
 ```toml
@@ -124,11 +148,14 @@ Bodies (from `libephemeris/constants.py`):
 
 ### Step 5: Document ASSIST configuration for full DE441 range
 
+**Status:** Pending
+
 ASSIST with DE441 data covers -13000 to +17000. The fallback chain in
-`planets.py:1612-1644` already works - it just needs ASSIST installed and
+`planets.py:1612-1644` already works — it just needs ASSIST installed and
 configured.
 
 **Requirements:**
+
 ```bash
 pip install rebound assist
 
@@ -163,7 +190,7 @@ Expected results:
 - Dates outside 1600-2500 but within -13000/+17000: show **ASSIST** (if installed)
 - Dates outside -13000/+17000: show **Keplerian** (only extreme edges of DE441)
 
-## JPL Horizons SPK Limits (Verified)
+## JPL Horizons SPK Limits
 
 Tested empirically against the Horizons API on 2026-02-20:
 
