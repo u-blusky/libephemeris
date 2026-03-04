@@ -209,6 +209,10 @@ typecheck = "mypy libephemeris"
 "test:leb:precision" = "pytest tests/test_leb/test_leb_precision.py -v"
 "test:leb:precision:quick" = "pytest tests/test_leb/test_leb_precision.py -v -k \"medium\""
 
+# LEB vs Skyfield comparison tests
+"test:leb:compare" = "pytest tests/test_leb/compare/ -v -m leb_compare"
+"test:leb:compare:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --timeout=120"
+
 # Lunar corrections and calibration
 [tool.poe.tasks.generate-lunar-corrections]
 cmd = "python scripts/generate_lunar_corrections.py --force"
@@ -353,6 +357,12 @@ args = [{name = "version", positional = true, required = true, help = "Version s
 cmd = "python scripts/release_leb.py --version ${version} --dry-run"
 help = "Dry run: show what LEB files would be uploaded"
 args = [{name = "version", positional = true, required = true, help = "Version string (e.g. 0.22.0)"}]
+
+[tool.pytest.ini_options]
+markers = [
+    "leb_compare: LEB vs Skyfield comparison tests",
+    "slow: Slow tests excluded from default runs",
+]
 
 [tool.mypy]
 python_version = "3.9"
