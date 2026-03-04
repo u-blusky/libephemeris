@@ -179,7 +179,7 @@ TIER_CONFIGS = {
 DEFAULT_LEB_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "leb")
 
 # Nutation Chebyshev parameters
-NUTATION_INTERVAL = 32.0  # days
+NUTATION_INTERVAL = 16.0  # days
 NUTATION_DEGREE = 16
 NUTATION_COMPONENTS = 2  # dpsi, deps
 

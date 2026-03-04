@@ -43,3 +43,5 @@ data/leb/*.leb
 *.pem
 *.key
 *.p12
+data/leb/.DS_Store
+data/.DS_Store

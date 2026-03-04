@@ -149,16 +149,16 @@ class NutationHeader:
 BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     # SE_SUN through SE_PLUTO, SE_EARTH: ICRS barycentric
     0: (32, 13, COORD_ICRS_BARY, 3),  # SE_SUN
-    1: (8, 13, COORD_ICRS_BARY, 3),  # SE_MOON
+    1: (4, 13, COORD_ICRS_BARY, 3),  # SE_MOON
     2: (16, 15, COORD_ICRS_BARY, 3),  # SE_MERCURY
     3: (32, 13, COORD_ICRS_BARY, 3),  # SE_VENUS
     4: (32, 13, COORD_ICRS_BARY, 3),  # SE_MARS
     5: (64, 11, COORD_ICRS_BARY, 3),  # SE_JUPITER
     6: (64, 11, COORD_ICRS_BARY, 3),  # SE_SATURN
-    7: (128, 9, COORD_ICRS_BARY, 3),  # SE_URANUS
-    8: (128, 9, COORD_ICRS_BARY, 3),  # SE_NEPTUNE
-    9: (128, 9, COORD_ICRS_BARY, 3),  # SE_PLUTO
-    14: (8, 13, COORD_ICRS_BARY, 3),  # SE_EARTH
+    7: (64, 13, COORD_ICRS_BARY, 3),  # SE_URANUS
+    8: (64, 13, COORD_ICRS_BARY, 3),  # SE_NEPTUNE
+    9: (64, 13, COORD_ICRS_BARY, 3),  # SE_PLUTO
+    14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH
     # Lunar nodes/Lilith: ecliptic direct
     10: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_NODE  (lon, 0, 0)
     11: (8, 13, COORD_ECLIPTIC, 3),  # SE_TRUE_NODE  (lon, lat, dist)

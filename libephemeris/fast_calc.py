@@ -107,6 +107,47 @@ def _cartesian_to_spherical(x: float, y: float, z: float) -> Tuple[float, float,
     return (lon, lat, dist)
 
 
+def _cartesian_velocity_to_spherical(
+    x: float,
+    y: float,
+    z: float,
+    vx: float,
+    vy: float,
+    vz: float,
+) -> Tuple[float, float, float]:
+    """Convert Cartesian velocity to spherical velocity.
+
+    Given position (x, y, z) and velocity (vx, vy, vz), compute the time
+    derivatives of (longitude, latitude, distance) using the standard
+    Cartesian-to-spherical Jacobian.
+
+    Args:
+        x, y, z: Position in AU (Cartesian).
+        vx, vy, vz: Velocity in AU/day (Cartesian).
+
+    Returns:
+        (dlon_deg_day, dlat_deg_day, ddist_au_day)
+    """
+    r_xy_sq = x * x + y * y
+    r_sq = r_xy_sq + z * z
+    r = math.sqrt(r_sq)
+    r_xy = math.sqrt(r_xy_sq)
+
+    if r == 0.0 or r_xy == 0.0:
+        # At the pole or origin — angular rates undefined
+        ddist = math.sqrt(vx * vx + vy * vy + vz * vz) if r == 0.0 else 0.0
+        return (0.0, 0.0, ddist)
+
+    dlon_rad = (x * vy - y * vx) / r_xy_sq  # rad/day
+    dlat_rad = (vz * r_xy_sq - z * (x * vx + y * vy)) / (r_sq * r_xy)  # rad/day
+    ddist = (x * vx + y * vy + z * vz) / r  # AU/day
+
+    dlon_deg = math.degrees(dlon_rad)  # deg/day
+    dlat_deg = math.degrees(dlat_rad)  # deg/day
+
+    return (dlon_deg, dlat_deg, ddist)
+
+
 def _rotate_equatorial_to_ecliptic(
     x: float, y: float, z: float, eps_rad: float
 ) -> Tuple[float, float, float]:
@@ -411,14 +452,27 @@ def _pipeline_icrs(
     jd_tt: float,
     ipl: int,
     iflag: int,
-) -> Tuple[float, float, float]:
+    want_velocity: bool = False,
+) -> Tuple[float, ...]:
     """Pipeline A: compute ecliptic coordinates for ICRS barycentric bodies.
 
+    When want_velocity is False (default), returns (lon, lat, dist).
+    When want_velocity is True, returns (lon, lat, dist, dlon, dlat, ddist)
+    where the velocity components are analytically derived from the Chebyshev
+    polynomial derivatives, transformed through the same rotation matrices
+    as the position.
+
     Returns:
-        (lon_deg, lat_deg, dist_au) in the requested frame.
+        (lon_deg, lat_deg, dist_au) or
+        (lon_deg, lat_deg, dist_au, dlon_deg_day, dlat_deg_day, ddist_au_day)
     """
-    # 1. Get body position
+    # 1. Get body position (and velocity if needed)
     target_pos, target_vel = reader.eval_body(ipl, jd_tt)
+
+    # Pre-initialize velocity variables to satisfy type checker.
+    # These are always set before use when want_velocity=True.
+    geo_vel: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    dlon = dlat = ddist = 0.0
 
     # 2. Observer selection (defer Earth fetch for helio/bary)
     if iflag & SEFLG_HELCTR:
@@ -440,25 +494,42 @@ def _pipeline_icrs(
     geo = _vec3_sub(target_pos, observer)
 
     # 4. Light-time correction (unless SEFLG_TRUEPOS)
+    #    Also get the velocity at the retarded time for analytical velocity.
+    #    Initialize retarded_vel to target_vel as fallback for dist == 0 case
+    #    (e.g. Earth geocentric where target == observer).
+    retarded_vel = target_vel
     if not (iflag & SEFLG_TRUEPOS):
         for _ in range(3):  # Fixed-point iterations
             dist = _vec3_dist(geo)
             if dist == 0.0:
                 break
             lt = dist / C_LIGHT_AU_DAY
-            retarded_pos, _ = reader.eval_body(ipl, jd_tt - lt)
+            retarded_pos, retarded_vel = reader.eval_body(ipl, jd_tt - lt)
             geo = _vec3_sub(retarded_pos, observer)
 
+    if want_velocity:
+        geo_vel = _vec3_sub(retarded_vel, observer_vel)
+
     # 5. Aberration (unless disabled or helio/bary/truepos)
+    #    For velocity: the aberration correction depends on Earth's velocity
+    #    which changes slowly (~0.017 deg/day²). The velocity component of
+    #    aberration is ~1e-8 deg/day — negligible. We skip it.
     if not (iflag & (SEFLG_NOABERR | SEFLG_HELCTR | SEFLG_BARYCTR | SEFLG_TRUEPOS)):
         geo = _apply_aberration(geo, earth_vel)
 
-    # 6. Coordinate transform
-    dist = _vec3_dist(geo)
-
+    # 6. Coordinate transform — apply the same transform to velocity
     if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
         # ICRS J2000 equatorial -- geo is already in this frame
         lon_deg, lat_deg, dist = _cartesian_to_spherical(geo[0], geo[1], geo[2])
+        if want_velocity:
+            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                geo[0],
+                geo[1],
+                geo[2],
+                geo_vel[0],
+                geo_vel[1],
+                geo_vel[2],
+            )
 
     elif iflag & SEFLG_EQUATORIAL:
         # True equator of date
@@ -467,11 +538,31 @@ def _pipeline_icrs(
         lon_deg, lat_deg, dist = _cartesian_to_spherical(
             geo_eq[0], geo_eq[1], geo_eq[2]
         )
+        if want_velocity:
+            vel_eq = _mat3_vec3(pn_mat, geo_vel)
+            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                geo_eq[0],
+                geo_eq[1],
+                geo_eq[2],
+                vel_eq[0],
+                vel_eq[1],
+                vel_eq[2],
+            )
 
     elif iflag & SEFLG_J2000:
         # J2000 ecliptic
         ecl = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
         lon_deg, lat_deg, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
+        if want_velocity:
+            vel_ecl = _rotate_icrs_to_ecliptic_j2000(geo_vel[0], geo_vel[1], geo_vel[2])
+            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                ecl[0],
+                ecl[1],
+                ecl[2],
+                vel_ecl[0],
+                vel_ecl[1],
+                vel_ecl[2],
+            )
 
     else:
         # TRUE ECLIPTIC OF DATE (default) -- most common path
@@ -492,6 +583,22 @@ def _pipeline_icrs(
         )
         lon_deg, lat_deg, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
 
+        if want_velocity:
+            vel_eq = _mat3_vec3(pn_mat, geo_vel)
+            vel_ecl = _rotate_equatorial_to_ecliptic(
+                vel_eq[0], vel_eq[1], vel_eq[2], eps_true_rad
+            )
+            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                ecl[0],
+                ecl[1],
+                ecl[2],
+                vel_ecl[0],
+                vel_ecl[1],
+                vel_ecl[2],
+            )
+
+    if want_velocity:
+        return lon_deg, lat_deg, dist, dlon, dlat, ddist
     return lon_deg, lat_deg, dist
 
 
@@ -775,31 +882,13 @@ def _fast_calc_core(
 
     # Dispatch to appropriate pipeline based on coordinate type
     if body.coord_type == COORD_ICRS_BARY:
-        # Pipeline A: ICRS barycentric
-        lon, lat, dist = _pipeline_icrs(reader, jd_tt, ipl, iflag)
-
-        # Velocity via central difference (simple, fast enough)
+        # Pipeline A: ICRS barycentric with analytical velocity
         if iflag & SEFLG_SPEED:
-            dt = 1.0 / 86400.0  # 1 second in days
-            flags_no_speed = iflag & ~SEFLG_SPEED
-            lon_prev, lat_prev, dist_prev = _pipeline_icrs(
-                reader, jd_tt - dt, ipl, flags_no_speed
+            lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
+                reader, jd_tt, ipl, iflag, want_velocity=True
             )
-            lon_next, lat_next, dist_next = _pipeline_icrs(
-                reader, jd_tt + dt, ipl, flags_no_speed
-            )
-
-            two_dt = 2.0 * dt
-            dlon = (lon_next - lon_prev) / two_dt
-            # Handle longitude wrap-around
-            if dlon > 180.0 / two_dt:
-                dlon -= 360.0 / two_dt
-            elif dlon < -180.0 / two_dt:
-                dlon += 360.0 / two_dt
-
-            dlat = (lat_next - lat_prev) / two_dt
-            ddist = (dist_next - dist_prev) / two_dt
         else:
+            lon, lat, dist = _pipeline_icrs(reader, jd_tt, ipl, iflag)
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     elif body.coord_type == COORD_ECLIPTIC:

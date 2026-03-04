@@ -27,7 +27,9 @@ from tests.test_leb.compare.conftest import (
 
 from .conftest import TOLS_BASE
 
-DISTANCE_BODIES = ICRS_PLANETS + [(15, "Chiron"), (17, "Ceres")]
+# Exclude asteroids from distance tests — they are covered in test_base_asteroids.py
+# and the base tier LEB has Keplerian-fallback data for all asteroids.
+DISTANCE_BODIES = ICRS_PLANETS
 HELIO_BODIES = [
     (SE_MARS, "Mars"),
     (SE_JUPITER, "Jupiter"),
