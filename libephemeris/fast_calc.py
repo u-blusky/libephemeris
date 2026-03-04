@@ -397,13 +397,8 @@ def _calc_ayanamsa_from_leb(
     else:
         raise KeyError(f"Unknown sidereal mode {mode}")
 
-    # True ayanamsa: add nutation in longitude
-    try:
-        dpsi, _ = reader.eval_nutation(jd_tt)
-        nutation_deg = math.degrees(dpsi)
-        return (mean_aya + nutation_deg) % 360.0
-    except (ValueError, Exception):
-        return mean_aya % 360.0
+    # Mean ayanamsa (without nutation) - swe_get_ayanamsa_ut() returns mean value
+    return mean_aya % 360.0
 
 
 # =============================================================================
@@ -827,13 +822,22 @@ def _fast_calc_core(
     # Sidereal correction
     if (iflag & SEFLG_SIDEREAL) and not (iflag & SEFLG_EQUATORIAL):
         try:
-            aya = _calc_ayanamsa_from_leb(
+            mean_aya = _calc_ayanamsa_from_leb(
                 reader,
                 jd_tt,
                 sid_mode=sid_mode,
                 sid_t0=sid_t0,
                 sid_ayan_t0=sid_ayan_t0,
             )
+            # True ayanamsa: add nutation in longitude (Δψ) to mean ayanamsa.
+            # Ecliptic longitude from pipelines includes nutation, so we must
+            # subtract the true ayanamsa (mean + Δψ) for correct cancellation.
+            try:
+                dpsi, _ = reader.eval_nutation(jd_tt)
+                nutation_deg = math.degrees(dpsi)
+                aya = mean_aya + nutation_deg
+            except (ValueError, Exception):
+                aya = mean_aya
             lon = (lon - aya) % 360.0
             # Sidereal speed correction: subtract precession rate from dlon
             # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
