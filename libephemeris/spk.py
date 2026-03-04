@@ -888,7 +888,7 @@ def _calc_type21_position(
         precess_from_j2000,
         apply_aberration_to_position,
     )
-    from .planets import swe_get_ayanamsa_ut
+    from .planets import _get_true_ayanamsa
 
     jd_tdb = t.tdb  # Use TDB for SPK calculations
     jd_tt = t.tt  # TT for precession/nutation
@@ -1059,7 +1059,9 @@ def _calc_type21_position(
     # Step 8: Apply sidereal correction if requested
     # =========================================================================
     if iflag & SEFLG_SIDEREAL:
-        ayanamsa = swe_get_ayanamsa_ut(t.ut1)
+        # Use true ayanamsa (mean + nutation) so that nutation cancels
+        # from the ecliptic longitude, consistent with planets.py path.
+        ayanamsa = _get_true_ayanamsa(t.ut1)
         lon = (lon - ayanamsa) % 360.0
 
     return (lon, lat, r, speed_lon, speed_lat, speed_dist)
@@ -1191,7 +1193,7 @@ def calc_spk_body_position(
     """
     from . import state
     from .constants import SEFLG_HELCTR, SEFLG_SPEED, SEFLG_SIDEREAL
-    from .planets import swe_get_ayanamsa_ut
+    from .planets import _get_true_ayanamsa
 
     # Check if body is registered
     if ipl not in state._SPK_BODY_MAP:
@@ -1329,7 +1331,9 @@ def calc_spk_body_position(
 
     # Apply sidereal correction if requested
     if iflag & SEFLG_SIDEREAL:
-        ayanamsa = swe_get_ayanamsa_ut(t.ut1)
+        # Use true ayanamsa (mean + nutation) so that nutation cancels
+        # from the ecliptic longitude, consistent with planets.py path.
+        ayanamsa = _get_true_ayanamsa(t.ut1)
         lon = (lon - ayanamsa) % 360.0
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)
