@@ -21,6 +21,14 @@ Calculation backend:
 
 from __future__ import annotations
 
+# Auto-load .env file before any module reads environment variables.
+# This must happen before importing logging_config (which reads
+# LIBEPHEMERIS_LOG_LEVEL at module level).
+from ._dotenv import load_dotenv as _load_dotenv
+
+_load_dotenv()
+del _load_dotenv
+
 from .constants import *
 from .logging_config import (
     get_logger,
@@ -651,6 +659,9 @@ helio_cross = swe_helio_cross
 # Helper for Arabic parts
 from .arabic_parts import calc_all_arabic_parts
 
+# .env file loader (public API for manual reloading)
+from ._dotenv import load_dotenv
+
 # Constants (planet IDs, flags, sidereal modes)
 from .constants import *
 
@@ -659,6 +670,8 @@ __author__ = "Giacomo Battaglia"
 __license__ = "LGPL-3.0"
 
 __all__ = [
+    # .env file loader
+    "load_dotenv",
     # Logging configuration
     "get_logger",
     "set_log_level",
