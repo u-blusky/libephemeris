@@ -21,6 +21,7 @@ import math
 import os
 import shutil
 import struct
+import subprocess
 import sys
 import time
 from typing import Callable, List, Optional, Tuple
@@ -1006,9 +1007,11 @@ def generate_ecliptic_bodies_vectorized(
     degree = 13
     components = 3
 
-    # Maximum JDs per evaluation chunk.  Each JD consumes ~500 bytes of peak
-    # memory in the vectorized Skyfield call, so 2M JDs ≈ 1 GB peak.
-    max_chunk_jds = 2_000_000
+    # Maximum JDs per evaluation chunk.  Each JD consumes ~500-800 bytes of
+    # peak memory in the vectorized Skyfield call, so 500K JDs ≈ 300 MB peak.
+    # With ~5 GB already used by planet/asteroid coefficients, this keeps total
+    # RSS under ~5.4 GB, well within macOS limits.
+    max_chunk_jds = 500_000
 
     if verbose:
         print(f"    Vectorized ecliptic generation: {len(body_ids)} bodies")
@@ -3170,19 +3173,84 @@ def main():
         if not args.quiet:
             print(f"  Group: {args.group} ({len(bodies)} bodies)")
 
-    t0 = time.time()
-    assemble_leb(
-        output=output,
-        jd_start=jd_start,
-        jd_end=jd_end,
-        bodies=bodies,
-        workers=args.workers,
-        verbose=not args.quiet,
-    )
-    elapsed = time.time() - t0
+    # ------------------------------------------------------------------
+    # Mode 2a: Subprocess orchestration (full generation, no --group/--bodies)
+    #
+    # Each body group (planets, asteroids, analytical) is generated in a
+    # separate subprocess to keep peak memory low (~1-3 GB per process
+    # instead of ~6+ GB combined).  The partial files are then merged
+    # in-process and deleted.
+    # ------------------------------------------------------------------
+    if bodies is None and args.group is None:
+        groups = ["planets", "asteroids", "analytical"]
+        partial_files: list[str] = []
 
-    if not args.quiet:
-        print(f"  Total time: {elapsed:.1f}s")
+        # Build the base command shared by all subprocesses
+        base_cmd = [sys.executable, os.path.abspath(__file__)]
+        if args.tier:
+            base_cmd += ["--tier", args.tier]
+        if args.start is not None:
+            base_cmd += ["--start", str(args.start)]
+        if args.end is not None:
+            base_cmd += ["--end", str(args.end)]
+        base_cmd += ["--workers", str(args.workers)]
+        if args.quiet:
+            base_cmd.append("--quiet")
+
+        t0 = time.time()
+
+        for i, group in enumerate(groups, 1):
+            partial = _group_output_path(output, group)
+            partial_files.append(partial)
+
+            if not args.quiet:
+                print(f"\n[{i}/{len(groups)}] Generating {group} group...")
+
+            # Pass --output explicitly so the subprocess writes to the
+            # exact partial path we expect (avoids auto-suffix mismatch).
+            cmd = base_cmd + ["--group", group, "--output", partial]
+            result = subprocess.run(cmd)
+            if result.returncode != 0:
+                print(
+                    f"Error: {group} group generation failed "
+                    f"(exit code {result.returncode})",
+                    file=sys.stderr,
+                )
+                sys.exit(result.returncode)
+
+        # Merge partial files into final output
+        if not args.quiet:
+            print(f"\nMerging {len(partial_files)} partial files...")
+        merge_leb_files(partial_files, output, verbose=not args.quiet)
+
+        # Cleanup partial files
+        for pf in partial_files:
+            if os.path.exists(pf):
+                os.remove(pf)
+                if not args.quiet:
+                    print(f"  Removed {os.path.basename(pf)}")
+
+        elapsed = time.time() - t0
+        if not args.quiet:
+            print(f"\n  Total time: {elapsed:.1f}s")
+
+    # ------------------------------------------------------------------
+    # Mode 2b: Direct generation (--group or --bodies specified)
+    # ------------------------------------------------------------------
+    else:
+        t0 = time.time()
+        assemble_leb(
+            output=output,
+            jd_start=jd_start,
+            jd_end=jd_end,
+            bodies=bodies,
+            workers=args.workers,
+            verbose=not args.quiet,
+        )
+        elapsed = time.time() - t0
+
+        if not args.quiet:
+            print(f"  Total time: {elapsed:.1f}s")
 
     if args.verify:
         print()

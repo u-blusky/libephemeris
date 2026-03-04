@@ -98,20 +98,20 @@ DATA_FILES = {
     # LEB (LibEphemeris Binary) precomputed ephemeris files
     "ephemeris_base.leb": {
         "url": f"{GITHUB_RELEASES_BASE}/ephemeris_base.leb",
-        "sha256": "0313211cabd17b398a1182673f164d333a24500314c2bd2e979b5a1a40f5b0fd",
+        "sha256": "006073f4c1b7926b94fb9137322dc5dd0939d079a12fd81b42e771c5a1c9cb61",
         "size_mb": 53.1,
         "description": "LEB binary ephemeris for 'base' tier (1850-2150, ~14x speedup)",
     },
     "ephemeris_medium.leb": {
         "url": f"{GITHUB_RELEASES_BASE}/ephemeris_medium.leb",
-        "sha256": "3cf0665f06e175ed1f8b07febbdd47bf273e1d00527f14cb6e20cc58fd810791",
+        "sha256": "dbd7239ac2aac96ce2dc33c322a5ff9bd9fd7b3d7ec5792cfba3250e6ab3b665",
         "size_mb": 174.6,
         "description": "LEB binary ephemeris for 'medium' tier (1550-2650, ~14x speedup)",
     },
     "ephemeris_extended.leb": {
         "url": f"{GITHUB_RELEASES_BASE}/ephemeris_extended.leb",
-        "sha256": None,  # Not yet generated
-        "size_mb": None,
+        "sha256": "8f3d9ca0efac7c8616041c96efa63fa0c64f375e5a4671cb37c70f98f0193a27",
+        "size_mb": 1603.6,
         "description": "LEB binary ephemeris for 'extended' tier (-5000 to +5000, ~14x speedup)",
     },
 }
