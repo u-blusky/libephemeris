@@ -209,9 +209,23 @@ typecheck = "mypy libephemeris"
 "test:leb:precision" = "pytest tests/test_leb/test_leb_precision.py -v"
 "test:leb:precision:quick" = "pytest tests/test_leb/test_leb_precision.py -v -k \"medium\""
 
-# LEB vs Skyfield comparison tests
-"test:leb:compare" = "pytest tests/test_leb/compare/ -v -m leb_compare"
-"test:leb:compare:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --timeout=120"
+# LEB vs Skyfield comparison tests (medium tier - existing)
+"test:leb:compare" = "pytest tests/test_leb/compare/ -v -m leb_compare --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
+"test:leb:compare:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
+
+# LEB vs Skyfield comparison tests (base tier)
+"test:leb:compare:base" = "pytest tests/test_leb/compare/base/ -v -m leb_compare_base"
+"test:leb:compare:base:quick" = "pytest tests/test_leb/compare/base/ -v -m \"leb_compare_base and not slow\""
+
+# LEB vs Skyfield comparison tests (extended tier)
+"test:leb:compare:extended" = "pytest tests/test_leb/compare/extended/ -v -m leb_compare_extended"
+"test:leb:compare:extended:quick" = "pytest tests/test_leb/compare/extended/ -v -m \"leb_compare_extended and not slow\""
+
+# LEB cross-tier consistency tests
+"test:leb:compare:crosstier" = "pytest tests/test_leb/compare/crosstier/ -v -m leb_compare_crosstier"
+
+# LEB comparison: all tiers combined
+"test:leb:compare:all" = "pytest tests/test_leb/compare/ -v -m \"leb_compare or leb_compare_base or leb_compare_extended or leb_compare_crosstier\""
 
 # Lunar corrections and calibration
 [tool.poe.tasks.generate-lunar-corrections]
@@ -360,7 +374,10 @@ args = [{name = "version", positional = true, required = true, help = "Version s
 
 [tool.pytest.ini_options]
 markers = [
-    "leb_compare: LEB vs Skyfield comparison tests",
+    "leb_compare: LEB vs Skyfield comparison tests (medium tier)",
+    "leb_compare_base: LEB vs Skyfield comparison tests (base tier)",
+    "leb_compare_extended: LEB vs Skyfield comparison tests (extended tier)",
+    "leb_compare_crosstier: Cross-tier consistency tests",
     "slow: Slow tests excluded from default runs",
 ]
 

@@ -1,0 +1,91 @@
+"""
+LEB vs Skyfield Comparison: Uranian Planets + Transpluto (Base Tier).
+
+Validates all 9 Pipeline C (heliocentric analytical) bodies
+across the base tier range (1860-2140).
+"""
+
+from __future__ import annotations
+
+import pytest
+
+import libephemeris as ephem
+from libephemeris.constants import SEFLG_SPEED
+
+from tests.test_leb.compare.conftest import (
+    HYPOTHETICAL_BODIES,
+    CompareHelper,
+    lon_error_arcsec,
+)
+
+from .conftest import TOLS_BASE
+
+
+class TestBaseHypotheticalPosition:
+    """Hypothetical body position precision."""
+
+    @pytest.mark.leb_compare_base
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", HYPOTHETICAL_BODIES)
+    def test_position(
+        self,
+        compare: CompareHelper,
+        base_dates_300: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Hypothetical body longitude and latitude match Skyfield."""
+        max_lon_err = 0.0
+        max_lat_err = 0.0
+        worst_jd = 0.0
+
+        for jd in base_dates_300:
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+
+            lon_err = lon_error_arcsec(ref[0], leb[0])
+            lat_err = abs(ref[1] - leb[1]) * 3600.0
+
+            if lon_err > max_lon_err:
+                max_lon_err = lon_err
+                worst_jd = jd
+            if lat_err > max_lat_err:
+                max_lat_err = lat_err
+
+        assert max_lon_err < TOLS_BASE.HYPOTHETICAL_ARCSEC, (
+            f'{body_name}: max lon error = {max_lon_err:.4f}" at JD {worst_jd:.1f}'
+        )
+        assert max_lat_err < TOLS_BASE.HYPOTHETICAL_ARCSEC, (
+            f'{body_name}: max lat error = {max_lat_err:.4f}"'
+        )
+
+
+class TestBaseHypotheticalSpeed:
+    """Hypothetical body velocity precision."""
+
+    @pytest.mark.leb_compare_base
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", HYPOTHETICAL_BODIES)
+    def test_speed(
+        self,
+        compare: CompareHelper,
+        base_dates_300: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Hypothetical body speed matches Skyfield within tolerance."""
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in base_dates_300:
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+
+            err = abs(ref[3] - leb[3])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < TOLS_BASE.SPEED_LON_DEG_DAY, (
+            f"{body_name}: max speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
+        )

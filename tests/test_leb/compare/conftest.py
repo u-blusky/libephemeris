@@ -2,10 +2,15 @@
 Shared fixtures and utilities for LEB vs Skyfield comparison tests.
 
 This module provides:
+- TierTolerances dataclass with per-tier configurable thresholds
 - CompareHelper class for executing functions in both modes
-- Tolerances dataclass with configurable thresholds
 - Test date generators
 - Helper functions for angular calculations
+- Body lists and per-body tolerance tables
+
+Tolerance override via environment variables:
+    Per-tier:  LEB_TOL_BASE_POSITION_ARCSEC=0.3
+    Global:    LEB_TOL_POSITION_ARCSEC=2.0   (fallback for all tiers)
 """
 
 from __future__ import annotations
@@ -21,20 +26,23 @@ from libephemeris.time_utils import swe_julday
 
 
 # =============================================================================
-# TOLERANCES
+# TIER-AWARE TOLERANCES
 # =============================================================================
+
+_LEB_DATA_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "leb")
+)
 
 
 @dataclasses.dataclass
-class Tolerances:
+class TierTolerances:
     """Configurable tolerance thresholds for LEB vs Skyfield comparison.
 
-    All values can be overridden via environment variables with the prefix
-    LEB_TOL_, e.g. LEB_TOL_POSITION_ARCSEC=0.5
+    All values can be overridden via environment variables:
+      - Per-tier: LEB_TOL_{TIER}_{FIELD}  e.g. LEB_TOL_BASE_POSITION_ARCSEC=0.3
+      - Global:   LEB_TOL_{FIELD}         e.g. LEB_TOL_POSITION_ARCSEC=2.0
 
-    Note: These tolerances reflect the actual LEB Chebyshev approximation precision.
-    LEB precision varies by body type and can be higher for outer planets.
-    See tests/test_leb/test_leb_precision.py for reference values.
+    Per-tier overrides take precedence over global overrides.
 
     Typical precision by body type:
     - Inner planets (Mercury-Venus): ~0.1-0.2 arcsec
@@ -44,22 +52,27 @@ class Tolerances:
     - Ecliptic bodies (nodes, Lilith): ~0.5 arcsec
     """
 
-    # Core position (ICRS planets can vary 0.1-5 arcsec depending on body/date)
+    # Core position
     POSITION_ARCSEC: float = 5.0
     ECLIPTIC_ARCSEC: float = 0.5
     HYPOTHETICAL_ARCSEC: float = 0.5
+    ASTEROID_ARCSEC: float = 5.0
     EQUATORIAL_ARCSEC: float = 5.0
     J2000_ARCSEC: float = 5.0
-    SIDEREAL_ARCSEC: float = 20.0  # Some modes (41, 255) have larger errors
+    SIDEREAL_ARCSEC: float = 20.0
     DISTANCE_AU: float = 1e-4
 
-    # Velocity (ecliptic bodies like OscuApogee can have higher speed errors)
+    # Velocity
     SPEED_LON_DEG_DAY: float = 0.05
     SPEED_LAT_DEG_DAY: float = 0.05
     SPEED_DIST_AU_DAY: float = 1e-4
 
     # Ayanamsha
     AYANAMSHA_ARCSEC: float = 0.001
+
+    # Nutation & Delta-T
+    NUTATION_ARCSEC: float = 0.01
+    DELTAT_SEC: float = 0.1
 
     # Timing (indirect callers)
     CROSSING_SUN_SEC: float = 1.0
@@ -69,25 +82,97 @@ class Tolerances:
     ECLIPSE_TIMING_SEC: float = 1.0
     ECLIPSE_MAGNITUDE: float = 1e-4
     ECLIPSE_POSITION_DEG: float = 0.001
-    ELONGATION_ARCSEC: float = 0.5  # Elongation uses two planet positions
+    ELONGATION_ARCSEC: float = 0.5
     STATION_TIMING_SEC: float = 1.0
     RISE_TRANSIT_SEC: float = 1.0
     HOUSE_SUNSHINE_ARCSEC: float = 0.001
     GAUQUELIN_SECTOR: float = 0.001
 
     @classmethod
-    def from_env(cls) -> "Tolerances":
-        """Load tolerance overrides from environment variables."""
-        kwargs = {}
+    def for_tier(cls, tier: str, **overrides: float) -> "TierTolerances":
+        """Create tolerances for a specific tier with env-var overrides.
+
+        Resolution order (highest priority first):
+        1. Explicit overrides passed as kwargs
+        2. LEB_TOL_{TIER}_{FIELD} environment variable
+        3. LEB_TOL_{FIELD} environment variable (global)
+        4. Default value from TIER_DEFAULTS[tier]
+        """
+        defaults = TIER_DEFAULTS.get(tier, {})
+        kwargs: dict[str, float] = {}
+
         for field in dataclasses.fields(cls):
-            env_name = f"LEB_TOL_{field.name.upper()}"
-            env_val = os.environ.get(env_name)
-            if env_val is not None:
-                kwargs[field.name] = float(env_val)
+            name = field.name
+
+            # Check explicit override first
+            if name in overrides:
+                kwargs[name] = overrides[name]
+                continue
+
+            # Check per-tier env var
+            tier_env = f"LEB_TOL_{tier.upper()}_{name.upper()}"
+            tier_val = os.environ.get(tier_env)
+            if tier_val is not None:
+                kwargs[name] = float(tier_val)
+                continue
+
+            # Check global env var
+            global_env = f"LEB_TOL_{name.upper()}"
+            global_val = os.environ.get(global_env)
+            if global_val is not None:
+                kwargs[name] = float(global_val)
+                continue
+
+            # Use tier-specific default (or dataclass default)
+            if name in defaults:
+                kwargs[name] = defaults[name]
+
         return cls(**kwargs)
 
+    @classmethod
+    def from_env(cls) -> "TierTolerances":
+        """Load tolerance overrides from environment variables (legacy)."""
+        return cls.for_tier("medium")
 
-TOLS = Tolerances.from_env()
+
+# Per-tier default overrides (only fields that differ from dataclass defaults)
+TIER_DEFAULTS: dict[str, dict[str, float]] = {
+    "base": {
+        # Shorter range = higher precision expected
+        "POSITION_ARCSEC": 5.0,
+        "ASTEROID_ARCSEC": 5.0,
+        "EQUATORIAL_ARCSEC": 5.0,
+        "J2000_ARCSEC": 5.0,
+        "SIDEREAL_ARCSEC": 20.0,
+    },
+    "medium": {
+        # Current defaults (unchanged)
+        "POSITION_ARCSEC": 5.0,
+        "ASTEROID_ARCSEC": 5.0,
+        "EQUATORIAL_ARCSEC": 5.0,
+        "J2000_ARCSEC": 5.0,
+        "SIDEREAL_ARCSEC": 20.0,
+    },
+    "extended": {
+        # Same rigid tolerances as other tiers.  Failures at extreme
+        # ancient/future dates are expected and will be addressed by
+        # improving LEB generation (finer Chebyshev segments, etc.).
+        "POSITION_ARCSEC": 5.0,
+        "ASTEROID_ARCSEC": 5.0,
+        "EQUATORIAL_ARCSEC": 5.0,
+        "J2000_ARCSEC": 5.0,
+        "SIDEREAL_ARCSEC": 20.0,
+        "ECLIPTIC_ARCSEC": 0.5,
+        "HYPOTHETICAL_ARCSEC": 0.5,
+        "SPEED_LON_DEG_DAY": 0.05,
+        "SPEED_LAT_DEG_DAY": 0.05,
+        "NUTATION_ARCSEC": 0.01,
+        "DELTAT_SEC": 0.1,
+    },
+}
+
+# Legacy global instance (medium tier, for existing tests)
+TOLS = TierTolerances.from_env()
 
 
 # =============================================================================
@@ -125,6 +210,12 @@ def year_to_jd(year: int) -> float:
     return swe_julday(year, 1, 1, 0.0)
 
 
+def leb_file_path(tier: str) -> str:
+    """Return absolute path to a tier's LEB file."""
+    filename = f"ephemeris_{tier}.leb"
+    return os.path.join(_LEB_DATA_DIR, filename)
+
+
 # =============================================================================
 # COMPARE HELPER
 # =============================================================================
@@ -135,33 +226,51 @@ class CompareHelper:
 
     Note: Uses set_calc_mode("skyfield") to prevent LEB auto-discovery from
     interfering with Skyfield reference calculations.
+
+    Args:
+        leb_path: Path to the LEB file for this tier.
+        tier: Precision tier name ("base", "medium", "extended"). When set,
+            skyfield() will call set_precision_tier() so the correct BSP file
+            (de440s/de440/de441) is used for reference calculations.
     """
 
-    def __init__(self, leb_path: str):
+    def __init__(self, leb_path: str, tier: str = "medium"):
         self.leb_path = leb_path
+        self.tier = tier
         self._saved_leb: str | None = None
         self._saved_mode: str | None = None
         self._saved_reader: Any = None
+        self._saved_tier: str | None = None
 
     def setup(self) -> None:
         """Save current global state."""
         self._saved_leb = ephem.state._LEB_FILE
         self._saved_mode = ephem.state._CALC_MODE
         self._saved_reader = ephem.state._LEB_READER
+        self._saved_tier = ephem.state._PRECISION_TIER
 
     def teardown(self) -> None:
         """Restore saved global state."""
         ephem.state._LEB_FILE = self._saved_leb
         ephem.state._LEB_READER = self._saved_reader
+        if self._saved_tier is not None:
+            ephem.set_precision_tier(self._saved_tier)
+        else:
+            ephem.state._PRECISION_TIER = None
         if self._saved_mode is not None:
             ephem.set_calc_mode(self._saved_mode)
         else:
             ephem.set_calc_mode(None)
 
     def skyfield(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
-        """Call fn in forced Skyfield mode (no LEB auto-discovery)."""
+        """Call fn in forced Skyfield mode (no LEB auto-discovery).
+
+        Sets the precision tier so the correct BSP file is loaded (e.g.
+        de441.bsp for extended tier, de440s.bsp for base tier).
+        """
         ephem.state._LEB_FILE = None
         ephem.state._LEB_READER = None
+        ephem.set_precision_tier(self.tier)
         ephem.set_calc_mode("skyfield")
         try:
             return fn(*args, **kwargs)
@@ -186,24 +295,37 @@ class CompareHelper:
 # =============================================================================
 
 
-_LEB_FILE_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "data", "leb", "ephemeris_medium.leb"
-)
-
-
 @pytest.fixture(scope="session")
 def leb_file() -> str:
     """Path to the pre-generated medium tier LEB file."""
-    path = os.path.abspath(_LEB_FILE_PATH)
+    path = os.path.abspath(leb_file_path("medium"))
     if not os.path.exists(path):
         pytest.skip(f"LEB file not found: {path}")
     return path
 
 
+@pytest.fixture(scope="session")
+def leb_file_base() -> str:
+    """Path to the pre-generated base tier LEB file."""
+    path = os.path.abspath(leb_file_path("base"))
+    if not os.path.exists(path):
+        pytest.skip(f"LEB base file not found: {path}")
+    return path
+
+
+@pytest.fixture(scope="session")
+def leb_file_extended() -> str:
+    """Path to the pre-generated extended tier LEB file."""
+    path = os.path.abspath(leb_file_path("extended"))
+    if not os.path.exists(path):
+        pytest.skip(f"LEB extended file not found: {path}")
+    return path
+
+
 @pytest.fixture
 def compare(leb_file: str) -> Generator[CompareHelper, None, None]:
-    """CompareHelper instance with automatic state save/restore."""
-    helper = CompareHelper(leb_file)
+    """CompareHelper instance for medium tier with automatic state save/restore."""
+    helper = CompareHelper(leb_file, tier="medium")
     helper.setup()
     try:
         yield helper
@@ -211,7 +333,29 @@ def compare(leb_file: str) -> Generator[CompareHelper, None, None]:
         helper.teardown()
 
 
-# Date fixtures for different test intensities
+@pytest.fixture
+def compare_base(leb_file_base: str) -> Generator[CompareHelper, None, None]:
+    """CompareHelper instance for base tier."""
+    helper = CompareHelper(leb_file_base, tier="base")
+    helper.setup()
+    try:
+        yield helper
+    finally:
+        helper.teardown()
+
+
+@pytest.fixture
+def compare_extended(leb_file_extended: str) -> Generator[CompareHelper, None, None]:
+    """CompareHelper instance for extended tier."""
+    helper = CompareHelper(leb_file_extended, tier="extended")
+    helper.setup()
+    try:
+        yield helper
+    finally:
+        helper.teardown()
+
+
+# Date fixtures for medium tier (different test intensities)
 _MEDIUM_TIER_START = year_to_jd(1560)
 _MEDIUM_TIER_END = year_to_jd(2640)
 
@@ -287,7 +431,9 @@ HYPOTHETICAL_BODIES = [
     (48, "Transpluto"),
 ]
 
-# Ecliptic body tolerances (per-body)
+ALL_LEB_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL_BODIES
+
+# Ecliptic body tolerances (per-body, in arcsec / deg-day)
 ECLIPTIC_TOLERANCES = {
     10: {"lon": 0.01, "speed": 0.0001},  # Mean Node
     11: {"lon": 0.5, "speed": 0.01},  # True Node
