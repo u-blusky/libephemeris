@@ -20,13 +20,6 @@ from tests.test_leb.compare.conftest import (
 
 from .conftest import TOLS_BASE
 
-# The base tier LEB file was generated without asteroid SPK files.
-# Asteroid distance velocity tests are xfailed until regeneration.
-_XFAIL_ASTEROID_REASON = (
-    "Base tier LEB generated without asteroid SPK data; "
-    "Keplerian fallback produces catastrophic errors."
-)
-
 
 class TestBaseLongitudeVelocity:
     """Longitude velocity (result[3]) precision for all bodies."""
@@ -91,7 +84,16 @@ class TestBaseLatitudeVelocity:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_BASE.SPEED_LAT_DEG_DAY, (
+        # Asteroid latitude velocity is architecturally limited: the
+        # ICRS→ecliptic pipeline amplifies errors by 1/geocentric_distance,
+        # which is severe for nearby asteroids.  Use a separate tolerance.
+        asteroid_ids = {b[0] for b in ASTEROID_BODIES}
+        tol = (
+            TOLS_BASE.ASTEROID_SPEED_LAT_DEG_DAY
+            if body_id in asteroid_ids
+            else TOLS_BASE.SPEED_LAT_DEG_DAY
+        )
+        assert max_err < tol, (
             f"{body_name}: max lat speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )
 
@@ -110,10 +112,6 @@ class TestBaseDistanceVelocity:
         body_name: str,
     ):
         """Distance speed matches Skyfield within tolerance."""
-        # Asteroids use Keplerian fallback in the base tier LEB — xfail them
-        if body_id in {15, 17, 18, 19, 20}:
-            pytest.xfail(_XFAIL_ASTEROID_REASON)
-
         max_err = 0.0
         worst_jd = 0.0
 

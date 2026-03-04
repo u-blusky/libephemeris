@@ -309,21 +309,34 @@ def fit_segment(
 def verify_segment(
     func: Callable[[float], np.ndarray],
     coeffs: np.ndarray,
-    jd_start: float,
-    jd_end: float,
+    seg_start: float,
+    seg_end: float,
     components: int,
     n_test: int = 10,
+    verify_end: float | None = None,
 ) -> float:
     """Verify a Chebyshev fit by evaluating at intermediate points.
 
+    Args:
+        seg_start: Segment start JD (defines the polynomial domain).
+        seg_end: Segment end JD (defines the polynomial domain).
+        verify_end: If given, only sample verification points up to this JD
+            (for the last segment which may extend beyond the data range).
+            Tau is always computed relative to [seg_start, seg_end] since
+            that is the domain the polynomial was fitted on.
+
     Returns the maximum error across all components and test points.
     """
+    if verify_end is None:
+        verify_end = seg_end
+    mid = 0.5 * (seg_start + seg_end)
+    half = 0.5 * (seg_end - seg_start)
     max_error = 0.0
     for i in range(n_test):
         # Uniform test points (not Chebyshev nodes)
         frac = (i + 0.5) / n_test
-        jd = jd_start + frac * (jd_end - jd_start)
-        tau = 2.0 * (jd - 0.5 * (jd_start + jd_end)) / (jd_end - jd_start)
+        jd = seg_start + frac * (verify_end - seg_start)
+        tau = (jd - mid) / half
 
         reference = func(jd)
         for c in range(components):
@@ -1694,9 +1707,12 @@ def _generate_segments(
         seg_end = seg_start + interval_days
 
         coeffs = fit_segment(func, seg_start, seg_end, degree, components)
-        # Verify only within the actual requested range
-        verify_end = min(seg_end, jd_end)
-        error = verify_segment(func, coeffs, seg_start, verify_end, components)
+        # Verify only within the actual requested range, but tau is always
+        # relative to the full segment [seg_start, seg_end].
+        v_end = min(seg_end, jd_end)
+        error = verify_segment(
+            func, coeffs, seg_start, seg_end, components, verify_end=v_end
+        )
         if error > max_error:
             max_error = error
 
@@ -1748,9 +1764,9 @@ def _generate_segments_unwrap(
             coeffs[c] = chebfit(nodes, values[:, c], degree)
 
         # Verify with re-wrapping (only within actual requested range)
-        verify_end = min(seg_end, jd_end)
+        v_end = min(seg_end, jd_end)
         error = _verify_segment_unwrapped(
-            func, coeffs, seg_start, verify_end, components
+            func, coeffs, seg_start, seg_end, components, verify_end=v_end
         )
         if error > max_error:
             max_error = error
@@ -1765,17 +1781,29 @@ def _generate_segments_unwrap(
 def _verify_segment_unwrapped(
     func: Callable[[float], np.ndarray],
     coeffs: np.ndarray,
-    jd_start: float,
-    jd_end: float,
+    seg_start: float,
+    seg_end: float,
     components: int,
     n_test: int = 10,
+    verify_end: float | None = None,
 ) -> float:
-    """Verify a Chebyshev fit for ecliptic bodies (with longitude re-wrapping)."""
+    """Verify a Chebyshev fit for ecliptic bodies (with longitude re-wrapping).
+
+    Args:
+        seg_start: Segment start JD (defines the polynomial domain).
+        seg_end: Segment end JD (defines the polynomial domain).
+        verify_end: If given, only sample verification points up to this JD.
+            Tau is always computed relative to [seg_start, seg_end].
+    """
+    if verify_end is None:
+        verify_end = seg_end
+    mid = 0.5 * (seg_start + seg_end)
+    half = 0.5 * (seg_end - seg_start)
     max_error = 0.0
     for i in range(n_test):
         frac = (i + 0.5) / n_test
-        jd = jd_start + frac * (jd_end - jd_start)
-        tau = 2.0 * (jd - 0.5 * (jd_start + jd_end)) / (jd_end - jd_start)
+        jd = seg_start + frac * (verify_end - seg_start)
+        tau = (jd - mid) / half
 
         reference = func(jd)
         for c in range(components):
@@ -2402,6 +2430,26 @@ def assemble_leb(
         print()
 
         # Print error summary
+        # Approximate minimum geocentric distances (AU) for angular error
+        # conversion. Using min distance gives the worst-case angular error.
+        _MIN_GEO_DIST: dict[int, float] = {
+            0: 0.98,  # Sun
+            1: 0.0024,  # Moon
+            2: 0.55,  # Mercury
+            3: 0.26,  # Venus
+            4: 0.37,  # Mars
+            5: 3.9,  # Jupiter
+            6: 8.0,  # Saturn
+            7: 17.3,  # Uranus
+            8: 28.8,  # Neptune
+            9: 28.7,  # Pluto
+            14: 0.0,  # Earth (geocentric = 0)
+            15: 7.5,  # Chiron
+            17: 1.6,  # Ceres
+            18: 1.2,  # Pallas
+            19: 1.0,  # Juno
+            20: 1.1,  # Vesta
+        }
         print("  Max fitting errors:")
         for bid in sorted(bodies):
             name = BODY_NAMES.get(bid, f"Body {bid}")
@@ -2417,8 +2465,12 @@ def assemble_leb(
                     yr_e = 2000.0 + (br_end - 2451545.0) / 365.25
                     range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
             if coord_type == COORD_ICRS_BARY:
-                # Convert AU error to arcseconds (rough: 1 AU at 1 AU distance = 206265")
-                arcsec = error * 206265.0
+                # Convert AU error to arcseconds using min geocentric distance
+                geo_dist = _MIN_GEO_DIST.get(bid, 1.0)
+                if geo_dist > 0.01:
+                    arcsec = (error / geo_dist) * 206265.0
+                else:
+                    arcsec = error * 206265.0  # fallback for Earth
                 print(f'    {name:20s}: {error:.2e} AU ({arcsec:.4f}"){range_note}')
             else:
                 # Already in degrees, convert to arcseconds

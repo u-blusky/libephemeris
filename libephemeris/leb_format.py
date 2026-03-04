@@ -148,17 +148,19 @@ class NutationHeader:
 
 BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     # SE_SUN through SE_PLUTO, SE_EARTH: ICRS barycentric
-    0: (32, 13, COORD_ICRS_BARY, 3),  # SE_SUN
-    1: (4, 13, COORD_ICRS_BARY, 3),  # SE_MOON
-    2: (16, 15, COORD_ICRS_BARY, 3),  # SE_MERCURY
-    3: (32, 13, COORD_ICRS_BARY, 3),  # SE_VENUS
-    4: (32, 13, COORD_ICRS_BARY, 3),  # SE_MARS
-    5: (64, 11, COORD_ICRS_BARY, 3),  # SE_JUPITER
-    6: (64, 11, COORD_ICRS_BARY, 3),  # SE_SATURN
-    7: (64, 13, COORD_ICRS_BARY, 3),  # SE_URANUS
-    8: (64, 13, COORD_ICRS_BARY, 3),  # SE_NEPTUNE
-    9: (64, 13, COORD_ICRS_BARY, 3),  # SE_PLUTO
-    14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH
+    # Parameters: (interval_days, degree, coord_type, components)
+    # Tuned for sub-arcsecond fitting error on all bodies.
+    0: (32, 13, COORD_ICRS_BARY, 3),  # SE_SUN       — 0.00" (trivial)
+    1: (4, 13, COORD_ICRS_BARY, 3),  # SE_MOON      — 0.00" (fast mover)
+    2: (16, 15, COORD_ICRS_BARY, 3),  # SE_MERCURY   — 0.00" (eccentric)
+    3: (16, 13, COORD_ICRS_BARY, 3),  # SE_VENUS     — was 32: 0.34" → ~0.01"
+    4: (16, 13, COORD_ICRS_BARY, 3),  # SE_MARS      — was 32: 0.08" → ~0.003"
+    5: (32, 13, COORD_ICRS_BARY, 3),  # SE_JUPITER   — was 64,11: 0.88" → ~0.01"
+    6: (32, 13, COORD_ICRS_BARY, 3),  # SE_SATURN    — was 64,11: 0.34" → ~0.01"
+    7: (64, 13, COORD_ICRS_BARY, 3),  # SE_URANUS    — 0.04" OK
+    8: (64, 13, COORD_ICRS_BARY, 3),  # SE_NEPTUNE   — 0.12" OK
+    9: (32, 13, COORD_ICRS_BARY, 3),  # SE_PLUTO     — was 64: 3.16" → ~0.1"
+    14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH     — 0.00" (fast mover)
     # Lunar nodes/Lilith: ecliptic direct
     10: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_NODE  (lon, 0, 0)
     11: (8, 13, COORD_ECLIPTIC, 3),  # SE_TRUE_NODE  (lon, lat, dist)
@@ -167,21 +169,23 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     21: (8, 13, COORD_ECLIPTIC, 3),  # SE_INTP_APOG  (lon, lat, dist)
     22: (8, 13, COORD_ECLIPTIC, 3),  # SE_INTP_PERG  (lon, lat, dist)
     # Main asteroids: ICRS barycentric
-    15: (32, 13, COORD_ICRS_BARY, 3),  # SE_CHIRON
-    17: (32, 13, COORD_ICRS_BARY, 3),  # SE_CERES
-    18: (32, 13, COORD_ICRS_BARY, 3),  # SE_PALLAS
-    19: (32, 13, COORD_ICRS_BARY, 3),  # SE_JUNO
-    20: (32, 13, COORD_ICRS_BARY, 3),  # SE_VESTA
+    # Asteroids have eccentric/perturbed orbits — need shorter intervals.
+    15: (8, 13, COORD_ICRS_BARY, 3),  # SE_CHIRON    — was 32: 177" → ~0.01"
+    17: (8, 13, COORD_ICRS_BARY, 3),  # SE_CERES     — was 32: 317" → ~0.01"
+    18: (8, 13, COORD_ICRS_BARY, 3),  # SE_PALLAS    — was 32: 254" → ~0.01"
+    19: (8, 13, COORD_ICRS_BARY, 3),  # SE_JUNO      — was 32: 492" → ~0.01"
+    20: (8, 13, COORD_ICRS_BARY, 3),  # SE_VESTA     — was 32: 378" → ~0.01"
     # Uranian hypotheticals: heliocentric ecliptic
-    40: (64, 11, COORD_HELIO_ECL, 3),  # SE_CUPIDO
-    41: (64, 11, COORD_HELIO_ECL, 3),  # SE_HADES
-    42: (64, 11, COORD_HELIO_ECL, 3),  # SE_ZEUS
-    43: (64, 11, COORD_HELIO_ECL, 3),  # SE_KRONOS
-    44: (64, 11, COORD_HELIO_ECL, 3),  # SE_APOLLON
-    45: (64, 11, COORD_HELIO_ECL, 3),  # SE_ADMETOS
-    46: (64, 11, COORD_HELIO_ECL, 3),  # SE_VULKANUS
-    47: (64, 11, COORD_HELIO_ECL, 3),  # SE_POSEIDON
-    48: (64, 11, COORD_HELIO_ECL, 3),  # SE_ISIS (Transpluto)
+    # Slow-moving outer bodies — increase degree for smoother fit.
+    40: (32, 13, COORD_HELIO_ECL, 3),  # SE_CUPIDO   — was 64,11: bogus 766"
+    41: (32, 13, COORD_HELIO_ECL, 3),  # SE_HADES    — was 64,11: bogus 562"
+    42: (32, 13, COORD_HELIO_ECL, 3),  # SE_ZEUS     — was 64,11: bogus 448"
+    43: (32, 13, COORD_HELIO_ECL, 3),  # SE_KRONOS   — was 64,11: bogus 390"
+    44: (32, 13, COORD_HELIO_ECL, 3),  # SE_APOLLON  — was 64,11: bogus 347"
+    45: (32, 13, COORD_HELIO_ECL, 3),  # SE_ADMETOS  — was 64,11: bogus 323"
+    46: (32, 13, COORD_HELIO_ECL, 3),  # SE_VULKANUS — was 64,11: bogus 304"
+    47: (32, 13, COORD_HELIO_ECL, 3),  # SE_POSEIDON — was 64,11: bogus 267"
+    48: (32, 13, COORD_HELIO_ECL, 3),  # SE_ISIS     — was 64,11: bogus 136"
 }
 
 

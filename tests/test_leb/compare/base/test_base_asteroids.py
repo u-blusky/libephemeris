@@ -2,7 +2,6 @@
 LEB vs Skyfield Comparison: Main-Belt Asteroids (Base Tier).
 
 Validates the 5 asteroids in LEB across the base tier range (1860-2140).
-Asteroid SPK coverage may limit effective date range.
 """
 
 from __future__ import annotations
@@ -20,24 +19,12 @@ from tests.test_leb.compare.conftest import (
 
 from .conftest import TOLS_BASE
 
-# The base tier LEB file was generated without asteroid SPK files.
-# All asteroid data uses Keplerian orbital element fallback, producing
-# catastrophically wrong positions (7,000-14,000" errors). These tests
-# are xfailed until the base tier LEB is regenerated with proper SPK
-# data (Phase 4 of the precision improvement plan).
-_XFAIL_ASTEROID_REASON = (
-    "Base tier LEB generated without asteroid SPK data; "
-    "Keplerian fallback produces catastrophic errors. "
-    "Regenerate with `poe leb:generate:base:groups` after downloading SPK files."
-)
-
 
 class TestBaseAsteroidPosition:
     """Asteroid position precision."""
 
     @pytest.mark.leb_compare_base
     @pytest.mark.slow
-    @pytest.mark.xfail(reason=_XFAIL_ASTEROID_REASON, strict=False)
     @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
     def test_position(
         self,
@@ -81,7 +68,6 @@ class TestBaseAsteroidSpeed:
 
     @pytest.mark.leb_compare_base
     @pytest.mark.slow
-    @pytest.mark.xfail(reason=_XFAIL_ASTEROID_REASON, strict=False)
     @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
     def test_speed(
         self,
@@ -116,7 +102,6 @@ class TestBaseAsteroidDistance:
 
     @pytest.mark.leb_compare_base
     @pytest.mark.slow
-    @pytest.mark.xfail(reason=_XFAIL_ASTEROID_REASON, strict=False)
     @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
     def test_distance(
         self,

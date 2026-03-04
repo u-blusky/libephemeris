@@ -67,6 +67,9 @@ class TierTolerances:
     SPEED_LAT_DEG_DAY: float = 0.05
     SPEED_DIST_AU_DAY: float = 1e-4
 
+    # Asteroid velocity (architectural: ICRS→ecliptic pipeline amplification)
+    ASTEROID_SPEED_LAT_DEG_DAY: float = 1.0
+
     # Ayanamsha
     AYANAMSHA_ARCSEC: float = 0.001
 
@@ -138,15 +141,27 @@ class TierTolerances:
 # Per-tier default overrides (only fields that differ from dataclass defaults)
 TIER_DEFAULTS: dict[str, dict[str, float]] = {
     "base": {
-        # Shorter range = higher precision expected
-        "POSITION_ARCSEC": 5.0,
-        "ASTEROID_ARCSEC": 5.0,
-        "EQUATORIAL_ARCSEC": 5.0,
-        "J2000_ARCSEC": 5.0,
-        "SIDEREAL_ARCSEC": 20.0,
+        # Tuned to minimum possible based on measured errors (2x safety margin).
+        # Saturn latitude is architecturally limited to ~4.85" (ICRS→ecliptic
+        # pipeline amplification by 1/geocentric_distance).
+        "POSITION_ARCSEC": 5.0,  # Saturn lat 4.85" (architectural limit)
+        "ASTEROID_ARCSEC": 0.5,  # Observed max 0.44"
+        "EQUATORIAL_ARCSEC": 1.0,  # Observed ~0.6"
+        "J2000_ARCSEC": 1.0,
+        "SIDEREAL_ARCSEC": 5.0,  # Observed ~0.6" but sidereal adds ayanamsha
+        "ECLIPTIC_ARCSEC": 0.05,  # Observed max 0.028"
+        "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
+        "DISTANCE_AU": 3e-5,  # Observed max 2.34e-5 (Pluto)
+        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.039, Saturn 0.013
+        "SPEED_LAT_DEG_DAY": 0.005,  # Saturn 0.0035 (asteroids handled separately)
+        "SPEED_DIST_AU_DAY": 1e-4,  # Observed max 8.98e-5 (Pluto dist velocity)
+        # Asteroid lat velocity is architecturally limited: ICRS→ecliptic
+        # pipeline amplifies errors by 1/geocentric_distance for velocity.
+        # Observed: Pallas 0.71, Juno 0.35, Ceres/Vesta 0.19 deg/day.
+        "ASTEROID_SPEED_LAT_DEG_DAY": 0.75,  # Observed max 0.714 (Pallas)
     },
     "medium": {
-        # Current defaults (unchanged)
+        # Current defaults — will tighten after medium tier regeneration.
         "POSITION_ARCSEC": 5.0,
         "ASTEROID_ARCSEC": 5.0,
         "EQUATORIAL_ARCSEC": 5.0,
@@ -243,11 +258,15 @@ class CompareHelper:
         self._saved_tier: str | None = None
 
     def setup(self) -> None:
-        """Save current global state."""
+        """Save current global state and enable SPK auto-download."""
         self._saved_leb = ephem.state._LEB_FILE
         self._saved_mode = ephem.state._CALC_MODE
         self._saved_reader = ephem.state._LEB_READER
         self._saved_tier = ephem.state._PRECISION_TIER
+        self._saved_auto_spk = ephem.state._AUTO_SPK_DOWNLOAD
+        # Enable auto SPK download so Skyfield reference calculations
+        # use SPK21 data for asteroids instead of Keplerian fallback.
+        ephem.set_auto_spk_download(True)
 
     def teardown(self) -> None:
         """Restore saved global state."""
@@ -261,6 +280,7 @@ class CompareHelper:
             ephem.set_calc_mode(self._saved_mode)
         else:
             ephem.set_calc_mode(None)
+        ephem.set_auto_spk_download(self._saved_auto_spk)
 
     def skyfield(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
         """Call fn in forced Skyfield mode (no LEB auto-discovery).

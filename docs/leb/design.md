@@ -225,7 +225,7 @@ runtime transforms:
 ### 3.9 Nutation Section
 
 Same Chebyshev format as bodies, but with 2 components (dpsi, deps) in radians.
-Parameters: interval=32 days, degree=16.
+Parameters: interval=16 days, degree=16.
 
 ### 3.10 Delta-T Section
 
@@ -255,24 +255,25 @@ Stars don't need Chebyshev precomputation. Proper motion is linear:
 
 | Body       | Interval (days) | Degree | Bytes/segment | Segments (200yr) | Total    |
 |------------|-----------------|--------|---------------|-------------------|----------|
-| Moon       | 8               | 13     | 336           | 9,125             | 3.1 MB   |
+| Moon       | 4               | 13     | 336           | 18,250            | 6.1 MB   |
 | Mercury    | 16              | 15     | 384           | 4,563             | 1.8 MB   |
-| Venus      | 32              | 13     | 336           | 2,282             | 767 KB   |
+| Venus      | 16              | 13     | 336           | 4,563             | 1.5 MB   |
 | Sun (EMB)  | 32              | 13     | 336           | 2,282             | 767 KB   |
-| Earth      | 8               | 13     | 336           | 9,125             | 3.1 MB   |
-| Mars       | 32              | 13     | 336           | 2,282             | 767 KB   |
-| Jupiter    | 64              | 11     | 288           | 1,141             | 329 KB   |
-| Saturn     | 64              | 11     | 288           | 1,141             | 329 KB   |
-| Uranus     | 128             | 9      | 240           | 571               | 137 KB   |
-| Neptune    | 128             | 9      | 240           | 571               | 137 KB   |
-| Pluto      | 128             | 9      | 240           | 571               | 137 KB   |
-| Chiron     | 32              | 13     | 336           | 2,282             | 767 KB   |
-| Ceres-Vesta (4) | 32         | 13     | 336           | 4 x 2,282        | 3.1 MB   |
-| Nutation   | 32              | 16     | 272           | 2,282             | 621 KB   |
-| **Total (200yr)** |          |        |               |                   | **~16 MB** |
+| Earth      | 4               | 13     | 336           | 18,250            | 6.1 MB   |
+| Mars       | 16              | 13     | 336           | 4,563             | 1.5 MB   |
+| Jupiter    | 32              | 13     | 336           | 2,282             | 767 KB   |
+| Saturn     | 32              | 13     | 336           | 2,282             | 767 KB   |
+| Uranus     | 64              | 13     | 336           | 1,141             | 384 KB   |
+| Neptune    | 64              | 13     | 336           | 1,141             | 384 KB   |
+| Pluto      | 32              | 13     | 336           | 2,282             | 767 KB   |
+| Chiron     | 8               | 13     | 336           | 9,125             | 3.1 MB   |
+| Ceres-Vesta (4) | 8          | 13     | 336           | 4 x 9,125        | 12.3 MB  |
+| Hypotheticals (9) | 32       | 13     | 336           | 9 x 2,282        | 6.9 MB   |
+| Nutation   | 16              | 16     | 272           | 4,563             | 1.2 MB   |
+| **Total (200yr)** |          |        |               |                   | **~44 MB** |
 
-For the full DE440 range (1550-2650, 1100 years): ~88 MB.
-For the full DE441 range (-13200 to +17191, 30,000 years): ~2.4 GB.
+For the full DE440 range (1550-2650, 1100 years): ~175 MB.
+For the full DE441 range (-13200 to +17191, 30,000 years): ~4.8 GB.
 
 ### 3.13 Longitude Wrap-Around
 
@@ -381,16 +382,16 @@ class StarEntry:
 BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     # SE_SUN through SE_PLUTO, SE_EARTH: ICRS barycentric
     0:  (32, 13, COORD_ICRS_BARY, 3),   # SE_SUN
-    1:  (8,  13, COORD_ICRS_BARY, 3),   # SE_MOON
+    1:  (4,  13, COORD_ICRS_BARY, 3),   # SE_MOON
     2:  (16, 15, COORD_ICRS_BARY, 3),   # SE_MERCURY
-    3:  (32, 13, COORD_ICRS_BARY, 3),   # SE_VENUS
-    4:  (32, 13, COORD_ICRS_BARY, 3),   # SE_MARS
-    5:  (64, 11, COORD_ICRS_BARY, 3),   # SE_JUPITER
-    6:  (64, 11, COORD_ICRS_BARY, 3),   # SE_SATURN
-    7:  (128, 9, COORD_ICRS_BARY, 3),   # SE_URANUS
-    8:  (128, 9, COORD_ICRS_BARY, 3),   # SE_NEPTUNE
-    9:  (128, 9, COORD_ICRS_BARY, 3),   # SE_PLUTO
-    14: (8,  13, COORD_ICRS_BARY, 3),   # SE_EARTH
+    3:  (16, 13, COORD_ICRS_BARY, 3),   # SE_VENUS
+    4:  (16, 13, COORD_ICRS_BARY, 3),   # SE_MARS
+    5:  (32, 13, COORD_ICRS_BARY, 3),   # SE_JUPITER
+    6:  (32, 13, COORD_ICRS_BARY, 3),   # SE_SATURN
+    7:  (64, 13, COORD_ICRS_BARY, 3),   # SE_URANUS
+    8:  (64, 13, COORD_ICRS_BARY, 3),   # SE_NEPTUNE
+    9:  (32, 13, COORD_ICRS_BARY, 3),   # SE_PLUTO
+    14: (4,  13, COORD_ICRS_BARY, 3),   # SE_EARTH
 
     # Lunar nodes/Lilith: ecliptic direct
     10: (8,  13, COORD_ECLIPTIC, 3),    # SE_MEAN_NODE  (lon, 0, 0)
@@ -401,22 +402,22 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     22: (8,  13, COORD_ECLIPTIC, 3),    # SE_INTP_PERG  (lon, lat, dist)
 
     # Main asteroids: ICRS barycentric
-    15: (32, 13, COORD_ICRS_BARY, 3),   # SE_CHIRON
-    17: (32, 13, COORD_ICRS_BARY, 3),   # SE_CERES
-    18: (32, 13, COORD_ICRS_BARY, 3),   # SE_PALLAS
-    19: (32, 13, COORD_ICRS_BARY, 3),   # SE_JUNO
-    20: (32, 13, COORD_ICRS_BARY, 3),   # SE_VESTA
+    15: (8,  13, COORD_ICRS_BARY, 3),   # SE_CHIRON
+    17: (8,  13, COORD_ICRS_BARY, 3),   # SE_CERES
+    18: (8,  13, COORD_ICRS_BARY, 3),   # SE_PALLAS
+    19: (8,  13, COORD_ICRS_BARY, 3),   # SE_JUNO
+    20: (8,  13, COORD_ICRS_BARY, 3),   # SE_VESTA
 
     # Uranian hypotheticals: heliocentric ecliptic
-    40: (64, 11, COORD_HELIO_ECL, 3),   # SE_CUPIDO
-    41: (64, 11, COORD_HELIO_ECL, 3),   # SE_HADES
-    42: (64, 11, COORD_HELIO_ECL, 3),   # SE_ZEUS
-    43: (64, 11, COORD_HELIO_ECL, 3),   # SE_KRONOS
-    44: (64, 11, COORD_HELIO_ECL, 3),   # SE_APOLLON
-    45: (64, 11, COORD_HELIO_ECL, 3),   # SE_ADMETOS
-    46: (64, 11, COORD_HELIO_ECL, 3),   # SE_VULKANUS
-    47: (64, 11, COORD_HELIO_ECL, 3),   # SE_POSEIDON
-    48: (64, 11, COORD_HELIO_ECL, 3),   # SE_ISIS (Transpluto)
+    40: (32, 13, COORD_HELIO_ECL, 3),   # SE_CUPIDO
+    41: (32, 13, COORD_HELIO_ECL, 3),   # SE_HADES
+    42: (32, 13, COORD_HELIO_ECL, 3),   # SE_ZEUS
+    43: (32, 13, COORD_HELIO_ECL, 3),   # SE_KRONOS
+    44: (32, 13, COORD_HELIO_ECL, 3),   # SE_APOLLON
+    45: (32, 13, COORD_HELIO_ECL, 3),   # SE_ADMETOS
+    46: (32, 13, COORD_HELIO_ECL, 3),   # SE_VULKANUS
+    47: (32, 13, COORD_HELIO_ECL, 3),   # SE_POSEIDON
+    48: (32, 13, COORD_HELIO_ECL, 3),   # SE_ISIS (Transpluto)
 }
 
 # --- Serialization helpers ---
@@ -906,36 +907,46 @@ This handles Sun, Moon, Mercury-Pluto, Earth, Chiron, Ceres-Vesta.
        lon_deg = (lon_deg - aya) % 360.0
 
 9. VELOCITY
-   # For Chebyshev-based positions, velocity comes from the analytical derivative.
-   # But the derivative is in ICRS barycentric -- we need it in the output frame.
-   #
-   # Two options:
-   # a) Transform velocity vector through the same rotation matrices (rigorous)
-   # b) Central difference on the FINAL coordinates using fast .leb eval (~50us total)
-   #
-   # Option (b) is simpler and still ~14x faster than Skyfield's central difference
-   # because each eval is ~25us instead of ~350us.
+    # The analytical Chebyshev derivative from eval_body() is transformed
+    # through the same rotation matrices as position (option (a) — rigorous).
+    #
+    # Pipeline steps for velocity:
+    # 1. geo_vel = target_vel - observer_vel (geocentric velocity)
+    # 2. Light-time: use velocity at retarded time (jd_tt - lt)
+    # 3. Apply precession-nutation matrix to velocity vector
+    # 4. Rotate equatorial → ecliptic using true obliquity
+    # 5. Convert Cartesian velocity to spherical via
+    #    _cartesian_velocity_to_spherical(x,y,z, vx,vy,vz)
+    #
+    # This is both faster (1 pipeline run instead of 3) and more precise
+    # than the previous central-difference approach.
 
-   if SEFLG_SPEED:
-       dt = 1.0 / 86400.0  # 1 second
-       result_prev = fast_calc_ut(reader, tjd_ut - dt, ipl, iflag & ~SEFLG_SPEED)
-       result_next = fast_calc_ut(reader, tjd_ut + dt, ipl, iflag & ~SEFLG_SPEED)
-       dlon = _central_diff(result_prev[0], result_next[0], dt)  # with wrap handling
-       dlat = (result_next[1] - result_prev[1]) / (2 * dt)
-       ddist = (result_next[2] - result_prev[2]) / (2 * dt)
-   else:
-       dlon, dlat, ddist = 0.0, 0.0, 0.0
+    if SEFLG_SPEED:
+        # want_velocity=True causes _pipeline_icrs() to return 6 values
+        lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
+            reader, jd_tt, ipl, iflag, want_velocity=True
+        )
+    else:
+        lon, lat, dist = _pipeline_icrs(reader, jd_tt, ipl, iflag)
+        dlon, dlat, ddist = 0.0, 0.0, 0.0
 
 10. RETURN
-    return (lon_deg, lat_deg, dist_au, dlon, dlat, ddist), iflag
+     return (lon_deg, lat_deg, dist_au, dlon, dlat, ddist), iflag
 ```
 
-**Note on velocity (Step 9):** The central-difference approach for velocity in
-the output frame is chosen for simplicity. Even though we could transform the
-Chebyshev derivative through rotation matrices, the central difference at
-~25us per eval (total ~50us for speed) is already 14x faster than Skyfield's
-~1050us. The analytical derivative optimization can be added later as a
-refinement if needed.
+**Note on velocity (Step 9):** The analytical approach (option (a) from the
+original design) was implemented. The Chebyshev derivative velocity vector
+is transformed through the same linear rotation matrices already computed
+for position. This eliminates the 2 extra pipeline evaluations that the
+central-difference approach required, and avoids amplifying Chebyshev
+fitting errors into velocity errors.
+
+**Architectural limitation:** For ICRS bodies, the Cartesian-to-spherical
+velocity conversion involves division by `r_xy` (distance in the ecliptic
+plane). For nearby asteroids (Ceres ~2.7 AU, Pallas ~2.8 AU), the
+`1/geocentric_distance` amplification factor produces latitude velocity
+errors of 0.19-0.71 deg/day. This is inherent to the coordinate
+transformation and cannot be fixed without changing the storage format.
 
 ### 7.4 Pipeline B: Ecliptic Direct Bodies
 

@@ -22,14 +22,14 @@ from libephemeris.constants import (
 
 from tests.test_leb.compare.conftest import (
     ICRS_PLANETS,
+    ASTEROID_BODIES,
     CompareHelper,
 )
 
 from .conftest import TOLS_BASE
 
-# Exclude asteroids from distance tests — they are covered in test_base_asteroids.py
-# and the base tier LEB has Keplerian-fallback data for all asteroids.
-DISTANCE_BODIES = ICRS_PLANETS
+# Include asteroids — base tier LEB now has proper SPK data.
+DISTANCE_BODIES = ICRS_PLANETS + [(15, "Chiron"), (17, "Ceres")]
 HELIO_BODIES = [
     (SE_MARS, "Mars"),
     (SE_JUPITER, "Jupiter"),

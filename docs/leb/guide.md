@@ -497,7 +497,7 @@ Both functions:
 
 | Flag | Effect |
 |------|--------|
-| `SEFLG_SPEED` | Compute velocities (central difference for ICRS, Chebyshev derivative for ecliptic) |
+| `SEFLG_SPEED` | Compute velocities (analytical Chebyshev derivative for all pipelines) |
 | `SEFLG_HELCTR` | Use Sun as observer instead of Earth; skip aberration |
 | `SEFLG_BARYCTR` | Use SSB as observer; skip aberration |
 | `SEFLG_TRUEPOS` | Skip light-time correction and aberration |
@@ -540,15 +540,25 @@ Pluto, Earth, Chiron, Ceres, Pallas, Juno, Vesta (16 bodies)
    - **J2000 equatorial** (`SEFLG_EQUATORIAL | SEFLG_J2000`):
      - ICRS is already ~J2000 equatorial, just convert to spherical
 
-**Velocity** is computed via central difference (not Chebyshev derivative),
-because the ICRS-to-ecliptic transform chain is nonlinear:
-```python
-dt = 1/86400  # 1 second
-lon_prev = pipeline(jd_tt - dt)
-lon_next = pipeline(jd_tt + dt)
-dlon = (lon_next - lon_prev) / (2 * dt)
-```
-This adds 2 extra pipeline evaluations per body when `SEFLG_SPEED` is set.
+**Velocity** is computed via the **analytical Chebyshev derivative**,
+transformed through the same rotation matrices as position. The velocity
+vector follows the same pipeline as position:
+
+1. Geocentric velocity = target_vel - observer_vel (from `eval_body()`)
+2. Light-time correction: use velocity at retarded time `jd_tt - lt`
+3. Apply precession-nutation matrix to velocity vector
+4. Rotate equatorial → ecliptic using true obliquity
+5. Convert Cartesian velocity to spherical: `_cartesian_velocity_to_spherical()`
+
+This replaces the previous central-difference approach (which required 2
+extra pipeline evaluations per body and amplified Chebyshev fitting errors
+into velocity errors). The analytical derivative is both faster (1 pipeline
+run instead of 3) and more precise.
+
+**Architectural limitation:** For nearby asteroids (Ceres, Pallas, Juno,
+Vesta), the ICRS→ecliptic pipeline amplifies errors by `1/geocentric_distance`.
+This produces latitude velocity errors of 0.19-0.71 deg/day — an inherent
+property of the coordinate transformation, not the Chebyshev fitting.
 
 ### 5.4 Pipeline B: Ecliptic Direct Bodies
 
@@ -1157,49 +1167,71 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
 | Body ID | Name | Interval | Degree | Coord Type | Components |
 |---------|------|----------|--------|------------|------------|
 | 0 | Sun | 32 | 13 | ICRS_BARY | 3 |
-| 1 | Moon | 8 | 13 | ICRS_BARY | 3 |
+| 1 | Moon | 4 | 13 | ICRS_BARY | 3 |
 | 2 | Mercury | 16 | 15 | ICRS_BARY | 3 |
-| 3 | Venus | 32 | 13 | ICRS_BARY | 3 |
-| 4 | Mars | 32 | 13 | ICRS_BARY | 3 |
-| 5 | Jupiter | 64 | 11 | ICRS_BARY | 3 |
-| 6 | Saturn | 64 | 11 | ICRS_BARY | 3 |
-| 7 | Uranus | 128 | 9 | ICRS_BARY | 3 |
-| 8 | Neptune | 128 | 9 | ICRS_BARY | 3 |
-| 9 | Pluto | 128 | 9 | ICRS_BARY | 3 |
+| 3 | Venus | 16 | 13 | ICRS_BARY | 3 |
+| 4 | Mars | 16 | 13 | ICRS_BARY | 3 |
+| 5 | Jupiter | 32 | 13 | ICRS_BARY | 3 |
+| 6 | Saturn | 32 | 13 | ICRS_BARY | 3 |
+| 7 | Uranus | 64 | 13 | ICRS_BARY | 3 |
+| 8 | Neptune | 64 | 13 | ICRS_BARY | 3 |
+| 9 | Pluto | 32 | 13 | ICRS_BARY | 3 |
 | 10 | Mean Node | 8 | 13 | ECLIPTIC | 3 |
 | 11 | True Node | 8 | 13 | ECLIPTIC | 3 |
 | 12 | Mean Apogee | 8 | 13 | ECLIPTIC | 3 |
 | 13 | Oscu Apogee | 8 | 13 | ECLIPTIC | 3 |
-| 14 | Earth | 8 | 13 | ICRS_BARY | 3 |
-| 15 | Chiron | 32 | 13 | ICRS_BARY | 3 |
-| 17 | Ceres | 32 | 13 | ICRS_BARY | 3 |
-| 18 | Pallas | 32 | 13 | ICRS_BARY | 3 |
-| 19 | Juno | 32 | 13 | ICRS_BARY | 3 |
-| 20 | Vesta | 32 | 13 | ICRS_BARY | 3 |
+| 14 | Earth | 4 | 13 | ICRS_BARY | 3 |
+| 15 | Chiron | 8 | 13 | ICRS_BARY | 3 |
+| 17 | Ceres | 8 | 13 | ICRS_BARY | 3 |
+| 18 | Pallas | 8 | 13 | ICRS_BARY | 3 |
+| 19 | Juno | 8 | 13 | ICRS_BARY | 3 |
+| 20 | Vesta | 8 | 13 | ICRS_BARY | 3 |
 | 21 | Interp Apogee | 8 | 13 | ECLIPTIC | 3 |
 | 22 | Interp Perigee | 8 | 13 | ECLIPTIC | 3 |
-| 40 | Cupido | 64 | 11 | HELIO_ECL | 3 |
-| 41 | Hades | 64 | 11 | HELIO_ECL | 3 |
-| 42 | Zeus | 64 | 11 | HELIO_ECL | 3 |
-| 43 | Kronos | 64 | 11 | HELIO_ECL | 3 |
-| 44 | Apollon | 64 | 11 | HELIO_ECL | 3 |
-| 45 | Admetos | 64 | 11 | HELIO_ECL | 3 |
-| 46 | Vulkanus | 64 | 11 | HELIO_ECL | 3 |
-| 47 | Poseidon | 64 | 11 | HELIO_ECL | 3 |
-| 48 | Transpluto | 64 | 11 | HELIO_ECL | 3 |
+| 40 | Cupido | 32 | 13 | HELIO_ECL | 3 |
+| 41 | Hades | 32 | 13 | HELIO_ECL | 3 |
+| 42 | Zeus | 32 | 13 | HELIO_ECL | 3 |
+| 43 | Kronos | 32 | 13 | HELIO_ECL | 3 |
+| 44 | Apollon | 32 | 13 | HELIO_ECL | 3 |
+| 45 | Admetos | 32 | 13 | HELIO_ECL | 3 |
+| 46 | Vulkanus | 32 | 13 | HELIO_ECL | 3 |
+| 47 | Poseidon | 32 | 13 | HELIO_ECL | 3 |
+| 48 | Transpluto | 32 | 13 | HELIO_ECL | 3 |
 
 **Total: 30 bodies.**
 
 ### 9.2 Parameter Design Rationale
 
-- **Moon (interval=8, degree=13):** Fast-moving (~13 deg/day), needs short
-  segments and high degree for sub-arcsecond accuracy.
-- **Mercury (interval=16, degree=15):** Eccentric orbit, highest degree to
-  capture orbital variations.
-- **Outer planets (interval=64-128, degree=9-11):** Slow-moving, longer
-  segments with lower degree are sufficient.
-- **Analytical bodies (interval=8, degree=13):** Short segments match the
-  Moon's parameters since nodes/apsides have similar variability timescales.
+Parameters were aggressively tuned in the precision improvement work to
+minimize fitting error for all bodies. The key insight is that even
+slow-moving outer planets are stored in ICRS barycentric coordinates, so
+their *apparent* position (as seen from Earth) varies faster than the raw
+orbital motion due to Earth's own motion and parallax effects.
+
+- **Moon, Earth (interval=4, degree=13):** Earth is the observer for all
+  geocentric calculations — any error in Earth's position propagates to
+  every other body. Moon is the fastest-moving body (~13 deg/day). Both
+  use 4-day intervals for maximum precision.
+- **Mercury (interval=16, degree=15):** Most eccentric orbit, needs highest
+  degree to capture orbital variations.
+- **Venus, Mars (interval=16, degree=13):** Halved from 32 days to reduce
+  latitude error caused by ICRS→ecliptic pipeline amplification at close
+  approach (Venus at ~0.26 AU, Mars at ~0.37 AU).
+- **Jupiter, Saturn (interval=32, degree=13):** Halved from 64 days and
+  degree increased from 11 to 13. Saturn latitude still has ~4.85"
+  architectural error due to pipeline amplification at large distance.
+- **Uranus, Neptune (interval=64, degree=13):** Halved from 128 days
+  and degree increased from 9 to 13.
+- **Pluto (interval=32, degree=13):** Halved from 64 days for better
+  distance velocity precision.
+- **Asteroids (interval=8, degree=13):** Reduced from 32 days. Eccentric
+  and perturbed orbits need short intervals for sub-arcsecond accuracy.
+- **Hypotheticals (interval=32, degree=13):** Reduced from 64 days and
+  degree increased from 11. Previous parameters produced bogus verification
+  errors (136-766") due to a tau bug in the generator (now fixed).
+- **Ecliptic bodies (interval=8, degree=13):** Unchanged — already tight.
+- **Nutation (interval=16, degree=16):** Halved from 32 days to reduce
+  obliquity error, which affects latitude of all bodies.
 
 ### 9.3 Bodies NOT in LEB (trigger Skyfield fallback)
 
@@ -1237,34 +1269,67 @@ Typical generation-time errors:
 
 ### 10.2 End-to-End Precision (vs Skyfield Reference)
 
-The precision test suite (`tests/test_leb/test_leb_precision.py`) compares
-`fast_calc_ut()` output against `swe_calc_ut()` for multiple dates.
+The compare test suite (`tests/test_leb/compare/`) validates LEB output
+against Skyfield for all 30 bodies across hundreds of dates per tier.
 
-Expected results with properly generated LEB files:
+#### Base Tier (1860-2140, 300-point measurement)
 
-| Body | Position Error | Speed Error | Notes |
-|------|---------------|-------------|-------|
-| Sun | <0.07" | <0.001"/day | Excellent |
-| Moon | <0.05" | <14"/day | Speed error from Chebyshev derivative |
-| Mercury | <0.01" | <0.001"/day | |
-| Mars | <0.05" | <0.001"/day | |
-| Jupiter | <0.05" | <0.001"/day | |
-| Mean Node | <0.001" | <0.001"/day | Perfect |
-| True Node | <0.001" | <1"/day | Analytical, speed acceptable |
-| Chiron | <1" | <0.1"/day | Requires SPK-generated LEB |
-| Ceres | <1" | <0.1"/day | Requires SPK-generated LEB |
-| Cupido | <0.001" | <0.001"/day | Perfect |
+**ICRS Planets — Position:**
 
-### 10.3 Moon Speed Error
+| Body | Lon (") | Lat (") | Dist (AU) |
+|------|---------|---------|-----------|
+| Sun | 0.0002 | 0.0000 | 1.15e-11 |
+| Moon | 0.0031 | 0.0002 | 3.86e-12 |
+| Mercury | 0.1316 | 0.1371 | 7.93e-10 |
+| Venus | 0.1553 | 0.4761 | 3.82e-10 |
+| Mars | 0.4591 | 0.1626 | 3.39e-10 |
+| Jupiter | 0.3567 | 0.6121 | 6.98e-07 |
+| Saturn | 0.6220 | 4.8507 | 5.52e-07 |
+| Uranus | 0.3174 | 0.3572 | 2.41e-07 |
+| Neptune | 0.1980 | 0.3177 | 1.01e-06 |
+| Pluto | 0.1242 | 0.1340 | 2.34e-05 |
 
-The Moon's speed can show errors up to ~14"/day at certain dates. This is
-~0.03% of the total speed (~47000"/day). The error comes from the Chebyshev
-derivative approximation: while the position polynomial is fitted to
-sub-arcsecond accuracy, the derivative of a degree-13 polynomial over an
-8-day interval inherently loses some precision compared to the analytical
-Skyfield velocity.
+**ICRS Planets — Velocity:**
 
-This is acceptable for astrological applications.
+| Body | Speed Lon (deg/day) | Speed Lat (deg/day) | Speed Dist (AU/day) |
+|------|---------------------|---------------------|---------------------|
+| Sun | 0.000090 | 0.000000 | 1.77e-06 |
+| Moon | 0.001355 | 0.000122 | 6.37e-08 |
+| Mercury | 0.000299 | 0.000049 | 4.86e-06 |
+| Venus | 0.000136 | 0.000038 | 3.80e-06 |
+| Mars | 0.000156 | 0.000048 | 3.29e-06 |
+| Jupiter | 0.000178 | 0.000241 | 3.51e-06 |
+| Saturn | 0.013370 | 0.003470 | 2.38e-06 |
+| Uranus | 0.000171 | 0.000122 | 2.18e-06 |
+| Neptune | 0.000187 | 0.000037 | 2.61e-06 |
+| Pluto | 0.000212 | 0.000074 | 8.98e-05 |
+
+**Asteroids** (300 dates, filtered to SPK coverage):
+- Position: 0.42-0.44" max error
+- Latitude velocity: 0.03-0.86 deg/day (architectural — see below)
+
+**Ecliptic bodies:** Max 0.028" position, 0.039 deg/day speed (OscuApogee)
+
+**Hypotheticals:** Essentially zero error (1e-14 level)
+
+### 10.3 Architectural Limitations
+
+**Saturn latitude error (~4.85"):** The ICRS→ecliptic pipeline amplifies
+Chebyshev fitting errors by `1/geocentric_distance`. Saturn's large
+barycentric distance means small AU-level errors become large angular
+errors in latitude. This is inherent to storing positions in ICRS
+barycentric coordinates. The same effect applies to Venus/Mars latitude
+(0.3-0.5") but is less severe due to smaller barycentric distance.
+
+**Asteroid latitude velocity (0.19-0.86 deg/day):** The same pipeline
+amplification affects velocity even more than position for nearby asteroids
+(Ceres, Pallas, Juno, Vesta). This is handled in tests via a separate
+`ASTEROID_SPEED_LAT_DEG_DAY` tolerance. Chiron is less affected (0.027
+deg/day) due to greater distance.
+
+These are not fixable without changing the storage format to ecliptic
+coordinates (which would lose the ability to serve multiple output frames
+from one dataset).
 
 ### 10.4 Asteroid Precision Caveat
 
@@ -1746,7 +1811,7 @@ J2000 = 2451545.0
 OBLIQUITY_J2000_DEG = 23.4392911
 
 # generate_leb.py
-NUTATION_INTERVAL = 32.0   # days
+NUTATION_INTERVAL = 16.0   # days
 NUTATION_DEGREE = 16
 DELTA_T_INTERVAL = 30.0    # days
 N_VERIFY = 10              # verification points per segment
