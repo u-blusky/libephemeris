@@ -68,7 +68,7 @@ GITHUB_RELEASES_BASE = (
 )
 
 # Data file definitions: (filename, sha256 hash, description)
-DATA_FILES = {
+DATA_FILES: dict[str, dict[str, Any]] = {
     # Legacy single file (kept for backward compatibility)
     "planet_centers.bsp": {
         "url": f"{GITHUB_RELEASES_BASE}/planet_centers.bsp",

@@ -69,7 +69,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Tuple, Union, overload
+from typing import Any, List, Optional, Tuple, Union, overload
 from .constants import *
 from .constants import (
     SEFLG_SIDEREAL,
@@ -3325,7 +3325,7 @@ def _houses_gauquelin(
     ascensional_diff = math.degrees(math.asin(asc_diff_arg))
 
     # Shared keyword arguments for the cusp helper
-    _cusp_kwargs = dict(
+    _cusp_kwargs: dict[str, Any] = dict(
         ascensional_diff=ascensional_diff,
         tan_obliquity=tan_obliquity,
         sin_obliquity=sin_obliquity,
