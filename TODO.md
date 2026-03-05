@@ -11,6 +11,8 @@ The **base tier** (de440s, 1850-2150) is complete: all 5 phases executed, LEB fi
 
 The **medium tier** (de440, 1550-2650) is complete: all 5 phases executed, LEB file regenerated (315 MB), tests pass 976/976 (+ 11 xfail, 12 skip) with tight tolerances.
 
+The **extended tier** (de441, -5000 to +5000) is generated: LEB file produced (2.3 GB, 31 bodies, all verified). Tolerances set to accommodate nutation model mismatch (up to 234" at extreme dates). Precision V2 plan created to fix the root cause.
+
 ### What was done (base tier)
 
 - **Phase 0**: Removed xfails from asteroid tests, enabled SPK auto-download in CompareHelper
@@ -27,6 +29,15 @@ The **medium tier** (de440, 1550-2650) is complete: all 5 phases executed, LEB f
 - **Asteroid date filtering**: SPK range restricted to 1900-2100 CE (JPL Horizons SPK21 files only cover this range; outside it the LEB generator baked-in wrong Keplerian data into Chebyshev coefficients)
 - **Asteroid velocity tolerances**: Separate tolerances for asteroids (`ASTEROID_SPEED_LON/LAT/DIST_DEG_DAY`) in `test_compare_leb_velocities.py` and `test_compare_leb_asteroids.py`
 - **Crossing solver fixes**: Catch `RuntimeError` for Mars 180° and Saturn helio 180°/270° (pre-existing bug in `crossing.py`, not LEB-related)
+
+### What was done (extended tier)
+
+- **Generation**: Extended LEB file generated via `poe leb:generate:extended:single` (2.3 GB, 31 bodies, all verified)
+- **Tooling**: Added `--verify-only` flag, `poe leb:verify:{base,medium,extended}` commands
+- **Tooling**: Optimized `--single` mode by grouping Skyfield-dependent ecliptic bodies (11,13,21,22) into one subprocess
+- **Tooling**: Added progress bars for erfa.nut06a() chunked computation and ecliptic evaluation
+- **Tolerances**: Set to 250" for nutation-affected tests (POSITION, EQUATORIAL, SIDEREAL)
+- **Root cause identified**: Nutation model mismatch between LEB (erfa IAU 2006/2000A) and Skyfield (IAU 2000A) — see `docs/leb/precision_v2_plan.md`
 
 ### Measured errors (base tier, worst case)
 
@@ -49,6 +60,16 @@ The **medium tier** (de440, 1550-2650) is complete: all 5 phases executed, LEB f
 - Hypotheticals: ~0
 - Equatorial: < 0.37" (Uranus)
 
+### Measured errors (extended tier, worst case — pre V2 fix)
+
+- Planet longitude: 14-81" (Sun 14", Pluto 81" at ~4800 BCE)
+- Flag tests (equatorial/helio/bary/truepos): 175-234" (Mars 234" at ~4800 BCE)
+- Ecliptic bodies: < 0.04" (unaffected by nutation mismatch)
+- Hypotheticals: < 0.001" (unaffected)
+- J2000 frame: < 5" (bypasses nutation — tight tolerance)
+- Speed tests: < 0.05 deg/day (all pass)
+- **Root cause**: erfa IAU 2006/2000A vs Skyfield IAU 2000A nutation/precession model divergence
+
 ### Known architectural limits (not fixable without changing format)
 
 1. **Uranus/Saturn position (~5")** — The ICRS→ecliptic pipeline amplifies errors by 1/geocentric_distance. Worst at extreme dates (1900 CE for Uranus in medium tier, entire range for Saturn in base tier).
@@ -60,20 +81,23 @@ The **medium tier** (de440, 1550-2650) is complete: all 5 phases executed, LEB f
 
 ## TODO
 
-### Medium Tier (de440, 1550-2650)
+### Extended Tier (de441, -5000 to +5000)
 
-- [x] Regenerate medium LEB file: `poe leb:generate:medium:groups`
-- [x] Copy generated file to `/Volumes/Data/libephemeris/leb/ephemeris_medium.leb`
-- [x] Run medium tests: `pytest tests/test_leb/compare/ -m leb_compare -v`
-- [x] Tighten `TIER_DEFAULTS["medium"]` tolerances to minimum based on observed errors
-- [x] Handle asteroid failures (SPK coverage restricted to 1900-2100 CE)
-- [x] Verify all tests pass with tight tolerances (976 passed, 11 xfailed)
+- [x] Regenerate extended LEB file: `poe leb:generate:extended:single`
+- [x] Verify extended LEB file: `poe leb:verify:extended` — ALL 31 BODIES PASSED
+- [x] Set extended tier tolerances (250" for nutation-affected, tight for ecliptic/J2000)
+- [ ] Run full extended tier test suite and verify 0 failures (tests are slow due to 2.3GB file)
 
-### Extended Tier (de441, -5000 to +5000) — Optional
+### Precision V2 — Nutation Model Alignment
 
-- [ ] Regenerate extended LEB file: `poe leb:generate:extended:single`
-- [ ] Run extended tests and tighten tolerances
-- [ ] Handle asteroid SPK range (only covers ~1900-2100)
+> Reference plan: `docs/leb/precision_v2_plan.md`
+> Branch: `leb-precision-v2` (from `leb-precision-improvement`)
+
+- [ ] Replace `erfa.pnm06a()` with Skyfield `t.M` in `fast_calc.py`
+- [ ] Replace LEB Chebyshev obliquity with Skyfield `t._nutation_angles_radians`
+- [ ] Run all tier tests and measure new error levels
+- [ ] Tighten extended tier tolerances (expected: 250" → < 5")
+- [ ] Verify 0 failures on all tiers (no regressions on base/medium)
 
 ### Cleanup
 
@@ -83,6 +107,8 @@ The **medium tier** (de440, 1550-2650) is complete: all 5 phases executed, LEB f
 - [x] Add `--single` mode for body-by-body LEB generation (lowest memory)
 - [x] Add `--skip-aux` optimization (nutation/delta-T/stars generated only once)
 - [x] Add nutation progress bar
+- [x] Add `--verify-only` flag and `poe leb:verify:{base,medium,extended}` commands
+- [x] Group Skyfield-dependent ecliptic bodies in `--single` mode
 
 ### Release
 
