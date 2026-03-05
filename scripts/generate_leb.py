@@ -1832,6 +1832,7 @@ def _verify_segment_unwrapped(
 def generate_nutation(
     jd_start: float,
     jd_end: float,
+    verbose: bool = False,
 ) -> Tuple[List[np.ndarray], float]:
     """Generate Chebyshev coefficients for nutation (dpsi, deps in radians).
 
@@ -1865,6 +1866,8 @@ def generate_nutation(
         NUTATION_COMPONENTS,
         n_segments,
         pts_per_seg,
+        label="Nutation",
+        verbose=verbose,
     )
 
 
@@ -2012,6 +2015,7 @@ def assemble_leb(
     bodies: Optional[List[int]] = None,
     workers: int = 1,
     verbose: bool = True,
+    skip_aux: bool = False,
 ) -> None:
     """Assemble a complete .leb file.
 
@@ -2022,6 +2026,10 @@ def assemble_leb(
         bodies: List of body IDs to include (None = all from BODY_PARAMS).
         workers: Number of parallel workers for body generation.
         verbose: Print progress messages.
+        skip_aux: If True, skip nutation, Delta-T and star catalog generation.
+            The resulting file will only contain body coefficients.  Useful
+            when generating single-body partial files that will be merged
+            later (merge takes aux data from the first file that has it).
     """
     if bodies is None:
         bodies = sorted(BODY_PARAMS.keys())
@@ -2246,35 +2254,53 @@ def assemble_leb(
     # -------------------------------------------------------------------------
     # 2. Generate nutation
     # -------------------------------------------------------------------------
-    if verbose:
-        print("  Generating nutation...", end=" ", flush=True)
-    t0 = time.time()
-    nutation_coeffs, nutation_error = generate_nutation(jd_start, jd_end)
-    t_nut = time.time() - t0
-    if verbose:
-        print(
-            f"{len(nutation_coeffs)} segments, max error={nutation_error:.2e} rad ({t_nut:.1f}s)"
+    nutation_coeffs: List[np.ndarray] = []
+    nutation_error = 0.0
+    if skip_aux:
+        if verbose:
+            print("  Skipping nutation (--skip-aux)")
+    else:
+        if verbose:
+            print("  Generating nutation...")
+        t0 = time.time()
+        nutation_coeffs, nutation_error = generate_nutation(
+            jd_start, jd_end, verbose=verbose
         )
+        t_nut = time.time() - t0
+        if verbose:
+            print(
+                f"{len(nutation_coeffs)} segments, max error={nutation_error:.2e} rad ({t_nut:.1f}s)"
+            )
 
     # -------------------------------------------------------------------------
     # 3. Generate Delta-T
     # -------------------------------------------------------------------------
-    if verbose:
-        print("  Generating Delta-T...", end=" ", flush=True)
-    t0 = time.time()
-    delta_t_table = generate_delta_t(jd_start, jd_end)
-    t_dt = time.time() - t0
-    if verbose:
-        print(f"{len(delta_t_table)} samples ({t_dt:.1f}s)")
+    delta_t_table: List[Tuple[float, float]] = []
+    if skip_aux:
+        if verbose:
+            print("  Skipping Delta-T (--skip-aux)")
+    else:
+        if verbose:
+            print("  Generating Delta-T...", end=" ", flush=True)
+        t0 = time.time()
+        delta_t_table = generate_delta_t(jd_start, jd_end)
+        t_dt = time.time() - t0
+        if verbose:
+            print(f"{len(delta_t_table)} samples ({t_dt:.1f}s)")
 
     # -------------------------------------------------------------------------
     # 4. Generate star catalog
     # -------------------------------------------------------------------------
-    if verbose:
-        print("  Generating star catalog...", end=" ", flush=True)
-    star_entries = generate_star_catalog()
-    if verbose:
-        print(f"{len(star_entries)} stars")
+    star_entries: List[StarEntry] = []
+    if skip_aux:
+        if verbose:
+            print("  Skipping star catalog (--skip-aux)")
+    else:
+        if verbose:
+            print("  Generating star catalog...", end=" ", flush=True)
+        star_entries = generate_star_catalog()
+        if verbose:
+            print(f"{len(star_entries)} stars")
 
     # -------------------------------------------------------------------------
     # 5. Calculate layout and write file
@@ -2424,9 +2450,10 @@ def assemble_leb(
         print(f"\n  File: {output}")
         print(f"  Size: {total_size:,} bytes ({total_size / (1024 * 1024):.1f} MB)")
         print(f"  Bodies: {body_count}")
-        print(f"  Nutation segments: {nut_n_segments}")
-        print(f"  Delta-T samples: {len(delta_t_table)}")
-        print(f"  Stars: {len(star_entries)}")
+        if not skip_aux:
+            print(f"  Nutation segments: {nut_n_segments}")
+            print(f"  Delta-T samples: {len(delta_t_table)}")
+            print(f"  Stars: {len(star_entries)}")
         print()
 
         # Print error summary
@@ -2476,8 +2503,9 @@ def assemble_leb(
                 # Already in degrees, convert to arcseconds
                 arcsec = error * 3600.0
                 print(f'    {name:20s}: {error:.2e} deg ({arcsec:.4f}"){range_note}')
-        nut_arcsec = math.degrees(nutation_error) * 3600.0
-        print(f'    {"Nutation":20s}: {nutation_error:.2e} rad ({nut_arcsec:.4f}")')
+        if not skip_aux:
+            nut_arcsec = math.degrees(nutation_error) * 3600.0
+            print(f'    {"Nutation":20s}: {nutation_error:.2e} rad ({nut_arcsec:.4f}")')
 
 
 # =============================================================================
@@ -3172,6 +3200,12 @@ def main():
         "Use this on memory-constrained machines.",
     )
     parser.add_argument(
+        "--skip-aux",
+        action="store_true",
+        help="Skip nutation, Delta-T and star catalog generation. "
+        "Used internally by --single mode for all bodies except the first.",
+    )
+    parser.add_argument(
         "--quiet",
         "-q",
         action="store_true",
@@ -3294,6 +3328,10 @@ def main():
                     "--output",
                     partial,
                 ]
+                # Only the first body generates nutation/delta-T/stars;
+                # all others skip aux data (merge takes it from the first).
+                if i > 1:
+                    cmd.append("--skip-aux")
                 result = subprocess.run(cmd)
                 if result.returncode != 0:
                     print(
@@ -3353,6 +3391,7 @@ def main():
             bodies=bodies,
             workers=args.workers,
             verbose=not args.quiet,
+            skip_aux=args.skip_aux,
         )
         elapsed = time.time() - t0
 
