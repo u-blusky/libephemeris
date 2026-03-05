@@ -1,60 +1,60 @@
 # LEB Precision Improvement — TODO
 
-> Piano di riferimento: `docs/leb/precision-improvement-plan.md`
+> Reference plan: `docs/leb/precision-improvement-plan.md`
 > Branch: `leb-precision-improvement`
 
-## Contesto
+## Context
 
-Il lavoro di precision improvement del formato LEB (LibEphemeris Binary) è suddiviso in 5 fasi (0-4), eseguite nell'ordine 0 → 1 → 2 → 4 → 3.
+The LEB (LibEphemeris Binary) precision improvement work is split into 5 phases (0-4), executed in order 0 → 1 → 2 → 4 → 3.
 
-Il **base tier** (de440s, 1850-2150) è completo: tutte le 5 fasi sono state eseguite, il file LEB rigenerato (94.3 MB), e i test passano 404/404 con tolleranze strette.
+The **base tier** (de440s, 1850-2150) is complete: all 5 phases executed, LEB file regenerated (94.3 MB), tests pass 404/404 with tight tolerances.
 
-Il **medium tier** (de440, 1550-2650) è completo: tutte le 5 fasi sono state eseguite, il file LEB rigenerato (315 MB), e i test passano 976/976 (+ 11 xfail, 12 skip) con tolleranze strette.
+The **medium tier** (de440, 1550-2650) is complete: all 5 phases executed, LEB file regenerated (315 MB), tests pass 976/976 (+ 11 xfail, 12 skip) with tight tolerances.
 
-### Cosa è stato fatto (base tier)
+### What was done (base tier)
 
-- **Phase 0**: Rimossi xfail dai test asteroidi, abilitato SPK auto-download nel CompareHelper
-- **Phase 1**: Parametri Chebyshev aggressivi (Moon/Earth 4d, Venus/Mars 16d, Jupiter/Saturn 32d, Asteroidi 8d, Ipotetici 32d, Nutation 16d)
-- **Phase 2**: Velocità analitica via derivata Chebyshev trasformata attraverso le matrici di rotazione (sostituisce central difference)
-- **Phase 4**: File LEB base rigenerato con tutti i 30 corpi verificati
-- **Phase 3**: Tolleranze strette al minimo, documentazione aggiornata (guide.md + design.md)
-- **Bug fix**: Tau bug in verify_segment del generatore, arcsec reporting con distanza geocentrica
+- **Phase 0**: Removed xfails from asteroid tests, enabled SPK auto-download in CompareHelper
+- **Phase 1**: Aggressive Chebyshev parameters (Moon/Earth 4d, Venus/Mars 16d, Jupiter/Saturn 32d, Asteroids 8d, Hypotheticals 32d, Nutation 16d)
+- **Phase 2**: Analytical velocity via Chebyshev derivative transformed through rotation matrices (replaces central difference)
+- **Phase 4**: Base LEB file regenerated with all 30 bodies verified
+- **Phase 3**: Tolerances tightened to minimum, documentation updated (guide.md + design.md)
+- **Bug fix**: Tau bug in verify_segment of the generator, arcsec reporting with geocentric distance
 
-### Cosa è stato fatto (medium tier)
+### What was done (medium tier)
 
-- **Phase 4**: File LEB medium rigenerato (315 MB, 31 corpi, tutti verificati)
-- **Phase 3**: Tolleranze strette al minimo basate su errori misurati
-- **Asteroid date filtering**: Range SPK ristretto a 1900-2100 CE (i file SPK21 Horizons coprono effettivamente solo questo range; fuori il generatore LEB ha baked-in dati Kepleriani errati nei coefficienti Chebyshev)
-- **Asteroid velocity tolerances**: Tolleranze separate per asteroidi (`ASTEROID_SPEED_LON/LAT/DIST_DEG_DAY`) in `test_compare_leb_velocities.py` e `test_compare_leb_asteroids.py`
-- **Crossing solver fixes**: Catch `RuntimeError` per Mars 180° e Saturn helio 180°/270° (bug pre-esistente in `crossing.py`, non LEB-related)
+- **Phase 4**: Medium LEB file regenerated (315 MB, 31 bodies, all verified)
+- **Phase 3**: Tolerances tightened to minimum based on measured errors
+- **Asteroid date filtering**: SPK range restricted to 1900-2100 CE (JPL Horizons SPK21 files only cover this range; outside it the LEB generator baked-in wrong Keplerian data into Chebyshev coefficients)
+- **Asteroid velocity tolerances**: Separate tolerances for asteroids (`ASTEROID_SPEED_LON/LAT/DIST_DEG_DAY`) in `test_compare_leb_velocities.py` and `test_compare_leb_asteroids.py`
+- **Crossing solver fixes**: Catch `RuntimeError` for Mars 180° and Saturn helio 180°/270° (pre-existing bug in `crossing.py`, not LEB-related)
 
-### Errori misurati (base tier, worst case)
+### Measured errors (base tier, worst case)
 
-- Posizione pianeti: da 0.0002" (Sole) a 4.85" (Saturno lat) — sub-arcsecond per tutti tranne Saturno lat
-- Velocità pianeti: < 0.014 deg/day (Saturno lon è il peggiore)
-- Asteroidi posizione: ~0.44"
-- Asteroidi velocità lat: 0.19-0.71 deg/day (limite architetturale della pipeline ICRS→eclittica)
-- Corpi eclittici: < 0.028"
-- Ipotetici: ~0 (1e-14)
+- Planet position: from 0.0002" (Sun) to 4.85" (Saturn lat) — sub-arcsecond for all except Saturn lat
+- Planet velocity: < 0.014 deg/day (Saturn lon is worst)
+- Asteroid position: ~0.44"
+- Asteroid lat velocity: 0.19-0.71 deg/day (architectural limit of ICRS→ecliptic pipeline)
+- Ecliptic bodies: < 0.028"
+- Hypotheticals: ~0 (1e-14)
 
-### Errori misurati (medium tier, worst case)
+### Measured errors (medium tier, worst case)
 
-- Posizione pianeti: da 0.0003" (Sole) a 4.58" (Urano lon ~1900 CE)
-- Velocità pianeti: < 0.0014 deg/day (Luna lon)
-- Velocità lat: < 0.0029 deg/day (OscuApogee/InterpApogee)
-- Distanza: < 1.92e-5 AU (Plutone)
-- Asteroidi posizione: ~0.29" (filtrato a 1900-2100 CE)
-- Asteroidi velocità lat: 0.34 deg/day (Pallas, limite architetturale)
-- Corpi eclittici: < 0.035" (OscuApogee)
-- Ipotetici: ~0
-- Equatoriale: < 0.37" (Urano)
+- Planet position: from 0.0003" (Sun) to 4.58" (Uranus lon ~1900 CE)
+- Planet velocity: < 0.0014 deg/day (Moon lon)
+- Lat velocity: < 0.0029 deg/day (OscuApogee/InterpApogee)
+- Distance: < 1.92e-5 AU (Pluto)
+- Asteroid position: ~0.29" (filtered to 1900-2100 CE)
+- Asteroid lat velocity: 0.34 deg/day (Pallas, architectural limit)
+- Ecliptic bodies: < 0.035" (OscuApogee)
+- Hypotheticals: ~0
+- Equatorial: < 0.37" (Uranus)
 
-### Limiti architetturali noti (non risolvibili senza cambiare formato)
+### Known architectural limits (not fixable without changing format)
 
-1. **Urano/Saturno posizione (~5")** — La pipeline ICRS→eclittica amplifica gli errori per 1/distanza_geocentrica. Peggiore a date estreme (1900 CE per Urano nel medium tier, tutto il range per Saturno nel base tier).
-2. **Velocità latitudine asteroidi (0.2-0.7 deg/day)** — Stesso meccanismo, peggiore per corpi vicini
-3. **Plutone velocità distanza (~2.3e-5 AU/day)** — Combinazione di distanza estrema e orbita eccentrica
-4. **Asteroidi fuori range SPK** — I file SPK21 Horizons coprono solo ~1900-2100 CE. Il generatore LEB produce dati Kepleriani errati fuori da questo range, baked-in nei coefficienti Chebyshev. Test filtrati con `filter_asteroid_dates()`.
+1. **Uranus/Saturn position (~5")** — The ICRS→ecliptic pipeline amplifies errors by 1/geocentric_distance. Worst at extreme dates (1900 CE for Uranus in medium tier, entire range for Saturn in base tier).
+2. **Asteroid latitude velocity (0.2-0.7 deg/day)** — Same mechanism, worse for nearby bodies
+3. **Pluto distance velocity (~2.3e-5 AU/day)** — Combination of extreme distance and eccentric orbit
+4. **Asteroids outside SPK range** — JPL Horizons SPK21 files only cover ~1900-2100 CE. The LEB generator produces wrong Keplerian data outside this range, baked-in to Chebyshev coefficients. Tests filtered with `filter_asteroid_dates()`.
 
 ---
 
@@ -62,26 +62,31 @@ Il **medium tier** (de440, 1550-2650) è completo: tutte le 5 fasi sono state es
 
 ### Medium Tier (de440, 1550-2650)
 
-- [x] Rigenerare il file LEB medium: `poe leb:generate:medium:groups`
-- [x] Copiare il file generato in `/Volumes/Data/libephemeris/leb/ephemeris_medium.leb`
-- [x] Runnare i test medium: `pytest tests/test_leb/compare/ -m leb_compare -v`
-- [x] Stringere le tolleranze `TIER_DEFAULTS["medium"]` in `tests/test_leb/compare/conftest.py` al minimo basandosi sugli errori osservati
-- [x] Gestire eventuali fallimenti asteroidi (copertura SPK ristretta a 1900-2100 CE)
-- [x] Verificare che tutti i test passino con le tolleranze strette (976 passed, 11 xfailed)
+- [x] Regenerate medium LEB file: `poe leb:generate:medium:groups`
+- [x] Copy generated file to `/Volumes/Data/libephemeris/leb/ephemeris_medium.leb`
+- [x] Run medium tests: `pytest tests/test_leb/compare/ -m leb_compare -v`
+- [x] Tighten `TIER_DEFAULTS["medium"]` tolerances to minimum based on observed errors
+- [x] Handle asteroid failures (SPK coverage restricted to 1900-2100 CE)
+- [x] Verify all tests pass with tight tolerances (976 passed, 11 xfailed)
 
-### Extended Tier (de441, -5000 a +5000) — Opzionale
+### Extended Tier (de441, -5000 to +5000) — Optional
 
-- [ ] Rigenerare il file LEB extended: `poe leb:generate:extended:groups`
-- [ ] Runnare i test extended e stringere le tolleranze
-- [ ] Gestire range SPK asteroidi (coprono solo ~1900-2100)
-
-### Release
-
-- [ ] Upload dei file LEB aggiornati su GitHub Releases: `poe release:leb <version>`
-- [ ] Aggiornare gli hash in `libephemeris/download.py`
-- [ ] Commit degli hash aggiornati
+- [ ] Regenerate extended LEB file: `poe leb:generate:extended:single`
+- [ ] Run extended tests and tighten tolerances
+- [ ] Handle asteroid SPK range (only covers ~1900-2100)
 
 ### Cleanup
 
-- [ ] Verificare che `poe typecheck` passi (mypy)
-- [ ] Merge del branch `leb-precision-improvement` in main
+- [x] Verify `poe typecheck` passes (mypy) — 0 errors
+- [x] Translate `docs/leb/testing.md` to English
+- [x] Add `poe test:leb:compare:medium` alias
+- [x] Add `--single` mode for body-by-body LEB generation (lowest memory)
+- [x] Add `--skip-aux` optimization (nutation/delta-T/stars generated only once)
+- [x] Add nutation progress bar
+
+### Release
+
+- [ ] Upload updated LEB files to GitHub Releases: `poe release:leb <version>`
+- [ ] Update hashes in `libephemeris/download.py`
+- [ ] Commit updated hashes
+- [ ] Merge branch `leb-precision-improvement` to main
