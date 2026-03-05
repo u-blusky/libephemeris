@@ -186,31 +186,30 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
     },
     "extended": {
         # Extended tier (de441, -5000 to 5000 CE, 10,000 years).
-        # Position errors grow with distance from J2000 due to nutation/
-        # precession model limitations (erfa.nut06a is validated to ±20 centuries;
-        # the extended tier reaches ±70 centuries).  These are NOT Chebyshev
-        # fitting errors (verify_leb passes with <0.03" for all bodies) — they
-        # are inherent differences between LEB's precomputed nutation Chebyshev
-        # coefficients and Skyfield's live nutation computation at extreme dates.
+        # After Precision V2 fix (Skyfield IAU 2000A nutation alignment),
+        # errors are comparable to base/medium tiers — dominated by the
+        # ICRS-to-ecliptic pipeline amplification (1/geocentric_distance).
         #
-        # Worst observed errors (at ~4800 BCE / JD -101469):
-        #   - Planet longitude (ecliptic): Mars 29", Pluto 81"
-        #   - Flag tests (various frames): Mars truepos 234", Mars noaberr 234"
-        #   - Boundary tests (extreme edges): expected higher than full-range
-        #
-        # J2000-frame tests pass at tight tolerances because J2000 coordinates
-        # bypass nutation entirely.
-        "POSITION_ARCSEC": 250.0,  # Mars 234" at boundary; nutation limit
-        "EQUATORIAL_ARCSEC": 250.0,  # Same nutation pipeline
-        "J2000_ARCSEC": 5.0,  # J2000 bypasses nutation — tight tolerance
-        "SIDEREAL_ARCSEC": 250.0,  # POSITION + ayanamsha (nutation-dependent)
-        "ECLIPTIC_ARCSEC": 0.5,  # Lunar/ecliptic bodies: observed <0.04"
-        "HYPOTHETICAL_ARCSEC": 0.5,  # Uranians: observed <0.001"
+        # Measured worst-case errors (V2, 500-point sweep):
+        #   Planet longitude: Uranus 1.91", Saturn 0.57", Mercury 0.53"
+        #   Flag tests (Sun/Moon/Mars/Jupiter): Mars 0.24" (all frames)
+        #   Ecliptic bodies: OscuApogee 0.04"
+        #   Hypothetical: <0.001"
+        #   Distance: Pluto 2.15e-5 AU
+        #   Speed lon: OscuApogee 0.035 deg/day
+        #   Speed lat: OscuApogee 0.002 deg/day
+        #   Speed dist: Pluto 1.08e-5 AU/day
+        "POSITION_ARCSEC": 5.0,  # Uranus 1.91" (pipeline limit, same as base/medium)
+        "EQUATORIAL_ARCSEC": 0.5,  # Mars 0.24" (2x margin)
+        "J2000_ARCSEC": 0.5,  # Mars/Jupiter ~0.24" (2x margin)
+        "SIDEREAL_ARCSEC": 5.0,  # POSITION + ayanamsha
+        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.04" (2.5x margin)
+        "HYPOTHETICAL_ARCSEC": 0.005,  # Observed <0.001" (5x margin)
         "ASTEROID_ARCSEC": 5.0,  # No asteroid tests (SPK coverage ~1900-2100)
-        "DISTANCE_AU": 1e-4,  # Observed max ~2.15e-5 (Pluto)
-        "SPEED_LON_DEG_DAY": 0.05,  # All speed tests pass at 0.05
-        "SPEED_LAT_DEG_DAY": 0.05,
-        "SPEED_DIST_AU_DAY": 1e-4,
+        "DISTANCE_AU": 5e-5,  # Pluto 2.15e-5 AU (2.3x margin)
+        "SPEED_LON_DEG_DAY": 0.05,  # OscuApogee 0.035 (1.4x margin)
+        "SPEED_LAT_DEG_DAY": 0.005,  # OscuApogee 0.002 (2.5x margin)
+        "SPEED_DIST_AU_DAY": 3e-5,  # Pluto 1.08e-5 (2.8x margin)
         "NUTATION_ARCSEC": 0.01,
         "DELTAT_SEC": 0.1,
     },

@@ -224,39 +224,48 @@ def _apply_aberration(
     return (ax / a_dist * dist, ay / a_dist * dist, az / a_dist * dist)
 
 
-def _precession_nutation_matrix(jd_tt: float):
-    """Get the precession-nutation rotation matrix (3x3).
+def _get_skyfield_frame_data(
+    jd_tt: float,
+) -> Tuple[
+    Tuple[Tuple[float, float, float], ...],
+    float,
+    float,
+    float,
+]:
+    """Get precession-nutation matrix and nutation angles from Skyfield.
 
-    Uses erfa.pnm06a if available, falling back to astrometry module.
+    Uses Skyfield's IAU 2000A nutation model, matching the reference pipeline
+    in planets.py.  This ensures LEB-vs-Skyfield comparison tests measure only
+    Chebyshev fitting error, not nutation model mismatch.
 
     Args:
         jd_tt: Julian Day in TT.
 
     Returns:
-        3x3 rotation matrix as nested tuples ((r00,r01,r02),(r10,r11,r12),(r20,r21,r22)).
+        (pn_mat, dpsi, deps, eps_true_rad) where:
+        - pn_mat: 3x3 ICRS→true-equatorial-of-date rotation as nested tuples
+        - dpsi: nutation in longitude (radians, IAU 2000A)
+        - deps: nutation in obliquity (radians, IAU 2000A)
+        - eps_true_rad: true obliquity (radians)
     """
-    try:
-        import erfa
+    from .state import get_timescale
 
-        # erfa.pnm06a returns a 3x3 numpy array
-        mat = erfa.pnm06a(J2000, jd_tt - J2000)
-        return (
-            (float(mat[0][0]), float(mat[0][1]), float(mat[0][2])),
-            (float(mat[1][0]), float(mat[1][1]), float(mat[1][2])),
-            (float(mat[2][0]), float(mat[2][1]), float(mat[2][2])),
-        )
-    except (ImportError, Exception):
-        pass
+    ts = get_timescale()
+    t = ts.tt_jd(jd_tt)
 
-    # Fallback: use astrometry module
-    from .astrometry import _precession_nutation_matrix as _pnm
-
-    mat = _pnm(jd_tt)
-    return (
-        (float(mat[0, 0]), float(mat[0, 1]), float(mat[0, 2])),
-        (float(mat[1, 0]), float(mat[1, 1]), float(mat[1, 2])),
-        (float(mat[2, 0]), float(mat[2, 1]), float(mat[2, 2])),
+    # PNM matrix: ICRS -> true equatorial of date (N × P × B)
+    M = t.M
+    pn_mat = (
+        (float(M[0][0]), float(M[0][1]), float(M[0][2])),
+        (float(M[1][0]), float(M[1][1]), float(M[1][2])),
+        (float(M[2][0]), float(M[2][1]), float(M[2][2])),
     )
+
+    # Nutation angles (IAU 2000A, matching Skyfield's own computation)
+    dpsi, deps = t._nutation_angles_radians
+    eps_true_rad = float(t._mean_obliquity_radians + deps)
+
+    return pn_mat, float(dpsi), float(deps), eps_true_rad
 
 
 def _mat3_vec3(
@@ -533,7 +542,7 @@ def _pipeline_icrs(
 
     elif iflag & SEFLG_EQUATORIAL:
         # True equator of date
-        pn_mat = _precession_nutation_matrix(jd_tt)
+        pn_mat, _, _, _ = _get_skyfield_frame_data(jd_tt)
         geo_eq = _mat3_vec3(pn_mat, geo)
         lon_deg, lat_deg, dist = _cartesian_to_spherical(
             geo_eq[0], geo_eq[1], geo_eq[2]
@@ -566,18 +575,13 @@ def _pipeline_icrs(
 
     else:
         # TRUE ECLIPTIC OF DATE (default) -- most common path
+        # Get PNM matrix and true obliquity from Skyfield (IAU 2000A)
+        pn_mat, _, _, eps_true_rad = _get_skyfield_frame_data(jd_tt)
+
         # Step 1: Precess ICRS -> equatorial of date
-        pn_mat = _precession_nutation_matrix(jd_tt)
         geo_eq = _mat3_vec3(pn_mat, geo)
 
         # Step 2: Rotate equatorial -> ecliptic using true obliquity
-        try:
-            dpsi, deps = reader.eval_nutation(jd_tt)
-            eps_mean = _mean_obliquity_iau2006(jd_tt)
-            eps_true_rad = math.radians(eps_mean) + deps
-        except (ValueError, Exception):
-            eps_true_rad = OBLIQUITY_J2000_RAD
-
         ecl = _rotate_equatorial_to_ecliptic(
             geo_eq[0], geo_eq[1], geo_eq[2], eps_true_rad
         )
@@ -649,12 +653,9 @@ def _pipeline_ecliptic(
 
     elif iflag & SEFLG_EQUATORIAL:
         # True equatorial of date: rotate ecliptic-of-date -> equatorial-of-date
-        try:
-            dpsi, deps = reader.eval_nutation(jd_tt)
-            eps_mean = _mean_obliquity_iau2006(jd_tt)
-            eps = eps_mean + math.degrees(deps)
-        except (ValueError, Exception):
-            eps = OBLIQUITY_J2000_DEG
+        _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+        eps_mean = _mean_obliquity_iau2006(jd_tt)
+        eps = eps_mean + math.degrees(deps)
 
         # Velocity via finite difference on original ecliptic coords
         dt_step = 0.001  # days
@@ -922,8 +923,8 @@ def _fast_calc_core(
             # Ecliptic longitude from pipelines includes nutation, so we must
             # subtract the true ayanamsa (mean + Δψ) for correct cancellation.
             try:
-                dpsi, _ = reader.eval_nutation(jd_tt)
-                nutation_deg = math.degrees(dpsi)
+                _, dpsi_sid, _, _ = _get_skyfield_frame_data(jd_tt)
+                nutation_deg = math.degrees(dpsi_sid)
                 aya = mean_aya + nutation_deg
             except (ValueError, Exception):
                 aya = mean_aya
