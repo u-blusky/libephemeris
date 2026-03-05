@@ -24,6 +24,7 @@ from .conftest import (
     ICRS_PLANETS,
     ASTEROID_BODIES,
     CompareHelper,
+    filter_asteroid_dates,
 )
 
 DISTANCE_BODIES = ICRS_PLANETS + [(15, "Chiron"), (17, "Ceres")]
@@ -53,7 +54,8 @@ class TestGeocentricDistance:
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in test_dates_100:
+        dates = filter_asteroid_dates(test_dates_100, body_id)
+        for jd in dates:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 

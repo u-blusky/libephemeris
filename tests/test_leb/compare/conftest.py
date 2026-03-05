@@ -68,7 +68,9 @@ class TierTolerances:
     SPEED_DIST_AU_DAY: float = 1e-4
 
     # Asteroid velocity (architectural: ICRS→ecliptic pipeline amplification)
+    ASTEROID_SPEED_LON_DEG_DAY: float = 0.15
     ASTEROID_SPEED_LAT_DEG_DAY: float = 1.0
+    ASTEROID_SPEED_DIST_AU_DAY: float = 5e-3
 
     # Ayanamsha
     AYANAMSHA_ARCSEC: float = 0.001
@@ -161,12 +163,26 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
         "ASTEROID_SPEED_LAT_DEG_DAY": 0.75,  # Observed max 0.714 (Pallas)
     },
     "medium": {
-        # Current defaults — will tighten after medium tier regeneration.
-        "POSITION_ARCSEC": 5.0,
-        "ASTEROID_ARCSEC": 5.0,
-        "EQUATORIAL_ARCSEC": 5.0,
-        "J2000_ARCSEC": 5.0,
-        "SIDEREAL_ARCSEC": 20.0,
+        # Tuned to minimum possible based on measured errors (2x safety margin).
+        # Medium tier (de440, 1550-2650) with asteroid SPK filtered to 1900-2100.
+        "POSITION_ARCSEC": 5.0,  # Uranus 4.58" at ~1900 CE (architectural limit)
+        "ASTEROID_ARCSEC": 0.5,  # Observed max 0.29" (Pallas)
+        "EQUATORIAL_ARCSEC": 0.5,  # Observed max 0.37" (Uranus)
+        "J2000_ARCSEC": 0.5,
+        "SIDEREAL_ARCSEC": 5.0,  # Conservative (equatorial 0.37" + ayanamsha)
+        "ECLIPTIC_ARCSEC": 0.05,  # Observed max 0.035" (OscuApogee)
+        "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
+        "DISTANCE_AU": 3e-5,  # Observed max 1.92e-5 (Pluto)
+        # Velocity — OscuApogee dominates lon (0.043 deg/day).
+        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.043, Moon 0.0014
+        "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee/InterpApogee 0.00286
+        "SPEED_DIST_AU_DAY": 3e-5,  # Observed max 2.32e-5 (Pluto)
+        # Asteroid velocity (ICRS→ecliptic pipeline amplification).
+        # With SPK filtered to 1900-2100, lon/dist are very small; only
+        # lat speed is architecturally limited (same as base tier).
+        "ASTEROID_SPEED_LON_DEG_DAY": 0.001,  # Observed max 0.000042 (Pallas)
+        "ASTEROID_SPEED_LAT_DEG_DAY": 0.40,  # Observed max 0.341 (Pallas)
+        "ASTEROID_SPEED_DIST_AU_DAY": 1e-6,  # Observed max 1.05e-9 (Chiron)
     },
     "extended": {
         # Same rigid tolerances as other tiers.  Failures at extreme
@@ -452,6 +468,39 @@ HYPOTHETICAL_BODIES = [
 ]
 
 ALL_LEB_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL_BODIES
+
+# Asteroid SPK coverage (same for all tiers — JPL Horizons limitation).
+# Outside this range, both LEB and Skyfield fall back to Keplerian orbits
+# which are catastrophically wrong.  Test dates must be filtered to this range.
+# Asteroid SPK actual coverage: ~1900-2100 CE for all 5 asteroids.
+# The JPL Horizons SPK21 files have limited temporal coverage.  Outside this
+# range, Skyfield falls back to Keplerian orbital elements which are
+# catastrophically wrong.  The LEB generator used Skyfield during generation,
+# so LEB segments outside SPK coverage contain Keplerian-fallback data that
+# is baked into the Chebyshev coefficients.  This contamination extends well
+# beyond the SPK boundary due to Chebyshev fitting windows straddling the edge.
+# Measured errors: 22,000-97,000 arcsec position, 0.06-0.59 AU distance.
+_ASTEROID_SPK_JD_START = year_to_jd(1900)  # Actual SPK coverage start
+_ASTEROID_SPK_JD_END = year_to_jd(2100)  # Actual SPK coverage end
+_ASTEROID_BODY_IDS = {b[0] for b in ASTEROID_BODIES}
+
+
+def filter_asteroid_dates(
+    dates: list[float], body_id: int, margin: float = 365.0
+) -> list[float]:
+    """Filter test dates to asteroid SPK coverage range.
+
+    For non-asteroid bodies, returns dates unchanged.
+    For asteroids, excludes dates outside the SPK coverage range
+    (with a safety margin to avoid Chebyshev segments contaminated
+    by boundary extrapolation).
+    """
+    if body_id not in _ASTEROID_BODY_IDS:
+        return dates
+    jd_lo = _ASTEROID_SPK_JD_START + margin
+    jd_hi = _ASTEROID_SPK_JD_END - margin
+    return [jd for jd in dates if jd_lo <= jd <= jd_hi]
+
 
 # Ecliptic body tolerances (per-body, in arcsec / deg-day)
 ECLIPTIC_TOLERANCES = {

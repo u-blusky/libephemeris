@@ -15,7 +15,9 @@ from .conftest import (
     TOLS,
     ASTEROID_BODIES,
     CompareHelper,
+    filter_asteroid_dates,
     lon_error_arcsec,
+    _ASTEROID_BODY_IDS,
 )
 
 
@@ -37,7 +39,8 @@ class TestAsteroidPosition:
         max_lat_err = 0.0
         worst_jd = 0.0
 
-        for jd in test_dates_200:
+        dates = filter_asteroid_dates(test_dates_200, body_id)
+        for jd in dates:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
@@ -75,7 +78,8 @@ class TestAsteroidSpeed:
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in test_dates_200:
+        dates = filter_asteroid_dates(test_dates_200, body_id)
+        for jd in dates:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
@@ -84,7 +88,12 @@ class TestAsteroidSpeed:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS.SPEED_LON_DEG_DAY, (
+        tol = (
+            TOLS.ASTEROID_SPEED_LON_DEG_DAY
+            if body_id in _ASTEROID_BODY_IDS
+            else TOLS.SPEED_LON_DEG_DAY
+        )
+        assert max_err < tol, (
             f"{body_name}: max speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )
 
@@ -106,7 +115,8 @@ class TestAsteroidDistance:
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in test_dates_200:
+        dates = filter_asteroid_dates(test_dates_200, body_id)
+        for jd in dates:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 

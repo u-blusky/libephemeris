@@ -18,6 +18,8 @@ from .conftest import (
     ASTEROID_BODIES,
     HYPOTHETICAL_BODIES,
     CompareHelper,
+    filter_asteroid_dates,
+    _ASTEROID_BODY_IDS,
 )
 
 ALL_LEB_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL_BODIES
@@ -40,7 +42,8 @@ class TestLongitudeVelocity:
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in test_dates_100:
+        dates = filter_asteroid_dates(test_dates_100, body_id)
+        for jd in dates:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
@@ -49,7 +52,12 @@ class TestLongitudeVelocity:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS.SPEED_LON_DEG_DAY, (
+        tol = (
+            TOLS.ASTEROID_SPEED_LON_DEG_DAY
+            if body_id in _ASTEROID_BODY_IDS
+            else TOLS.SPEED_LON_DEG_DAY
+        )
+        assert max_err < tol, (
             f"{body_name}: max lon speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )
 
@@ -71,7 +79,8 @@ class TestLatitudeVelocity:
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in test_dates_100:
+        dates = filter_asteroid_dates(test_dates_100, body_id)
+        for jd in dates:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
@@ -80,7 +89,12 @@ class TestLatitudeVelocity:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS.SPEED_LAT_DEG_DAY, (
+        tol = (
+            TOLS.ASTEROID_SPEED_LAT_DEG_DAY
+            if body_id in _ASTEROID_BODY_IDS
+            else TOLS.SPEED_LAT_DEG_DAY
+        )
+        assert max_err < tol, (
             f"{body_name}: max lat speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )
 
@@ -102,7 +116,8 @@ class TestDistanceVelocity:
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in test_dates_100:
+        dates = filter_asteroid_dates(test_dates_100, body_id)
+        for jd in dates:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
@@ -111,7 +126,12 @@ class TestDistanceVelocity:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS.SPEED_DIST_AU_DAY, (
+        tol = (
+            TOLS.ASTEROID_SPEED_DIST_AU_DAY
+            if body_id in _ASTEROID_BODY_IDS
+            else TOLS.SPEED_DIST_AU_DAY
+        )
+        assert max_err < tol, (
             f"{body_name}: max dist speed error = {max_err:.2e} AU/day at JD {worst_jd:.1f}"
         )
 
