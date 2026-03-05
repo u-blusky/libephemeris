@@ -3249,7 +3249,10 @@ def main():
     # ------------------------------------------------------------------
     if args.verify_only:
         if args.tier:
-            _, _, _, tier_output = TIER_CONFIGS[args.tier]
+            ephem_file, _, _, tier_output = TIER_CONFIGS[args.tier]
+            from libephemeris import set_jpl_file
+
+            set_jpl_file(ephem_file)
             leb_path = (
                 args.output
                 if args.output
