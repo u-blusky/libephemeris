@@ -43,25 +43,47 @@ Errori misurati (100 date, 1560-2640):
 
 Nota: Saturn nel medium tier è molto migliore che nel base (0.13" vs 4.85"). Il worst case position è Uranus a ~1900 CE (4.58") — stessa questione architetturale di Saturn nel base tier.
 
-### 6. Lint: `poe lint` → All checks passed
+### 6. Eclipse test fix (`test_compare_leb_eclipses_solar.py`)
+- Fix lat/lon swap per Sydney — aggiunto helper `_geopos()` (fatto nella sessione precedente, incluso nel commit)
 
-## Risultati test
+### 7. Distance test fix (`test_compare_leb_distances.py`)
+- Aggiunto `filter_asteroid_dates` per Chiron/Ceres nel `DISTANCE_BODIES` (fatto nella sessione precedente, incluso nel commit)
+
+## Risultati finali
 
 - **Medium tier**: 976 passed, 0 failed, 12 skipped, 11 xfailed
-- **Base tier**: da verificare (test aborted, runnare di nuovo)
+- **Base tier**: 404 passed, 0 failed (verificato no regressioni)
+- **Lint**: `poe lint` → All checks passed
+- **Format**: `poe format` → 349 files left unchanged
+- **Typecheck**: `poe typecheck` → 16 errori pre-esistenti in `download.py` e `houses.py` (non LEB-related)
 
-## File modificati
+## File modificati (committati)
 
-- `tests/test_leb/compare/conftest.py` — SPK range, tolleranze medium
-- `tests/test_leb/compare/test_compare_leb_velocities.py` — assertion asteroidi
+- `tests/test_leb/compare/conftest.py` — SPK range 1900-2100, TIER_DEFAULTS["medium"] completo
+- `tests/test_leb/compare/test_compare_leb_velocities.py` — assertion asteroidi (3 classi)
 - `tests/test_leb/compare/test_compare_leb_asteroids.py` — assertion speed + import
-- `tests/test_leb/compare/test_compare_leb_crossings.py` — RuntimeError catch
-- `scripts/_measure_medium.py` — script di misurazione (temporaneo, da rimuovere)
+- `tests/test_leb/compare/test_compare_leb_crossings.py` — RuntimeError catch (geo + helio)
+- `tests/test_leb/compare/test_compare_leb_distances.py` — filter_asteroid_dates
+- `tests/test_leb/compare/test_compare_leb_eclipses_solar.py` — _geopos() helper
+- `TODO.md` — medium tier marcato come completato
+- `NOTES.md` — queste note
 
-## TODO rimanenti
+## Commit
+```
+4b0abcb feat(leb): complete medium tier precision improvement (976 passed, 0 failed)
+```
 
-- [ ] Runnare test base tier per verificare no regressioni
-- [ ] `poe format`
-- [ ] Aggiornare `TODO.md`
-- [ ] Commit
-- [ ] Rimuovere `scripts/_measure_medium.py`
+## Scoperte chiave della sessione
+
+1. **Range SPK asteroidi**: i file SPK21 di JPL Horizons coprono solo ~1900-2100 CE, non ~1600-2500 come inizialmente supposto. La contaminazione Kepleriana nei coefficienti Chebyshev si estende centinaia di anni oltre i confini SPK reali.
+
+2. **Uranus worst case**: nel medium tier, il worst case di posizione è Uranus a ~1900 CE (4.58"), non Saturn. Saturn è molto migliore nel medium tier (0.13") rispetto al base tier (4.85").
+
+3. **OscuApogee domina le velocità**: OscuApogee e InterpApogee hanno i più alti errori di velocità (0.043 deg/day lon, 0.00286 deg/day lat), più di qualsiasi pianeta.
+
+## TODO rimanenti (da TODO.md)
+
+- [ ] Extended tier (opzionale)
+- [ ] Release: upload LEB files su GitHub Releases
+- [ ] Typecheck: 16 errori pre-esistenti in download.py/houses.py (non nostri)
+- [ ] Merge del branch in main
