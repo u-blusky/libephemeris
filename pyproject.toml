@@ -209,9 +209,11 @@ typecheck = "mypy libephemeris"
 "test:leb:precision" = "pytest tests/test_leb/test_leb_precision.py -v"
 "test:leb:precision:quick" = "pytest tests/test_leb/test_leb_precision.py -v -k \"medium\""
 
-# LEB vs Skyfield comparison tests (medium tier - existing)
+# LEB vs Skyfield comparison tests (medium tier)
 "test:leb:compare" = "pytest tests/test_leb/compare/ -v -m leb_compare --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
 "test:leb:compare:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
+"test:leb:compare:medium" = "pytest tests/test_leb/compare/ -v -m leb_compare --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
+"test:leb:compare:medium:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
 
 # LEB vs Skyfield comparison tests (base tier)
 "test:leb:compare:base" = "pytest tests/test_leb/compare/base/ -v -m leb_compare_base"

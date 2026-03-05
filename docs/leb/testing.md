@@ -1,56 +1,58 @@
-# LEB vs Skyfield — Guida ai Test di Comparazione
+# LEB vs Skyfield — Comparison Test Guide
 
-Questa guida spiega come eseguire e interpretare i test che confrontano i risultati del calcolo LEB (LibEphemeris Binary) con quelli di Skyfield (calcolo diretto da effemeridi NASA JPL).
+This guide explains how to run and interpret the tests that compare LEB (LibEphemeris Binary) calculation results with Skyfield (direct calculation from NASA JPL ephemerides).
 
-## Prerequisiti
+## Prerequisites
 
-### File LEB
+### LEB Files
 
-I test richiedono file `.leb` pre-generati. Ci sono due posizioni possibili:
+Tests require pre-generated `.leb` files. There are two possible locations:
 
-| Posizione | Path | Note |
-|-----------|------|------|
-| **Locale** (default) | `data/leb/ephemeris_{tier}.leb` | Usata automaticamente dai test |
-| **Esterna** | `/Volumes/Data/libephemeris/leb/ephemeris_{tier}.leb` | Va indicata via env var |
+| Location | Path | Notes |
+|----------|------|-------|
+| **Local** (default) | `data/leb/ephemeris_{tier}.leb` | Used automatically by tests |
+| **External** | `/Volumes/Data/libephemeris/leb/ephemeris_{tier}.leb` | Must be set via env var |
 
-Per usare un file LEB esterno (ad esempio su un disco separato):
+To use an external LEB file (e.g. on a separate disk):
 
 ```bash
 export LIBEPHEMERIS_LEB=/Volumes/Data/libephemeris/leb/ephemeris_medium.leb
 ```
 
-Se il file LEB non viene trovato, i test vengono **skippati** (non falliscono).
+If the LEB file is not found, tests are **skipped** (they don't fail).
 
-### Tier disponibili
+### Available Tiers
 
-| Tier | Effemeridi | Range | File |
+| Tier | Ephemeris | Range | File |
 |------|-----------|-------|------|
 | `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~94 MB) |
 | `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~315 MB) |
 | `extended` | de441.bsp | -13200–+17191 | `ephemeris_extended.leb` |
 
-### Dipendenze
+### Dependencies
 
 ```bash
 uv pip install -e ".[dev]"
 ```
 
-I test degli asteroidi richiedono accesso alla rete per scaricare automaticamente i file SPK21 da JPL Horizons (gestito da `set_auto_spk_download(True)` nel setup dei test).
+Asteroid tests require network access to automatically download SPK21 files from JPL Horizons (handled by `set_auto_spk_download(True)` in the test setup).
 
 ---
 
-## Comandi rapidi
+## Quick Commands
 
 ### Medium tier (default)
 
 ```bash
-# Tutti i test medium (completo, ~90 secondi con -n 4)
+# All medium tests (full, ~90 seconds with -n 4)
 poe test:leb:compare
+poe test:leb:compare:medium
 
-# Solo i test veloci (no @pytest.mark.slow)
+# Fast tests only (no @pytest.mark.slow)
 poe test:leb:compare:quick
+poe test:leb:compare:medium:quick
 
-# Con parallelismo (raccomandato)
+# With parallelism (recommended)
 LIBEPHEMERIS_LEB=/path/to/ephemeris_medium.leb \
   pytest tests/test_leb/compare/ -m "leb_compare" -v --tb=short -n 4
 ```
@@ -58,13 +60,13 @@ LIBEPHEMERIS_LEB=/path/to/ephemeris_medium.leb \
 ### Base tier
 
 ```bash
-# Tutti i test base (~90 secondi con -n 4)
+# All base tests (~90 seconds with -n 4)
 poe test:leb:compare:base
 
-# Solo veloci
+# Fast only
 poe test:leb:compare:base:quick
 
-# Con parallelismo
+# With parallelism
 pytest tests/test_leb/compare/base/ -m "leb_compare_base" -v --tb=short -n 4
 ```
 
@@ -75,55 +77,55 @@ poe test:leb:compare:extended
 poe test:leb:compare:extended:quick
 ```
 
-### Tutti i tier insieme
+### All tiers together
 
 ```bash
 poe test:leb:compare:all
 ```
 
-### Test singolo
+### Single test
 
 ```bash
-# Un file specifico
+# A specific file
 pytest tests/test_leb/compare/test_compare_leb_planets.py -v -n 4
 
-# Un test specifico
+# A specific test
 pytest tests/test_leb/compare/test_compare_leb_planets.py::TestPlanetLongitude::test_longitude[6-Saturn] -v
 
-# Per keyword
+# By keyword
 pytest tests/test_leb/compare/ -m "leb_compare" -k "asteroid" -v -n 4
 ```
 
 ---
 
-## Struttura dei test
+## Test Structure
 
 ### Directory
 
 ```
 tests/test_leb/compare/
-├── conftest.py                          # Infrastruttura condivisa (tolleranze, helper, fixture)
-├── test_compare_leb_planets.py          # Lon, lat, dist, speed dei pianeti ICRS
-├── test_compare_leb_asteroids.py        # Posizione, speed, distanza asteroidi
-├── test_compare_leb_hypothetical.py     # Corpi Uraniani (Cupido, Hades, Zeus, ...)
-├── test_compare_leb_velocities.py       # Speed lon/lat/dist per tutti i 30 corpi
-├── test_compare_leb_distances.py        # Distanza geocentrica e eliocentrica
+├── conftest.py                          # Shared infrastructure (tolerances, helpers, fixtures)
+├── test_compare_leb_planets.py          # Lon, lat, dist, speed for ICRS planets
+├── test_compare_leb_asteroids.py        # Position, speed, distance for asteroids
+├── test_compare_leb_hypothetical.py     # Uranian bodies (Cupido, Hades, Zeus, ...)
+├── test_compare_leb_velocities.py       # Speed lon/lat/dist for all 30 bodies
+├── test_compare_leb_distances.py        # Geocentric and heliocentric distance
 ├── test_compare_leb_crossings.py        # swe_cross_ut, swe_solcross_ut, ...
-├── test_compare_leb_eclipses_solar.py   # Eclissi solari
-├── test_compare_leb_eclipses_lunar.py   # Eclissi lunari
-├── test_compare_leb_nutation.py         # Nutazione
+├── test_compare_leb_eclipses_solar.py   # Solar eclipses
+├── test_compare_leb_eclipses_lunar.py   # Lunar eclipses
+├── test_compare_leb_nutation.py         # Nutation
 ├── test_compare_leb_deltat.py           # Delta-T
-├── test_compare_leb_ayanamsha.py        # Ayanamsha (27 modi siderali)
-├── test_compare_leb_sidereal.py         # Posizioni siderali
-├── test_compare_leb_observations.py     # Coordinate equatoriali, J2000
-├── test_compare_leb_houses.py           # Case (Placidus, Koch, ...)
-├── test_compare_leb_rise_transit.py     # Alba, tramonto, transito
-├── test_compare_leb_stations.py         # Stazioni (retrogradazione)
-├── test_compare_leb_elongation.py       # Elongazione
-├── test_compare_leb_gauquelin.py        # Settori Gauquelin
-├── test_compare_leb_lunar.py            # Funzioni lunari specifiche
-├── base/                                # Test base tier (de440s)
-│   ├── conftest.py                      # Tolleranze e fixture base tier
+├── test_compare_leb_ayanamsha.py        # Ayanamsha (27 sidereal modes)
+├── test_compare_leb_sidereal.py         # Sidereal positions
+├── test_compare_leb_observations.py     # Equatorial coordinates, J2000
+├── test_compare_leb_houses.py           # Houses (Placidus, Koch, ...)
+├── test_compare_leb_rise_transit.py     # Rise, set, transit
+├── test_compare_leb_stations.py         # Stations (retrogradation)
+├── test_compare_leb_elongation.py       # Elongation
+├── test_compare_leb_gauquelin.py        # Gauquelin sectors
+├── test_compare_leb_lunar.py            # Lunar-specific functions
+├── base/                                # Base tier tests (de440s)
+│   ├── conftest.py                      # Base tier tolerances and fixtures
 │   ├── test_base_planets.py
 │   ├── test_base_asteroids.py
 │   ├── test_base_velocities.py
@@ -132,43 +134,43 @@ tests/test_leb/compare/
 │   ├── test_base_sidereal.py
 │   ├── test_base_flags.py
 │   └── test_base_lunar.py
-├── extended/                            # Test extended tier (de441)
-└── crosstier/                           # Test di consistenza cross-tier
+├── extended/                            # Extended tier tests (de441)
+└── crosstier/                           # Cross-tier consistency tests
 ```
 
-### Marker pytest
+### Pytest Markers
 
-| Marker | Significato |
-|--------|-------------|
-| `leb_compare` | Test medium tier |
-| `leb_compare_base` | Test base tier |
-| `leb_compare_extended` | Test extended tier |
-| `leb_compare_crosstier` | Test cross-tier |
-| `slow` | Test intensivi (100-200 date per corpo) |
+| Marker | Meaning |
+|--------|---------|
+| `leb_compare` | Medium tier test |
+| `leb_compare_base` | Base tier test |
+| `leb_compare_extended` | Extended tier test |
+| `leb_compare_crosstier` | Cross-tier test |
+| `slow` | Intensive tests (100-200 dates per body) |
 
 ---
 
-## Come funziona il confronto
+## How Comparison Works
 
 ### CompareHelper
 
-Il cuore dell'infrastruttura è la classe `CompareHelper` in `conftest.py`. Esegue la stessa funzione in due modalità:
+The core of the infrastructure is the `CompareHelper` class in `conftest.py`. It runs the same function in two modes:
 
 ```python
-# Modalità Skyfield (riferimento): calcolo diretto da effemeridi NASA
+# Skyfield mode (reference): direct calculation from NASA ephemerides
 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
-# Modalità LEB: calcolo via Chebyshev precomputed
+# LEB mode: calculation via precomputed Chebyshev polynomials
 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 ```
 
-Internamente, `CompareHelper`:
-1. **Salva** lo stato globale di libephemeris (mode, tier, LEB file)
-2. **skyfield()**: forza `set_calc_mode("skyfield")` e il precision tier corretto
-3. **leb()**: forza il file LEB specificato e `set_calc_mode("auto")`
-4. **teardown()**: ripristina lo stato originale
+Internally, `CompareHelper`:
+1. **Saves** the global libephemeris state (mode, tier, LEB file)
+2. **skyfield()**: forces `set_calc_mode("skyfield")` and the correct precision tier
+3. **leb()**: forces the specified LEB file and `set_calc_mode("auto")`
+4. **teardown()**: restores the original state
 
-### Pattern tipico di un test
+### Typical Test Pattern
 
 ```python
 @pytest.mark.leb_compare
@@ -192,109 +194,109 @@ def test_longitude(self, compare, test_dates_200, body_id, body_name):
     )
 ```
 
-Il test:
-1. Itera su N date uniformemente distribuite nel range del tier
-2. Per ogni data, calcola con Skyfield e con LEB
-3. Misura l'errore massimo (worst case)
-4. Confronta con la tolleranza del tier
+The test:
+1. Iterates over N dates uniformly distributed across the tier range
+2. For each date, calculates with Skyfield and with LEB
+3. Measures the maximum error (worst case)
+4. Compares against the tier tolerance
 
-### Date di test
+### Test Dates
 
-Le date sono generate uniformemente nel range del tier con un margine di 30 giorni ai bordi:
+Dates are generated uniformly across the tier range with a 30-day margin at the edges:
 
-| Fixture | N date | Uso |
-|---------|--------|-----|
-| `test_dates_200` | 200 | Posizione pianeti, asteroidi |
-| `test_dates_100` | 100 | Velocità, distanze |
-| `test_dates_50` | 50 | Equatoriali, siderali |
-| `test_dates_20` | 20 | Test rapidi |
+| Fixture | N dates | Usage |
+|---------|---------|-------|
+| `test_dates_200` | 200 | Planet and asteroid positions |
+| `test_dates_100` | 100 | Velocities, distances |
+| `test_dates_50` | 50 | Equatorial, sidereal |
+| `test_dates_20` | 20 | Quick tests |
 
-Per il base tier: `base_dates_300`, `base_dates_150`, `base_dates_100`, `base_dates_50`.
+For the base tier: `base_dates_300`, `base_dates_150`, `base_dates_100`, `base_dates_50`.
 
-### Filtro date asteroidi
+### Asteroid Date Filtering
 
-Gli asteroidi hanno dati SPK validi solo per ~1900-2100 CE. Le date vengono filtrate automaticamente:
+Asteroids have valid SPK data only for ~1900-2100 CE. Dates are filtered automatically:
 
 ```python
 dates = filter_asteroid_dates(test_dates_200, body_id)
 ```
 
-Per corpi non-asteroidi, restituisce tutte le date invariate.
+For non-asteroid bodies, all dates are returned unchanged.
 
 ---
 
-## Tolleranze
+## Tolerances
 
-### Struttura
+### Structure
 
-Le tolleranze sono definite nella dataclass `TierTolerances` e configurate per tier in `TIER_DEFAULTS`:
+Tolerances are defined in the `TierTolerances` dataclass and configured per tier in `TIER_DEFAULTS`:
 
 ```python
-TOLS = TierTolerances.for_tier("medium")  # Carica i default del medium tier
+TOLS = TierTolerances.for_tier("medium")  # Loads medium tier defaults
 ```
 
-### Override via variabili d'ambiente
+### Override via Environment Variables
 
 ```bash
-# Override per un tier specifico
+# Override for a specific tier
 LEB_TOL_BASE_POSITION_ARCSEC=10.0 pytest ...
 
-# Override globale (fallback per tutti i tier)
+# Global override (fallback for all tiers)
 LEB_TOL_POSITION_ARCSEC=10.0 pytest ...
 ```
 
-Ordine di priorità (dal più alto al più basso):
-1. Override esplicito via kwargs
-2. `LEB_TOL_{TIER}_{FIELD}` (env var per-tier)
-3. `LEB_TOL_{FIELD}` (env var globale)
-4. `TIER_DEFAULTS[tier]` (default nel codice)
-5. Default della dataclass
+Priority order (highest to lowest):
+1. Explicit override via kwargs
+2. `LEB_TOL_{TIER}_{FIELD}` (per-tier env var)
+3. `LEB_TOL_{FIELD}` (global env var)
+4. `TIER_DEFAULTS[tier]` (code defaults)
+5. Dataclass defaults
 
-### Tolleranze correnti
+### Current Tolerances
 
-#### Posizione
+#### Position
 
-| Campo | Base | Medium | Unità | Note |
-|-------|------|--------|-------|------|
-| `POSITION_ARCSEC` | 5.0 | 5.0 | arcsec | Saturn/Uranus (limite architetturale) |
+| Field | Base | Medium | Unit | Notes |
+|-------|------|--------|------|-------|
+| `POSITION_ARCSEC` | 5.0 | 5.0 | arcsec | Saturn/Uranus (architectural limit) |
 | `ASTEROID_ARCSEC` | 0.5 | 0.5 | arcsec | |
-| `ECLIPTIC_ARCSEC` | 0.05 | 0.05 | arcsec | Nodi, Lilith |
-| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | arcsec | Uraniani (errore ~0) |
+| `ECLIPTIC_ARCSEC` | 0.05 | 0.05 | arcsec | Nodes, Lilith |
+| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | arcsec | Uranians (error ~0) |
 | `EQUATORIAL_ARCSEC` | 1.0 | 0.5 | arcsec | |
 | `J2000_ARCSEC` | 1.0 | 0.5 | arcsec | |
 | `SIDEREAL_ARCSEC` | 5.0 | 5.0 | arcsec | |
 | `DISTANCE_AU` | 3e-5 | 3e-5 | AU | |
 
-#### Velocità
+#### Velocity
 
-| Campo | Base | Medium | Unità | Note |
-|-------|------|--------|-------|------|
-| `SPEED_LON_DEG_DAY` | 0.045 | 0.045 | deg/day | OscuApogee domina |
+| Field | Base | Medium | Unit | Notes |
+|-------|------|--------|------|-------|
+| `SPEED_LON_DEG_DAY` | 0.045 | 0.045 | deg/day | OscuApogee dominates |
 | `SPEED_LAT_DEG_DAY` | 0.005 | 0.004 | deg/day | |
 | `SPEED_DIST_AU_DAY` | 1e-4 | 3e-5 | AU/day | |
 | `ASTEROID_SPEED_LON_DEG_DAY` | — | 0.001 | deg/day | |
-| `ASTEROID_SPEED_LAT_DEG_DAY` | 0.75 | 0.40 | deg/day | Limite architetturale |
+| `ASTEROID_SPEED_LAT_DEG_DAY` | 0.75 | 0.40 | deg/day | Architectural limit |
 | `ASTEROID_SPEED_DIST_AU_DAY` | — | 1e-6 | AU/day | |
 
-#### Timing (funzioni indirette)
+#### Timing (indirect functions)
 
-| Campo | Valore | Unità | Funzione testata |
-|-------|--------|-------|-----------------|
+| Field | Value | Unit | Tested function |
+|-------|-------|------|-----------------|
 | `CROSSING_SUN_SEC` | 1.0 | sec | `swe_solcross_ut` |
 | `CROSSING_MOON_SEC` | 5.0 | sec | `swe_mooncross_ut` |
 | `CROSSING_PLANET_SEC` | 30.0 | sec | `swe_cross_ut` |
 | `ECLIPSE_TIMING_SEC` | 1.0 | sec | `swe_sol_eclipse_*` |
-| `STATION_TIMING_SEC` | 1.0 | sec | Stazioni retrograde |
+| `STATION_TIMING_SEC` | 1.0 | sec | Retrograde stations |
 | `RISE_TRANSIT_SEC` | 1.0 | sec | `swe_rise_trans` |
 
 ---
 
-## Corpi testati (31 totali)
+## Tested Bodies (31 total)
 
-### Pipeline A — ICRS (11 corpi)
+### Pipeline A — ICRS (11 bodies)
 
-| ID | Nome | Note |
-|----|------|------|
+| ID | Name | Notes |
+|----|------|-------|
 | 0 | Sun | |
 | 1 | Moon | |
 | 2 | Mercury | |
@@ -307,30 +309,30 @@ Ordine di priorità (dal più alto al più basso):
 | 9 | Pluto | |
 | 14 | Earth | |
 
-### Pipeline A — Asteroidi (5 corpi)
+### Pipeline A — Asteroids (5 bodies)
 
-| ID | Nome | Note |
-|----|------|------|
-| 15 | Chiron | SPK valido solo 1900–2100 |
-| 17 | Ceres | SPK valido solo 1900–2100 |
-| 18 | Pallas | SPK valido solo 1900–2100, orbita inclinata 34.8° |
-| 19 | Juno | SPK valido solo 1900–2100 |
-| 20 | Vesta | SPK valido solo 1900–2100 |
+| ID | Name | Notes |
+|----|------|-------|
+| 15 | Chiron | SPK valid only 1900–2100 |
+| 17 | Ceres | SPK valid only 1900–2100 |
+| 18 | Pallas | SPK valid only 1900–2100, orbital inclination 34.8° |
+| 19 | Juno | SPK valid only 1900–2100 |
+| 20 | Vesta | SPK valid only 1900–2100 |
 
-### Pipeline B — Eclittici (6 corpi)
+### Pipeline B — Ecliptic (6 bodies)
 
-| ID | Nome | Note |
-|----|------|------|
-| 10 | MeanNode | Errore ~0 (formula analitica) |
+| ID | Name | Notes |
+|----|------|-------|
+| 10 | MeanNode | Error ~0 (analytical formula) |
 | 11 | TrueNode | |
-| 12 | MeanApogee | Errore ~0 (formula analitica) |
-| 13 | OscuApogee | Errore maggiore in velocità |
+| 12 | MeanApogee | Error ~0 (analytical formula) |
+| 13 | OscuApogee | Highest velocity error |
 | 21 | InterpApogee | |
 | 22 | InterpPerigee | |
 
-### Pipeline B — Ipotetici/Uraniani (9 corpi)
+### Pipeline B — Hypothetical/Uranian (9 bodies)
 
-| ID | Nome |
+| ID | Name |
 |----|------|
 | 40 | Cupido |
 | 41 | Hades |
@@ -344,13 +346,13 @@ Ordine di priorità (dal più alto al più basso):
 
 ---
 
-## Rigenerazione dei file LEB
+## LEB File Regeneration
 
-Se modifichi i parametri Chebyshev o la pipeline di calcolo, devi rigenerare i file LEB.
+If you modify Chebyshev parameters or the calculation pipeline, you must regenerate the LEB files.
 
-### Generazione per gruppi (raccomandato)
+### Group generation (recommended)
 
-Su macOS usare sempre la generazione per gruppi (evita deadlock del multiprocessing):
+On macOS always use group generation (avoids multiprocessing deadlocks):
 
 ```bash
 # Base tier
@@ -363,13 +365,13 @@ poe leb:generate:medium:groups
 poe leb:generate:extended:groups
 ```
 
-Ogni comando esegue in sequenza:
-1. `planets` — Sun-Pluto, Earth (11 corpi)
-2. `asteroids` — Chiron, Ceres, Pallas, Juno, Vesta (5 corpi)
-3. `analytical` — Nodi, Lilith, Uraniani (15 corpi)
-4. `merge` — Unisce i 3 file parziali + verifica
+Each command runs in sequence:
+1. `planets` — Sun-Pluto, Earth (11 bodies)
+2. `asteroids` — Chiron, Ceres, Pallas, Juno, Vesta (5 bodies)
+3. `analytical` — Nodes, Lilith, Uranians (15 bodies)
+4. `merge` — Merges the 3 partial files + verification
 
-### Generazione singola (Linux)
+### Single generation (Linux)
 
 ```bash
 poe leb:generate:base
@@ -377,9 +379,9 @@ poe leb:generate:medium
 poe leb:generate:extended
 ```
 
-### Copia su disco esterno
+### Copy to external disk
 
-Dopo la generazione, il file è in `data/leb/`. Per usarlo dai test con env var:
+After generation, the file is in `data/leb/`. To use it from tests with env var:
 
 ```bash
 cp data/leb/ephemeris_medium.leb /Volumes/Data/libephemeris/leb/
@@ -387,54 +389,54 @@ cp data/leb/ephemeris_medium.leb /Volumes/Data/libephemeris/leb/
 
 ---
 
-## Test xfailed e skipped
+## xfailed and Skipped Tests
 
-### xfail (fallimenti attesi)
+### xfail (expected failures)
 
-| Test | Motivo |
+| Test | Reason |
 |------|--------|
-| Jupiter/Saturn crossing geocentrico | Bug pre-esistente nel solver `crossing.py` (non LEB) |
-| Mars 180° crossing geocentrico | `RuntimeError: Maximum iterations reached` (non LEB) |
-| Saturn 180°/270° crossing eliocentrico | `RuntimeError: Heliocentric crossing search diverged` (non LEB) |
+| Jupiter/Saturn geocentric crossing | Pre-existing bug in `crossing.py` solver (not LEB) |
+| Mars 180° geocentric crossing | `RuntimeError: Maximum iterations reached` (not LEB) |
+| Saturn 180°/270° heliocentric crossing | `RuntimeError: Heliocentric crossing search diverged` (not LEB) |
 
 ### skip
 
-I test vengono skippati se il file LEB del tier corrispondente non è trovato.
+Tests are skipped if the LEB file for the corresponding tier is not found.
 
 ---
 
-## Interpretare i fallimenti
+## Interpreting Failures
 
-### Errore di posizione (arcsec)
+### Position error (arcsec)
 
 ```
 AssertionError: Saturn: max lon error = 6.2345" at JD 2451544.5
 assert 6.2345 < 5.0
 ```
 
-L'errore è in **arcosecondi**. Per convertire:
-- In gradi: dividere per 3600 (6.23" = 0.0017°)
-- In minuti d'arco: dividere per 60 (6.23" = 0.10')
+The error is in **arcseconds**. To convert:
+- To degrees: divide by 3600 (6.23" = 0.0017°)
+- To arcminutes: divide by 60 (6.23" = 0.10')
 
-### Errore di velocità (deg/day)
+### Velocity error (deg/day)
 
 ```
 AssertionError: Pallas: max lat speed error = 0.450000 deg/day at JD 2451544.5
 assert 0.45 < 0.40
 ```
 
-### Errore di distanza (AU)
+### Distance error (AU)
 
 ```
 AssertionError: Pluto: max dist error = 4.50e-05 AU at JD 2451544.5
 assert 4.5e-05 < 3e-05
 ```
 
-1 AU = ~150 milioni di km. Un errore di 3e-5 AU = ~4500 km.
+1 AU = ~150 million km. An error of 3e-5 AU = ~4500 km.
 
-### Cosa fare se un test fallisce
+### What to do if a test fails
 
-1. **Controllare la data** — errori grandi a date estreme (inizio/fine del tier) suggeriscono contaminazione SPK o segmenti Chebyshev di bordo
-2. **Controllare il corpo** — Saturn, Uranus, asteroidi hanno limiti architetturali noti
-3. **Allargare la tolleranza?** — solo se l'errore è vicino al limite e il margine di sicurezza (2x) è confermato su molte date
-4. **Rigenerare il LEB?** — se hai cambiato parametri in `leb_format.py` o `fast_calc.py`
+1. **Check the date** — large errors at extreme dates (start/end of tier) suggest SPK contamination or edge Chebyshev segments
+2. **Check the body** — Saturn, Uranus, asteroids have known architectural limits
+3. **Widen the tolerance?** — only if the error is close to the limit and the safety margin (2x) is confirmed across many dates
+4. **Regenerate the LEB?** — if you changed parameters in `leb_format.py` or `fast_calc.py`
