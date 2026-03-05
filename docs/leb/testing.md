@@ -371,7 +371,24 @@ Each command runs in sequence:
 3. `analytical` — Nodes, Lilith, Uranians (15 bodies)
 4. `merge` — Merges the 3 partial files + verification
 
-### Single generation (Linux)
+### Single-body generation (lowest memory)
+
+If group generation still uses too much memory, use single-body mode. Each of the 31 bodies is generated in its own subprocess (one at a time), then all partial files are merged:
+
+```bash
+# Base tier
+poe leb:generate:base:single
+
+# Medium tier
+poe leb:generate:medium:single
+
+# Extended tier
+poe leb:generate:extended:single
+```
+
+This is slower than group mode but uses minimal memory (~1 body in memory at a time).
+
+### Direct generation (Linux)
 
 ```bash
 poe leb:generate:base

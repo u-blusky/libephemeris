@@ -3165,6 +3165,13 @@ def main():
         "Example: --merge planets.leb asteroids.leb analytical.leb",
     )
     parser.add_argument(
+        "--single",
+        action="store_true",
+        help="Generate each body in its own subprocess (lowest memory usage). "
+        "Each body runs sequentially, then all partial files are merged. "
+        "Use this on memory-constrained machines.",
+    )
+    parser.add_argument(
         "--quiet",
         "-q",
         action="store_true",
@@ -3228,13 +3235,13 @@ def main():
     # ------------------------------------------------------------------
     # Mode 2a: Subprocess orchestration (full generation, no --group/--bodies)
     #
-    # Each body group (planets, asteroids, analytical) is generated in a
-    # separate subprocess to keep peak memory low (~1-3 GB per process
-    # instead of ~6+ GB combined).  The partial files are then merged
-    # in-process and deleted.
+    # Two sub-modes:
+    #   --single : one subprocess per body (lowest memory, ~31 subprocesses)
+    #   default  : one subprocess per group (3 subprocesses)
+    #
+    # The partial files are then merged in-process and deleted.
     # ------------------------------------------------------------------
     if bodies is None and args.group is None:
-        groups = ["planets", "asteroids", "analytical"]
         partial_files: list[str] = []
 
         # Build the base command shared by all subprocesses
@@ -3251,24 +3258,72 @@ def main():
 
         t0 = time.time()
 
-        for i, group in enumerate(groups, 1):
-            partial = _group_output_path(output, group)
-            partial_files.append(partial)
+        if args.single:
+            # Single-body mode: one subprocess per body
+            all_bodies = []
+            for group_bodies in BODY_GROUPS.values():
+                all_bodies.extend(group_bodies)
+            # Deduplicate preserving order
+            seen: set[int] = set()
+            unique_bodies: list[int] = []
+            for bid in all_bodies:
+                if bid not in seen:
+                    seen.add(bid)
+                    unique_bodies.append(bid)
 
             if not args.quiet:
-                print(f"\n[{i}/{len(groups)}] Generating {group} group...")
-
-            # Pass --output explicitly so the subprocess writes to the
-            # exact partial path we expect (avoids auto-suffix mismatch).
-            cmd = base_cmd + ["--group", group, "--output", partial]
-            result = subprocess.run(cmd)
-            if result.returncode != 0:
                 print(
-                    f"Error: {group} group generation failed "
-                    f"(exit code {result.returncode})",
-                    file=sys.stderr,
+                    f"  Single-body mode: generating {len(unique_bodies)} "
+                    f"bodies sequentially"
                 )
-                sys.exit(result.returncode)
+
+            for i, bid in enumerate(unique_bodies, 1):
+                name = BODY_NAMES.get(bid, f"Body {bid}")
+                partial = _group_output_path(output, f"body{bid}")
+                partial_files.append(partial)
+
+                if not args.quiet:
+                    print(
+                        f"\n[{i}/{len(unique_bodies)}] "
+                        f"Generating body {bid} ({name})..."
+                    )
+
+                cmd = base_cmd + [
+                    "--bodies",
+                    str(bid),
+                    "--output",
+                    partial,
+                ]
+                result = subprocess.run(cmd)
+                if result.returncode != 0:
+                    print(
+                        f"Error: body {bid} ({name}) generation failed "
+                        f"(exit code {result.returncode})",
+                        file=sys.stderr,
+                    )
+                    sys.exit(result.returncode)
+        else:
+            # Group mode (default): one subprocess per group
+            groups = ["planets", "asteroids", "analytical"]
+
+            for i, group in enumerate(groups, 1):
+                partial = _group_output_path(output, group)
+                partial_files.append(partial)
+
+                if not args.quiet:
+                    print(f"\n[{i}/{len(groups)}] Generating {group} group...")
+
+                # Pass --output explicitly so the subprocess writes to the
+                # exact partial path we expect (avoids auto-suffix mismatch).
+                cmd = base_cmd + ["--group", group, "--output", partial]
+                result = subprocess.run(cmd)
+                if result.returncode != 0:
+                    print(
+                        f"Error: {group} group generation failed "
+                        f"(exit code {result.returncode})",
+                        file=sys.stderr,
+                    )
+                    sys.exit(result.returncode)
 
         # Merge partial files into final output
         if not args.quiet:

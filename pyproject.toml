@@ -297,6 +297,10 @@ help = "Merge base tier partial files into ephemeris_base.leb"
 sequence = ["leb:generate:base:planets", "leb:generate:base:asteroids", "leb:generate:base:analytical", "leb:generate:base:merge"]
 help = "Generate base tier via groups (planets + asteroids + analytical) then merge"
 
+[tool.poe.tasks."leb:generate:base:single"]
+cmd = "python scripts/generate_leb.py --tier base --single --verify"
+help = "Generate base tier one body at a time (lowest memory usage)"
+
 # Medium tier group generation
 [tool.poe.tasks."leb:generate:medium:planets"]
 cmd = "python scripts/generate_leb.py --tier medium --group planets"
@@ -322,6 +326,10 @@ help = "Merge medium tier partial files into ephemeris_medium.leb"
 sequence = ["leb:generate:medium:planets", "leb:generate:medium:asteroids", "leb:generate:medium:analytical", "leb:generate:medium:merge"]
 help = "Generate medium tier via groups (planets + asteroids + analytical) then merge"
 
+[tool.poe.tasks."leb:generate:medium:single"]
+cmd = "python scripts/generate_leb.py --tier medium --single --verify"
+help = "Generate medium tier one body at a time (lowest memory usage)"
+
 # Extended tier group generation
 [tool.poe.tasks."leb:generate:extended:planets"]
 cmd = "python scripts/generate_leb.py --tier extended --group planets"
@@ -346,6 +354,10 @@ help = "Merge extended tier partial files into ephemeris_extended.leb"
 [tool.poe.tasks."leb:generate:extended:groups"]
 sequence = ["leb:generate:extended:planets", "leb:generate:extended:asteroids", "leb:generate:extended:analytical", "leb:generate:extended:merge"]
 help = "Generate extended tier via groups (planets + asteroids + analytical) then merge"
+
+[tool.poe.tasks."leb:generate:extended:single"]
+cmd = "python scripts/generate_leb.py --tier extended --single --verify"
+help = "Generate extended tier one body at a time (lowest memory usage)"
 
 # LEB release — upload generated .leb files to GitHub Releases (data-v1)
 # Requires: gh CLI authenticated (gh auth login)
