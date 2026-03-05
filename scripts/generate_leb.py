@@ -1047,19 +1047,18 @@ def generate_ecliptic_bodies_vectorized(
         chunk_segs = max_chunk_jds // pts_per_seg
         chunk_jds = chunk_segs * pts_per_seg
         n_chunks = math.ceil(len(all_jds) / chunk_jds)
-        if verbose:
-            print(
-                f"    Chunked evaluation: {n_chunks} chunks "
-                f"of ~{chunk_segs:,} segments ({chunk_jds:,} JDs)"
-            )
 
         accumulated: dict[int, list] = {bid: [] for bid in body_ids}
+        bar = ProgressBar(
+            total=len(all_jds),
+            label="Ecliptic eval",
+            unit="JDs",
+            enabled=verbose,
+        )
         for ci in range(n_chunks):
             start_idx = ci * chunk_jds
             end_idx = min(start_idx + chunk_jds, len(all_jds))
             jds_chunk = all_jds[start_idx:end_idx]
-            if verbose:
-                print(f"      Chunk {ci + 1}/{n_chunks}: {len(jds_chunk):,} JDs...")
             chunk_results = _eval_ecliptic_bodies_batch(
                 jds_chunk, body_ids, verbose=False
             )
@@ -1068,6 +1067,8 @@ def generate_ecliptic_bodies_vectorized(
                     accumulated[bid].append(chunk_results[bid])
             # Free chunk intermediates
             del chunk_results, jds_chunk
+            bar.update(end_idx)
+        bar.finish()
 
         body_values = {
             bid: np.concatenate(parts) for bid, parts in accumulated.items() if parts
@@ -1845,14 +1846,37 @@ def generate_nutation(
     all_jds, n_segments, pts_per_seg = _compute_all_segment_jds(
         jd_start, jd_end, NUTATION_INTERVAL, NUTATION_DEGREE
     )
+    n_points = len(all_jds)
 
     # Convert JD to TT (J2000 epoch split for erfa)
     # erfa uses (jd1, jd2) split: jd1 = 2451545.0 (J2000), jd2 = jd - 2451545.0
     jd1 = np.full_like(all_jds, 2451545.0)
     jd2 = all_jds - 2451545.0
 
-    # Single vectorized erfa call
-    dpsi, deps = erfa.nut06a(jd1, jd2)  # Both in radians
+    # Chunked erfa computation with progress bar for large arrays
+    CHUNK_SIZE = 500_000
+    if n_points > CHUNK_SIZE:
+        dpsi_list = []
+        deps_list = []
+        bar = ProgressBar(
+            total=n_points,
+            label="Nutation (erfa)",
+            unit="pts",
+            enabled=verbose,
+        )
+        for i in range(0, n_points, CHUNK_SIZE):
+            end_i = min(i + CHUNK_SIZE, n_points)
+            dpsi_chunk, deps_chunk = erfa.nut06a(jd1[i:end_i], jd2[i:end_i])
+            dpsi_list.append(dpsi_chunk)
+            deps_list.append(deps_chunk)
+            bar.update(end_i)
+        bar.finish()
+        dpsi = np.concatenate(dpsi_list)
+        deps = np.concatenate(deps_list)
+    else:
+        if verbose:
+            print(f"Computing nutation for {n_points:,} points...")
+        dpsi, deps = erfa.nut06a(jd1, jd2)
 
     # Stack into (N, 2) array
     all_values = np.column_stack([dpsi, deps])
@@ -3206,6 +3230,12 @@ def main():
         "Used internally by --single mode for all bodies except the first.",
     )
     parser.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="Only verify an existing .leb file (no generation). "
+        "Use with --tier to auto-resolve the file path, or --output to specify one.",
+    )
+    parser.add_argument(
         "--quiet",
         "-q",
         action="store_true",
@@ -3213,6 +3243,34 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # ------------------------------------------------------------------
+    # Mode 0: Verify-only (no generation)
+    # ------------------------------------------------------------------
+    if args.verify_only:
+        if args.tier:
+            _, _, _, tier_output = TIER_CONFIGS[args.tier]
+            leb_path = (
+                args.output
+                if args.output
+                else os.path.join(DEFAULT_LEB_DIR, tier_output)
+            )
+        elif args.output:
+            leb_path = args.output
+        else:
+            parser.error("--verify-only requires --tier or --output")
+            return  # unreachable
+
+        if not os.path.exists(leb_path):
+            print(f"Error: file not found: {leb_path}", file=sys.stderr)
+            sys.exit(1)
+
+        ok = verify_leb(
+            leb_path,
+            n_samples=args.verify_samples,
+            verbose=not args.quiet,
+        )
+        sys.exit(0 if ok else 1)
 
     # ------------------------------------------------------------------
     # Mode 1: Merge existing partial files
@@ -3293,7 +3351,9 @@ def main():
         t0 = time.time()
 
         if args.single:
-            # Single-body mode: one subprocess per body
+            # Single-body mode: one subprocess per body, except
+            # Skyfield-dependent ecliptic bodies (11, 13, 21, 22) are grouped
+            # into a single subprocess to share the expensive Moon computation.
             all_bodies = []
             for group_bodies in BODY_GROUPS.values():
                 all_bodies.extend(group_bodies)
@@ -3305,37 +3365,56 @@ def main():
                     seen.add(bid)
                     unique_bodies.append(bid)
 
+            # Group Skyfield-dependent ecliptic bodies into one unit.
+            # These all need (moon-earth).at(t) which is the dominant cost;
+            # running them together computes it once instead of 4 times.
+            _SKYFIELD_ECLIPTIC = {11, 13, 21, 22}
+            units: list[tuple[list[int], str]] = []
+            skyfield_group: list[int] = []
+            for bid in unique_bodies:
+                if bid in _SKYFIELD_ECLIPTIC:
+                    skyfield_group.append(bid)
+                else:
+                    name = BODY_NAMES.get(bid, f"Body {bid}")
+                    units.append(([bid], name))
+            if skyfield_group:
+                names = ", ".join(BODY_NAMES.get(b, str(b)) for b in skyfield_group)
+                units.append((skyfield_group, names))
+
             if not args.quiet:
                 print(
-                    f"  Single-body mode: generating {len(unique_bodies)} "
-                    f"bodies sequentially"
+                    f"  Single-body mode: {len(units)} units "
+                    f"({len(unique_bodies)} bodies, "
+                    f"ecliptic group: {len(skyfield_group)} bodies)"
                 )
 
-            for i, bid in enumerate(unique_bodies, 1):
-                name = BODY_NAMES.get(bid, f"Body {bid}")
-                partial = _group_output_path(output, f"body{bid}")
+            for i, (bids, name) in enumerate(units, 1):
+                bid_str = ",".join(str(b) for b in bids)
+                suffix = (
+                    f"body{bids[0]}"
+                    if len(bids) == 1
+                    else f"bodies{'_'.join(str(b) for b in bids)}"
+                )
+                partial = _group_output_path(output, suffix)
                 partial_files.append(partial)
 
                 if not args.quiet:
-                    print(
-                        f"\n[{i}/{len(unique_bodies)}] "
-                        f"Generating body {bid} ({name})..."
-                    )
+                    print(f"\n[{i}/{len(units)}] Generating {name}...")
 
                 cmd = base_cmd + [
                     "--bodies",
-                    str(bid),
+                    bid_str,
                     "--output",
                     partial,
                 ]
-                # Only the first body generates nutation/delta-T/stars;
+                # Only the first unit generates nutation/delta-T/stars;
                 # all others skip aux data (merge takes it from the first).
                 if i > 1:
                     cmd.append("--skip-aux")
                 result = subprocess.run(cmd)
                 if result.returncode != 0:
                     print(
-                        f"Error: body {bid} ({name}) generation failed "
+                        f"Error: {name} generation failed "
                         f"(exit code {result.returncode})",
                         file=sys.stderr,
                     )
