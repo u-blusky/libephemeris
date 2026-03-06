@@ -165,6 +165,9 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
     "medium": {
         # Tuned to minimum possible based on measured errors (2x safety margin).
         # Medium tier (de440, 1550-2650) with asteroid SPK filtered to 1900-2100.
+        # V3: geocentric ecliptic storage — distance velocity errors are higher
+        # because geocentric distance varies more rapidly (retrograde motion)
+        # and the Chebyshev derivative amplifies fitting error.
         "POSITION_ARCSEC": 5.0,  # Uranus 4.58" at ~1900 CE (architectural limit)
         "ASTEROID_ARCSEC": 0.5,  # Observed max 0.29" (Pallas)
         "EQUATORIAL_ARCSEC": 0.5,  # Observed max 0.37" (Uranus)
@@ -176,13 +179,14 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
         # Velocity — OscuApogee dominates lon (0.043 deg/day).
         "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.043, Moon 0.0014
         "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee/InterpApogee 0.00286
-        "SPEED_DIST_AU_DAY": 3e-5,  # Observed max 2.32e-5 (Pluto)
-        # Asteroid velocity (ICRS→ecliptic pipeline amplification).
-        # With SPK filtered to 1900-2100, lon/dist are very small; only
-        # lat speed is architecturally limited (same as base tier).
+        "SPEED_DIST_AU_DAY": 1e-4,  # V3: Pluto 4.87e-5 AU/day (geocentric dist derivative)
+        # Asteroid velocity — V3 geocentric ecliptic changes dist speed profile.
+        # With SPK filtered to 1900-2100, lon are very small; lat speed is
+        # architecturally limited (same as base tier). Dist speed increased
+        # due to geocentric distance Chebyshev derivative amplification.
         "ASTEROID_SPEED_LON_DEG_DAY": 0.001,  # Observed max 0.000042 (Pallas)
         "ASTEROID_SPEED_LAT_DEG_DAY": 0.40,  # Observed max 0.341 (Pallas)
-        "ASTEROID_SPEED_DIST_AU_DAY": 1e-6,  # Observed max 1.05e-9 (Chiron)
+        "ASTEROID_SPEED_DIST_AU_DAY": 6e-6,  # V3: Vesta 2.97e-6, Juno 2.79e-6
     },
     "extended": {
         # Extended tier (de441, -5000 to 5000 CE, 10,000 years).
