@@ -1779,6 +1779,10 @@ def _apply_geo_ecliptic_pipeline(
     earth_bary: np.ndarray,
     light_time: np.ndarray,
     planets,
+    *,
+    skip_deflection: bool = False,
+    verbose: bool = False,
+    label: str = "",
 ) -> np.ndarray:
     """Convert geocentric ICRS Cartesian to geocentric ecliptic-of-date spherical.
 
@@ -1800,6 +1804,10 @@ def _apply_geo_ecliptic_pipeline(
         earth_bary: ``(N, 3)`` Earth ICRS barycentric positions in AU.
         light_time: ``(N,)`` light-time from target to observer in days.
         planets: Skyfield SpiceKernel ephemeris.
+        skip_deflection: If True, skip gravitational deflection (for the Moon,
+            where the effect is < 0.000001" and negligible).
+        verbose: Print progress for each pipeline step.
+        label: Body label for progress output.
 
     Returns:
         ``(N, 3)`` array of ``(lon_deg, lat_deg, dist_au)``.
@@ -1807,11 +1815,23 @@ def _apply_geo_ecliptic_pipeline(
     C_AU_DAY = 173.1446326846693
 
     # --- Gravitational deflection (Sun, Jupiter, Saturn) ---
-    geo_defl = _apply_gravitational_deflection(
-        geo, earth_bary, all_jds, light_time, planets, ts
-    )
+    if skip_deflection:
+        geo_defl = geo
+        if verbose:
+            print(f"      {label}: deflection skipped (negligible)")
+    else:
+        if verbose:
+            print(
+                f"      {label}: gravitational deflection ({len(all_jds):,} pts)...",
+                flush=True,
+            )
+        geo_defl = _apply_gravitational_deflection(
+            geo, earth_bary, all_jds, light_time, planets, ts
+        )
 
     # --- Relativistic aberration (matches Skyfield's add_aberration) ---
+    if verbose:
+        print(f"      {label}: aberration...", flush=True)
     p1mag = light_time * C_AU_DAY  # (N,) distance in AU
     vemag = np.sqrt(np.sum(earth_vel**2, axis=1))  # (N,)
     beta = vemag / C_AU_DAY  # (N,)
@@ -1830,6 +1850,8 @@ def _apply_geo_ecliptic_pipeline(
     ) / safe_r[:, np.newaxis]  # (N, 3)
 
     # --- PNM rotation: ICRS → true equatorial of date ---
+    if verbose:
+        print(f"      {label}: PNM rotation ({len(all_jds):,} pts)...", flush=True)
     t = ts.tt_jd(all_jds)
     M = t.M  # For vectorized Time: M[i][j] is an (N,) array
     # Convert to (N, 3, 3) for batch matmul
@@ -1903,6 +1925,8 @@ def generate_body_geo_ecliptic(
         print(f"    {label}: {len(all_jds):,} JDs ({n_segments} segments)")
 
     # 1. Earth ICRS barycentric position + velocity (vectorized)
+    if verbose:
+        print(f"      {label}: Earth position + velocity...", flush=True)
     earth_pos = _eval_body_icrs_vectorized("earth", all_jds, planets, ts)  # (N, 3)
     # Velocity via Skyfield (clamp JDs to SPK range for boundary safety)
     clamped_jds = np.clip(all_jds, spk_min + 1.0, spk_max - 1.0)
@@ -1910,13 +1934,17 @@ def generate_body_geo_ecliptic(
     earth_vel = np.asarray(planets["earth"].at(t_clamped).velocity.au_per_d).T  # (N, 3)
 
     # 2. Target ICRS barycentric position (vectorized)
+    if verbose:
+        print(f"      {label}: target position...", flush=True)
     target_pos = _eval_body_icrs_vectorized(target_name, all_jds, planets, ts)  # (N, 3)
 
     # 3. Geometric geocentric vector
     geo = target_pos - earth_pos  # (N, 3)
 
     # 4. Light-time correction (3 fixed-point iterations)
-    for _ in range(3):
+    for lt_iter in range(3):
+        if verbose:
+            print(f"      {label}: light-time iteration {lt_iter + 1}/3...", flush=True)
         dist = np.sqrt(np.sum(geo**2, axis=1))  # (N,)
         lt = dist / C_AU_DAY  # (N,) days
         # Retarded target: evaluate at jd - lt (vectorized Skyfield)
@@ -1927,8 +1955,20 @@ def generate_body_geo_ecliptic(
         geo = retarded_pos - earth_pos  # (N, 3)
 
     # 5–9. Deflection + aberration + PNM + ecliptic rotation + spherical
+    # Skip gravitational deflection for Moon (body_id=1): at ~0.0026 AU the
+    # PPN deflection is < 0.000001", completely negligible.  Saves 6 Skyfield
+    # evaluations (Sun/Jupiter/Saturn × 2 each).
     all_values = _apply_geo_ecliptic_pipeline(
-        geo, earth_vel, all_jds, ts, earth_pos, lt, planets
+        geo,
+        earth_vel,
+        all_jds,
+        ts,
+        earth_pos,
+        lt,
+        planets,
+        skip_deflection=(body_id == 1),
+        verbose=verbose,
+        label=label,
     )
 
     # Fit Chebyshev with longitude unwrapping (component 0)
