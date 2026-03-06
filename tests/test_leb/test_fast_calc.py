@@ -221,65 +221,45 @@ class TestFastCalcFlags:
 
     @pytest.mark.integration
     def test_equatorial_flag(self, leb_reader, jd_mid):
-        """SEFLG_EQUATORIAL should produce equatorial coordinates."""
-        ecl_result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, 0)
-        eq_result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL)
-
-        # The coordinates should differ (ecliptic vs equatorial)
-        # RA and lon are generally different
-        # Just verify it doesn't crash and produces valid values
-        assert 0.0 <= eq_result[0] < 360.0
-        assert -90.0 <= eq_result[1] <= 90.0
+        """SEFLG_EQUATORIAL raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
+        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
+            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL)
 
     @pytest.mark.integration
     def test_j2000_flag(self, leb_reader, jd_mid):
-        """SEFLG_J2000 should produce J2000 ecliptic coordinates."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_J2000)
-        assert 0.0 <= result[0] < 360.0
-        assert -90.0 <= result[1] <= 90.0
+        """SEFLG_J2000 raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
+        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
+            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_J2000)
 
     @pytest.mark.integration
     def test_equatorial_j2000_flag(self, leb_reader, jd_mid):
-        """SEFLG_EQUATORIAL | SEFLG_J2000 should produce ICRS RA/Dec."""
-        result, _ = fast_calc_ut(
-            leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL | SEFLG_J2000
-        )
-        assert 0.0 <= result[0] < 360.0
-        assert -90.0 <= result[1] <= 90.0
+        """SEFLG_EQUATORIAL|SEFLG_J2000 raises KeyError for GEO_ECLIPTIC bodies."""
+        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
+            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL | SEFLG_J2000)
 
     @pytest.mark.integration
     def test_helctr_flag(self, leb_reader, jd_mid):
-        """SEFLG_HELCTR should give heliocentric coordinates."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_HELCTR)
-        # Mars should have valid heliocentric coordinates
-        assert 0.0 <= result[0] < 360.0
+        """SEFLG_HELCTR raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
+        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
+            fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_HELCTR)
 
     @pytest.mark.integration
     def test_baryctr_flag(self, leb_reader, jd_mid):
-        """SEFLG_BARYCTR should give barycentric coordinates."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_BARYCTR)
-        assert 0.0 <= result[0] < 360.0
+        """SEFLG_BARYCTR raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
+        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
+            fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_BARYCTR)
 
     @pytest.mark.integration
     def test_noaberr_flag(self, leb_reader, jd_mid):
-        """SEFLG_NOABERR should differ slightly from default."""
-        result_default, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, 0)
-        result_noaberr, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_NOABERR)
-
-        # Aberration correction is ~20 arcsec, so results should differ
-        lon_diff = abs(result_default[0] - result_noaberr[0])
-        if lon_diff > 180:
-            lon_diff = 360 - lon_diff
-        # Should differ by at least a few arcseconds
-        assert lon_diff > 0.001 / 3600.0, (
-            f"NOABERR should differ from default: diff = {lon_diff * 3600:.4f} arcsec"
-        )
+        """SEFLG_NOABERR raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
+        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
+            fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_NOABERR)
 
     @pytest.mark.integration
     def test_truepos_flag(self, leb_reader, jd_mid):
-        """SEFLG_TRUEPOS should give geometric position."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_TRUEPOS)
-        assert 0.0 <= result[0] < 360.0
+        """SEFLG_TRUEPOS raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
+        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
+            fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_TRUEPOS)
 
     @pytest.mark.integration
     def test_topoctr_raises(self, leb_reader, jd_mid):

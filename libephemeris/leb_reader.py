@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Tuple
 from .leb_format import (
     BODY_ENTRY_SIZE,
     COORD_ECLIPTIC,
+    COORD_GEO_ECLIPTIC,
     COORD_HELIO_ECL,
     DELTA_T_ENTRY_FMT,
     DELTA_T_ENTRY_SIZE,
@@ -338,8 +339,8 @@ class LEBReader:
             pos.append(val)
             vel.append(deriv * scale)
 
-        # Wrap longitude for ecliptic bodies
-        if body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL):
+        # Wrap longitude for ecliptic/geo-ecliptic bodies
+        if body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_GEO_ECLIPTIC):
             pos[0] = pos[0] % 360.0
 
         return tuple(pos), tuple(vel)  # type: ignore[return-value]

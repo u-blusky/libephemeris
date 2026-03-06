@@ -437,7 +437,7 @@ def test_dates_20() -> list[float]:
 # BODY LISTS
 # =============================================================================
 
-ICRS_PLANETS = [
+MAIN_PLANETS = [
     (0, "Sun"),
     (1, "Moon"),
     (2, "Mercury"),
@@ -450,6 +450,10 @@ ICRS_PLANETS = [
     (9, "Pluto"),
     (14, "Earth"),
 ]
+
+# Backward-compatible alias (V3 renamed ICRS_PLANETS → MAIN_PLANETS because
+# bodies 0-9 now use COORD_GEO_ECLIPTIC, not COORD_ICRS_BARY).
+ICRS_PLANETS = MAIN_PLANETS
 
 ECLIPTIC_BODIES = [
     (10, "MeanNode"),
@@ -480,7 +484,7 @@ HYPOTHETICAL_BODIES = [
     (48, "Transpluto"),
 ]
 
-ALL_LEB_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL_BODIES
+ALL_LEB_BODIES = MAIN_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL_BODIES
 
 # Asteroid SPK coverage (same for all tiers — JPL Horizons limitation).
 # Outside this range, both LEB and Skyfield fall back to Keplerian orbits

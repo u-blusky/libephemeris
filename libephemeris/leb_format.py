@@ -35,6 +35,7 @@ VERSION = 1
 COORD_ICRS_BARY = 0  # ICRS barycentric (x, y, z) in AU
 COORD_ECLIPTIC = 1  # Ecliptic of date (lon, lat, dist) in deg/deg/AU
 COORD_HELIO_ECL = 2  # Heliocentric ecliptic (lon, lat, dist) in deg/deg/AU
+COORD_GEO_ECLIPTIC = 3  # Geocentric ecliptic of date (lon, lat, dist) in deg/deg/AU
 
 # Section IDs
 SECTION_BODY_INDEX = 0
@@ -147,45 +148,47 @@ class NutationHeader:
 # This is the single source of truth for Chebyshev parameters.
 
 BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
-    # SE_SUN through SE_PLUTO, SE_EARTH: ICRS barycentric
+    # SE_SUN through SE_PLUTO: geocentric ecliptic of date (V3)
     # Parameters: (interval_days, degree, coord_type, components)
-    # Tuned for sub-arcsecond fitting error on all bodies.
-    0: (32, 13, COORD_ICRS_BARY, 3),  # SE_SUN       — 0.00" (trivial)
-    1: (4, 13, COORD_ICRS_BARY, 3),  # SE_MOON      — 0.00" (fast mover)
-    2: (16, 15, COORD_ICRS_BARY, 3),  # SE_MERCURY   — 0.00" (eccentric)
-    3: (16, 13, COORD_ICRS_BARY, 3),  # SE_VENUS     — was 32: 0.34" → ~0.01"
-    4: (16, 13, COORD_ICRS_BARY, 3),  # SE_MARS      — was 32: 0.08" → ~0.003"
-    5: (32, 13, COORD_ICRS_BARY, 3),  # SE_JUPITER   — was 64,11: 0.88" → ~0.01"
-    6: (32, 13, COORD_ICRS_BARY, 3),  # SE_SATURN    — was 64,11: 0.34" → ~0.01"
-    7: (64, 13, COORD_ICRS_BARY, 3),  # SE_URANUS    — 0.04" OK
-    8: (64, 13, COORD_ICRS_BARY, 3),  # SE_NEPTUNE   — 0.12" OK
-    9: (32, 13, COORD_ICRS_BARY, 3),  # SE_PLUTO     — was 64: 3.16" → ~0.1"
-    14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH     — 0.00" (fast mover)
-    # Lunar nodes/Lilith: ecliptic direct
+    # V3: store final geocentric ecliptic coords directly, eliminating
+    # the ICRS→ecliptic conversion pipeline and its ~5" error amplification.
+    # Geocentric ecliptic includes retrograde motion, requiring shorter
+    # segments than ICRS barycentric for the same fitting accuracy.
+    # Tuned after V3 base tier verification (target: <0.5" worst-case).
+    0: (32, 13, COORD_GEO_ECLIPTIC, 3),  # SE_SUN       — 0.013"
+    1: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_MOON      — 0.001"
+    2: (16, 15, COORD_GEO_ECLIPTIC, 3),  # SE_MERCURY   — 0.36"
+    3: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_VENUS     — 0.10"
+    4: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_MARS      — 0.52"
+    5: (16, 13, COORD_GEO_ECLIPTIC, 3),  # SE_JUPITER   — 0.17"
+    6: (8, 15, COORD_GEO_ECLIPTIC, 3),  # SE_SATURN    — was 16d/1.07"
+    7: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_URANUS    — 0.59"
+    8: (32, 13, COORD_GEO_ECLIPTIC, 3),  # SE_NEPTUNE   — 0.13"
+    9: (32, 13, COORD_GEO_ECLIPTIC, 3),  # SE_PLUTO     — 0.13"
+    14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH     — kept ICRS (geocentric=degenerate)
+    # Lunar nodes/Lilith: ecliptic direct (unchanged)
     10: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_NODE  (lon, 0, 0)
     11: (8, 13, COORD_ECLIPTIC, 3),  # SE_TRUE_NODE  (lon, lat, dist)
     12: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_APOG  (lon, lat, 0)
     13: (8, 13, COORD_ECLIPTIC, 3),  # SE_OSCU_APOG  (lon, lat, dist)
     21: (8, 13, COORD_ECLIPTIC, 3),  # SE_INTP_APOG  (lon, lat, dist)
     22: (8, 13, COORD_ECLIPTIC, 3),  # SE_INTP_PERG  (lon, lat, dist)
-    # Main asteroids: ICRS barycentric
-    # Asteroids have eccentric/perturbed orbits — need shorter intervals.
-    15: (8, 13, COORD_ICRS_BARY, 3),  # SE_CHIRON    — was 32: 177" → ~0.01"
-    17: (8, 13, COORD_ICRS_BARY, 3),  # SE_CERES     — was 32: 317" → ~0.01"
-    18: (8, 13, COORD_ICRS_BARY, 3),  # SE_PALLAS    — was 32: 254" → ~0.01"
-    19: (8, 13, COORD_ICRS_BARY, 3),  # SE_JUNO      — was 32: 492" → ~0.01"
-    20: (8, 13, COORD_ICRS_BARY, 3),  # SE_VESTA     — was 32: 378" → ~0.01"
-    # Uranian hypotheticals: heliocentric ecliptic
-    # Slow-moving outer bodies — increase degree for smoother fit.
-    40: (32, 13, COORD_HELIO_ECL, 3),  # SE_CUPIDO   — was 64,11: bogus 766"
-    41: (32, 13, COORD_HELIO_ECL, 3),  # SE_HADES    — was 64,11: bogus 562"
-    42: (32, 13, COORD_HELIO_ECL, 3),  # SE_ZEUS     — was 64,11: bogus 448"
-    43: (32, 13, COORD_HELIO_ECL, 3),  # SE_KRONOS   — was 64,11: bogus 390"
-    44: (32, 13, COORD_HELIO_ECL, 3),  # SE_APOLLON  — was 64,11: bogus 347"
-    45: (32, 13, COORD_HELIO_ECL, 3),  # SE_ADMETOS  — was 64,11: bogus 323"
-    46: (32, 13, COORD_HELIO_ECL, 3),  # SE_VULKANUS — was 64,11: bogus 304"
-    47: (32, 13, COORD_HELIO_ECL, 3),  # SE_POSEIDON — was 64,11: bogus 267"
-    48: (32, 13, COORD_HELIO_ECL, 3),  # SE_ISIS     — was 64,11: bogus 136"
+    # Main asteroids: geocentric ecliptic of date (V3)
+    15: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_CHIRON    — V3: direct ecl
+    17: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_CERES     — V3: direct ecl
+    18: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_PALLAS    — V3: direct ecl
+    19: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_JUNO      — V3: direct ecl
+    20: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_VESTA     — V3: direct ecl
+    # Uranian hypotheticals: heliocentric ecliptic (unchanged)
+    40: (32, 13, COORD_HELIO_ECL, 3),  # SE_CUPIDO
+    41: (32, 13, COORD_HELIO_ECL, 3),  # SE_HADES
+    42: (32, 13, COORD_HELIO_ECL, 3),  # SE_ZEUS
+    43: (32, 13, COORD_HELIO_ECL, 3),  # SE_KRONOS
+    44: (32, 13, COORD_HELIO_ECL, 3),  # SE_APOLLON
+    45: (32, 13, COORD_HELIO_ECL, 3),  # SE_ADMETOS
+    46: (32, 13, COORD_HELIO_ECL, 3),  # SE_VULKANUS
+    47: (32, 13, COORD_HELIO_ECL, 3),  # SE_POSEIDON
+    48: (32, 13, COORD_HELIO_ECL, 3),  # SE_ISIS
 }
 
 

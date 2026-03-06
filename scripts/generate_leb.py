@@ -127,6 +127,7 @@ from libephemeris.leb_format import (
     BODY_ENTRY_SIZE,
     BODY_PARAMS,
     COORD_ECLIPTIC,
+    COORD_GEO_ECLIPTIC,
     COORD_HELIO_ECL,
     COORD_ICRS_BARY,
     DELTA_T_ENTRY_FMT,
@@ -251,8 +252,8 @@ _ASTEROID_NAIF = {
 # Body groups for independent generation + merge workflow.
 # Each group can be generated as a standalone .leb file and later merged.
 BODY_GROUPS: dict[str, List[int]] = {
-    "planets": sorted(_PLANET_MAP.keys()),  # 11 ICRS planets (vectorized Skyfield)
-    "asteroids": sorted(_ASTEROID_NAIF.keys()),  # 5 ICRS asteroids (spktype21)
+    "planets": sorted(_PLANET_MAP.keys()),  # 11 planets (GEO_ECLIPTIC/ICRS, vectorized)
+    "asteroids": sorted(_ASTEROID_NAIF.keys()),  # 5 asteroids (GEO_ECLIPTIC, spktype21)
     "analytical": sorted(
         bid
         for bid in BODY_PARAMS
@@ -1587,6 +1588,557 @@ def generate_body_icrs_asteroid(
         kernel.close()
 
 
+# =============================================================================
+# GEOCENTRIC ECLIPTIC GENERATORS (V3)
+# =============================================================================
+
+
+def _apply_gravitational_deflection(
+    geo: np.ndarray,
+    earth_bary: np.ndarray,
+    all_jds: np.ndarray,
+    light_time: np.ndarray,
+    planets,
+    ts,
+) -> np.ndarray:
+    """Apply gravitational light deflection by Sun, Jupiter, Saturn.
+
+    Vectorized implementation matching Skyfield's ``apparent(deflectors=(10, 599, 699))``.
+
+    For each deflector, computes the position of the deflector at the time when
+    the photon from the target passed closest to it, then applies the standard
+    PPN deflection formula.
+
+    Args:
+        geo: ``(N, 3)`` geocentric ICRS positions in AU (light-time corrected).
+        earth_bary: ``(N, 3)`` Earth ICRS barycentric positions in AU.
+        all_jds: ``(N,)`` Julian Days in TT.
+        light_time: ``(N,)`` light-time from target to observer in days.
+        planets: Skyfield SpiceKernel ephemeris.
+        ts: Skyfield Timescale.
+
+    Returns:
+        ``(N, 3)`` deflection-corrected geocentric ICRS positions in AU.
+    """
+    # Constants from Skyfield's relativity module
+    GS = 1.32712440017987e20  # m^3/s^2
+    C = 299792458.0  # m/s
+    AU_M = 149597870700  # m
+    C_AUDAY = 173.1446326846693
+
+    # Deflectors: Sun (10), Jupiter barycenter (5), Saturn barycenter (6)
+    # Skyfield uses codes 599/699 but falls back to 5/6 if planet centers
+    # are not in the ephemeris.  For deflection purposes the barycenter
+    # offset is negligible, so we always use the barycenter.
+    deflectors = [
+        ("sun", 1.0),  # Sun, rmass=1
+        ("jupiter barycenter", 1047.3486),  # Jupiter, rmass
+        ("saturn barycenter", 3497.898),  # Saturn, rmass
+    ]
+
+    spk_min, spk_max = _get_spk_jd_range(planets)
+    result = geo.copy()
+
+    pmag = np.sqrt(np.sum(result**2, axis=1))  # (N,)
+    safe_pmag = np.where(pmag > 0, pmag, 1.0)
+
+    for defl_name, rmass in deflectors:
+        deflector = planets[defl_name]
+
+        # 1. Deflector barycentric position at observation time
+        defl_bary = _eval_target_vectorized(
+            deflector, all_jds, ts, spk_min, spk_max
+        )  # (N, 3)
+
+        # 2. Deflector position relative to observer
+        gpv = defl_bary - earth_bary  # (N, 3)
+
+        # 3. Light-time difference: when did light pass closest to deflector?
+        u1 = result / safe_pmag[:, np.newaxis]  # (N, 3)
+        dlt = np.sum(u1 * gpv, axis=1) / C_AUDAY  # (N,) days
+
+        # 4. Clamp and compute time when light was closest
+        tclose_offset = np.clip(dlt, 0.0, light_time)  # (N,)
+        tclose_jds = all_jds - tclose_offset  # (N,)
+
+        # 5. Deflector position at closest approach time
+        defl_bary_close = _eval_target_vectorized(
+            deflector, tclose_jds, ts, spk_min, spk_max
+        )  # (N, 3)
+
+        # 6. pe = observer - deflector (observer relative to deflector)
+        pe = earth_bary - defl_bary_close  # (N, 3)
+
+        # 7. Compute deflection correction
+        pq = result + pe  # target relative to deflector (N, 3)
+
+        qmag = np.sqrt(np.sum(pq**2, axis=1))  # (N,)
+        emag = np.sqrt(np.sum(pe**2, axis=1))  # (N,)
+
+        safe_qmag = np.where(qmag > 0, qmag, 1.0)
+        safe_emag = np.where(emag > 0, emag, 1.0)
+
+        phat = result / safe_pmag[:, np.newaxis]
+        qhat = pq / safe_qmag[:, np.newaxis]
+        ehat = pe / safe_emag[:, np.newaxis]
+
+        pdotq = np.sum(phat * qhat, axis=1)  # (N,)
+        qdote = np.sum(qhat * ehat, axis=1)  # (N,)
+        edotp = np.sum(ehat * phat, axis=1)  # (N,)
+
+        # Skip if object is on line-of-sight to deflector (|edotp| > threshold)
+        flag = (np.abs(edotp) <= 0.99999999999).astype(float)  # (N,)
+
+        fac1 = 2.0 * GS / (C * C * safe_emag * AU_M * rmass)  # (N,)
+        fac2 = 1.0 + qdote  # (N,)
+        safe_fac2 = np.where(np.abs(fac2) > 1e-30, fac2, 1.0)
+
+        # Deflection vector
+        d = (flag * fac1 / safe_fac2 * pmag)[:, np.newaxis] * (
+            pdotq[:, np.newaxis] * ehat - edotp[:, np.newaxis] * qhat
+        )  # (N, 3)
+
+        result += d
+
+    return result
+
+
+def _apply_type21_ecliptic_pipeline(
+    geo_ecl: np.ndarray,
+    earth_vel_ecl: np.ndarray,
+    all_jds: np.ndarray,
+) -> np.ndarray:
+    """Convert geocentric J2000 ecliptic to ecliptic-of-date (lon, lat, dist).
+
+    Vectorized equivalent of ``spk.py._calc_type21_position()`` post-light-time
+    pipeline.  Steps:
+
+    1. First-order Bradley aberration (in J2000 ecliptic).
+    2. Cartesian → spherical (J2000).
+    3. Ecliptic precession J2000 → date.
+    4. Add nutation Δψ to longitude.
+
+    No gravitational deflection (matching ``_calc_type21_position``).
+
+    Args:
+        geo_ecl: ``(N, 3)`` geocentric J2000 ecliptic positions (AU, light-time
+            corrected).
+        earth_vel_ecl: ``(N, 3)`` Earth **heliocentric** velocity in J2000
+            ecliptic (AU/day).
+        all_jds: ``(N,)`` Julian Days (TT).
+
+    Returns:
+        ``(N, 3)`` of ``(lon_deg, lat_deg, dist_au)``.
+    """
+    from libephemeris.astrometry import nutation_angles, precess_from_j2000
+
+    C_AU_DAY = 173.1446326846693
+    N = len(all_jds)
+
+    # --- 1. First-order Bradley aberration (vectorized) ---
+    # Matches apply_aberration_to_position() in astrometry.py
+    dist = np.sqrt(np.sum(geo_ecl**2, axis=1))  # (N,)
+    safe_dist = np.where(dist > 1e-30, dist, 1.0)
+    u = geo_ecl / safe_dist[:, np.newaxis]  # (N, 3) unit vectors
+
+    v = earth_vel_ecl / C_AU_DAY  # (N, 3) velocity in units of c
+    r_dot_v = np.sum(u * v, axis=1)  # (N,)
+    dx = v - r_dot_v[:, np.newaxis] * u  # (N, 3) aberration displacement
+    a = u + dx  # (N, 3) aberrated direction
+    a_mag = np.sqrt(np.sum(a**2, axis=1))
+    safe_a_mag = np.where(a_mag > 1e-30, a_mag, 1.0)
+    a_norm = a / safe_a_mag[:, np.newaxis]
+    pos_aber = a_norm * safe_dist[:, np.newaxis]  # (N, 3) preserve distance
+
+    # --- 2. Cartesian → spherical in J2000 ecliptic ---
+    x, y, z = pos_aber[:, 0], pos_aber[:, 1], pos_aber[:, 2]
+    r = np.sqrt(x**2 + y**2 + z**2)
+    safe_r = np.where(r > 0, r, 1.0)
+    lon_j2000 = np.degrees(np.arctan2(y, x)) % 360.0  # (N,)
+    lat_j2000 = np.degrees(np.arcsin(np.clip(z / safe_r, -1.0, 1.0)))  # (N,)
+
+    # --- 3+4. Precession J2000→date + nutation Δψ (scalar loop) ---
+    lon_date = np.empty(N)
+    lat_date = np.empty(N)
+    for i in range(N):
+        lon_p, lat_p = precess_from_j2000(
+            float(lon_j2000[i]), float(lat_j2000[i]), float(all_jds[i])
+        )
+        dpsi, _deps = nutation_angles(float(all_jds[i]))
+        lon_date[i] = (lon_p + dpsi) % 360.0
+        lat_date[i] = lat_p
+
+    return np.column_stack([lon_date, lat_date, dist])
+
+
+def _apply_geo_ecliptic_pipeline(
+    geo: np.ndarray,
+    earth_vel: np.ndarray,
+    all_jds: np.ndarray,
+    ts,
+    earth_bary: np.ndarray,
+    light_time: np.ndarray,
+    planets,
+) -> np.ndarray:
+    """Convert geocentric ICRS Cartesian to geocentric ecliptic-of-date spherical.
+
+    Applies gravitational deflection, relativistic aberration,
+    precession-nutation rotation, and ecliptic rotation.
+    Input ``geo`` must already have light-time correction applied.
+
+    Matches Skyfield's ``observer.at(t).observe(target).apparent()`` pipeline:
+    - Gravitational deflection by Sun, Jupiter, Saturn (PPN formula).
+    - Aberration: Skyfield relativistic formula (Lorentz contraction + velocity).
+    - PNM: Skyfield ``Time.M`` matrix (IAU 2006/2000A).
+    - Ecliptic rotation: true obliquity = mean + Δε.
+
+    Args:
+        geo: ``(N, 3)`` geocentric ICRS Cartesian positions in AU (light-time corrected).
+        earth_vel: ``(N, 3)`` Earth ICRS barycentric velocity in AU/day.
+        all_jds: ``(N,)`` Julian Days in TT.
+        ts: Skyfield Timescale.
+        earth_bary: ``(N, 3)`` Earth ICRS barycentric positions in AU.
+        light_time: ``(N,)`` light-time from target to observer in days.
+        planets: Skyfield SpiceKernel ephemeris.
+
+    Returns:
+        ``(N, 3)`` array of ``(lon_deg, lat_deg, dist_au)``.
+    """
+    C_AU_DAY = 173.1446326846693
+
+    # --- Gravitational deflection (Sun, Jupiter, Saturn) ---
+    geo_defl = _apply_gravitational_deflection(
+        geo, earth_bary, all_jds, light_time, planets, ts
+    )
+
+    # --- Relativistic aberration (matches Skyfield's add_aberration) ---
+    p1mag = light_time * C_AU_DAY  # (N,) distance in AU
+    vemag = np.sqrt(np.sum(earth_vel**2, axis=1))  # (N,)
+    beta = vemag / C_AU_DAY  # (N,)
+    dot = np.sum(geo_defl * earth_vel, axis=1)  # (N,)
+
+    safe_denom = np.where(p1mag * vemag > 0, p1mag * vemag, 1.0)
+    cosd = dot / safe_denom  # (N,)
+    gammai = np.sqrt(1.0 - beta * beta)  # (N,) inverse Lorentz factor
+    p = beta * cosd  # (N,)
+    q = (1.0 + p / (1.0 + gammai)) * light_time  # (N,)
+    r = 1.0 + p  # (N,)
+    safe_r = np.where(np.abs(r) > 1e-30, r, 1.0)
+
+    geo_aber = (
+        gammai[:, np.newaxis] * geo_defl + q[:, np.newaxis] * earth_vel
+    ) / safe_r[:, np.newaxis]  # (N, 3)
+
+    # --- PNM rotation: ICRS → true equatorial of date ---
+    t = ts.tt_jd(all_jds)
+    M = t.M  # For vectorized Time: M[i][j] is an (N,) array
+    # Convert to (N, 3, 3) for batch matmul
+    M_arr = np.array(M)  # (3, 3, N)
+    M_T = np.transpose(M_arr, (2, 0, 1))  # (N, 3, 3)
+    geo_eq = np.einsum("nij,nj->ni", M_T, geo_aber)  # (N, 3)
+
+    # --- True obliquity: mean + Δε (IAU 2000A, matching Skyfield/fast_calc) ---
+    mean_obl = np.asarray(t._mean_obliquity_radians)  # (N,)
+    _dpsi, deps = t._nutation_angles_radians
+    deps_arr = np.asarray(deps)
+    eps_true = mean_obl + deps_arr  # (N,)
+
+    cos_eps = np.cos(eps_true)
+    sin_eps = np.sin(eps_true)
+
+    # --- Equatorial → ecliptic rotation ---
+    ecl_x = geo_eq[:, 0]
+    ecl_y = geo_eq[:, 1] * cos_eps + geo_eq[:, 2] * sin_eps
+    ecl_z = -geo_eq[:, 1] * sin_eps + geo_eq[:, 2] * cos_eps
+
+    # --- Cartesian → spherical ---
+    dist_final = np.sqrt(ecl_x**2 + ecl_y**2 + ecl_z**2)
+    safe_dist_f = np.where(dist_final > 0.0, dist_final, 1.0)
+    lon = np.degrees(np.arctan2(ecl_y, ecl_x)) % 360.0
+    lat = np.degrees(np.arcsin(np.clip(ecl_z / safe_dist_f, -1.0, 1.0)))
+
+    return np.column_stack([lon, lat, dist_final])
+
+
+def generate_body_geo_ecliptic(
+    body_id: int,
+    jd_start: float,
+    jd_end: float,
+    interval_days: float,
+    degree: int,
+    label: str = "",
+    verbose: bool = False,
+) -> Tuple[List[np.ndarray], float]:
+    """Generate Chebyshev coefficients for a COORD_GEO_ECLIPTIC planet.
+
+    Computes the full geocentric ecliptic-of-date pipeline at full float64
+    precision at each Chebyshev node, then fits the resulting (lon, lat, dist).
+
+    The pipeline matches Skyfield's ``observer.at(t).observe(target).apparent()``
+    pipeline: ICRS bary → geocentric subtraction → light-time (3 iter) →
+    gravitational deflection → relativistic aberration → PNM rotation →
+    ecliptic rotation → spherical.
+
+    Returns:
+        ``(list_of_coefficient_arrays, max_error_deg)``
+    """
+    from libephemeris.state import get_planets, get_timescale
+
+    planets = get_planets()
+    ts = get_timescale()
+
+    target_name = _PLANET_MAP.get(body_id)
+    if target_name is None:
+        raise ValueError(f"No planet map entry for body_id={body_id}")
+
+    C_AU_DAY = 173.1446326846693
+    spk_min, spk_max = _get_spk_jd_range(planets)
+
+    # Precompute all JDs (fit nodes + verification points)
+    all_jds, n_segments, pts_per_seg = _compute_all_segment_jds(
+        jd_start, jd_end, interval_days, degree
+    )
+
+    if verbose:
+        print(f"    {label}: {len(all_jds):,} JDs ({n_segments} segments)")
+
+    # 1. Earth ICRS barycentric position + velocity (vectorized)
+    earth_pos = _eval_body_icrs_vectorized("earth", all_jds, planets, ts)  # (N, 3)
+    # Velocity via Skyfield (clamp JDs to SPK range for boundary safety)
+    clamped_jds = np.clip(all_jds, spk_min + 1.0, spk_max - 1.0)
+    t_clamped = ts.tt_jd(clamped_jds)
+    earth_vel = np.asarray(planets["earth"].at(t_clamped).velocity.au_per_d).T  # (N, 3)
+
+    # 2. Target ICRS barycentric position (vectorized)
+    target_pos = _eval_body_icrs_vectorized(target_name, all_jds, planets, ts)  # (N, 3)
+
+    # 3. Geometric geocentric vector
+    geo = target_pos - earth_pos  # (N, 3)
+
+    # 4. Light-time correction (3 fixed-point iterations)
+    for _ in range(3):
+        dist = np.sqrt(np.sum(geo**2, axis=1))  # (N,)
+        lt = dist / C_AU_DAY  # (N,) days
+        # Retarded target: evaluate at jd - lt (vectorized Skyfield)
+        retarded_jds = all_jds - lt
+        retarded_pos = _eval_body_icrs_vectorized(
+            target_name, retarded_jds, planets, ts
+        )
+        geo = retarded_pos - earth_pos  # (N, 3)
+
+    # 5–9. Deflection + aberration + PNM + ecliptic rotation + spherical
+    all_values = _apply_geo_ecliptic_pipeline(
+        geo, earth_vel, all_jds, ts, earth_pos, lt, planets
+    )
+
+    # Fit Chebyshev with longitude unwrapping (component 0)
+    return _fit_and_verify_from_values_unwrap(
+        all_values,
+        jd_start,
+        jd_end,
+        interval_days,
+        degree,
+        3,
+        n_segments,
+        pts_per_seg,
+        label=label,
+        verbose=verbose,
+    )
+
+
+def generate_body_geo_ecliptic_asteroid(
+    body_id: int,
+    jd_start: float,
+    jd_end: float,
+    interval_days: float,
+    degree: int,
+    label: str = "",
+    verbose: bool = False,
+) -> Tuple[List[np.ndarray], float]:
+    """Generate Chebyshev coefficients for a COORD_GEO_ECLIPTIC asteroid.
+
+    Matches the ``spk.py._calc_type21_position()`` pipeline exactly:
+    all work is done in J2000 ecliptic, with first-order Bradley aberration,
+    analytical precession, and nutation Δψ.  No gravitational deflection
+    (matching the runtime ``swe_calc()`` path for SPK type-21 bodies).
+
+    Reads heliocentric positions from spktype21 (scalar loop).  Earth
+    heliocentric position/velocity comes from Skyfield (earth_ssb − sun_ssb),
+    rotated to J2000 ecliptic.
+
+    Returns:
+        ``(list_of_coefficient_arrays, max_error_deg)``
+    """
+    from libephemeris.state import get_planets, get_timescale, _SPK_BODY_MAP
+
+    planets = get_planets()
+    ts = get_timescale()
+
+    # --- SPK kernel setup (same as generate_body_icrs_asteroid) ---
+    spk_info = _SPK_BODY_MAP.get(body_id)
+    ast_name = BODY_NAMES.get(body_id, f"Body {body_id}")
+
+    if spk_info is None:
+        raise RuntimeError(
+            f"No SPK kernel registered for {ast_name} (body {body_id}). "
+            f"Cannot generate LEB data without SPK."
+        )
+
+    spk_file, naif_id = spk_info
+    try:
+        from spktype21 import SPKType21
+
+        kernel = SPKType21.open(spk_file)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Cannot open SPK file for {ast_name}: {spk_file}: {exc}"
+        ) from exc
+
+    try:
+        center_id = kernel.segments[0].center
+        target_id = kernel.segments[0].target
+
+        T0_SPK = 2451545.0
+        ast_jd_lo = min(
+            T0_SPK + seg.start_second / 86400.0
+            for seg in kernel.segments
+            if seg.target == target_id
+        )
+        ast_jd_hi = max(
+            T0_SPK + seg.end_second / 86400.0
+            for seg in kernel.segments
+            if seg.target == target_id
+        )
+
+        if ast_jd_lo > jd_start + 2.0 or ast_jd_hi < jd_end - 2.0:
+            raise RuntimeError(
+                f"SPK for {ast_name} covers JD {ast_jd_lo:.1f}–{ast_jd_hi:.1f} "
+                f"but requested range is JD {jd_start:.1f}–{jd_end:.1f}."
+            )
+
+        C_AU_DAY = 173.1446326846693
+        AU_KM = 149597870.7
+        spk_min, spk_max = _get_spk_jd_range(planets)
+
+        # J2000 ecliptic obliquity (must match spk.py._icrs_to_ecliptic_j2000)
+        _OBL_J2000_RAD = math.radians(23.4392911)
+        _cos_obl = math.cos(_OBL_J2000_RAD)
+        _sin_obl = math.sin(_OBL_J2000_RAD)
+
+        def _icrs_to_ecl_j2000_vec(v: np.ndarray) -> np.ndarray:
+            """Rotate (N, 3) ICRS → J2000 ecliptic (vectorized)."""
+            out = np.empty_like(v)
+            out[:, 0] = v[:, 0]
+            out[:, 1] = v[:, 1] * _cos_obl + v[:, 2] * _sin_obl
+            out[:, 2] = -v[:, 1] * _sin_obl + v[:, 2] * _cos_obl
+            return out
+
+        # Precompute all JDs
+        all_jds, n_segments, pts_per_seg = _compute_all_segment_jds(
+            jd_start, jd_end, interval_days, degree
+        )
+
+        if verbose:
+            print(f"    {label}: {len(all_jds):,} JDs ({n_segments} segments)")
+
+        N = len(all_jds)
+
+        # 1. Earth heliocentric position + velocity in J2000 ecliptic
+        #    (matching _calc_type21_position: earth_helio = earth_ssb - sun_ssb)
+        sun = planets["sun"]
+        earth_ssb = _eval_body_icrs_vectorized("earth", all_jds, planets, ts)  # (N, 3)
+        sun_ssb = _eval_target_vectorized(sun, all_jds, ts, spk_min, spk_max)  # (N, 3)
+        earth_helio_icrs = earth_ssb - sun_ssb  # (N, 3) ICRS
+        earth_helio_ecl = _icrs_to_ecl_j2000_vec(earth_helio_icrs)  # (N, 3) J2000 ecl
+
+        # Earth heliocentric velocity in J2000 ecliptic
+        clamped_jds = np.clip(all_jds, spk_min + 1.0, spk_max - 1.0)
+        t_clamped = ts.tt_jd(clamped_jds)
+        earth_vel_ssb = np.asarray(
+            planets["earth"].at(t_clamped).velocity.au_per_d
+        ).T  # (N, 3)
+        sun_vel_ssb = np.asarray(sun.at(t_clamped).velocity.au_per_d).T  # (N, 3)
+        earth_vel_helio_icrs = earth_vel_ssb - sun_vel_ssb
+        earth_vel_ecl = _icrs_to_ecl_j2000_vec(earth_vel_helio_icrs)  # (N, 3)
+
+        # 2. Asteroid heliocentric from spktype21 → J2000 ecliptic (scalar loop)
+        ast_clamped = np.clip(all_jds, ast_jd_lo + 0.01, ast_jd_hi - 0.01)
+        helio_ecl = np.empty((N, 3))
+        spk_bar = ProgressBar(
+            N,
+            label=label + " (spk21)" if label else "spk21 eval",
+            unit="pt",
+            enabled=verbose,
+        )
+        for i in range(N):
+            pos_km, _ = kernel.compute_type21(
+                center_id, target_id, float(ast_clamped[i])
+            )
+            # ICRS → J2000 ecliptic (scalar, matching spk.py)
+            px, py, pz = pos_km[0] / AU_KM, pos_km[1] / AU_KM, pos_km[2] / AU_KM
+            helio_ecl[i, 0] = px
+            helio_ecl[i, 1] = py * _cos_obl + pz * _sin_obl
+            helio_ecl[i, 2] = -py * _sin_obl + pz * _cos_obl
+            spk_bar.update(i + 1)
+        spk_bar.finish()
+
+        # 3. Geometric geocentric in J2000 ecliptic
+        geo_ecl = helio_ecl - earth_helio_ecl  # (N, 3)
+
+        # 4. Light-time correction (3 iterations, in J2000 ecliptic)
+        for lt_iter in range(3):
+            dist = np.sqrt(np.sum(geo_ecl**2, axis=1))
+            lt = dist / C_AU_DAY
+            retarded_jds = all_jds - lt
+
+            # Re-evaluate asteroid helio at retarded time (scalar loop)
+            ast_ret_clamped = np.clip(retarded_jds, ast_jd_lo + 0.01, ast_jd_hi - 0.01)
+            helio_ret_ecl = np.empty((N, 3))
+            if verbose and lt_iter == 0:
+                lt_bar = ProgressBar(
+                    N,
+                    label=label + " (lt iter)",
+                    unit="pt",
+                    enabled=verbose,
+                )
+            for i in range(N):
+                pos_km, _ = kernel.compute_type21(
+                    center_id, target_id, float(ast_ret_clamped[i])
+                )
+                px, py, pz = pos_km[0] / AU_KM, pos_km[1] / AU_KM, pos_km[2] / AU_KM
+                helio_ret_ecl[i, 0] = px
+                helio_ret_ecl[i, 1] = py * _cos_obl + pz * _sin_obl
+                helio_ret_ecl[i, 2] = -py * _sin_obl + pz * _cos_obl
+            if verbose and lt_iter == 0:
+                lt_bar.finish()  # type: ignore[possibly-undefined]
+
+            geo_ecl = helio_ret_ecl - earth_helio_ecl
+
+        # 5–8. Aberration + spherical + precession + nutation
+        #       (matches _calc_type21_position — NO gravitational deflection)
+        all_values = _apply_type21_ecliptic_pipeline(geo_ecl, earth_vel_ecl, all_jds)
+
+        # Fit Chebyshev with longitude unwrapping
+        return _fit_and_verify_from_values_unwrap(
+            all_values,
+            jd_start,
+            jd_end,
+            interval_days,
+            degree,
+            3,
+            n_segments,
+            pts_per_seg,
+            label=label,
+            verbose=verbose,
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"GEO_ECLIPTIC generation failed for {ast_name} (body {body_id}): {exc}"
+        ) from exc
+    finally:
+        kernel.close()
+
+
 def generate_body_ecliptic(
     body_id: int,
     jd_start: float,
@@ -1985,7 +2537,28 @@ def generate_single_body(
     interval_days, degree, coord_type, components = params
     label = BODY_NAMES.get(body_id, f"Body {body_id}")
 
-    if coord_type == COORD_ICRS_BARY:
+    if coord_type == COORD_GEO_ECLIPTIC:
+        if body_id in _PLANET_MAP:
+            coeffs, error = generate_body_geo_ecliptic(
+                body_id,
+                jd_start,
+                jd_end,
+                interval_days,
+                degree,
+                label=label,
+                verbose=verbose,
+            )
+        else:
+            coeffs, error = generate_body_geo_ecliptic_asteroid(
+                body_id,
+                jd_start,
+                jd_end,
+                interval_days,
+                degree,
+                label=label,
+                verbose=verbose,
+            )
+    elif coord_type == COORD_ICRS_BARY:
         if body_id in _PLANET_MAP:
             coeffs, error = generate_body_icrs(
                 body_id,
@@ -2201,33 +2774,33 @@ def assemble_leb(
     body_errors: dict[int, float] = {}
 
     # Categorize bodies by generation strategy:
-    # - ICRS planets: vectorized Skyfield (fast, run in main process)
-    # - ICRS asteroids: vectorized via SPK target (fast, run in main process)
+    # - Planets (in _PLANET_MAP): vectorized Skyfield — GEO_ECLIPTIC or ICRS_BARY
+    # - Asteroids (in _ASTEROID_NAIF): SPK-based — GEO_ECLIPTIC or ICRS_BARY
     # - Ecliptic/Helio: scalar analytical funcs (slow, parallelize across workers)
-    icrs_planet_bodies = [b for b in bodies if b in _PLANET_MAP]
-    icrs_asteroid_bodies = [b for b in bodies if b in _ASTEROID_NAIF]
+    planet_bodies = [b for b in bodies if b in _PLANET_MAP]
+    asteroid_bodies_gen = [b for b in bodies if b in _ASTEROID_NAIF]
     analytical_bodies = [
         b for b in bodies if b not in _PLANET_MAP and b not in _ASTEROID_NAIF
     ]
 
     t0 = time.time()
 
-    # 1a. Generate ICRS planets (vectorized, very fast)
-    if icrs_planet_bodies and verbose:
-        print("  --- ICRS planets (vectorized Skyfield) ---")
-    for bid in icrs_planet_bodies:
+    # 1a. Generate planets (vectorized Skyfield)
+    if planet_bodies and verbose:
+        print("  --- Planets (vectorized Skyfield) ---")
+    for bid in planet_bodies:
         bid, coeffs, error = generate_single_body(
             bid, jd_start, jd_end, verbose=verbose
         )
         body_data[bid] = coeffs
         body_errors[bid] = error
 
-    # 1b. Generate asteroids (vectorized via SPK, fast)
+    # 1b. Generate asteroids (SPK-based)
     # Each asteroid uses its own date range (from body_jd_ranges) which may
     # be narrower than the tier range when SPK coverage is partial.
-    if icrs_asteroid_bodies and verbose:
-        print("  --- ICRS asteroids ---")
-    for bid in icrs_asteroid_bodies:
+    if asteroid_bodies_gen and verbose:
+        print("  --- Asteroids ---")
+    for bid in asteroid_bodies_gen:
         ast_start, ast_end = body_jd_ranges.get(bid, (jd_start, jd_end))
         bid, coeffs, error = generate_single_body(
             bid, ast_start, ast_end, verbose=verbose
@@ -2524,7 +3097,7 @@ def assemble_leb(
                     arcsec = error * 206265.0  # fallback for Earth
                 print(f'    {name:20s}: {error:.2e} AU ({arcsec:.4f}"){range_note}')
             else:
-                # Already in degrees, convert to arcseconds
+                # GEO_ECLIPTIC, ECLIPTIC, HELIO_ECL: already in degrees
                 arcsec = error * 3600.0
                 print(f'    {name:20s}: {error:.2e} deg ({arcsec:.4f}"){range_note}')
         if not skip_aux:
@@ -2906,6 +3479,13 @@ def verify_leb(
                         max_error = 999.0
                     error_unit = "deg"
 
+            elif body.coord_type == COORD_GEO_ECLIPTIC:
+                # Geocentric ecliptic body: compare with swe_calc_ut
+                sample_err = _verify_geo_ecliptic_body(body_id, jd, pos)
+                if sample_err > max_error:
+                    max_error = sample_err
+                error_unit = "deg"
+
             elif body.coord_type == COORD_HELIO_ECL:
                 # Heliocentric body: compare with analytical function
                 eval_func = helio_eval_funcs.get(body_id)
@@ -3066,6 +3646,49 @@ def _verify_icrs_asteroid(
         return 1.0, 1.0
     finally:
         kernel.close()
+
+
+def _verify_geo_ecliptic_body(body_id: int, jd: float, leb_pos: tuple) -> float:
+    """Verify a GEO_ECLIPTIC body against swe_calc (TT, Skyfield).
+
+    Compares stored geocentric ecliptic (lon°, lat°, dist AU) against
+    the full Skyfield pipeline via swe_calc (TT) in forced-Skyfield mode.
+
+    Note: LEB files are indexed by TT, so we must compare against swe_calc
+    (which takes TT), not swe_calc_ut (which takes UT).
+
+    Returns max angular error in degrees.
+    """
+    import libephemeris as _ephem
+    from libephemeris.constants import SEFLG_SPEED
+    from libephemeris.planets import swe_calc
+
+    # Force Skyfield mode to bypass LEB
+    saved_mode = _ephem.state._CALC_MODE
+    saved_leb = _ephem.state._LEB_FILE
+    saved_reader = _ephem.state._LEB_READER
+    _ephem.state._LEB_FILE = None
+    _ephem.state._LEB_READER = None
+    _ephem.set_calc_mode("skyfield")
+    try:
+        ref, _ = swe_calc(jd, body_id, SEFLG_SPEED)
+    finally:
+        _ephem.state._LEB_FILE = saved_leb
+        _ephem.state._LEB_READER = saved_reader
+        if saved_mode is not None:
+            _ephem.set_calc_mode(saved_mode)
+        else:
+            _ephem.set_calc_mode(None)
+
+    # Longitude comparison (handle 0/360 wrap)
+    dlon = abs(float(leb_pos[0]) - ref[0])
+    if dlon > 180.0:
+        dlon = 360.0 - dlon
+
+    # Latitude comparison
+    dlat = abs(float(leb_pos[1]) - ref[1])
+
+    return max(dlon, dlat)
 
 
 def _verify_ecliptic_body(
