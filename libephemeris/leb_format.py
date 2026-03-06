@@ -154,17 +154,17 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     # the ICRS→ecliptic conversion pipeline and its ~5" error amplification.
     # Geocentric ecliptic includes retrograde motion, requiring shorter
     # segments than ICRS barycentric for the same fitting accuracy.
-    # Tuned after V3 base tier verification (target: <0.5" worst-case).
-    0: (32, 13, COORD_GEO_ECLIPTIC, 3),  # SE_SUN       — 0.013"
-    1: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_MOON      — 0.001"
-    2: (16, 15, COORD_GEO_ECLIPTIC, 3),  # SE_MERCURY   — 0.36"
-    3: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_VENUS     — 0.10"
-    4: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_MARS      — 0.52"
-    5: (16, 13, COORD_GEO_ECLIPTIC, 3),  # SE_JUPITER   — 0.17"
-    6: (8, 15, COORD_GEO_ECLIPTIC, 3),  # SE_SATURN    — was 16d/1.07"
-    7: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_URANUS    — 0.59"
-    8: (32, 13, COORD_GEO_ECLIPTIC, 3),  # SE_NEPTUNE   — 0.13"
-    9: (32, 13, COORD_GEO_ECLIPTIC, 3),  # SE_PLUTO     — 0.13"
+    # Tuned with dense 500-segment scans (target: <0.5" worst-case).
+    0: (32, 13, COORD_GEO_ECLIPTIC, 3),  # SE_SUN       — 0.014"
+    1: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_MOON      — 0.000"
+    2: (2, 17, COORD_GEO_ECLIPTIC, 3),  # SE_MERCURY   — 0.000"
+    3: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_VENUS     — 0.000"
+    4: (1, 17, COORD_GEO_ECLIPTIC, 3),  # SE_MARS      — 0.000"
+    5: (1, 17, COORD_GEO_ECLIPTIC, 3),  # SE_JUPITER   — 0.048"
+    6: (4, 15, COORD_GEO_ECLIPTIC, 3),  # SE_SATURN    — 0.000"
+    7: (1, 21, COORD_GEO_ECLIPTIC, 3),  # SE_URANUS    — 0.003"
+    8: (4, 15, COORD_GEO_ECLIPTIC, 3),  # SE_NEPTUNE   — 0.000"
+    9: (16, 13, COORD_GEO_ECLIPTIC, 3),  # SE_PLUTO     — 0.003"
     14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH     — kept ICRS (geocentric=degenerate)
     # Lunar nodes/Lilith: ecliptic direct (unchanged)
     10: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_NODE  (lon, 0, 0)
