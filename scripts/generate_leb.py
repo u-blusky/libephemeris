@@ -225,6 +225,44 @@ BODY_NAMES = {
     48: "Transpluto",
 }
 
+# Reverse lookup: case-insensitive name → body ID.
+# Supports both canonical names ("Mean Node") and short aliases ("moon").
+_NAME_TO_BODY_ID: dict[str, int] = {}
+for _bid, _bname in BODY_NAMES.items():
+    _NAME_TO_BODY_ID[_bname.lower()] = _bid
+    # Also register without spaces (e.g. "meannode" → 10)
+    _no_space = _bname.lower().replace(" ", "")
+    if _no_space != _bname.lower():
+        _NAME_TO_BODY_ID[_no_space] = _bid
+
+
+def _resolve_body_token(token: str) -> int:
+    """Resolve a body token (ID or name) to a numeric body ID.
+
+    Accepts:
+      - Numeric IDs: "1", "14"
+      - Names (case-insensitive): "moon", "Moon", "MOON"
+      - Names without spaces: "meannode", "oscuapogee", "interpapogee"
+
+    Raises:
+        ValueError: If the token cannot be resolved.
+    """
+    token = token.strip()
+    # Try numeric first
+    try:
+        return int(token)
+    except ValueError:
+        pass
+    # Try name lookup
+    key = token.lower()
+    if key in _NAME_TO_BODY_ID:
+        return _NAME_TO_BODY_ID[key]
+    raise ValueError(
+        f"Unknown body '{token}'. Use a numeric ID or one of: "
+        + ", ".join(sorted(_NAME_TO_BODY_ID.keys()))
+    )
+
+
 # Planet name map for Skyfield (body_id -> skyfield name)
 _PLANET_MAP = {
     0: "sun",
@@ -1780,7 +1818,6 @@ def _apply_geo_ecliptic_pipeline(
     light_time: np.ndarray,
     planets,
     *,
-    skip_deflection: bool = False,
     verbose: bool = False,
     label: str = "",
 ) -> np.ndarray:
@@ -1796,6 +1833,10 @@ def _apply_geo_ecliptic_pipeline(
     - PNM: Skyfield ``Time.M`` matrix (IAU 2006/2000A).
     - Ecliptic rotation: true obliquity = mean + Δε.
 
+    For large arrays (>250K points), automatically chunks the computation to
+    bound peak memory at ~300 MB and provide progress output.  Each JD is
+    independent, so chunking produces bit-identical results.
+
     Args:
         geo: ``(N, 3)`` geocentric ICRS Cartesian positions in AU (light-time corrected).
         earth_vel: ``(N, 3)`` Earth ICRS barycentric velocity in AU/day.
@@ -1804,30 +1845,58 @@ def _apply_geo_ecliptic_pipeline(
         earth_bary: ``(N, 3)`` Earth ICRS barycentric positions in AU.
         light_time: ``(N,)`` light-time from target to observer in days.
         planets: Skyfield SpiceKernel ephemeris.
-        skip_deflection: If True, skip gravitational deflection (for the Moon,
-            where the effect is < 0.000001" and negligible).
         verbose: Print progress for each pipeline step.
         label: Body label for progress output.
 
     Returns:
         ``(N, 3)`` array of ``(lon_deg, lat_deg, dist_au)``.
     """
+    # Chunk large arrays to bound memory (~300 MB per chunk) and show progress.
+    _CHUNK_SIZE = 250_000
+    N = len(all_jds)
+
+    if N > _CHUNK_SIZE:
+        n_chunks = int(math.ceil(N / _CHUNK_SIZE))
+        if verbose:
+            print(
+                f"      {label}: processing in {n_chunks} chunks "
+                f"({_CHUNK_SIZE:,} pts each)...",
+                flush=True,
+            )
+        results = []
+        for ci in range(n_chunks):
+            i0 = ci * _CHUNK_SIZE
+            i1 = min(i0 + _CHUNK_SIZE, N)
+            if verbose:
+                print(
+                    f"      {label}: chunk {ci + 1}/{n_chunks} [{i0:,}–{i1:,}]...",
+                    flush=True,
+                )
+            chunk_result = _apply_geo_ecliptic_pipeline(
+                geo[i0:i1],
+                earth_vel[i0:i1],
+                all_jds[i0:i1],
+                ts,
+                earth_bary[i0:i1],
+                light_time[i0:i1],
+                planets,
+                verbose=False,
+                label=label,
+            )
+            results.append(chunk_result)
+        return np.concatenate(results, axis=0)
+
     C_AU_DAY = 173.1446326846693
 
     # --- Gravitational deflection (Sun, Jupiter, Saturn) ---
-    if skip_deflection:
-        geo_defl = geo
-        if verbose:
-            print(f"      {label}: deflection skipped (negligible)")
-    else:
-        if verbose:
-            print(
-                f"      {label}: gravitational deflection ({len(all_jds):,} pts)...",
-                flush=True,
-            )
-        geo_defl = _apply_gravitational_deflection(
-            geo, earth_bary, all_jds, light_time, planets, ts
+    if verbose:
+        print(
+            f"      {label}: gravitational deflection ({N:,} pts)...",
+            flush=True,
         )
+    geo_defl = _apply_gravitational_deflection(
+        geo, earth_bary, all_jds, light_time, planets, ts
+    )
 
     # --- Relativistic aberration (matches Skyfield's add_aberration) ---
     if verbose:
@@ -1966,7 +2035,6 @@ def generate_body_geo_ecliptic(
         earth_pos,
         lt,
         planets,
-        skip_deflection=(body_id == 1),
         verbose=verbose,
         label=label,
     )
@@ -3861,7 +3929,8 @@ def main():
         "--bodies",
         type=str,
         default=None,
-        help="Comma-separated list of body IDs (default: all)",
+        help="Comma-separated list of body IDs or names (e.g. '1,2,3' or "
+        "'moon,mercury,venus' or 'Moon,14'). Case-insensitive.",
     )
     parser.add_argument(
         "--group",
@@ -3979,7 +4048,10 @@ def main():
     # Resolve body list
     bodies = None
     if args.bodies:
-        bodies = [int(b.strip()) for b in args.bodies.split(",")]
+        try:
+            bodies = [_resolve_body_token(b) for b in args.bodies.split(",")]
+        except ValueError as exc:
+            parser.error(str(exc))
     elif args.group:
         if args.group not in BODY_GROUPS:
             parser.error(f"Unknown group: {args.group}")
