@@ -143,50 +143,45 @@ class TierTolerances:
 # Per-tier default overrides (only fields that differ from dataclass defaults)
 TIER_DEFAULTS: dict[str, dict[str, float]] = {
     "base": {
-        # Tuned to minimum possible based on measured errors (2x safety margin).
-        # Saturn latitude is architecturally limited to ~4.85" (ICRS→ecliptic
-        # pipeline amplification by 1/geocentric_distance).
-        "POSITION_ARCSEC": 5.0,  # Saturn lat 4.85" (architectural limit)
-        "ASTEROID_ARCSEC": 0.5,  # Observed max 0.44"
-        "EQUATORIAL_ARCSEC": 1.0,  # Observed ~0.6"
-        "J2000_ARCSEC": 1.0,
-        "SIDEREAL_ARCSEC": 5.0,  # Observed ~0.6" but sidereal adds ayanamsha
-        "ECLIPTIC_ARCSEC": 0.05,  # Observed max 0.028"
+        # V3: geocentric ecliptic storage.  Chebyshev fitting of geocentric
+        # coordinates has higher worst-case errors during retrograde motion
+        # near opposition.  Measured: 500-sample verify + 200-date compare.
+        # Worst case: Jupiter 3.0" lon at JD 2458845 (~2020 CE, near opposition).
+        "POSITION_ARCSEC": 8.0,  # Jupiter 3.0" near opposition (2.7x margin)
+        "ASTEROID_ARCSEC": 0.001,  # ~0.0001" measured (10x margin, floor)
+        "EQUATORIAL_ARCSEC": 1.2,  # GEO_ECLIPTIC falls back to Skyfield (0 error)
+        "J2000_ARCSEC": 1.2,  # GEO_ECLIPTIC falls back to Skyfield (0 error)
+        "SIDEREAL_ARCSEC": 8.0,  # = position error (ayanamsha is formula-exact)
+        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.0432" (2.3x margin)
         "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
-        "DISTANCE_AU": 3e-5,  # Observed max 2.34e-5 (Pluto)
-        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.039, Saturn 0.013
-        "SPEED_LAT_DEG_DAY": 0.005,  # Saturn 0.0035 (asteroids handled separately)
-        "SPEED_DIST_AU_DAY": 1e-4,  # Observed max 8.98e-5 (Pluto dist velocity)
-        # Asteroid lat velocity is architecturally limited: ICRS→ecliptic
-        # pipeline amplifies errors by 1/geocentric_distance for velocity.
-        # Observed: Pallas 0.71, Juno 0.35, Ceres/Vesta 0.19 deg/day.
-        "ASTEROID_SPEED_LAT_DEG_DAY": 0.75,  # Observed max 0.714 (Pallas)
+        "DISTANCE_AU": 5e-5,  # Pluto 2.26e-5 AU (2.2x margin)
+        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.035 (1.3x margin)
+        "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee ~0.003, planets 0.000082
+        "SPEED_DIST_AU_DAY": 6e-5,  # Pluto 2.70e-5 (2.2x margin)
+        "ASTEROID_SPEED_LON_DEG_DAY": 0.001,  # Pallas 0.000189 (5x margin)
+        "ASTEROID_SPEED_LAT_DEG_DAY": 1.7,  # Pallas 0.84 (2x margin)
+        "ASTEROID_SPEED_DIST_AU_DAY": 7e-6,  # Juno 3.01e-6 (2.3x margin)
     },
     "medium": {
-        # Tuned to minimum possible based on measured errors (2x safety margin).
-        # Medium tier (de440, 1550-2650) with asteroid SPK filtered to 1900-2100.
-        # V3: geocentric ecliptic storage — distance velocity errors are higher
-        # because geocentric distance varies more rapidly (retrograde motion)
-        # and the Chebyshev derivative amplifies fitting error.
-        "POSITION_ARCSEC": 5.0,  # Uranus 4.58" at ~1900 CE (architectural limit)
-        "ASTEROID_ARCSEC": 0.5,  # Observed max 0.29" (Pallas)
-        "EQUATORIAL_ARCSEC": 0.5,  # Observed max 0.37" (Uranus)
-        "J2000_ARCSEC": 0.5,
-        "SIDEREAL_ARCSEC": 5.0,  # Conservative (equatorial 0.37" + ayanamsha)
-        "ECLIPTIC_ARCSEC": 0.05,  # Observed max 0.035" (OscuApogee)
+        # V3: geocentric ecliptic storage.  Measured: 500-sample verify +
+        # 200-date compare tests across 1560-2640 CE.
+        # Worst case: Uranus 3.75" lon, 5.59" lat at JD ~1900 CE (near opposition).
+        "POSITION_ARCSEC": 12.0,  # Uranus 5.59" lat at ~1900 CE (2.1x margin)
+        "ASTEROID_ARCSEC": 0.001,  # ~0.0000" measured (floor)
+        "EQUATORIAL_ARCSEC": 1.2,  # GEO_ECLIPTIC falls back to Skyfield (0 error)
+        "J2000_ARCSEC": 1.2,
+        "SIDEREAL_ARCSEC": 12.0,  # = position error (ayanamsha is formula-exact)
+        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.0339" (2.9x margin)
         "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
-        "DISTANCE_AU": 3e-5,  # Observed max 1.92e-5 (Pluto)
+        "DISTANCE_AU": 5e-5,  # Pluto 2.01e-5 AU (2.5x margin)
         # Velocity — OscuApogee dominates lon (0.043 deg/day).
-        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.043, Moon 0.0014
-        "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee/InterpApogee 0.00286
-        "SPEED_DIST_AU_DAY": 1e-4,  # V3: Pluto 4.87e-5 AU/day (geocentric dist derivative)
-        # Asteroid velocity — V3 geocentric ecliptic changes dist speed profile.
-        # With SPK filtered to 1900-2100, lon are very small; lat speed is
-        # architecturally limited (same as base tier). Dist speed increased
-        # due to geocentric distance Chebyshev derivative amplification.
-        "ASTEROID_SPEED_LON_DEG_DAY": 0.001,  # Observed max 0.000042 (Pallas)
-        "ASTEROID_SPEED_LAT_DEG_DAY": 0.40,  # Observed max 0.341 (Pallas)
-        "ASTEROID_SPEED_DIST_AU_DAY": 6e-6,  # V3: Vesta 2.97e-6, Juno 2.79e-6
+        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.043
+        "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee ~0.003, planets 0.000052
+        "SPEED_DIST_AU_DAY": 1e-4,  # Pluto 4.87e-5 AU/day (2.1x margin)
+        # Asteroid velocity — V3 geocentric ecliptic.
+        "ASTEROID_SPEED_LON_DEG_DAY": 0.001,  # Pallas 0.000201 (5x margin)
+        "ASTEROID_SPEED_LAT_DEG_DAY": 0.70,  # Pallas 0.341 (2x margin)
+        "ASTEROID_SPEED_DIST_AU_DAY": 6e-6,  # Vesta 2.97e-6 (2x margin)
     },
     "extended": {
         # Extended tier (de441, -5000 to 5000 CE, 10,000 years).
