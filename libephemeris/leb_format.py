@@ -161,7 +161,7 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     3: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_VENUS     — 0.0000"
     4: (1, 17, COORD_GEO_ECLIPTIC, 3),  # SE_MARS      — 0.0000"
     5: (0.5, 21, COORD_GEO_ECLIPTIC, 3),  # SE_JUPITER   — 0.0003"
-    6: (4, 15, COORD_GEO_ECLIPTIC, 3),  # SE_SATURN    — 0.0002"
+    6: (2, 15, COORD_GEO_ECLIPTIC, 3),  # SE_SATURN    — 0.0003"
     7: (1, 23, COORD_GEO_ECLIPTIC, 3),  # SE_URANUS    — 0.0000"
     8: (4, 17, COORD_GEO_ECLIPTIC, 3),  # SE_NEPTUNE   — 0.0005"
     9: (8, 13, COORD_GEO_ECLIPTIC, 3),  # SE_PLUTO     — 0.0000"
