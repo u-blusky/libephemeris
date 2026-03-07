@@ -143,15 +143,14 @@ class TierTolerances:
 # Per-tier default overrides (only fields that differ from dataclass defaults)
 TIER_DEFAULTS: dict[str, dict[str, float]] = {
     "base": {
-        # V3: geocentric ecliptic storage.  Chebyshev fitting of geocentric
-        # coordinates has higher worst-case errors during retrograde motion
-        # near opposition.  Measured: 500-sample verify + 200-date compare.
-        # Worst case: Jupiter 3.0" lon at JD 2458845 (~2020 CE, near opposition).
-        "POSITION_ARCSEC": 8.0,  # Jupiter 3.0" near opposition (2.7x margin)
+        # V3: geocentric ecliptic storage with <0.001" Chebyshev precision.
+        # All planets validated with dense 300-500 segment scans, 100 test pts.
+        # Worst case: Jupiter 0.0003", Saturn 0.0003", Neptune 0.0005".
+        "POSITION_ARCSEC": 0.05,  # 0.0005" measured (100x margin)
         "ASTEROID_ARCSEC": 0.001,  # ~0.0001" measured (10x margin, floor)
         "EQUATORIAL_ARCSEC": 1.2,  # GEO_ECLIPTIC falls back to Skyfield (0 error)
         "J2000_ARCSEC": 1.2,  # GEO_ECLIPTIC falls back to Skyfield (0 error)
-        "SIDEREAL_ARCSEC": 8.0,  # = position error (ayanamsha is formula-exact)
+        "SIDEREAL_ARCSEC": 0.05,  # = position error (ayanamsha is formula-exact)
         "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.0432" (2.3x margin)
         "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
         "DISTANCE_AU": 5e-5,  # Pluto 2.26e-5 AU (2.2x margin)
@@ -163,14 +162,15 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
         "ASTEROID_SPEED_DIST_AU_DAY": 7e-6,  # Juno 3.01e-6 (2.3x margin)
     },
     "medium": {
-        # V3: geocentric ecliptic storage.  Measured: 500-sample verify +
-        # 200-date compare tests across 1560-2640 CE.
-        # Worst case: Uranus 3.75" lon, 5.59" lat at JD ~1900 CE (near opposition).
-        "POSITION_ARCSEC": 12.0,  # Uranus 5.59" lat at ~1900 CE (2.1x margin)
+        # V3: geocentric ecliptic storage with <0.001" Chebyshev precision.
+        # All planets validated with dense 500 segment scans, 100 test pts
+        # across 1550-2650 CE range.
+        # Worst case: Saturn 0.0003", Neptune 0.0005", Jupiter 0.0003".
+        "POSITION_ARCSEC": 0.05,  # 0.0005" measured (100x margin)
         "ASTEROID_ARCSEC": 0.001,  # ~0.0000" measured (floor)
         "EQUATORIAL_ARCSEC": 1.2,  # GEO_ECLIPTIC falls back to Skyfield (0 error)
         "J2000_ARCSEC": 1.2,
-        "SIDEREAL_ARCSEC": 12.0,  # = position error (ayanamsha is formula-exact)
+        "SIDEREAL_ARCSEC": 0.05,  # = position error (ayanamsha is formula-exact)
         "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.0339" (2.9x margin)
         "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
         "DISTANCE_AU": 5e-5,  # Pluto 2.01e-5 AU (2.5x margin)
