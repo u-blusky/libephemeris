@@ -155,7 +155,7 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     # Geocentric ecliptic includes retrograde motion, requiring shorter
     # segments than ICRS barycentric for the same fitting accuracy.
     # Tuned with dense 500-segment scans (target: <0.5" worst-case).
-    0: (32, 13, COORD_GEO_ECLIPTIC, 3),  # SE_SUN       — 0.014"
+    0: (16, 15, COORD_GEO_ECLIPTIC, 3),  # SE_SUN       — ~0.0001"
     1: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_MOON      — 0.000"
     2: (2, 17, COORD_GEO_ECLIPTIC, 3),  # SE_MERCURY   — 0.000"
     3: (4, 13, COORD_GEO_ECLIPTIC, 3),  # SE_VENUS     — 0.000"
