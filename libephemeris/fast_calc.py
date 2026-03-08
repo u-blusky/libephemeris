@@ -38,6 +38,7 @@ from .leb_format import (
     COORD_ECLIPTIC,
     COORD_HELIO_ECL,
     COORD_ICRS_BARY,
+    COORD_ICRS_BARY_SYSTEM,
 )
 
 if TYPE_CHECKING:
@@ -267,6 +268,81 @@ _DEFLECTORS: Tuple[Tuple[int, float], ...] = (
 # Body IDs in the LEB file for deflector barycenters
 # (Jupiter=5, Saturn=6 map to body_ids 5, 6 in LEB — their barycentric ICRS)
 _DEFLECTOR_LEB_IDS = {SE_SUN: SE_SUN, 5: 5, 6: 6}
+
+# =============================================================================
+# CENTER-OF-BODY (COB) CORRECTION FOR SYSTEM BARYCENTERS
+# =============================================================================
+
+# Barycenter names for outer planets (used by get_cob_offset / SPK centers)
+_SYSTEM_BARY_NAMES: Dict[int, str] = {
+    5: "jupiter barycenter",
+    6: "saturn barycenter",
+    7: "uranus barycenter",
+    8: "neptune barycenter",
+    9: "pluto barycenter",
+}
+
+
+def _apply_cob_correction(
+    pos: Tuple[float, float, float],
+    ipl: int,
+    jd_tt: float,
+) -> Tuple[float, float, float]:
+    """Apply center-of-body correction to a system barycenter position.
+
+    Converts system barycenter ICRS position to planet center ICRS position
+    by adding the COB offset. Uses SPK planet_centers segments where available
+    (high precision), falling back to analytical moon-theory COB corrections.
+
+    This matches the behavior of _SpkCenterTarget in planets.py.
+
+    Args:
+        pos: System barycenter ICRS position (x, y, z) in AU.
+        ipl: Body ID (5=Jupiter, 6=Saturn, 7=Uranus, 8=Neptune, 9=Pluto).
+        jd_tt: Julian Day TT at which to evaluate the COB offset.
+
+    Returns:
+        Planet center ICRS position (x, y, z) in AU.
+    """
+    from .planets import _PLANET_CENTER_NAIF_IDS
+    from .state import get_planet_center_segment, get_timescale
+
+    bary_name = _SYSTEM_BARY_NAMES.get(ipl)
+    if bary_name is None:
+        return pos  # Not an outer planet, no COB needed
+
+    ts = get_timescale()
+    t = ts.tt_jd(jd_tt)
+
+    # Map body_id to planet name for NAIF lookup
+    planet_name = {5: "jupiter", 6: "saturn", 7: "uranus", 8: "neptune", 9: "pluto"}[
+        ipl
+    ]
+
+    # Try SPK center offset first (high precision)
+    if planet_name in _PLANET_CENTER_NAIF_IDS:
+        naif_id = _PLANET_CENTER_NAIF_IDS[planet_name]
+        seg = get_planet_center_segment(naif_id)
+        if seg is not None:
+            try:
+                offset_pos = seg.at(t).position.au
+                return (
+                    pos[0] + float(offset_pos[0]),
+                    pos[1] + float(offset_pos[1]),
+                    pos[2] + float(offset_pos[2]),
+                )
+            except Exception:
+                pass  # Fall through to analytical COB
+
+    # Fallback: analytical COB from moon theories
+    from .moon_theories import get_cob_offset
+
+    offset = get_cob_offset(bary_name, t)
+    return (
+        pos[0] + offset[0],
+        pos[1] + offset[1],
+        pos[2] + offset[2],
+    )
 
 
 def _apply_gravitational_deflection(
@@ -608,8 +684,13 @@ def _pipeline_icrs(
     ipl: int,
     iflag: int,
     want_velocity: bool = False,
+    is_system_bary: bool = False,
 ) -> Tuple[float, ...]:
     """Pipeline A: compute ecliptic coordinates for ICRS barycentric bodies.
+
+    Handles both planet-center bodies (COORD_ICRS_BARY) and system-barycenter
+    bodies (COORD_ICRS_BARY_SYSTEM). For system barycenters, COB correction
+    is applied at runtime to match Skyfield's _SpkCenterTarget behavior.
 
     When want_velocity is False (default), returns (lon, lat, dist).
     When want_velocity is True, returns (lon, lat, dist, dlon, dlat, ddist)
@@ -617,12 +698,27 @@ def _pipeline_icrs(
     polynomial derivatives, transformed through the same rotation matrices
     as the position.
 
+    Args:
+        reader: Open LEBReader.
+        jd_tt: Julian Day TT.
+        ipl: Body ID.
+        iflag: Flags.
+        want_velocity: Whether to compute velocity.
+        is_system_bary: If True, stored data is system barycenter; apply COB.
+
     Returns:
         (lon_deg, lat_deg, dist_au) or
         (lon_deg, lat_deg, dist_au, dlon_deg_day, dlat_deg_day, ddist_au_day)
     """
     # 1. Get body position (and velocity if needed)
     target_pos, target_vel = reader.eval_body(ipl, jd_tt)
+
+    # 1b. For system barycenters, apply COB only for TRUEPOS (no light-time).
+    #     For normal path, COB is deferred until after light-time iteration
+    #     to match Skyfield's _SpkCenterTarget._observe_from_bcrs() behavior:
+    #     iterate light-time on barycenter, apply COB once at retarded time.
+    if is_system_bary and (iflag & SEFLG_TRUEPOS):
+        target_pos = _apply_cob_correction(target_pos, ipl, jd_tt)
 
     # Pre-initialize velocity variables to satisfy type checker.
     # These are always set before use when want_velocity=True.
@@ -649,9 +745,14 @@ def _pipeline_icrs(
     geo = _vec3_sub(target_pos, observer)
 
     # 4. Light-time correction (unless SEFLG_TRUEPOS)
-    #    Also get the velocity at the retarded time for analytical velocity.
-    #    Initialize retarded_vel to target_vel as fallback for dist == 0 case
-    #    (e.g. Earth geocentric where target == observer).
+    #    For system barycenters: iterate on raw barycenter positions (smooth),
+    #    then apply COB once after convergence at OBSERVER time. This matches
+    #    Skyfield's _SpkCenterTarget._observe_from_bcrs() which:
+    #      1. Calls barycenter._observe_from_bcrs(observer) to iterate light-time
+    #         on the barycenter, returning (pos, vel, t, light_time) where
+    #         t = observer.t (the OBSERVATION time, not retarded time).
+    #      2. Evaluates center_segment.at(t) at OBSERVER time, not retarded time.
+    #    We must match this: COB offset evaluated at jd_tt (observer time).
     retarded_vel = target_vel
     lt = 0.0
     if not (iflag & SEFLG_TRUEPOS):
@@ -662,6 +763,17 @@ def _pipeline_icrs(
             lt = dist / C_LIGHT_AU_DAY
             retarded_pos, retarded_vel = reader.eval_body(ipl, jd_tt - lt)
             geo = _vec3_sub(retarded_pos, observer)
+
+        # Apply COB correction at OBSERVER time (jd_tt), matching Skyfield's
+        # _SpkCenterTarget._observe_from_bcrs() which evaluates the center
+        # segment at observer.t, not at the retarded time.
+        if is_system_bary and lt > 0.0:
+            retarded_pos_cob = _apply_cob_correction(
+                (geo[0] + observer[0], geo[1] + observer[1], geo[2] + observer[2]),
+                ipl,
+                jd_tt,
+            )
+            geo = _vec3_sub(retarded_pos_cob, observer)
 
     if want_velocity:
         geo_vel = _vec3_sub(retarded_vel, observer_vel)
@@ -925,7 +1037,13 @@ def fast_calc_ut(
         sid_ayan_t0 = _SIDEREAL_AYAN_T0
 
     # Delta-T conversion: UT -> TT
-    delta_t = reader.delta_t(tjd_ut)
+    # Use swe_deltat() for exact match with the Skyfield reference path.
+    # The LEB reader's linearly-interpolated sparse table introduces up to
+    # ~0.004s error near 1985, which at the Moon's ~0.5"/s speed exceeds
+    # the 0.001" target.
+    from .time_utils import swe_deltat
+
+    delta_t = swe_deltat(tjd_ut)
     jd_tt = tjd_ut + delta_t
 
     return _fast_calc_core(
@@ -1045,6 +1163,27 @@ def _fast_calc_core(
             )
         else:
             lon, lat, dist = _pipeline_icrs(reader, jd_tt, ipl, iflag)
+            dlon, dlat, ddist = 0.0, 0.0, 0.0
+
+    elif body.coord_type == COORD_ICRS_BARY_SYSTEM:
+        # Pipeline A': ICRS system barycenter — COB correction applied at runtime
+        if iflag & SEFLG_SPEED:
+            lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
+                reader,
+                jd_tt,
+                ipl,
+                iflag,
+                want_velocity=True,
+                is_system_bary=True,
+            )
+        else:
+            lon, lat, dist = _pipeline_icrs(
+                reader,
+                jd_tt,
+                ipl,
+                iflag,
+                is_system_bary=True,
+            )
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     elif body.coord_type == COORD_ECLIPTIC:

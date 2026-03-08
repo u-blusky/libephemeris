@@ -143,21 +143,24 @@ class TierTolerances:
 # Per-tier default overrides (only fields that differ from dataclass defaults)
 TIER_DEFAULTS: dict[str, dict[str, float]] = {
     "base": {
-        # ICRS barycentric storage with gravitational deflection + SR aberration
-        # pipeline.  Chebyshev fitting is sub-arcsecond; pipeline error <0.002"
-        # for all planets except Pluto (~0.13" from COB offset + fitting).
+        # ICRS barycentric storage with COORD_ICRS_BARY_SYSTEM for outer
+        # planets + gravitational deflection + SR aberration pipeline.
         # Measured worst-case (200-point sweep, 1849-2150):
-        #   Sun 0.001", Moon 0.001", Mercury 0.003", Venus 0.004",
-        #   Mars 0.004", Jupiter 0.006", Saturn 0.003", Uranus 0.01",
-        #   Neptune 0.01", Pluto 0.13", Earth 0.001"
-        "POSITION_ARCSEC": 0.2,  # Pluto 0.13" (1.5x margin)
-        "ASTEROID_ARCSEC": 5.0,  # ICRS pipeline (same as planets)
-        "EQUATORIAL_ARCSEC": 0.2,  # Same pipeline, different output frame
-        "J2000_ARCSEC": 0.2,  # Same pipeline, J2000 ecliptic output
-        "SIDEREAL_ARCSEC": 0.2,  # = position error (ayanamsha is formula-exact)
-        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.0432" (2.3x margin)
+        #   Sun 0.000001", Moon 0.000332", Mercury 0.000004",
+        #   Venus 0.000006", Mars 0.000003", Jupiter 0.000002",
+        #   Saturn 0.000005", Uranus 0.000001", Neptune 0.000000",
+        #   Pluto 0.000000", Earth 0.000000"
+        #   Asteroids: max 0.000045" (Juno)
+        #   Ecliptic: max 0.000049" (OscuApog)
+        #   Hypothetical: ~0.000000"
+        "POSITION_ARCSEC": 0.001,  # Moon 0.000332" (3x margin)
+        "ASTEROID_ARCSEC": 0.001,  # Juno 0.000045" (22x margin)
+        "EQUATORIAL_ARCSEC": 0.02,  # Moon heliocentric 0.0103" (2x margin)
+        "J2000_ARCSEC": 0.001,  # Same pipeline, J2000 ecliptic output
+        "SIDEREAL_ARCSEC": 0.001,  # = position error (ayanamsha is formula-exact)
+        "ECLIPTIC_ARCSEC": 0.001,  # OscuApog 0.000049" (20x margin)
         "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
-        "DISTANCE_AU": 5e-5,  # Pluto 2.26e-5 AU (2.2x margin)
+        "DISTANCE_AU": 5e-6,  # Uranus helio 1.04e-6 AU (5x margin)
         "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.035 (1.3x margin)
         "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee ~0.003, planets 0.000082
         "SPEED_DIST_AU_DAY": 1.2e-4,  # Pluto 8.98e-5 (1.3x margin)
@@ -516,13 +519,16 @@ def filter_asteroid_dates(
 
 
 # Ecliptic body tolerances (per-body, in arcsec / deg-day)
+# Measured worst-case (base tier, 200 samples):
+#   MeanNode 0.000000", TrueNode 0.000001", MeanApog 0.000001",
+#   OscuApog 0.000049", IntpApog 0.000004", IntpPerg 0.000004"
 ECLIPTIC_TOLERANCES = {
-    10: {"lon": 0.01, "speed": 0.0001},  # Mean Node
-    11: {"lon": 0.5, "speed": 0.01},  # True Node
-    12: {"lon": 0.01, "speed": 0.0001},  # Mean Apogee
-    13: {"lon": 0.5, "speed": 0.05},  # Oscu Apogee (higher speed variance)
-    21: {"lon": 0.5, "speed": 0.01},  # Interp Apogee
-    22: {"lon": 0.5, "speed": 0.01},  # Interp Perigee
+    10: {"lon": 0.001, "speed": 0.0001},  # Mean Node
+    11: {"lon": 0.001, "speed": 0.01},  # True Node
+    12: {"lon": 0.001, "speed": 0.0001},  # Mean Apogee
+    13: {"lon": 0.001, "speed": 0.05},  # Oscu Apogee (higher speed variance)
+    21: {"lon": 0.001, "speed": 0.01},  # Interp Apogee
+    22: {"lon": 0.001, "speed": 0.01},  # Interp Perigee
 }
 
 # Formula-based sidereal modes (27 modes + user-defined)

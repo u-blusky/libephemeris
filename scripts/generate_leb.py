@@ -129,6 +129,7 @@ from libephemeris.leb_format import (
     COORD_ECLIPTIC,
     COORD_HELIO_ECL,
     COORD_ICRS_BARY,
+    COORD_ICRS_BARY_SYSTEM,
     DELTA_T_ENTRY_FMT,
     DELTA_T_ENTRY_SIZE,
     DELTA_T_HEADER_FMT,
@@ -275,6 +276,15 @@ _PLANET_MAP = {
     8: "neptune",
     9: "pluto",
     14: "earth",
+}
+
+# Outer planet barycenter names for system-barycenter generation
+_SYSTEM_BARY_MAP = {
+    5: "jupiter barycenter",
+    6: "saturn barycenter",
+    7: "uranus barycenter",
+    8: "neptune barycenter",
+    9: "pluto barycenter",
 }
 
 # Asteroid NAIF IDs for Skyfield SPK lookup
@@ -1359,6 +1369,12 @@ def _eval_body_icrs_vectorized(
     Handles inner planets (direct Skyfield target) and outer planets
     (barycenter + SPK center offset or COB correction) transparently.
 
+    For outer planets, uses a **hybrid per-JD approach** that matches the
+    runtime behavior of _SpkCenterTarget: SPK center offsets are used for
+    JDs within the planet_centers.bsp coverage, and analytical COB corrections
+    are used for JDs outside that range. This ensures the stored Chebyshev
+    data matches what swe_calc() produces at runtime.
+
     JDs that extend beyond the SPK ephemeris range (from last-segment
     overshoot) are linearly extrapolated using position + velocity at
     the boundary. This preserves Chebyshev fit quality for in-range dates.
@@ -1391,28 +1407,48 @@ def _eval_body_icrs_vectorized(
 
     barycenter = planets[bary_name]
 
-    # Try SPK center segments (vectorized natively via Skyfield)
+    # Get barycenter positions for ALL JDs (vectorized, always available)
+    bary_vals = _eval_target_vectorized(barycenter, all_jds, ts, spk_min, spk_max)
+
+    # Hybrid SPK/COB approach: use SPK center where in range, analytical COB
+    # where out of range. This matches _SpkCenterTarget's runtime behavior.
     if target_name in _PLANET_CENTER_NAIF_IDS:
         naif_id = _PLANET_CENTER_NAIF_IDS[target_name]
         center_segment = get_planet_center_segment(naif_id)
         if center_segment is not None:
-            try:
-                bary_vals = _eval_target_vectorized(
-                    barycenter, all_jds, ts, spk_min, spk_max
-                )
-                offset_vals = _eval_target_vectorized(
-                    center_segment, all_jds, ts, spk_min, spk_max
-                )
-                return bary_vals + offset_vals
-            except Exception:
-                pass  # Fall through to COB correction
+            # Get the SPK center segment's JD range
+            spk_seg = center_segment.spk_segment
+            center_jd_min = spk_seg.start_jd
+            center_jd_max = spk_seg.end_jd
+            margin = 1.0  # days safety margin
+            clo = center_jd_min + margin
+            chi = center_jd_max - margin
 
-    # Fallback: vectorized barycenter + scalar COB correction
-    # The barycenter evaluation is the expensive part (vectorized).
-    # COB offsets are cheap analytical formulas computed one-by-one.
+            in_spk = (all_jds >= clo) & (all_jds <= chi)
+            in_spk_idx = np.where(in_spk)[0]
+            out_spk_idx = np.where(~in_spk)[0]
+
+            # Apply SPK center offset for in-range JDs (vectorized)
+            if len(in_spk_idx) > 0:
+                t_in = ts.tt_jd(all_jds[in_spk_idx])
+                offset_pos = np.asarray(center_segment.at(t_in).position.au)  # (3, N)
+                bary_vals[in_spk_idx] += offset_pos.T
+
+            # Apply analytical COB for out-of-range JDs (scalar)
+            if len(out_spk_idx) > 0:
+                from libephemeris.moon_theories import get_cob_offset
+
+                for i in out_spk_idx:
+                    t_single = ts.tt_jd(float(all_jds[i]))
+                    offset = get_cob_offset(bary_name, t_single)
+                    bary_vals[i, 0] += offset[0]
+                    bary_vals[i, 1] += offset[1]
+                    bary_vals[i, 2] += offset[2]
+
+            return bary_vals
+
+    # No SPK center available at all: pure analytical COB fallback
     from libephemeris.moon_theories import get_cob_offset
-
-    bary_vals = _eval_target_vectorized(barycenter, all_jds, ts, spk_min, spk_max)
 
     for i in range(len(all_jds)):
         t_single = ts.tt_jd(float(all_jds[i]))
@@ -1457,6 +1493,62 @@ def generate_body_icrs(
 
     # Single vectorized evaluation (handles COB correction for outer planets)
     all_values = _eval_body_icrs_vectorized(target_name, all_jds, planets, ts)
+
+    return _fit_and_verify_from_values(
+        all_values,
+        jd_start,
+        jd_end,
+        interval_days,
+        degree,
+        3,
+        n_segments,
+        pts_per_seg,
+        label=label,
+        verbose=verbose,
+    )
+
+
+def generate_body_icrs_system_bary(
+    body_id: int,
+    jd_start: float,
+    jd_end: float,
+    interval_days: float,
+    degree: int,
+    label: str = "",
+    verbose: bool = False,
+) -> Tuple[List[np.ndarray], float]:
+    """Generate Chebyshev coefficients for a system barycenter (ICRS).
+
+    Stores the pure system barycenter position (no COB correction),
+    which is ultra-smooth and fits Chebyshev polynomials with negligible error.
+    COB correction is applied at runtime by fast_calc._apply_cob_correction().
+
+    This eliminates the high-frequency moon oscillations (e.g., Io's 1.77-day
+    period for Jupiter, Charon's 6.4-day period for Pluto) that cause
+    Chebyshev fitting errors of 0.01-0.15" when storing planet center positions.
+
+    Returns:
+        (list_of_coefficient_arrays, max_error_au)
+    """
+    from libephemeris.state import get_planets, get_timescale
+
+    planets = get_planets()
+    ts = get_timescale()
+
+    bary_name = _SYSTEM_BARY_MAP.get(body_id)
+    if bary_name is None:
+        raise ValueError(f"No system barycenter map entry for body_id={body_id}")
+
+    spk_min, spk_max = _get_spk_jd_range(planets)
+    barycenter = planets[bary_name]
+
+    # Precompute all JDs for all segments (fit + verify)
+    all_jds, n_segments, pts_per_seg = _compute_all_segment_jds(
+        jd_start, jd_end, interval_days, degree
+    )
+
+    # Pure system barycenter evaluation (no COB — ultra-smooth)
+    all_values = _eval_target_vectorized(barycenter, all_jds, ts, spk_min, spk_max)
 
     return _fit_and_verify_from_values(
         all_values,
@@ -2044,6 +2136,17 @@ def generate_single_body(
                 label=label,
                 verbose=verbose,
             )
+    elif coord_type == COORD_ICRS_BARY_SYSTEM:
+        # System barycenter — store pure barycenter, COB applied at runtime
+        coeffs, error = generate_body_icrs_system_bary(
+            body_id,
+            jd_start,
+            jd_end,
+            interval_days,
+            degree,
+            label=label,
+            verbose=verbose,
+        )
     elif coord_type == COORD_ECLIPTIC:
         coeffs, error = generate_body_ecliptic(
             body_id,
@@ -2275,24 +2378,49 @@ def assemble_leb(
 
     # 1c. Generate analytical bodies
     # Split into ecliptic (vectorized) and heliocentric (scalar, already fast).
-    ecliptic_body_ids = [
-        b for b in analytical_bodies if BODY_PARAMS[b][2] == COORD_ECLIPTIC
+    # The vectorized ecliptic path assumes uniform params (8d/13), so bodies
+    # with non-standard params are routed to the scalar path instead.
+    _STD_ECL_PARAMS = (8.0, 13)  # (interval_days, degree) for vectorized path
+    ecliptic_body_ids_vec = [
+        b
+        for b in analytical_bodies
+        if BODY_PARAMS[b][2] == COORD_ECLIPTIC
+        and (BODY_PARAMS[b][0], BODY_PARAMS[b][1]) == _STD_ECL_PARAMS
+    ]
+    ecliptic_body_ids_scalar = [
+        b
+        for b in analytical_bodies
+        if BODY_PARAMS[b][2] == COORD_ECLIPTIC
+        and (BODY_PARAMS[b][0], BODY_PARAMS[b][1]) != _STD_ECL_PARAMS
     ]
     helio_body_ids = [
         b for b in analytical_bodies if BODY_PARAMS[b][2] == COORD_HELIO_ECL
     ]
 
-    # Ecliptic bodies (10-13, 21, 22): single vectorized Skyfield call + numpy
+    # Ecliptic bodies with standard params: single vectorized Skyfield call + numpy
     # This replaces ~328K scalar Skyfield calls per body with ONE array call.
-    if ecliptic_body_ids:
+    if ecliptic_body_ids_vec:
         if verbose:
             print(
-                f"  --- Ecliptic bodies ({len(ecliptic_body_ids)} bodies, vectorized) ---"
+                f"  --- Ecliptic bodies ({len(ecliptic_body_ids_vec)} bodies, vectorized) ---"
             )
         vec_results = generate_ecliptic_bodies_vectorized(
-            ecliptic_body_ids, jd_start, jd_end, verbose=verbose
+            ecliptic_body_ids_vec, jd_start, jd_end, verbose=verbose
         )
         for bid, (_, coeffs, error) in vec_results.items():
+            body_data[bid] = coeffs
+            body_errors[bid] = error
+
+    # Ecliptic bodies with non-standard params: scalar path (per-body params)
+    if ecliptic_body_ids_scalar:
+        if verbose:
+            print(
+                f"  --- Ecliptic bodies ({len(ecliptic_body_ids_scalar)} bodies, scalar) ---"
+            )
+        for bid in ecliptic_body_ids_scalar:
+            bid, coeffs, error = generate_single_body(
+                bid, jd_start, jd_end, verbose=verbose
+            )
             body_data[bid] = coeffs
             body_errors[bid] = error
 
@@ -2553,7 +2681,7 @@ def assemble_leb(
                     yr_s = 2000.0 + (br_start - 2451545.0) / 365.25
                     yr_e = 2000.0 + (br_end - 2451545.0) / 365.25
                     range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
-            if coord_type == COORD_ICRS_BARY:
+            if coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
                 # Convert AU error to arcseconds using min geocentric distance
                 geo_dist = _MIN_GEO_DIST.get(bid, 1.0)
                 if geo_dist > 0.01:
@@ -2914,9 +3042,12 @@ def verify_leb(
         for jd in body_test_jds:
             pos, vel = reader.eval_body(body_id, jd)
 
-            if body.coord_type == COORD_ICRS_BARY:
+            if body.coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
                 if body_id in _PLANET_MAP:
                     # Planet: direct ICRS comparison with Skyfield
+                    # For COORD_ICRS_BARY_SYSTEM, stored data is system
+                    # barycenter — verification compares raw fit accuracy
+                    # (COB correction is applied at runtime, not stored).
                     sample_err, dist = _verify_icrs_planet(body_id, jd, pos)
                     if sample_err > max_error:
                         max_error = sample_err
