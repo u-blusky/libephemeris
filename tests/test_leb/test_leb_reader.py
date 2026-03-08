@@ -247,29 +247,27 @@ class TestEvalBody:
 
     @pytest.mark.integration
     def test_sun_position_reasonable(self, leb_reader):
-        """Sun geocentric ecliptic position should have valid lon/lat/dist."""
+        """Sun ICRS barycentric position should have reasonable magnitude."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
         pos, vel = leb_reader.eval_body(SE_SUN, jd_mid)
-        # V3: Sun stored as (lon°, lat°, dist_AU) geocentric ecliptic
-        assert 0.0 <= pos[0] < 360.0, f"Sun longitude = {pos[0]} (out of range)"
-        assert -5.0 < pos[1] < 5.0, f"Sun latitude = {pos[1]} (too far from ecliptic)"
-        # Geocentric distance ~1 AU (varies ~0.983-1.017 AU)
-        assert 0.98 < pos[2] < 1.02, f"Sun geocentric distance = {pos[2]} AU"
+        # ICRS barycentric: Sun is near SSB, typically <0.01 AU from it
+        import math
+
+        dist = math.sqrt(pos[0] ** 2 + pos[1] ** 2 + pos[2] ** 2)
+        assert dist < 0.02, f"Sun barycentric distance = {dist} AU (too large)"
 
     @pytest.mark.integration
     def test_mars_position_reasonable(self, leb_reader):
-        """Mars geocentric ecliptic position should have valid lon/lat/dist."""
+        """Mars ICRS barycentric position should have reasonable magnitude."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
         pos, vel = leb_reader.eval_body(SE_MARS, jd_mid)
-        # V3: Mars stored as (lon°, lat°, dist_AU) geocentric ecliptic
-        assert 0.0 <= pos[0] < 360.0, f"Mars longitude = {pos[0]} (out of range)"
-        assert -10.0 < pos[1] < 10.0, (
-            f"Mars latitude = {pos[1]} (too far from ecliptic)"
-        )
-        # Mars geocentric distance varies ~0.37-2.68 AU
-        assert 0.3 < pos[2] < 3.0, f"Mars geocentric distance = {pos[2]} AU"
+        # ICRS barycentric: Mars orbits at ~1.38-1.67 AU from Sun
+        import math
+
+        dist = math.sqrt(pos[0] ** 2 + pos[1] ** 2 + pos[2] ** 2)
+        assert 1.0 < dist < 2.0, f"Mars barycentric distance = {dist} AU"
 
     @pytest.mark.integration
     def test_mean_node_longitude_range(self, leb_reader):
@@ -290,27 +288,28 @@ class TestEvalBody:
 
     @pytest.mark.integration
     def test_sun_matches_skyfield(self, leb_reader):
-        """Sun geocentric ecliptic from .leb matches swe_calc_ut within 5 arcsec.
+        """Sun ICRS barycentric from .leb matches Skyfield within tolerance.
 
         Note: This test uses a small on-the-fly LEB file with default segment
-        parameters.  The tolerance is generous (5") to accommodate Chebyshev
-        fitting error before parameter tuning (Phase 5).  Production accuracy
-        is validated by the compare/ test suite.
+        parameters.  The tolerance is generous to accommodate Chebyshev
+        fitting error.  Production accuracy is validated by the compare/ suite.
         """
-        import libephemeris as ephem
         from libephemeris.constants import SEFLG_SPEED
+        from libephemeris.fast_calc import fast_calc_ut
 
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
 
-        # LEB value (lon°, lat°, dist AU)
-        pos_leb, _ = leb_reader.eval_body(SE_SUN, jd_mid)
+        # Full pipeline: LEB → fast_calc → geocentric ecliptic of date
+        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_SPEED)
 
         # Skyfield reference via swe_calc_ut (geocentric ecliptic of date)
+        import libephemeris as ephem
+
         ref, _ = ephem.swe_calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
 
         # Longitude
-        lon_err = abs(pos_leb[0] - ref[0])
+        lon_err = abs(fast_result[0] - ref[0])
         if lon_err > 180.0:
             lon_err = 360.0 - lon_err
         lon_err_arcsec = lon_err * 3600.0
@@ -319,19 +318,11 @@ class TestEvalBody:
         )
 
         # Latitude
-        lat_err_arcsec = abs(pos_leb[1] - ref[1]) * 3600.0
+        lat_err_arcsec = abs(fast_result[1] - ref[1]) * 3600.0
         assert lat_err_arcsec < 5.0, f"Sun latitude error = {lat_err_arcsec:.4f} arcsec"
 
         # Distance
-        dist_err = abs(pos_leb[2] - ref[2])
-        assert dist_err < 1e-4, f"Sun distance error = {dist_err:.2e} AU"
-
-        # Latitude
-        lat_err_arcsec = abs(pos_leb[1] - ref[1]) * 3600.0
-        assert lat_err_arcsec < 0.1, f"Sun latitude error = {lat_err_arcsec:.4f} arcsec"
-
-        # Distance
-        dist_err = abs(pos_leb[2] - ref[2])
+        dist_err = abs(fast_result[2] - ref[2])
         assert dist_err < 1e-4, f"Sun distance error = {dist_err:.2e} AU"
 
     @pytest.mark.integration

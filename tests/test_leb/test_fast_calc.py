@@ -221,45 +221,53 @@ class TestFastCalcFlags:
 
     @pytest.mark.integration
     def test_equatorial_flag(self, leb_reader, jd_mid):
-        """SEFLG_EQUATORIAL raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
-        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
-            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL)
+        """SEFLG_EQUATORIAL should return equatorial RA/Dec for ICRS_BARY bodies."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL)
+        # RA should be in [0, 360)
+        assert 0.0 <= result[0] < 360.0, f"RA = {result[0]}"
+        # Dec should be in [-90, 90]
+        assert -90.0 <= result[1] <= 90.0, f"Dec = {result[1]}"
 
     @pytest.mark.integration
     def test_j2000_flag(self, leb_reader, jd_mid):
-        """SEFLG_J2000 raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
-        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
-            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_J2000)
+        """SEFLG_J2000 should return J2000 ecliptic coords for ICRS_BARY bodies."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_J2000)
+        assert 0.0 <= result[0] < 360.0, f"Lon = {result[0]}"
 
     @pytest.mark.integration
     def test_equatorial_j2000_flag(self, leb_reader, jd_mid):
-        """SEFLG_EQUATORIAL|SEFLG_J2000 raises KeyError for GEO_ECLIPTIC bodies."""
-        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
-            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL | SEFLG_J2000)
+        """SEFLG_EQUATORIAL|SEFLG_J2000 should return J2000 RA/Dec."""
+        result, _ = fast_calc_ut(
+            leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL | SEFLG_J2000
+        )
+        assert 0.0 <= result[0] < 360.0, f"RA = {result[0]}"
+        assert -90.0 <= result[1] <= 90.0, f"Dec = {result[1]}"
 
     @pytest.mark.integration
     def test_helctr_flag(self, leb_reader, jd_mid):
-        """SEFLG_HELCTR raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
-        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
-            fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_HELCTR)
+        """SEFLG_HELCTR should return heliocentric coords for ICRS_BARY bodies."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_HELCTR)
+        # Mars heliocentric distance ~1.38-1.67 AU
+        assert 1.0 < result[2] < 2.0, f"Mars helio dist = {result[2]}"
 
     @pytest.mark.integration
     def test_baryctr_flag(self, leb_reader, jd_mid):
-        """SEFLG_BARYCTR raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
-        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
-            fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_BARYCTR)
+        """SEFLG_BARYCTR should return barycentric coords for ICRS_BARY bodies."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_BARYCTR)
+        # Mars barycentric distance ~1.38-1.67 AU
+        assert 1.0 < result[2] < 2.0, f"Mars bary dist = {result[2]}"
 
     @pytest.mark.integration
     def test_noaberr_flag(self, leb_reader, jd_mid):
-        """SEFLG_NOABERR raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
-        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
-            fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_NOABERR)
+        """SEFLG_NOABERR should skip aberration and return valid coords."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_NOABERR)
+        assert 0.0 <= result[0] < 360.0, f"Lon = {result[0]}"
 
     @pytest.mark.integration
     def test_truepos_flag(self, leb_reader, jd_mid):
-        """SEFLG_TRUEPOS raises KeyError for GEO_ECLIPTIC bodies (Skyfield fallback)."""
-        with pytest.raises(KeyError, match="COORD_GEO_ECLIPTIC"):
-            fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_TRUEPOS)
+        """SEFLG_TRUEPOS should skip light-time and aberration."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_TRUEPOS)
+        assert 0.0 <= result[0] < 360.0, f"Lon = {result[0]}"
 
     @pytest.mark.integration
     def test_topoctr_raises(self, leb_reader, jd_mid):
