@@ -169,17 +169,24 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
         "ASTEROID_SPEED_DIST_AU_DAY": 5e-3,  # ICRS pipeline
     },
     "medium": {
-        # ICRS barycentric storage with gravitational deflection + SR aberration
-        # pipeline.  Same approach as base tier, wider date range (1550-2650).
-        # Pluto residual ~0.13" from COB offset between generator and runtime.
-        "POSITION_ARCSEC": 0.2,  # Pluto 0.13" (1.5x margin)
-        "ASTEROID_ARCSEC": 5.0,  # ICRS pipeline (same as planets)
-        "EQUATORIAL_ARCSEC": 0.2,  # Same pipeline, different output frame
-        "J2000_ARCSEC": 0.2,
-        "SIDEREAL_ARCSEC": 0.2,  # = position error (ayanamsha is formula-exact)
-        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.0339" (2.9x margin)
+        # ICRS barycentric storage with COORD_ICRS_BARY_SYSTEM for outer
+        # planets + gravitational deflection + SR aberration pipeline.
+        # Measured worst-case (200-point sweep, 1550-2650):
+        #   Sun 0.000001", Moon 0.000325", Mercury 0.000004",
+        #   Venus 0.000004", Mars 0.000002", Jupiter 0.000007",
+        #   Saturn 0.000001", Uranus 0.000005", Neptune 0.000000",
+        #   Pluto 0.000000", Earth 0.000000"
+        #   Asteroids: max 0.000036" (Vesta)
+        #   Ecliptic: max 0.000075" (OscuApog)
+        #   Hypothetical: ~0.000000"
+        "POSITION_ARCSEC": 0.001,  # Moon 0.000325" (3x margin)
+        "ASTEROID_ARCSEC": 0.001,  # Vesta 0.000036" (28x margin)
+        "EQUATORIAL_ARCSEC": 0.02,  # Moon heliocentric amplification
+        "J2000_ARCSEC": 0.001,  # Same pipeline, J2000 ecliptic output
+        "SIDEREAL_ARCSEC": 0.001,  # = position error (ayanamsha is formula-exact)
+        "ECLIPTIC_ARCSEC": 0.001,  # OscuApog 0.000075" (13x margin)
         "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
-        "DISTANCE_AU": 5e-5,  # Pluto 2.01e-5 AU (2.5x margin)
+        "DISTANCE_AU": 5e-6,  # Uranus 1.36e-08 AU (helio amplification margin)
         # Velocity — OscuApogee dominates lon (0.043 deg/day).
         "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.043
         "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee ~0.003, planets 0.000052
