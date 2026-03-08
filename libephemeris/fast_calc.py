@@ -36,7 +36,6 @@ from .constants import (
 )
 from .leb_format import (
     COORD_ECLIPTIC,
-    COORD_GEO_ECLIPTIC,
     COORD_HELIO_ECL,
     COORD_ICRS_BARY,
 )
@@ -872,51 +871,6 @@ def _pipeline_helio(
 
 
 # =============================================================================
-# PIPELINE D: GEOCENTRIC ECLIPTIC BODIES (V3)
-# =============================================================================
-
-
-def _pipeline_geo_ecliptic(
-    reader: "LEBReader",
-    jd_tt: float,
-    ipl: int,
-    iflag: int,
-) -> Tuple[float, float, float, float, float, float]:
-    """Pipeline D: evaluate geocentric ecliptic-of-date bodies.
-
-    The LEB data already contains geocentric ecliptic-of-date coordinates
-    (lon, lat, dist) with light-time and aberration applied.  For the default
-    output frame this is a direct read with no conversion.
-
-    For non-default flags (SEFLG_EQUATORIAL, SEFLG_J2000, SEFLG_HELCTR,
-    SEFLG_BARYCTR, SEFLG_TRUEPOS, SEFLG_NOABERR), this pipeline raises
-    KeyError to trigger fallback to the full Skyfield pipeline.
-
-    Returns:
-        (lon, lat, dist, dlon, dlat, ddist)
-    """
-    # Flags that require a different computation — fall back to Skyfield
-    unsupported = (
-        SEFLG_EQUATORIAL
-        | SEFLG_J2000
-        | SEFLG_HELCTR
-        | SEFLG_BARYCTR
-        | SEFLG_TRUEPOS
-        | SEFLG_NOABERR
-    )
-    if iflag & unsupported:
-        raise KeyError(
-            f"COORD_GEO_ECLIPTIC does not support flag {iflag:#x}, "
-            f"falling back to Skyfield"
-        )
-
-    # Direct read — no conversion needed
-    (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
-
-    return lon, lat, dist, dlon, dlat, ddist
-
-
-# =============================================================================
 # ENTRY POINTS
 # =============================================================================
 
@@ -1083,15 +1037,7 @@ def _fast_calc_core(
     body = reader._bodies[ipl]
 
     # Dispatch to appropriate pipeline based on coordinate type
-    if body.coord_type == COORD_GEO_ECLIPTIC:
-        # Pipeline D: geocentric ecliptic of date (V3 — direct read)
-        lon, lat, dist, dlon, dlat, ddist = _pipeline_geo_ecliptic(
-            reader, jd_tt, ipl, iflag
-        )
-        if not (iflag & SEFLG_SPEED):
-            dlon, dlat, ddist = 0.0, 0.0, 0.0
-
-    elif body.coord_type == COORD_ICRS_BARY:
+    if body.coord_type == COORD_ICRS_BARY:
         # Pipeline A: ICRS barycentric with analytical velocity
         if iflag & SEFLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(

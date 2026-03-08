@@ -104,11 +104,11 @@ class TestGenerateMinimal:
             jd_mid = (jd_start + jd_end) / 2.0
 
             pos, vel = reader.eval_body(SE_SUN, jd_mid)
-            # V3: Sun stored as (lon°, lat°, dist_AU) geocentric ecliptic
-            assert 0.0 <= pos[0] < 360.0, f"Sun longitude = {pos[0]}"
-            assert -5.0 < pos[1] < 5.0, f"Sun latitude = {pos[1]}"
-            # Geocentric distance ~1 AU
-            assert 0.98 < pos[2] < 1.02, f"Sun geocentric dist = {pos[2]} AU"
+            # ICRS barycentric: Sun is near SSB, typically <0.01 AU
+            import math
+
+            dist = math.sqrt(pos[0] ** 2 + pos[1] ** 2 + pos[2] ** 2)
+            assert dist < 0.02, f"Sun barycentric distance = {dist} AU (too large)"
 
 
 class TestGenerateSingleBody:
@@ -146,63 +146,62 @@ class TestChebyshevFitting:
 
     @pytest.mark.integration
     def test_sun_fit_accuracy(self, test_leb_file):
-        """Sun Chebyshev fit should reproduce Skyfield geocentric ecliptic within 5 arcsec.
+        """Sun through full pipeline should match Skyfield within 5 arcsec.
 
         Note: Tolerance is generous (5") for on-the-fly test files with default
         segment parameters.  Production accuracy validated by compare/ tests.
         """
         import libephemeris as ephem
         from libephemeris.constants import SEFLG_SPEED
+        from libephemeris.fast_calc import fast_calc_ut
 
         with LEBReader(test_leb_file) as reader:
             jd_start, jd_end = reader.jd_range
             jd_mid = (jd_start + jd_end) / 2.0
 
-            pos_leb, _ = reader.eval_body(SE_SUN, jd_mid)
+            # Full pipeline: LEB → fast_calc → geocentric ecliptic
+            fast_result, _ = fast_calc_ut(reader, jd_mid, SE_SUN, SEFLG_SPEED)
 
             # Skyfield reference (geocentric ecliptic of date)
             ref, _ = ephem.swe_calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
 
-            lon_err = abs(pos_leb[0] - ref[0])
+            lon_err = abs(fast_result[0] - ref[0])
             if lon_err > 180.0:
                 lon_err = 360.0 - lon_err
             lon_err_arcsec = lon_err * 3600.0
 
-            lat_err_arcsec = abs(pos_leb[1] - ref[1]) * 3600.0
+            lat_err_arcsec = abs(fast_result[1] - ref[1]) * 3600.0
 
             max_err_arcsec = max(lon_err_arcsec, lat_err_arcsec)
             assert max_err_arcsec < 5.0, f"Sun fit error = {max_err_arcsec:.4f} arcsec"
 
     @pytest.mark.integration
     def test_moon_fit_accuracy(self, test_leb_file):
-        """Moon Chebyshev fit should reproduce Skyfield geocentric ecliptic within 5 arcsec.
+        """Moon through full pipeline should match Skyfield within 5 arcsec.
 
         Note: Tolerance is generous (5") for on-the-fly test files with default
         segment parameters.  Production accuracy validated by compare/ tests.
         """
         import libephemeris as ephem
         from libephemeris.constants import SEFLG_SPEED
+        from libephemeris.fast_calc import fast_calc_ut
 
         with LEBReader(test_leb_file) as reader:
             jd_start, jd_end = reader.jd_range
             jd_mid = (jd_start + jd_end) / 2.0
 
-            pos_leb, _ = reader.eval_body(SE_MOON, jd_mid)
+            # Full pipeline: LEB → fast_calc → geocentric ecliptic
+            fast_result, _ = fast_calc_ut(reader, jd_mid, SE_MOON, SEFLG_SPEED)
 
             # Skyfield reference (geocentric ecliptic of date)
             ref, _ = ephem.swe_calc_ut(jd_mid, SE_MOON, SEFLG_SPEED)
 
-            lon_err = abs(pos_leb[0] - ref[0])
+            lon_err = abs(fast_result[0] - ref[0])
             if lon_err > 180.0:
                 lon_err = 360.0 - lon_err
             lon_err_arcsec = lon_err * 3600.0
 
-            lat_err_arcsec = abs(pos_leb[1] - ref[1]) * 3600.0
+            lat_err_arcsec = abs(fast_result[1] - ref[1]) * 3600.0
 
             max_err_arcsec = max(lon_err_arcsec, lat_err_arcsec)
-            # Moon moves ~13°/day; geocentric ecliptic fitting with default
-            # segment parameters produces larger errors than ICRS barycentric.
-            # Production accuracy validated by compare/ tests after tuning.
-            assert max_err_arcsec < 60.0, (
-                f"Moon fit error = {max_err_arcsec:.4f} arcsec"
-            )
+            assert max_err_arcsec < 5.0, f"Moon fit error = {max_err_arcsec:.4f} arcsec"

@@ -188,30 +188,25 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
     },
     "extended": {
         # Extended tier (de441, -5000 to 5000 CE, 10,000 years).
-        # After Precision V2 fix (Skyfield IAU 2000A nutation alignment),
-        # errors are comparable to base/medium tiers — dominated by the
-        # ICRS-to-ecliptic pipeline amplification (1/geocentric_distance).
-        #
-        # Measured worst-case errors (V2, 500-point sweep):
-        #   Planet longitude: Uranus 1.91", Saturn 0.57", Mercury 0.53"
-        #   Flag tests (Sun/Moon/Mars/Jupiter): Mars 0.24" (all frames)
-        #   Ecliptic bodies: OscuApogee 0.04"
-        #   Hypothetical: <0.001"
-        #   Distance: Pluto 2.15e-5 AU
-        #   Speed lon: OscuApogee 0.035 deg/day
-        #   Speed lat: OscuApogee 0.002 deg/day
-        #   Speed dist: Pluto 1.08e-5 AU/day
-        "POSITION_ARCSEC": 5.0,  # Uranus 1.91" (pipeline limit, same as base/medium)
-        "EQUATORIAL_ARCSEC": 0.5,  # Mars 0.24" (2x margin)
-        "J2000_ARCSEC": 0.5,  # Mars/Jupiter ~0.24" (2x margin)
-        "SIDEREAL_ARCSEC": 5.0,  # POSITION + ayanamsha
+        # ICRS barycentric storage with gravitational deflection + SR aberration.
+        # Same pipeline as base/medium. Tolerances will be validated after
+        # regeneration with the deflection pipeline.
+        # Previous V2 errors (without deflection): Uranus 1.91", Saturn 0.57".
+        # Expected with deflection: <0.2" for all planets (matching base/medium).
+        "POSITION_ARCSEC": 0.5,  # Conservative until measured (wider date range)
+        "EQUATORIAL_ARCSEC": 0.5,  # Same pipeline, different output frame
+        "J2000_ARCSEC": 0.5,  # Same pipeline, J2000 ecliptic output
+        "SIDEREAL_ARCSEC": 0.5,  # POSITION + ayanamsha
         "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.04" (2.5x margin)
         "HYPOTHETICAL_ARCSEC": 0.005,  # Observed <0.001" (5x margin)
         "ASTEROID_ARCSEC": 5.0,  # No asteroid tests (SPK coverage ~1900-2100)
         "DISTANCE_AU": 5e-5,  # Pluto 2.15e-5 AU (2.3x margin)
         "SPEED_LON_DEG_DAY": 0.05,  # OscuApogee 0.035 (1.4x margin)
         "SPEED_LAT_DEG_DAY": 0.005,  # OscuApogee 0.002 (2.5x margin)
-        "SPEED_DIST_AU_DAY": 3e-5,  # Pluto 1.08e-5 (2.8x margin)
+        "SPEED_DIST_AU_DAY": 1.2e-4,  # Pluto (matching base tier)
+        "ASTEROID_SPEED_LON_DEG_DAY": 0.15,  # ICRS pipeline
+        "ASTEROID_SPEED_LAT_DEG_DAY": 1.7,  # ICRS pipeline
+        "ASTEROID_SPEED_DIST_AU_DAY": 5e-3,  # ICRS pipeline
         "NUTATION_ARCSEC": 0.01,
         "DELTAT_SEC": 0.1,
     },
@@ -453,8 +448,7 @@ MAIN_PLANETS = [
     (14, "Earth"),
 ]
 
-# Backward-compatible alias (V3 renamed ICRS_PLANETS → MAIN_PLANETS because
-# bodies 0-9 now use COORD_GEO_ECLIPTIC, not COORD_ICRS_BARY).
+# Backward-compatible alias.
 ICRS_PLANETS = MAIN_PLANETS
 
 ECLIPTIC_BODIES = [

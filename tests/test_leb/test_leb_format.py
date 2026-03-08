@@ -15,7 +15,6 @@ from libephemeris.leb_format import (
     BODY_ENTRY_SIZE,
     BODY_PARAMS,
     COORD_ECLIPTIC,
-    COORD_GEO_ECLIPTIC,
     COORD_HELIO_ECL,
     COORD_ICRS_BARY,
     DELTA_T_ENTRY_FMT,
@@ -266,7 +265,6 @@ class TestBodyParams:
             COORD_ICRS_BARY,
             COORD_ECLIPTIC,
             COORD_HELIO_ECL,
-            COORD_GEO_ECLIPTIC,
         }
         for body_id, params in BODY_PARAMS.items():
             _, _, coord_type, _ = params
