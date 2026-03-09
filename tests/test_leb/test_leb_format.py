@@ -17,6 +17,7 @@ from libephemeris.leb_format import (
     COORD_ECLIPTIC,
     COORD_HELIO_ECL,
     COORD_ICRS_BARY,
+    COORD_ICRS_BARY_SYSTEM,
     DELTA_T_ENTRY_FMT,
     DELTA_T_ENTRY_SIZE,
     DELTA_T_HEADER_FMT,
@@ -260,8 +261,13 @@ class TestBodyParams:
 
     @pytest.mark.unit
     def test_coord_types_valid(self):
-        """All coord types must be one of the three defined types."""
-        valid_types = {COORD_ICRS_BARY, COORD_ECLIPTIC, COORD_HELIO_ECL}
+        """All coord types must be one of the defined types."""
+        valid_types = {
+            COORD_ICRS_BARY,
+            COORD_ICRS_BARY_SYSTEM,
+            COORD_ECLIPTIC,
+            COORD_HELIO_ECL,
+        }
         for body_id, params in BODY_PARAMS.items():
             _, _, coord_type, _ = params
             assert coord_type in valid_types, (

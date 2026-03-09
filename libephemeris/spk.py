@@ -847,6 +847,154 @@ def _icrs_to_ecliptic_j2000(x: float, y: float, z: float) -> tuple:
     return (x_ecl, y_ecl, z_ecl)
 
 
+# =============================================================================
+# SKYFIELD VECTORFUNCTION WRAPPER FOR SPK TYPE 21
+# =============================================================================
+
+
+class _SpkType21Target:
+    """Skyfield VectorFunction-compatible wrapper for SPK type 21 asteroids.
+
+    Combines spktype21 heliocentric positions with the Sun's SSB position
+    to produce SSB-centered ICRS positions, compatible with Skyfield's
+    observe()/apparent() pipeline.
+
+    This ensures asteroids use the same coordinate transformation path as
+    planets (ICRS → Skyfield frame_latlon), avoiding the ~0.3" systematic
+    error from the manual ecliptic J2000 + precession/nutation approach.
+    """
+
+    def __init__(self, kernel, naif_id: int, sun_target):
+        """Initialize with spktype21 kernel and Sun target.
+
+        Args:
+            kernel: SPKType21 kernel object
+            naif_id: NAIF ID of the asteroid in the kernel
+            sun_target: Skyfield VectorFunction for the Sun (from SSB)
+        """
+        self._kernel = kernel
+        self._naif_id = naif_id
+        self._sun = sun_target
+        self.center = 0  # SSB-centered (required for observe())
+        self.target = naif_id
+
+    def _at(self, t):
+        """Compute SSB-centered ICRS position at time t.
+
+        Matches the Skyfield VectorFunction._at() protocol:
+        Returns (position_au, velocity_au_per_d, gcrs_position, message).
+
+        Args:
+            t: Skyfield Time object
+
+        Returns:
+            Tuple of (position, velocity, None, None)
+        """
+        AU_KM = 149597870.7
+
+        # Get Sun SSB position (ICRS, AU)
+        sun_pos = self._sun.at(t)
+        sun_au = sun_pos.position.au
+        sun_vel = sun_pos.velocity.au_per_d
+
+        # Get heliocentric position from spktype21
+        # Handle both scalar and array times
+        jd_tdb = t.tdb
+        if np.ndim(jd_tdb) == 0:
+            # Scalar time
+            pos_km, vel_km_s = self._kernel.compute_type21(
+                10, self._naif_id, float(jd_tdb)
+            )
+            pos_au = np.array(pos_km) / AU_KM
+            vel_au_d = np.array(vel_km_s) * 86400.0 / AU_KM
+            # SSB = Sun + heliocentric
+            position = (
+                sun_au + pos_au.reshape(3, 1) if sun_au.ndim > 1 else sun_au + pos_au
+            )
+            velocity = (
+                sun_vel + vel_au_d.reshape(3, 1)
+                if sun_vel.ndim > 1
+                else sun_vel + vel_au_d
+            )
+        else:
+            # Array of times
+            n = len(jd_tdb)
+            position = np.empty((3, n))
+            velocity = np.empty((3, n))
+            for i in range(n):
+                pos_km, vel_km_s = self._kernel.compute_type21(
+                    10, self._naif_id, float(jd_tdb[i])
+                )
+                pos_au = np.array(pos_km) / AU_KM
+                vel_au_d = np.array(vel_km_s) * 86400.0 / AU_KM
+                position[:, i] = sun_au[:, i] + pos_au
+                velocity[:, i] = sun_vel[:, i] + vel_au_d
+
+        return position, velocity, None, None
+
+    def at(self, t):
+        """Return ICRF position at time t."""
+        from skyfield.positionlib import ICRF
+
+        position, velocity, _, _ = self._at(t)
+        return ICRF(position, velocity, t=t, center=self.center)
+
+    def _observe_from_bcrs(self, observer):
+        """Observe this target from an observer in BCRS coordinates.
+
+        Implements the Skyfield VectorFunction protocol for observe().
+        Delegates to _correct_for_light_travel_time which iterates
+        light-time using self._at().
+
+        Args:
+            observer: Skyfield Barycentric position of the observer
+
+        Returns:
+            Tuple of (position_au, velocity_au_per_d, time, light_time_days)
+        """
+        from skyfield.vectorlib import _correct_for_light_travel_time
+
+        return _correct_for_light_travel_time(observer, self)
+
+    def __repr__(self):
+        return f"<SpkType21Target NAIF={self._naif_id}>"
+
+
+def get_spk_type21_target(ipl: int):
+    """Get a Skyfield-compatible VectorFunction target for a type 21 asteroid.
+
+    Returns a _SpkType21Target that can be used with Skyfield's observe/apparent
+    pipeline, or None if the body is not registered or not type 21.
+
+    Args:
+        ipl: libephemeris body ID (e.g., SE_CHIRON=15, SE_CERES=17)
+
+    Returns:
+        _SpkType21Target or None
+    """
+    from . import state
+
+    if ipl not in state._SPK_BODY_MAP:
+        return None
+
+    spk_file, naif_id = state._SPK_BODY_MAP[ipl]
+
+    # Only handle type 21
+    spk_type = _detect_spk_type(spk_file)
+    if spk_type != 21:
+        return None
+
+    kernel = _load_type21_kernel(spk_file)
+    if kernel is None:
+        return None
+
+    # Get the Sun target from the main ephemeris
+    planets = state.get_planets()
+    sun = planets["sun"]
+
+    return _SpkType21Target(kernel, naif_id, sun)
+
+
 def _calc_type21_position(
     kernel,
     naif_id: int,

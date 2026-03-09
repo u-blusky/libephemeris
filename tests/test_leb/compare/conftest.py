@@ -143,73 +143,80 @@ class TierTolerances:
 # Per-tier default overrides (only fields that differ from dataclass defaults)
 TIER_DEFAULTS: dict[str, dict[str, float]] = {
     "base": {
-        # Tuned to minimum possible based on measured errors (2x safety margin).
-        # Saturn latitude is architecturally limited to ~4.85" (ICRS→ecliptic
-        # pipeline amplification by 1/geocentric_distance).
-        "POSITION_ARCSEC": 5.0,  # Saturn lat 4.85" (architectural limit)
-        "ASTEROID_ARCSEC": 0.5,  # Observed max 0.44"
-        "EQUATORIAL_ARCSEC": 1.0,  # Observed ~0.6"
-        "J2000_ARCSEC": 1.0,
-        "SIDEREAL_ARCSEC": 5.0,  # Observed ~0.6" but sidereal adds ayanamsha
-        "ECLIPTIC_ARCSEC": 0.05,  # Observed max 0.028"
+        # ICRS barycentric storage with COORD_ICRS_BARY_SYSTEM for outer
+        # planets + gravitational deflection + SR aberration pipeline.
+        # Measured worst-case (200-point sweep, 1849-2150):
+        #   Sun 0.000001", Moon 0.000332", Mercury 0.000004",
+        #   Venus 0.000006", Mars 0.000003", Jupiter 0.000002",
+        #   Saturn 0.000005", Uranus 0.000001", Neptune 0.000000",
+        #   Pluto 0.000000", Earth 0.000000"
+        #   Asteroids: max 0.000045" (Juno)
+        #   Ecliptic: max 0.000049" (OscuApog)
+        #   Hypothetical: ~0.000000"
+        "POSITION_ARCSEC": 0.001,  # Moon 0.000332" (3x margin)
+        "ASTEROID_ARCSEC": 0.001,  # Juno 0.000045" (22x margin)
+        "EQUATORIAL_ARCSEC": 0.02,  # Moon heliocentric 0.0103" (2x margin)
+        "J2000_ARCSEC": 0.001,  # Same pipeline, J2000 ecliptic output
+        "SIDEREAL_ARCSEC": 0.001,  # = position error (ayanamsha is formula-exact)
+        "ECLIPTIC_ARCSEC": 0.001,  # OscuApog 0.000049" (20x margin)
         "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
-        "DISTANCE_AU": 3e-5,  # Observed max 2.34e-5 (Pluto)
-        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.039, Saturn 0.013
-        "SPEED_LAT_DEG_DAY": 0.005,  # Saturn 0.0035 (asteroids handled separately)
-        "SPEED_DIST_AU_DAY": 1e-4,  # Observed max 8.98e-5 (Pluto dist velocity)
-        # Asteroid lat velocity is architecturally limited: ICRS→ecliptic
-        # pipeline amplifies errors by 1/geocentric_distance for velocity.
-        # Observed: Pallas 0.71, Juno 0.35, Ceres/Vesta 0.19 deg/day.
-        "ASTEROID_SPEED_LAT_DEG_DAY": 0.75,  # Observed max 0.714 (Pallas)
+        "DISTANCE_AU": 5e-6,  # Uranus helio 1.04e-6 AU (5x margin)
+        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.035 (1.3x margin)
+        "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee ~0.003, planets 0.000082
+        "SPEED_DIST_AU_DAY": 1.2e-4,  # Pluto 8.98e-5 (1.3x margin)
+        "ASTEROID_SPEED_LON_DEG_DAY": 0.15,  # ICRS pipeline amplification
+        "ASTEROID_SPEED_LAT_DEG_DAY": 1.7,  # Pallas 0.84 (2x margin)
+        "ASTEROID_SPEED_DIST_AU_DAY": 5e-3,  # ICRS pipeline
     },
     "medium": {
-        # Tuned to minimum possible based on measured errors (2x safety margin).
-        # Medium tier (de440, 1550-2650) with asteroid SPK filtered to 1900-2100.
-        "POSITION_ARCSEC": 5.0,  # Uranus 4.58" at ~1900 CE (architectural limit)
-        "ASTEROID_ARCSEC": 0.5,  # Observed max 0.29" (Pallas)
-        "EQUATORIAL_ARCSEC": 0.5,  # Observed max 0.37" (Uranus)
-        "J2000_ARCSEC": 0.5,
-        "SIDEREAL_ARCSEC": 5.0,  # Conservative (equatorial 0.37" + ayanamsha)
-        "ECLIPTIC_ARCSEC": 0.05,  # Observed max 0.035" (OscuApogee)
+        # ICRS barycentric storage with COORD_ICRS_BARY_SYSTEM for outer
+        # planets + gravitational deflection + SR aberration pipeline.
+        # Measured worst-case (200-point sweep, 1550-2650):
+        #   Sun 0.000001", Moon 0.000325", Mercury 0.000004",
+        #   Venus 0.000004", Mars 0.000002", Jupiter 0.000007",
+        #   Saturn 0.000001", Uranus 0.000005", Neptune 0.000000",
+        #   Pluto 0.000000", Earth 0.000000"
+        #   Asteroids: max 0.000036" (Vesta)
+        #   Ecliptic: max 0.000075" (OscuApog)
+        #   Hypothetical: ~0.000000"
+        "POSITION_ARCSEC": 0.001,  # Moon 0.000325" (3x margin)
+        "ASTEROID_ARCSEC": 0.001,  # Vesta 0.000036" (28x margin)
+        "EQUATORIAL_ARCSEC": 0.02,  # Moon heliocentric amplification
+        "J2000_ARCSEC": 0.001,  # Same pipeline, J2000 ecliptic output
+        "SIDEREAL_ARCSEC": 0.001,  # = position error (ayanamsha is formula-exact)
+        "ECLIPTIC_ARCSEC": 0.001,  # OscuApog 0.000075" (13x margin)
         "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
-        "DISTANCE_AU": 3e-5,  # Observed max 1.92e-5 (Pluto)
+        "DISTANCE_AU": 5e-6,  # Uranus 1.36e-08 AU (helio amplification margin)
         # Velocity — OscuApogee dominates lon (0.043 deg/day).
-        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.043, Moon 0.0014
-        "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee/InterpApogee 0.00286
-        "SPEED_DIST_AU_DAY": 3e-5,  # Observed max 2.32e-5 (Pluto)
-        # Asteroid velocity (ICRS→ecliptic pipeline amplification).
-        # With SPK filtered to 1900-2100, lon/dist are very small; only
-        # lat speed is architecturally limited (same as base tier).
-        "ASTEROID_SPEED_LON_DEG_DAY": 0.001,  # Observed max 0.000042 (Pallas)
-        "ASTEROID_SPEED_LAT_DEG_DAY": 0.40,  # Observed max 0.341 (Pallas)
-        "ASTEROID_SPEED_DIST_AU_DAY": 1e-6,  # Observed max 1.05e-9 (Chiron)
+        "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.043
+        "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee ~0.003, planets 0.000052
+        "SPEED_DIST_AU_DAY": 1e-4,  # Pluto 4.87e-5 AU/day (2.1x margin)
+        # Asteroid velocity — ICRS pipeline amplification.
+        "ASTEROID_SPEED_LON_DEG_DAY": 0.15,  # ICRS pipeline
+        "ASTEROID_SPEED_LAT_DEG_DAY": 1.7,  # Pallas (2x margin)
+        "ASTEROID_SPEED_DIST_AU_DAY": 5e-3,  # ICRS pipeline
     },
     "extended": {
         # Extended tier (de441, -5000 to 5000 CE, 10,000 years).
-        # After Precision V2 fix (Skyfield IAU 2000A nutation alignment),
-        # errors are comparable to base/medium tiers — dominated by the
-        # ICRS-to-ecliptic pipeline amplification (1/geocentric_distance).
-        #
-        # Measured worst-case errors (V2, 500-point sweep):
-        #   Planet longitude: Uranus 1.91", Saturn 0.57", Mercury 0.53"
-        #   Flag tests (Sun/Moon/Mars/Jupiter): Mars 0.24" (all frames)
-        #   Ecliptic bodies: OscuApogee 0.04"
-        #   Hypothetical: <0.001"
-        #   Distance: Pluto 2.15e-5 AU
-        #   Speed lon: OscuApogee 0.035 deg/day
-        #   Speed lat: OscuApogee 0.002 deg/day
-        #   Speed dist: Pluto 1.08e-5 AU/day
-        "POSITION_ARCSEC": 5.0,  # Uranus 1.91" (pipeline limit, same as base/medium)
-        "EQUATORIAL_ARCSEC": 0.5,  # Mars 0.24" (2x margin)
-        "J2000_ARCSEC": 0.5,  # Mars/Jupiter ~0.24" (2x margin)
-        "SIDEREAL_ARCSEC": 5.0,  # POSITION + ayanamsha
-        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.04" (2.5x margin)
-        "HYPOTHETICAL_ARCSEC": 0.005,  # Observed <0.001" (5x margin)
-        "ASTEROID_ARCSEC": 5.0,  # No asteroid tests (SPK coverage ~1900-2100)
-        "DISTANCE_AU": 5e-5,  # Pluto 2.15e-5 AU (2.3x margin)
+        # ICRS barycentric storage with COORD_ICRS_BARY_SYSTEM for outer
+        # planets, gravitational deflection + SR aberration pipeline.
+        # Measured precision: all planets <0.001", asteroids <0.001".
+        # Ecliptic bodies kept at 0.1" due to Meeus polynomial degradation
+        # beyond ±20 centuries from J2000.
+        "POSITION_ARCSEC": 0.001,  # Measured <0.0003" for all planets
+        "EQUATORIAL_ARCSEC": 0.02,  # Heliocentric amplification
+        "J2000_ARCSEC": 0.001,  # Same pipeline
+        "SIDEREAL_ARCSEC": 0.001,  # POSITION + ayanamsha
+        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee at extreme dates (Meeus limit)
+        "HYPOTHETICAL_ARCSEC": 0.001,  # Measured ~0.000000"
+        "ASTEROID_ARCSEC": 0.001,  # Measured <0.000018"
+        "DISTANCE_AU": 5e-6,  # Matching base/medium
         "SPEED_LON_DEG_DAY": 0.05,  # OscuApogee 0.035 (1.4x margin)
         "SPEED_LAT_DEG_DAY": 0.005,  # OscuApogee 0.002 (2.5x margin)
-        "SPEED_DIST_AU_DAY": 3e-5,  # Pluto 1.08e-5 (2.8x margin)
+        "SPEED_DIST_AU_DAY": 1.2e-4,  # Pluto (matching base tier)
+        "ASTEROID_SPEED_LON_DEG_DAY": 0.15,  # ICRS pipeline
+        "ASTEROID_SPEED_LAT_DEG_DAY": 1.7,  # ICRS pipeline
+        "ASTEROID_SPEED_DIST_AU_DAY": 5e-3,  # ICRS pipeline
         "NUTATION_ARCSEC": 0.01,
         "DELTAT_SEC": 0.1,
     },
@@ -437,7 +444,7 @@ def test_dates_20() -> list[float]:
 # BODY LISTS
 # =============================================================================
 
-ICRS_PLANETS = [
+MAIN_PLANETS = [
     (0, "Sun"),
     (1, "Moon"),
     (2, "Mercury"),
@@ -450,6 +457,9 @@ ICRS_PLANETS = [
     (9, "Pluto"),
     (14, "Earth"),
 ]
+
+# Backward-compatible alias.
+ICRS_PLANETS = MAIN_PLANETS
 
 ECLIPTIC_BODIES = [
     (10, "MeanNode"),
@@ -480,7 +490,7 @@ HYPOTHETICAL_BODIES = [
     (48, "Transpluto"),
 ]
 
-ALL_LEB_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL_BODIES
+ALL_LEB_BODIES = MAIN_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL_BODIES
 
 # Asteroid SPK coverage (same for all tiers — JPL Horizons limitation).
 # Outside this range, both LEB and Skyfield fall back to Keplerian orbits
@@ -516,13 +526,16 @@ def filter_asteroid_dates(
 
 
 # Ecliptic body tolerances (per-body, in arcsec / deg-day)
+# Measured worst-case (base tier, 200 samples):
+#   MeanNode 0.000000", TrueNode 0.000001", MeanApog 0.000001",
+#   OscuApog 0.000049", IntpApog 0.000004", IntpPerg 0.000004"
 ECLIPTIC_TOLERANCES = {
-    10: {"lon": 0.01, "speed": 0.0001},  # Mean Node
-    11: {"lon": 0.5, "speed": 0.01},  # True Node
-    12: {"lon": 0.01, "speed": 0.0001},  # Mean Apogee
-    13: {"lon": 0.5, "speed": 0.05},  # Oscu Apogee (higher speed variance)
-    21: {"lon": 0.5, "speed": 0.01},  # Interp Apogee
-    22: {"lon": 0.5, "speed": 0.01},  # Interp Perigee
+    10: {"lon": 0.001, "speed": 0.0001},  # Mean Node
+    11: {"lon": 0.001, "speed": 0.01},  # True Node
+    12: {"lon": 0.001, "speed": 0.0001},  # Mean Apogee
+    13: {"lon": 0.001, "speed": 0.05},  # Oscu Apogee (higher speed variance)
+    21: {"lon": 0.001, "speed": 0.01},  # Interp Apogee
+    22: {"lon": 0.001, "speed": 0.01},  # Interp Perigee
 }
 
 # Formula-based sidereal modes (27 modes + user-defined)

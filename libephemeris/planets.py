@@ -1663,111 +1663,122 @@ def _calc_body(
         return _to_native_floats(pos), iflag
 
     # Handle minor bodies (asteroids and TNOs)
+    # Strategy: try to get a type21 VectorFunction target so we can route
+    # through the Skyfield observe/apparent pipeline (same as planets).
+    # This avoids the ~0.3" systematic error from the legacy ecliptic J2000
+    # + manual precession/nutation approach in _calc_type21_position.
+    _spk_type21_target = None
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
-        # Try SPK kernel first (high precision)
         from . import spk
         from .state import get_auto_spk_download, get_strict_precision
         from .exceptions import SPKRequiredError
         from .constants import SPK_BODY_NAME_MAP
         from .logging_config import get_logger
 
-        spk_result = spk.calc_spk_body_position(t, ipl, iflag)
-        if spk_result is not None:
-            get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
-            spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
-            return _to_native_floats(spk_result), iflag
+        # First check if already registered
+        _spk_type21_target = spk.get_spk_type21_target(ipl)
 
-        # Try automatic SPK download if enabled and body not registered.
-        # Uses direct HTTP to JPL Horizons (no astroquery dependency).
-        if get_auto_spk_download():
+        if _spk_type21_target is None:
+            # Not registered yet — try auto-download, then check again
+            if get_auto_spk_download():
+                try:
+                    # _try_auto_spk_download registers the SPK as a side effect
+                    _try_auto_spk_download(t, ipl, iflag)
+                except Exception:
+                    pass
+                # Re-check after download
+                _spk_type21_target = spk.get_spk_type21_target(ipl)
+
+        if _spk_type21_target is not None:
+            # Route through the planet pipeline below (observe/apparent)
+            pass
+        else:
+            # Fallback: try the legacy calc_spk_body_position (non-type21 SPK)
+            spk_result = spk.calc_spk_body_position(t, ipl, iflag)
+            if spk_result is not None:
+                get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
+                spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
+                return _to_native_floats(spk_result), iflag
+
+            # In strict precision mode, require SPK for all downloadable bodies.
+            if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
+                horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
+                body_name = spk._get_body_name(ipl) or str(ipl)
+                raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
+
+            jd_tt = t.tt
+
+            # Try ASSIST N-body integration fallback if available
             try:
-                spk_result = _try_auto_spk_download(t, ipl, iflag)
-                if spk_result is not None:
+                from .rebound_integration import check_assist_data_available
+
+                if check_assist_data_available():
+                    lon, lat, dist = _assist_position_at(jd_tt, ipl, iflag, planets)
+
+                    speed_lon = 0.0
+                    speed_lat = 0.0
+                    speed_dist = 0.0
+                    if iflag & SEFLG_SPEED:
+                        dt = 1.0 / 86400.0
+                        lon_prev, lat_prev, dist_prev = _assist_position_at(
+                            jd_tt - dt, ipl, iflag, planets
+                        )
+                        lon_next, lat_next, dist_next = _assist_position_at(
+                            jd_tt + dt, ipl, iflag, planets
+                        )
+                        speed_lon = (lon_next - lon_prev) / (2.0 * dt)
+                        speed_lat = (lat_next - lat_prev) / (2.0 * dt)
+                        speed_dist = (dist_next - dist_prev) / (2.0 * dt)
+
+                        if speed_lon > 180.0 / (2.0 * dt):
+                            speed_lon -= 360.0 / (2.0 * dt)
+                        if speed_lon < -180.0 / (2.0 * dt):
+                            speed_lon += 360.0 / (2.0 * dt)
+
                     get_logger().debug(
-                        "body=%d jd=%.1f source=SPK (auto-downloaded)",
-                        ipl,
-                        t.tt,
+                        "body=%d jd=%.1f source=ASSIST (n-body)", ipl, jd_tt
                     )
-                    spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
-                    return _to_native_floats(spk_result), iflag
+                    return _to_native_floats(
+                        _maybe_equatorial_convert(
+                            (lon, lat, dist, speed_lon, speed_lat, speed_dist),
+                            jd_tt,
+                            iflag,
+                        )
+                    ), iflag
             except Exception:
-                # If auto-download fails, continue to strict precision check
                 pass
 
-        # In strict precision mode, require SPK for all downloadable bodies.
-        # All bodies in SPK_BODY_NAME_MAP can be downloaded from JPL Horizons.
-        if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
-            horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
-            body_name = spk._get_body_name(ipl) or str(ipl)
-            raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
-
-        jd_tt = t.tt
-
-        # Try ASSIST N-body integration fallback if available
-        try:
-            from .rebound_integration import check_assist_data_available
-
-            if check_assist_data_available():
-                lon, lat, dist = _assist_position_at(jd_tt, ipl, iflag, planets)
-
-                speed_lon = 0.0
-                speed_lat = 0.0
-                speed_dist = 0.0
-                if iflag & SEFLG_SPEED:
-                    dt = 1.0 / 86400.0
-                    lon_prev, lat_prev, dist_prev = _assist_position_at(
-                        jd_tt - dt, ipl, iflag, planets
-                    )
-                    lon_next, lat_next, dist_next = _assist_position_at(
-                        jd_tt + dt, ipl, iflag, planets
-                    )
-                    speed_lon = (lon_next - lon_prev) / (2.0 * dt)
-                    speed_lat = (lat_next - lat_prev) / (2.0 * dt)
-                    speed_dist = (dist_next - dist_prev) / (2.0 * dt)
-
-                    if speed_lon > 180.0 / (2.0 * dt):
-                        speed_lon -= 360.0 / (2.0 * dt)
-                    if speed_lon < -180.0 / (2.0 * dt):
-                        speed_lon += 360.0 / (2.0 * dt)
-
-                get_logger().debug("body=%d jd=%.1f source=ASSIST (n-body)", ipl, jd_tt)
-                return _to_native_floats(
-                    _maybe_equatorial_convert(
-                        (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
-                    )
-                ), iflag
-        except Exception:
-            pass
-
-        # Keplerian as last resort
-        get_logger().debug("body=%d jd=%.1f source=Keplerian (fallback)", ipl, jd_tt)
-        lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
-
-        speed_lon = 0.0
-        speed_lat = 0.0
-        speed_dist = 0.0
-        if iflag & SEFLG_SPEED:
-            dt = 1.0 / 86400.0
-            lon_prev, lat_prev, dist_prev = _keplerian_position_at(
-                jd_tt - dt, ipl, iflag, planets
+            # Keplerian as last resort
+            get_logger().debug(
+                "body=%d jd=%.1f source=Keplerian (fallback)", ipl, jd_tt
             )
-            lon_next, lat_next, dist_next = _keplerian_position_at(
-                jd_tt + dt, ipl, iflag, planets
-            )
-            speed_lon = (lon_next - lon_prev) / (2.0 * dt)
-            speed_lat = (lat_next - lat_prev) / (2.0 * dt)
-            speed_dist = (dist_next - dist_prev) / (2.0 * dt)
+            lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
 
-            if speed_lon > 180.0 / (2.0 * dt):
-                speed_lon -= 360.0 / (2.0 * dt)
-            if speed_lon < -180.0 / (2.0 * dt):
-                speed_lon += 360.0 / (2.0 * dt)
+            speed_lon = 0.0
+            speed_lat = 0.0
+            speed_dist = 0.0
+            if iflag & SEFLG_SPEED:
+                dt = 1.0 / 86400.0
+                lon_prev, lat_prev, dist_prev = _keplerian_position_at(
+                    jd_tt - dt, ipl, iflag, planets
+                )
+                lon_next, lat_next, dist_next = _keplerian_position_at(
+                    jd_tt + dt, ipl, iflag, planets
+                )
+                speed_lon = (lon_next - lon_prev) / (2.0 * dt)
+                speed_lat = (lat_next - lat_prev) / (2.0 * dt)
+                speed_dist = (dist_next - dist_prev) / (2.0 * dt)
 
-        return _to_native_floats(
-            _maybe_equatorial_convert(
-                (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
-            )
-        ), iflag
+                if speed_lon > 180.0 / (2.0 * dt):
+                    speed_lon -= 360.0 / (2.0 * dt)
+                if speed_lon < -180.0 / (2.0 * dt):
+                    speed_lon += 360.0 / (2.0 * dt)
+
+            return _to_native_floats(
+                _maybe_equatorial_convert(
+                    (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
+                )
+            ), iflag
 
     # Handle fixed stars
     if ipl in fixed_stars.FIXED_STARS:
@@ -1829,8 +1840,11 @@ def _calc_body(
 
         return _to_native_floats((lon, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
 
-    # Handle standard planets
-    if ipl in _PLANET_MAP:
+    # Handle standard planets (and type21 asteroids routed through planet pipeline)
+    if _spk_type21_target is not None:
+        # Type21 asteroid: use the VectorFunction wrapper for Skyfield pipeline
+        target = _spk_type21_target
+    elif ipl in _PLANET_MAP:
         target_name = _PLANET_MAP[ipl]
         target = get_planet_target(planets, target_name)
     else:

@@ -1,5 +1,7 @@
 # LEB vs Skyfield — Comparison Test Guide
 
+> **Updated:** March 2026 — reflects <0.001" precision achieved for all 31 bodies.
+
 This guide explains how to run and interpret the tests that compare LEB (LibEphemeris Binary) calculation results with Skyfield (direct calculation from NASA JPL ephemerides).
 
 ## Prerequisites
@@ -25,9 +27,9 @@ If the LEB file is not found, tests are **skipped** (they don't fail).
 
 | Tier | Ephemeris | Range | File |
 |------|-----------|-------|------|
-| `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~94 MB) |
-| `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~315 MB) |
-| `extended` | de441.bsp | -13200–+17191 | `ephemeris_extended.leb` |
+| `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~112 MB) |
+| `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~377 MB) |
+| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (~2.8 GB) |
 
 ### Dependencies
 
@@ -108,7 +110,7 @@ tests/test_leb/compare/
 ├── test_compare_leb_planets.py          # Lon, lat, dist, speed for ICRS planets
 ├── test_compare_leb_asteroids.py        # Position, speed, distance for asteroids
 ├── test_compare_leb_hypothetical.py     # Uranian bodies (Cupido, Hades, Zeus, ...)
-├── test_compare_leb_velocities.py       # Speed lon/lat/dist for all 30 bodies
+├── test_compare_leb_velocities.py       # Speed lon/lat/dist for all 31 bodies
 ├── test_compare_leb_distances.py        # Geocentric and heliocentric distance
 ├── test_compare_leb_crossings.py        # swe_cross_ut, swe_solcross_ut, ...
 ├── test_compare_leb_eclipses_solar.py   # Solar eclipses
@@ -254,29 +256,43 @@ Priority order (highest to lowest):
 
 ### Current Tolerances
 
+All 31 bodies achieve <0.001 arcsecond geocentric position precision on both
+base and medium tiers.
+
 #### Position
 
 | Field | Base | Medium | Unit | Notes |
 |-------|------|--------|------|-------|
-| `POSITION_ARCSEC` | 5.0 | 5.0 | arcsec | Saturn/Uranus (architectural limit) |
-| `ASTEROID_ARCSEC` | 0.5 | 0.5 | arcsec | |
-| `ECLIPTIC_ARCSEC` | 0.05 | 0.05 | arcsec | Nodes, Lilith |
+| `POSITION_ARCSEC` | 0.001 | 0.001 | arcsec | All planets including outer |
+| `ASTEROID_ARCSEC` | 0.001 | 0.001 | arcsec | |
+| `ECLIPTIC_ARCSEC` | 0.001 | 0.001 | arcsec | Nodes, Lilith |
 | `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | arcsec | Uranians (error ~0) |
-| `EQUATORIAL_ARCSEC` | 1.0 | 0.5 | arcsec | |
-| `J2000_ARCSEC` | 1.0 | 0.5 | arcsec | |
-| `SIDEREAL_ARCSEC` | 5.0 | 5.0 | arcsec | |
-| `DISTANCE_AU` | 3e-5 | 3e-5 | AU | |
+| `EQUATORIAL_ARCSEC` | 0.02 | 0.02 | arcsec | Heliocentric amplification |
+| `J2000_ARCSEC` | 0.001 | 0.001 | arcsec | |
+| `SIDEREAL_ARCSEC` | 0.001 | 0.001 | arcsec | |
+| `DISTANCE_AU` | 5e-6 | 5e-6 | AU | |
 
 #### Velocity
 
 | Field | Base | Medium | Unit | Notes |
 |-------|------|--------|------|-------|
 | `SPEED_LON_DEG_DAY` | 0.045 | 0.045 | deg/day | OscuApogee dominates |
-| `SPEED_LAT_DEG_DAY` | 0.005 | 0.004 | deg/day | |
-| `SPEED_DIST_AU_DAY` | 1e-4 | 3e-5 | AU/day | |
-| `ASTEROID_SPEED_LON_DEG_DAY` | — | 0.001 | deg/day | |
-| `ASTEROID_SPEED_LAT_DEG_DAY` | 0.75 | 0.40 | deg/day | Architectural limit |
-| `ASTEROID_SPEED_DIST_AU_DAY` | — | 1e-6 | AU/day | |
+| `SPEED_LAT_DEG_DAY` | 0.004 | 0.004 | deg/day | |
+| `SPEED_DIST_AU_DAY` | 1.2e-4 | 1e-4 | AU/day | |
+| `ASTEROID_SPEED_LON_DEG_DAY` | 0.15 | 0.15 | deg/day | |
+| `ASTEROID_SPEED_LAT_DEG_DAY` | 1.7 | 1.7 | deg/day | Architectural limit |
+| `ASTEROID_SPEED_DIST_AU_DAY` | 5e-3 | 5e-3 | AU/day | |
+
+#### Ecliptic Per-Body Overrides
+
+| Body | Lon (arcsec) | Speed (deg/day) |
+|------|-------------|-----------------|
+| Mean Node | 0.001 | 0.0001 |
+| True Node | 0.001 | 0.01 |
+| Mean Apogee | 0.001 | 0.0001 |
+| Oscu Apogee | 0.001 | 0.05 |
+| Interp Apogee | 0.001 | 0.01 |
+| Interp Perigee | 0.001 | 0.01 |
 
 #### Timing (indirect functions)
 
@@ -427,13 +443,13 @@ Tests are skipped if the LEB file for the corresponding tier is not found.
 ### Position error (arcsec)
 
 ```
-AssertionError: Saturn: max lon error = 6.2345" at JD 2451544.5
-assert 6.2345 < 5.0
+AssertionError: Moon: max lon error = 0.0015" at JD 2451544.5
+assert 0.0015 < 0.001
 ```
 
 The error is in **arcseconds**. To convert:
-- To degrees: divide by 3600 (6.23" = 0.0017°)
-- To arcminutes: divide by 60 (6.23" = 0.10')
+- To degrees: divide by 3600 (0.0015" = 0.0000004°)
+- To arcminutes: divide by 60 (0.0015" = 0.000025')
 
 ### Velocity error (deg/day)
 

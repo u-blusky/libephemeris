@@ -1,6 +1,6 @@
 [project]
 name = "libephemeris"
-version = "0.22.0"
+version = "0.23.0"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -301,6 +301,16 @@ help = "Generate base tier via groups (planets + asteroids + analytical) then me
 cmd = "python scripts/generate_leb.py --tier base --single --verify"
 help = "Generate base tier one body at a time (lowest memory usage)"
 
+# Targeted body generation — generate a single body (or comma-separated list).
+# Accepts numeric IDs or names (case-insensitive).
+# Usage: poe leb:generate:base:body moon
+#        poe leb:generate:base:body "moon,sun,mercury"
+#        poe leb:generate:base:body 1
+[tool.poe.tasks."leb:generate:base:body"]
+cmd = "python scripts/generate_leb.py --tier base --bodies ${body}"
+help = "Generate base tier for specific body(ies) (e.g. 'moon', '1,2,3', 'sun,mercury')"
+args = [{name = "body", positional = true, required = true, help = "Body ID(s) or name(s), comma-separated"}]
+
 # Medium tier group generation
 [tool.poe.tasks."leb:generate:medium:planets"]
 cmd = "python scripts/generate_leb.py --tier medium --group planets"
@@ -330,6 +340,11 @@ help = "Generate medium tier via groups (planets + asteroids + analytical) then 
 cmd = "python scripts/generate_leb.py --tier medium --single --verify"
 help = "Generate medium tier one body at a time (lowest memory usage)"
 
+[tool.poe.tasks."leb:generate:medium:body"]
+cmd = "python scripts/generate_leb.py --tier medium --bodies ${body}"
+help = "Generate medium tier for specific body(ies) (e.g. 'moon', '1,2,3', 'sun,mercury')"
+args = [{name = "body", positional = true, required = true, help = "Body ID(s) or name(s), comma-separated"}]
+
 # Extended tier group generation
 [tool.poe.tasks."leb:generate:extended:planets"]
 cmd = "python scripts/generate_leb.py --tier extended --group planets"
@@ -358,6 +373,11 @@ help = "Generate extended tier via groups (planets + asteroids + analytical) the
 [tool.poe.tasks."leb:generate:extended:single"]
 cmd = "python scripts/generate_leb.py --tier extended --single --verify"
 help = "Generate extended tier one body at a time (lowest memory usage)"
+
+[tool.poe.tasks."leb:generate:extended:body"]
+cmd = "python scripts/generate_leb.py --tier extended --bodies ${body}"
+help = "Generate extended tier for specific body(ies) (e.g. 'moon', '1,2,3', 'sun,mercury')"
+args = [{name = "body", positional = true, required = true, help = "Body ID(s) or name(s), comma-separated"}]
 
 # LEB verify — verify existing .leb files without regenerating
 [tool.poe.tasks."leb:verify:base"]

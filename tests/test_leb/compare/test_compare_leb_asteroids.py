@@ -53,10 +53,10 @@ class TestAsteroidPosition:
             if lat_err > max_lat_err:
                 max_lat_err = lat_err
 
-        assert max_lon_err < TOLS.POSITION_ARCSEC, (
+        assert max_lon_err < TOLS.ASTEROID_ARCSEC, (
             f'{body_name}: max lon error = {max_lon_err:.4f}" at JD {worst_jd:.1f}'
         )
-        assert max_lat_err < TOLS.POSITION_ARCSEC, (
+        assert max_lat_err < TOLS.ASTEROID_ARCSEC, (
             f'{body_name}: max lat error = {max_lat_err:.4f}"'
         )
 

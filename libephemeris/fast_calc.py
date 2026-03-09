@@ -34,7 +34,12 @@ from .constants import (
     SEFLG_TRUEPOS,
     SEFLG_XYZ,
 )
-from .leb_format import COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_ICRS_BARY
+from .leb_format import (
+    COORD_ECLIPTIC,
+    COORD_HELIO_ECL,
+    COORD_ICRS_BARY,
+    COORD_ICRS_BARY_SYSTEM,
+)
 
 if TYPE_CHECKING:
     from .leb_reader import LEBReader
@@ -179,49 +184,266 @@ def _rotate_icrs_to_ecliptic_j2000(
 def _apply_aberration(
     geo: Tuple[float, float, float],
     earth_vel: Tuple[float, float, float],
+    light_time: float = 0.0,
 ) -> Tuple[float, float, float]:
-    """Apply annual aberration to a geometric position vector.
+    """Apply relativistic aberration to a geometric position vector.
 
-    Uses the classical formula: apparent = geometric + (v/c) correction.
-    The Earth velocity should be in AU/day.
+    Uses the full special-relativistic formula matching Skyfield's
+    ``add_aberration()``.  This includes the Lorentz factor γ for
+    exact agreement with the reference pipeline (< 0.001 mas).
+
+    When *light_time* is zero or negative, falls back to a first-order
+    approximation (classical Bradley aberration) for backward
+    compatibility with callers that do not track light-time.
 
     Args:
-        geo: Geometric position vector (ICRS, AU).
-        earth_vel: Earth velocity vector (ICRS, AU/day).
+        geo: Light-time-corrected geocentric position vector (ICRS, AU).
+        earth_vel: Earth barycentric velocity vector (ICRS, AU/day).
+        light_time: One-way light travel time in days (observer→target).
 
     Returns:
-        Aberrated position vector.
+        Aberrated position vector (same frame, AU).
     """
-    # Normalize position to unit vector
     dist = _vec3_dist(geo)
     if dist == 0.0:
         return geo
 
+    # ── Full special-relativistic aberration (Skyfield formula) ──────────
+    if light_time > 0.0:
+        p1mag = light_time * C_LIGHT_AU_DAY  # distance in AU
+        vemag = math.sqrt(earth_vel[0] ** 2 + earth_vel[1] ** 2 + earth_vel[2] ** 2)
+        if vemag == 0.0 or p1mag == 0.0:
+            return geo
+
+        beta = vemag / C_LIGHT_AU_DAY
+        dot = geo[0] * earth_vel[0] + geo[1] * earth_vel[1] + geo[2] * earth_vel[2]
+        cosd = dot / (p1mag * vemag)
+        gammai = math.sqrt(1.0 - beta * beta)  # inverse Lorentz factor
+        p = beta * cosd
+        q = (1.0 + p / (1.0 + gammai)) * light_time
+        r = 1.0 + p
+        if abs(r) < 1e-30:
+            r = 1.0
+
+        return (
+            (gammai * geo[0] + q * earth_vel[0]) / r,
+            (gammai * geo[1] + q * earth_vel[1]) / r,
+            (gammai * geo[2] + q * earth_vel[2]) / r,
+        )
+
+    # ── Fallback: first-order Bradley aberration ────────────────────────
     ux = geo[0] / dist
     uy = geo[1] / dist
     uz = geo[2] / dist
 
-    # Earth velocity in units of c
     vx = earth_vel[0] / C_LIGHT_AU_DAY
     vy = earth_vel[1] / C_LIGHT_AU_DAY
     vz = earth_vel[2] / C_LIGHT_AU_DAY
 
-    # dot product u . v
     dot = ux * vx + uy * vy + uz * vz
 
-    # Aberration formula (first order):
-    # u' = u + v - u*(u.v)
-    # Then renormalize and scale back to original distance
     ax = ux + vx - ux * dot
     ay = uy + vy - uy * dot
     az = uz + vz - uz * dot
 
-    # Renormalize
     a_dist = math.sqrt(ax * ax + ay * ay + az * az)
     if a_dist == 0.0:
         return geo
 
     return (ax / a_dist * dist, ay / a_dist * dist, az / a_dist * dist)
+
+
+# Gravitational deflection constants (matching Skyfield's relativity module)
+_GS = 1.32712440017987e20  # heliocentric gravitational constant (m^3/s^2)
+_C_MS = 299792458.0  # speed of light (m/s)
+_AU_M = 149597870700  # 1 AU in metres
+
+# Deflector reciprocal masses (solar mass / deflector mass)
+_DEFLECTORS: Tuple[Tuple[int, float], ...] = (
+    (SE_SUN, 1.0),  # Sun
+    (5, 1047.3486),  # Jupiter barycenter
+    (6, 3497.898),  # Saturn barycenter
+)
+
+# Body IDs in the LEB file for deflector barycenters
+# (Jupiter=5, Saturn=6 map to body_ids 5, 6 in LEB — their barycentric ICRS)
+_DEFLECTOR_LEB_IDS = {SE_SUN: SE_SUN, 5: 5, 6: 6}
+
+# =============================================================================
+# CENTER-OF-BODY (COB) CORRECTION FOR SYSTEM BARYCENTERS
+# =============================================================================
+
+# Barycenter names for outer planets (used by get_cob_offset / SPK centers)
+_SYSTEM_BARY_NAMES: Dict[int, str] = {
+    5: "jupiter barycenter",
+    6: "saturn barycenter",
+    7: "uranus barycenter",
+    8: "neptune barycenter",
+    9: "pluto barycenter",
+}
+
+
+def _apply_cob_correction(
+    pos: Tuple[float, float, float],
+    ipl: int,
+    jd_tt: float,
+) -> Tuple[float, float, float]:
+    """Apply center-of-body correction to a system barycenter position.
+
+    Converts system barycenter ICRS position to planet center ICRS position
+    by adding the COB offset. Uses SPK planet_centers segments where available
+    (high precision), falling back to analytical moon-theory COB corrections.
+
+    This matches the behavior of _SpkCenterTarget in planets.py.
+
+    Args:
+        pos: System barycenter ICRS position (x, y, z) in AU.
+        ipl: Body ID (5=Jupiter, 6=Saturn, 7=Uranus, 8=Neptune, 9=Pluto).
+        jd_tt: Julian Day TT at which to evaluate the COB offset.
+
+    Returns:
+        Planet center ICRS position (x, y, z) in AU.
+    """
+    from .planets import _PLANET_CENTER_NAIF_IDS
+    from .state import get_planet_center_segment, get_timescale
+
+    bary_name = _SYSTEM_BARY_NAMES.get(ipl)
+    if bary_name is None:
+        return pos  # Not an outer planet, no COB needed
+
+    ts = get_timescale()
+    t = ts.tt_jd(jd_tt)
+
+    # Map body_id to planet name for NAIF lookup
+    planet_name = {5: "jupiter", 6: "saturn", 7: "uranus", 8: "neptune", 9: "pluto"}[
+        ipl
+    ]
+
+    # Try SPK center offset first (high precision)
+    if planet_name in _PLANET_CENTER_NAIF_IDS:
+        naif_id = _PLANET_CENTER_NAIF_IDS[planet_name]
+        seg = get_planet_center_segment(naif_id)
+        if seg is not None:
+            try:
+                offset_pos = seg.at(t).position.au
+                return (
+                    pos[0] + float(offset_pos[0]),
+                    pos[1] + float(offset_pos[1]),
+                    pos[2] + float(offset_pos[2]),
+                )
+            except Exception:
+                pass  # Fall through to analytical COB
+
+    # Fallback: analytical COB from moon theories
+    from .moon_theories import get_cob_offset
+
+    offset = get_cob_offset(bary_name, t)
+    return (
+        pos[0] + offset[0],
+        pos[1] + offset[1],
+        pos[2] + offset[2],
+    )
+
+
+def _apply_gravitational_deflection(
+    geo: Tuple[float, float, float],
+    earth_bary: Tuple[float, float, float],
+    jd_tt: float,
+    light_time: float,
+    reader: "LEBReader",
+) -> Tuple[float, float, float]:
+    """Apply PPN gravitational light deflection by Sun, Jupiter, Saturn.
+
+    Matches Skyfield's ``apparent(deflectors=(10, 599, 699))`` formula.
+    Uses LEB data for deflector positions (barycentric ICRS).
+
+    For the Sun, deflection is the dominant correction (~max 1.75" at
+    the limb, typically 0.01–4" for planets).  Jupiter and Saturn add
+    ~0.01" near their limbs.
+
+    Args:
+        geo: Light-time-corrected geocentric ICRS position (AU).
+        earth_bary: Earth ICRS barycentric position (AU).
+        jd_tt: Observation Julian Day in TT.
+        light_time: Light travel time to target (days).
+        reader: Open LEBReader for deflector positions.
+
+    Returns:
+        Deflection-corrected geocentric ICRS position (AU).
+    """
+    result = list(geo)
+    pmag = math.sqrt(result[0] ** 2 + result[1] ** 2 + result[2] ** 2)
+    if pmag == 0.0:
+        return geo
+
+    for defl_body_id, rmass in _DEFLECTORS:
+        # 1. Deflector barycentric position at observation time
+        try:
+            defl_pos, _ = reader.eval_body(defl_body_id, jd_tt)
+        except (KeyError, ValueError):
+            continue
+
+        # 2. Deflector relative to observer
+        gpv = (
+            defl_pos[0] - earth_bary[0],
+            defl_pos[1] - earth_bary[1],
+            defl_pos[2] - earth_bary[2],
+        )
+
+        # 3. Unit vector to target
+        phat = (result[0] / pmag, result[1] / pmag, result[2] / pmag)
+
+        # 4. Light-time difference: when photon passed closest to deflector
+        dlt = (phat[0] * gpv[0] + phat[1] * gpv[1] + phat[2] * gpv[2]) / C_LIGHT_AU_DAY
+
+        # 5. Clamp and compute time at closest approach
+        tclose_offset = max(0.0, min(dlt, light_time))
+        tclose_jd = jd_tt - tclose_offset
+
+        # 6. Deflector position at closest approach
+        try:
+            defl_close, _ = reader.eval_body(defl_body_id, tclose_jd)
+        except (KeyError, ValueError):
+            continue
+
+        # 7. pe = observer - deflector (observer relative to deflector)
+        pe = (
+            earth_bary[0] - defl_close[0],
+            earth_bary[1] - defl_close[1],
+            earth_bary[2] - defl_close[2],
+        )
+
+        # 8. pq = target relative to deflector (from observer frame)
+        pq = (result[0] + pe[0], result[1] + pe[1], result[2] + pe[2])
+
+        qmag = math.sqrt(pq[0] ** 2 + pq[1] ** 2 + pq[2] ** 2)
+        emag = math.sqrt(pe[0] ** 2 + pe[1] ** 2 + pe[2] ** 2)
+
+        if qmag == 0.0 or emag == 0.0:
+            continue
+
+        qhat = (pq[0] / qmag, pq[1] / qmag, pq[2] / qmag)
+        ehat = (pe[0] / emag, pe[1] / emag, pe[2] / emag)
+
+        pdotq = phat[0] * qhat[0] + phat[1] * qhat[1] + phat[2] * qhat[2]
+        qdote = qhat[0] * ehat[0] + qhat[1] * ehat[1] + qhat[2] * ehat[2]
+        edotp = ehat[0] * phat[0] + ehat[1] * phat[1] + ehat[2] * phat[2]
+
+        # Skip if object is on the line-of-sight to the deflector
+        if abs(edotp) > 0.99999999999:
+            continue
+
+        fac1 = 2.0 * _GS / (_C_MS * _C_MS * emag * _AU_M * rmass)
+        fac2 = 1.0 + qdote
+        if abs(fac2) < 1e-30:
+            continue
+
+        coeff = fac1 / fac2 * pmag
+        result[0] += coeff * (pdotq * ehat[0] - edotp * qhat[0])
+        result[1] += coeff * (pdotq * ehat[1] - edotp * qhat[1])
+        result[2] += coeff * (pdotq * ehat[2] - edotp * qhat[2])
+
+    return (result[0], result[1], result[2])
 
 
 def _get_skyfield_frame_data(
@@ -462,8 +684,13 @@ def _pipeline_icrs(
     ipl: int,
     iflag: int,
     want_velocity: bool = False,
+    is_system_bary: bool = False,
 ) -> Tuple[float, ...]:
     """Pipeline A: compute ecliptic coordinates for ICRS barycentric bodies.
+
+    Handles both planet-center bodies (COORD_ICRS_BARY) and system-barycenter
+    bodies (COORD_ICRS_BARY_SYSTEM). For system barycenters, COB correction
+    is applied at runtime to match Skyfield's _SpkCenterTarget behavior.
 
     When want_velocity is False (default), returns (lon, lat, dist).
     When want_velocity is True, returns (lon, lat, dist, dlon, dlat, ddist)
@@ -471,12 +698,27 @@ def _pipeline_icrs(
     polynomial derivatives, transformed through the same rotation matrices
     as the position.
 
+    Args:
+        reader: Open LEBReader.
+        jd_tt: Julian Day TT.
+        ipl: Body ID.
+        iflag: Flags.
+        want_velocity: Whether to compute velocity.
+        is_system_bary: If True, stored data is system barycenter; apply COB.
+
     Returns:
         (lon_deg, lat_deg, dist_au) or
         (lon_deg, lat_deg, dist_au, dlon_deg_day, dlat_deg_day, ddist_au_day)
     """
     # 1. Get body position (and velocity if needed)
     target_pos, target_vel = reader.eval_body(ipl, jd_tt)
+
+    # 1b. For system barycenters, apply COB only for TRUEPOS (no light-time).
+    #     For normal path, COB is deferred until after light-time iteration
+    #     to match Skyfield's _SpkCenterTarget._observe_from_bcrs() behavior:
+    #     iterate light-time on barycenter, apply COB once at retarded time.
+    if is_system_bary and (iflag & SEFLG_TRUEPOS):
+        target_pos = _apply_cob_correction(target_pos, ipl, jd_tt)
 
     # Pre-initialize velocity variables to satisfy type checker.
     # These are always set before use when want_velocity=True.
@@ -503,10 +745,16 @@ def _pipeline_icrs(
     geo = _vec3_sub(target_pos, observer)
 
     # 4. Light-time correction (unless SEFLG_TRUEPOS)
-    #    Also get the velocity at the retarded time for analytical velocity.
-    #    Initialize retarded_vel to target_vel as fallback for dist == 0 case
-    #    (e.g. Earth geocentric where target == observer).
+    #    For system barycenters: iterate on raw barycenter positions (smooth),
+    #    then apply COB once after convergence at OBSERVER time. This matches
+    #    Skyfield's _SpkCenterTarget._observe_from_bcrs() which:
+    #      1. Calls barycenter._observe_from_bcrs(observer) to iterate light-time
+    #         on the barycenter, returning (pos, vel, t, light_time) where
+    #         t = observer.t (the OBSERVATION time, not retarded time).
+    #      2. Evaluates center_segment.at(t) at OBSERVER time, not retarded time.
+    #    We must match this: COB offset evaluated at jd_tt (observer time).
     retarded_vel = target_vel
+    lt = 0.0
     if not (iflag & SEFLG_TRUEPOS):
         for _ in range(3):  # Fixed-point iterations
             dist = _vec3_dist(geo)
@@ -516,15 +764,34 @@ def _pipeline_icrs(
             retarded_pos, retarded_vel = reader.eval_body(ipl, jd_tt - lt)
             geo = _vec3_sub(retarded_pos, observer)
 
+        # Apply COB correction at OBSERVER time (jd_tt), matching Skyfield's
+        # _SpkCenterTarget._observe_from_bcrs() which evaluates the center
+        # segment at observer.t, not at the retarded time.
+        if is_system_bary and lt > 0.0:
+            retarded_pos_cob = _apply_cob_correction(
+                (geo[0] + observer[0], geo[1] + observer[1], geo[2] + observer[2]),
+                ipl,
+                jd_tt,
+            )
+            geo = _vec3_sub(retarded_pos_cob, observer)
+
     if want_velocity:
         geo_vel = _vec3_sub(retarded_vel, observer_vel)
 
-    # 5. Aberration (unless disabled or helio/bary/truepos)
+    # 5. Gravitational deflection by Sun, Jupiter, Saturn (PPN formula).
+    #    Dominant correction: up to ~4" for Saturn near the Sun's limb.
+    #    Skipped for helio/bary/truepos and for the Moon (negligible at
+    #    ~0.0026 AU, deflection < 0.000001").
+    if not (iflag & (SEFLG_NOABERR | SEFLG_HELCTR | SEFLG_BARYCTR | SEFLG_TRUEPOS)):
+        if ipl != SE_MOON and lt > 0.0:
+            geo = _apply_gravitational_deflection(geo, observer, jd_tt, lt, reader)
+
+    # 6. Aberration (full special-relativistic, matching Skyfield).
     #    For velocity: the aberration correction depends on Earth's velocity
     #    which changes slowly (~0.017 deg/day²). The velocity component of
     #    aberration is ~1e-8 deg/day — negligible. We skip it.
     if not (iflag & (SEFLG_NOABERR | SEFLG_HELCTR | SEFLG_BARYCTR | SEFLG_TRUEPOS)):
-        geo = _apply_aberration(geo, earth_vel)
+        geo = _apply_aberration(geo, earth_vel, lt)
 
     # 6. Coordinate transform — apply the same transform to velocity
     if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
@@ -770,7 +1037,13 @@ def fast_calc_ut(
         sid_ayan_t0 = _SIDEREAL_AYAN_T0
 
     # Delta-T conversion: UT -> TT
-    delta_t = reader.delta_t(tjd_ut)
+    # Use swe_deltat() for exact match with the Skyfield reference path.
+    # The LEB reader's linearly-interpolated sparse table introduces up to
+    # ~0.004s error near 1985, which at the Moon's ~0.5"/s speed exceeds
+    # the 0.001" target.
+    from .time_utils import swe_deltat
+
+    delta_t = swe_deltat(tjd_ut)
     jd_tt = tjd_ut + delta_t
 
     return _fast_calc_core(
@@ -890,6 +1163,27 @@ def _fast_calc_core(
             )
         else:
             lon, lat, dist = _pipeline_icrs(reader, jd_tt, ipl, iflag)
+            dlon, dlat, ddist = 0.0, 0.0, 0.0
+
+    elif body.coord_type == COORD_ICRS_BARY_SYSTEM:
+        # Pipeline A': ICRS system barycenter — COB correction applied at runtime
+        if iflag & SEFLG_SPEED:
+            lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
+                reader,
+                jd_tt,
+                ipl,
+                iflag,
+                want_velocity=True,
+                is_system_bary=True,
+            )
+        else:
+            lon, lat, dist = _pipeline_icrs(
+                reader,
+                jd_tt,
+                ipl,
+                iflag,
+                is_system_bary=True,
+            )
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     elif body.coord_type == COORD_ECLIPTIC:

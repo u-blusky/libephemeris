@@ -1,8 +1,21 @@
 # LEB Implementation Plan: Binary Ephemeris Mode
 
-> **STATUS: APPROVED IMPLEMENTATION PLAN**
-> This document is the authoritative reference for implementing the `.leb` binary
-> ephemeris mode. It supersedes the early design notes now archived in [Architecture Overview](../development/architecture-overview.md).
+> **STATUS: HISTORICAL DOCUMENT — ORIGINAL IMPLEMENTATION PLAN**
+> This document is the original design plan for the `.leb` binary ephemeris mode.
+> It has been **superseded** by the [Technical Guide](guide.md) and
+> [Algorithms & Theory](algorithms.md) as authoritative references.
+>
+> **Key changes since this plan was written:**
+> - `COORD_ICRS_BARY_SYSTEM` (type 4) added for outer planets (Jupiter-Pluto)
+>   to store system barycenters with runtime COB correction
+> - PPN gravitational deflection (Sun/Jupiter/Saturn) added to Pipeline A
+> - Bodies 13, 21, 22 tightened to interval=4, degree=15
+> - `fast_calc_ut` uses `swe_deltat()` instead of `reader.delta_t()`
+> - Generator grew from ~600 to ~3668 lines with vectorized evaluation
+> - All 31 bodies achieve <0.001" precision on base and medium tiers
+> - Parallelization removed; replaced by group generation workflow
+>
+> See the [Technical Guide](guide.md) for the current accurate state.
 
 ---
 
