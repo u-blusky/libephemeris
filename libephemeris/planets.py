@@ -2282,8 +2282,8 @@ def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
         >>> ayanamsa = swe_get_ayanamsa_ut(2451545.0)  # J2000.0
         >>> print(f"Lahiri ayanamsa: {ayanamsa:.6f}°")
     """
-    sid_mode = get_sid_mode()
-    # get_sid_mode() without full=True always returns int
+    sid_mode, sid_t0, sid_ayan_t0 = get_sid_mode(full=True)
+    # get_sid_mode(full=True) returns (int, float, float)
     assert isinstance(sid_mode, int)
 
     # --- LEB fast path: compute ayanamsa from precomputed data ---
@@ -2296,7 +2296,13 @@ def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
 
             delta_t = reader.delta_t(tjd_ut)
             jd_tt = tjd_ut + delta_t
-            return _calc_ayanamsa_from_leb(reader, jd_tt, sid_mode=sid_mode)
+            return _calc_ayanamsa_from_leb(
+                reader,
+                jd_tt,
+                sid_mode=sid_mode,
+                sid_t0=sid_t0,
+                sid_ayan_t0=sid_ayan_t0,
+            )
         except (KeyError, ValueError):
             pass  # star-based mode or out of range, fall through
     # --- END LEB fast path ---
