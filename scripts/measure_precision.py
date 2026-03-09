@@ -11,44 +11,28 @@ import math
 import os
 import sys
 import time
+import warnings
 
 import numpy as np
 
 sys.path.insert(0, ".")
 
-# Ensure LEB is NOT loaded initially so swe_calc uses Skyfield
+# Ensure LEB is NOT loaded for reference swe_calc calls.
+# We pop the env var AND force skyfield mode so auto-discovery cannot
+# silently route reference calls through LEB.
 os.environ.pop("LIBEPHEMERIS_LEB", None)
 
 import libephemeris as ephem
-from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_EARTH,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_CHIRON,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SEFLG_SPEED,
-)
-from libephemeris.leb_format import (
-    BODY_PARAMS,
-    COORD_ICRS_BARY,
-    COORD_ECLIPTIC,
-    COORD_HELIO_ECL,
-)
+from libephemeris.constants import SEFLG_SPEED
+from libephemeris.leb_format import BODY_PARAMS
+
+# Force skyfield mode globally so swe_calc never auto-discovers LEB files
+ephem.set_calc_mode("skyfield")
+
+# Suppress MeeusPolynomialWarning spam from ecliptic bodies on extended tier
+from libephemeris.lunar import MeeusPolynomialWarning
+
+warnings.filterwarnings("ignore", category=MeeusPolynomialWarning)
 
 
 BODY_NAMES = {
@@ -114,11 +98,25 @@ def lon_diff_arcsec(lon1, lon2):
     return d * 3600.0
 
 
-def measure_body(ipl, leb_path, jd_start, jd_end, n_samples=2000):
+def measure_body(ipl, reader, jd_start, jd_end, n_samples=2000):
     """Measure end-to-end error for a single body.
 
-    Returns dict with statistics.
+    Compares fast_calc (LEB) against swe_calc (Skyfield reference).
+    The global calc mode must be set to "skyfield" so swe_calc never
+    uses LEB auto-discovery.
+
+    Args:
+        ipl: Body ID.
+        reader: Pre-opened LEBReader instance.
+        jd_start: Start of JD range.
+        jd_end: End of JD range.
+        n_samples: Number of evenly-spaced sample points.
+
+    Returns:
+        Dict with per-body error statistics, or None if no valid samples.
     """
+    from libephemeris.fast_calc import fast_calc_tt
+
     # Generate dense sample points
     jds = np.linspace(jd_start, jd_end, n_samples)
 
@@ -134,7 +132,7 @@ def measure_body(ipl, leb_path, jd_start, jd_end, n_samples=2000):
     for jd in jds:
         jd_float = float(jd)
 
-        # Reference: swe_calc via Skyfield (no LEB)
+        # Reference: swe_calc via Skyfield (calc_mode="skyfield" set globally)
         try:
             ref_result, _ = ephem.swe_calc(jd_float, ipl, iflag)
         except Exception:
@@ -142,14 +140,10 @@ def measure_body(ipl, leb_path, jd_start, jd_end, n_samples=2000):
 
         ref_lon, ref_lat, ref_dist = ref_result[0], ref_result[1], ref_result[2]
 
-        # LEB: fast_calc
+        # LEB: fast_calc_tt directly (bypasses global mode)
         try:
-            from libephemeris.fast_calc import fast_calc_tt
-            from libephemeris.leb_reader import LEBReader
-
-            reader = LEBReader(leb_path)
             leb_result, _ = fast_calc_tt(reader, jd_float, ipl, iflag)
-        except Exception as e:
+        except Exception:
             continue
 
         leb_lon, leb_lat, leb_dist = leb_result[0], leb_result[1], leb_result[2]
@@ -195,10 +189,31 @@ def measure_body(ipl, leb_path, jd_start, jd_end, n_samples=2000):
     }
 
 
+def _detect_tier(leb_path: str) -> str:
+    """Auto-detect precision tier from LEB filename.
+
+    Matches patterns like 'ephemeris_base.leb', 'ephemeris_extended.leb',
+    'ephemeris_medium.leb'. Falls back to 'medium' if no match.
+    """
+    basename = os.path.basename(leb_path).lower()
+    for tier in ("base", "medium", "extended"):
+        if tier in basename:
+            return tier
+    return "medium"
+
+
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Measure LEB precision")
+    parser = argparse.ArgumentParser(
+        description="Measure LEB precision: fast_calc vs swe_calc (Skyfield reference)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "The --tier flag ensures the Skyfield reference uses the matching\n"
+            "SPK file (de440s/de440/de441). If omitted, the tier is auto-detected\n"
+            "from the LEB filename (e.g. ephemeris_extended.leb -> extended)."
+        ),
+    )
     parser.add_argument("--leb", required=True, help="Path to .leb file")
     parser.add_argument("--samples", type=int, default=2000, help="Samples per body")
     parser.add_argument("--bodies", nargs="*", type=int, help="Specific body IDs")
@@ -208,11 +223,23 @@ def main():
         default="all",
         help="Body group to test",
     )
+    parser.add_argument(
+        "--tier",
+        choices=["base", "medium", "extended"],
+        default=None,
+        help="Precision tier for Skyfield reference (auto-detected from filename if omitted)",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.leb):
         print(f"ERROR: LEB file not found: {args.leb}")
         sys.exit(1)
+
+    # Determine and set the precision tier so Skyfield loads the matching SPK
+    tier = args.tier or _detect_tier(args.leb)
+    ephem.set_precision_tier(tier)
+    tier_info = ephem.TIERS[tier]
+    print(f"Precision tier: {tier} ({tier_info.ephemeris_file})")
 
     # Read the LEB file to determine date range
     from libephemeris.leb_reader import LEBReader
@@ -247,15 +274,23 @@ def main():
     print(f"Testing {len(body_ids)} bodies: {[BODY_NAMES.get(b, b) for b in body_ids]}")
     print("=" * 100)
 
+    # Coordinate type names for display
+    COORD_NAMES = {
+        0: "ICRS_BARY",
+        1: "ECLIPTIC",
+        2: "HELIO_ECL",
+        4: "ICRS_SYS",
+    }
+
     # Measure each body
     results = []
     for ipl in body_ids:
         name = BODY_NAMES.get(ipl, f"body_{ipl}")
         params = BODY_PARAMS.get(ipl)
-        coord_type = params[2] if params else "?"
-        coord_name = {0: "ICRS_BARY", 1: "ECLIPTIC", 2: "HELIO_ECL", 3: "GEO_ECL"}.get(
-            coord_type, "?"
-        )
+        if params is None:
+            print(f"  {name:12s} (id={ipl:2d}) ... SKIPPED (no BODY_PARAMS)")
+            continue
+        coord_name = COORD_NAMES.get(params[2], "?")
 
         t0 = time.time()
         print(
@@ -264,7 +299,7 @@ def main():
             flush=True,
         )
 
-        result = measure_body(ipl, args.leb, jd_start, jd_end, args.samples)
+        result = measure_body(ipl, reader, jd_start, jd_end, args.samples)
         elapsed = time.time() - t0
 
         if result is None:
@@ -293,7 +328,7 @@ def main():
     for r in results:
         ipl = r["body"]
         params = BODY_PARAMS.get(ipl, (0, 0, 0, 0))
-        coord_name = {0: "ICRS_BARY", 1: "ECLIPTIC", 2: "HELIO_ECL"}.get(params[2], "?")
+        coord_name = COORD_NAMES.get(params[2], "?")
         status = "PASS" if r["max_arcsec"] < 0.001 else "FAIL"
         if status == "FAIL":
             all_pass = False
