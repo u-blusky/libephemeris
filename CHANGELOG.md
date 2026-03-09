@@ -20,6 +20,18 @@ and precession-nutation at evaluation time.
 Previous worst-case error: **4.85 arcseconds** (Saturn, base tier).
 New worst-case error: **0.000332 arcseconds** (Moon, base tier) — a **14,600x improvement**.
 
+The 31 LEB bodies are: Sun (0), Moon (1), Mercury (2), Venus (3), Mars (4),
+Jupiter (5), Saturn (6), Uranus (7), Neptune (8), Pluto (9), Mean Node (10),
+True Node (11), Mean Apogee (12), Oscu Apogee (13), Earth (14), Chiron (15),
+Ceres (17), Pallas (18), Juno (19), Vesta (20), Interp Apogee (21),
+Interp Perigee (22), Cupido (40), Hades (41), Zeus (42), Kronos (43),
+Apollon (44), Admetos (45), Vulkanus (46), Poseidon (47), Transpluto (48).
+
+Bodies not in LEB (Pholus, TNOs, additional asteroids, fixed stars, planetary
+moons, astrological angles, Arabic parts) silently fall back to Skyfield
+with zero user-visible difference. See `docs/leb/guide.md` §9.3 for the
+complete fallback table.
+
 ### Added
 
 #### New coordinate type: `COORD_ICRS_BARY_SYSTEM` (type 4)

@@ -1302,15 +1302,99 @@ orbital motion due to Earth's own motion and parallax effects.
 - **Nutation (interval=16, degree=16):** Halved from 32 days to reduce
   obliquity error, which affects latitude of all bodies.
 
-### 9.3 Bodies NOT in LEB (trigger Skyfield fallback)
+### 9.3 Bodies NOT in LEB (Skyfield Fallback)
 
-- Pholus (SE_PHOLUS = 16)
-- Any asteroid beyond the major 5
-- TNOs (Eris, Sedna, etc.)
-- Fixed stars (use the star catalog section instead)
-- House cusps and angles
-- Arabic parts
-- SE_ECL_NUT (-1)
+When LEB is active and a body is **not** in `BODY_PARAMS`, the library
+raises `KeyError` internally, which is caught by `swe_calc_ut()` /
+`swe_calc()`, and the request falls through to the full Skyfield pipeline.
+This is completely transparent to the caller.
+
+The same fallback is triggered by:
+
+- **Unsupported flags:** `SEFLG_TOPOCTR`, `SEFLG_XYZ`, `SEFLG_RADIANS`,
+  `SEFLG_NONUT`
+- **JD out of range:** Julian Day outside the LEB file's coverage
+- **Star-based sidereal modes:** e.g., `SE_SIDM_TRUE_REVATI` (requires
+  fixed star position not available in LEB fast path)
+
+#### Bodies that always fall back to Skyfield
+
+| Category | Bodies | IDs | Count | How computed |
+|----------|--------|-----|-------|--------------|
+| Centaur | Pholus | 16 | 1 | SPK → ASSIST → Keplerian |
+| Additional hypotheticals | Leverrier, Adams, Lowell, Pickering, Vulcan, Selena, Proserpina, Waldemath | 51–58 | 8 | Keplerian from `hypothetical.py` |
+| TNOs | Eris, Sedna, Haumea, Makemake, Quaoar, Orcus, Ixion, Gonggong, Varuna | SE_AST_OFFSET + n | 9 | SPK → ASSIST → Keplerian |
+| Additional asteroids | Nessus, Asbolus, Chariklo, Apophis, Hygiea, Interamnia, Davida, Europa (ast), Sylvia, Psyche, Eros, Amor, Icarus, Toro, Sappho, Pandora, Lilith (ast), Hidalgo, Toutatis, Itokawa, Bennu, Ryugu | SE_AST_OFFSET + n | 22 | SPK → ASSIST → Keplerian |
+| Fixed stars | 102 stars (Regulus, Spica, Aldebaran, …) | SE_FIXSTAR_OFFSET + n | 102 | `fixed_stars.py` (see §9.4) |
+| Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | SE_MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
+| Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
+| Arabic parts | Pars Fortunae, Pars Spiritus, Pars Amoris, Pars Fidei | 9100–9103 | 4 | `arabic_parts.py` (derived) |
+| Nutation/obliquity | SE_ECL_NUT | -1 | 1 | LEB nutation section (§9.4) |
+
+**Total bodies NOT in LEB Chebyshev data:** ~174 (1 centaur + 8 hypotheticals
+\+ 31 minor bodies/TNOs + 102 stars + 21 moons + 10 angles/parts + 1 nutation).
+
+**Why these bodies are excluded:** The 31-body LEB catalog covers the bodies
+most commonly used in astrological chart calculations. Adding TNOs, additional
+asteroids, and planetary moons would increase file size and generation time
+substantially while benefiting a small fraction of users. The Skyfield
+fallback provides identical accuracy for these bodies at the cost of ~120 µs
+per evaluation (vs ~8 µs for LEB bodies).
+
+**Note on Pholus (ID 16):** Pholus is the only "gap" in the otherwise
+contiguous planet/asteroid range (IDs 0–22). It was excluded because it
+requires SPK Type 21 data like the other asteroids, and adding a 6th
+asteroid to LEB was not justified by usage frequency. It falls back
+seamlessly to the SPK → Skyfield pipeline.
+
+### 9.4 Auxiliary LEB Sections (Non-Chebyshev Data)
+
+In addition to Chebyshev polynomial coefficients for the 31 bodies, each
+`.leb` file contains three auxiliary data sections that accelerate other
+parts of the calculation pipeline:
+
+#### Nutation (Section 2)
+
+Stores Chebyshev polynomial approximations for **dpsi** (nutation in
+longitude) and **deps** (nutation in obliquity) using the IAU 2006/2000A
+model. These are used by Pipelines A/A' for the precession-nutation matrix,
+by ecliptic body pipelines for true obliquity, and by sidereal ayanamsha
+calculations.
+
+- **Parameters:** interval=16 days, degree=16
+- **Precision:** sub-milliarcsecond (matches `erfa.nut06a()`)
+- **Access:** `reader.eval_nutation(jd_tt)` → `(dpsi, deps)` in radians
+- **Evaluation time:** ~0.8 µs
+
+#### Delta-T (Section 3)
+
+Stores a sparse table of historical Delta-T values (TT − UT1) at regular
+intervals. Used by `fast_calc_tt()` for reverse UT↔TT lookups, but
+**not** used by `fast_calc_ut()` for the forward UT→TT conversion (which
+uses `swe_deltat()` for higher precision — see §5).
+
+- **Format:** array of `(jd, delta_t_days)` pairs
+- **Interpolation:** linear between adjacent entries
+- **Access:** `reader.delta_t(jd)` → Delta-T in days
+- **Evaluation time:** ~0.3 µs
+- **Caveat:** Linear interpolation introduces up to ~0.004s error near 1985.
+  This is why `fast_calc_ut()` uses `swe_deltat()` instead.
+
+#### Star Catalog (Section 4)
+
+Stores a snapshot of the fixed star catalog (J2000 positions, proper motions,
+parallax, radial velocity) for the 102 stars defined in `fixed_stars.py`.
+This is **read-only reference data** — star positions are not stored as
+Chebyshev polynomials because proper motion is a simple linear correction
+that doesn't benefit from polynomial approximation.
+
+- **Format:** per-star entries with RA, Dec, pmRA, pmDec, parallax, radial
+  velocity, visual magnitude
+- **Access:** `reader.get_star(hip_number)` → star data dict
+- **Note:** Fixed star calculations still go through the full Skyfield
+  pipeline when called via `swe_calc_ut()`. The star catalog in LEB is
+  used internally for sidereal ayanamsha calculations involving reference
+  stars.
 
 ---
 
