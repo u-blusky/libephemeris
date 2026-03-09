@@ -901,14 +901,18 @@ independent contributions:
 
 ### Achieved Precision
 
-After all fixes, the combined error for all 31 bodies is:
+After all fixes, the combined error for all 31 bodies across all three tiers:
 
-| Category | Max geocentric error |
-|----------|---------------------|
-| All planets (Sun-Pluto, Earth) | **<0.001"** |
-| All asteroids (Chiron, Ceres-Vesta) | **<0.001"** |
-| All ecliptic bodies (Nodes, Lilith) | **<0.001"** |
-| All hypothetical bodies (Uranians) | **~0.000"** |
+| Category | Base (<0.001") | Medium (<0.001") | Extended |
+|----------|---------------|------------------|----------|
+| All planets (Sun-Pluto, Earth) | **<0.001"** | **<0.001"** | **<0.001"** |
+| All asteroids (Chiron, Ceres-Vesta) | **<0.001"** | **<0.001"** | **<0.001"** |
+| All ecliptic bodies (Nodes, Lilith) | **<0.001"** | **<0.001"** | <0.1" * |
+| All hypothetical bodies (Uranians) | **~0.000"** | **~0.000"** | **~0.000"** |
+
+\* Ecliptic body precision on the extended tier is limited by Meeus polynomial
+degradation beyond ±20 centuries from J2000.0. Within ±1000 CE of J2000,
+ecliptic body errors are <0.001".
 
 ### Error Amplification in Secondary Pipelines
 

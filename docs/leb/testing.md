@@ -29,7 +29,7 @@ If the LEB file is not found, tests are **skipped** (they don't fail).
 |------|-----------|-------|------|
 | `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~112 MB) |
 | `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~377 MB) |
-| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` |
+| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (~2.8 GB) |
 
 ### Dependencies
 

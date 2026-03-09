@@ -198,19 +198,19 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
     },
     "extended": {
         # Extended tier (de441, -5000 to 5000 CE, 10,000 years).
-        # ICRS barycentric storage with gravitational deflection + SR aberration.
-        # Same pipeline as base/medium. Tolerances will be validated after
-        # regeneration with the deflection pipeline.
-        # Previous V2 errors (without deflection): Uranus 1.91", Saturn 0.57".
-        # Expected with deflection: <0.2" for all planets (matching base/medium).
-        "POSITION_ARCSEC": 0.5,  # Conservative until measured (wider date range)
-        "EQUATORIAL_ARCSEC": 0.5,  # Same pipeline, different output frame
-        "J2000_ARCSEC": 0.5,  # Same pipeline, J2000 ecliptic output
-        "SIDEREAL_ARCSEC": 0.5,  # POSITION + ayanamsha
-        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee 0.04" (2.5x margin)
-        "HYPOTHETICAL_ARCSEC": 0.005,  # Observed <0.001" (5x margin)
-        "ASTEROID_ARCSEC": 5.0,  # No asteroid tests (SPK coverage ~1900-2100)
-        "DISTANCE_AU": 5e-5,  # Pluto 2.15e-5 AU (2.3x margin)
+        # ICRS barycentric storage with COORD_ICRS_BARY_SYSTEM for outer
+        # planets, gravitational deflection + SR aberration pipeline.
+        # Measured precision: all planets <0.001", asteroids <0.001".
+        # Ecliptic bodies kept at 0.1" due to Meeus polynomial degradation
+        # beyond ±20 centuries from J2000.
+        "POSITION_ARCSEC": 0.001,  # Measured <0.0003" for all planets
+        "EQUATORIAL_ARCSEC": 0.02,  # Heliocentric amplification
+        "J2000_ARCSEC": 0.001,  # Same pipeline
+        "SIDEREAL_ARCSEC": 0.001,  # POSITION + ayanamsha
+        "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee at extreme dates (Meeus limit)
+        "HYPOTHETICAL_ARCSEC": 0.001,  # Measured ~0.000000"
+        "ASTEROID_ARCSEC": 0.001,  # Measured <0.000018"
+        "DISTANCE_AU": 5e-6,  # Matching base/medium
         "SPEED_LON_DEG_DAY": 0.05,  # OscuApogee 0.035 (1.4x margin)
         "SPEED_LAT_DEG_DAY": 0.005,  # OscuApogee 0.002 (2.5x margin)
         "SPEED_DIST_AU_DAY": 1.2e-4,  # Pluto (matching base tier)

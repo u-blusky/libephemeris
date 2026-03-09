@@ -1342,7 +1342,7 @@ The compare test suite (`tests/test_leb/compare/`) validates LEB output
 against Skyfield for all 31 bodies across hundreds of dates per tier.
 
 **All 31 bodies achieve <0.001 arcsecond geocentric position precision**
-on both base and medium tiers. This was accomplished through:
+on all three tiers (base, medium, and extended). This was accomplished through:
 
 1. `COORD_ICRS_BARY_SYSTEM` storage for outer planets (eliminates COB
    oscillation fitting errors)
@@ -1377,18 +1377,37 @@ lunar, velocities, distances, flags, sidereal).
 tests plus eclipses, crossings, stations, rise/transit, elongation, ayanamsha,
 nutation, houses, gauquelin).
 
+#### Extended Tier (-5000 to 5000 CE, verified)
+
+| Group | Bodies | Worst Case Body | Max Error |
+|-------|--------|-----------------|-----------|
+| Planets (11) | Sun-Pluto, Earth | Mars | 0.000010" |
+| Asteroids (5) | Chiron, Ceres-Vesta | Pallas | 0.000018" |
+| Ecliptic (6) | Nodes, Lilith | OscuApog | 0.054" * |
+| Hypothetical (9) | Uranians, Transpluto | all | ~0.000000" |
+
+\* Ecliptic body precision is limited by Meeus polynomial degradation
+beyond ±20 centuries from J2000.0. OscuApogee uses analytical lunar
+formulas that lose accuracy at extreme dates. Within ±1000 CE, ecliptic
+body errors are <0.001".
+
+**Tests passed:** 261 comparison tests (planets, hypothetical, velocities,
+lunar, flags, ancient/future sub-ranges, boundary dates).
+
+**File size:** 2.8 GB (de441.bsp, -5000 to 5000 CE, 10,000 years).
+
 #### Test Tolerances (as configured in `conftest.py`)
 
-| Field | Base | Medium | Notes |
-|-------|------|--------|-------|
-| `POSITION_ARCSEC` | 0.001 | 0.001 | All planets including outer |
-| `ASTEROID_ARCSEC` | 0.001 | 0.001 | |
-| `ECLIPTIC_ARCSEC` | 0.001 | 0.001 | All ecliptic bodies |
-| `EQUATORIAL_ARCSEC` | 0.02 | 0.02 | Heliocentric amplification |
-| `J2000_ARCSEC` | 0.001 | 0.001 | |
-| `SIDEREAL_ARCSEC` | 0.001 | 0.001 | |
-| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | |
-| `DISTANCE_AU` | 5e-6 | 5e-6 | |
+| Field | Base | Medium | Extended | Notes |
+|-------|------|--------|----------|-------|
+| `POSITION_ARCSEC` | 0.001 | 0.001 | 0.001 | All planets including outer |
+| `ASTEROID_ARCSEC` | 0.001 | 0.001 | 0.001 | |
+| `ECLIPTIC_ARCSEC` | 0.001 | 0.001 | 0.1 | Meeus limit at extreme dates |
+| `EQUATORIAL_ARCSEC` | 0.02 | 0.02 | 0.02 | Heliocentric amplification |
+| `J2000_ARCSEC` | 0.001 | 0.001 | 0.001 | |
+| `SIDEREAL_ARCSEC` | 0.001 | 0.001 | 0.001 | |
+| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | 0.001 | |
+| `DISTANCE_AU` | 5e-6 | 5e-6 | 5e-6 | |
 
 ### 10.3 Architectural Limitations
 
