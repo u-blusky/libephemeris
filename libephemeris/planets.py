@@ -97,6 +97,8 @@ from .constants import (
     SEFLG_NOABERR,
     SEFLG_EQUATORIAL,
     SEFLG_J2000,
+    SEFLG_XYZ,
+    SEFLG_RADIANS,
     SE_PARS_FORTUNAE,
     SE_PARS_SPIRITUS,
     SE_PARS_AMORIS,
@@ -435,6 +437,84 @@ def _to_native_floats(values: tuple) -> PositionResult:
         float(values[4]),
         float(values[5]),
     )
+
+
+def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
+    """Apply output format flags (SEFLG_XYZ, SEFLG_RADIANS) to position result.
+
+    Post-processes the standard (lon, lat, dist, dlon, dlat, ddist) output
+    from _calc_body into the format requested by the caller.
+
+    When SEFLG_XYZ is set, converts spherical coordinates to Cartesian:
+        (lon°, lat°, dist_AU) → (x, y, z) in AU
+        (dlon°/d, dlat°/d, ddist_AU/d) → (vx, vy, vz) in AU/day
+
+    When SEFLG_RADIANS is set, converts angular values from degrees to radians.
+    Distance values are unaffected.
+
+    When both are set, SEFLG_XYZ takes priority (Cartesian output has no angles).
+
+    Args:
+        result: Standard 6-tuple (lon, lat, dist, dlon, dlat, ddist) in degrees/AU
+        iflag: Calculation flags (may include SEFLG_XYZ, SEFLG_RADIANS)
+
+    Returns:
+        Transformed 6-tuple based on flags.
+    """
+    lon, lat, dist, dlon, dlat, ddist = result
+
+    if iflag & SEFLG_XYZ:
+        # Convert spherical (degrees) to Cartesian (AU)
+        lon_rad = math.radians(lon)
+        lat_rad = math.radians(lat)
+        cos_lat = math.cos(lat_rad)
+        sin_lat = math.sin(lat_rad)
+        cos_lon = math.cos(lon_rad)
+        sin_lon = math.sin(lon_rad)
+
+        x = dist * cos_lat * cos_lon
+        y = dist * cos_lat * sin_lon
+        z = dist * sin_lat
+
+        # Convert velocity from (deg/day, deg/day, AU/day) to Cartesian AU/day
+        # Using the Jacobian of the spherical-to-Cartesian transformation
+        dlon_rad = math.radians(dlon)  # rad/day
+        dlat_rad = math.radians(dlat)  # rad/day
+
+        vx = (
+            ddist * cos_lat * cos_lon
+            - dist * sin_lat * cos_lon * dlat_rad
+            - dist * cos_lat * sin_lon * dlon_rad
+        )
+        vy = (
+            ddist * cos_lat * sin_lon
+            - dist * sin_lat * sin_lon * dlat_rad
+            + dist * cos_lat * cos_lon * dlon_rad
+        )
+        vz = ddist * sin_lat + dist * cos_lat * dlat_rad
+
+        return (
+            float(x),
+            float(y),
+            float(z),
+            float(vx),
+            float(vy),
+            float(vz),
+        )
+
+    if iflag & SEFLG_RADIANS:
+        # Convert angular values from degrees to radians
+        # Distance (index 2) and distance speed (index 5) are unchanged
+        return (
+            math.radians(lon),
+            math.radians(lat),
+            dist,
+            math.radians(dlon),
+            math.radians(dlat),
+            ddist,
+        )
+
+    return result
 
 
 def _body_uses_jpl_ephemeris(ipl: int) -> bool:
@@ -793,15 +873,22 @@ def swe_calc_ut(
     if _body_uses_jpl_ephemeris(ipl):
         validate_jd_range(tjd_ut, ipl, "swe_calc_ut")
 
+    # Strip SEFLG_XYZ and SEFLG_RADIANS from the flags passed to _calc_body
+    # since they are output format flags, not calculation flags.
+    # We apply them after the calculation is complete.
+    calc_iflag = iflag & ~SEFLG_XYZ & ~SEFLG_RADIANS
+
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
     try:
-        result = _calc_body(t, ipl, iflag)
+        pos, retflag = _calc_body(t, ipl, calc_iflag)
         # _calc_body logs the specific source (SPK, ASSIST, Keplerian)
         # for minor bodies; for standard planets it's always Skyfield
         if ipl in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", ipl, tjd_ut)
-        return result
+        # Apply output format flags (XYZ, RADIANS)
+        pos = _apply_output_flags(pos, iflag)
+        return pos, retflag
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjd_ut, ipl) from e
 
@@ -868,13 +955,19 @@ def swe_calc(
     if _body_uses_jpl_ephemeris(ipl):
         validate_jd_range(tjd, ipl, "swe_calc")
 
+    # Strip SEFLG_XYZ and SEFLG_RADIANS from the flags passed to _calc_body
+    # since they are output format flags, not calculation flags.
+    calc_iflag = iflag & ~SEFLG_XYZ & ~SEFLG_RADIANS
+
     ts = get_timescale()
     t = ts.tt_jd(tjd)
     try:
-        result = _calc_body(t, ipl, iflag)
+        pos, retflag = _calc_body(t, ipl, calc_iflag)
         if ipl in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", ipl, tjd)
-        return result
+        # Apply output format flags (XYZ, RADIANS)
+        pos = _apply_output_flags(pos, iflag)
+        return pos, retflag
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
 
@@ -4086,16 +4179,16 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], 
 
 def swe_orbit_max_min_true_distance(
     tjd_ut: float, ipl: int, iflag: int
-) -> Tuple[float, float]:
+) -> Tuple[float, float, float]:
     """
-    Calculate the minimum and maximum geocentric distances during a planet's orbit.
+    Calculate the maximum, minimum, and current true geocentric distances.
 
-    Reference API compatible function.
+    Reference API compatible function matching pyswisseph
+    ``orbit_max_min_true_distance``.
 
-    This function computes the minimum and maximum true distances from Earth
-    that a planet can reach during its orbital motion. These distances correspond
-    to the planet's perigee (closest approach) and apogee (farthest distance)
-    relative to Earth.
+    This function computes the maximum and minimum true distances from Earth
+    that a planet can reach during its orbital motion, plus the current true
+    distance at the given time.
 
     For outer planets (Mars-Pluto), the minimum distance occurs around opposition
     and the maximum around conjunction with the Sun.
@@ -4103,40 +4196,43 @@ def swe_orbit_max_min_true_distance(
     For inner planets (Mercury, Venus), the minimum distance occurs near inferior
     conjunction and the maximum near superior conjunction.
 
-    Note: The pyswisseph API returns (min_distance, max_distance).
-
     Args:
         tjd_ut: Julian Day in Universal Time (UT1) - used to determine current
-                orbital elements, though the min/max are characteristic of the orbit.
+                orbital elements and current true distance.
         ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
-        iflag: Calculation flags (currently unused, for API compatibility)
+        iflag: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
-        Tuple of (min_distance, max_distance) in AU
+        Tuple of (max_distance, min_distance, true_distance) in AU.
+        Order matches pyswisseph: (max, min, true).
 
     Example:
         >>> from libephemeris import orbit_max_min_true_distance, SE_MARS
-        >>> min_dist, max_dist = orbit_max_min_true_distance(2451545.0, SE_MARS, 0)
-        >>> print(f"Mars distance range: {min_dist:.4f} - {max_dist:.4f} AU")
+        >>> max_dist, min_dist, true_dist = orbit_max_min_true_distance(
+        ...     2451545.0, SE_MARS, 0
+        ... )
+        >>> print(f"Mars: {min_dist:.4f} - {max_dist:.4f} AU (now {true_dist:.4f})")
 
     Note:
         - For geocentric calculations, these represent the range of Earth-planet
           distances possible during the synodic cycle.
         - The Moon's distance is calculated as geocentric (Earth-Moon distance).
-        - Sun returns (0.0, 0.0) as it has no meaningful geocentric distance range.
+        - Sun returns (0.0, 0.0, 0.0) as it has no meaningful geocentric
+          distance range.
     """
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
-    return _calc_orbit_max_min_true_distance(t, ipl, iflag)
+    return _calc_orbit_max_min_true_distance(t, ipl, iflag, tjd_ut)
 
 
-def _calc_orbit_max_min_true_distance(t, ipl: int, iflag: int) -> Tuple[float, float]:
+def _calc_orbit_max_min_true_distance(
+    t, ipl: int, iflag: int, tjd_ut: float = 0.0
+) -> Tuple[float, float, float]:
     """
-    Internal function to calculate min/max geocentric distances.
+    Internal function to calculate max/min/true geocentric distances.
 
     For planets, this computes the theoretical minimum and maximum distances
-    from Earth during the orbital cycle. This is derived from the orbital
-    elements of both the planet and Earth.
+    from Earth during the orbital cycle, plus the current true distance.
 
     Algorithm:
         For outer planets (Mars-Pluto):
@@ -4153,17 +4249,27 @@ def _calc_orbit_max_min_true_distance(t, ipl: int, iflag: int) -> Tuple[float, f
         t: Skyfield Time object
         ipl: Planet ID
         iflag: Calculation flags
+        tjd_ut: Julian Day UT for true distance calculation
 
     Returns:
-        Tuple of (min_distance, max_distance) in AU
+        Tuple of (max_distance, min_distance, true_distance) in AU
     """
+    # Get current true distance from swe_calc_ut
+    true_dist = 0.0
+    if tjd_ut > 0:
+        try:
+            pos, _ = swe_calc_ut(tjd_ut, ipl, iflag)
+            true_dist = float(pos[2])
+        except Exception:
+            pass
+
     # Sun has no geocentric distance variation
     if ipl == SE_SUN:
-        return (0.0, 0.0)
+        return (0.0, 0.0, true_dist)
 
     # Earth has no geocentric distance (it's the observer)
     if ipl == SE_EARTH:
-        return (0.0, 0.0)
+        return (0.0, 0.0, 0.0)
 
     # Moon - use geocentric orbit parameters
     if ipl == SE_MOON:
@@ -4174,14 +4280,14 @@ def _calc_orbit_max_min_true_distance(t, ipl: int, iflag: int) -> Tuple[float, f
         e_moon = 0.0549
         min_dist = a_moon * (1 - e_moon)  # Perigee
         max_dist = a_moon * (1 + e_moon)  # Apogee
-        return (min_dist, max_dist)
+        return (max_dist, min_dist, true_dist)
 
     # For planets, we need orbital elements
     # Get orbital elements from the existing function
     elements, _ = _calc_orbital_elements(t, ipl, iflag)
 
     if elements[0] == 0.0:  # Invalid planet
-        return (0.0, 0.0)
+        return (0.0, 0.0, true_dist)
 
     # Extract planet's semi-major axis and eccentricity
     a_planet = elements[0]  # Semi-major axis in AU
@@ -4215,7 +4321,7 @@ def _calc_orbit_max_min_true_distance(t, ipl: int, iflag: int) -> Tuple[float, f
         min_dist = abs(r_planet_min - r_earth_max)
         max_dist = r_planet_max + r_earth_max
 
-    return (min_dist, max_dist)
+    return (max_dist, min_dist, true_dist)
 
 
 def _calc_nod_aps_osculating(
@@ -4389,27 +4495,30 @@ _RAD_TO_ARCSEC = 206264.80624709636  # (180/pi) * 3600
 
 def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
     """
-    Calculate apparent angular diameter in arcseconds.
+    Calculate apparent angular diameter in degrees.
 
     Uses the small-angle approximation which is accurate for all solar system bodies
     as seen from Earth (maximum angular size is ~0.5 degrees for Sun/Moon).
 
     The formula is:
-        diameter_arcsec = 2 * radius_km / distance_km * RAD_TO_ARCSEC
-                        = 2 * radius_km / (distance_au * AU_KM) * RAD_TO_ARCSEC
+        diameter_deg = 2 * radius_km / distance_km * RAD_TO_DEG
+                     = 2 * radius_km / (distance_au * AU_KM) * (180 / pi)
+
+    Returns degrees for pyswisseph API compatibility (swe_pheno_ut attr[3]).
 
     Args:
         radius_km: Physical radius of the body in kilometers
         distance_au: Distance from observer to body in AU
 
     Returns:
-        Apparent angular diameter in arcseconds
+        Apparent angular diameter in degrees
     """
     if distance_au <= 0:
         return 0.0
     distance_km = distance_au * _AU_KM
     # Angular diameter = 2 * arctan(radius/distance) ≈ 2 * radius/distance (small angle)
-    return 2.0 * radius_km / distance_km * _RAD_TO_ARCSEC
+    # Convert from radians to degrees (not arcseconds) for pyswisseph compatibility
+    return 2.0 * radius_km / distance_km * _RAD_TO_ARCSEC / 3600.0
 
 
 # Visual magnitude parameters for outer planets

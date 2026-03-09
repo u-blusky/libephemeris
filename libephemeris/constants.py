@@ -593,6 +593,31 @@ SE_SKAT: int = SE_FIXSTAR_OFFSET + 100  # Delta Aquarii
 SE_ETA_PISCIUM: int = SE_FIXSTAR_OFFSET + 101  # Eta Piscium - brightest in Pisces
 SE_ALRESCHA: int = SE_FIXSTAR_OFFSET + 102  # Alpha Piscium - the Knot
 
+# Andromeda constellation
+SE_ALPHERATZ: int = SE_FIXSTAR_OFFSET + 103  # Alpha Andromedae
+
+# Pegasus constellation
+SE_ALGENIB: int = SE_FIXSTAR_OFFSET + 104  # Gamma Pegasi
+
+# Gemini constellation - additional stars
+SE_PROPUS: int = SE_FIXSTAR_OFFSET + 105  # Eta Geminorum
+SE_ALHENA: int = SE_FIXSTAR_OFFSET + 106  # Gamma Geminorum
+SE_TEJAT: int = SE_FIXSTAR_OFFSET + 107  # Mu Geminorum
+SE_WASAT: int = SE_FIXSTAR_OFFSET + 108  # Delta Geminorum
+
+# Canis Major constellation - additional stars
+SE_ADHARA: int = SE_FIXSTAR_OFFSET + 109  # Epsilon Canis Majoris
+SE_WEZEN: int = SE_FIXSTAR_OFFSET + 110  # Delta Canis Majoris
+
+# Draco constellation
+SE_THUBAN: int = SE_FIXSTAR_OFFSET + 111  # Alpha Draconis
+
+# Hercules constellation
+SE_RASALGETHI: int = SE_FIXSTAR_OFFSET + 112  # Alpha1 Herculis
+
+# Cygnus constellation
+SE_ALBIREO: int = SE_FIXSTAR_OFFSET + 113  # Beta1 Cygni
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree

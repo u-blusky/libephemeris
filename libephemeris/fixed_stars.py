@@ -151,6 +151,17 @@ from .constants import (
     SE_SKAT,
     SE_ETA_PISCIUM,
     SE_ALRESCHA,
+    SE_ALPHERATZ,
+    SE_ALGENIB,
+    SE_PROPUS,
+    SE_ALHENA,
+    SE_TEJAT,
+    SE_WASAT,
+    SE_ADHARA,
+    SE_WEZEN,
+    SE_THUBAN,
+    SE_RASALGETHI,
+    SE_ALBIREO,
     SEFLG_SPEED,
     SEFLG_NOABERR,
     SEFLG_EQUATORIAL,
@@ -1674,6 +1685,158 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=3.82,
     ),
+    # ======== ANDROMEDA CONSTELLATION ========
+    # Data: ESA Hipparcos catalogue (ESA SP-1200, 1997) via CDS/SIMBAD
+    StarCatalogEntry(
+        id=SE_ALPHERATZ,
+        name="Alpheratz",
+        nomenclature="alAnd",
+        hip_number=677,
+        data=StarData(
+            ra_j2000=2.096916,  # 00h 08m 23.3s (Alpha Andromedae, HIP 677)
+            dec_j2000=29.090431,  # +29° 05' 25.6"
+            pm_ra=0.13746,  # 137.46 mas/yr (mu_alpha*, includes cos(dec))
+            pm_dec=-0.16344,  # -163.44 mas/yr
+        ),
+        magnitude=2.06,
+    ),
+    # ======== PEGASUS CONSTELLATION - additional stars ========
+    StarCatalogEntry(
+        id=SE_ALGENIB,
+        name="Algenib",
+        nomenclature="gaPeg",
+        hip_number=1067,
+        data=StarData(
+            ra_j2000=3.308968,  # 00h 13m 14.2s (Gamma Pegasi, HIP 1067)
+            dec_j2000=15.183598,  # +15° 11' 01.0"
+            pm_ra=0.00049,  # 0.49 mas/yr
+            pm_dec=-0.01073,  # -10.73 mas/yr
+        ),
+        magnitude=2.84,
+    ),
+    # ======== GEMINI CONSTELLATION - additional stars ========
+    # Data: ESA Hipparcos catalogue via CDS/SIMBAD
+    StarCatalogEntry(
+        id=SE_PROPUS,
+        name="Propus",
+        nomenclature="etGem",
+        hip_number=29655,
+        data=StarData(
+            ra_j2000=93.719355,  # 06h 14m 52.6s (Eta Geminorum, HIP 29655)
+            dec_j2000=22.506787,  # +22° 30' 24.4"
+            pm_ra=-0.05953,  # -59.53 mas/yr
+            pm_dec=-0.00777,  # -7.77 mas/yr
+        ),
+        magnitude=3.28,
+    ),
+    StarCatalogEntry(
+        id=SE_TEJAT,
+        name="Tejat",
+        nomenclature="muGem",
+        hip_number=30343,
+        data=StarData(
+            ra_j2000=95.740112,  # 06h 22m 57.6s (Mu Geminorum, HIP 30343)
+            dec_j2000=22.513583,  # +22° 30' 48.9"
+            pm_ra=0.05639,  # 56.39 mas/yr
+            pm_dec=-0.11003,  # -110.03 mas/yr
+        ),
+        magnitude=2.87,
+    ),
+    StarCatalogEntry(
+        id=SE_ALHENA,
+        name="Alhena",
+        nomenclature="gaGem",
+        hip_number=31681,
+        data=StarData(
+            ra_j2000=99.427960,  # 06h 37m 42.7s (Gamma Geminorum, HIP 31681)
+            dec_j2000=16.399280,  # +16° 23' 57.4"
+            pm_ra=0.01381,  # 13.81 mas/yr
+            pm_dec=-0.05496,  # -54.96 mas/yr
+        ),
+        magnitude=1.92,
+    ),
+    StarCatalogEntry(
+        id=SE_WASAT,
+        name="Wasat",
+        nomenclature="deGem",
+        hip_number=35550,
+        data=StarData(
+            ra_j2000=110.030727,  # 07h 20m 07.4s (Delta Geminorum, HIP 35550)
+            dec_j2000=21.982304,  # +21° 58' 56.3"
+            pm_ra=-0.02772,  # -27.72 mas/yr
+            pm_dec=-0.01470,  # -14.70 mas/yr
+        ),
+        magnitude=3.53,
+    ),
+    # ======== CANIS MAJOR CONSTELLATION - additional stars ========
+    StarCatalogEntry(
+        id=SE_ADHARA,
+        name="Adhara",
+        nomenclature="epCMa",
+        hip_number=33579,
+        data=StarData(
+            ra_j2000=104.656453,  # 06h 58m 37.5s (Epsilon CMa, HIP 33579)
+            dec_j2000=-28.972086,  # -28° 58' 19.5"
+            pm_ra=0.00324,  # 3.24 mas/yr
+            pm_dec=0.00133,  # 1.33 mas/yr
+        ),
+        magnitude=1.50,
+    ),
+    StarCatalogEntry(
+        id=SE_WEZEN,
+        name="Wezen",
+        nomenclature="deCMa",
+        hip_number=34444,
+        data=StarData(
+            ra_j2000=107.097850,  # 07h 08m 23.5s (Delta CMa, HIP 34444)
+            dec_j2000=-26.393200,  # -26° 23' 35.5"
+            pm_ra=-0.00312,  # -3.12 mas/yr
+            pm_dec=0.00331,  # 3.31 mas/yr
+        ),
+        magnitude=1.84,
+    ),
+    # ======== DRACO CONSTELLATION ========
+    StarCatalogEntry(
+        id=SE_THUBAN,
+        name="Thuban",
+        nomenclature="alDra",
+        hip_number=68756,
+        data=StarData(
+            ra_j2000=211.097323,  # 14h 04m 23.4s (Alpha Draconis, HIP 68756)
+            dec_j2000=64.375870,  # +64° 22' 33.1"
+            pm_ra=-0.05635,  # -56.35 mas/yr
+            pm_dec=0.01233,  # 12.33 mas/yr
+        ),
+        magnitude=3.68,
+    ),
+    # ======== HERCULES CONSTELLATION ========
+    StarCatalogEntry(
+        id=SE_RASALGETHI,
+        name="Rasalgethi",
+        nomenclature="alHer",
+        hip_number=84345,
+        data=StarData(
+            ra_j2000=258.661909,  # 17h 14m 38.9s (Alpha1 Herculis, HIP 84345)
+            dec_j2000=14.390341,  # +14° 23' 25.2"
+            pm_ra=-0.00732,  # -7.32 mas/yr
+            pm_dec=0.03607,  # 36.07 mas/yr
+        ),
+        magnitude=3.06,  # Variable (SRC), mean V from Bright Star Catalogue
+    ),
+    # ======== CYGNUS CONSTELLATION ========
+    StarCatalogEntry(
+        id=SE_ALBIREO,
+        name="Albireo",
+        nomenclature="beCyg",
+        hip_number=95947,
+        data=StarData(
+            ra_j2000=292.680315,  # 19h 30m 43.3s (Beta1 Cygni, HIP 95947)
+            dec_j2000=27.959674,  # +27° 57' 34.8"
+            pm_ra=0.00492,  # 4.92 mas/yr
+            pm_dec=-0.01113,  # -11.13 mas/yr
+        ),
+        magnitude=3.08,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -2998,6 +3161,47 @@ STAR_ALIASES: dict[str, int] = {
     "KASTOR": SE_CASTOR,
     "POLUX": SE_POLLUX,
     "POLLUCKS": SE_POLLUX,
+    # Alpheratz variants (Alpha Andromedae)
+    "ALPHERATZ": SE_ALPHERATZ,
+    "SIRRAH": SE_ALPHERATZ,
+    "SIRAH": SE_ALPHERATZ,
+    "ALPHERAT": SE_ALPHERATZ,
+    "ALPHA ANDROMEDAE": SE_ALPHERATZ,
+    # Algenib variants (Gamma Pegasi)
+    "ALGENIB": SE_ALGENIB,
+    "GAMMA PEGASI": SE_ALGENIB,
+    # Propus variants (Eta Geminorum)
+    "PROPUS": SE_PROPUS,
+    "ETA GEMINORUM": SE_PROPUS,
+    # Tejat variants (Mu Geminorum)
+    "TEJAT": SE_TEJAT,
+    "TEJAT POSTERIOR": SE_TEJAT,
+    "MU GEMINORUM": SE_TEJAT,
+    # Alhena variants (Gamma Geminorum)
+    "ALHENA": SE_ALHENA,
+    "ALMEISAN": SE_ALHENA,
+    "GAMMA GEMINORUM": SE_ALHENA,
+    # Wasat variants (Delta Geminorum)
+    "WASAT": SE_WASAT,
+    "DELTA GEMINORUM": SE_WASAT,
+    # Adhara variants (Epsilon Canis Majoris)
+    "ADHARA": SE_ADHARA,
+    "ADARA": SE_ADHARA,
+    "EPSILON CANIS MAJORIS": SE_ADHARA,
+    # Wezen variants (Delta Canis Majoris)
+    "WEZEN": SE_WEZEN,
+    "WESEN": SE_WEZEN,
+    "DELTA CANIS MAJORIS": SE_WEZEN,
+    # Thuban variants (Alpha Draconis)
+    "THUBAN": SE_THUBAN,
+    "ALPHA DRACONIS": SE_THUBAN,
+    # Rasalgethi variants (Alpha Herculis)
+    "RASALGETHI": SE_RASALGETHI,
+    "RAS ALGETHI": SE_RASALGETHI,
+    "ALPHA HERCULIS": SE_RASALGETHI,
+    # Albireo variants (Beta Cygni)
+    "ALBIREO": SE_ALBIREO,
+    "BETA CYGNI": SE_ALBIREO,
 }
 
 
@@ -3249,14 +3453,15 @@ def resolve_star_name(name: str) -> int | None:
         if parsed_flamsteed in STAR_ALIASES:
             return STAR_ALIASES[parsed_flamsteed]
 
-    # 6. Try fuzzy matching: check if any alias CONTAINS the search term
-    # Only for reasonably short inputs (avoid false positives)
+    # 6. Try prefix matching: check if any alias STARTS WITH the search term
+    # Uses prefix matching instead of substring to avoid false positives
+    # (e.g., "GENIB" matching "ZUBENELGENUBI" via substring)
     if len(normalized) >= 3:
         for alias, star_id in STAR_ALIASES.items():
-            if normalized in alias:
+            if alias.startswith(normalized):
                 return star_id
         for entry in STAR_CATALOG:
-            if normalized in entry.name.upper():
+            if entry.name.upper().startswith(normalized):
                 return entry.id
 
     # 7. Try phonetic fuzzy matching for common misspellings
@@ -4027,10 +4232,8 @@ def swe_fixstar2(
 
 
 # Magnitude values for legacy _resolve_star_id lookup
-_STAR_MAGNITUDES = {
-    SE_REGULUS: 1.40,
-    SE_SPICA_STAR: 1.04,
-}
+# Built from STAR_CATALOG so every cataloged star has a magnitude available.
+_STAR_MAGNITUDES = {entry.id: entry.magnitude for entry in STAR_CATALOG}
 
 
 # =============================================================================
@@ -4466,7 +4669,7 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "TAYGETA": 17531,  # 19 Tauri (Pleiades)
     "TEBERDA": 94256,  # HD 178813
     "TEGMINE": 43103,  # Zeta1 Cancri
-    "TEJAT": 32362,  # Mu Geminorum
+    "TEJAT": 30343,  # Mu Geminorum (HIP 30343, corrected from erroneous 32362)
     "THUBAN": 68756,  # Alpha Draconis
     "TIAKI": 23015,  # Beta Gruis
     "TIANGUAN": 25930,  # Zeta Tauri

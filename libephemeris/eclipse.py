@@ -3913,7 +3913,9 @@ def sol_eclipse_how_details(
 # =============================================================================
 
 # Constants for lunar eclipse calculations
-ECLIPSE_LIMIT_LUNAR = 12.0  # Maximum elongation from node for lunar eclipse (degrees)
+ECLIPSE_LIMIT_LUNAR = 18.5  # Maximum elongation from node for lunar eclipse (degrees)
+# Note: penumbral eclipses can occur up to ~18° from a node (observed max 18.02°).
+# The previous value of 12.0° was too restrictive and missed shallow penumbral eclipses.
 
 
 def _find_next_full_moon(jd_start: float) -> float:
@@ -4065,6 +4067,17 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     else:
         # Umbra doesn't reach Moon (antumbra) - extremely rare for lunar eclipses
         umbra_radius = 0.0
+
+    # Apply atmospheric enlargement of Earth's shadow (Danjon factor).
+    # Earth's atmosphere refracts sunlight, effectively enlarging the shadow
+    # by approximately 1/85 (~1.18%). This correction is standard in eclipse
+    # magnitude calculations and is necessary for correct classification of
+    # borderline total/partial eclipses.
+    # Reference: Danjon, A. (1951), "Les éclipses de Lune"
+    # Also: Meeus, "Astronomical Algorithms", Ch. 54
+    _SHADOW_ENLARGEMENT = 1.0 + 1.0 / 85.0
+    penumbra_radius *= _SHADOW_ENLARGEMENT
+    umbra_radius *= _SHADOW_ENLARGEMENT
 
     # Moon's distance from the shadow axis (in degrees)
     moon_distance_from_axis = abs(moon_lat)
@@ -10731,6 +10744,11 @@ def _calc_lunar_eclipse_penumbral_separation(jd: float) -> float:
 
     # Penumbra radius at Moon's distance
     penumbra_radius = earth_semidiameter + sun_semidiameter
+
+    # Apply Danjon atmospheric shadow enlargement (same factor used in
+    # _calculate_lunar_eclipse_type_and_magnitude for consistency)
+    _SHADOW_ENLARGEMENT = 1.0 + 1.0 / 85.0
+    penumbra_radius *= _SHADOW_ENLARGEMENT
 
     # Separation: positive = Moon outside penumbra, negative = Moon inside
     # Contact occurs when Moon's nearest limb touches penumbra edge

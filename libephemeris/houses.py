@@ -821,6 +821,9 @@ def swe_houses(
         cusps = _houses_equal_mc(asc, mc)
     elif hsys_char in ("I", "i"):  # Sunshine (Makransky)
         cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, sun_dec)
+        # Sunshine may flip MC internally (mc_under_horizon handling).
+        # Sync ascmc[1] back from cusps[10] so the returned MC matches.
+        ascmc[1] = cusps[10]
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -3730,7 +3733,22 @@ def _houses_sunshine(
     """
     NEAR_ZERO = 1e-10
 
+    # Detect MC-below-horizon condition.
+    # mcdec = declination of the MC, derived from ARMC and obliquity.
+    # When |lat - mcdec| > 90°, the MC is below the horizon.
+    mcdec = math.degrees(
+        math.atan(math.sin(math.radians(armc)) * math.tan(math.radians(eps)))
+    )
+    mc_under_horizon = abs(lat - mcdec) > 90
+
     cusps = [0.0] * 13
+
+    # When MC is below the horizon, flip MC and IC by 180° to keep MC
+    # above the horizon (analogous to Regiomontanus polar handling).
+    # The ASC is already hemisphere-corrected by the dispatch.
+    if mc_under_horizon:
+        mc = (mc + 180.0) % 360.0
+
     cusps[1] = asc
     cusps[10] = mc
     cusps[4] = (mc + 180.0) % 360.0
@@ -3756,12 +3774,6 @@ def _houses_sunshine(
     sin_obliquity = math.sin(math.radians(eps))
     cos_obliquity = math.cos(math.radians(eps))
 
-    # Determine whether the MC is below the horizon (affects sign convention)
-    mc_declination = math.degrees(
-        math.atan(math.sin(math.radians(armc)) * math.tan(math.radians(eps)))
-    )
-    mc_under_horizon = abs(lat - mc_declination) > 90.0
-
     # RA offsets along each semi-arc (positive = toward MC, negative = toward IC)
     # NSA offsets (nocturnal cusps 2, 3, 5, 6)
     nsa_third = nocturnal_semi_arc / 3.0
@@ -3779,11 +3791,6 @@ def _houses_sunshine(
         11: 1.0 * dsa_third,
         12: 2.0 * dsa_third,
     }
-
-    # Invert all offsets when MC is under horizon
-    if mc_under_horizon:
-        nsa_offsets = {k: -v for k, v in nsa_offsets.items()}
-        dsa_offsets = {k: -v for k, v in dsa_offsets.items()}
 
     # Shared kwargs for the geometric helper
     _common = dict(
@@ -3814,12 +3821,12 @@ def _houses_sunshine(
             **_common,
         )
 
-    # Reflect all intermediate cusps by 180° when MC was under horizon
+    # When MC is below the horizon, shift all intermediate cusps by 180°.
+    # This keeps the MC above the horizon, consistent with the polar-circle
+    # handling used for Regiomontanus and Campanus systems.
     if mc_under_horizon:
-        for ih in range(1, 13):
-            if (ih - 1) % 3 == 0:
-                continue  # skip cardinals (1, 4, 7, 10)
-            cusps[ih] = (cusps[ih] + 180.0) % 360.0
+        for i in (2, 3, 5, 6, 8, 9, 11, 12):
+            cusps[i] = (cusps[i] + 180.0) % 360.0
 
     return cusps
 

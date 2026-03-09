@@ -40,7 +40,8 @@ from .planets import swe_calc_ut, swe_calc
 # Station detection threshold: speed below this indicates proximity to retrograde station
 # At stations, Newton-Raphson can fail due to near-zero derivative (speed)
 # Typical station speeds: Mercury ~0.05°/day slowing to 0, outer planets much slower
-STATION_SPEED_THRESHOLD = 0.001  # degrees/day
+# Jupiter near station can be ~0.003°/day, Saturn ~0.001°/day — both need Brent's method
+STATION_SPEED_THRESHOLD = 0.01  # degrees/day
 
 # Newton-Raphson convergence constants
 # 0.1 arcsecond tolerance for reference API compatibility
@@ -1003,13 +1004,16 @@ def swe_cross_ut(
         # Near station: Newton-Raphson may fail due to division by near-zero speed
         # Use Brent's method which only requires bracketing, not derivatives
         try:
-            # Estimate search window based on typical speeds
-            # At stations, planet barely moves, so we need a wider bracket
-            search_window = (
-                max(30.0, abs(diff / speed_default) * 1.5)
-                if speed_default > 0
-                else 60.0
-            )
+            # Estimate search window based on typical speeds.
+            # Near stations, the planet may need to complete a full retrograde
+            # cycle before reaching the target. Use a generous window:
+            # - At least the synodic-period estimate (diff / average_speed * 3)
+            # - Minimum 60 days for fast planets, 500 days for slow ones
+            if speed_default > 0:
+                min_window = 500.0 if speed_default < 0.1 else 60.0
+                search_window = max(min_window, abs(diff / speed_default) * 3.0)
+            else:
+                search_window = 500.0
             jd_bracket_start = jd_ut
             jd_bracket_end = jd_ut + search_window
 
@@ -1051,14 +1055,21 @@ def swe_cross_ut(
         # Detect if we've encountered a station during iteration
         if _is_near_station(speed) and not station_fallback_triggered:
             station_fallback_triggered = True
-            # Switch to Brent's method for robustness
+            # Switch to Brent's method for robustness.
+            # Search from the original start time forward — the planet may
+            # need to complete a full retrograde cycle before reaching target.
             try:
-                # Create a bracket around current position
-                bracket_size = max(
-                    5.0, abs(diff / speed_default) if speed_default > 0 else 10.0
-                )
+                if speed_default > 0:
+                    min_window = 500.0 if speed_default < 0.1 else 60.0
+                    bracket_window = max(min_window, abs(diff / speed_default) * 3.0)
+                else:
+                    bracket_window = 500.0
                 jd_a, jd_b = _find_bracket_for_crossing(
-                    get_position, x2cross, jd - bracket_size / 2, jd + bracket_size
+                    get_position,
+                    x2cross,
+                    jd_ut,
+                    jd_ut + bracket_window,
+                    num_samples=40,
                 )
                 return _brent_find_crossing(
                     get_position,
@@ -1081,13 +1092,21 @@ def swe_cross_ut(
         jd += diff / speed
 
         # Safety: longer range for slower planets, also account for retrograde
-        # Inner planets (Mercury, Venus) can cross same degree multiple times per year
-        if abs(speed_default) < 0.1:
-            max_range = 500  # Slow outer planets
+        # Outer planets can take years to cross a given longitude due to
+        # retrograde periods and long orbital periods. Jupiter's orbital
+        # period is ~12 years (~4333 days), Saturn ~29 years, etc.
+        if abs(speed_default) < 0.01:
+            max_range = 100000  # Very slow planets (Pluto ~248yr period)
+        elif abs(speed_default) < 0.05:
+            max_range = (
+                40000  # Slow outer planets (Saturn ~29yr, Uranus ~84yr, Neptune ~165yr)
+            )
+        elif abs(speed_default) < 0.1:
+            max_range = 5000  # Jupiter (~12yr orbital period)
         elif planet_id in (2, 3):  # Mercury, Venus
             max_range = 500  # Fast inner planets with multiple crossings/year
         else:
-            max_range = 400
+            max_range = 800  # Mars and others
         if abs(jd - jd_ut) > max_range:  # Use jd_ut not jd_guess
             raise RuntimeError("Planet crossing search diverged")
 

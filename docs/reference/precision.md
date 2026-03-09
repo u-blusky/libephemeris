@@ -704,6 +704,12 @@ Memory overhead per context: ~1 KB. Ephemeris files (DE440: ~119 MB) are loaded 
 
 ---
 
+## See Also
+
+- **[Swiss Ephemeris Comparison](swisseph-comparison.md)** — Exhaustive comparison between libephemeris and pyswisseph, including measured precision tables, known differences with detailed explanations, bugs found and fixed, and API signature differences. Based on 1,109 automated tests covering all 87 `swe_*` functions.
+
+---
+
 ## References
 
 1. Park, R.S. et al. (2021). "The JPL Planetary and Lunar Ephemerides DE440 and DE441." *Astronomical Journal*, 161(3), 105.
