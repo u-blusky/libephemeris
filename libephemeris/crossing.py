@@ -275,8 +275,12 @@ def _find_bracket_for_crossing(
         curr_jd = jd_start + i * step
         curr_diff = get_diff(curr_jd)
 
-        # Check for sign change (crossing)
-        if prev_diff * curr_diff <= 0:
+        # Check for sign change (crossing).
+        # Filter out wrapping artifacts at target+180°: a genuine crossing
+        # has diff smoothly passing through 0 (small values on each side),
+        # while wrapping at the antipodal point has diffs near ±180° that
+        # jump by ~360°. Reject sign changes where the jump exceeds 180°.
+        if prev_diff * curr_diff <= 0 and abs(prev_diff - curr_diff) < 180:
             return (prev_jd, curr_jd)
 
         prev_jd = curr_jd
@@ -1007,19 +1011,29 @@ def swe_cross_ut(
             # Estimate search window based on typical speeds.
             # Near stations, the planet may need to complete a full retrograde
             # cycle before reaching the target. Use a generous window:
-            # - At least the synodic-period estimate (diff / average_speed * 3)
+            # - At least the time estimate (dt_guess * 1.5) to cover the full
+            #   expected travel, plus margin for retrograde detours
             # - Minimum 60 days for fast planets, 500 days for slow ones
             if speed_default > 0:
                 min_window = 500.0 if speed_default < 0.1 else 60.0
-                search_window = max(min_window, abs(diff / speed_default) * 3.0)
+                search_window = max(
+                    min_window, abs(dt_guess) * 1.5, abs(diff / speed_default) * 3.0
+                )
             else:
-                search_window = 500.0
+                search_window = max(500.0, abs(dt_guess) * 1.5)
             jd_bracket_start = jd_ut
             jd_bracket_end = jd_ut + search_window
 
+            # Scale samples so we check at least every ~30 days
+            bracket_samples = max(40, int(search_window / 30))
+
             # Find bracket containing the crossing
             jd_a, jd_b = _find_bracket_for_crossing(
-                get_position, x2cross, jd_bracket_start, jd_bracket_end
+                get_position,
+                x2cross,
+                jd_bracket_start,
+                jd_bracket_end,
+                num_samples=bracket_samples,
             )
 
             # Use Brent's method to find the exact crossing
@@ -1061,15 +1075,20 @@ def swe_cross_ut(
             try:
                 if speed_default > 0:
                     min_window = 500.0 if speed_default < 0.1 else 60.0
-                    bracket_window = max(min_window, abs(diff / speed_default) * 3.0)
+                    bracket_window = max(
+                        min_window,
+                        abs(dt_guess) * 1.5,
+                        abs(diff / speed_default) * 3.0,
+                    )
                 else:
-                    bracket_window = 500.0
+                    bracket_window = max(500.0, abs(dt_guess) * 1.5)
+                bracket_samples = max(40, int(bracket_window / 30))
                 jd_a, jd_b = _find_bracket_for_crossing(
                     get_position,
                     x2cross,
                     jd_ut,
                     jd_ut + bracket_window,
-                    num_samples=40,
+                    num_samples=bracket_samples,
                 )
                 return _brent_find_crossing(
                     get_position,

@@ -643,15 +643,7 @@ class TestCrossUt:
     @pytest.mark.parametrize(
         "planet_id,target_lon,name",
         [
-            pytest.param(
-                SE_JUPITER,
-                0.0,
-                "Jupiter 0° Aries",
-                marks=pytest.mark.xfail(
-                    reason="Jupiter 0° needs full 12-year orbit search; "
-                    "NR converges to 180° instead"
-                ),
-            ),
+            (SE_JUPITER, 0.0, "Jupiter 0° Aries"),
             (SE_JUPITER, 60.0, "Jupiter 60°"),
             (SE_JUPITER, 90.0, "Jupiter 90°"),
             (SE_SATURN, 0.0, "Saturn 0° Aries"),

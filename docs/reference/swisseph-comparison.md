@@ -83,19 +83,14 @@ All planets except the Moon are sub-2" (sub-arcsecond for outer planets). The Mo
 
 These are not bugs. They are inherent consequences of using different astronomical models, different ephemerides, or different algorithmic strategies. Each is explained in full so that users and developers understand exactly what to expect.
 
-### 2.1. Jupiter 0° crossing — full-orbit search limitation
+### 2.1. Crossing functions — full-orbit search for slow planets
 
-**What:** `swe_cross_ut(SE_JUPITER, 0.0, jd_start, flags)` converges to 180° instead of 0° when searching from certain start dates.
+`swe_cross_ut` now handles full-orbit searches for all planets, including slow outer planets like Jupiter and Saturn. The algorithm automatically scales the Brent bracket search window based on the estimated time to crossing (`dt_guess`), and filters out false sign changes at the antipodal point (target ± 180°) during the coarse scan. This ensures convergence even when the crossing is 10+ years away and the planet undergoes multiple retrograde periods en route.
 
-**Why:** The crossing algorithm uses Newton-Raphson iteration: it computes the planet's longitude and angular velocity at each step, then estimates how many days until the target longitude is reached. This works well when the crossing is within a fraction of the planet's orbital period.
-
-Jupiter's orbital period is 11.86 years. When searching for 0° Aries starting from January 2024, the next crossing may be 8--10 years away. During that interval, Jupiter undergoes multiple retrograde periods (~4 months each), where its apparent motion reverses. The Newton-Raphson method follows the local velocity gradient and can get trapped in a retrograde loop, converging on 180° (the diametrically opposite point) instead of 0°.
-
-**Scope:** Only affects geocentric crossings for very slow planets (Jupiter, Saturn) when the target longitude requires traversing more than ~180° of the orbit. Heliocentric crossings and crossings for faster planets (Venus, Mars) are not affected. Jupiter at 60°, 90°, and other longitudes converges correctly. Saturn at 0° and 350° converges correctly.
-
-**Workaround:** For edge cases, compute the planet's current longitude and choose a start date closer to the expected crossing. Alternatively, use `swe_solcross_ut` or `swe_mooncross_ut` for Sun/Moon crossings, which are unaffected.
-
-**pyswisseph behavior:** pyswisseph uses a similar Newton-Raphson approach and has comparable limitations for very long search ranges, though the specific failure points may differ.
+Previously, Jupiter 0° Aries searches could converge on 180° instead of 0°. This was fixed by:
+1. Scaling the search window to `max(min_window, dt_guess * 1.5)` instead of a fixed 500-day cap
+2. Scaling the number of coarse samples proportionally (`search_window / 30` days per sample)
+3. Rejecting bracket candidates where the signed-difference jump exceeds 180° (wrapping artifacts at the antipodal point)
 
 ### 2.2. Moon precision — max ~135" over 800 years
 
@@ -226,7 +221,7 @@ The Danjon atmospheric shadow enlargement is a well-established correction: Eart
 
 | # | Bug | Fix | Commit |
 |---|-----|-----|--------|
-| 11 | `swe_cross_ut` diverged for slow outer planets (Saturn, Jupiter) near stations — the station detection threshold was too narrow and the Brent bracket search window too small | Widened `STATION_SPEED_THRESHOLD` from 0.001 to 0.01 °/day; expanded Brent bracket windows; increased `max_range` limits per planet speed category | `d39aaf8` |
+| 11 | `swe_cross_ut` diverged for slow outer planets (Saturn, Jupiter) near stations — the station detection threshold was too narrow and the Brent bracket search window too small | Widened `STATION_SPEED_THRESHOLD` from 0.001 to 0.01 °/day; expanded Brent bracket windows; increased `max_range` limits per planet speed category; scaled search window with `dt_guess * 1.5`; added antipodal-point wrapping filter to bracket scanner | `d39aaf8` |
 | 12 | `swe_orbit_max_min_true_distance` returned 2 values `(min, max)` in wrong order; pyswisseph returns 3 values `(max, min, true_dist)` | Changed return to 3-tuple `(max_dist, min_dist, true_dist)` with correct order, added true distance calculation from `swe_calc_ut` | `d39aaf8` |
 
 ---
@@ -323,10 +318,10 @@ These tolerances are set to catch genuine bugs while accepting the inherent mode
 
 | Result | Count |
 |--------|-------|
-| **Passed** | 1,050 |
+| **Passed** | 1,051 |
 | **Failed** | 0 |
 | **Skipped** | 5 (convergence-dependent tests) |
-| **Expected failures** | 1 (Jupiter 0° crossing) |
+| **Expected failures** | 0 |
 | **Total** | 1,109 |
 
 All 87 exported `swe_*` functions are covered by at least one test suite.
