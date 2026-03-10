@@ -1387,15 +1387,20 @@ def swe_helio_cross(
     if _is_near_station(speed):
         try:
             search_window = (
-                max(60.0, abs(diff / speed_default) * 1.5)
+                max(60.0, abs(dt_guess) * 2.0, abs(diff / speed_default) * 1.5)
                 if speed_default > 0
-                else 120.0
+                else max(120.0, abs(dt_guess) * 2.0)
             )
             jd_bracket_start = jd_tt
             jd_bracket_end = jd_tt + search_window
+            bracket_samples = max(40, int(search_window / 30))
 
             jd_a, jd_b = _find_bracket_for_crossing(
-                get_helio_position_tt, x2cross, jd_bracket_start, jd_bracket_end
+                get_helio_position_tt,
+                x2cross,
+                jd_bracket_start,
+                jd_bracket_end,
+                num_samples=bracket_samples,
             )
 
             return _brent_find_crossing(
@@ -1431,9 +1436,10 @@ def swe_helio_cross(
 
         jd += diff / speed
 
-        # Safety: longer range for slower planets
-        max_range = 500 if abs(speed_default) < 0.05 else 400
-        if abs(jd - jd_guess) > max_range:
+        # Safety: scale max_range with dt_guess so slow planets have enough room
+        base_range = 500.0 if abs(speed_default) < 0.05 else 400.0
+        max_range = max(base_range, abs(dt_guess) * 2.0)
+        if abs(jd - jd_tt) > max_range:
             raise RuntimeError("Heliocentric crossing search diverged")
 
     raise RuntimeError(

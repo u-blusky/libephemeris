@@ -279,13 +279,13 @@ These functions exist in libephemeris but have no pyswisseph equivalent:
 
 ### Test infrastructure
 
-The validation consists of 4 test suites totaling **1,109 automated tests**:
+The validation consists of 4 test suites totaling **1,116 automated tests**:
 
 | Suite | File | Tests | Focus |
 |-------|------|-------|-------|
 | 1 | `test_deep_validation.py` | 514 | Planetary positions (10 planets × 12 flag combos × 210 dates), houses, fixed stars, crossings, eclipses, rise/set, coordinates, utilities |
 | 2 | `test_deep_validation_2.py` | 444 | Sidereal modes, topocentric, TT variants, nodal/apsides, orbital elements, phenomena, combined flags, eclipse details |
-| 3 | `test_deep_validation_3.py` | 88 | Eclipse geography, occultations, Gauquelin sectors, heliacal events, ARMC ex2, orbit distances, cross_ut, helio_cross_ut |
+| 3 | `test_deep_validation_3.py` | 95 | Eclipse geography, occultations, Gauquelin sectors, heliacal events, ARMC ex2, orbit distances, cross_ut, helio_cross_ut |
 | 4 | `test_deep_validation_4.py` | 63 | Polar fallback houses, eclipse max time/details/obscuration, planet occultations, heliacal_pheno_ut, calc_angles, state functions |
 
 ### Test parameters
