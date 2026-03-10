@@ -471,6 +471,28 @@ class TestHousesArmcEx2:
         has_nonzero = any(abs(float(s)) > 0.0 for s in cusps_speed)
         assert has_nonzero, "All cusp speeds are zero despite SEFLG_SPEED"
 
+    @pytest.mark.parametrize("hsys_code", ["P", "R", "C", "E", "M", "B", "T"])
+    def test_cusp_speeds_vs_pyswisseph(self, hsys_code):
+        """Cusp speeds should be close to pyswisseph for systems with compatible derivatives."""
+        armc = 292.957
+        lat = 41.9
+        eps = 23.4393
+
+        _, _, lib_cspeeds, lib_aspeeds = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord(hsys_code), SEFLG_SPEED
+        )
+        _, _, swe_cspeeds, swe_aspeeds = swe.houses_armc_ex2(
+            armc, lat, eps, hsys_code.encode(), swe.FLG_SPEED
+        )
+
+        # Cusp speeds: numerical vs analytical, allow < 2 deg/day difference
+        for i in range(12):
+            diff = abs(float(lib_cspeeds[i]) - float(swe_cspeeds[i]))
+            assert diff < 2.0, (
+                f"{hsys_code} cusp {i + 1} speed: lib={lib_cspeeds[i]:.4f}, "
+                f"swe={swe_cspeeds[i]:.4f}, diff={diff:.4f} deg/day"
+            )
+
     def test_speeds_without_flag(self):
         """Cusp speeds should be zero when SEFLG_SPEED is not set."""
         armc = 292.957

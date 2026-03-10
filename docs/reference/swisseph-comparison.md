@@ -138,21 +138,19 @@ For the modern era (1900--2020), where direct measurements exist, the two models
 
 **Practical impact:** ΔT affects the mapping from calendar time to astronomical time. A 232-second difference means that the two libraries place the same calendar date at slightly different points on the astronomical timeline. For planetary positions, this translates to at most a few arcseconds of positional difference (the Moon moves ~0.5"/second, so 232 seconds ≈ 116" of lunar motion — consistent with the Moon precision figures above). For the Sun and planets, the effect is much smaller.
 
-### 2.4. House cusp speeds — not yet implemented
+### 2.4. House cusp speeds — numerical vs analytical derivatives
 
-**What:** `swe_houses_ex2` returns correct cusp positions but all-zero cusp velocities (speeds).
+**What:** `swe_houses_ex2` and `swe_houses_armc_ex2` compute cusp velocities using centered finite differences when `SEFLG_SPEED` is set. The maximum difference from pyswisseph is ~0.7 deg/day (~0.2% relative).
 
-**Why:** Computing house cusp speeds requires either:
+**Why:** The two libraries use different differentiation strategies:
 
-1. **Numerical differentiation**: Calculate cusps at `t − h` and `t + h`, then compute `speed = (cusp(t+h) − cusp(t−h)) / (2h)`. This doubles the computational cost of each call and requires careful handling of the 0°/360° boundary.
+- **libephemeris** uses **numerical differentiation** (central difference at ±1 minute): `speed = (cusp(t+dt) − cusp(t−dt)) / (2·dt)`, with proper 0°/360° wraparound handling.
 
-2. **Analytical differentiation**: Derive the mathematical formula for each house system's cusps with respect to time. This is complex because it involves differentiating through the sidereal time, obliquity, and the specific house system algorithm (different for each of 24 systems).
+- **pyswisseph** uses **analytical derivatives** by differentiating the house cusp formulas symbolically with respect to time.
 
-pyswisseph implements analytical derivatives for cusp speeds. libephemeris has not yet implemented either approach.
+Both approaches are valid. The numerical method introduces a small truncation error proportional to `dt²`, which at a 1-minute step produces differences of < 1 deg/day from the analytical result. Given that cusp speeds are ~280--340 deg/day, this corresponds to < 0.3% relative error.
 
-**Practical impact:** Cusp speeds are a niche feature used primarily for research into house cusp ingresses (when a cusp changes sign). The cusp positions themselves — the primary use case — are correct and match pyswisseph to < 0.02".
-
-**Scope:** Only `swe_houses_ex2` and `swe_houses_armc_ex2` are affected (the `_ex2` variants that return speeds). The standard `swe_houses`, `swe_houses_ex`, and `swe_houses_armc` functions are fully correct.
+**Note:** Cusp speeds are only computed when `SEFLG_SPEED` is passed in the `flags` parameter. Without this flag, zero velocities are returned for efficiency.
 
 ### 2.5. Asteroids — Keplerian approximation vs integrated ephemerides
 
@@ -259,7 +257,7 @@ libephemeris aims for 1:1 API compatibility with pyswisseph, but some function s
 |----------|-----------|-------------|
 | `swe_get_orbital_elements` | Returns flat tuple | May return nested tuple — access via `result[0][i]` |
 | `swe_houses_armc` | `ascmc[3]` = obliquity | `ascmc[3]` = Vertex (not obliquity) |
-| `swe_houses_ex2` | Returns cusp speeds | Returns all-zero cusp speeds (not yet implemented) |
+| `swe_houses_ex2` | Returns cusp speeds (analytical) | Returns cusp speeds (numerical, requires `SEFLG_SPEED`) |
 
 ### libephemeris-only extensions
 

@@ -744,6 +744,35 @@ class TestClose:
 class TestCrossFunctionConsistency:
     """Cross-function consistency checks for newly tested functions."""
 
+    def test_houses_ex2_cusp_speeds_vs_pyswisseph(self):
+        """houses_ex2 cusp speeds should be close to pyswisseph."""
+        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        lat, lon = 41.9, 12.5
+
+        # Test systems with compatible derivatives (< 2 deg/day difference)
+        for hsys_code in ["P", "R", "C", "E", "M", "B", "T"]:
+            _, _, lib_cspeeds, lib_aspeeds = ephem.swe_houses_ex2(
+                jd, lat, lon, ord(hsys_code), SEFLG_SPEED | SEFLG_SWIEPH
+            )
+            _, _, swe_cspeeds, swe_aspeeds = swe.houses_ex2(
+                jd, lat, lon, hsys_code.encode(), swe.FLG_SPEED | swe.FLG_SWIEPH
+            )
+
+            for i in range(12):
+                diff = abs(float(lib_cspeeds[i]) - float(swe_cspeeds[i]))
+                assert diff < 2.0, (
+                    f"{hsys_code} cusp {i + 1} speed: lib={lib_cspeeds[i]:.4f}, "
+                    f"swe={swe_cspeeds[i]:.4f}, diff={diff:.4f} deg/day"
+                )
+
+            # ASC and MC speeds should also be close
+            for j, label in enumerate(["ASC", "MC"]):
+                diff = abs(float(lib_aspeeds[j]) - float(swe_aspeeds[j]))
+                assert diff < 2.0, (
+                    f"{hsys_code} {label} speed: lib={lib_aspeeds[j]:.4f}, "
+                    f"swe={swe_aspeeds[j]:.4f}, diff={diff:.4f} deg/day"
+                )
+
     def test_houses_with_fallback_consistent_with_houses_ex(self):
         """houses_with_fallback cusps should match houses_ex at normal latitudes."""
         jd = ephem.swe_julday(2024, 6, 21, 12.0)
