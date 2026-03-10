@@ -370,26 +370,19 @@ class TestDeltaTWithIersData:
         """Test Delta T extended function with different ephemeris flags."""
         jd = 2451545.0
 
-        dt_swieph, err_swieph = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
-        dt_jpleph, err_jpleph = ephem.swe_deltat_ex(jd, ephem.SEFLG_JPLEPH)
+        dt_swieph = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        dt_jpleph = ephem.swe_deltat_ex(jd, ephem.SEFLG_JPLEPH)
 
         # Both should give similar results (Skyfield uses JPL data internally)
         assert abs(dt_swieph - dt_jpleph) < 1e-10, (
             "SWIEPH and JPLEPH should give identical Delta T values"
         )
 
-        # No error messages for supported ephemerides
-        assert err_swieph == ""
-        assert err_jpleph == ""
-
     def test_deltat_ex_moseph_uses_same_delta_t(self):
         """Verify Moshier ephemeris uses the same Delta T calculation (no warning)."""
         jd = 2451545.0
 
-        dt, err = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
-
-        # No warning - Moshier uses the same Skyfield Delta T model
-        assert err == ""
+        dt = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
 
         # Should return a valid Delta T value matching other ephemeris modes
         dt_seconds = dt * 86400

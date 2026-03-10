@@ -218,14 +218,14 @@ class TestSweHeliacalUtStars:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Sirius", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
-        if retflag > 0:
-            assert dret[0] > jd_start
+        assert isinstance(result, tuple)
+        assert len(result) == 3
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_regulus_by_name(self):
         """Test swe_heliacal_ut with Regulus by name."""
@@ -234,12 +234,12 @@ class TestSweHeliacalUtStars:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Regulus", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_aldebaran_by_name(self):
         """Test swe_heliacal_ut with Aldebaran by name."""
@@ -248,12 +248,12 @@ class TestSweHeliacalUtStars:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Aldebaran", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_vega_by_name(self):
         """Test swe_heliacal_ut with Vega by name."""
@@ -262,12 +262,12 @@ class TestSweHeliacalUtStars:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Vega", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_star_name_case_insensitive(self):
         """Test that star name matching is case insensitive."""
@@ -277,20 +277,20 @@ class TestSweHeliacalUtStars:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Lowercase
-        dret1, _ = swe_heliacal_ut(
+        result1 = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "sirius", SE_HELIACAL_RISING
         )
         # Uppercase
-        dret2, _ = swe_heliacal_ut(
+        result2 = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "SIRIUS", SE_HELIACAL_RISING
         )
         # Mixed case
-        dret3, _ = swe_heliacal_ut(
+        result3 = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Sirius", SE_HELIACAL_RISING
         )
 
         # All should return same result
-        assert dret1[0] == dret2[0] == dret3[0]
+        assert result1[0] == result2[0] == result3[0]
 
     def test_star_evening_first_by_name_raises_error(self):
         """Test that SE_EVENING_FIRST raises ValueError for stars via swe API."""

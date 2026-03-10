@@ -206,23 +206,25 @@ class TestAyanamsaEx:
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_returns_tuple(self):
-        """get_ayanamsa_ex should return a tuple of 3 floats."""
+        """get_ayanamsa_ex should return a tuple of (retflag, ayanamsa)."""
         jd = 2451545.0
-        result = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        result = ephem.swe_get_ayanamsa_ex(jd, 0)
 
         assert isinstance(result, tuple)
-        assert len(result) == 3
-        assert all(isinstance(x, float) for x in result)
+        assert len(result) == 2
+        assert all(isinstance(x, (int, float)) for x in result)
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_ut_returns_tuple(self):
-        """get_ayanamsa_ex_ut should return a tuple of 3 floats."""
+        """get_ayanamsa_ex_ut should return a tuple of (retflag, ayanamsa)."""
         jd = 2451545.0
-        result = ephem.swe_get_ayanamsa_ex_ut(jd, SE_SIDM_LAHIRI)
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        result = ephem.swe_get_ayanamsa_ex_ut(jd, 0)
 
         assert isinstance(result, tuple)
-        assert len(result) == 3
-        assert all(isinstance(x, float) for x in result)
+        assert len(result) == 2
+        assert all(isinstance(x, (int, float)) for x in result)
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_ayanamsa_matches_standard(self):
@@ -231,7 +233,7 @@ class TestAyanamsaEx:
         ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
 
         aya_standard = ephem.swe_get_ayanamsa(jd)
-        aya_ex, _, _ = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+        _retflag, aya_ex = ephem.swe_get_ayanamsa_ex(jd, 0)
 
         assert abs(aya_ex - aya_standard) < 0.0001
 
@@ -242,29 +244,19 @@ class TestAyanamsaEx:
         ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
 
         aya_standard = ephem.swe_get_ayanamsa_ut(jd)
-        aya_ex, _, _ = ephem.swe_get_ayanamsa_ex_ut(jd, SE_SIDM_LAHIRI)
+        _retflag, aya_ex = ephem.swe_get_ayanamsa_ex_ut(jd, 0)
 
         assert abs(aya_ex - aya_standard) < 0.0001
 
     @pytest.mark.unit
-    def test_get_ayanamsa_ex_eps_true_reasonable(self):
-        """True obliquity should be around 23.4 degrees for modern dates."""
+    def test_get_ayanamsa_ex_retflag(self):
+        """get_ayanamsa_ex retflag should be a non-negative integer."""
         jd = 2451545.0  # J2000.0
-        _, eps_true, _ = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        retflag, _aya = ephem.swe_get_ayanamsa_ex(jd, 0)
 
-        # True obliquity at J2000 should be approximately 23.44°
-        assert 23.0 < eps_true < 24.0
-        assert abs(eps_true - 23.44) < 0.1
-
-    @pytest.mark.unit
-    def test_get_ayanamsa_ex_nut_long_reasonable(self):
-        """Nutation in longitude should be small (typically -0.02° to +0.02°)."""
-        jd = 2451545.0
-        _, _, nut_long = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
-
-        # Nutation in longitude is typically between -20" and +20"
-        # (about -0.006° to +0.006°). Can be larger up to ~17" = ~0.005°
-        assert abs(nut_long) < 0.05  # 0.05° = 180" max
+        assert isinstance(retflag, int)
+        assert retflag >= 0
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -281,72 +273,65 @@ class TestAyanamsaEx:
     def test_get_ayanamsa_ex_different_modes(self, sid_mode, name):
         """Test get_ayanamsa_ex works with different sidereal modes."""
         jd = 2451545.0
-        aya, eps, nut = ephem.swe_get_ayanamsa_ex(jd, sid_mode)
+        ephem.swe_set_sid_mode(sid_mode)
+        retflag, aya = ephem.swe_get_ayanamsa_ex(jd, 0)
 
         # Ayanamsa should be valid
         assert isinstance(aya, float)
         assert -360 < aya < 360
 
-        # Obliquity should always be around 23.44° regardless of mode
-        assert 23.0 < eps < 24.0
-
-        # Nutation should be the same for all modes
-        assert abs(nut) < 0.05
-
     @pytest.mark.unit
-    def test_get_ayanamsa_ex_sid_mode_independent(self):
-        """get_ayanamsa_ex should not depend on global swe_set_sid_mode."""
+    def test_get_ayanamsa_ex_uses_global_sid_mode(self):
+        """get_ayanamsa_ex should use the global swe_set_sid_mode."""
         jd = 2451545.0
 
-        # Set global mode to Fagan-Bradley
-        ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-
-        # But ask for Lahiri explicitly
-        aya_ex, _, _ = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
-
-        # Compare with Lahiri value
+        # Set global mode to Lahiri
         ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        _retflag, aya_ex = ephem.swe_get_ayanamsa_ex(jd, 0)
+
+        # Compare with standard function
         aya_lahiri = ephem.swe_get_ayanamsa(jd)
 
-        # Should match Lahiri, not Fagan-Bradley
+        # Should match Lahiri
         assert abs(aya_ex - aya_lahiri) < 0.0001
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_with_flags(self):
-        """Test that flags parameter is accepted (reserved for future use)."""
+        """Test that flags parameter is accepted."""
         jd = 2451545.0
-        # Flags currently unused, but should be accepted
-        result = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI, 0)
-        assert len(result) == 3
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        result = ephem.swe_get_ayanamsa_ex(jd, 0)
+        assert len(result) == 2
 
-        result_with_flag = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI, 256)
-        assert len(result_with_flag) == 3
+        result_with_flag = ephem.swe_get_ayanamsa_ex(jd, 256)
+        assert len(result_with_flag) == 2
 
     @pytest.mark.unit
-    def test_get_ayanamsa_ex_eps_changes_over_time(self):
-        """True obliquity should change over time due to precession and nutation."""
+    def test_get_ayanamsa_ex_changes_over_time(self):
+        """Ayanamsa should change over time due to precession."""
         jd_2000 = 2451545.0  # J2000.0
         jd_2020 = 2459215.5  # 2020-12-01
 
-        _, eps_2000, _ = ephem.swe_get_ayanamsa_ex(jd_2000, SE_SIDM_LAHIRI)
-        _, eps_2020, _ = ephem.swe_get_ayanamsa_ex(jd_2020, SE_SIDM_LAHIRI)
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        _, aya_2000 = ephem.swe_get_ayanamsa_ex(jd_2000, 0)
+        _, aya_2020 = ephem.swe_get_ayanamsa_ex(jd_2020, 0)
 
-        # Obliquity decreases slowly (~0.47"/year) but nutation causes oscillation
-        # Just check they're not identical
-        assert eps_2000 != eps_2020
+        # Ayanamsa increases over time due to precession
+        assert aya_2020 > aya_2000
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_aliases(self):
         """Test that the non-swe_ aliases work."""
         jd = 2451545.0
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
 
         # Test alias without swe_ prefix
-        result1 = ephem.get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
-        result2 = ephem.swe_get_ayanamsa_ex(jd, SE_SIDM_LAHIRI)
+        result1 = ephem.get_ayanamsa_ex(jd, 0)
+        result2 = ephem.swe_get_ayanamsa_ex(jd, 0)
 
         assert result1 == result2
 
-        result3 = ephem.get_ayanamsa_ex_ut(jd, SE_SIDM_LAHIRI)
-        result4 = ephem.swe_get_ayanamsa_ex_ut(jd, SE_SIDM_LAHIRI)
+        result3 = ephem.get_ayanamsa_ex_ut(jd, 0)
+        result4 = ephem.swe_get_ayanamsa_ex_ut(jd, 0)
 
         assert result3 == result4

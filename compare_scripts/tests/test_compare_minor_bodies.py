@@ -4,11 +4,9 @@ Minor Bodies (Asteroids, TNOs) Comparison Tests.
 Compares minor body calculations between pyswisseph and libephemeris.
 Tests cover all minor bodies defined in constants.py.
 
-NOTE: These tests are marked as xfail because libephemeris uses Keplerian
-orbital elements for asteroids while pyswisseph uses JPL SPK (binary) ephemeris
-files. The Keplerian approach has limited precision especially for objects with
-significant perturbations (e.g., Pallas with high inclination/eccentricity) or
-for dates far from the element epoch.
+NOTE: With SPK auto-download enabled (via conftest), libephemeris uses JPL SPK
+ephemeris files for common minor bodies (Ceres, Pallas, Juno, Vesta, Chiron,
+Pholus, Eris, Sedna), providing high-precision results comparable to pyswisseph.
 """
 
 import pytest
@@ -59,12 +57,6 @@ from libephemeris.constants import (
     SE_PANDORA_AST,
     SE_LILITH_AST,
     SE_HIDALGO,
-)
-
-
-# Mark asteroid tests as expected to fail (Keplerian vs SPK precision)
-_ASTEROID_XFAIL = pytest.mark.xfail(
-    reason="Keplerian elements vs SPK ephemeris precision differences", strict=False
 )
 
 
@@ -167,7 +159,6 @@ TEST_DATES = [
 class TestMainAsteroids:
     """Compare main belt asteroid calculations."""
 
-    @_ASTEROID_XFAIL
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", MAIN_ASTEROIDS)
     @pytest.mark.parametrize("year,month,day,hour,desc", TEST_DATES)
@@ -220,7 +211,6 @@ class TestLargeMainBeltAsteroids:
 class TestCentaurs:
     """Compare centaur calculations (Chiron, Pholus)."""
 
-    @_ASTEROID_XFAIL
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", CENTAURS)
     @pytest.mark.parametrize("year,month,day,hour,desc", TEST_DATES)
@@ -371,7 +361,6 @@ class TestAstrologicalAsteroids:
 class TestChironSpecific:
     """Specific tests for Chiron (most commonly used asteroid)."""
 
-    @_ASTEROID_XFAIL
     @pytest.mark.comparison
     def test_chiron_at_j2000(self):
         """Test Chiron position at J2000 epoch."""
@@ -388,7 +377,6 @@ class TestChironSpecific:
 
         assert diff < 0.001, f"Chiron at J2000 diff {diff:.6f}° exceeds tight tolerance"
 
-    @_ASTEROID_XFAIL
     @pytest.mark.comparison
     def test_chiron_with_speed(self):
         """Test Chiron position with velocity."""
@@ -411,7 +399,6 @@ class TestChironSpecific:
 class TestCeresSpecific:
     """Specific tests for Ceres (dwarf planet)."""
 
-    @_ASTEROID_XFAIL
     @pytest.mark.comparison
     def test_ceres_at_j2000(self):
         """Test Ceres position at J2000 epoch."""
@@ -492,7 +479,6 @@ class TestApophisSpecific:
 class TestAsteroidVelocity:
     """Test asteroid velocity calculations."""
 
-    @_ASTEROID_XFAIL
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", MAIN_ASTEROIDS + CENTAURS)
     def test_asteroid_velocity(self, body_id, body_name):

@@ -63,13 +63,12 @@ class TestAyanamshaConsistency:
     def test_ayanamsha_vs_sidereal_offset(
         self, compare: CompareHelper, ayanamsha_dates: list[float], sid_mode: int
     ):
-        """Tropical-sidereal difference matches true ayanamsha (mean + nutation).
+        """Tropical-sidereal difference matches true ayanamsha (with nutation).
 
-        swe_get_ayanamsa_ut() returns the *mean* ayanamsha (without nutation),
-        but sidereal positions subtract the *true* ayanamsha (mean + Δψ) so
+        Sidereal positions subtract the *true* ayanamsha (mean + Δψ) so
         that nutation cancels from the ecliptic longitude. We use
-        swe_get_ayanamsa_ex_ut() which returns (mean_aya, eps_true, nut_long)
-        to reconstruct the true ayanamsha for comparison.
+        swe_get_ayanamsa_ex_ut() with flags=0 to get the true ayanamsha
+        (with nutation included) for comparison.
         """
         from libephemeris.constants import SE_SUN, SEFLG_SPEED, SEFLG_SIDEREAL
 
@@ -78,9 +77,8 @@ class TestAyanamshaConsistency:
         for jd in ayanamsha_dates[:10]:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            # Get mean ayanamsha + nutation via extended API
-            aya_mean, _eps, nut_long = ephem.swe_get_ayanamsa_ex_ut(jd, sid_mode)
-            aya_true = aya_mean + nut_long
+            # Get true ayanamsha (with nutation) via extended API
+            _retflag, aya_true = ephem.swe_get_ayanamsa_ex_ut(jd, 0)
 
             # Get tropical and sidereal positions
             tropical, _ = compare.leb(ephem.swe_calc_ut, jd, SE_SUN, SEFLG_SPEED)

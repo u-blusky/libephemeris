@@ -57,9 +57,6 @@ class TestAsteroids:
             assert -90 <= pos[1] <= 90, f"{name}: Invalid latitude"
             assert pos[2] > 0, f"{name}: Invalid distance"
 
-    @pytest.mark.xfail(
-        reason="Pallas has high Keplerian error due to orbital characteristics"
-    )
     @pytest.mark.parametrize(
         "body_id,name,swe_id",
         [

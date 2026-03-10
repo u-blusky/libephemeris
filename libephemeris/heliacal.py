@@ -1330,7 +1330,7 @@ def swe_heliacal_ut(
     object_name: str,
     event_type: int,
     hel_flag: int = SEFLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], int]:
+) -> Tuple[float, float, float]:
     """
     Calculate heliacal rising or setting time for a celestial body.
 
@@ -1384,15 +1384,12 @@ def swe_heliacal_ut(
               contribution (useful for calculating epoch heliacal dates).
 
     Returns:
-        Tuple containing:
-            - dret: Tuple of 50 floats with heliacal event data:
-                - [0]: Start of visibility (Julian day number)
-                - [1]: Optimum visibility (Julian day number),
-                       zero if SE_HELFLAG_NO_DETAILS is set
-                - [2]: End of visibility (Julian day number),
-                       zero if SE_HELFLAG_NO_DETAILS is set
-                - [3-49]: Reserved for future use (currently 0.0)
-            - retflag: Return flag (event_type on success, negative on error)
+        Tuple of 3 floats:
+            - [0]: Start of visibility (Julian day number)
+            - [1]: Optimum visibility (Julian day number),
+                   zero if SE_HELFLAG_NO_DETAILS is set
+            - [2]: End of visibility (Julian day number),
+                   zero if SE_HELFLAG_NO_DETAILS is set
 
     Raises:
         ValueError: If invalid object_name, body ID, or event_type.
@@ -1432,10 +1429,10 @@ def swe_heliacal_ut(
         >>> # Observer: age 36, normal vision
         >>> dobs = (36.0, 1.0, 0, 0, 0, 0)
         >>> # Find next heliacal rising of Venus
-        >>> dret, flag = swe_heliacal_ut(jd, geopos, datm, dobs,
-        ...                               "Venus", SE_HELIACAL_RISING)
-        >>> if flag > 0:
-        ...     print(f"Venus heliacal rising at JD {dret[0]:.5f}")
+        >>> jd1, jd2, jd3 = swe_heliacal_ut(jd, geopos, datm, dobs,
+        ...                                  "Venus", SE_HELIACAL_RISING)
+        >>> if jd1 > 0:
+        ...     print(f"Venus heliacal rising at JD {jd1:.5f}")
 
     See Also:
         - heliacal_ut: Internal function using planet ID instead of name
@@ -1498,11 +1495,13 @@ def swe_heliacal_ut(
         flags=hel_flag,
     )
 
-    # Build the result array (50 elements as per reference API)
-    dret = [0.0] * 50
+    # Build the result as 3 floats matching pyswisseph API
+    jd1 = 0.0  # Start of visibility
+    jd2 = 0.0  # Optimum visibility
+    jd3 = 0.0  # End of visibility
 
     if jd_event > 0:
-        dret[0] = jd_event  # Start visibility
+        jd1 = jd_event  # Start visibility
 
         # Calculate optimum and end visibility if details requested
         if not (hel_flag & SE_HELFLAG_NO_DETAILS):
@@ -1510,10 +1509,10 @@ def swe_heliacal_ut(
             # based on typical visibility window durations
             # This is an approximation; full implementation would require
             # more complex calculations
-            dret[1] = jd_event  # Optimum (same as start for now)
-            dret[2] = jd_event  # End (same as start for now)
+            jd2 = jd_event  # Optimum (same as start for now)
+            jd3 = jd_event  # End (same as start for now)
 
-    return tuple(dret), retflag
+    return (jd1, jd2, jd3)
 
 
 def _parse_object_name(object_name: str) -> int:

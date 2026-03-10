@@ -498,12 +498,11 @@ class TestDeltatExWithIERS:
         # Enable IERS Delta T
         set_iers_delta_t_enabled(True)
 
-        dt, serr = swe_deltat_ex(jd)
+        dt = swe_deltat_ex(jd)
         dt_seconds = dt * 86400
 
         # Should match our observed data (63.8285 seconds)
         assert dt_seconds == pytest.approx(63.8285, abs=0.01)
-        assert serr == ""
 
     @pytest.mark.unit
     def test_swe_deltat_and_swe_deltat_ex_consistent(self):
@@ -516,7 +515,7 @@ class TestDeltatExWithIERS:
         set_iers_delta_t_enabled(True)
 
         dt = swe_deltat(jd)
-        dt_ex, _ = swe_deltat_ex(jd)
+        dt_ex = swe_deltat_ex(jd)
 
         # Both should return identical values
         assert dt == pytest.approx(dt_ex, abs=1e-10)

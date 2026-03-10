@@ -10,7 +10,7 @@ This function calculates Keplerian orbital elements:
 - Mean anomaly (M)
 - And other derived parameters
 
-The function returns a 17-element tuple matching pyswisseph's format.
+The function returns a 50-element tuple matching pyswisseph's format.
 """
 
 import pytest
@@ -33,29 +33,29 @@ class TestOrbitalElementsBasic:
     """Test basic functionality of get_orbital_elements."""
 
     @pytest.mark.unit
-    def test_returns_17_elements(self):
-        """get_orbital_elements should return a tuple of 17 elements."""
+    def test_returns_50_elements(self):
+        """get_orbital_elements should return a tuple of 50 elements."""
         jd = 2451545.0  # J2000
-        elements, flag = ephem.get_orbital_elements(jd, SE_MARS, 0)
+        elements = ephem.get_orbital_elements(jd, SE_MARS, 0)
 
         assert isinstance(elements, tuple)
-        assert len(elements) == 17
-        assert isinstance(flag, int)
+        assert len(elements) == 50
+        assert isinstance(elements[0], float)
 
     @pytest.mark.unit
-    def test_returns_17_elements_ut(self):
-        """get_orbital_elements_ut should return a tuple of 17 elements."""
+    def test_returns_50_elements_ut(self):
+        """get_orbital_elements_ut should return a tuple of 50 elements."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements_ut(jd, SE_MARS, 0)
+        elements = ephem.get_orbital_elements_ut(jd, SE_MARS, 0)
 
         assert isinstance(elements, tuple)
-        assert len(elements) == 17
+        assert len(elements) == 50
 
     @pytest.mark.unit
     def test_all_elements_are_floats(self):
         """All elements should be floats."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_JUPITER, 0)
+        elements = ephem.get_orbital_elements(jd, SE_JUPITER, 0)
 
         for i, val in enumerate(elements):
             assert isinstance(val, (int, float)), f"Element {i} should be numeric"
@@ -64,7 +64,7 @@ class TestOrbitalElementsBasic:
     def test_sun_returns_zeros(self):
         """Sun should return zero elements (no heliocentric orbit)."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_SUN, 0)
+        elements = ephem.get_orbital_elements(jd, SE_SUN, 0)
 
         # All elements should be zero for Sun
         assert elements[0] == 0.0  # Semi-major axis
@@ -91,7 +91,7 @@ class TestOrbitalElementsValues:
     def test_semi_major_axis(self, planet_id, planet_name, expected_a, tolerance):
         """Semi-major axis should match known values."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, planet_id, 0)
+        elements = ephem.get_orbital_elements(jd, planet_id, 0)
 
         a = elements[0]
         assert abs(a - expected_a) < tolerance, (
@@ -113,7 +113,7 @@ class TestOrbitalElementsValues:
     def test_eccentricity(self, planet_id, planet_name, expected_e, tolerance):
         """Eccentricity should match known values."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, planet_id, 0)
+        elements = ephem.get_orbital_elements(jd, planet_id, 0)
 
         e = elements[1]
         assert abs(e - expected_e) < tolerance, (
@@ -135,7 +135,7 @@ class TestOrbitalElementsValues:
     def test_inclination(self, planet_id, planet_name, expected_i, tolerance):
         """Inclination should match known values."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, planet_id, 0)
+        elements = ephem.get_orbital_elements(jd, planet_id, 0)
 
         i = elements[2]
         assert abs(i - expected_i) < tolerance, (
@@ -150,7 +150,7 @@ class TestOrbitalElementsRelationships:
     def test_perihelion_from_a_and_e(self):
         """Perihelion distance should equal a*(1-e)."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_MARS, 0)
+        elements = ephem.get_orbital_elements(jd, SE_MARS, 0)
 
         a = elements[0]
         e = elements[1]
@@ -165,7 +165,7 @@ class TestOrbitalElementsRelationships:
     def test_aphelion_from_a_and_e(self):
         """Aphelion distance should equal a*(1+e)."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_MARS, 0)
+        elements = ephem.get_orbital_elements(jd, SE_MARS, 0)
 
         a = elements[0]
         e = elements[1]
@@ -182,7 +182,7 @@ class TestOrbitalElementsRelationships:
         jd = 2451545.0
 
         for planet_id in [SE_MERCURY, SE_MARS, SE_JUPITER, SE_SATURN]:
-            elements, flag = ephem.get_orbital_elements(jd, planet_id, 0)
+            elements = ephem.get_orbital_elements(jd, planet_id, 0)
             q = elements[11]
             Q = elements[12]
             assert q < Q, f"Perihelion {q} should be less than aphelion {Q}"
@@ -191,7 +191,7 @@ class TestOrbitalElementsRelationships:
     def test_longitude_of_perihelion(self):
         """Longitude of perihelion should equal Omega + omega."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_MARS, 0)
+        elements = ephem.get_orbital_elements(jd, SE_MARS, 0)
 
         Omega = elements[3]  # Longitude of ascending node
         omega = elements[4]  # Argument of perihelion
@@ -210,7 +210,7 @@ class TestOrbitalElementsRelationships:
     def test_mean_longitude(self):
         """Mean longitude should equal Omega + omega + M."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_JUPITER, 0)
+        elements = ephem.get_orbital_elements(jd, SE_JUPITER, 0)
 
         Omega = elements[3]
         omega = elements[4]
@@ -236,7 +236,7 @@ class TestOrbitalElementsAnglesRange:
     def test_angles_in_valid_range(self, planet_id):
         """All angular elements should be in 0-360 range."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, planet_id, 0)
+        elements = ephem.get_orbital_elements(jd, planet_id, 0)
 
         # Indices of angular elements
         angle_indices = [2, 3, 4, 5, 6, 7, 8, 9]  # i, Omega, omega, M, nu, E, L, varpi
@@ -266,7 +266,7 @@ class TestOrbitalElementsOrbitalPeriod:
     ):
         """Orbital period should match known values."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, planet_id, 0)
+        elements = ephem.get_orbital_elements(jd, planet_id, 0)
 
         P = elements[13]  # Orbital period in tropical years
         assert abs(P - expected_period_years) < tolerance, (
@@ -278,7 +278,7 @@ class TestOrbitalElementsOrbitalPeriod:
     def test_mean_motion_from_period(self):
         """Mean daily motion should be consistent with orbital period."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_MARS, 0)
+        elements = ephem.get_orbital_elements(jd, SE_MARS, 0)
 
         n = elements[10]  # Mean daily motion (degrees/day)
         P = elements[13]  # Orbital period (years)
@@ -297,7 +297,7 @@ class TestOrbitalElementsMoon:
     def test_moon_has_geocentric_elements(self):
         """Moon should have valid geocentric orbital elements."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_MOON, 0)
+        elements = ephem.get_orbital_elements(jd, SE_MOON, 0)
 
         a = elements[0]  # Semi-major axis
         e = elements[1]  # Eccentricity
@@ -316,7 +316,7 @@ class TestOrbitalElementsMoon:
     def test_moon_orbital_period(self):
         """Moon's orbital period should be about 27.3 days."""
         jd = 2451545.0
-        elements, flag = ephem.get_orbital_elements(jd, SE_MOON, 0)
+        elements = ephem.get_orbital_elements(jd, SE_MOON, 0)
 
         P_years = elements[13]
         P_days = P_years * 365.24219
@@ -336,7 +336,7 @@ class TestOrbitalElementsCurrentDistance:
         jd = 2451545.0
 
         for planet_id in [SE_MARS, SE_JUPITER, SE_SATURN]:
-            elements, flag = ephem.get_orbital_elements(jd, planet_id, 0)
+            elements = ephem.get_orbital_elements(jd, planet_id, 0)
             r = elements[16]  # Current distance
             assert r > 0, f"Current distance should be positive, got {r}"
 
@@ -346,7 +346,7 @@ class TestOrbitalElementsCurrentDistance:
         jd = 2451545.0
 
         for planet_id in [SE_MARS, SE_JUPITER, SE_SATURN]:
-            elements, flag = ephem.get_orbital_elements(jd, planet_id, 0)
+            elements = ephem.get_orbital_elements(jd, planet_id, 0)
             q = elements[11]
             Q = elements[12]
             r = elements[16]
@@ -363,26 +363,26 @@ class TestOrbitalElementsAliases:
     def test_swe_get_orbital_elements_alias(self):
         """swe_get_orbital_elements should be available."""
         result = ephem.swe_get_orbital_elements(2451545.0, SE_MARS, 0)
-        assert len(result) == 2
-        assert len(result[0]) == 17
+        assert len(result) == 50
+        assert isinstance(result[0], float)
 
     @pytest.mark.unit
     def test_swe_get_orbital_elements_ut_alias(self):
         """swe_get_orbital_elements_ut should be available."""
         result = ephem.swe_get_orbital_elements_ut(2451545.0, SE_MARS, 0)
-        assert len(result) == 2
-        assert len(result[0]) == 17
+        assert len(result) == 50
+        assert isinstance(result[0], float)
 
     @pytest.mark.unit
     def test_get_orbital_elements_alias(self):
         """get_orbital_elements should be available."""
         result = ephem.get_orbital_elements(2451545.0, SE_MARS, 0)
-        assert len(result) == 2
-        assert len(result[0]) == 17
+        assert len(result) == 50
+        assert isinstance(result[0], float)
 
     @pytest.mark.unit
     def test_get_orbital_elements_ut_alias(self):
         """get_orbital_elements_ut should be available."""
         result = ephem.get_orbital_elements_ut(2451545.0, SE_MARS, 0)
-        assert len(result) == 2
-        assert len(result[0]) == 17
+        assert len(result) == 50
+        assert isinstance(result[0], float)

@@ -38,17 +38,7 @@ FAMOUS_STARS = list(dict.fromkeys(FIXED_STARS))
 TEST_DATES = [
     (2000, 1, 1, 12.0, "J2000"),
     (2024, 6, 15, 0.0, "Current"),
-    pytest.param(
-        1950,
-        1,
-        1,
-        12.0,
-        "Mid-century",
-        marks=pytest.mark.xfail(
-            reason="Historical dates have higher proper motion calculation error",
-            strict=False,
-        ),
-    ),
+    (1950, 1, 1, 12.0, "Mid-century"),
 ]
 
 

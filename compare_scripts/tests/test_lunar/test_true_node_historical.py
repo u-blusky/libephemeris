@@ -14,9 +14,9 @@ Historical Eclipse Data Sources:
 - Meeus "Astronomical Tables of the Sun, Moon and Planets"
 - Five Millennium Canon of Solar Eclipses (-1999 to +3000)
 
-NOTE: Some historical date tests are marked as xfail because libephemeris
-uses a pure polynomial approximation while pyswisseph uses numerical
-integration for historical dates, leading to slightly higher errors.
+NOTE: For ancient dates (-1000 to 1900), precision may degrade slightly
+because libephemeris uses a polynomial approximation while pyswisseph uses
+numerical integration, but all tests currently pass within tolerance.
 """
 
 import math

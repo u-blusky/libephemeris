@@ -2191,13 +2191,9 @@ class TestOrbitalElementsDeep:
 
             if isinstance(res_swe, tuple) and isinstance(res_lib, tuple):
                 # Compare semi-major axis (element 0), eccentricity (element 1), etc.
-                # These are returned as a tuple of 50 values
-                swe_vals = (
-                    res_swe[0] if isinstance(res_swe[0], (list, tuple)) else res_swe
-                )
-                lib_vals = (
-                    res_lib[0] if isinstance(res_lib[0], (list, tuple)) else res_lib
-                )
+                # Both return a flat tuple of 50 values
+                swe_vals = res_swe
+                lib_vals = res_lib
 
                 if hasattr(swe_vals, "__len__") and hasattr(lib_vals, "__len__"):
                     # Check first few orbital elements

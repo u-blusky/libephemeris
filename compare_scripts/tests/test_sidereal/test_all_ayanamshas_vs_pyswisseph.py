@@ -480,15 +480,9 @@ class TestAyanamshaExFunctions:
         ephem.swe_set_sid_mode(sid_mode)
         ayan_standard = ephem.swe_get_ayanamsa_ut(jd)
 
-        ayan_ex, eps_true, nut_long = ephem.swe_get_ayanamsa_ex_ut(jd, sid_mode)
+        retflag, ayan_ex = ephem.swe_get_ayanamsa_ex_ut(jd, 0)
 
         # Ayanamsha should match
         assert abs(ayan_ex - ayan_standard) < 0.0001, (
             f"Mode {name}: ex={ayan_ex:.6f} != standard={ayan_standard:.6f}"
         )
-
-        # Obliquity should be around 23.44 degrees at J2000
-        assert 23.0 < eps_true < 24.0, f"Mode {name}: eps_true={eps_true} unexpected"
-
-        # Nutation should be small
-        assert abs(nut_long) < 0.1, f"Mode {name}: nut_long={nut_long} too large"

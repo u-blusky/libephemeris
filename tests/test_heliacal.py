@@ -293,17 +293,17 @@ class TestSweHeliacalUt:
         # Observer: age, Snellen ratio, and optical params
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
         )
 
-        # Should return a tuple of 50 floats
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        # Should return a tuple of 3 floats (jd1, jd2, jd3)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
         # Should find an event within a year
-        if retflag > 0:
-            assert dret[0] > jd_start
-            assert dret[0] < jd_start + 365
+        if result[0] > 0:
+            assert result[0] > jd_start
+            assert result[0] < jd_start + 365
 
     def test_swe_heliacal_ut_with_planet_name_mercury(self):
         """Test swe_heliacal_ut with Mercury."""
@@ -312,16 +312,16 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Mercury", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
         # Mercury has ~3 synodic periods per year
-        if retflag > 0:
-            assert dret[0] > jd_start
-            assert dret[0] < jd_start + 120
+        if result[0] > 0:
+            assert result[0] > jd_start
+            assert result[0] < jd_start + 120
 
     def test_swe_heliacal_ut_with_planet_name_mars(self):
         """Test swe_heliacal_ut with Mars."""
@@ -330,12 +330,12 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Mars", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_with_planet_name_jupiter(self):
         """Test swe_heliacal_ut with Jupiter."""
@@ -344,12 +344,12 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Jupiter", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_with_planet_name_saturn(self):
         """Test swe_heliacal_ut with Saturn."""
@@ -358,12 +358,12 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Saturn", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_heliacal_setting(self):
         """Test swe_heliacal_ut for heliacal setting event."""
@@ -372,14 +372,12 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_SETTING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
-        if retflag > 0:
-            assert retflag == SE_HELIACAL_SETTING
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_evening_first(self):
         """Test swe_heliacal_ut for evening first event."""
@@ -388,12 +386,12 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Venus", SE_EVENING_FIRST
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_morning_last(self):
         """Test swe_heliacal_ut for morning last event."""
@@ -402,12 +400,12 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Mercury", SE_MORNING_LAST
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_sun_raises_error(self):
         """Test that Sun raises ValueError."""
@@ -459,20 +457,20 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Should work with lowercase
-        dret1, _ = swe_heliacal_ut(
+        result1 = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "venus", SE_HELIACAL_RISING
         )
         # Should work with uppercase
-        dret2, _ = swe_heliacal_ut(
+        result2 = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "VENUS", SE_HELIACAL_RISING
         )
         # Should work with mixed case
-        dret3, _ = swe_heliacal_ut(
+        result3 = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
         )
 
         # All should return same result
-        assert dret1[0] == dret2[0] == dret3[0]
+        assert result1[0] == result2[0] == result3[0]
 
     def test_swe_heliacal_ut_default_atmospheric(self):
         """Test that zero atmospheric values get defaults."""
@@ -482,12 +480,12 @@ class TestSweHeliacalUt:
         datm = (0, 0, 0, 0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_with_altitude(self):
         """Test swe_heliacal_ut with observer at altitude."""
@@ -496,12 +494,12 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_southern_hemisphere(self):
         """Test swe_heliacal_ut in southern hemisphere."""
@@ -510,12 +508,12 @@ class TestSweHeliacalUt:
         datm = (1013.25, 25.0, 60.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_swe_heliacal_ut_with_planet_id_string(self):
         """Test swe_heliacal_ut with planet ID as string."""
@@ -525,12 +523,10 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Venus is planet ID 3
-        dret, retflag = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "3", SE_HELIACAL_RISING
-        )
+        result = swe_heliacal_ut(jd_start, geopos, datm, dobs, "3", SE_HELIACAL_RISING)
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
 
 class TestHeliacalDateValidation:
@@ -1225,12 +1221,12 @@ class TestSweHeliacalUtOuterPlanetValidation:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Should not raise an error
-        dret, retflag = swe_heliacal_ut(
+        result = swe_heliacal_ut(
             jd_start, geopos, datm, dobs, "Mercury", SE_EVENING_FIRST
         )
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_venus_morning_last_via_swe_api_works(self):
         """Test that Venus with SE_MORNING_LAST works via swe API."""
@@ -1240,9 +1236,7 @@ class TestSweHeliacalUtOuterPlanetValidation:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Should not raise an error
-        dret, retflag = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", SE_MORNING_LAST
-        )
+        result = swe_heliacal_ut(jd_start, geopos, datm, dobs, "Venus", SE_MORNING_LAST)
 
-        assert isinstance(dret, tuple)
-        assert len(dret) == 50
+        assert isinstance(result, tuple)
+        assert len(result) == 3

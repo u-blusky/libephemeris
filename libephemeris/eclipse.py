@@ -8052,8 +8052,9 @@ def heliacal_ut(
         return 0.0, -1  # Not found
 
 
-# Alias for reference API compatibility
-swe_heliacal_ut = heliacal_ut
+# Note: swe_heliacal_ut is defined in heliacal.py with the pyswisseph-compatible
+# API signature (returns 3-tuple). The internal heliacal_ut here returns
+# (jd_event, retflag) and is used by swe_heliacal_ut internally.
 
 
 def heliacal_pheno_ut(

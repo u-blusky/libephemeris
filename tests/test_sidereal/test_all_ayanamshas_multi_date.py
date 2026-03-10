@@ -381,21 +381,11 @@ class TestAyanamshaExAtMultipleDates:
         ephem.swe_set_sid_mode(sid_mode)
         ayan_standard = ephem.swe_get_ayanamsa_ut(jd)
 
-        ayan_ex, eps_true, nut_long = ephem.swe_get_ayanamsa_ex_ut(jd, sid_mode)
+        retflag, ayan_ex = ephem.swe_get_ayanamsa_ex_ut(jd, 0)
 
         # Ayanamsha should match
         assert abs(ayan_ex - ayan_standard) < 0.0001, (
             f"{name} at {epoch_name}: ex={ayan_ex:.6f} != standard={ayan_standard:.6f}"
-        )
-
-        # Obliquity should be around 23-24 degrees
-        assert 22.5 < eps_true < 24.5, (
-            f"{name} at {epoch_name}: eps_true={eps_true:.4f} unexpected"
-        )
-
-        # Nutation should be small
-        assert abs(nut_long) < 0.1, (
-            f"{name} at {epoch_name}: nut_long={nut_long:.6f} too large"
         )
 
 

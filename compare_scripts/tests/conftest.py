@@ -5,11 +5,18 @@ This provides comprehensive test infrastructure for verifying 1:1 compatibility
 with pyswisseph (Swiss Ephemeris).
 """
 
+import os
 from pathlib import Path
 
 import pytest
 import random
 import swisseph as swe
+
+# Force Skyfield mode for all comparison tests. This prevents the LEB binary
+# ephemeris from intercepting swe_calc_ut calls with precomputed values,
+# ensuring we always test the live Skyfield calculation path.
+os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
+
 import libephemeris as ephem
 from libephemeris.constants import *
 
@@ -19,6 +26,14 @@ from libephemeris.constants import *
 # compute star positions internally.
 _EPHE_PATH = str(Path(__file__).resolve().parents[2] / "swisseph" / "ephe")
 swe.set_ephe_path(_EPHE_PATH)
+
+# Enable automatic SPK download for common minor bodies (Chiron, Pholus,
+# Ceres, Pallas, Juno, Vesta, Eris, Sedna). This ensures comparison tests
+# use high-precision JPL SPK kernels instead of Keplerian orbital element
+# approximations. SPK files are cached in ~/.libephemeris/spk/.
+from libephemeris import spk_auto
+
+spk_auto.enable_common_bodies()
 
 
 # ============================================================================

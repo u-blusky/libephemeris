@@ -976,18 +976,15 @@ class TestAyanamsaExtended:
     def test_get_ayanamsa_ex_ut(self, sid_mode, jd_ut):
         """get_ayanamsa_ex_ut should match pyswisseph.
 
-        Note: API signatures differ:
-        - libephemeris: swe_get_ayanamsa_ex_ut(tjd_ut, sid_mode, flags) -> (ayan, eps, nut)
-        - pyswisseph: get_ayanamsa_ex_ut(tjd_ut, flags) -> (flags, ayanamsa)
-        pyswisseph uses global set_sid_mode; lib takes sid_mode as parameter.
+        Both APIs now use global set_sid_mode and return (retflag, ayanamsa).
         """
         ephem.swe_set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        lib_result = ephem.swe_get_ayanamsa_ex_ut(jd_ut, sid_mode, SEFLG_SWIEPH)
+        lib_result = ephem.swe_get_ayanamsa_ex_ut(jd_ut, SEFLG_SWIEPH)
         swe_result = swe.get_ayanamsa_ex_ut(jd_ut, swe.FLG_SWIEPH)
 
-        lib_ayan = float(lib_result[0])
+        lib_ayan = float(lib_result[1])
         swe_ayan = float(swe_result[1])
 
         diff = abs(lib_ayan - swe_ayan)
@@ -1014,10 +1011,10 @@ class TestAyanamsaExtended:
         ephem.swe_set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        lib_result = ephem.swe_get_ayanamsa_ex(jd_tt, sid_mode, SEFLG_SWIEPH)
+        lib_result = ephem.swe_get_ayanamsa_ex(jd_tt, SEFLG_SWIEPH)
         swe_result = swe.get_ayanamsa_ex(jd_tt + swe.deltat(jd_ut) - dt, swe.FLG_SWIEPH)
 
-        lib_ayan = float(lib_result[0])
+        lib_ayan = float(lib_result[1])
         swe_ayan = float(swe_result[1])
 
         diff = abs(lib_ayan - swe_ayan)
@@ -1045,10 +1042,10 @@ class TestAyanamsaExtended:
         """get_ayanamsa_ex_ut should match get_ayanamsa_ut for same mode."""
         ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
 
-        ex_result = ephem.swe_get_ayanamsa_ex_ut(jd_ut, SE_SIDM_LAHIRI, SEFLG_SWIEPH)
+        ex_result = ephem.swe_get_ayanamsa_ex_ut(jd_ut, SEFLG_SWIEPH)
         simple_result = ephem.swe_get_ayanamsa_ut(jd_ut)
 
-        diff = abs(float(ex_result[0]) - float(simple_result))
+        diff = abs(float(ex_result[1]) - float(simple_result))
         assert diff < 1e-10, f"get_ayanamsa_ex_ut vs get_ayanamsa_ut diff {diff}"
 
 
@@ -1518,13 +1515,9 @@ class TestOrbitalElementsUT:
         ut_result = ephem.swe_get_orbital_elements_ut(jd_ut, planet_id, SEFLG_SWIEPH)
         tt_result = ephem.swe_get_orbital_elements(jd_tt, planet_id, SEFLG_SWIEPH)
 
-        # Result is a nested structure: result[0] is the tuple of elements
-        ut_elems = (
-            ut_result[0] if isinstance(ut_result[0], (list, tuple)) else ut_result
-        )
-        tt_elems = (
-            tt_result[0] if isinstance(tt_result[0], (list, tuple)) else tt_result
-        )
+        # Result is a flat tuple of 50 elements
+        ut_elems = ut_result
+        tt_elems = tt_result
 
         # Compare first 6 elements (a, e, i, Omega, omega, M)
         for i in range(6):
@@ -1550,9 +1543,8 @@ class TestDeltaTEx:
         dt = ephem.swe_deltat(jd_ut)
         dt_ex = ephem.swe_deltat_ex(jd_ut, SEFLG_SWIEPH)
 
-        # dt_ex returns (value, error_msg)
-        dt_ex_val = float(dt_ex[0])
-        diff = abs(dt - dt_ex_val)
+        # dt_ex now returns a float directly
+        diff = abs(dt - dt_ex)
         assert diff < 1e-10, f"deltat vs deltat_ex diff {diff} at JD {jd_ut}"
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:4])
@@ -1561,8 +1553,8 @@ class TestDeltaTEx:
         lib_result = ephem.swe_deltat_ex(jd_ut, SEFLG_SWIEPH)
         swe_result = swe.deltat_ex(jd_ut, swe.FLG_SWIEPH)
 
-        lib_val = float(lib_result[0])
-        # pyswisseph deltat_ex returns a float directly (not a tuple)
+        lib_val = float(lib_result)
+        # pyswisseph deltat_ex returns a float directly
         swe_val = float(swe_result)
 
         diff_sec = abs(lib_val - swe_val) * 86400

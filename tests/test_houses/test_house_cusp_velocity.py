@@ -184,17 +184,19 @@ class TestHousesEx2SpeedFlag:
         assert all(s == 0.0 for s in cusps_speed1)
         assert all(s == 0.0 for s in ascmc_speed1)
 
-        # With flag: cusp velocities are zero (fixed at sign boundaries)
-        # but ASC/MC velocities should be calculated
-        assert all(s == 0.0 for s in cusps_speed2), (
-            "Whole Sign cusps are fixed, velocity should be 0"
-        )
-        # ASC and MC still have velocities
-        assert ascmc_speed2[0] != 0.0, "ASC speed should be non-zero"
-        assert ascmc_speed2[1] != 0.0, "MC speed should be non-zero"
+        # With flag: most cusp velocities are zero (fixed at sign boundaries)
+        # but cusps 1,7 (ASC/DESC) and 4,10 (IC/MC) get ASC/MC speeds
+        # to match pyswisseph behaviour.
+        for i in [1, 2, 4, 5, 7, 8]:  # 0-indexed: cusps 2,3,5,6,8,9
+            assert cusps_speed2[i] == 0.0, (
+                f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed2[i]}"
+            )
+        # Cusps at ASC/DESC/MC/IC positions have non-zero speeds
+        assert cusps_speed2[0] != 0.0, "Cusp 1 (ASC) speed should be non-zero"
+        assert cusps_speed2[3] != 0.0, "Cusp 4 (IC) speed should be non-zero"
+        assert cusps_speed2[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
+        assert cusps_speed2[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
 
-
-class TestHousesArmcEx2SpeedFlag:
     """Tests for SEFLG_SPEED flag in swe_houses_armc_ex2."""
 
     @pytest.mark.unit
@@ -240,9 +242,9 @@ class TestHousesArmcEx2SpeedFlag:
         # ASC and MC velocities should be non-zero
         assert ascmc_speed[0] != 0.0, "ASC speed should be non-zero"
         assert ascmc_speed[1] != 0.0, "MC speed should be non-zero"
-        # ARMC velocity should be exactly 360 deg/day
-        assert abs(ascmc_speed[2] - 360.0) < 0.01, (
-            f"ARMC speed {ascmc_speed[2]} should be ~360"
+        # ARMC velocity should be the sidereal rotation rate (~360.986 deg/day)
+        assert abs(ascmc_speed[2] - 360.9856) < 0.01, (
+            f"ARMC speed {ascmc_speed[2]} should be ~360.986"
         )
 
     @pytest.mark.unit
@@ -344,14 +346,18 @@ class TestHousesArmcEx2SpeedFlag:
         assert all(s == 0.0 for s in cusps_speed1)
         assert all(s == 0.0 for s in ascmc_speed1)
 
-        # With flag: cusp velocities are zero (fixed at sign boundaries)
-        # but ASC/MC velocities should be calculated
-        assert all(s == 0.0 for s in cusps_speed2), (
-            "Whole Sign cusps are fixed, velocity should be 0"
-        )
-        # ASC and MC still have velocities
-        assert ascmc_speed2[0] != 0.0, "ASC speed should be non-zero"
-        assert ascmc_speed2[1] != 0.0, "MC speed should be non-zero"
+        # With flag: most cusp velocities are zero (fixed at sign boundaries)
+        # but cusps 1,7 (ASC/DESC) and 4,10 (IC/MC) get ASC/MC speeds
+        # to match pyswisseph behaviour.
+        for i in [1, 2, 4, 5, 7, 8]:  # 0-indexed: cusps 2,3,5,6,8,9
+            assert cusps_speed2[i] == 0.0, (
+                f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed2[i]}"
+            )
+        # Cusps at ASC/DESC/MC/IC positions have non-zero speeds
+        assert cusps_speed2[0] != 0.0, "Cusp 1 (ASC) speed should be non-zero"
+        assert cusps_speed2[3] != 0.0, "Cusp 4 (IC) speed should be non-zero"
+        assert cusps_speed2[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
+        assert cusps_speed2[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
 
 
 class TestHouseCuspVelocityEdgeCases:

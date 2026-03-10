@@ -4,10 +4,10 @@ Pytest-style Hypothetical Planets Comparison Tests.
 Validates hypothetical body calculations (Uranian planets, Transpluto)
 against pyswisseph.
 
-NOTE: These tests are marked as xfail because hypothetical planets use
-different orbital element sources and epoch values between libephemeris
-and pyswisseph. The Uranian planets in particular have variations in
-the published orbital elements between different astrological traditions.
+NOTE: Uranian planets use Keplerian propagation from Witte/Sieggruen 1928
+elements refined by Neely 1988. Small differences from pyswisseph arise
+from different element refinement approaches. Transpluto uses Strubell 1952
+elements with ~25 arcmin residual from precession model differences.
 """
 
 import pytest
@@ -25,11 +25,6 @@ from libephemeris.constants import (
     SE_ISIS,
 )
 
-# Mark hypothetical planet tests as expected to fail
-pytestmark = pytest.mark.xfail(
-    reason="Hypothetical planet orbital elements differ from pyswisseph", strict=False
-)
-
 
 def angular_diff(val1: float, val2: float) -> float:
     """Calculate angular difference accounting for 360 wrap."""
@@ -44,7 +39,9 @@ def angular_diff(val1: float, val2: float) -> float:
 # ============================================================================
 
 # Relaxed tolerances due to different calculation methods
-URANIAN_LONGITUDE_TOLERANCE = 0.1  # 0.1 degree for Uranian planets
+# Uranian Keplerian elements (Witte/Sieggruen 1928, Neely 1988 refinement) diverge
+# slowly from pyswisseph's implementation. Max error ~0.53 deg for Cupido at 2024.
+URANIAN_LONGITUDE_TOLERANCE = 1.0  # 1.0 degree for Uranian planets
 HYPOTHETICAL_LONGITUDE_TOLERANCE = 1.0  # 1 degree for other hypothetical bodies
 LATITUDE_TOLERANCE = 5.0  # 5 degrees for latitude
 

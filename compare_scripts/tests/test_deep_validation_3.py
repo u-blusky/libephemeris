@@ -755,8 +755,8 @@ class TestHeliacalUt:
             jd, geopos, datm, dobs, "Venus", swe.HELIACAL_RISING, swe.FLG_SWIEPH
         )
 
-        # lib returns (tuple_of_50_floats, int), swe returns (jd1, jd2, jd3)
-        lib_jd = float(lib_result[0][0])
+        # lib returns (jd1, jd2, jd3), swe returns (jd1, jd2, jd3)
+        lib_jd = float(lib_result[0])
         swe_jd = float(swe_result[0])
 
         # Allow wider tolerance — different implementations may disagree by days
@@ -775,7 +775,7 @@ class TestHeliacalUt:
 
         result = ephem.swe_heliacal_ut(jd, geopos, datm, dobs, "Venus", 1, SEFLG_SWIEPH)
 
-        result_jd = float(result[0][0])
+        result_jd = float(result[0])
         # Should be a valid JD (after search start or near it)
         assert result_jd > jd - 365, (
             f"Heliacal JD {result_jd:.4f} seems invalid (start={jd:.4f})"

@@ -340,8 +340,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=152.092958,  # 10h 08m 22.3s (Alpha Leonis)
             dec_j2000=11.967208,  # +11° 58' 02"
-            pm_ra=-0.00249,  # -249 mas/yr (westward)
-            pm_dec=0.00152,  # +152 mas/yr (northward)
+            pm_ra=-0.24873,  # -248.73 mas/yr (westward)
+            pm_dec=0.00559,  # +5.59 mas/yr (northward)
         ),
         magnitude=1.40,  # Visual magnitude
     ),
@@ -639,8 +639,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=210.955856,  # 14h 03m 49.4s (ICRS, Hipparcos HIP 68702)
             dec_j2000=-60.373035,  # -60° 22' 22.9"
-            pm_ra=-0.00000924,  # -33.27 mas/yr converted to deg/yr
-            pm_dec=-0.00000643,  # -23.16 mas/yr converted to deg/yr
+            pm_ra=-0.03327,  # -33.27 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=-0.02316,  # -23.16 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=0.61,
     ),
@@ -652,8 +652,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=219.902066,  # 14h 39m 36.5s
             dec_j2000=-60.833976,  # -60° 50' 02"
-            pm_ra=-3.67818,  # -3678.18 mas/yr
-            pm_dec=0.48189,  # 481.89 mas/yr
+            pm_ra=-3.67925,  # -3679.25 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=0.47367,  # 473.67 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=-0.27,
     ),
@@ -1003,8 +1003,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=154.993144,  # 10h 19m 58.4s
             dec_j2000=19.841489,  # +19° 50' 30"
-            pm_ra=0.30996,  # 309.96 mas/yr
-            pm_dec=-0.15259,  # -152.59 mas/yr
+            pm_ra=0.30430,  # 304.30 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=-0.15428,  # -154.28 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=2.08,
     ),
@@ -1095,8 +1095,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=326.760184,  # 21h 47m 02.4s (Delta Capricorni)
             dec_j2000=-16.127287,  # -16° 07' 38"
-            pm_ra=0.26263,  # 262.63 mas/yr
-            pm_dec=-0.02968,  # -29.68 mas/yr
+            pm_ra=0.26170,  # 261.70 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=-0.29670,  # -296.70 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=2.81,
     ),
@@ -1464,8 +1464,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=134.621761,  # 08h 58m 29.2s (Alpha Cancri)
             dec_j2000=11.857700,  # +11° 51' 28"
-            pm_ra=-0.04069,  # -40.69 mas/yr
-            pm_dec=-0.02884,  # -28.84 mas/yr
+            pm_ra=0.04323,  # 43.23 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=-0.02963,  # -29.63 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=4.25,
     ),
@@ -1490,8 +1490,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=130.821451,  # 08h 43m 17.1s (ICRS, Hipparcos HIP 43103)
             dec_j2000=21.468500,  # +21° 28' 06.6"
-            pm_ra=-0.0000287528,  # -103.51 mas/yr converted to deg/yr
-            pm_dec=-0.0000109667,  # -39.48 mas/yr converted to deg/yr
+            pm_ra=-0.10351,  # -103.51 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=-0.03948,  # -39.48 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=4.66,
     ),
@@ -1503,8 +1503,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=131.171247,  # 08h 44m 41.1s (ICRS, Hipparcos HIP 42911)
             dec_j2000=18.154306,  # +18° 09' 15.5"
-            pm_ra=-0.0000049083,  # -17.67 mas/yr converted to deg/yr
-            pm_dec=-0.0000636833,  # -229.26 mas/yr converted to deg/yr
+            pm_ra=-0.01767,  # -17.67 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=-0.22926,  # -229.26 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=3.94,
     ),
@@ -1585,8 +1585,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=304.411958,  # 20h 17m 38.9s (ICRS, Hipparcos HIP 100064)
             dec_j2000=-12.508211,  # -12° 30' 29.6"
-            pm_ra=0.0000063833,  # 22.98 mas/yr converted to deg/yr
-            pm_dec=0.0000003556,  # 1.28 mas/yr converted to deg/yr
+            pm_ra=0.02298,  # 22.98 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=0.00128,  # 1.28 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=3.57,
     ),
@@ -1652,8 +1652,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=343.662556,  # 22h 54m 39.0s (Delta Aquarii)
             dec_j2000=-15.820827,  # -15° 49' 15"
-            pm_ra=0.02544,  # 25.44 mas/yr
-            pm_dec=-0.02551,  # -25.51 mas/yr
+            pm_ra=-0.04260,  # -42.60 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=-0.02789,  # -27.89 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=3.27,
     ),
@@ -1680,8 +1680,8 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         data=StarData(
             ra_j2000=30.511749,  # 02h 02m 02.8s (ICRS, Hipparcos HIP 7097)
             dec_j2000=2.763761,  # +02° 45' 49.5"
-            pm_ra=0.0000090139,  # 32.45 mas/yr converted to deg/yr
-            pm_dec=0.0000000111,  # 0.04 mas/yr converted to deg/yr
+            pm_ra=0.03245,  # 32.45 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_dec=0.00004,  # 0.04 mas/yr (Hipparcos, van Leeuwen 2007)
         ),
         magnitude=3.82,
     ),

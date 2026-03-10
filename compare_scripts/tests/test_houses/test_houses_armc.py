@@ -361,8 +361,11 @@ class TestHousesArmcEx2Basic:
             f"Only {positive_cusps} cusps have positive velocity"
         )
 
-        # ARMC velocity (ascmc_speed[2]) should be exactly 360°/day
-        assert abs(ascmc_speed[2] - 360.0) < 0.01, f"ARMC speed {ascmc_speed[2]} != 360"
+        # ARMC velocity (ascmc_speed[2]) should be the sidereal rotation
+        # rate (~360.9856°/day), not the solar rate (360°/day).
+        assert abs(ascmc_speed[2] - 360.9856) < 0.01, (
+            f"ARMC speed {ascmc_speed[2]} != ~360.986"
+        )
 
 
 class TestHousesArmcEx2VariousSystems:

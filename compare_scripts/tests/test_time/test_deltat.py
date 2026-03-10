@@ -220,41 +220,33 @@ class TestDeltatEx:
     """Tests for the extended Delta T function swe_deltat_ex."""
 
     @pytest.mark.unit
-    def test_deltat_ex_returns_tuple(self):
-        """swe_deltat_ex should return a tuple of (delta_t, serr)."""
+    def test_deltat_ex_returns_float(self):
+        """swe_deltat_ex should return a float."""
         jd = 2451545.0  # J2000
         result = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
-        assert isinstance(result, tuple)
-        assert len(result) == 2
-        assert isinstance(result[0], float)
-        assert isinstance(result[1], str)
+        assert isinstance(result, float)
 
     @pytest.mark.unit
     def test_deltat_ex_matches_deltat(self):
         """swe_deltat_ex with SEFLG_SWIEPH should match swe_deltat."""
         jd = 2451545.0  # J2000
         dt = ephem.swe_deltat(jd)
-        dt_ex, serr = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        dt_ex = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
         assert dt_ex == dt
-        assert serr == ""
 
     @pytest.mark.unit
     def test_deltat_ex_jpleph_matches_swieph(self):
         """SEFLG_JPLEPH should produce same results as SEFLG_SWIEPH."""
         jd = 2451545.0  # J2000
-        dt_swieph, serr_swieph = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
-        dt_jpleph, serr_jpleph = ephem.swe_deltat_ex(jd, ephem.SEFLG_JPLEPH)
+        dt_swieph = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        dt_jpleph = ephem.swe_deltat_ex(jd, ephem.SEFLG_JPLEPH)
         assert dt_swieph == dt_jpleph
-        assert serr_swieph == ""
-        assert serr_jpleph == ""
 
     @pytest.mark.unit
     def test_deltat_ex_moseph_uses_same_delta_t(self):
         """SEFLG_MOSEPH uses the same Delta T calculation (no warning)."""
         jd = 2451545.0  # J2000
-        dt, serr = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
-        # No warning - Moshier uses the same Skyfield Delta T model
-        assert serr == ""
+        dt = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
         # Should still return a valid Delta T value
         assert isinstance(dt, float)
         dt_seconds = dt * 86400
@@ -267,9 +259,8 @@ class TestDeltatEx:
     def test_deltat_ex_no_flag(self):
         """swe_deltat_ex with no ephemeris flag should work."""
         jd = 2451545.0  # J2000
-        dt, serr = ephem.swe_deltat_ex(jd, 0)
+        dt = ephem.swe_deltat_ex(jd, 0)
         assert isinstance(dt, float)
-        assert serr == ""
         # Value should match the standard function
         dt_standard = ephem.swe_deltat(jd)
         assert dt == dt_standard
@@ -278,19 +269,17 @@ class TestDeltatEx:
     def test_deltat_ex_default_flag(self):
         """swe_deltat_ex should default to SEFLG_SWIEPH."""
         jd = 2451545.0
-        dt_default, serr_default = ephem.swe_deltat_ex(jd)
-        dt_explicit, serr_explicit = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        dt_default = ephem.swe_deltat_ex(jd)
+        dt_explicit = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
         assert dt_default == dt_explicit
-        assert serr_default == serr_explicit == ""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("year", [1900, 1950, 2000, 2020, 2040])
     def test_deltat_ex_various_years(self, year):
         """swe_deltat_ex should work for various years."""
         jd = ephem.swe_julday(year, 6, 15, 12.0)
-        dt, serr = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        dt = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
         assert isinstance(dt, float)
-        assert serr == ""
         # Should match swe_deltat
         dt_standard = ephem.swe_deltat(jd)
         assert dt == dt_standard
@@ -301,9 +290,8 @@ class TestDeltatEx:
         jd = 2451545.0
         # Combine ephemeris flag with other flags (SEFLG_SPEED, etc.)
         combined_flag = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
-        dt, serr = ephem.swe_deltat_ex(jd, combined_flag)
+        dt = ephem.swe_deltat_ex(jd, combined_flag)
         assert isinstance(dt, float)
-        assert serr == ""
         # Should still match standard deltat
         dt_standard = ephem.swe_deltat(jd)
         assert dt == dt_standard
@@ -312,8 +300,8 @@ class TestDeltatEx:
     def test_deltat_ex_vs_pyswisseph(self):
         """swe_deltat_ex should match pyswisseph deltat_ex."""
         jd = 2451545.0  # J2000
-        dt_lib, serr_lib = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
-        # pyswisseph deltat_ex returns just the delta_t value (float), not a tuple
+        dt_lib = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        # pyswisseph deltat_ex returns just the delta_t value (float)
         dt_swe = swe.deltat_ex(jd, swe.FLG_SWIEPH)
         # Allow 0.5 second tolerance (in days: 0.5/86400)
         assert dt_lib == pytest.approx(dt_swe, abs=0.5 / 86400)
@@ -330,7 +318,7 @@ class TestDeltatEx:
         """swe_deltat_ex with various flags should match pyswisseph."""
         flag_name, flag_value = flag
         jd = ephem.swe_julday(2000, 1, 1, 12.0)
-        dt_lib, _ = ephem.swe_deltat_ex(jd, flag_value)
+        dt_lib = ephem.swe_deltat_ex(jd, flag_value)
         # pyswisseph deltat_ex returns just the delta_t value (float)
         dt_swe = swe.deltat_ex(jd, flag_value)
         # Allow 1 second tolerance

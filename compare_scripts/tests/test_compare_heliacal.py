@@ -139,7 +139,7 @@ class TestPlanetHeliacalRising:
 
         # LibEphemeris
         try:
-            dret_py, _ = pyephem.swe_heliacal_ut(
+            result_py = pyephem.swe_heliacal_ut(
                 jd_start,
                 geopos,
                 STANDARD_ATMO,
@@ -147,7 +147,7 @@ class TestPlanetHeliacalRising:
                 planet_name,
                 HELIACAL_RISING,
             )
-            jd_py = dret_py[0]
+            jd_py = result_py[0]
         except Exception as e:
             pytest.skip(f"LibEphemeris heliacal_ut failed: {e}")
 
@@ -186,7 +186,7 @@ class TestPlanetHeliacalSetting:
             pytest.skip(f"SwissEphemeris failed: {e}")
 
         try:
-            dret_py, _ = pyephem.swe_heliacal_ut(
+            result_py = pyephem.swe_heliacal_ut(
                 jd_start,
                 geopos,
                 STANDARD_ATMO,
@@ -194,7 +194,7 @@ class TestPlanetHeliacalSetting:
                 planet_name,
                 HELIACAL_SETTING,
             )
-            jd_py = dret_py[0]
+            jd_py = result_py[0]
         except Exception as e:
             pytest.skip(f"LibEphemeris failed: {e}")
 
@@ -233,7 +233,7 @@ class TestStarHeliacal:
             pytest.skip(f"SwissEphemeris failed: {e}")
 
         try:
-            dret_py, _ = pyephem.swe_heliacal_ut(
+            result_py = pyephem.swe_heliacal_ut(
                 jd_start,
                 geopos,
                 STANDARD_ATMO,
@@ -241,7 +241,7 @@ class TestStarHeliacal:
                 star_name,
                 HELIACAL_RISING,
             )
-            jd_py = dret_py[0]
+            jd_py = result_py[0]
         except Exception as e:
             pytest.skip(f"LibEphemeris failed: {e}")
 

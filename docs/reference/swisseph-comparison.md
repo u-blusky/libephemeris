@@ -243,7 +243,7 @@ libephemeris aims for 1:1 API compatibility with pyswisseph, but some function s
 | Function | pyswisseph signature | libephemeris signature |
 |----------|---------------------|----------------------|
 | `swe_get_ayanamsa_ex_ut` | `(tjd_ut, flags)` | `(tjd_ut, sid_mode, flags)` |
-| `swe_heliacal_ut` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` | `(jd, geopos, datm, dobs, name, event, flags)` → `(tuple_50, int)` |
+| `swe_heliacal_ut` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` ✅ |
 | `swe_lun_occult_when_loc` | body can be `int` or `str` | body can be `int` or `str` — same |
 
 ### Structural differences

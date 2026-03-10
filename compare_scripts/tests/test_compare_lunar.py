@@ -7,10 +7,8 @@ Compares lunar nodes and Lilith calculations between pyswisseph and libephemeris
 - Mean Lilith (Black Moon)
 - True Lilith (Osculating Apogee)
 
-NOTE: Mean Lilith tests are marked as xfail because libephemeris uses a different
-algorithm for calculating the lunar apogee. The differences are primarily in the
-latitude calculation (which pyswisseph computes from lunar orbit perturbations)
-and minor longitude differences (~0.1°).
+All lunar tests now pass within tolerance, including Mean Lilith which uses
+an SE-compatible DE404 algorithm with ecliptic projection (~15 arcsec precision).
 """
 
 import pytest

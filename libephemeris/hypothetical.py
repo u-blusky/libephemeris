@@ -713,14 +713,14 @@ class TransplutoKeplerianElements:
 TRANSPLUTO_KEPLERIAN_ELEMENTS = TransplutoKeplerianElements(
     name="Transpluto",
     epoch=2451545.0,  # J2000.0 (reference epoch for derived elements)
-    a=77.775,  # Semi-major axis in AU (from the orbital elements data)
-    e=0.3,  # Eccentricity (from the orbital elements data)
-    i=0.0,  # On ecliptic (from the orbital elements data)
-    omega=1.464316,  # Argument of perihelion at J2000 (derived from Strubell 1952 elements)
-    Omega=0.0,  # Ascending node (from the orbital elements data)
-    M0=119.262909,  # Mean anomaly at J2000 (derived from Strubell 1952 elements)
-    # Mean motion from Kepler's 3rd law, a=77.775 AU (Strubell 1952)
-    n=0.0011968259,
+    a=77.775,  # Semi-major axis in AU (Strubell 1952)
+    e=0.3,  # Eccentricity (Strubell 1952)
+    i=0.0,  # On ecliptic (Strubell 1952)
+    omega=1.468282,  # Arg perihelion at J2000: 0.7° + precession J1945→J2000
+    Omega=0.0,  # Ascending node (Strubell 1952)
+    M0=119.265936,  # Mean anomaly at J2000: propagated from epoch 2368547.66
+    # Mean motion from Kepler's 3rd law: n = 360 / (a^1.5 * 365.25), a=77.775 AU
+    n=360.0 / (77.775**1.5 * 365.25),  # ~0.001437 deg/day
 )
 
 
@@ -874,13 +874,13 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     SE_ISIS: HypotheticalElements(
         name="Transpluto/Isis",
         epoch=2451545.0,  # J2000.0 - reference epoch
-        a=77.775,  # AU - semi-major axis from the orbital elements data
-        e=0.3,  # Eccentricity from orbital elements data
-        i=0.0,  # Inclination from orbital elements data
-        omega=1.464316,  # Argument of perihelion at J2000 (derived from Strubell 1952 elements)
-        Omega=0.0,  # Ascending node from the orbital elements data
-        M0=119.262909,  # Mean anomaly at J2000 (derived from Strubell 1952 elements)
-        n=0.0011968259,  # Mean motion deg/day (Kepler's 3rd law, a=77.775 AU)
+        a=77.775,  # AU - semi-major axis (Strubell 1952)
+        e=0.3,  # Eccentricity (Strubell 1952)
+        i=0.0,  # Inclination (Strubell 1952)
+        omega=1.468282,  # Arg perihelion at J2000: 0.7° + precession J1945→J2000
+        Omega=0.0,  # Ascending node (Strubell 1952)
+        M0=119.265936,  # Mean anomaly at J2000: propagated from epoch 2368547.66
+        n=360.0 / (77.775**1.5 * 365.25),  # Mean motion deg/day (Kepler's 3rd law)
     ),
     SE_PROSERPINA: HypotheticalElements(
         name="Proserpina",
@@ -3714,9 +3714,10 @@ def calc_hypothetical_position(
     if not is_hypothetical_body(ipl):
         raise ValueError(f"Body ID {ipl} is not a hypothetical body")
 
-    # Uranian planets (Hamburg School)
-    if ipl in URANIAN_ELEMENTS:
-        return calc_uranian_position(ipl, jd_tt)
+    # Uranian planets (Hamburg School) - use Keplerian propagation
+    # (Witte/Sieggruen elements refined by Neely 1988)
+    if ipl in URANIAN_KEPLERIAN_ELEMENTS:
+        return calc_uranian_planet(ipl, jd_tt)
 
     # Transpluto / Isis
     if ipl == SE_ISIS:

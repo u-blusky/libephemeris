@@ -198,7 +198,7 @@ def swe_deltat(tjd: float) -> float:
     return delta_t_seconds / 86400.0
 
 
-def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str]:
+def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> float:
     """
     Calculate Delta T (TT - UT1) with explicit ephemeris source specification.
 
@@ -213,9 +213,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
             - SEFLG_MOSEPH (4): Accepted for compatibility (same Delta T)
 
     Returns:
-        tuple: (delta_t, serr) where:
-            - delta_t: Delta T in days (TT - UT1)
-            - serr: Error message string (empty if no error/warning)
+        float: Delta T in days (TT - UT1)
 
     Note:
         The implementation uses multiple sources for Delta T:
@@ -245,7 +243,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
 
     Example:
         >>> from libephemeris import swe_deltat_ex, SEFLG_SWIEPH, SEFLG_JPLEPH
-        >>> dt, err = swe_deltat_ex(2451545.0, SEFLG_SWIEPH)
+        >>> dt = swe_deltat_ex(2451545.0, SEFLG_SWIEPH)
         >>> print(f"Delta T: {dt * 86400:.2f} seconds")
         Delta T: 63.83 seconds
 
@@ -257,10 +255,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
     # Check for user-defined Delta T first
     userdef_dt = get_delta_t_userdef()
     if userdef_dt is not None:
-        return userdef_dt, ""
-
-    # Determine if there's a warning based on the flag
-    serr = ""
+        return userdef_dt
 
     # Check for valid ephemeris flags
     ephe_selection = ephe_flag & (SEFLG_JPLEPH | SEFLG_SWIEPH)
@@ -278,7 +273,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
             delta_t_seconds = iers_data.get_delta_t_iers(tjd)
             if delta_t_seconds is not None:
                 # IERS returns seconds, convert to days
-                return delta_t_seconds / 86400.0, serr
+                return delta_t_seconds / 86400.0
         except Exception:
             # Fall back to Skyfield if IERS data fails
             pass
@@ -289,7 +284,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> tuple[float, str
     delta_t_seconds = float(t.delta_t)
     delta_t = delta_t_seconds / 86400.0
 
-    return delta_t, serr
+    return delta_t
 
 
 def date_conversion(

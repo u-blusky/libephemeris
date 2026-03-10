@@ -295,9 +295,6 @@ class TestKeplerianPrecisionVsSwisseph:
         except swe.Error:
             return None
 
-    @pytest.mark.xfail(
-        reason="Pallas Keplerian elements have high error due to high inclination/eccentricity"
-    )
     @pytest.mark.parametrize("body_id,ast_num,name", MAIN_BELT)
     def test_main_belt_keplerian_accuracy(self, body_id, ast_num, name):
         """Main belt asteroids should be within expected Keplerian tolerance."""
@@ -526,43 +523,53 @@ class TestFallbackBehavior:
 
     def test_calc_ut_works_without_any_spk_registered(self):
         """calc_ut should work for all minor bodies without any SPK files."""
-        # Unregister all SPK bodies
-        for body_id in list(list_spk_bodies().keys()):
-            unregister_spk_body(body_id)
+        # Disable strict precision to allow Keplerian fallback
+        ephem.set_strict_precision(False)
+        try:
+            # Unregister all SPK bodies
+            for body_id in list(list_spk_bodies().keys()):
+                unregister_spk_body(body_id)
 
-        jd = 2451545.0
+            jd = 2451545.0
 
-        # All should return positions via Keplerian fallback
-        for body_id in MINOR_BODY_ELEMENTS:
-            pos, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
+            # All should return positions via Keplerian fallback
+            for body_id in MINOR_BODY_ELEMENTS:
+                pos, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
 
-            assert len(pos) >= 3, f"Body {body_id} should return position"
-            assert math.isfinite(pos[0]), f"Body {body_id} longitude not finite"
-            assert math.isfinite(pos[1]), f"Body {body_id} latitude not finite"
-            assert math.isfinite(pos[2]), f"Body {body_id} distance not finite"
+                assert len(pos) >= 3, f"Body {body_id} should return position"
+                assert math.isfinite(pos[0]), f"Body {body_id} longitude not finite"
+                assert math.isfinite(pos[1]), f"Body {body_id} latitude not finite"
+                assert math.isfinite(pos[2]), f"Body {body_id} distance not finite"
+        finally:
+            ephem.set_strict_precision(None)  # Reset to default
 
     def test_heliocentric_and_geocentric_both_work(self):
         """Both heliocentric and geocentric calculations should work."""
-        # Unregister SPK to test Keplerian
-        unregister_spk_body(SE_CERES)
+        # Disable strict precision to allow Keplerian fallback
+        ephem.set_strict_precision(False)
+        try:
+            # Unregister SPK to test Keplerian
+            unregister_spk_body(SE_CERES)
 
-        jd = 2451545.0
+            jd = 2451545.0
 
-        # Heliocentric
-        pos_hel, _ = ephem.swe_calc_ut(jd, SE_CERES, SEFLG_HELCTR)
-        assert math.isfinite(pos_hel[0]), "Heliocentric longitude not finite"
-        assert math.isfinite(pos_hel[2]), "Heliocentric distance not finite"
+            # Heliocentric
+            pos_hel, _ = ephem.swe_calc_ut(jd, SE_CERES, SEFLG_HELCTR)
+            assert math.isfinite(pos_hel[0]), "Heliocentric longitude not finite"
+            assert math.isfinite(pos_hel[2]), "Heliocentric distance not finite"
 
-        # Geocentric (default)
-        pos_geo, _ = ephem.swe_calc_ut(jd, SE_CERES, 0)
-        assert math.isfinite(pos_geo[0]), "Geocentric longitude not finite"
-        assert math.isfinite(pos_geo[2]), "Geocentric distance not finite"
+            # Geocentric (default)
+            pos_geo, _ = ephem.swe_calc_ut(jd, SE_CERES, 0)
+            assert math.isfinite(pos_geo[0]), "Geocentric longitude not finite"
+            assert math.isfinite(pos_geo[2]), "Geocentric distance not finite"
 
-        # Heliocentric distance should be different from geocentric
-        # (Earth is at ~1 AU from Sun, so distances will differ)
-        assert abs(pos_hel[2] - pos_geo[2]) > 0.1, (
-            "Helio and geo distances should differ significantly"
-        )
+            # Heliocentric distance should be different from geocentric
+            # (Earth is at ~1 AU from Sun, so distances will differ)
+            assert abs(pos_hel[2] - pos_geo[2]) > 0.1, (
+                "Helio and geo distances should differ significantly"
+            )
+        finally:
+            ephem.set_strict_precision(None)  # Reset to default
 
 
 class TestPeriodicPositions:

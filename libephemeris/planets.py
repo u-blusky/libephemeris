@@ -3309,69 +3309,58 @@ def swe_get_ayanamsa(tjd_et: float) -> float:
     return swe_get_ayanamsa_ut(tjd_ut)
 
 
-def swe_get_ayanamsa_ex(
-    tjd_et: float, sid_mode: int, flags: int = 0
-) -> Tuple[float, float, float]:
+def swe_get_ayanamsa_ex(tjd_et: float, flags: int = 0) -> Tuple[int, float]:
     """
-    Calculate ayanamsa with additional astronomical components.
+    Calculate ayanamsa with extended flags for Ephemeris Time.
 
-    Unlike swe_get_ayanamsa() which returns only the ayanamsa value, this function
-    returns a tuple including true obliquity and nutation in longitude, which are
-    useful for advanced sidereal calculations.
-
-    This is a libephemeris extension. The sid_mode parameter allows specifying
-    the sidereal mode directly without relying on global state from swe_set_sid_mode().
+    Uses the sidereal mode set via swe_set_sid_mode(). Returns the ayanamsa
+    value along with the return flags, matching pyswisseph signature.
 
     Args:
         tjd_et: Julian Day in Ephemeris Time (TT/ET)
-        sid_mode: Sidereal mode constant (SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, etc.)
-        flags: Calculation flags (currently unused, reserved for future extensions)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
-        Tuple of (ayanamsa, eps_true, nut_long):
+        Tuple of (retflag, ayanamsa):
+            - retflag: Return flags (int)
             - ayanamsa: Ayanamsa value in degrees (tropical_lon - sidereal_lon)
-            - eps_true: True obliquity of ecliptic in degrees (mean + nutation)
-            - nut_long: Nutation in longitude in degrees (Δψ)
 
     Example:
-        >>> from libephemeris import swe_get_ayanamsa_ex, SE_SIDM_LAHIRI
-        >>> aya, eps, nut = swe_get_ayanamsa_ex(2451545.0, SE_SIDM_LAHIRI)
-        >>> print(f"Ayanamsa: {aya:.6f}°")
-        >>> print(f"True obliquity: {eps:.6f}°")
-        >>> print(f"Nutation in longitude: {nut:.6f}°")
+        >>> from libephemeris import swe_get_ayanamsa_ex, swe_set_sid_mode, SE_SIDM_LAHIRI
+        >>> swe_set_sid_mode(SE_SIDM_LAHIRI)
+        >>> flags, aya = swe_get_ayanamsa_ex(2451545.0)
+        >>> print(f"Ayanamsa: {aya:.6f}")
 
     Note:
-        - eps_true = mean_obliquity + nutation_in_obliquity
-        - nut_long is the nutation in longitude (Δψ), not obliquity (Δε)
-        - Uses IAU 2000B nutation model (77 terms, ~0.1" precision)
+        The sidereal mode must be set via swe_set_sid_mode() before calling.
     """
-    return _calc_ayanamsa_ex(tjd_et, sid_mode, flags)
+    sid_mode = get_sid_mode()
+    assert isinstance(sid_mode, int)
+    ayanamsa = _calc_ayanamsa_ex_value(tjd_et, sid_mode)
+    return (flags, ayanamsa)
 
 
-def swe_get_ayanamsa_ex_ut(
-    tjd_ut: float, sid_mode: int, flags: int = 0
-) -> Tuple[float, float, float]:
+def swe_get_ayanamsa_ex_ut(tjd_ut: float, flags: int = 0) -> Tuple[int, float]:
     """
-    Calculate ayanamsa with additional components for Universal Time.
+    Calculate ayanamsa with extended flags for Universal Time.
 
     This is the UT version of swe_get_ayanamsa_ex(). It internally converts
     from UT to TT before calculating.
 
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
-        sid_mode: Sidereal mode constant (SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, etc.)
-        flags: Calculation flags (currently unused, reserved for future extensions)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
-        Tuple of (ayanamsa, eps_true, nut_long):
+        Tuple of (retflag, ayanamsa):
+            - retflag: Return flags (int)
             - ayanamsa: Ayanamsa value in degrees (tropical_lon - sidereal_lon)
-            - eps_true: True obliquity of ecliptic in degrees (mean + nutation)
-            - nut_long: Nutation in longitude in degrees (Δψ)
 
     Example:
-        >>> from libephemeris import swe_get_ayanamsa_ex_ut, SE_SIDM_LAHIRI
-        >>> aya, eps, nut = swe_get_ayanamsa_ex_ut(2451545.0, SE_SIDM_LAHIRI)
-        >>> print(f"Ayanamsa: {aya:.6f}°")
+        >>> from libephemeris import swe_get_ayanamsa_ex_ut, swe_set_sid_mode, SE_SIDM_LAHIRI
+        >>> swe_set_sid_mode(SE_SIDM_LAHIRI)
+        >>> flags, aya = swe_get_ayanamsa_ex_ut(2451545.0)
+        >>> print(f"Ayanamsa: {aya:.6f}")
 
     Note:
         Internally converts UT to TT using Delta T before calculation.
@@ -3379,53 +3368,27 @@ def swe_get_ayanamsa_ex_ut(
     ts = get_timescale()
     t_ut = ts.ut1_jd(tjd_ut)
     tjd_tt = t_ut.tt  # Convert UT1 to TT
-    return _calc_ayanamsa_ex(tjd_tt, sid_mode, flags)
+    sid_mode = get_sid_mode()
+    assert isinstance(sid_mode, int)
+    ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode)
+    return (flags, ayanamsa)
 
 
-def _calc_ayanamsa_ex(
-    tjd_tt: float, sid_mode: int, flags: int = 0
-) -> Tuple[float, float, float]:
+def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int) -> float:
     """
-    Internal function to calculate ayanamsa with astronomical components.
-
-    This function computes the ayanamsa value along with true obliquity and
-    nutation in longitude for a given sidereal mode.
+    Internal function to calculate the ayanamsa value for a given TT and sid_mode.
 
     Args:
         tjd_tt: Julian Day in Terrestrial Time (TT)
         sid_mode: Sidereal mode constant
-        flags: Calculation flags (reserved)
 
     Returns:
-        Tuple of (ayanamsa, eps_true, nut_long)
+        Ayanamsa value in degrees
     """
-    # Reference date J2000 = JD 2451545.0 = 2000-01-01 12:00 TT
-    J2000 = 2451545.0
-    T = (tjd_tt - J2000) / 36525.0  # Julian centuries from J2000 in TT
-
-    # Mean Obliquity IAU 2006 (Hilton et al. 2006, via pyerfa)
-    eps0 = math.degrees(erfa.obl06(2451545.0, tjd_tt - 2451545.0))
-
-    # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
     ts = get_timescale()
     t_obj = ts.tt_jd(tjd_tt)
-    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjd_tt - 2451545.0)
-
-    # Convert from radians to degrees
-    nut_long = math.degrees(dpsi_rad)  # Nutation in longitude (Δψ)
-    deps_deg = math.degrees(deps_rad)  # Nutation in obliquity (Δε)
-
-    # True obliquity = mean obliquity + nutation in obliquity
-    eps_true = eps0 + deps_deg
-
-    # Convert TT to UT for ayanamsa calculation (some modes need UT)
     tjd_ut = t_obj.ut1
-
-    # Calculate the ayanamsa value using the internal function
-    # We need to temporarily work with this sid_mode
-    ayanamsa = _calc_ayanamsa(tjd_ut, sid_mode)
-
-    return (ayanamsa, eps_true, nut_long)
+    return _calc_ayanamsa(tjd_ut, sid_mode)
 
 
 # Position tuple type for nod_aps results
@@ -3829,13 +3792,11 @@ def _calc_nod_aps(
     return (xnasc, xndsc, xperi, xaphe)
 
 
-def swe_get_orbital_elements(
-    tjd_et: float, ipl: int, iflag: int
-) -> Tuple[Tuple[float, ...], int]:
+def swe_get_orbital_elements(tjd_et: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for a celestial body.
 
-    Reference API compatible function.
+    Reference API compatible function matching pyswisseph signature.
 
     This function computes the osculating (instantaneous) orbital elements
     for a planet at a given time. The elements describe the elliptical orbit
@@ -3847,32 +3808,31 @@ def swe_get_orbital_elements(
         iflag: Calculation flags (SEFLG_HELCTR for heliocentric, etc.)
 
     Returns:
-        Tuple containing:
-            - Tuple of 17 orbital elements:
-                [0] a: Semi-major axis (AU)
-                [1] e: Eccentricity (0=circle, <1=ellipse, 1=parabola, >1=hyperbola)
-                [2] i: Inclination (degrees, relative to ecliptic)
-                [3] Omega: Longitude of ascending node (degrees)
-                [4] omega: Argument of perihelion (degrees)
-                [5] M: Mean anomaly (degrees)
-                [6] nu: True anomaly (degrees)
-                [7] E: Eccentric anomaly (degrees)
-                [8] L: Mean longitude (degrees)
-                [9] varpi: Longitude of perihelion (degrees)
-                [10] n: Mean daily motion (degrees/day)
-                [11] q: Perihelion distance (AU)
-                [12] Q: Aphelion distance (AU)
-                [13] P: Orbital period (tropical years)
-                [14] T: Time of perihelion passage (JD)
-                [15] Ps: Synodic period (days)
-                [16] r: Current heliocentric distance (AU)
-            - Return flag: iflag value on success
+        Flat tuple of 50 floats with orbital elements:
+            [0] a: Semi-major axis (AU)
+            [1] e: Eccentricity (0=circle, <1=ellipse, 1=parabola, >1=hyperbola)
+            [2] i: Inclination (degrees, relative to ecliptic)
+            [3] Omega: Longitude of ascending node (degrees)
+            [4] omega: Argument of perihelion (degrees)
+            [5] M: Mean anomaly (degrees)
+            [6] nu: True anomaly (degrees)
+            [7] E: Eccentric anomaly (degrees)
+            [8] L: Mean longitude (degrees)
+            [9] varpi: Longitude of perihelion (degrees)
+            [10] n: Mean daily motion (degrees/day)
+            [11] q: Perihelion distance (AU)
+            [12] Q: Aphelion distance (AU)
+            [13] P: Orbital period (tropical years)
+            [14] T: Time of perihelion passage (JD)
+            [15] Ps: Synodic period (days)
+            [16] r: Current heliocentric distance (AU)
+            [17-49]: Reserved (0.0)
 
     Example:
         >>> from libephemeris import get_orbital_elements, SE_MARS, SEFLG_HELCTR
-        >>> elements, flag = get_orbital_elements(2451545.0, SE_MARS, SEFLG_HELCTR)
+        >>> elements = get_orbital_elements(2451545.0, SE_MARS, SEFLG_HELCTR)
         >>> a, e, i = elements[0], elements[1], elements[2]
-        >>> print(f"Mars: a={a:.4f} AU, e={e:.4f}, i={i:.4f}°")
+        >>> print(f"Mars: a={a:.4f} AU, e={e:.4f}, i={i:.4f}")
 
     Note:
         - For heliocentric calculations (default), elements are relative to the Sun
@@ -3886,7 +3846,7 @@ def swe_get_orbital_elements(
 
 def swe_get_orbital_elements_ut(
     tjd_ut: float, ipl: int, iflag: int
-) -> Tuple[Tuple[float, ...], int]:
+) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for Universal Time.
 
@@ -3899,10 +3859,10 @@ def swe_get_orbital_elements_ut(
         iflag: Calculation flags
 
     Returns:
-        Same as swe_get_orbital_elements: (elements_tuple, retflag)
+        Flat tuple of 50 floats with orbital elements (same as swe_get_orbital_elements).
 
     Example:
-        >>> elements, flag = get_orbital_elements_ut(2451545.0, SE_JUPITER, 0)
+        >>> elements = get_orbital_elements_ut(2451545.0, SE_JUPITER, 0)
         >>> print(f"Jupiter semi-major axis: {elements[0]:.4f} AU")
     """
     ts = get_timescale()
@@ -3910,7 +3870,7 @@ def swe_get_orbital_elements_ut(
     return _calc_orbital_elements(t, ipl, iflag)
 
 
-def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
+def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Internal function to calculate orbital elements.
 
@@ -3923,18 +3883,18 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], 
         iflag: Calculation flags
 
     Returns:
-        Tuple of (17-element tuple, flags)
+        Flat tuple of 50 floats with orbital elements (padded with 0.0)
     """
     planets = get_planets()
-    zero_elements = tuple([0.0] * 17)
+    zero_elements = tuple([0.0] * 50)
 
     # Sun and Earth don't have heliocentric orbital elements
     if ipl == SE_SUN:
-        return (zero_elements, iflag)
+        return zero_elements
 
     # Get target and center bodies
     if ipl not in _PLANET_MAP:
-        return (zero_elements, iflag)
+        return zero_elements
 
     target_name = _PLANET_MAP[ipl]
     # Try planet center first, fall back to barycenter if not available
@@ -4174,7 +4134,9 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], 
         r_current,  # [16] Current heliocentric distance (AU)
     )
 
-    return (elements, iflag)
+    # Pad to 50 elements for pyswisseph compatibility
+    elements_50 = elements + tuple([0.0] * (50 - len(elements)))
+    return elements_50
 
 
 def swe_orbit_max_min_true_distance(
@@ -4284,7 +4246,7 @@ def _calc_orbit_max_min_true_distance(
 
     # For planets, we need orbital elements
     # Get orbital elements from the existing function
-    elements, _ = _calc_orbital_elements(t, ipl, iflag)
+    elements = _calc_orbital_elements(t, ipl, iflag)
 
     if elements[0] == 0.0:  # Invalid planet
         return (0.0, 0.0, true_dist)

@@ -132,9 +132,8 @@ class TestDeltatExWithUserdef:
         ephem.set_delta_t_userdef(dt_value)
 
         jd = 2451545.0  # J2000
-        result, serr = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        result = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
         assert result == dt_value
-        assert serr == ""
 
     @pytest.mark.unit
     def test_swe_deltat_ex_userdef_ignores_flag(self):
@@ -144,16 +143,14 @@ class TestDeltatExWithUserdef:
 
         jd = 2451545.0
 
-        result_swieph, _ = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
-        result_jpleph, _ = ephem.swe_deltat_ex(jd, ephem.SEFLG_JPLEPH)
-        result_moseph, serr_moseph = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
+        result_swieph = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        result_jpleph = ephem.swe_deltat_ex(jd, ephem.SEFLG_JPLEPH)
+        result_moseph = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
 
         # All should return the user-defined value
         assert result_swieph == dt_value
         assert result_jpleph == dt_value
         assert result_moseph == dt_value
-        # When userdef is set, no warning should be generated
-        assert serr_moseph == ""
 
     @pytest.mark.unit
     def test_swe_deltat_ex_matches_swe_deltat_with_userdef(self):
@@ -163,7 +160,7 @@ class TestDeltatExWithUserdef:
 
         jd = 2451545.0
         dt = ephem.swe_deltat(jd)
-        dt_ex, _ = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        dt_ex = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
 
         assert dt == dt_ex == dt_value
 
