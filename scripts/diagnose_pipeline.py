@@ -66,7 +66,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
     lat_sky_deg = lat_sky.degrees
     dist_sky_au = dist_sky.au
 
-    print(f"\n  PATH A: Skyfield apparent()")
+    print("\n  PATH A: Skyfield apparent()")
     print(
         f"    Earth bary pos:  ({earth_pos_sky[0]:.12f}, {earth_pos_sky[1]:.12f}, {earth_pos_sky[2]:.12f})"
     )
@@ -124,7 +124,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
         )
         geo_gen = retarded_pos - earth_pos_gen
 
-    print(f"\n  PATH B: Generator pipeline")
+    print("\n  PATH B: Generator pipeline")
     print(
         f"    Earth bary pos:  ({earth_pos_gen[0, 0]:.12f}, {earth_pos_gen[0, 1]:.12f}, {earth_pos_gen[0, 2]:.12f})"
     )
@@ -138,7 +138,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
 
     # Compare astrometric positions
     diff_astro = np.sqrt(np.sum((geo_gen[0] - astro_pos_sky) ** 2))
-    print(f"\n  COMPARISON: astrometric positions (before deflection/aberration)")
+    print("\n  COMPARISON: astrometric positions (before deflection/aberration)")
     print(
         f"    Skyfield astro:  ({astro_pos_sky[0]:.12f}, {astro_pos_sky[1]:.12f}, {astro_pos_sky[2]:.12f})"
     )
@@ -163,7 +163,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
     lat_gen = result_gen[0, 1]
     dist_gen_final = result_gen[0, 2]
 
-    print(f"\n  PATH B final:")
+    print("\n  PATH B final:")
     print(f"    Ecliptic lon:    {lon_gen:.10f}°")
     print(f"    Ecliptic lat:    {lat_gen:.10f}°")
     print(f"    Distance:        {dist_gen_final:.12f} AU")
@@ -198,7 +198,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
     err_gen_vs_sky_lon = ang_diff(lon_gen, lon_sky_deg) * 3600
     err_gen_vs_sky_lat = abs(lat_gen - lat_sky_deg) * 3600
 
-    print(f"\n  ERROR SUMMARY (arcsec):")
+    print("\n  ERROR SUMMARY (arcsec):")
     print(
         f'    Skyfield.apparent vs swe_calc:  lon={err_sky_vs_ref_lon:.6f}"  lat={err_sky_vs_ref_lat:.6f}"'
     )
@@ -274,7 +274,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
     err_gen2_vs_ref_lon = ang_diff(lon_gen2_deg, lon_ref) * 3600
     err_gen2_vs_ref_lat = abs(lat_gen2_deg - lat_ref) * 3600
 
-    print(f"\n  GEN ICRS→Skyfield ecliptic frame:")
+    print("\n  GEN ICRS→Skyfield ecliptic frame:")
     print(f"    lon={lon_gen2_deg:.10f}°  lat={lat_gen2_deg:.10f}°")
     print(f'    vs Skyfield.apparent: lon={err_gen2_vs_sky_lon:.6f}"')
     print(
@@ -310,7 +310,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
     err_gen3_vs_sky_lon = ang_diff(lon_gen3, lon_sky_deg) * 3600
     err_gen3_vs_ref_lon = ang_diff(lon_gen3, lon_ref) * 3600
 
-    print(f"\n  GEN ICRS→manual PNM+obliquity:")
+    print("\n  GEN ICRS→manual PNM+obliquity:")
     print(f"    lon={lon_gen3:.10f}°  lat={lat_gen3:.10f}°")
     print(f'    vs Skyfield.apparent: lon={err_gen3_vs_sky_lon:.6f}"')
     print(f'    vs swe_calc:          lon={err_gen3_vs_ref_lon:.6f}"')

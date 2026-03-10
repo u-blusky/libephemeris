@@ -1009,18 +1009,17 @@ def swe_cross_ut(
         # Use Brent's method which only requires bracketing, not derivatives
         try:
             # Estimate search window based on typical speeds.
-            # Near stations, the planet may need to complete a full retrograde
-            # cycle before reaching the target. Use a generous window:
-            # - At least the time estimate (dt_guess * 1.5) to cover the full
-            #   expected travel, plus margin for retrograde detours
-            # - Minimum 60 days for fast planets, 500 days for slow ones
+            # Near stations or retrograde, the planet may need to complete a
+            # full retrograde cycle before reaching the target. Use a generous
+            # window: dt_guess * 2.0 covers the expected travel plus margin
+            # for retrograde detours that can add ~50% more time.
             if speed_default > 0:
                 min_window = 500.0 if speed_default < 0.1 else 60.0
                 search_window = max(
-                    min_window, abs(dt_guess) * 1.5, abs(diff / speed_default) * 3.0
+                    min_window, abs(dt_guess) * 2.0, abs(diff / speed_default) * 3.0
                 )
             else:
-                search_window = max(500.0, abs(dt_guess) * 1.5)
+                search_window = max(500.0, abs(dt_guess) * 2.0)
             jd_bracket_start = jd_ut
             jd_bracket_end = jd_ut + search_window
 
@@ -1066,8 +1065,10 @@ def swe_cross_ut(
         if abs(diff) < NR_TOLERANCE:
             return jd
 
-        # Detect if we've encountered a station during iteration
-        if _is_near_station(speed) and not station_fallback_triggered:
+        # Detect if we've encountered a station or retrograde during iteration.
+        # Retrograde (speed < 0) causes NR to step backward in time, which
+        # can oscillate indefinitely for forward-only searches.
+        if (_is_near_station(speed) or speed < 0) and not station_fallback_triggered:
             station_fallback_triggered = True
             # Switch to Brent's method for robustness.
             # Search from the original start time forward — the planet may
@@ -1077,11 +1078,11 @@ def swe_cross_ut(
                     min_window = 500.0 if speed_default < 0.1 else 60.0
                     bracket_window = max(
                         min_window,
-                        abs(dt_guess) * 1.5,
+                        abs(dt_guess) * 2.0,
                         abs(diff / speed_default) * 3.0,
                     )
                 else:
-                    bracket_window = max(500.0, abs(dt_guess) * 1.5)
+                    bracket_window = max(500.0, abs(dt_guess) * 2.0)
                 bracket_samples = max(40, int(bracket_window / 30))
                 jd_a, jd_b = _find_bracket_for_crossing(
                     get_position,
@@ -1232,15 +1233,20 @@ def swe_helio_cross_ut(
     if _is_near_station(speed):
         try:
             search_window = (
-                max(60.0, abs(diff / speed_default) * 1.5)
+                max(60.0, abs(dt_guess) * 2.0, abs(diff / speed_default) * 1.5)
                 if speed_default > 0
-                else 120.0
+                else max(120.0, abs(dt_guess) * 2.0)
             )
             jd_bracket_start = jd_ut
             jd_bracket_end = jd_ut + search_window
+            bracket_samples = max(40, int(search_window / 30))
 
             jd_a, jd_b = _find_bracket_for_crossing(
-                get_helio_position, x2cross, jd_bracket_start, jd_bracket_end
+                get_helio_position,
+                x2cross,
+                jd_bracket_start,
+                jd_bracket_end,
+                num_samples=bracket_samples,
             )
 
             return _brent_find_crossing(
@@ -1276,9 +1282,13 @@ def swe_helio_cross_ut(
 
         jd += diff / speed
 
-        # Safety: longer range for slower planets
-        max_range = 500 if abs(speed_default) < 0.05 else 400
-        if abs(jd - jd_guess) > max_range:
+        # Safety: scale max_range with dt_guess so slow planets have enough room.
+        # Heliocentric orbits are smooth (no retrograde), so NR converges well —
+        # but the initial guess may be off by a significant fraction of dt_guess
+        # due to elliptical orbit speed variation.
+        base_range = 500.0 if abs(speed_default) < 0.05 else 400.0
+        max_range = max(base_range, abs(dt_guess) * 2.0)
+        if abs(jd - jd_ut) > max_range:
             raise RuntimeError("Heliocentric crossing search diverged")
 
     raise RuntimeError(

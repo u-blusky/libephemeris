@@ -7,7 +7,8 @@ or the pipeline output.
 """
 
 from __future__ import annotations
-import sys, math
+import sys
+import math
 import numpy as np
 from numpy.polynomial.chebyshev import chebfit, chebval
 
@@ -104,7 +105,7 @@ def main():
     # Method B: swe_calc (scalar, reference)
     swe_vals = eval_swe_calc_at_jds(node_jds)
 
-    print(f"\nNode-by-node comparison (pipeline vs swe_calc):")
+    print("\nNode-by-node comparison (pipeline vs swe_calc):")
     for i in range(DEGREE + 1):
         lon_err = ang_diff(pipeline_vals[i, 0], swe_vals[i, 0]) * 3600
         lat_err = abs(pipeline_vals[i, 1] - swe_vals[i, 1]) * 3600
@@ -170,7 +171,7 @@ def main():
                 f'  {jd_test:.6f}  {err_pipe:12.6f}"  {err_swe:12.6f}"  {err_cross:12.6f}"'
             )
 
-    print(f"\nMax errors:")
+    print("\nMax errors:")
     print(f'  Pipeline fit vs pipeline ref:  {max_pipe_err:.6f}"')
     print(f'  swe_calc fit vs swe_calc ref:  {max_swe_err:.6f}"')
     print(f'  Pipeline fit vs swe_calc ref:  {max_cross_err:.6f}"')

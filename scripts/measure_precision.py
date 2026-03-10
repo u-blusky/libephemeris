@@ -303,7 +303,7 @@ def main():
         elapsed = time.time() - t0
 
         if result is None:
-            print(f"SKIPPED (no valid samples)")
+            print("SKIPPED (no valid samples)")
             continue
 
         status = "OK" if result["max_arcsec"] < 0.001 else "FAIL"

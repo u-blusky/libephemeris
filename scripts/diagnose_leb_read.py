@@ -101,7 +101,7 @@ def check_leb_vs_swe_calc(leb_path: str, body_id: int, body_name: str, jd_ut: fl
     err4_lon = ang_diff(lon_leb2, ref_tt2[0]) * 3600
     err4_lat = abs(lat_leb2 - ref_tt2[1]) * 3600
 
-    print(f"\n  ERRORS (arcsec):")
+    print("\n  ERRORS (arcsec):")
     print(
         f'    LEB(leb_tt) vs swe_calc_ut:         lon={err1_lon:.6f}"  lat={err1_lat:.6f}"'
     )
@@ -116,8 +116,8 @@ def check_leb_vs_swe_calc(leb_path: str, body_id: int, body_name: str, jd_ut: fl
     )
 
     # 7. What the compare test actually does
-    print(f"\n  COMPARE TEST simulation:")
-    print(f"    The test calls swe_calc_ut(jd_ut) in both skyfield and LEB mode")
+    print("\n  COMPARE TEST simulation:")
+    print("    The test calls swe_calc_ut(jd_ut) in both skyfield and LEB mode")
 
     # LEB mode: swe_calc_ut → fast_calc_ut → jd_tt = jd_ut + reader.delta_t(jd_ut)
     # → _pipeline_geo_ecliptic → reader.eval_body(ipl, jd_tt)
