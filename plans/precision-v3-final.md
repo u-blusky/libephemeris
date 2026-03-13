@@ -81,13 +81,19 @@ For every area with tolerance > 0.001°, we perform a 3-source triangulation:
 - **Test:** 10 dates, compare numerical velocities vs ours vs SE
 - **Priority:** MEDIUM (velocities are secondary to positions)
 
-### A6. Fixed Stars — 0.002° (7.2")
+### A6. Fixed Stars — 0.002° (7.2") ✅ COMPLETED
 
 - **Symptom:** Position differences for fixed stars
-- **Ground truth:** Gaia DR3 (or Hipparcos with propagated proper motion) via SIMBAD
-- **Test:** 10 principal stars (Regulus, Spica, Aldebaran...), compare ecliptic positions
-- **If we win:** Document "Star positions derived directly from ESA Hipparcos catalog with rigorous space motion propagation"
-- **Priority:** MEDIUM
+- **Ground truth:** van Leeuwen 2007 (new Hipparcos reduction, I/311/hip2) via VizieR TAP + SIMBAD
+- **Result:** IMPROVED — 99 stars updated to van Leeuwen 2007 proper motions, 2 catalog bugs fixed
+- **Findings:**
+  - Proper motions updated from original Hipparcos 1997 to van Leeuwen 2007 for 99/116 stars
+  - Algedi: RA/Dec were for wrong component (Alpha-1 instead of Alpha-2 Cap) — fixed
+  - Asellus Borealis: HIP number was wrong (43103=Iota Cnc, corrected to 42806=Gamma Cnc) — fixed
+  - 5 stars resolve to different physical components vs SE (Menkar, Algedi, Algieba, Albireo, Almach)
+  - Independent astropy verification: both us and SE agree with astropy to <0.5" for all 10 principal stars
+  - Sirius 0.24" and Fomalhaut 0.11" offsets traced to annual parallax (not modeled)
+  - Post-update: 100% of 101 comparable stars within 0.002° of SE, 98% within 0.5"
 
 ### A7. Star-based Sidereal Ayanamshas — 0.1°
 

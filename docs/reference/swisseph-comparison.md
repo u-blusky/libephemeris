@@ -51,7 +51,7 @@ All planets except the Moon are sub-2" (sub-arcsecond for outer planets). The Mo
 | Area | Precision | Notes |
 |------|-----------|-------|
 | House cusps (24 systems) | < 0.02" | All house systems tested at 11 global locations |
-| Fixed stars (102 stars) | < 0.30" | Hipparcos catalog, all proper-motion corrected |
+| Fixed stars (116 stars) | < 0.51" | van Leeuwen 2007 proper motions, verified vs SIMBAD |
 | Coordinate transforms | Exact | cotrans, azalt, equatorial ↔ ecliptic |
 | Utility functions | Exact | julday, revjul, degnorm, split_deg, etc. |
 | Solar eclipse timing | < 6 sec | Maximum, contact times (C1--C4) |
@@ -390,6 +390,40 @@ All previous tolerances (0.2–1.5°) were wildly over-conservative. Tightened t
 
 The `fixed_stars.py` module previously handled only 4 of 19 SEFLG flags. Most critically, `SEFLG_SIDEREAL` returned tropical coordinates without warning. This has been fixed — all meaningful flags are now handled:
 `SEFLG_SIDEREAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_XYZ`, `SEFLG_RADIANS`, `SEFLG_TRUEPOS`, `SEFLG_MOSEPH`, `SEFLG_SPEED3`, `SEFLG_TOPOCTR`.
+
+### 6.6. Fixed star catalog — cross-checked against Hipparcos/SIMBAD
+
+All 116 catalog stars were independently verified against authoritative sources:
+
+**Proper motions updated to van Leeuwen 2007** (new Hipparcos reduction, A&A 474, 653-664):
+- 99 stars had proper motion values updated from the original 1997 Hipparcos catalog
+- Data independently sourced from CDS/VizieR catalog I/311/hip2 via TAP query
+- Largest correction: Tarf (Beta Cancri) — 18.3" position error at 100 years with old PM
+
+**Position (RA/Dec) cross-checked against SIMBAD**:
+- All 10 principal stars verified to <0.02" against SIMBAD J2000 positions
+- Two catalog bugs found and fixed:
+  - Algedi: coordinates were for Alpha-1 Cap instead of Alpha-2 Cap (HIP 100064)
+  - Asellus Borealis: HIP number was wrong (43103 = Iota Cnc, corrected to 42806 = Gamma Cnc)
+
+**Post-update agreement with SE** (101 comparable stars at J2025.0):
+- 100% within 0.002° (7.2")
+- 98% within 0.5"
+- 80% within 0.1"
+- Max difference: Rigil Kentaurus 0.51" (nearest star — parallax not modeled)
+- Remaining sub-arcsecond differences are from Skyfield vs SE precession/nutation pipeline
+
+**IAU WGSN star name differences** (5 stars resolve to different physical components):
+- Menkar: we use Alpha Ceti (IAU WGSN), SE uses Lambda Ceti
+- Algedi: we use Alpha-2 Cap (IAU), SE uses Alpha-1 Cap
+- Algieba, Albireo, Almach: different component designations
+
+**Independent astropy verification** (10 principal stars, 3 epochs):
+- At J2025.0: LibEphemeris wins longitude 4/10, SE wins 6/10 vs astropy
+- At J2025.0: LibEphemeris wins latitude 5/10, SE wins 3/10 vs astropy
+- At J2100.0: LibEphemeris wins longitude 5/10, SE wins 5/10 vs astropy
+- Sirius 0.24" latitude offset traced to annual parallax (not modeled — Sirius is 2.6 pc)
+- Fomalhaut 0.11" longitude offset also from parallax (7.7 pc)
 
 ---
 
