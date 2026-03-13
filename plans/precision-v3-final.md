@@ -46,14 +46,15 @@ For every area with tolerance > 0.001°, we perform a 3-source triangulation:
 - **If we win:** Document "IAU 2006 precession produces more accurate J2000 frame transformation"
 - **Priority:** HIGH (potential selling point)
 
-### A2. Mean Lilith (MEAN_APOG) — 0.01° (~36")
+### A2. Mean Lilith (MEAN_APOG) — 0.01° (~36") ✅ COMPLETED — NOT a bug
 
 - **Symptom:** Consistent ~15" mean difference in mean Lilith longitude
 - **Ground truth:** Chapront et al. (2002) published mean orbital elements of lunar perigee
-- **Hypothesis:** Different coefficients in the analytical mean argument of perigee formula
-- **Test:** Compare formula coefficients against the original publication
-- **If we win:** Document "Uses updated Chapront mean elements"
-- **Priority:** LOW (small difference, analytical formula)
+- **Results:**
+  - Longitude: < 0.015" within 1950–2050 (essentially zero). Grows to ~1.9" at year 2600 due to minor higher-order polynomial coefficient difference (~0.05–0.07"/cy²). Negligible.
+  - Latitude: Systematic ~15–20" sinusoidal difference. Traced to phase offset in the node calculation used for orbital-plane-to-ecliptic projection (`lat = i × sin(apogee − node)`). Both libraries use slightly different analytical node formulas.
+  - Speed: < 0.00005°/day — perfect agreement.
+- **Conclusion:** No action needed. Differences are inherent to the different analytical approaches (DE404-fitted Chapront coefficients vs SE internal coefficients). Mean Lilith is a mathematical point, not a physical body — sub-arcsecond longitude agreement is excellent.
 
 ### A3. Equatorial Coordinates — TRUE_NODE 0.2°, OSCU_APOG 0.15°
 
@@ -101,12 +102,19 @@ For every area with tolerance > 0.001°, we perform a 3-source triangulation:
 - **Test:** Compute Lahiri ayanamsha (Spica-based) independently
 - **Priority:** LOW
 
-### A8. Heliocentric/Barycentric Planets — 0.03°
+### A8. Heliocentric/Barycentric Planets — 0.03° ✅ COMPLETED
 
 - **Symptom:** Relaxed tolerance in heliocentric/barycentric frames
-- **Ground truth:** JPL Horizons heliocentric output
-- **Test:** 5 planets x 5 dates
-- **Priority:** LOW
+- **Ground truth:** JPL Horizons heliocentric output, raw Skyfield/DE440
+- **Test:** 10 bodies × 10 dates × 4 modes (helio, bary, equatorial, XYZ) = 503 tests
+- **Results:**
+  - Heliocentric (Mercury–Pluto): < 0.0004° (1.1") — sub-arcsecond, no issues
+  - Barycentric (Moon–Pluto): < 0.001° — sub-arcsecond, no issues
+  - Barycentric Sun: up to 0.04° angular, but actual 3D offset is only ~120 km (0.017% of solar radius). Angular amplification from tiny Sun-SSB distance (~0.001–0.009 AU). Verified LE is closer to raw Skyfield/DE440 at J2000.
+  - Equatorial: < 0.0005° (1.7") — sub-arcsecond, no issues
+  - XYZ Cartesian: < 0.00005 AU — sub-arcsecond angular at all distances
+- **Bug found:** SEFLG_XYZ and SEFLG_RADIANS not preserved in retflag — fixed in planets.py
+- **Test file:** `compare_scripts/tests/test_compare_helio_bary.py` (503 tests, all pass)
 
 **Execution order: A4 > A1 > A3 > A5 > A6 > A2 > A8 > A7**
 

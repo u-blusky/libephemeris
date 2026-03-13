@@ -883,6 +883,8 @@ def swe_calc_ut(
             get_logger().debug("body=%d jd=%.1f source=Skyfield", ipl, tjd_ut)
         # Apply output format flags (XYZ, RADIANS)
         pos = _apply_output_flags(pos, iflag)
+        # Restore output format flags in retflag (they were stripped for calc)
+        retflag |= iflag & (SEFLG_XYZ | SEFLG_RADIANS)
         return pos, retflag
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjd_ut, ipl) from e
@@ -950,6 +952,8 @@ def swe_calc(
             get_logger().debug("body=%d jd=%.1f source=Skyfield", ipl, tjd)
         # Apply output format flags (XYZ, RADIANS)
         pos = _apply_output_flags(pos, iflag)
+        # Restore output format flags in retflag (they were stripped for calc)
+        retflag |= iflag & (SEFLG_XYZ | SEFLG_RADIANS)
         return pos, retflag
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjd, ipl) from e

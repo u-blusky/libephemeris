@@ -425,6 +425,28 @@ All 116 catalog stars were independently verified against authoritative sources:
 - Sirius 0.24" latitude offset traced to annual parallax (not modeled — Sirius is 2.6 pc)
 - Fomalhaut 0.11" longitude offset also from parallax (7.7 pc)
 
+### 6.7. Heliocentric, barycentric, equatorial, and XYZ modes — verified
+
+Comprehensive testing across 4 coordinate modes, 10 bodies, 10 dates (1950–2050):
+
+**Heliocentric (SEFLG_HELCTR)** — bodies Mercury–Pluto:
+- Position: < 0.0004° (1.1") max (Mercury), sub-arcsecond for all bodies
+- Speed: < 0.0002°/day
+
+**Barycentric (SEFLG_BARYCTR)** — bodies Moon–Pluto:
+- Position: < 0.001° for all bodies except Sun
+- Barycentric Sun: up to 0.04° (138") in angular terms, but this is a distance-amplification artifact. The actual 3D positional difference is only ~120 km (0.017% of the solar radius), amplified by the tiny Sun-SSB distance (~0.001–0.009 AU). Independent verification against raw Skyfield/JPL DE440 confirms libephemeris is closer to the source ephemeris at J2000.
+
+**Equatorial (SEFLG_EQUATORIAL)** — Sun, Moon, Mars, Jupiter:
+- RA: < 0.0005° (1.7") max (Moon)
+- Dec: < 0.0002° (0.6") max
+
+**XYZ Cartesian (SEFLG_XYZ)** — all bodies:
+- Position: < 0.00005 AU for all bodies (< 0.00004 AU for Sun–Saturn)
+- Neptune/Pluto show ~0.00003 AU max, corresponding to sub-arcsecond angular difference at their distances (30+ AU)
+
+**Bug found and fixed**: `SEFLG_XYZ` and `SEFLG_RADIANS` flags were not preserved in the return flag of `swe_calc_ut()` / `swe_calc()`. These output format flags were stripped before calculation but not restored in the returned `retflag`. Now fixed.
+
 ---
 
 ## 7. References
