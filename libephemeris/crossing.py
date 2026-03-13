@@ -708,10 +708,9 @@ def swe_mooncross_node_ut(
         RuntimeError: If convergence fails or calculation error occurs
 
     Algorithm:
-        1. Get current Moon latitude and latitude velocity
-        2. Linear estimate: dt = -latitude / latitude_velocity
-        3. Refine with Newton-Raphson until latitude is ~0
-        4. Converge to < 0.05 arcsecond (sub-arcsecond precision)
+        1. Convert UT to TT for internal calculation
+        2. Delegate to swe_mooncross_node (TT version) for Newton-Raphson search
+        3. Convert result TT back to UT for return value
 
     Note:
         The function finds the NEXT node crossing regardless of whether it's
@@ -728,89 +727,21 @@ def swe_mooncross_node_ut(
         >>> pos, _ = swe_calc_ut(jd_node, SE_MOON, SEFLG_SPEED)
         >>> is_ascending = pos[4] > 0  # positive lat velocity = ascending
     """
-    # Half nodal month - time between successive node crossings
-    HALF_NODAL_MONTH = 13.6
+    from .state import get_timescale
 
-    try:
-        pos, _ = swe_calc_ut(jd_ut, SE_MOON, flag | SEFLG_SPEED)
-        lat = pos[1]  # ecliptic latitude
-        lat_speed = pos[4]  # latitude velocity in degrees/day
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate Moon position: {e}")
+    # Convert UT to TT for the TT-based search
+    ts = get_timescale()
+    t_start = ts.ut1_jd(jd_ut)
+    jd_tt_start = t_start.tt
 
-    # If latitude velocity is zero or very small, use average value
-    # Moon's latitude varies between about ±5.15° with period ~27.2 days
-    # Average latitude speed at zero crossing: ~1.0°/day
-    if abs(lat_speed) < 0.1:
-        lat_speed = 1.0 if lat >= 0 else -1.0
+    # Delegate to the TT version
+    jd_tt_cross, xlon, xlat = swe_mooncross_node(jd_tt_start, flag)
 
-    # Initial time estimate to reach latitude = 0
-    dt_guess = -lat / lat_speed
+    # Convert result from TT back to UT
+    t_cross = ts.tt_jd(jd_tt_cross)
+    jd_ut_cross = t_cross.ut1
 
-    # If dt_guess is negative, very small, OR too large (> half nodal month),
-    # the linear estimate is unreliable. Search for the actual crossing.
-    # The strategy: check at multiple points to bracket the next crossing
-    if dt_guess < 0.1 or dt_guess > HALF_NODAL_MONTH:
-        # Search in steps to find where latitude changes sign
-        # The next crossing is within 0 to ~13.6 days
-        jd_search_start = jd_ut + 0.5  # Start half day ahead to avoid current crossing
-
-        # Get sign of latitude at search start
-        pos_start, _ = swe_calc_ut(jd_search_start, SE_MOON, flag | SEFLG_SPEED)
-        lat_sign = 1 if pos_start[1] >= 0 else -1
-
-        # Step forward in 2-day increments to find sign change
-        for step in range(8):  # Up to 16 days
-            jd_check = jd_search_start + step * 2.0
-            pos_check, _ = swe_calc_ut(jd_check, SE_MOON, flag | SEFLG_SPEED)
-            current_sign = 1 if pos_check[1] >= 0 else -1
-
-            if current_sign != lat_sign:
-                # Found a sign change - crossing is between jd_check-2 and jd_check
-                # Use the midpoint as starting guess and refine
-                jd_guess = jd_check - 1.0
-                break
-        else:
-            # Fallback: use half nodal month
-            jd_guess = jd_ut + HALF_NODAL_MONTH
-    else:
-        jd_guess = jd_ut + dt_guess
-
-    jd = jd_guess
-    for iteration in range(NR_MAX_ITER_MOON):
-        try:
-            pos, _ = swe_calc_ut(jd, SE_MOON, flag | SEFLG_SPEED)
-            lat = pos[1]
-            lat_speed = pos[4]
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to calculate Moon position during iteration: {e}"
-            )
-
-        # Check convergence (< 0.05 arcsecond for Moon)
-        if abs(lat) < NR_TOLERANCE_MOON:
-            # Make sure we found a crossing that's actually in the future
-            if jd > jd_ut + 0.001:  # At least ~1.4 minutes in future
-                # Return tuple (jd_cross, xlon, xlat) matching reference API
-                return (jd, pos[0], lat)
-            # If we found a crossing too close to start, look for next one
-            jd = jd + HALF_NODAL_MONTH / 2
-            continue
-
-        # Newton-Raphson step
-        if abs(lat_speed) < 0.1:
-            lat_speed = 1.0 if lat >= 0 else -1.0
-
-        jd -= lat / lat_speed
-
-        # Safety check: should find a crossing within reasonable time
-        if jd < jd_ut:
-            # We went backward, push forward
-            jd = jd_ut + HALF_NODAL_MONTH / 2
-        elif abs(jd - jd_ut) > 30:
-            raise RuntimeError("Moon node crossing search diverged")
-
-    raise RuntimeError("Maximum iterations reached in moon node crossing calculation")
+    return (float(jd_ut_cross), xlon, xlat)
 
 
 def swe_mooncross_node(

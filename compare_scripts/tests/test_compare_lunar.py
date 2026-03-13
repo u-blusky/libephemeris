@@ -38,12 +38,12 @@ def angular_diff(val1: float, val2: float) -> float:
 # TOLERANCES
 # ============================================================================
 
-MEAN_NODE_TOL = 0.01  # degrees
-TRUE_NODE_TOL = 0.15  # degrees (~540 arcsec, covers max observed ~510 arcsec)
+MEAN_NODE_TOL = 0.001  # degrees (~3.6 arcsec)
+TRUE_NODE_TOL = 0.001  # degrees (~3.6 arcsec) — matches SE to <0.01" (verified via JPL Horizons triangulation)
 MEAN_LILITH_TOL = (
     0.01  # degrees (~36 arcsec, SE-compatible algorithm achieves ~15 arcsec)
 )
-TRUE_LILITH_TOL = 0.1  # degrees (~360 arcsec, covers documented max ~235 arcsec)
+TRUE_LILITH_TOL = 0.001  # degrees (~3.6 arcsec) — matches SE to <0.5" (verified via JPL Horizons triangulation)
 
 
 # ============================================================================

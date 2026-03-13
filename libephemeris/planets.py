@@ -97,8 +97,12 @@ from .constants import (
     SEFLG_NOABERR,
     SEFLG_EQUATORIAL,
     SEFLG_J2000,
+    SEFLG_NONUT,
     SEFLG_XYZ,
     SEFLG_RADIANS,
+    SEFLG_ICRS,
+    SEFLG_SPEED3,
+    SEFLG_NOGDEFL,
     SE_PARS_FORTUNAE,
     SE_PARS_SPIRITUS,
     SE_PARS_AMORIS,
@@ -849,25 +853,16 @@ def swe_calc_ut(
     # Strip SEFLG_MOSEPH bit — accepted for compatibility, always uses JPL
     iflag = iflag & ~SEFLG_MOSEPH
 
+    # SEFLG_SPEED3: 3-position numerical differentiation for speed.
+    # libephemeris already uses this method as its only speed computation,
+    # so SPEED3 is treated as equivalent to SPEED (matching SE behavior
+    # where SPEED takes priority if both are set).
+    if iflag & SEFLG_SPEED3:
+        iflag = (iflag & ~SEFLG_SPEED3) | SEFLG_SPEED
+
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
     from .logging_config import get_logger
-
-    reader = get_leb_reader()
-    if reader is not None:
-        try:
-            from . import fast_calc
-
-            result = fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
-            get_logger().debug("body=%d jd=%.1f source=LEB", ipl, tjd_ut)
-            return result
-        except (KeyError, ValueError):
-            get_logger().debug(
-                "body=%d jd=%.1f source=LEB->fallback (not in LEB or out of range)",
-                ipl,
-                tjd_ut,
-            )
-    # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
@@ -931,25 +926,13 @@ def swe_calc(
     # Strip SEFLG_MOSEPH bit — accepted for compatibility, always uses JPL
     iflag = iflag & ~SEFLG_MOSEPH
 
+    # SEFLG_SPEED3: treat as SEFLG_SPEED (see swe_calc_ut for rationale)
+    if iflag & SEFLG_SPEED3:
+        iflag = (iflag & ~SEFLG_SPEED3) | SEFLG_SPEED
+
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
     from .logging_config import get_logger
-
-    reader = get_leb_reader()
-    if reader is not None:
-        try:
-            from . import fast_calc
-
-            result = fast_calc.fast_calc_tt(reader, tjd, ipl, iflag)
-            get_logger().debug("body=%d jd=%.1f source=LEB", ipl, tjd)
-            return result
-        except (KeyError, ValueError):
-            get_logger().debug(
-                "body=%d jd=%.1f source=LEB->fallback (not in LEB or out of range)",
-                ipl,
-                tjd,
-            )
-    # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
@@ -1096,8 +1079,29 @@ def _calc_body_pctr(
         v_ = tgt_vel - obs_vel
         return p_, v_
 
-    # Get position vector
-    p, v = get_vector(t)
+    # Get position vector with light-time correction
+    # Iterative light-time: target position at t - light_travel_time
+    import numpy as np
+
+    C_AU_PER_DAY = 173.1446326847  # Speed of light in AU/day
+
+    if iflag & SEFLG_TRUEPOS:
+        # Geometric position (no light-time correction)
+        p, v = get_vector(t)
+    else:
+        # Light-time corrected position
+        p, v = get_vector(t)
+        for _ in range(3):
+            dist_au = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
+            light_time = dist_au / C_AU_PER_DAY
+            ts_lt = get_timescale()
+            # Retard only the target, keep observer at current time
+            tgt_pos_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time)).position.au
+            tgt_vel_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time)).velocity.au_per_d
+            obs_pos = observer.at(t).position.au
+            obs_vel = observer.at(t).velocity.au_per_d
+            p = tgt_pos_ret - obs_pos
+            v = tgt_vel_ret - obs_vel
 
     # Create position object for coordinate conversion
     # Center doesn't matter for coordinate conversion, just for documentation
@@ -1105,6 +1109,7 @@ def _calc_body_pctr(
 
     # Extract coordinates based on flags
     is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
+    is_icrs = bool(iflag & SEFLG_ICRS)
     is_sidereal = bool(iflag & SEFLG_SIDEREAL)
 
     p1, p2, p3 = 0.0, 0.0, 0.0
@@ -1114,11 +1119,27 @@ def _calc_body_pctr(
         # Equatorial coordinates (RA/Dec)
         if iflag & SEFLG_J2000:
             ra, dec, dist = pos.radec()
+        elif is_icrs:
+            # ICRS equatorial of date: skip frame bias (B matrix).
+            import numpy as np
+
+            from skyfield.framelib import ICRS_to_J2000
+
+            xyz_icrs = np.array(pos.position.au)
+            # True equator: N × P (no B)
+            M_no_bias = t.M @ ICRS_to_J2000.T
+            xyz_eq = M_no_bias @ xyz_icrs
+            xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
+            dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
+            p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+            p2 = math.degrees(math.asin(ze / dist_val))
+            p3 = dist_val
         else:
             ra, dec, dist = pos.radec(epoch="date")
-        p1 = ra.hours * 15.0  # Convert hours to degrees
-        p2 = dec.degrees
-        p3 = dist.au
+        if not is_icrs or (iflag & SEFLG_J2000):
+            p1 = ra.hours * 15.0  # Convert hours to degrees
+            p2 = dec.degrees
+            p3 = dist.au
     else:
         # Ecliptic coordinates (default)
         if iflag & SEFLG_J2000:
@@ -1138,6 +1159,21 @@ def _calc_body_pctr(
             lat = math.degrees(math.asin(ze / dist)) if dist > 0 else 0.0
 
             p1, p2, p3 = lon, lat, dist
+        elif is_icrs:
+            # ICRS ecliptic of date: skip frame bias (B matrix).
+            import numpy as np
+
+            from skyfield.framelib import ICRS_to_J2000
+
+            R_ecl = ecliptic_frame.rotation_at(t)
+            R_icrs = R_ecl @ ICRS_to_J2000.T
+            xyz_icrs = np.array(pos.position.au)
+            xyz_ecl = R_icrs @ xyz_icrs
+            xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
+            dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+            p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+            p2 = math.degrees(math.asin(ze / dist))
+            p3 = dist
         else:
             # Ecliptic of date
             lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
@@ -1319,6 +1355,11 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     # For J2000 frame, use J2000 obliquity; otherwise use obliquity of date
     if iflag & SEFLG_J2000:
         eps = 23.4392911  # Mean obliquity at J2000.0
+    elif iflag & SEFLG_NONUT:
+        # NONUT: use mean obliquity (no nutation correction)
+        from .cache import get_mean_obliquity
+
+        eps = get_mean_obliquity(jd_tt)
     else:
         eps = get_true_obliquity(jd_tt)
 
@@ -1516,6 +1557,14 @@ def _calc_body(
         is_sidereal = bool(iflag & SEFLG_SIDEREAL)
         if ipl == SE_MEAN_NODE:
             lon = lunar.calc_mean_lunar_node(jd_tt)
+            # The Meeus polynomial returns mean ecliptic of date.
+            # Swiss Ephemeris outputs in the true ecliptic of date,
+            # so add nutation in longitude (dpsi) unless NONUT is set.
+            if not (iflag & SEFLG_NONUT):
+                from .cache import get_cached_nutation
+
+                dpsi_rad, _ = get_cached_nutation(jd_tt)
+                lon = (lon + math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
             # Using ±0.5 days to capture any slow variations in the mean motion.
             dlon = 0.0
@@ -1530,16 +1579,15 @@ def _calc_body(
                 elif lon_diff < -180:
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
-            # Apply sidereal correction if requested (but not for equatorial output)
-            # Sidereal correction is ignored when outputting equatorial coords
+            # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_true_ayanamsa(t.ut1)
+                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
                 lon = (lon - ayanamsa) % 360.0
                 # Correct velocity for ayanamsha rate
                 if iflag & SEFLG_SPEED:
                     dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_true_ayanamsa(t.ut1 - dt_aya)
-                    ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                     da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                     dlon -= da
             result = (lon, 0.0, 0.0, dlon, 0.0, 0.0)
@@ -1547,6 +1595,13 @@ def _calc_body(
             return _to_native_floats(result), iflag
         else:  # SE_TRUE_NODE
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
+            # TrueNode includes nutation effects in its perturbation terms.
+            # When NONUT is set, subtract dpsi to get mean ecliptic position.
+            if iflag & SEFLG_NONUT:
+                from .cache import get_cached_nutation
+
+                dpsi_rad, _ = get_cached_nutation(jd_tt)
+                lon = (lon - math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
             # Using ±0.5 days to capture perturbation effects that a 1-second
             # step would miss, ensuring velocity reflects the actual rate of
@@ -1574,16 +1629,15 @@ def _calc_body(
                     # At ephemeris boundaries, speed calculation may fail
                     # Return 0 for speed components
                     pass
-            # Apply sidereal correction if requested (but not for equatorial output)
-            # Sidereal correction is ignored when outputting equatorial coords
+            # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_true_ayanamsa(t.ut1)
+                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
                 lon = (lon - ayanamsa) % 360.0
                 # Correct velocity for ayanamsha rate
                 if iflag & SEFLG_SPEED:
                     dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_true_ayanamsa(t.ut1 - dt_aya)
-                    ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                     da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                     dlon -= da
             result = (lon, lat, dist, dlon, dlat, ddist)
@@ -1610,6 +1664,14 @@ def _calc_body(
         is_sidereal = bool(iflag & SEFLG_SIDEREAL)
         if ipl == SE_MEAN_APOG:
             lon, lat = lunar.calc_mean_lilith_with_latitude(jd_tt)
+            # The analytical formula returns mean ecliptic of date.
+            # Swiss Ephemeris outputs in the true ecliptic of date,
+            # so add nutation in longitude (dpsi) unless NONUT is set.
+            if not (iflag & SEFLG_NONUT):
+                from .cache import get_cached_nutation
+
+                dpsi_rad, _ = get_cached_nutation(jd_tt)
+                lon = (lon + math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
             # Using ±0.5 days to capture perturbation effects that a 1-second
             # step would miss, ensuring velocity reflects the actual rate of
@@ -1627,15 +1689,14 @@ def _calc_body(
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
-            # Apply sidereal correction if requested (but not for equatorial output)
-            # Sidereal correction is ignored when outputting equatorial coords
+            # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_true_ayanamsa(t.ut1)
+                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
                 lon = (lon - ayanamsa) % 360.0
                 if iflag & SEFLG_SPEED:
                     dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_true_ayanamsa(t.ut1 - dt_aya)
-                    ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                     da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                     dlon -= da
             result = (lon, lat, 0.0, dlon, dlat, 0.0)
@@ -1643,6 +1704,13 @@ def _calc_body(
             return _to_native_floats(result), iflag
         else:  # SE_OSCU_APOG
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
+            # OscuApog includes nutation effects in its orbital computation.
+            # When NONUT is set, subtract dpsi to get mean ecliptic position.
+            if iflag & SEFLG_NONUT:
+                from .cache import get_cached_nutation
+
+                dpsi_rad, _ = get_cached_nutation(jd_tt)
+                lon = (lon - math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
             # Using ±0.5 days to capture perturbation effects that a 1-second
             # step would miss, ensuring velocity reflects the actual rate of
@@ -1666,15 +1734,14 @@ def _calc_body(
                     # At ephemeris boundaries, speed calculation may fail
                     # Return 0 for speed components
                     pass
-            # Apply sidereal correction if requested (but not for equatorial output)
-            # Sidereal correction is ignored when outputting equatorial coords
+            # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_true_ayanamsa(t.ut1)
+                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
                 lon = (lon - ayanamsa) % 360.0
                 if iflag & SEFLG_SPEED:
                     dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_true_ayanamsa(t.ut1 - dt_aya)
-                    ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                     da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                     dlon -= da
             result = (lon, lat, dist, dlon, dlat, ddist)
@@ -1719,15 +1786,14 @@ def _calc_body(
             dlon = lon_diff / (2.0 * dt)
             dlat = (lat_next - lat_prev) / (2.0 * dt)
             ddist = (dist_next - dist_prev) / (2.0 * dt)
-        # Apply sidereal correction if requested (but not for equatorial output)
-        # Swiss Ephemeris ignores sidereal flag when outputting equatorial coords
+        # Apply sidereal correction if requested (not for equatorial output)
         if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-            ayanamsa = _get_true_ayanamsa(t.ut1)
+            ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
             lon = (lon - ayanamsa) % 360.0
             if iflag & SEFLG_SPEED:
                 dt_aya = 1.0 / 86400.0
-                ayanamsa_prev = _get_true_ayanamsa(t.ut1 - dt_aya)
-                ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+                ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                 da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                 dlon -= da
         result = (lon, lat, dist, dlon, dlat, ddist)
@@ -1841,9 +1907,13 @@ def _calc_body(
             except Exception:
                 pass
 
-            # Keplerian as last resort
-            get_logger().debug(
-                "body=%d jd=%.1f source=Keplerian (fallback)", ipl, jd_tt
+            # Keplerian as last resort — reduced precision, warn the user
+            get_logger().warning(
+                "body=%d jd=%.1f source=Keplerian (fallback). "
+                "Precision is limited (arcminute-level). "
+                "Install SPK kernels or enable auto-download for higher accuracy.",
+                ipl,
+                jd_tt,
             )
             lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
 
@@ -2032,11 +2102,17 @@ def _calc_body(
         else:
             if iflag & SEFLG_NOABERR:
                 pos = observer.at(t).observe(target)  # Astrometric
+            elif iflag & SEFLG_NOGDEFL:
+                # Aberration without gravitational deflection:
+                # Pass empty deflectors tuple to skip Sun/Jupiter/Saturn
+                # deflection while still applying stellar aberration.
+                pos = observer.at(t).observe(target).apparent(deflectors=())
             else:
                 pos = observer.at(t).observe(target).apparent()  # Apparent
 
     # 4. Coordinate System & Speeds
     is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
+    is_icrs = bool(iflag & SEFLG_ICRS)
     is_sidereal = bool(iflag & SEFLG_SIDEREAL)
 
     p1, p2, p3 = 0.0, 0.0, 0.0
@@ -2090,6 +2166,10 @@ def _calc_body(
                     else:
                         if iflag & SEFLG_NOABERR:
                             pos_ = observer.at(t_).observe(target)
+                        elif iflag & SEFLG_NOGDEFL:
+                            pos_ = (
+                                observer.at(t_).observe(target).apparent(deflectors=())
+                            )
                         else:
                             pos_ = observer.at(t_).observe(target).apparent()
                     ra_, dec_, dist_ = pos_.radec()
@@ -2106,42 +2186,86 @@ def _calc_body(
                 if dp1 < -9000:
                     dp1 += 360 / (2.0 * dt)
         else:
-            # True Equator of Date
-            # Central difference numerical differentiation for speeds
-            # 1 second timestep provides good balance between accuracy and numerical stability
-            dt = 1.0 / 86400.0  # 1 second in days
+            # Equator of Date (true or mean depending on NONUT/SIDEREAL flags)
+            # Use the already-computed pos (with light-time correction) for the
+            # main position. This is critical for HELCTR/BARYCTR where pos
+            # includes iterative light-time correction applied in section 3.
+            # When SIDEREAL+EQUATORIAL, pyswisseph uses mean equator (no nutation),
+            # same as NONUT behavior.
+            _use_mean_equator = bool(iflag & SEFLG_NONUT) or is_sidereal
 
-            # Helper to get coord at time t_
-            def get_coord(t_):
-                from skyfield.positionlib import ICRF
+            if is_icrs:
+                # ICRS equatorial of date: skip frame bias (B matrix).
+                # t.M = N × P × B; for ICRS we want N × P = t.M × B^T.
+                # t.P is precession-only (J2000 dyn → mean of date).
+                import numpy as np
 
-                if (
-                    iflag & SEFLG_TRUEPOS
-                    or (iflag & SEFLG_BARYCTR)
-                    or (iflag & SEFLG_HELCTR)
-                ):
-                    p_, v_ = get_vector(t_)
-                    pos_ = ICRF(
-                        p_,
-                        v_,
-                        t=t_,
-                        center=icrf_center,
-                    )
+                from skyfield.framelib import ICRS_to_J2000
+
+                xyz_icrs = np.array(pos.position.au)
+                if _use_mean_equator:
+                    # Mean equator: P only (no B, no N)
+                    xyz_eq = t.P @ xyz_icrs
                 else:
-                    if iflag & SEFLG_NOABERR:
-                        pos_ = observer.at(t_).observe(target)
-                    else:
-                        pos_ = observer.at(t_).observe(target).apparent()
+                    # True equator: N × P (no B)
+                    M_no_bias = t.M @ ICRS_to_J2000.T
+                    xyz_eq = M_no_bias @ xyz_icrs
+                xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
+                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+                p2 = math.degrees(math.asin(ze / dist))
+                p3 = dist
+            elif _use_mean_equator:
+                from skyfield.framelib import mean_equator_and_equinox_of_date
 
-                if iflag & SEFLG_J2000:
-                    ra_, dec_, dist_ = pos_.radec()
-                else:
-                    ra_, dec_, dist_ = pos_.radec(epoch="date")
-                return ra_.hours * 15.0, dec_.degrees, dist_.au
-
-            p1, p2, p3 = get_coord(t)
+                dec_, ra_, dist_ = pos.frame_latlon(mean_equator_and_equinox_of_date)
+                p1, p2, p3 = ra_.degrees, dec_.degrees, dist_.au
+            else:
+                ra_, dec_, dist_ = pos.radec(epoch="date")
+                p1, p2, p3 = ra_.hours * 15.0, dec_.degrees, dist_.au
 
             if iflag & SEFLG_SPEED:
+                # Central difference numerical differentiation for speeds
+                # 1 second timestep provides good balance
+                dt = 1.0 / 86400.0  # 1 second in days
+
+                # Helper to get coord at time t_ (for speed neighbors only)
+                def get_coord(t_):
+                    from skyfield.positionlib import ICRF
+
+                    if (
+                        iflag & SEFLG_TRUEPOS
+                        or (iflag & SEFLG_BARYCTR)
+                        or (iflag & SEFLG_HELCTR)
+                    ):
+                        p_, v_ = get_vector(t_)
+                        pos_ = ICRF(
+                            p_,
+                            v_,
+                            t=t_,
+                            center=icrf_center,
+                        )
+                    else:
+                        if iflag & SEFLG_NOABERR:
+                            pos_ = observer.at(t_).observe(target)
+                        elif iflag & SEFLG_NOGDEFL:
+                            pos_ = (
+                                observer.at(t_).observe(target).apparent(deflectors=())
+                            )
+                        else:
+                            pos_ = observer.at(t_).observe(target).apparent()
+
+                    if _use_mean_equator:
+                        from skyfield.framelib import mean_equator_and_equinox_of_date
+
+                        dec_, ra_, dist_ = pos_.frame_latlon(
+                            mean_equator_and_equinox_of_date
+                        )
+                        return ra_.degrees, dec_.degrees, dist_.au
+                    else:
+                        ra_, dec_, dist_ = pos_.radec(epoch="date")
+                    return ra_.hours * 15.0, dec_.degrees, dist_.au
+
                 ts = get_timescale()
                 # Central difference: get t-dt and t+dt
                 p1_prev, p2_prev, p3_prev = get_coord(ts.tt_jd(t.tt - dt))
@@ -2183,11 +2307,54 @@ def _calc_body(
             p1, p2, p3 = lon, lat, dist
 
         else:
-            # Ecliptic of Date
-            lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
-            p1 = lon_.degrees
-            p2 = lat_.degrees
-            p3 = dist_.au
+            # Ecliptic of Date (true or mean depending on NONUT flag)
+            if iflag & SEFLG_NONUT:
+                # Mean ecliptic of date: precession only, no nutation
+                # Full chain: mean_ecliptic = rot_x(-ε) @ P @ B  (B = ICRS_to_J2000)
+                # ICRS mode: mean_ecliptic = rot_x(-ε) @ P       (skip frame bias)
+                from skyfield.framelib import ICRS_to_J2000
+                from skyfield.functions import mxm, rot_x
+
+                mean_obliquity = t._mean_obliquity_radians
+                if is_icrs:
+                    mean_ecl_matrix = mxm(rot_x(-mean_obliquity), t.P)
+                else:
+                    mean_ecl_matrix = mxm(
+                        rot_x(-mean_obliquity), mxm(t.P, ICRS_to_J2000)
+                    )
+                # Transform ICRS position to mean ecliptic
+                import numpy as np
+
+                xyz_icrs = np.array(pos.position.au)
+                xyz_ecl = mean_ecl_matrix @ xyz_icrs
+                xe, ye, ze = xyz_ecl
+                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+                p2 = math.degrees(math.asin(ze / dist))
+                p3 = dist
+            elif is_icrs:
+                # ICRS ecliptic of date: skip frame bias (B matrix).
+                # ecliptic_frame.rotation_at(t) = rot_x(-ε_true) @ t.M
+                # where t.M = N @ P @ B.  For ICRS: rot_x(-ε_true) @ N @ P
+                # = ecliptic_frame.rotation_at(t) @ B^T
+                import numpy as np
+
+                from skyfield.framelib import ICRS_to_J2000
+
+                R_ecl = ecliptic_frame.rotation_at(t)
+                R_icrs = R_ecl @ ICRS_to_J2000.T
+                xyz_icrs = np.array(pos.position.au)
+                xyz_ecl = R_icrs @ xyz_icrs
+                xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
+                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+                p2 = math.degrees(math.asin(ze / dist))
+                p3 = dist
+            else:
+                lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
+                p1 = lon_.degrees
+                p2 = lat_.degrees
+                p3 = dist_.au
 
     # 4. Speed (Central Difference Numerical Differentiation if requested)
     # Using central differences: f'(x) ≈ [f(x+h) - f(x-h)] / (2h)
@@ -2234,17 +2401,18 @@ def _calc_body(
             dp1 += 360.0 / (2.0 * dt)
 
     # 5. Sidereal Mode
-    # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
-    # as is standard practice. get_ayanamsa_ut() returns mean ayanamsha.
+    # Sidereal correction is applied to ecliptic longitude only.
+    # Pyswisseph ignores sidereal flag when outputting equatorial coords.
+    # Use NONUT-aware ayanamsha when SEFLG_NONUT is set.
     if is_sidereal and not is_equatorial:
-        ayanamsa = _get_true_ayanamsa(t.ut1)
+        ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
         p1 = (p1 - ayanamsa) % 360.0
 
         # Correct velocity for ayanamsha rate if speed was calculated
         # Central difference: (f(t+h) - f(t-h)) / (2h) for O(h²) precision
         if iflag & SEFLG_SPEED:
-            ayanamsa_prev = _get_true_ayanamsa(t.ut1 - dt)
-            ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt)
+            ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt, iflag)
+            ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt, iflag)
             da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt)
             dp1 -= da
 
@@ -2452,6 +2620,10 @@ def swe_get_ayanamsa_name(sid_mode: int) -> str:
         SE_SIDM_GALEQU_FIORENZA: "Galactic Equator Fiorenza",
         SE_SIDM_GALALIGN_MARDYKS: "Galactic Alignment Mardyks",
         SE_SIDM_VALENS_MOON: "Valens Moon",
+        SE_SIDM_LAHIRI_1940: "Lahiri (1940)",
+        SE_SIDM_LAHIRI_VP285: "Lahiri (VP285)",
+        SE_SIDM_KRISHNAMURTI_VP291: "Krishnamurti (VP291)",
+        SE_SIDM_LAHIRI_ICRC: "Lahiri (ICRC)",
         SE_SIDM_USER: "User Defined",
     }
     return names.get(sid_mode, "Unknown")
@@ -2855,6 +3027,21 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         SE_SIDM_GALCENT_MULA_WILHELM: (0.0, 0.0),  # Gal. Center at Mula (Wilhelm)
         SE_SIDM_GALCENT_COCHRANE: (0.0, 0.0),  # Galactic Center (Cochrane)
         SE_SIDM_VALENS_MOON: (0.0, 0.0),  # Valens (Moon-based)
+        #
+        # --- Additional Lahiri / Krishnamurti variants ---
+        #
+        # Lahiri 1940: Value adopted by the Lahiri Commission in 1940.
+        # Slightly different epoch calibration from modern Lahiri.
+        SE_SIDM_LAHIRI_1940: (23.842323260327, _PREC_C1),
+        #
+        # Lahiri VP285: Lahiri variant with Vernal Point at 285 CE.
+        SE_SIDM_LAHIRI_VP285: (23.863481230643, _PREC_C1),
+        #
+        # Krishnamurti VP291: Krishnamurti variant with Vernal Point at 291 CE.
+        SE_SIDM_KRISHNAMURTI_VP291: (23.780364984917, _PREC_C1),
+        #
+        # Lahiri ICRC: Indian Calendar Reform Committee official value.
+        SE_SIDM_LAHIRI_ICRC: (23.856789016286, _PREC_C1),
     }
 
     # For modes that need astronomical calculation (marked with 0.0, 0.0)
@@ -3119,6 +3306,26 @@ def _get_true_ayanamsa(tjd_ut: float) -> float:
     nutation_deg = math.degrees(dpsi_rad)
 
     return (mean_ayanamsa + nutation_deg) % 360.0
+
+
+def _get_ayanamsa_for_flags(tjd_ut: float, iflag: int) -> float:
+    """Get appropriate ayanamsha based on calculation flags.
+
+    When SEFLG_NONUT is set, returns mean ayanamsha (without nutation).
+    Otherwise returns true ayanamsha (mean + nutation in longitude).
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1)
+        iflag: Calculation flags bitmask
+
+    Returns:
+        Ayanamsha in degrees
+    """
+    if iflag & SEFLG_NONUT:
+        sid_mode = get_sid_mode()
+        assert isinstance(sid_mode, int)
+        return _calc_ayanamsa(tjd_ut, sid_mode)
+    return _get_true_ayanamsa(tjd_ut)
 
 
 def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
@@ -3480,314 +3687,243 @@ def swe_nod_aps(
 class HeliocentricNodApsWarning(UserWarning):
     """Warning for heliocentric nod_aps methodology differences.
 
-    This warning is issued when calculating nodes and apsides for inner planets
-    (Mercury, Venus) because LibEphemeris uses heliocentric mean orbital elements
-    while pyswisseph uses a geocentric interpretation, causing large apparent
-    differences (up to 250 degrees).
-
-    Both approaches are astronomically valid and answer different questions:
-    - Heliocentric: Where does the orbit cross the ecliptic as seen from the Sun?
-    - Geocentric: Where does the planet appear to cross the ecliptic from Earth?
-
-    For astrological use, check which interpretation matches your tradition.
+    .. deprecated::
+        This warning is no longer emitted since libephemeris now uses geocentric
+        osculating elements for nod_aps calculations, matching pyswisseph's
+        approach. Kept for backward compatibility.
     """
 
     pass
+
+
+_J2000_JD = 2451545.0
+
+# Gaussian gravitational constant squared: GM_sun in AU^3/day^2
+_GM_SUN = 0.01720209895**2
 
 
 def _calc_nod_aps(
     t, ipl: int, iflag: int, method: int
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
     """
-    Calculate orbital nodes and apsides using heliocentric mean orbital elements.
+    Calculate orbital nodes and apsides using geocentric osculating elements.
 
-    .. warning:: Methodological Difference from pyswisseph
+    Computes the heliocentric osculating orbital elements from JPL DE440 state
+    vectors, determines the 3D heliocentric positions of the ascending node,
+    descending node, perihelion, and aphelion on the instantaneous orbit, then
+    converts these positions to geocentric ecliptic coordinates of date.
 
-        This function uses **heliocentric mean orbital elements** from Standish
-        (1992) JPL/IERS tables. This is a fundamentally different approach from
-        pyswisseph, which uses a **geocentric interpretation**.
-
-        **Impact for inner planets (Mercury, Venus):**
-        Differences can be up to ~250 degrees because the heliocentric and
-        geocentric orbital planes are oriented very differently relative to Earth.
-
-        **Impact for outer planets (Mars, Jupiter, Saturn, etc.):**
-        Differences are small (<1 degree) because the heliocentric/geocentric
-        distinction diminishes with distance from the Sun.
-
-        **Which is "correct"?**
-        Both approaches are astronomically valid - they answer different questions:
-
-        - **Heliocentric (LibEphemeris)**: "Where does the planet's orbit cross
-          the ecliptic plane as seen from the Sun?" This gives the true orbital
-          node of the planet in its heliocentric orbit.
-
-        - **Geocentric (pyswisseph)**: "Where does the planet appear to
-          cross the ecliptic as seen from Earth?" This is the apparent crossing
-          point from Earth's perspective.
-
-        For outer planets, both approaches give similar results. For inner planets,
-        the geocentric interpretation is more commonly used in astrological
-        traditions that focus on Earth-centered observations.
-
-    Uses mean orbital elements from JPL/IERS tables (Standish, 1992) to compute
-    the positions of orbital nodes and apsides. The mean elements are given as
-    polynomial expansions in time from J2000.0.
-
-    For SE_NODBIT_MEAN: Uses mean orbital elements (averaged over perturbations)
-    For SE_NODBIT_OSCU: Uses osculating elements from current state vector
+    This approach matches pyswisseph's geocentric interpretation: the returned
+    longitudes represent where the node/apse appears in the ecliptic as seen
+    from Earth.
 
     Args:
         t: Skyfield Time object
         ipl: Planet ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
         iflag: Calculation flags
-        method: Node/apse calculation method (SE_NODBIT_MEAN or SE_NODBIT_OSCU)
+        method: Node/apse calculation method (SE_NODBIT_MEAN, SE_NODBIT_OSCU, etc.)
+            Currently all methods use osculating elements from JPL ephemeris.
 
     Returns:
         Tuple of (ascending_node, descending_node, perihelion, aphelion)
         Each element is a PosTuple: (longitude, latitude, distance, dlon, dlat, ddist)
-
-    See Also:
-        - PRECISION.md: "Planetary Nodes and Apsides" section for full documentation
-        - swe_nod_aps(): Public API wrapper for Ephemeris Time
-        - swe_nod_aps_ut(): Public API wrapper for Universal Time
-
-    References:
-        - Standish, E.M. (1992). "Keplerian Elements for Approximate Positions
-          of the Major Planets". JPL/IERS.
     """
-    # Zero position for unsupported bodies
+    from .cache import get_true_obliquity
+
     zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
-    # Get planet name from map
+    # Unsupported bodies
     if ipl not in _PLANET_MAP:
         return (zero_pos, zero_pos, zero_pos, zero_pos)
 
-    # Sun and Earth don't have orbital nodes/apsides in heliocentric sense
-    if ipl in [SE_SUN, SE_EARTH]:
+    # Sun and Earth don't have meaningful heliocentric orbital nodes/apsides
+    if ipl in (SE_SUN, SE_EARTH):
         return (zero_pos, zero_pos, zero_pos, zero_pos)
 
-    # Warn for inner planets about methodological differences with pyswisseph
-    if ipl in [SE_MERCURY, SE_VENUS]:
-        planet_name = _PLANET_NAMES.get(ipl, f"Planet {ipl}")
-        warnings.warn(
-            f"nod_aps for {planet_name}: LibEphemeris uses heliocentric mean orbital "
-            f"elements (Standish 1992) while pyswisseph uses geocentric "
-            f"interpretation. This can cause differences up to ~250 degrees for inner "
-            f"planets. Both approaches are valid - see PRECISION.md for details.",
-            HeliocentricNodApsWarning,
-            stacklevel=3,  # Point to caller of swe_nod_aps/swe_nod_aps_ut
+    planets = get_planets()
+    jd_tt = t.tt
+
+    # --- ICRS → ecliptic of date rotation ---
+    # Step 1: precession-nutation matrix (ICRS → true equator of date)
+    pnm = erfa.pnm06a(_J2000_JD, jd_tt - _J2000_JD)
+    # Step 2: true obliquity for equator-of-date → ecliptic-of-date
+    eps_deg = get_true_obliquity(jd_tt)
+    eps_rad = math.radians(eps_deg)
+    cos_eps = math.cos(eps_rad)
+    sin_eps = math.sin(eps_rad)
+
+    def _icrs_to_ecliptic(vec):
+        """Rotate an ICRS vector to ecliptic of date."""
+        # Apply precession-nutation
+        x_eq = pnm[0][0] * vec[0] + pnm[0][1] * vec[1] + pnm[0][2] * vec[2]
+        y_eq = pnm[1][0] * vec[0] + pnm[1][1] * vec[1] + pnm[1][2] * vec[2]
+        z_eq = pnm[2][0] * vec[0] + pnm[2][1] * vec[1] + pnm[2][2] * vec[2]
+        # Rotate equatorial → ecliptic
+        return (x_eq, y_eq * cos_eps + z_eq * sin_eps, -y_eq * sin_eps + z_eq * cos_eps)
+
+    # --- Get Sun and Earth positions in ICRS ---
+    sun = planets["sun"]
+    earth = planets["earth"]
+    sun_pos = sun.at(t)
+    earth_pos = earth.at(t)
+
+    # Earth's heliocentric position in ecliptic of date
+    r_earth_icrs = earth_pos.position.au - sun_pos.position.au
+    r_earth_ecl = _icrs_to_ecliptic(r_earth_icrs)
+
+    # --- Get target's state vector ---
+    target_name = _PLANET_MAP[ipl]
+    try:
+        target = planets[target_name]
+    except KeyError:
+        if target_name in _PLANET_FALLBACK:
+            target = planets[_PLANET_FALLBACK[target_name]]
+        else:
+            return (zero_pos, zero_pos, zero_pos, zero_pos)
+
+    target_pos = target.at(t)
+
+    # For Moon, use geocentric orbit (around Earth); for planets, heliocentric
+    if ipl == SE_MOON:
+        # Geocentric ICRS vectors (Moon relative to Earth)
+        r_icrs = target_pos.position.au - earth_pos.position.au
+        v_icrs = target_pos.velocity.au_per_d - earth_pos.velocity.au_per_d
+        # GM_Earth in AU^3/day^2
+        GM = 0.01720209895**2 / 332946.0
+        is_geocentric = True
+    else:
+        # Heliocentric ICRS vectors
+        r_icrs = target_pos.position.au - sun_pos.position.au
+        v_icrs = target_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
+        GM = _GM_SUN
+        is_geocentric = False
+
+    # Convert to ecliptic of date
+    r_ecl = _icrs_to_ecliptic(r_icrs)
+    v_ecl = _icrs_to_ecliptic(v_icrs)
+
+    # --- Compute osculating orbital elements ---
+    r_mag = math.sqrt(r_ecl[0] ** 2 + r_ecl[1] ** 2 + r_ecl[2] ** 2)
+    v_mag = math.sqrt(v_ecl[0] ** 2 + v_ecl[1] ** 2 + v_ecl[2] ** 2)
+
+    # Angular momentum vector h = r × v
+    hx = r_ecl[1] * v_ecl[2] - r_ecl[2] * v_ecl[1]
+    hy = r_ecl[2] * v_ecl[0] - r_ecl[0] * v_ecl[2]
+    hz = r_ecl[0] * v_ecl[1] - r_ecl[1] * v_ecl[0]
+    h_mag = math.sqrt(hx**2 + hy**2 + hz**2)
+
+    # Inclination
+    incl = math.acos(max(-1.0, min(1.0, hz / h_mag))) if h_mag > 0 else 0.0
+
+    # Node vector n = k × h (k = ecliptic pole = [0, 0, 1])
+    nx = -hy
+    ny = hx
+    n_mag = math.sqrt(nx**2 + ny**2)
+
+    # Longitude of ascending node
+    if n_mag > 1e-10:
+        Omega = math.atan2(ny, nx)
+        if Omega < 0:
+            Omega += 2.0 * math.pi
+    else:
+        Omega = 0.0
+
+    # Eccentricity vector e = (v × h) / μ - r̂
+    r_dot_v = r_ecl[0] * v_ecl[0] + r_ecl[1] * v_ecl[1] + r_ecl[2] * v_ecl[2]
+    coef1 = v_mag**2 / GM - 1.0 / r_mag
+    coef2 = r_dot_v / GM
+
+    ex = coef1 * r_ecl[0] - coef2 * v_ecl[0]
+    ey = coef1 * r_ecl[1] - coef2 * v_ecl[1]
+    ez = coef1 * r_ecl[2] - coef2 * v_ecl[2]
+    e_mag = math.sqrt(ex**2 + ey**2 + ez**2)
+
+    # Argument of perihelion (or perigee for Moon)
+    if n_mag > 1e-10 and e_mag > 1e-10:
+        n_dot_e = nx * ex + ny * ey
+        cos_omega = max(-1.0, min(1.0, n_dot_e / (n_mag * e_mag)))
+        omega = math.acos(cos_omega)
+        if ez < 0:
+            omega = 2.0 * math.pi - omega
+    else:
+        omega = 0.0
+
+    # Semi-major axis
+    a = 1.0 / (2.0 / r_mag - v_mag**2 / GM)
+
+    # Semi-latus rectum
+    p = a * (1.0 - e_mag**2) if e_mag < 1.0 else h_mag**2 / GM
+
+    # --- Compute 3D positions of nodes and apsides in orbital frame ---
+    cos_Omega = math.cos(Omega)
+    sin_Omega = math.sin(Omega)
+    cos_incl = math.cos(incl)
+    sin_incl = math.sin(incl)
+    cos_omega = math.cos(omega)
+    sin_omega = math.sin(omega)
+
+    def _orbit_pos_3d(nu: float):
+        """Compute ecliptic 3D position for given true anomaly.
+
+        For planets: heliocentric ecliptic position.
+        For Moon: geocentric ecliptic position.
+        """
+        denom = 1.0 + e_mag * math.cos(nu)
+        r_orb = p / denom if abs(denom) > 1e-10 else a
+        x_orb = r_orb * math.cos(nu)
+        y_orb = r_orb * math.sin(nu)
+        # Perifocal → ecliptic rotation (3-1-3: Omega, incl, omega)
+        xe = (cos_Omega * cos_omega - sin_Omega * sin_omega * cos_incl) * x_orb + (
+            -cos_Omega * sin_omega - sin_Omega * cos_omega * cos_incl
+        ) * y_orb
+        ye = (sin_Omega * cos_omega + cos_Omega * sin_omega * cos_incl) * x_orb + (
+            -sin_Omega * sin_omega + cos_Omega * cos_omega * cos_incl
+        ) * y_orb
+        ze = (sin_omega * sin_incl) * x_orb + (cos_omega * sin_incl) * y_orb
+        return (xe, ye, ze, r_orb)
+
+    def _to_geo_lonlat(center_pos):
+        """Convert center-relative ecliptic position to geocentric lon/lat/dist.
+
+        For planets: helio_pos → geocentric (subtract Earth position).
+        For Moon: already geocentric (just convert to lon/lat).
+        """
+        if is_geocentric:
+            # Moon positions are already geocentric
+            gx, gy, gz = center_pos[0], center_pos[1], center_pos[2]
+        else:
+            gx = center_pos[0] - r_earth_ecl[0]
+            gy = center_pos[1] - r_earth_ecl[1]
+            gz = center_pos[2] - r_earth_ecl[2]
+        r_geo = math.sqrt(gx**2 + gy**2 + gz**2)
+        lon = math.degrees(math.atan2(gy, gx)) % 360.0
+        lat = (
+            math.degrees(math.asin(max(-1.0, min(1.0, gz / r_geo))))
+            if r_geo > 0
+            else 0.0
         )
+        return lon, lat, r_geo
 
-    # Mean orbital elements at J2000.0 and their rates per Julian century
-    # From "Keplerian Elements for Approximate Positions of the Major Planets"
-    # (Standish, E.M., 1992, JPL/IERS)
-    # Format: {planet_id: (a, e, i, L, varpi, Omega, da, de, di, dL, dvarpi, dOmega)}
-    # where L = mean longitude, varpi = longitude of perihelion, Omega = longitude of ascending node
-    # Rates are per Julian century from J2000.0
-    # Values in AU, degrees, and AU/century, degrees/century
-    MEAN_ELEMENTS = {
-        SE_MERCURY: (
-            0.38709927,
-            0.20563593,
-            7.00497902,
-            252.25032350,
-            77.45779628,
-            48.33076593,
-            0.00000037,
-            0.00001906,
-            -0.00594749,
-            149472.67411175,
-            0.16047689,
-            -0.12534081,
-        ),
-        SE_VENUS: (
-            0.72333566,
-            0.00677672,
-            3.39467605,
-            181.97909950,
-            131.60246718,
-            76.67984255,
-            0.00000390,
-            -0.00004107,
-            -0.00078890,
-            58517.81538729,
-            0.00268329,
-            -0.27769418,
-        ),
-        SE_MARS: (
-            1.52371034,
-            0.09339410,
-            1.84969142,
-            -4.55343205,
-            -23.94362959,
-            49.55953891,
-            0.00001847,
-            0.00007882,
-            -0.00813131,
-            19140.30268499,
-            0.44441088,
-            -0.29257343,
-        ),
-        SE_JUPITER: (
-            5.20288700,
-            0.04838624,
-            1.30439695,
-            34.39644051,
-            14.72847983,
-            100.47390909,
-            -0.00011607,
-            -0.00013253,
-            -0.00183714,
-            3034.74612775,
-            0.21252668,
-            0.20469106,
-        ),
-        SE_SATURN: (
-            9.53667594,
-            0.05386179,
-            2.48599187,
-            49.95424423,
-            92.59887831,
-            113.66242448,
-            -0.00125060,
-            -0.00050991,
-            0.00193609,
-            1222.49362201,
-            -0.41897216,
-            -0.28867794,
-        ),
-        SE_URANUS: (
-            19.18916464,
-            0.04725744,
-            0.77263783,
-            313.23810451,
-            170.95427630,
-            74.01692503,
-            -0.00196176,
-            -0.00004397,
-            -0.00242939,
-            428.48202785,
-            0.40805281,
-            0.04240589,
-        ),
-        SE_NEPTUNE: (
-            30.06992276,
-            0.00859048,
-            1.77004347,
-            -55.12002969,
-            44.96476227,
-            131.78422574,
-            0.00026291,
-            0.00005105,
-            0.00035372,
-            218.45945325,
-            -0.32241464,
-            -0.00508664,
-        ),
-        SE_PLUTO: (
-            39.48211675,
-            0.24882730,
-            17.14001206,
-            238.92903833,
-            224.06891629,
-            110.30393684,
-            -0.00031596,
-            0.00005170,
-            0.00004818,
-            145.20780515,
-            -0.04062942,
-            -0.01183482,
-        ),
-        SE_MOON: (
-            # Moon uses different parameters - orbital elements around Earth
-            # a (in AU), e, i (to ecliptic), L, varpi, Omega
-            # Values for Moon are geocentric, not heliocentric
-            0.00256955529,
-            0.0549,
-            5.145,
-            0.0,
-            0.0,
-            0.0,  # Approximate values
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ),
-    }
+    # Ascending node: true anomaly = -omega (body crosses ecliptic northward)
+    pos_asc = _orbit_pos_3d(-omega)
+    # Descending node: true anomaly = pi - omega
+    pos_dsc = _orbit_pos_3d(math.pi - omega)
+    # Perihelion/perigee: true anomaly = 0
+    pos_peri = _orbit_pos_3d(0.0)
+    # Aphelion/apogee: true anomaly = pi
+    pos_aphe = _orbit_pos_3d(math.pi)
 
-    # Check if we have mean elements for this planet
-    if ipl not in MEAN_ELEMENTS:
-        # For unsupported bodies, use osculating elements
-        return _calc_nod_aps_osculating(t, ipl, iflag)
+    # Convert to geocentric ecliptic coordinates
+    geo_asc = _to_geo_lonlat(pos_asc)
+    geo_dsc = _to_geo_lonlat(pos_dsc)
+    geo_peri = _to_geo_lonlat(pos_peri)
+    geo_aphe = _to_geo_lonlat(pos_aphe)
 
-    # Calculate Julian centuries from J2000.0
-    T = (t.tt - 2451545.0) / 36525.0
-
-    # Get mean elements
-    a0, e0, i0, L0, varpi0, Omega0, da, de, di, dL, dvarpi, dOmega = MEAN_ELEMENTS[ipl]
-
-    # Calculate current mean elements
-    a = a0 + da * T  # Semi-major axis
-    e = e0 + de * T  # Eccentricity
-    incl = i0 + di * T  # Inclination (degrees)
-    L = (L0 + dL * T) % 360.0  # Mean longitude (degrees)
-    varpi = (varpi0 + dvarpi * T) % 360.0  # Longitude of perihelion (degrees)
-    Omega = (Omega0 + dOmega * T) % 360.0  # Longitude of ascending node (degrees)
-
-    # Argument of perihelion: omega = varpi - Omega
-    omega = varpi - Omega
-    if omega < 0:
-        omega += 360.0
-
-    # Convert inclination and omega to radians for latitude calculation
-    incl_rad = math.radians(incl)
-    omega_rad = math.radians(omega)
-
-    # Distances at nodes and apsides
-    # Semi-latus rectum: p = a * (1 - e^2)
-    p = a * (1 - e**2)
-
-    # Distance at ascending node (true anomaly = -omega)
-    nu_asc = -omega_rad
-    r_asc = (
-        p / (1 + e * math.cos(nu_asc)) if abs(1 + e * math.cos(nu_asc)) > 1e-10 else a
-    )
-
-    # Distance at descending node (true anomaly = pi - omega)
-    nu_dsc = math.pi - omega_rad
-    r_dsc = (
-        p / (1 + e * math.cos(nu_dsc)) if abs(1 + e * math.cos(nu_dsc)) > 1e-10 else a
-    )
-
-    # Distance at perihelion: r_peri = a * (1 - e)
-    r_peri = a * (1 - e)
-
-    # Distance at aphelion: r_aphe = a * (1 + e)
-    r_aphe = a * (1 + e)
-
-    # Latitude at perihelion (true anomaly = 0, measured from ascending node)
-    # latitude = arcsin(sin(i) * sin(omega))
-    lat_peri = math.degrees(math.asin(math.sin(incl_rad) * math.sin(omega_rad)))
-
-    # Latitude at aphelion (true anomaly = pi)
-    # latitude = arcsin(sin(i) * sin(omega + pi)) = -arcsin(sin(i) * sin(omega))
-    lat_aphe = -lat_peri
-
-    # Normalize angles
-    Omega_deg = Omega % 360.0
-    Omega_dsc_deg = (Omega + 180.0) % 360.0
-    varpi_deg = varpi % 360.0
-    aphe_deg = (varpi + 180.0) % 360.0
-
-    # Create position tuples (lon, lat, dist, dlon, dlat, ddist)
-    # For mean elements, the latitude of nodes is 0 (by definition)
-    xnasc: PosTuple = (Omega_deg, 0.0, r_asc, 0.0, 0.0, 0.0)
-    xndsc: PosTuple = (Omega_dsc_deg, 0.0, r_dsc, 0.0, 0.0, 0.0)
-    xperi: PosTuple = (varpi_deg, lat_peri, r_peri, 0.0, 0.0, 0.0)
-    xaphe: PosTuple = (aphe_deg, lat_aphe, r_aphe, 0.0, 0.0, 0.0)
+    # Build output tuples (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+    xnasc: PosTuple = (geo_asc[0], geo_asc[1], geo_asc[2], 0.0, 0.0, 0.0)
+    xndsc: PosTuple = (geo_dsc[0], geo_dsc[1], geo_dsc[2], 0.0, 0.0, 0.0)
+    xperi: PosTuple = (geo_peri[0], geo_peri[1], geo_peri[2], 0.0, 0.0, 0.0)
+    xaphe: PosTuple = (geo_aphe[0], geo_aphe[1], geo_aphe[2], 0.0, 0.0, 0.0)
 
     return (xnasc, xndsc, xperi, xaphe)
 
@@ -3814,18 +3950,18 @@ def swe_get_orbital_elements(tjd_et: float, ipl: int, iflag: int) -> Tuple[float
             [2] i: Inclination (degrees, relative to ecliptic)
             [3] Omega: Longitude of ascending node (degrees)
             [4] omega: Argument of perihelion (degrees)
-            [5] M: Mean anomaly (degrees)
-            [6] nu: True anomaly (degrees)
-            [7] E: Eccentric anomaly (degrees)
-            [8] L: Mean longitude (degrees)
-            [9] varpi: Longitude of perihelion (degrees)
-            [10] n: Mean daily motion (degrees/day)
-            [11] q: Perihelion distance (AU)
-            [12] Q: Aphelion distance (AU)
-            [13] P: Orbital period (tropical years)
+            [5] varpi: Longitude of periapsis (degrees)
+            [6] M: Mean anomaly at epoch (degrees)
+            [7] nu: True anomaly at epoch (degrees)
+            [8] E: Eccentric anomaly at epoch (degrees)
+            [9] L: Mean longitude at epoch (degrees)
+            [10] P_sid: Sidereal orbital period (tropical years)
+            [11] n: Mean daily motion (degrees/day)
+            [12] P_trop: Tropical period (years)
+            [13] P_syn: Synodic period (days, negative for inner planets/Moon)
             [14] T: Time of perihelion passage (JD)
-            [15] Ps: Synodic period (days)
-            [16] r: Current heliocentric distance (AU)
+            [15] q: Perihelion distance (AU)
+            [16] Q: Aphelion distance (AU)
             [17-49]: Reserved (0.0)
 
     Example:
@@ -4071,13 +4207,26 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         q = r_mag  # For parabolic/hyperbolic
         Q = float("inf")
 
-    # Orbital period in tropical years
-    # 1 tropical year = 365.24219 days
+    # Sidereal orbital period (Keplerian period relative to stars)
+    # Expressed in tropical years (365.24219 days/year)
     if n > 0:
-        P_days = 2 * math.pi / n
-        P_years = P_days / 365.24219
+        P_days = 2 * math.pi / n  # n is in radians/day
+        P_sid_years = P_days / 365.24219
     else:
-        P_years = float("inf")
+        P_days = float("inf")
+        P_sid_years = float("inf")
+
+    # Mean daily motion in degrees/day
+    n_deg = math.degrees(n)
+
+    # Tropical orbital period (return to same ecliptic longitude)
+    # Accounts for general precession in longitude (~50.29"/year)
+    _PRECESSION_DEG_PER_DAY = 50.2882 / 3600.0 / 365.25
+    if n_deg > 0:
+        P_trop_days = 360.0 / (n_deg + _PRECESSION_DEG_PER_DAY)
+        P_trop_years = P_trop_days / 365.24219
+    else:
+        P_trop_years = float("inf")
 
     # Time of perihelion passage (T)
     # T = t - M/n where M is in radians and n is radians/day
@@ -4086,21 +4235,18 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     else:
         T_jd = 0.0
 
-    # Synodic period (for planets relative to Earth)
-    # P_syn = |1 / (1/P_planet - 1/P_earth)|
-    P_earth_days = 365.24219  # Earth's orbital period in days
-    if P_years > 0 and P_years < float("inf") and ipl not in [SE_EARTH, SE_MOON]:
-        P_planet_days = P_years * 365.24219
-        denom = abs(1.0 / P_planet_days - 1.0 / P_earth_days)
-        if denom > 1e-10:
-            P_syn = 1.0 / denom
+    # Synodic period (relative to Earth's orbital motion)
+    # P_syn = P_earth * P_planet / (P_planet - P_earth)
+    # Negative for inner planets and Moon (P_planet < P_earth), positive for outer
+    P_earth_days = 365.24219
+    if P_days > 0 and P_days < float("inf") and ipl != SE_EARTH:
+        denom = P_days - P_earth_days
+        if abs(denom) > 1e-10:
+            P_syn = P_earth_days * P_days / denom
         else:
             P_syn = float("inf")
     else:
-        P_syn = 0.0  # Not applicable for Earth or Moon
-
-    # Current heliocentric distance
-    r_current = r_mag
+        P_syn = 0.0
 
     # Convert angles to degrees
     i_deg = math.degrees(i)
@@ -4111,27 +4257,26 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     M_deg = math.degrees(M)
     L_deg = math.degrees(L)
     varpi_deg = math.degrees(varpi)
-    n_deg = math.degrees(n)  # degrees/day
 
-    # Build the 17-element tuple
+    # Build the 17-element tuple matching pyswisseph index layout
     elements = (
         a,  # [0] Semi-major axis (AU)
         e,  # [1] Eccentricity
         i_deg,  # [2] Inclination (degrees)
         Omega_deg,  # [3] Longitude of ascending node (degrees)
         omega_deg,  # [4] Argument of perihelion (degrees)
-        M_deg,  # [5] Mean anomaly (degrees)
-        nu_deg,  # [6] True anomaly (degrees)
-        E_deg,  # [7] Eccentric anomaly (degrees)
-        L_deg,  # [8] Mean longitude (degrees)
-        varpi_deg,  # [9] Longitude of perihelion (degrees)
-        n_deg,  # [10] Mean daily motion (degrees/day)
-        q,  # [11] Perihelion distance (AU)
-        Q,  # [12] Aphelion distance (AU)
-        P_years,  # [13] Orbital period (tropical years)
+        varpi_deg,  # [5] Longitude of periapsis (degrees)
+        M_deg,  # [6] Mean anomaly at epoch (degrees)
+        nu_deg,  # [7] True anomaly at epoch (degrees)
+        E_deg,  # [8] Eccentric anomaly at epoch (degrees)
+        L_deg,  # [9] Mean longitude at epoch (degrees)
+        P_sid_years,  # [10] Sidereal orbital period (tropical years)
+        n_deg,  # [11] Mean daily motion (degrees/day)
+        P_trop_years,  # [12] Tropical period (years)
+        P_syn,  # [13] Synodic period (days, negative for inner/Moon)
         T_jd,  # [14] Time of perihelion passage (JD)
-        P_syn,  # [15] Synodic period (days)
-        r_current,  # [16] Current heliocentric distance (AU)
+        q,  # [15] Perihelion distance (AU)
+        Q,  # [16] Aphelion distance (AU)
     )
 
     # Pad to 50 elements for pyswisseph compatibility
@@ -4225,9 +4370,14 @@ def _calc_orbit_max_min_true_distance(
         except Exception:
             pass
 
-    # Sun has no geocentric distance variation
+    # Sun: geocentric distance = Earth-Sun distance, varies with Earth's orbit
     if ipl == SE_SUN:
-        return (0.0, 0.0, true_dist)
+        # Earth's orbital parameters
+        a_earth = 1.00000261  # Semi-major axis in AU
+        e_earth = 0.01671123  # Eccentricity
+        min_dist = a_earth * (1 - e_earth)  # Perihelion (closest to Sun)
+        max_dist = a_earth * (1 + e_earth)  # Aphelion (farthest from Sun)
+        return (max_dist, min_dist, true_dist)
 
     # Earth has no geocentric distance (it's the observer)
     if ipl == SE_EARTH:
@@ -4490,8 +4640,8 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
 _PLANET_MAG_PARAMS = {
     # Mercury, Venus, Mars, Jupiter, Saturn, Pluto use Mallama 2018 formulas
     # (implemented directly in _calc_planet_magnitude)
-    SE_URANUS: (-7.19, 0.002, 0.0, 0.0),  # Uranus
-    SE_NEPTUNE: (-6.87, 0.0, 0.0, 0.0),  # Neptune: nearly constant
+    SE_URANUS: (-7.15, 0.002, 0.0, 0.0),  # Uranus (Mallama & Hilton 2018)
+    # Neptune uses dedicated secular variation formula in _calc_planet_magnitude
     # Pluto uses dedicated Mallama 2018 formula below
 }
 
@@ -4502,26 +4652,22 @@ _J2000 = 2451545.0
 _MEAN_MOON_DISTANCE_AU = 384400.0 / 149597870.7
 
 
-def _calc_moon_magnitude_hapke(phase_angle: float, distance_au: float) -> float:
+def _calc_moon_magnitude(phase_angle: float, distance_au: float) -> float:
     """
-    Calculate Moon's visual magnitude using a simplified Hapke photometric model.
+    Calculate Moon's visual magnitude using the Astronomical Almanac formula.
 
-    This implementation is based on the Hapke bidirectional reflectance model
-    with parameters derived from USNO lunar photometry data and Allen's
-    Astrophysical Quantities. The model accounts for:
+    Uses the standard photometric model from the Astronomical Almanac
+    (based on Allen's Astrophysical Quantities) with a linear phase
+    coefficient and a quartic term that captures the steep brightening
+    at opposition and the rapid dimming for thin crescents.
 
-    1. Phase darkening: The Moon gets dimmer as phase angle increases
-    2. Opposition surge: Enhanced brightness at small phase angles (<7°)
-       due to shadow hiding and coherent backscattering
-    3. Distance correction: Brightness varies with Earth-Moon distance
-
-    The phase function uses polynomial coefficients fitted to match observed
-    lunar brightness curves within ±0.1 mag across all phases.
+    The formula is: V = V0 + 5*log10(d/d_mean) + 0.026*|α| + 4e-9*|α|⁴
 
     Reference values:
-    - Full Moon at mean distance: V = -12.74 mag (Allen's Astrophysical Quantities)
-    - Full Moon at perigee: V ≈ -12.90 mag
-    - Full Moon at apogee: V ≈ -12.55 mag
+    - Full Moon at mean distance: V = -12.73 mag
+    - Quarter Moon (α≈90°): V ≈ -10.0 to -10.5
+    - Full Moon at perigee: V ≈ -12.89 mag
+    - Full Moon at apogee: V ≈ -12.54 mag
 
     Args:
         phase_angle: Sun-Moon-Earth angle in degrees (0° = full, 180° = new)
@@ -4531,78 +4677,27 @@ def _calc_moon_magnitude_hapke(phase_angle: float, distance_au: float) -> float:
         Visual magnitude (more negative = brighter)
 
     References:
-        - Hapke, B. (1986) "Bidirectional reflectance spectroscopy"
+        - Astronomical Almanac, Section K
         - Allen's Astrophysical Quantities, 4th ed., Table 12.16
-        - Kieffer, H.H. & Stone, T.C. (2005) "The spectral irradiance of the Moon"
-        - Lane, A.P. & Irvine, W.M. (1973) "Lunar photometry"
     """
-    # Full Moon magnitude at mean distance (Allen's Astrophysical Quantities)
-    V0 = -12.74
+    # Full Moon magnitude at mean distance
+    V0 = -12.73
 
     # Distance correction: magnitude scales with distance squared
-    # delta_m = 5 * log10(d / d_mean)
     if distance_au > 0:
         dist_correction = 5.0 * math.log10(distance_au / _MEAN_MOON_DISTANCE_AU)
     else:
         dist_correction = 0.0
 
-    # Phase angle in radians for trigonometric calculations
-    alpha = phase_angle
-    alpha_rad = math.radians(alpha)
+    alpha = abs(phase_angle)
 
-    # Opposition surge (Hapke B_S0 and h_s parameters)
-    # This models the brightness enhancement at small phase angles
-    # The surge width h_s ≈ 0.06 rad (≈3.4°) is typical for lunar regolith
-    # B_S0 is reduced to 0.4 to avoid over-brightening at opposition
-    # Opposition effect: B(α) = B_S0 / (1 + tan(α/2) / h_s)
-    h_s = 0.06  # Opposition surge angular width parameter (radians)
-    B_S0 = 0.4  # Opposition surge amplitude (reduced from typical 1.0)
-    if alpha < 0.1:
-        # Very small angles - avoid numerical issues
-        opposition_factor = B_S0
-    else:
-        tan_half_alpha = math.tan(alpha_rad / 2.0)
-        opposition_factor = B_S0 / (1.0 + tan_half_alpha / h_s)
+    # Phase function from the Astronomical Almanac:
+    # Linear term dominates at moderate phases (0.026 mag/degree)
+    # Quartic term adds steep brightening near opposition and
+    # rapid dimming for thin crescents
+    phase_darkening = 0.026 * alpha + 4.0e-9 * alpha**4
 
-    # Phase function coefficients from polynomial fit to lunar photometry
-    # These coefficients reproduce the observed phase curve within ±0.1 mag
-    # for phase angles from 0° to 150°
-    #
-    # The polynomial: Φ(α) = c0 + c1*α + c2*α²
-    # where α is in degrees
-    #
-    # Reference values for calibration:
-    # - Full Moon (α≈0°): V = -12.74
-    # - Quarter Moon (α≈90°): V ≈ -10.0 to -10.5
-    # - Crescent Moon (α≈135°): V ≈ -6 to -8
-    #
-    # Coefficients adjusted to match Lane & Irvine (1973) phase curve
-    c1 = 0.028  # Linear dimming coefficient (mag/degree)
-    c2 = 1.0e-5  # Small quadratic correction for phase curve shape
-
-    # Calculate phase darkening (polynomial phase function)
-    # This gives ~2.5 mag at 90°, which brings Quarter Moon to about -10.2
-    phase_darkening = c1 * alpha + c2 * alpha**2
-
-    # Opposition surge correction (applied as magnitude reduction at low phase)
-    # Convert opposition factor to magnitude: -2.5 * log10(1 + opposition_factor)
-    # At α=0: opposition_factor ≈ 0.4, so surge ≈ -0.4 mag
-    # At α>20°: opposition_factor ≈ 0, so surge ≈ 0
-    if opposition_factor > 0.001:
-        opposition_surge_mag = -2.5 * math.log10(1.0 + opposition_factor)
-    else:
-        opposition_surge_mag = 0.0
-
-    # Combine all terms
-    # Note: opposition surge makes Moon brighter (negative), so we add it
-    magnitude = V0 + dist_correction + phase_darkening + opposition_surge_mag
-
-    # For very thin crescents (phase angle > 160°), the brightness drops rapidly
-    # This is because only a thin sliver is illuminated
-    if alpha > 160.0:
-        # Additional dimming for thin crescent phases
-        extra_dimming = 0.02 * (alpha - 160.0) ** 1.5
-        magnitude += extra_dimming
+    magnitude = V0 + dist_correction + phase_darkening
 
     return magnitude
 
@@ -4719,9 +4814,9 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         sun_radius_km = _BODY_RADIUS_KM.get(SE_SUN, 695700.0)
         diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
 
-        # Sun magnitude (approximately -26.74 at 1 AU)
+        # Sun magnitude (V(1,0) = -26.86 at 1 AU, Mallama & Hilton 2018)
         magnitude = (
-            -26.74 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.74
+            -26.86 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.86
         )
 
         attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
@@ -4798,24 +4893,27 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         cos_elong = max(-1.0, min(1.0, cos_elong))
         elongation = math.degrees(math.acos(cos_elong))
 
-        # Phase angle for Moon
-        # Using the formula from Meeus "Astronomical Algorithms"
-        # Phase angle i is approximately: cos(i) = -cos(elongation)
-        # More precisely, use triangle Sun-Moon-Earth
-        r_sun = sun_dist.au  # Earth-Sun distance
+        # Phase angle for Moon using 3D vector approach
+        # The phase angle is the angle at the Moon vertex between the
+        # Sun-Moon and Earth-Moon directions. Using position vectors
+        # is more numerically stable than law-of-cosines for the Moon's
+        # extremely elongated triangle (Sun~1AU, Moon~0.003AU from Earth).
         r_moon = moon_dist.au  # Earth-Moon distance
 
-        # Get Moon's heliocentric distance
-        moon_helio = sun.at(t).observe(planets["moon"])
-        R_moon = math.sqrt(
-            sum(x**2 for x in moon_helio.position.au)
-        )  # Sun-Moon distance
+        # Vectors in geocentric frame (Earth at origin)
+        M = target_pos_geo.position.au  # Moon position
+        S = sun_from_earth.position.au  # Sun position
 
-        # Use law of cosines to get phase angle
-        # In triangle Sun-Moon-Earth: i is at Moon vertex
-        # cos(i) = (R^2 + r_moon^2 - r_sun^2) / (2 * R * r_moon)
-        if R_moon > 0 and r_moon > 0:
-            cos_phase = (R_moon**2 + r_moon**2 - r_sun**2) / (2 * R_moon * r_moon)
+        # Vectors from Moon to Sun and from Moon to Earth
+        vec_moon_to_sun = S - M
+        vec_moon_to_earth = -M
+
+        dot_prod = sum(a * b for a, b in zip(vec_moon_to_sun, vec_moon_to_earth))
+        mag_ms = math.sqrt(sum(x**2 for x in vec_moon_to_sun))
+        mag_me = math.sqrt(sum(x**2 for x in vec_moon_to_earth))
+
+        if mag_ms > 0 and mag_me > 0:
+            cos_phase = dot_prod / (mag_ms * mag_me)
             cos_phase = max(-1.0, min(1.0, cos_phase))
             phase_angle = math.degrees(math.acos(cos_phase))
         else:
@@ -4828,10 +4926,8 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         moon_radius_km = _BODY_RADIUS_KM.get(SE_MOON, 1737.4)
         diameter = _calc_apparent_diameter(moon_radius_km, r_moon)
 
-        # Moon's magnitude using Hapke photometric model
-        # This provides ±0.1 mag accuracy across all phases, compared to
-        # the simplified formula which can have errors up to 0.5 mag
-        magnitude = _calc_moon_magnitude_hapke(phase_angle, r_moon)
+        # Moon's magnitude using Astronomical Almanac photometric model
+        magnitude = _calc_moon_magnitude(phase_angle, r_moon)
 
         attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
         return attr, iflag
@@ -4854,18 +4950,23 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         cos_elong = max(-1.0, min(1.0, cos_elong))
         elongation = math.degrees(math.acos(cos_elong))
 
-        # Phase angle calculation using triangle Sun-Planet-Earth
-        # r = geocentric distance of planet
-        # R = heliocentric distance of planet
-        # d_sun = geocentric distance of Sun (≈ 1 AU)
-        r = target_geo_dist
-        R = target_helio_dist
-        d_sun = sun_dist.au
+        # Phase angle calculation using 3D vector approach
+        # The phase angle is the angle at the planet vertex between the
+        # Sun-Planet and Earth-Planet directions. Using position vectors
+        # avoids numerical issues with the law-of-cosines for scalar distances.
+        P = target_pos_geo.position.au  # Planet position (geocentric)
+        S = sun_pos_geo.position.au  # Sun position (geocentric)
 
-        # Law of cosines: phase angle i is at the planet vertex
-        # cos(i) = (R^2 + r^2 - d_sun^2) / (2 * R * r)
-        if R > 0 and r > 0:
-            cos_phase = (R**2 + r**2 - d_sun**2) / (2 * R * r)
+        # Vectors from planet to Sun and from planet to Earth
+        vec_planet_to_sun = S - P
+        vec_planet_to_earth = -P
+
+        dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
+        mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))
+        mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
+
+        if mag_ps > 0 and mag_pe > 0:
+            cos_phase = dot_prod / (mag_ps * mag_pe)
             cos_phase = max(-1.0, min(1.0, cos_phase))
             phase_angle = math.degrees(math.acos(cos_phase))
         else:
@@ -4886,16 +4987,14 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
 
     # Visual magnitude
     # For Saturn, we need ecliptic coordinates for ring tilt calculation
+    # tjd is needed for Saturn (ring tilt) and Neptune (secular brightness)
     geo_lon = 0.0
     geo_lat = 0.0
     helio_lon = 0.0
     helio_lat = 0.0
-    tjd = 0.0
+    tjd = t.tt
 
     if ipl == SE_SATURN:
-        # Get Julian day from Skyfield time object
-        tjd = t.tt
-
         # Get geocentric ecliptic coordinates
         try:
             geo_ecl_lat, geo_ecl_lon, _ = target_pos_geo.frame_latlon(ecliptic_frame)
@@ -5072,6 +5171,23 @@ def _calc_planet_magnitude(
         beta = 0.0362  # Phase coefficient in mag/degree
         phase_correction = beta * a  # Linear phase correction
         magnitude = V0 + dist_factor + phase_correction
+        return magnitude
+
+    # Neptune - secular brightness variation
+    # Neptune's albedo has been increasing since ~1980 due to seasonal changes
+    # over its 165-year orbital period. The absolute magnitude V(1,0) transitions
+    # linearly from -6.89 (pre-1980) to -7.00 (by J2000.0).
+    # Reference: Lockwood & Thompson (1991), Sromovsky et al. (2003)
+    if ipl == SE_NEPTUNE:
+        year = 2000.0 + (tjd - _J2000) / 365.25
+        if year >= 2000.0:
+            V0 = -7.00
+        elif year <= 1980.0:
+            V0 = -6.89
+        else:
+            # Linear interpolation: -6.89 at 1980 to -7.00 at 2000
+            V0 = -6.89 + (year - 1980.0) * (-0.11 / 20.0)
+        magnitude = V0 + dist_factor
         return magnitude
 
     # Outer planets using simplified formula

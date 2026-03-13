@@ -300,7 +300,11 @@ class TestVisLimitMagFlags:
         )
 
         # Moon altitude with no-moon flag should be -90
-        assert dret_no_moon[5] == -90.0
+        # (only when object is above horizon; below-horizon returns all zeros)
+        if result_no_moon != SE_HELFLAG_BELOW_HORIZON:
+            assert dret_no_moon[5] == -90.0
+        else:
+            assert dret_no_moon[5] == 0.0
 
 
 class TestVisLimitMagVisionTypes:

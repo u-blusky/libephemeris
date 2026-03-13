@@ -46,13 +46,11 @@ import libephemeris as ephem
 # Current implementation thresholds (based on Moshier analytical implementation)
 # These values represent the current precision with ~50 term analytical perturbation series
 # Updated after implementing comprehensive Moshier-based apsidal perturbation terms
-CURRENT_APOGEE_MAX_ERROR = 0.55  # degrees (expected: <0.55°)
-CURRENT_APOGEE_MEAN_ERROR = 0.2  # degrees (expected: <0.2°)
-CURRENT_PERIGEE_MAX_ERROR = (
-    21.0  # degrees (independent ELP2000-82B perturbation series)
-)
+CURRENT_APOGEE_MAX_ERROR = 0.20  # degrees (LSQ-fitted perturbation series)
+CURRENT_APOGEE_MEAN_ERROR = 0.05  # degrees (LSQ-fitted perturbation series)
+CURRENT_PERIGEE_MAX_ERROR = 1.5  # degrees (LSQ-fitted extended evection series k=1..26)
 CURRENT_PERIGEE_MEAN_ERROR = (
-    12.0  # degrees (independent ELP2000-82B perturbation series)
+    0.4  # degrees (LSQ-fitted extended evection series k=1..26)
 )
 
 # Target precision as specified in the task

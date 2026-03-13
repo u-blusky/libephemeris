@@ -296,13 +296,13 @@ class TestDocumentedReturnValues:
             _, lat, _ = calc_interpolated_apogee(jd)
             assert abs(lat) < 10, f"Latitude {lat} unexpectedly large at JD {jd}"
 
-    def test_eccentricity_is_reasonable(self):
-        """Verify eccentricity is ~0.055 as documented."""
+    def test_distance_is_reasonable(self):
+        """Verify distance in AU is ~0.0027 (apogee distance)."""
         jd = 2451545.0
-        _, _, ecc = calc_interpolated_apogee(jd)
+        _, _, dist = calc_interpolated_apogee(jd)
 
-        # Moon's orbital eccentricity is approximately 0.055
-        assert 0.04 < ecc < 0.07, f"Eccentricity {ecc} not in expected range"
+        # 3rd return value is apogee distance in AU (~0.0027)
+        assert 0.002 < dist < 0.003, f"Distance {dist} AU not in expected range"
 
 
 class TestDocumentedAlgorithmParameters:
@@ -350,12 +350,12 @@ class TestDocumentedUseCases:
         # Osculating (True) Lilith
         oscu_lon, oscu_lat, oscu_ecc = calc_true_lilith(jd)
         assert 0 <= oscu_lon < 360
-        assert 0.04 < oscu_ecc < 0.07
+        assert 0.002 < oscu_ecc < 0.003
 
         # Interpolated
         intp_lon, intp_lat, intp_ecc = calc_interpolated_apogee(jd)
         assert 0 <= intp_lon < 360
-        assert 0.04 < intp_ecc < 0.07
+        assert 0.002 < intp_ecc < 0.003
 
     def test_variants_differ_appropriately(self):
         """Verify the three variants give different results as documented."""

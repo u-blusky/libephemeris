@@ -162,8 +162,12 @@ from .constants import (
     SE_THUBAN,
     SE_RASALGETHI,
     SE_ALBIREO,
+    SE_MIRACH,
+    SE_ALMACH,
+    SE_MENKAR,
     SEFLG_SPEED,
     SEFLG_NOABERR,
+    SEFLG_NOGDEFL,
     SEFLG_EQUATORIAL,
     J2000,
     J1991_25,
@@ -1837,6 +1841,47 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         ),
         magnitude=3.08,
     ),
+    # ======== ANDROMEDA CONSTELLATION (additional) ========
+    StarCatalogEntry(
+        id=SE_MIRACH,
+        name="Mirach",
+        nomenclature="beAnd",
+        hip_number=5447,
+        data=StarData(
+            ra_j2000=17.433013,  # 01h 09m 43.9s (Beta Andromedae, HIP 5447)
+            dec_j2000=35.620557,  # +35° 37' 14.0"
+            pm_ra=0.17590,  # 175.90 mas/yr
+            pm_dec=-0.11240,  # -112.40 mas/yr
+        ),
+        magnitude=2.05,
+    ),
+    StarCatalogEntry(
+        id=SE_ALMACH,
+        name="Almach",
+        nomenclature="ga1And",
+        hip_number=9640,
+        data=StarData(
+            ra_j2000=30.974803,  # 02h 03m 53.9s (Gamma1 Andromedae, HIP 9640)
+            dec_j2000=42.329725,  # +42° 19' 47.0"
+            pm_ra=0.04350,  # 43.50 mas/yr
+            pm_dec=-0.05080,  # -50.80 mas/yr
+        ),
+        magnitude=2.10,
+    ),
+    # ======== CETUS CONSTELLATION ========
+    StarCatalogEntry(
+        id=SE_MENKAR,
+        name="Menkar",
+        nomenclature="alCet",
+        hip_number=14135,
+        data=StarData(
+            ra_j2000=45.569885,  # 03h 02m 16.8s (Alpha Ceti, HIP 14135)
+            dec_j2000=4.089737,  # +04° 05' 23.1"
+            pm_ra=-0.00632,  # -6.32 mas/yr
+            pm_dec=-0.07847,  # -78.47 mas/yr
+        ),
+        magnitude=2.54,
+    ),
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -3202,6 +3247,29 @@ STAR_ALIASES: dict[str, int] = {
     # Albireo variants (Beta Cygni)
     "ALBIREO": SE_ALBIREO,
     "BETA CYGNI": SE_ALBIREO,
+    # Mirach variants (Beta Andromedae)
+    "MIRACH": SE_MIRACH,
+    "BETA ANDROMEDAE": SE_MIRACH,
+    "BETA AND": SE_MIRACH,
+    "β AND": SE_MIRACH,
+    "BEAND": SE_MIRACH,
+    "MIRAK": SE_MIRACH,
+    "MIRAC": SE_MIRACH,
+    # Almach variants (Gamma Andromedae)
+    "ALMACH": SE_ALMACH,
+    "ALAMAK": SE_ALMACH,
+    "ALMAAK": SE_ALMACH,
+    "GAMMA ANDROMEDAE": SE_ALMACH,
+    "GAMMA AND": SE_ALMACH,
+    "γ AND": SE_ALMACH,
+    "GA1AND": SE_ALMACH,
+    # Menkar variants (Alpha Ceti)
+    "MENKAR": SE_MENKAR,
+    "MENKAB": SE_MENKAR,
+    "ALPHA CETI": SE_MENKAR,
+    "ALPHA CET": SE_MENKAR,
+    "α CET": SE_MENKAR,
+    "ALCET": SE_MENKAR,
 }
 
 
@@ -3489,7 +3557,7 @@ def get_canonical_star_name(star_id: int) -> str | None:
 
 
 def _calc_star_position_skyfield(
-    star_id: int, jd_tt: float, noaberr: bool = False
+    star_id: int, jd_tt: float, noaberr: bool = False, nogdefl: bool = False
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position using Skyfield Star class with proper aberration.
@@ -3499,11 +3567,13 @@ def _calc_star_position_skyfield(
     - Precession
     - Nutation
     - Annual aberration (unless noaberr=True)
+    - Gravitational light deflection (unless nogdefl=True)
 
     Args:
         star_id: Star identifier (SE_* constant)
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
+        nogdefl: If True, skip gravitational deflection but keep aberration
 
     Returns:
         Tuple of (longitude, latitude, distance) in degrees and AU
@@ -3541,6 +3611,10 @@ def _calc_star_position_skyfield(
 
     if noaberr:
         pos = astrometric
+    elif nogdefl:
+        # Aberration without gravitational deflection:
+        # Pass empty deflectors tuple to skip deflection while keeping aberration.
+        pos = astrometric.apparent(deflectors=())
     else:
         pos = astrometric.apparent()
 
@@ -3558,7 +3632,7 @@ def _calc_star_position_skyfield(
 
 
 def calc_fixed_star_position(
-    star_id: int, jd_tt: float, noaberr: bool = False
+    star_id: int, jd_tt: float, noaberr: bool = False, nogdefl: bool = False
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position of a fixed star at given date.
@@ -3567,11 +3641,13 @@ def calc_fixed_star_position(
     - Proper motion
     - Precession and nutation
     - Annual aberration (by default)
+    - Gravitational light deflection (by default)
 
     Args:
         star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
+        nogdefl: If True, skip gravitational deflection but keep aberration
 
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
@@ -3590,11 +3666,11 @@ def calc_fixed_star_position(
         IAU 2006 precession (Capitaine et al.)
         Skyfield library for apparent position calculation
     """
-    return _calc_star_position_skyfield(star_id, jd_tt, noaberr)
+    return _calc_star_position_skyfield(star_id, jd_tt, noaberr, nogdefl)
 
 
 def calc_fixed_star_velocity(
-    star_id: int, jd_tt: float, noaberr: bool = False
+    star_id: int, jd_tt: float, noaberr: bool = False, nogdefl: bool = False
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Calculate ecliptic position and velocity of a fixed star at given date.
@@ -3618,30 +3694,14 @@ def calc_fixed_star_velocity(
         star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
+        nogdefl: If True, skip gravitational deflection but keep aberration
 
     Returns:
         Tuple[float, float, float, float, float, float]:
-            (longitude, latitude, distance, speed_lon, speed_lat, speed_dist) where:
-            - longitude: Ecliptic longitude of date in degrees (0-360)
-            - latitude: Ecliptic latitude of date in degrees
-            - distance: Arbitrary large value (100000 AU)
-            - speed_lon: Velocity in longitude in degrees/day
-            - speed_lat: Velocity in latitude in degrees/day
-            - speed_dist: Velocity in distance (always 0.0 for fixed stars)
+            (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
 
     Raises:
         ValueError: If star_id not in catalog
-
-    Algorithm:
-        1. Calculate position at jd_tt (for return value)
-        2. Use central difference for longitude velocity (captures precession)
-        3. Compute latitude velocity analytically from proper motion vector
-           transformation to match the pyswisseph sign convention
-        4. speed_dist = 0 (stellar distances don't measurably change)
-
-    References:
-        Precession rate: ~50.3 arcsec/year ≈ 0.0001378 deg/day in longitude
-        Cartesian-to-polar velocity transformation algorithm
     """
     import numpy as np
     from .state import get_timescale, get_planets
@@ -3655,11 +3715,15 @@ def calc_fixed_star_velocity(
     h = 0.5
 
     # Calculate position at current time (for return value)
-    lon, lat, dist = calc_fixed_star_position(star_id, jd_tt, noaberr)
+    lon, lat, dist = calc_fixed_star_position(star_id, jd_tt, noaberr, nogdefl)
 
     # Calculate positions at t-0.5 and t+0.5 for central difference
-    lon_prev, lat_prev, _ = calc_fixed_star_position(star_id, jd_tt - h, noaberr)
-    lon_next, lat_next, _ = calc_fixed_star_position(star_id, jd_tt + h, noaberr)
+    lon_prev, lat_prev, _ = calc_fixed_star_position(
+        star_id, jd_tt - h, noaberr, nogdefl
+    )
+    lon_next, lat_next, _ = calc_fixed_star_position(
+        star_id, jd_tt + h, noaberr, nogdefl
+    )
 
     # Central difference for longitude: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
     speed_lon = lon_next - lon_prev
@@ -3690,6 +3754,8 @@ def calc_fixed_star_velocity(
 
     if noaberr:
         pos = astrometric
+    elif nogdefl:
+        pos = astrometric.apparent(deflectors=())
     else:
         pos = astrometric.apparent()
 
@@ -3810,15 +3876,16 @@ def swe_fixstar_ut(
     try:
         # Check SEFLG_NOABERR flag for astrometric (no aberration) position
         noaberr = bool(iflag & SEFLG_NOABERR)
+        nogdefl = bool(iflag & SEFLG_NOGDEFL)
 
         # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, t.tt, noaberr
+                star_id, t.tt, noaberr, nogdefl
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
-            lon, lat, dist = calc_fixed_star_position(star_id, t.tt, noaberr)
+            lon, lat, dist = calc_fixed_star_position(star_id, t.tt, noaberr, nogdefl)
             # Return canonical star name on success (reference API behavior)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
@@ -3879,15 +3946,16 @@ def swe_fixstar(
     try:
         # Check SEFLG_NOABERR flag for astrometric (no aberration) position
         noaberr = bool(iflag & SEFLG_NOABERR)
+        nogdefl = bool(iflag & SEFLG_NOGDEFL)
 
         # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, jd, noaberr
+                star_id, jd, noaberr, nogdefl
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
-            lon, lat, dist = calc_fixed_star_position(star_id, jd, noaberr)
+            lon, lat, dist = calc_fixed_star_position(star_id, jd, noaberr, nogdefl)
             # Return canonical star name on success (reference API behavior)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
@@ -4114,16 +4182,17 @@ def swe_fixstar2_ut(
     try:
         # Check SEFLG_NOABERR flag for astrometric (no aberration) position
         noaberr = bool(iflag & SEFLG_NOABERR)
+        nogdefl = bool(iflag & SEFLG_NOGDEFL)
 
         # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, t.tt, noaberr
+                entry.id, t.tt, noaberr, nogdefl
             )
             star_name_out = _format_star_name(entry)
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
-            lon, lat, dist = calc_fixed_star_position(entry.id, t.tt, noaberr)
+            lon, lat, dist = calc_fixed_star_position(entry.id, t.tt, noaberr, nogdefl)
             star_name_out = _format_star_name(entry)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
@@ -4198,16 +4267,17 @@ def swe_fixstar2(
     try:
         # Check SEFLG_NOABERR flag for astrometric (no aberration) position
         noaberr = bool(iflag & SEFLG_NOABERR)
+        nogdefl = bool(iflag & SEFLG_NOGDEFL)
 
         # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, jd, noaberr
+                entry.id, jd, noaberr, nogdefl
             )
             star_name_out = _format_star_name(entry)
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
-            lon, lat, dist = calc_fixed_star_position(entry.id, jd, noaberr)
+            lon, lat, dist = calc_fixed_star_position(entry.id, jd, noaberr, nogdefl)
             star_name_out = _format_star_name(entry)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 

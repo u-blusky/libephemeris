@@ -291,7 +291,7 @@ class TestAnnualEquationIntegration:
 
             assert 0 <= lon < 360, f"Invalid longitude {lon} at JD {jd}"
             assert -10 <= lat <= 10, f"Invalid latitude {lat} at JD {jd}"
-            assert 0.02 < e_mag < 0.1, f"Invalid eccentricity {e_mag} at JD {jd}"
+            assert 0.002 < e_mag < 0.003, f"Invalid distance {e_mag} AU at JD {jd}"
 
     def test_multiple_years_consistency(self):
         """True Lilith should work consistently across multiple years."""
@@ -306,7 +306,7 @@ class TestAnnualEquationIntegration:
 
                 assert 0 <= lon < 360
                 assert -10 <= lat <= 10
-                assert 0.02 < e_mag < 0.1
+                assert 0.002 < e_mag < 0.003
 
     def test_annual_equation_smooth_variation(self):
         """Annual equation effect should vary smoothly over the year."""

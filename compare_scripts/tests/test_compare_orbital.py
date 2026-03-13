@@ -1,25 +1,15 @@
 """
 Compare orbital element calculations with pyswisseph.
 
-NOTE: Tests for nod_aps are marked as xfail because libephemeris uses a different
-methodology for calculating planetary nodes and apsides.
+Tests for nod_aps compare geocentric osculating orbital nodes and apsides.
+Both libraries compute heliocentric osculating elements from JPL state vectors,
+then project to geocentric ecliptic of date.
 
-Key difference:
-- libephemeris: Uses heliocentric mean orbital elements from Standish (1992) JPL/IERS
-  tables. The ascending node longitude is the heliocentric Omega where the planet's
-  orbit crosses the ecliptic going north (as seen from the Sun).
-
-- Swiss Ephemeris: Appears to use a geocentric interpretation, returning the ecliptic
-  longitude where the planet appears to cross the ecliptic as seen from Earth.
-
-For outer planets (Jupiter, Saturn, etc.), the difference is small (<1°) because
-they are far from Earth. For inner planets (Mercury, Venus), the difference can be
-~250° because the heliocentric and geocentric orbital planes are oriented very
-differently relative to Earth.
-
-Both approaches are astronomically valid - they answer different questions:
-- Heliocentric: "Where does the orbit cross the ecliptic as seen from the Sun?"
-- Geocentric: "Where does the planet appear to cross the ecliptic from Earth?"
+Node longitudes agree to < 0.02 degrees for all planets.
+Apse longitudes agree to < 0.02 degrees for high-eccentricity planets
+(Mercury, Venus, Mars) but have larger differences (~1 degree) for
+low-eccentricity gas giants (Jupiter e~0.048, Saturn e~0.054) where
+the perihelion direction is poorly constrained.
 """
 
 import pytest
@@ -32,12 +22,6 @@ from libephemeris.constants import (
     SE_JUPITER,
     SE_SATURN,
     SEFLG_SWIEPH,
-)
-
-# Mark nod_aps tests as expected to fail
-_NOD_APS_XFAIL = pytest.mark.xfail(
-    reason="Orbital node calculation methodology differs (heliocentric vs geocentric)",
-    strict=False,
 )
 
 
@@ -100,13 +84,18 @@ TEST_DATES = [
 class TestNodAps:
     """Tests for nodes and apsides (nod_aps_ut) calculations."""
 
-    @_NOD_APS_XFAIL
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", TEST_PLANETS)
     @pytest.mark.parametrize("method,method_name", NOD_APS_METHODS)
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES)
     def test_nod_aps_ut(self, body_id, body_name, method, method_name, jd, date_desc):
-        """Test nodes and apsides calculations."""
+        """Test nodes and apsides calculations.
+
+        Both libraries compute geocentric osculating elements from JPL ephemeris.
+        Node longitudes agree to < 0.02 degrees for all planets.
+        Apse longitudes use a relaxed tolerance for low-eccentricity gas giants
+        (Jupiter, Saturn) where the perihelion direction is poorly constrained.
+        """
         # SwissEphemeris
         try:
             ret_swe = swe.nod_aps_ut(jd, body_id, SEFLG_SWIEPH, method)
@@ -127,16 +116,30 @@ class TestNodAps:
         except Exception as e:
             pytest.skip(f"LibEphemeris failed: {e}")
 
-        # Compare node and apsides longitudes
+        # Compare node longitudes (tight tolerance for all planets)
         diff_nasc = angular_diff(nasc_swe[0], nasc_py[0])
         diff_ndesc = angular_diff(ndesc_swe[0], ndesc_py[0])
+        max_node_diff = max(diff_nasc, diff_ndesc)
+
+        assert max_node_diff < OrbitalTolerance.ANGLE_DEGREES, (
+            f"{body_name} {method_name} @ {date_desc}: node diff {max_node_diff}°"
+        )
+
+        # Compare apse longitudes (relaxed for low-eccentricity gas giants)
         diff_peri = angular_diff(peri_swe[0], peri_py[0])
         diff_aphe = angular_diff(aphe_swe[0], aphe_py[0])
+        max_apse_diff = max(diff_peri, diff_aphe)
 
-        max_diff = max(diff_nasc, diff_ndesc, diff_peri, diff_aphe)
+        # Jupiter (e~0.048) and Saturn (e~0.054) have poorly constrained
+        # perihelion directions, so use the relaxed PERI_ANGLE_DEGREES tolerance
+        apse_tol = (
+            OrbitalTolerance.PERI_ANGLE_DEGREES
+            if body_id in (SE_JUPITER, SE_SATURN)
+            else OrbitalTolerance.ANGLE_DEGREES
+        )
 
-        assert max_diff < OrbitalTolerance.ANGLE_DEGREES, (
-            f"{body_name} {method_name} @ {date_desc}: max diff {max_diff}°"
+        assert max_apse_diff < apse_tol, (
+            f"{body_name} {method_name} @ {date_desc}: apse diff {max_apse_diff}°"
         )
 
 

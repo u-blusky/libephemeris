@@ -127,6 +127,17 @@ Asteroid positions are derived from the same JPL data products used by professio
 
 All differences produce sub-arcsecond effects for the planets and sub-degree effects for the lunar apsides. Both libraries are scientifically valid. LibEphemeris chooses to align with the most current JPL and IAU standards at the cost of strict numerical agreement with Swiss Ephemeris.
 
+### Cross-validation against professional astronomy standards
+
+LibEphemeris photometric models, body constants, and coordinate transformations are cross-validated against independent professional astronomy tools during development:
+
+- **IAU ERFA/SOFA** (via pyerfa) — Official IAU standard routines for nutation, precession, obliquity, and frame transformations. Used as a runtime dependency for all coordinate calculations.
+- **Astropy** — The professional astronomy library used by Hubble, JWST, and major observatories worldwide. Used as a development dependency for independent verification of magnitude formulas, body constants, and coordinate pipelines.
+- **Astronomical Almanac** — Published photometric formulas (Mallama & Hilton 2018) used for all planetary magnitude calculations.
+- **IAU 2015 Resolution B3** — Official nominal values for solar and planetary radii, used for apparent diameter calculations.
+
+Where LibEphemeris and Swiss Ephemeris produce different results, the cross-validation determines which value is more astronomically accurate. In several cases — notably apparent diameters (IAU equatorial radii vs mean volumetric), Delta T model (2016 vs 2006), and ephemeris generation (DE440 vs DE431) — LibEphemeris uses the more current and accurate standard.
+
 ## Comparison with Swiss Ephemeris
 
 | Area                     | Swiss Ephemeris                        | LibEphemeris                               |
@@ -136,6 +147,10 @@ All differences produce sub-arcsecond effects for the planets and sub-degree eff
 | Lunar apsides            | ELP2000-82B analytical filtering       | JPL passage-interpolated fitting           |
 | Delta T model            | Espenak & Meeus (2006)                 | Stephenson, Morrison & Hohenkerk (2016)    |
 | Minor body dynamics      | Pre-computed Chebyshev polynomials     | JPL SPK + optional N-body integration      |
+| Nutation model           | IAU 2006/2000A                         | IAU 2006/2000A (via pyerfa)                |
+| Magnitude formulas       | Internal implementation                | Mallama & Hilton 2018 (peer-reviewed)      |
+| Body radii               | Mean volumetric                        | IAU 2015 equatorial (Astronomical Almanac) |
+| Validation               | Internal test suite                    | Cross-validated against astropy, ERFA, IAU |
 
 ## References
 

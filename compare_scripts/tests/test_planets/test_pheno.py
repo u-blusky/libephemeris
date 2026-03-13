@@ -88,8 +88,8 @@ class TestSunPhenomena:
         attr, _ = ephem.pheno_ut(jd, SE_SUN, 0)
 
         diameter = attr[3]
-        # Sun diameter ~32 arcmin = ~1920 arcsec
-        assert 1850 < diameter < 1980, f"Sun diameter {diameter} arcsec unexpected"
+        # Sun diameter ~32 arcmin ≈ 0.53 degrees, varies with distance
+        assert 0.51 < diameter < 0.55, f"Sun diameter {diameter} deg unexpected"
 
     @pytest.mark.unit
     def test_sun_magnitude_reasonable(self):
@@ -128,8 +128,10 @@ class TestMoonPhenomena:
         attr, _ = ephem.pheno_ut(jd, SE_MOON, 0)
 
         diameter = attr[3]
-        # Moon diameter ~31 arcmin = ~1860 arcsec, varies with distance
-        assert 1700 < diameter < 2100, f"Moon diameter {diameter} arcsec unexpected"
+        # Moon diameter ~31 arcmin ≈ 0.49-0.56 degrees, varies with distance
+        assert 0.47 < diameter < 0.58, (
+            f"Moon diameter {diameter:.4f} deg outside expected range [0.47, 0.58]"
+        )
 
     @pytest.mark.unit
     def test_moon_elongation_varies(self):
@@ -511,9 +513,7 @@ class TestSwePheno20Values:
         """
         All 5 active phenomenon values must match Swiss Ephemeris within tolerance.
 
-        Note: libephemeris returns diameter in arcseconds while Swiss Ephemeris
-        returns it in degrees. The comparison accounts for this by converting
-        SE degrees to arcseconds.
+        Note: Both libephemeris and Swiss Ephemeris return diameter in degrees.
         """
         jd = 2451545.0
 
@@ -542,16 +542,16 @@ class TestSwePheno20Values:
             f"LIB={lib_attr[2]:.4f}, diff={diff_elongation:.4f}"
         )
 
-        # attr[3]: Diameter (SE returns degrees, libephemeris returns arcseconds)
-        swe_diam_arcsec = swe_attr[3] * 3600  # Convert SE degrees to arcseconds
-        lib_diam_arcsec = lib_attr[3]
-        if swe_diam_arcsec > 0:
-            rel_diff_diam = abs(swe_diam_arcsec - lib_diam_arcsec) / swe_diam_arcsec
+        # attr[3]: Diameter (both SE and libephemeris return degrees)
+        swe_diam = swe_attr[3]
+        lib_diam = lib_attr[3]
+        if swe_diam > 0:
+            rel_diff_diam = abs(swe_diam - lib_diam) / swe_diam
         else:
-            rel_diff_diam = 0.0 if lib_diam_arcsec == 0 else 1.0
+            rel_diff_diam = 0.0 if lib_diam == 0 else 1.0
         assert rel_diff_diam < self.DIAMETER_TOL, (
-            f"{planet_name} diameter: SE={swe_diam_arcsec:.2f}as, "
-            f"LIB={lib_diam_arcsec:.2f}as, rel_diff={rel_diff_diam:.4f}"
+            f"{planet_name} diameter: SE={swe_diam:.6f}deg, "
+            f"LIB={lib_diam:.6f}deg, rel_diff={rel_diff_diam:.4f}"
         )
 
         # attr[4]: Magnitude
@@ -583,12 +583,12 @@ class TestSwePheno20Values:
         assert lib_attr[1] == 1.0, "Sun phase should be 1.0"
         assert lib_attr[2] == 0.0, "Sun elongation should be 0"
 
-        # Diameter check (SE degrees -> arcsec conversion)
-        swe_diam_arcsec = swe_attr[3] * 3600
-        lib_diam_arcsec = lib_attr[3]
-        rel_diff = abs(swe_diam_arcsec - lib_diam_arcsec) / swe_diam_arcsec
+        # Diameter check (both return degrees)
+        swe_diam = swe_attr[3]
+        lib_diam = lib_attr[3]
+        rel_diff = abs(swe_diam - lib_diam) / swe_diam
         assert rel_diff < 0.01, (
-            f"Sun diameter: SE={swe_diam_arcsec:.2f}as, LIB={lib_diam_arcsec:.2f}as"
+            f"Sun diameter: SE={swe_diam:.6f}deg, LIB={lib_diam:.6f}deg"
         )
 
         # Magnitude check (small tolerance for Sun)
@@ -625,12 +625,12 @@ class TestSwePheno20Values:
         diff_elong = abs(swe_attr[2] - lib_attr[2])
         assert diff_elong < 2.0, f"Moon elongation diff: {diff_elong:.4f}"
 
-        # Diameter check (SE degrees -> arcsec)
-        swe_diam_arcsec = swe_attr[3] * 3600
-        lib_diam_arcsec = lib_attr[3]
-        rel_diff = abs(swe_diam_arcsec - lib_diam_arcsec) / swe_diam_arcsec
+        # Diameter check (both return degrees)
+        swe_diam = swe_attr[3]
+        lib_diam = lib_attr[3]
+        rel_diff = abs(swe_diam - lib_diam) / swe_diam
         assert rel_diff < 0.01, (
-            f"Moon diameter: SE={swe_diam_arcsec:.2f}as, LIB={lib_diam_arcsec:.2f}as"
+            f"Moon diameter: SE={swe_diam:.6f}deg, LIB={lib_diam:.6f}deg"
         )
 
         # Reserved values
@@ -675,14 +675,13 @@ class TestSwePheno20Values:
             f"{planet_name} elongation: SE={swe_attr[2]:.4f}, LIB={lib_attr[2]:.4f}"
         )
 
-        # Diameter (SE degrees -> arcsec)
-        swe_diam_arcsec = swe_attr[3] * 3600
-        lib_diam_arcsec = lib_attr[3]
-        if swe_diam_arcsec > 0:
-            rel_diff = abs(swe_diam_arcsec - lib_diam_arcsec) / swe_diam_arcsec
+        # Diameter (both return degrees)
+        swe_diam = swe_attr[3]
+        lib_diam = lib_attr[3]
+        if swe_diam > 0:
+            rel_diff = abs(swe_diam - lib_diam) / swe_diam
             assert rel_diff < 0.1, (
-                f"{planet_name} diameter: SE={swe_diam_arcsec:.2f}as, "
-                f"LIB={lib_diam_arcsec:.2f}as"
+                f"{planet_name} diameter: SE={swe_diam:.6f}deg, LIB={lib_diam:.6f}deg"
             )
 
         # Reserved values
@@ -1398,9 +1397,9 @@ class TestApparentDiameterAllPlanets:
     calculated from the body's physical radius and geocentric distance:
 
         diameter = 2 * arctan(radius / distance) ≈ 2 * radius / distance (in radians)
-        diameter_arcsec = diameter_rad * (180/π) * 3600
+        diameter_deg = diameter_rad * (180/π)
 
-    This corresponds to attr[3] in the swe_pheno_ut output (in arcseconds).
+    This corresponds to attr[3] in the swe_pheno_ut output (in degrees).
     """
 
     # Tolerance for diameter comparison with Swiss Ephemeris (relative)
@@ -1409,7 +1408,7 @@ class TestApparentDiameterAllPlanets:
     @pytest.mark.unit
     def test_sun_diameter_typical_range(self):
         """
-        Sun apparent diameter should be around 32 arcminutes (~1920 arcsec).
+        Sun apparent diameter should be around 32 arcminutes (~0.53 degrees).
 
         The Sun's diameter varies from ~31.5' (aphelion) to ~32.5' (perihelion)
         due to Earth's elliptical orbit.
@@ -1418,9 +1417,9 @@ class TestApparentDiameterAllPlanets:
         attr, _ = ephem.pheno_ut(jd, SE_SUN, 0)
 
         diameter = attr[3]
-        # Sun diameter ~32 arcmin = ~1920 arcsec (±3%)
-        assert 1850 < diameter < 1980, (
-            f"Sun diameter {diameter:.1f} arcsec outside expected range [1850, 1980]"
+        # Sun diameter ~32 arcmin ≈ 0.53 deg (±3%)
+        assert 0.51 < diameter < 0.55, (
+            f"Sun diameter {diameter:.4f} deg outside expected range [0.51, 0.55]"
         )
 
     @pytest.mark.unit
@@ -1447,7 +1446,7 @@ class TestApparentDiameterAllPlanets:
     @pytest.mark.unit
     def test_moon_diameter_typical_range(self):
         """
-        Moon apparent diameter should be around 31 arcminutes (~1860 arcsec).
+        Moon apparent diameter should be around 31 arcminutes (~0.52 degrees).
 
         The Moon's diameter varies from ~29.4' (apogee) to ~33.5' (perigee)
         due to its elliptical orbit.
@@ -1456,9 +1455,9 @@ class TestApparentDiameterAllPlanets:
         attr, _ = ephem.pheno_ut(jd, SE_MOON, 0)
 
         diameter = attr[3]
-        # Moon diameter typically 29-34 arcmin = 1740-2040 arcsec
-        assert 1700 < diameter < 2100, (
-            f"Moon diameter {diameter:.1f} arcsec outside expected range [1700, 2100]"
+        # Moon diameter typically 29-34 arcmin ≈ 0.47-0.57 degrees
+        assert 0.47 < diameter < 0.58, (
+            f"Moon diameter {diameter:.4f} deg outside expected range [0.47, 0.58]"
         )
 
     @pytest.mark.unit
@@ -1490,11 +1489,11 @@ class TestApparentDiameterAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name,min_diam,max_diam",
         [
-            (SE_MERCURY, "Mercury", 4, 14),  # 4.5" to 13" typically
-            (SE_VENUS, "Venus", 10, 66),  # 9.7" to 66" (crescent to near-inferior)
-            (SE_MARS, "Mars", 3, 26),  # 3.5" to 25" (far to opposition)
-            (SE_JUPITER, "Jupiter", 30, 51),  # 30" to 50"
-            (SE_SATURN, "Saturn", 15, 21),  # 15" to 21" (disk only)
+            (SE_MERCURY, "Mercury", 0.0011, 0.0039),  # 4"-14" in degrees
+            (SE_VENUS, "Venus", 0.0028, 0.0183),  # 10"-66" in degrees
+            (SE_MARS, "Mars", 0.0008, 0.0072),  # 3"-26" in degrees
+            (SE_JUPITER, "Jupiter", 0.0083, 0.0142),  # 30"-51" in degrees
+            (SE_SATURN, "Saturn", 0.0042, 0.0058),  # 15"-21" in degrees
         ],
     )
     def test_planet_diameter_in_typical_range(
@@ -1504,13 +1503,14 @@ class TestApparentDiameterAllPlanets:
         Planet apparent diameter should be within expected observable range.
 
         These ranges account for varying Earth-planet distances.
+        Values are in degrees.
         """
         jd = 2451545.0
         attr, _ = ephem.pheno_ut(jd, planet_id, 0)
 
         diameter = attr[3]
         assert min_diam < diameter < max_diam, (
-            f"{planet_name} diameter {diameter:.2f} arcsec "
+            f"{planet_name} diameter {diameter:.6f} deg "
             f"outside typical range [{min_diam}, {max_diam}]"
         )
 
@@ -1518,21 +1518,21 @@ class TestApparentDiameterAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name,max_expected",
         [
-            (SE_URANUS, "Uranus", 4.5),  # 3.4" to 4.1"
-            (SE_NEPTUNE, "Neptune", 2.5),  # 2.2" to 2.4"
-            (SE_PLUTO, "Pluto", 0.2),  # ~0.11"
+            (SE_URANUS, "Uranus", 0.00125),  # 3.4"-4.1" in degrees
+            (SE_NEPTUNE, "Neptune", 0.00069),  # 2.2"-2.4" in degrees
+            (SE_PLUTO, "Pluto", 0.000056),  # ~0.11" in degrees
         ],
     )
     def test_outer_planet_diameter_small(self, planet_id, planet_name, max_expected):
         """
-        Distant planets should have very small apparent diameters.
+        Distant planets should have very small apparent diameters (in degrees).
         """
         jd = 2451545.0
         attr, _ = ephem.pheno_ut(jd, planet_id, 0)
 
         diameter = attr[3]
         assert 0 < diameter < max_expected, (
-            f"{planet_name} diameter {diameter:.3f} arcsec "
+            f"{planet_name} diameter {diameter:.6f} deg "
             f"should be in (0, {max_expected})"
         )
 
@@ -1556,7 +1556,7 @@ class TestApparentDiameterAllPlanets:
         """
         Apparent diameter should match Swiss Ephemeris within tolerance.
 
-        Note: Swiss Ephemeris returns diameter in degrees, libephemeris in arcseconds.
+        Note: Both Swiss Ephemeris and libephemeris return diameter in degrees.
         """
         test_dates = [
             2451545.0,  # J2000
@@ -1571,15 +1571,15 @@ class TestApparentDiameterAllPlanets:
             swe_attr = swe.pheno_ut(jd, planet_id, 0)
             lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
 
-            # Convert Swiss Ephemeris degrees to arcseconds
-            swe_diam_arcsec = swe_attr[3] * 3600
-            lib_diam_arcsec = lib_attr[3]
+            # Both return degrees
+            swe_diam = swe_attr[3]
+            lib_diam = lib_attr[3]
 
-            if swe_diam_arcsec > 0:
-                rel_diff = abs(swe_diam_arcsec - lib_diam_arcsec) / swe_diam_arcsec
+            if swe_diam > 0:
+                rel_diff = abs(swe_diam - lib_diam) / swe_diam
                 assert rel_diff < self.DIAMETER_REL_TOL, (
                     f"{planet_name} at JD {jd}: diameter "
-                    f"SE={swe_diam_arcsec:.2f}as, LIB={lib_diam_arcsec:.2f}as, "
+                    f"SE={swe_diam:.6f}deg, LIB={lib_diam:.6f}deg, "
                     f"rel_diff={rel_diff:.2%}"
                 )
 
@@ -1682,10 +1682,14 @@ class TestApparentDiameterAllPlanets:
 
         # The Sun's diameter should be close to the theoretical value
         # (within a few percent due to actual distance variation)
-        theoretical_sun_diam = 2 * 695700 / 149597870.7 * 206264.806
-        assert abs(attr_sun[3] - theoretical_sun_diam) / theoretical_sun_diam < 0.02, (
-            f"Sun diameter {attr_sun[3]:.2f}as differs from theoretical "
-            f"{theoretical_sun_diam:.2f}as by more than 2%"
+        theoretical_sun_diam_arcsec = 2 * 695700 / 149597870.7 * 206264.806
+        theoretical_sun_diam_deg = theoretical_sun_diam_arcsec / 3600.0
+        assert (
+            abs(attr_sun[3] - theoretical_sun_diam_deg) / theoretical_sun_diam_deg
+            < 0.02
+        ), (
+            f"Sun diameter {attr_sun[3]:.6f}deg differs from theoretical "
+            f"{theoretical_sun_diam_deg:.6f}deg by more than 2%"
         )
 
     @pytest.mark.comparison
@@ -1712,14 +1716,14 @@ class TestApparentDiameterAllPlanets:
                 swe_attr = swe.pheno_ut(jd, planet_id, 0)
                 lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
 
-                swe_diam = swe_attr[3] * 3600  # Convert to arcsec
+                swe_diam = swe_attr[3]  # Both return degrees
                 lib_diam = lib_attr[3]
 
                 if swe_diam > 0:
                     rel_diff = abs(swe_diam - lib_diam) / swe_diam
                     assert rel_diff < 0.05, (
                         f"Planet {planet_id} at JD {jd}: "
-                        f"diameter SE={swe_diam:.2f}as, LIB={lib_diam:.2f}as"
+                        f"diameter SE={swe_diam:.6f}deg, LIB={lib_diam:.6f}deg"
                     )
 
 

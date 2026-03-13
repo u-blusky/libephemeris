@@ -29,6 +29,9 @@ at the cost of speed and strict numerical agreement with Swiss Ephemeris.
 
 - **Modern ephemeris, no fallback.** All calculations use JPL DE440/DE441 (2021) exclusively. The `SEFLG_MOSEPH` flag is accepted for compatibility but silently ignored -- there is no degradation to 1980s analytical theories.
 - **Physical planet positions.** Outer planet positions are automatically corrected from system barycenters to true planet body centers, using JPL satellite ephemerides and analytical moon theories. No extra flags or files required.
+- **Peer-reviewed photometric models.** Visual magnitudes use Mallama & Hilton (2018) formulas, published in *The Astronomical Journal* and adopted by the Astronomical Almanac. Body radii use IAU 2015 official equatorial values.
+- **IAU standard coordinate transforms.** Nutation (IAU 2006/2000A, 1365 terms), precession (IAU 2006), and obliquity use the official IAU ERFA library -- the same routines used by professional observatories.
+- **Cross-validated against professional astronomy tools.** All models are independently verified against astropy, IAU ERFA/SOFA, and the Astronomical Almanac during development.
 - **JPL-grounded lunar apsides.** The interpolated perigee and apogee are derived from actual physical distance-extrema passages in JPL data, rather than from truncated analytical series.
 - **Current Delta T model.** Uses Stephenson, Morrison & Hohenkerk (2016) with optional IERS observational data -- the current astronomical standard for historical timescale conversion.
 - **Transparent.** Pure Python, fully testable, readable, and documented with explicit astronomical references.
@@ -149,7 +152,7 @@ pos, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_SIDEREAL
 > `SEFLG_MOSEPH` and `SEFLG_SWIEPH` are accepted for API compatibility but
 > silently ignored — all calculations always use JPL DE440/DE441 via Skyfield.
 > `SEFLG_BARYCTR` is mapped to heliocentric. `SEFLG_XYZ`, `SEFLG_RADIANS`,
-> `SEFLG_SPEED3`, and `SEFLG_ICRS` are defined but not yet implemented.
+> `SEFLG_SPEED3` is defined but not yet implemented.
 
 ---
 

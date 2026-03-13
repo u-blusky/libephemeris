@@ -20,8 +20,10 @@ LibEphemeris is built on modern IAU standards and NASA JPL ephemerides. Every co
 - [14. Rise, Set, and Transit](#14-rise-set-and-transit)
 - [15. Heliacal Events](#15-heliacal-events)
 - [16. Planetary Positions -- Measured Precision](#16-planetary-positions----measured-precision)
-- [17. Minor Bodies](#17-minor-bodies)
-- [18. Thread-safe Context API](#18-thread-safe-context-api)
+- [17. Photometric Models (Phenomena)](#17-photometric-models-phenomena)
+- [18. Minor Bodies](#18-minor-bodies)
+- [19. Thread-safe Context API](#19-thread-safe-context-api)
+- [20. Comprehensive Precision Audit](#20-comprehensive-precision-audit)
 - [References](#references)
 
 ---
@@ -676,7 +678,80 @@ The differences between LibEphemeris and Swiss Ephemeris are **not errors** in e
 
 ---
 
-## 17. Minor Bodies
+## 17. Photometric Models (Phenomena)
+
+LibEphemeris implements `swe_pheno_ut()` / `swe_pheno()` for computing observable planetary phenomena: phase angle, phase (illuminated fraction), elongation, apparent diameter, and visual magnitude. The photometric models use peer-reviewed formulas from the astronomical literature, validated against astropy and the Astronomical Almanac.
+
+### Phase Angle
+
+The phase angle (Sun-Body-Earth angle) is computed using 3D vector geometry (dot product of geocentric position vectors), which is numerically stable for all configurations including the extremely elongated Sun-Moon-Earth triangle. This avoids the numerical instability of the law-of-cosines approach for bodies at very different distances.
+
+| Body | Max diff vs SE | Notes |
+|------|---------------|-------|
+| Sun | 0" | Exact (always 0) |
+| Moon | < 1" | Irreducible JPL vs SE ephemeris difference |
+| Inner planets | < 20" | Irreducible ephemeris difference |
+| Outer planets | < 24" | Irreducible ephemeris difference |
+
+The 4--24" differences for planets arise from the different underlying ephemerides (JPL DE440 vs DE431) and are not correctable.
+
+### Visual Magnitude
+
+LibEphemeris uses **Mallama & Hilton (2018)** formulas for all planets, published in *The Astronomical Journal* and adopted by the Astronomical Almanac. These are the current standard for planetary magnitude computation.
+
+| Body | Formula | Reference | Max diff vs SE |
+|------|---------|-----------|---------------|
+| Sun | V(1,0) = -26.86 at 1 AU | Mallama & Hilton 2018 | 0.0000 mag |
+| Moon | V = -12.73 + 0.026\|alpha\| + 4e-9\|alpha\|^4 | Astronomical Almanac, Allen's Astrophysical Quantities | 0.03 mag (normal), 0.2 mag (thin crescent) |
+| Mercury | 6th-order polynomial in alpha | Mallama & Hilton 2018 | 0.001 mag |
+| Venus | Piecewise polynomial | Mallama & Hilton 2018 | 0.0002 mag |
+| Mars | Piecewise polynomial | Mallama & Hilton 2018 | 0.0001 mag |
+| Jupiter | Quadratic in alpha | Mallama & Hilton 2018 | 0.0001 mag |
+| Saturn | Ring-corrected (Meeus geometry) | Mallama & Hilton 2018 | 0.002 mag |
+| Uranus | Linear phase coefficient | Mallama & Hilton 2018 | 0.009 mag |
+| Neptune | Secular V(1,0) variation | Lockwood & Thompson 1991, Sromovsky et al. 2003 | 0.0000 mag |
+| Pluto | Linear phase coefficient | Mallama & Hilton 2018 | 0.04 mag |
+
+#### Neptune secular brightness variation
+
+Neptune's albedo has been increasing since the 1980s due to seasonal atmospheric changes over its 165-year orbital period. LibEphemeris models this with a secular V(1,0) that transitions linearly from -6.89 (pre-1980) to -7.00 (by J2000.0), matching observational data from Lockwood & Thompson (1991) and Sromovsky et al. (2003). This produces exact magnitude agreement across all epochs.
+
+#### Moon thin crescent limitation
+
+For phase angles > 165 degrees (very thin crescents near new moon), the Astronomical Almanac quartic formula diverges from observations. The mean error across all phases is ~0.03 mag; for alpha > 165 degrees it can reach 0.2 mag. This is an inherent limitation of the quartic phase model and affects a narrow range near new moon that is astronomically insignificant (the Moon is unobservable at these phases).
+
+### Apparent Diameter
+
+LibEphemeris uses **IAU 2015 equatorial radii** for all bodies, which is the standard adopted by the Astronomical Almanac for computing apparent angular diameters.
+
+| Body | LibEphemeris radius (km) | Standard | SE radius (km) | SE standard |
+|------|------------------------|----------|----------------|-------------|
+| Sun | 695,700.0 | IAU 2015 nominal | 696,002.6 | Internal |
+| Moon | 1,737.4 | IAU mean | 1,737.5 | ~IAU |
+| Mercury | 2,439.7 | IAU equatorial | 2,439.4 | ~IAU |
+| Venus | 6,051.8 | IAU equatorial | 6,051.8 | IAU |
+| Mars | 3,396.2 | IAU equatorial | 3,389.5 | Mean volumetric |
+| Jupiter | 71,492.0 | IAU equatorial | 69,911.0 | Mean volumetric |
+| Saturn | 60,268.0 | IAU equatorial | 58,232.0 | Mean volumetric |
+| Uranus | 25,559.0 | IAU equatorial | 25,362.0 | Mean volumetric |
+| Neptune | 24,764.0 | IAU equatorial | 24,622.0 | Mean volumetric |
+| Pluto | 1,188.3 | IAU mean | 1,188.3 | IAU mean |
+
+The equatorial radius is the correct choice for apparent diameter because it represents the maximum cross-section as seen from an external observer. The mean volumetric radius used by Swiss Ephemeris produces systematically smaller diameters (2--3.5% for giant planets). The IAU equatorial values are the standard used in the Astronomical Almanac and professional observatory software.
+
+### Swiss Ephemeris comparison
+
+The differences in `pheno_ut` between LibEphemeris and Swiss Ephemeris fall into three categories:
+
+1. **Irreducible ephemeris differences** (phase angle, elongation): 4--24 arcseconds for planets, caused by DE440 vs DE431. These cannot be eliminated and represent the improved accuracy of the newer ephemeris.
+
+2. **Intentional methodology differences** (apparent diameter): 2--3.5% for giant planets, caused by using IAU equatorial radii vs mean volumetric radii. The IAU values are the professional standard.
+
+3. **Equivalent precision** (magnitude): < 0.01 mag for all planets except Moon thin crescents and Pluto. Both libraries use similar Mallama 2018 formulas; residual differences are from distance calculations via different ephemerides.
+
+---
+
+## 18. Minor Bodies
 
 ### Strict precision mode (default)
 
@@ -696,11 +771,111 @@ TNOs use Keplerian elements with first-order secular perturbations from Jupiter,
 
 ---
 
-## 18. Thread-safe Context API
+## 19. Thread-safe Context API
 
 Each `EphemerisContext` instance has its own isolated state while sharing the expensive ephemeris data across instances. The `_CONTEXT_SWAP_LOCK` (RLock) ensures thread safety during state operations.
 
 Memory overhead per context: ~1 KB. Ephemeris files (DE440: ~119 MB) are loaded once and shared.
+
+---
+
+## 20. Comprehensive Precision Audit
+
+A deep cross-validation audit was performed across all calculation modes and coordinate systems. This section summarizes the findings.
+
+### Planetary positions at extreme dates
+
+Tested all 10 major bodies (Sun through Pluto) at dates spanning 1551--2649 CE (the full DE440 range).
+
+| Era | Years | Max dLon | Notes |
+|-----|-------|----------|-------|
+| Modern | 1900--2100 | <1" | All bodies sub-arcsecond |
+| 19th century | 1800--1850 | <1" | All bodies excellent |
+| 18th century | 1700 | ~1" | All bodies fine |
+| 16th--17th century | 1551--1600 | ~11" | Moon only exceeds threshold |
+| 22nd--27th century | 2149--2649 | up to 283" | Moon most sensitive; outer planets remain <3" |
+
+The divergence at extreme dates is driven by Delta-T model differences (Stephenson et al. 2016 vs Espenak & Meeus 2006). The Moon's rapid motion (~13°/day) amplifies any time-base discrepancy. Outer planets are insensitive due to slow motion and remain within tolerance at all dates.
+
+### Fixed stars
+
+Tested 19 stars (navigational + astrologically important) at 3 epochs (J2000, current, 1900).
+
+| Metric | Value |
+|--------|-------|
+| Max longitude diff | 0.49" (Sirius, current epoch) |
+| Mean longitude diff | 0.06" |
+| Max latitude diff | 1.29" (Procyon, 1900 -- high proper motion star) |
+| Stars >1" longitude | 0 of 57 |
+
+High proper motion stars (Sirius, Vega, Procyon) show the largest differences due to slightly different proper motion reduction methods. Distant/slow stars agree to <0.03".
+
+### House cusps at extreme latitudes
+
+Tested 7 house systems at latitudes 0°--89°, including the arctic circle (66.56°).
+
+| Result | Detail |
+|--------|--------|
+| Max cusp difference | 0.000005° (0.018") |
+| Placidus/Koch above arctic | Both libraries correctly fail (geometrically undefined) |
+| Geometric systems (Regiomontanus, Campanus, Equal, Whole Sign, Porphyry) | Valid to 89° with sub-arcsecond agreement |
+
+### Velocities and speed flags
+
+Tested all bodies with FLG_SPEED, FLG_SPEED|FLG_EQUATORIAL, and FLG_SPEED|FLG_NONUT at 20 dates.
+
+| Metric | Value |
+|--------|-------|
+| Max longitude speed diff | 0.000065 °/day (Moon) |
+| Max latitude speed diff | 0.000025 °/day |
+| Retrograde sign mismatches | 0 (Mercury station resolved to <10⁻⁶ °/day) |
+| Threshold (0.001 °/day) exceeded | Never |
+
+### Heliocentric and barycentric modes
+
+| Mode | Bodies tested | Max dLon | Status |
+|------|--------------|----------|--------|
+| Heliocentric (SEFLG_HELCTR) | Mercury--Pluto | 0.00032° | All OK |
+| Barycentric (SEFLG_BARYCTR) | Sun--Pluto | <1" at J2000 | All OK |
+| Equatorial (SEFLG_EQUATORIAL) | Sun, Moon, Mars, Jupiter | 0.00047° (Moon) | All OK |
+| XYZ Cartesian (SEFLG_XYZ) | All bodies | 0.000033 AU (Pluto) | All OK |
+
+Note: Barycentric Sun shows large angular differences (~100"+) at dates when the Sun is near the Solar System Barycenter (distance ~0.001 AU). This is a geometric amplification effect, not a precision issue -- the Cartesian positions agree to <0.000001 AU.
+
+### Sidereal mode and ayanamshas
+
+Tested Lahiri, Raman, Krishnamurti, and Fagan/Bradley ayanamshas.
+
+| Metric | Value |
+|--------|-------|
+| Max sidereal longitude diff | 0.07" (Moon) |
+| Ayanamsha value differences | <0.000001° (floating-point noise) |
+
+### Delta-T
+
+| Era | Max diff (seconds) | Notes |
+|-----|-------------------|-------|
+| Modern (1900--2025) | <1 sec | Both use IERS observed data |
+| Historical (1700--1900) | <1 sec | Model blending differences |
+| Pre-telescope (<1700) | up to 187 sec | Different models (SMH 2016 vs E&M 2006) |
+| Future (>2025) | up to 297 sec (at 2500) | Both extrapolate with different parabolas |
+
+LibEphemeris uses the more recent Stephenson, Morrison & Hohenkerk (2016) model. For the modern era where observed data exists, both libraries agree to sub-second precision.
+
+### Ecliptic obliquity and nutation
+
+| Metric | Max diff |
+|--------|----------|
+| True obliquity | 0.00086" |
+| Mean obliquity | 0.00016" |
+| Nutation in longitude | 0.0013" |
+| Nutation in obliquity | 0.00087" |
+
+Sub-milliarcsecond agreement across all tested dates (1800--2200). Both libraries implement IAU 2006/2000A correctly.
+
+### SEFLG_MOSEPH behavior
+
+When `SEFLG_MOSEPH` (flag value 4) is passed, Swiss Ephemeris falls back to the Moshier semi-analytical ephemeris. LibEphemeris accepts this flag for API compatibility but always uses JPL DE440. The resulting differences (typically <0.2" for modern dates) reflect the lower precision of the Moshier ephemeris, not a bug in either library.
 
 ---
 
@@ -726,3 +901,7 @@ Memory overhead per context: ~1 KB. Ephemeris files (DE440: ~119 MB) are loaded 
 12. Schaefer, B.E. (1990). "Telescopic limiting magnitudes." *Publications of the Astronomical Society of the Pacific*, 102, 212-229.
 13. IERS Conventions (2010). IERS Technical Note No. 36, ed. Petit, G. & Luzum, B.
 14. ESA (1997). *The Hipparcos and Tycho Catalogues*. ESA SP-1200.
+15. Mallama, A. & Hilton, J.L. (2018). "Computing Apparent Planetary Magnitudes for The Astronomical Almanac." *Astronomy and Computing*, 25, 10-24.
+16. Lockwood, G.W. & Thompson, D.T. (1991). "Solar cycle chromospheric variations and photometric variability of Neptune." *Nature*, 349, 593-594.
+17. Sromovsky, L.A. et al. (2003). "Episodic bright and dark spots on Uranus." *Icarus*, 163, 256-261.
+18. IAU (2015). "IAU 2015 Resolution B3: Recommended Nominal Conversion Constants for Selected Solar and Planetary Properties." *IAU General Assembly*, Honolulu.

@@ -4506,6 +4506,76 @@ def house_pos(
         hpos = hpos_deg / 30.0 + 1.0
         return hpos
 
+    elif hsys_char == "K":
+        # Koch (Birthplace/GOH) house position
+        # Uses the MC's semi-arc as the reference arc, combined with the
+        # body's ascensional difference (AD) and the MC's AD.
+        #
+        # Formula:
+        #   adp = arcsin(tan(lat) * tan(dec))        -- body's AD
+        #   admc = arcsin(tan(eps) * tan(lat) * sin(armc))  -- MC's AD
+        #   samc = 90 + admc                         -- MC's semi-arc
+        #
+        #   East (mdd >= 0):  dfac = (mdd - adp + admc) / samc
+        #                     xp0 = (dfac - 1) * 90
+        #   West (mdd < 0):   dfac = (mdd + 180 + adp + admc) / samc
+        #                     xp0 = (dfac + 1) * 90
+
+        tan_eps = math.tan(math.radians(eps))
+
+        # Circumpolar checks for body
+        is_invalid = False
+        is_circumpolar = False
+
+        if 90.0 - geolat < de or -90.0 - geolat > de:
+            adp = 90.0
+            is_circumpolar = True
+        elif geolat - 90.0 > de or geolat + 90.0 < de:
+            adp = -90.0
+            is_circumpolar = True
+        else:
+            adp_arg = math.tan(math.radians(geolat)) * math.tan(math.radians(de))
+            adp_arg = max(-1.0, min(1.0, adp_arg))
+            adp = math.degrees(math.asin(adp_arg))
+
+        # MC's ascensional difference
+        admc_arg = (
+            tan_eps * math.tan(math.radians(geolat)) * math.sin(math.radians(armc))
+        )
+        if abs(admc_arg) > 1.0:
+            admc_arg = 1.0 if admc_arg > 0 else -1.0
+            is_circumpolar = True
+        admc = math.degrees(math.asin(admc_arg))
+
+        # MC's semi-arc
+        samc = 90.0 + admc
+        if samc == 0.0:
+            is_invalid = True
+
+        xp0 = 0.0
+        if not is_invalid and abs(samc) > 0:
+            if mdd >= 0:  # east
+                dfac = (mdd - adp + admc) / samc
+                xp0 = (dfac - 1.0) * 90.0
+                if dfac > 2.0 or dfac < 0.0:
+                    is_invalid = True
+            else:  # west
+                mdn_val = mdd + 180.0
+                dfac = (mdn_val + adp + admc) / samc
+                xp0 = (dfac + 1.0) * 90.0
+                if dfac > 2.0 or dfac < 0.0:
+                    is_invalid = True
+
+        if is_invalid:
+            # Koch position failed in circumpolar area — return 0.0
+            # matching pyswisseph behavior
+            return 0.0
+        else:
+            xp0 = xp0 % 360.0
+            xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
+            hpos = xp0 / 30.0 + 1.0
+            return hpos
+
     # Default fallback: use cusp-based method
     cusps, ascmc = swe_houses_armc(armc, lat, obliquity, hsys_int)
 

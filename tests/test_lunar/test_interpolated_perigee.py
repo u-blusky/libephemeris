@@ -47,8 +47,8 @@ class TestInterpolatedPerigeeBasic:
         # Latitude should be reasonable (typically small for lunar perigee)
         assert -10 < lat < 10, f"Latitude {lat} seems unreasonable"
 
-        # Eccentricity (returned as dist) should be reasonable (~0.055)
-        assert 0.04 < dist < 0.07, f"Eccentricity {dist} seems unreasonable"
+        # 3rd return value is distance in AU (~0.0024 for perigee)
+        assert 0.002 < dist < 0.003, f"Distance {dist} AU seems unreasonable"
 
     def test_calc_returns_valid_position(self):
         """Test that swe_calc (TT) returns a valid position for SE_INTP_PERG."""
@@ -98,7 +98,7 @@ class TestInterpolatedPerigeeDirectFunction:
 
         assert 0 <= lon < 360
         assert -10 < lat < 10
-        assert 0.04 < ecc < 0.07
+        assert 0.002 < ecc < 0.003
 
     def test_perigee_independent_of_apogee(self):
         """Test that perigee is interpolated independently, not derived from apogee.

@@ -541,6 +541,7 @@ def refrac(
 
     if calc_flag == SE_TRUE_TO_APP:
         # True altitude to apparent altitude (add refraction)
+        # Uses Sæmundsson formula: R = 1.02 / tan(h + 10.3/(h+5.11)) arcminutes
         alt = altitude
 
         if alt > 15.0:
@@ -550,22 +551,24 @@ def refrac(
             tan_z = math.tan(z_rad)
             refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
             refraction = refraction_arcsec / 3600.0 * correction
-        elif alt > -2.0:
-            # Bennett formula for lower altitudes (more accurate near horizon)
-            # R = 1.02 / tan(h + 10.3/(h + 5.11)) arcminutes
-            h = max(alt, 0.01)  # Avoid division issues
-            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
-            refraction = r_arcmin / 60.0 * correction
+            return altitude + refraction
         else:
-            # Below -2 degrees: extrapolate linearly
-            # Calculate refraction at -2 degrees and extrapolate
-            h = -2.0
-            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
-            refraction_at_minus2 = r_arcmin / 60.0 * correction
-            # Linear decrease for more negative altitudes
-            refraction = refraction_at_minus2 + (alt + 2.0) * 0.1
+            # Sæmundsson formula with actual altitude (no clamping)
+            # Guard against singularity at h = -5.11
+            denom = alt + 5.11
+            if abs(denom) < 0.001:
+                return altitude  # Near singularity, refraction negligible
+            arg = alt + 10.3 / denom
+            if arg <= 0:
+                return altitude  # Formula not valid
+            r_arcmin = 1.02 / math.tan(math.radians(arg))
+            refraction = r_arcmin / 60.0 * correction
 
-        return altitude + refraction
+            apparent = altitude + refraction
+            # If refraction can't bring object above horizon, return unchanged
+            if apparent < 0:
+                return altitude
+            return apparent
 
     else:
         # SE_APP_TO_TRUE: Apparent altitude to true altitude (subtract refraction)
@@ -577,17 +580,18 @@ def refrac(
         # Use iterative approach: start with apparent alt, compute refraction,
         # subtract to get true estimate, iterate until converged.
 
-        # First, calculate the refraction at true altitude 0° (horizon)
-        # This is the threshold below which APP_TO_TRUE returns input unchanged
-        h = 0.01  # Small value near 0
-        r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
+        # Calculate the refraction at true altitude 0° (horizon)
+        # This is the apparent altitude of the geometric horizon.
+        # Below this apparent altitude, no unique true altitude exists.
+        r_arcmin = 1.02 / math.tan(math.radians(10.3 / 5.11))
         horizon_refraction = r_arcmin / 60.0 * correction
 
-        # If apparent altitude is at or below 0, return it unchanged
-        if altitude <= 0:
+        # If apparent altitude is below the horizon refraction, return unchanged
+        # (the object would be geometrically below the horizon)
+        if altitude < horizon_refraction:
             return altitude
 
-        # Initial estimate: true alt ≈ apparent alt - refrac(apparent alt)
+        # Initial estimate: true alt ≈ apparent alt
         true_alt = altitude
 
         # Iterate to find true altitude
@@ -598,15 +602,15 @@ def refrac(
                 tan_z = math.tan(z_rad)
                 refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
                 refraction = refraction_arcsec / 3600.0 * correction
-            elif true_alt > -2.0:
-                h = max(true_alt, 0.01)
-                r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
-                refraction = r_arcmin / 60.0 * correction
             else:
-                h = -2.0
-                r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
-                refraction_at_minus2 = r_arcmin / 60.0 * correction
-                refraction = refraction_at_minus2 + (true_alt + 2.0) * 0.1
+                denom = true_alt + 5.11
+                if abs(denom) < 0.001:
+                    break
+                arg = true_alt + 10.3 / denom
+                if arg <= 0:
+                    break
+                r_arcmin = 1.02 / math.tan(math.radians(arg))
+                refraction = r_arcmin / 60.0 * correction
 
             # Update estimate: true_alt + refraction should equal apparent_alt
             new_true_alt = altitude - refraction
@@ -1640,9 +1644,6 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
             # Round to nearest second
             if secfr >= 0.5:
                 sec_part += 1
-            # When rounding to seconds, the fractional-seconds field receives
-            # the rounded integer value (preserves backward-compatible return format)
-            secfr = float(sec_part)
 
             # Handle overflow: sec >= 60
             if sec_part >= 60:
@@ -1652,6 +1653,10 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
                 if min_part >= 60:
                     min_part = 0
                     deg_part += 1
+
+            # When rounding to seconds, the fractional-seconds field receives
+            # the rounded integer value (AFTER overflow carry)
+            secfr = float(sec_part)
 
         elif round_min:
             # Round to nearest minute

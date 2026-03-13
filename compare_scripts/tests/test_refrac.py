@@ -222,12 +222,22 @@ class TestRefracEdgeCases:
     """Edge case tests for refrac."""
 
     def test_refrac_negative_altitude(self):
-        """Test refraction for negative altitudes (below horizon)."""
-        # Should still return a value (extrapolated)
+        """Test refraction for negative altitudes (below horizon).
+
+        For true altitudes where refraction cannot bring the object above
+        the horizon, the input altitude is returned unchanged (matching
+        pyswisseph behavior). For altitudes just below 0° (e.g. -0.5°),
+        refraction CAN bring the object above the horizon, so a corrected
+        value is returned.
+        """
+        # At -1°, refraction (~0.5°) can't bring it above 0° -> unchanged
         apparent_alt = ephem.refrac(-1.0, 1013.25, 15.0, ephem.SE_TRUE_TO_APP)
         assert isinstance(apparent_alt, float)
-        # Apparent should be higher than true (refraction positive)
-        assert apparent_alt > -1.0
+        assert apparent_alt == -1.0
+
+        # At -0.5°, refraction (~0.55°) CAN bring it above 0° -> corrected
+        apparent_half = ephem.refrac(-0.5, 1013.25, 15.0, ephem.SE_TRUE_TO_APP)
+        assert apparent_half > -0.5
 
     def test_refrac_very_negative_altitude(self):
         """Test refraction for very negative altitudes."""

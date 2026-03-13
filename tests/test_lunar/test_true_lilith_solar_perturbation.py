@@ -37,10 +37,10 @@ class TestSolarPerturbationEccentricityVector:
         # Should return valid coordinates
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
         assert -10 < lat < 10, f"Latitude {lat} unexpectedly large"
-        assert 0.03 < e_mag < 0.08, f"Eccentricity {e_mag} out of expected range"
+        assert 0.002 < e_mag < 0.003, f"Distance {e_mag} AU out of expected range"
 
     def test_eccentricity_magnitude_preserved(self):
-        """Eccentricity magnitude should remain in valid range after perturbation."""
+        """Distance in AU should remain in valid range after perturbation."""
         test_dates = [
             2451545.0,  # J2000.0
             2451545.0 + 8,  # ~1/4 evection period
@@ -51,10 +51,9 @@ class TestSolarPerturbationEccentricityVector:
 
         for jd in test_dates:
             _, _, e_mag = calc_true_lilith(jd)
-            # Eccentricity should be in expected lunar range
-            # Mean lunar eccentricity ~0.055, evection modulates by ~0.01148
-            assert 0.03 < e_mag < 0.08, (
-                f"Eccentricity {e_mag} at JD {jd} out of expected range [0.03, 0.08]"
+            # 3rd return value is distance in AU (~0.0027 for apogee)
+            assert 0.002 < e_mag < 0.003, (
+                f"Distance {e_mag} AU at JD {jd} out of expected range [0.002, 0.003]"
             )
 
     def test_perturbation_varies_with_solar_position(self):
@@ -185,10 +184,9 @@ class TestSolarPerturbationPhysicalProperties:
 
         lon, _, e_mag = calc_true_lilith(jd)
 
-        # Eccentricity should be close to mean value of ~0.055
-        # The perturbation changes direction, not magnitude significantly
-        assert 0.04 < e_mag < 0.07, (
-            f"Eccentricity {e_mag} deviates too much from mean ~0.055"
+        # Distance should be close to mean apogee distance ~0.00271 AU
+        assert 0.002 < e_mag < 0.003, (
+            f"Distance {e_mag} AU deviates too much from expected ~0.0027"
         )
 
     def test_perturbation_preserves_orbital_validity(self):
@@ -202,11 +200,11 @@ class TestSolarPerturbationPhysicalProperties:
             # All orbital parameters should be physical
             assert 0 <= lon < 360, f"Invalid longitude {lon} at JD {jd}"
             assert -90 < lat < 90, f"Invalid latitude {lat} at JD {jd}"
-            assert 0 < e_mag < 1, f"Invalid eccentricity {e_mag} at JD {jd}"
+            assert 0 < e_mag < 1, f"Invalid distance {e_mag} AU at JD {jd}"
 
-            # Eccentricity should be in lunar range
-            assert 0.03 < e_mag < 0.08, (
-                f"Eccentricity {e_mag} at JD {jd} outside expected lunar range"
+            # Distance should be in lunar apogee range
+            assert 0.002 < e_mag < 0.003, (
+                f"Distance {e_mag} AU at JD {jd} outside expected lunar range"
             )
 
 
@@ -298,7 +296,7 @@ class TestSolarPerturbationEdgeCases:
 
             assert 0 <= lon < 360, f"Invalid longitude at JD {jd}"
             assert -10 < lat < 10, f"Invalid latitude at JD {jd}"
-            assert 0.03 < e_mag < 0.08, f"Invalid eccentricity at JD {jd}"
+            assert 0.002 < e_mag < 0.003, f"Invalid distance at JD {jd}"
 
     def test_handles_rapid_consecutive_calls(self):
         """Multiple rapid calls should produce consistent results."""
@@ -332,4 +330,4 @@ class TestSolarPerturbationEdgeCases:
             # All calculations should succeed
             assert 0 <= lon < 360
             assert -10 < lat < 10
-            assert 0.03 < e_mag < 0.08
+            assert 0.002 < e_mag < 0.003

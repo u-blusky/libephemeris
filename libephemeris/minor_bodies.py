@@ -2583,6 +2583,19 @@ def calc_minor_body_position(
     y = P21 * x_orb + P22 * y_orb
     z = P31 * x_orb + P32 * y_orb
 
+    # M1: Apply short-period perturbation corrections from Jupiter and Saturn.
+    # These analytical corrections capture the dominant synodic-period oscillations
+    # (~400 days for Jupiter-Ceres) that are the largest error source at timescales
+    # < 5 years. The amplitudes depend on current orbital elements, so they evolve
+    # naturally as elements drift. Only applied for bound orbits with perturbations.
+    if include_perturbations and e < 1.0:
+        dx, dy, dz = _calc_short_period_correction(
+            elements, jd_tt, omega_rad, Omega_rad, i_rad
+        )
+        x += dx
+        y += dy
+        z += dz
+
     return x, y, z
 
 

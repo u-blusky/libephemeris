@@ -618,6 +618,13 @@ SE_RASALGETHI: int = SE_FIXSTAR_OFFSET + 112  # Alpha1 Herculis
 # Cygnus constellation
 SE_ALBIREO: int = SE_FIXSTAR_OFFSET + 113  # Beta1 Cygni
 
+# Andromeda constellation (additional)
+SE_MIRACH: int = SE_FIXSTAR_OFFSET + 114  # Beta Andromedae
+SE_ALMACH: int = SE_FIXSTAR_OFFSET + 115  # Gamma1 Andromedae
+
+# Cetus constellation
+SE_MENKAR: int = SE_FIXSTAR_OFFSET + 116  # Alpha Ceti
+
 # Astrological Angles (requires observer location)
 SE_ANGLE_OFFSET: int = 2000000
 SE_ASCENDANT: int = SE_ANGLE_OFFSET + 1  # Rising sign/degree
@@ -751,6 +758,10 @@ SE_SIDM_GALALIGN_MARDYKS: int = 34  # Galactic Alignment (Mardyks)
 
 # Other systems
 SE_SIDM_VALENS_MOON: int = 42  # Vettius Valens (Moon-based)
+SE_SIDM_LAHIRI_1940: int = 43  # Lahiri (1940 Lahiri Commission value)
+SE_SIDM_LAHIRI_VP285: int = 44  # Lahiri (Vernal Point 285 CE)
+SE_SIDM_KRISHNAMURTI_VP291: int = 45  # Krishnamurti (Vernal Point 291 CE)
+SE_SIDM_LAHIRI_ICRC: int = 46  # Lahiri (ICRC, Indian Calendar Reform Committee)
 SE_SIDM_USER: int = 255  # User-defined ayanamsha
 
 # =============================================================================
@@ -814,6 +825,10 @@ SIDM_GALALIGN_MARDYKS: int = SE_SIDM_GALALIGN_MARDYKS
 
 # Other systems
 SIDM_VALENS_MOON: int = SE_SIDM_VALENS_MOON
+SIDM_LAHIRI_1940: int = SE_SIDM_LAHIRI_1940
+SIDM_LAHIRI_VP285: int = SE_SIDM_LAHIRI_VP285
+SIDM_KRISHNAMURTI_VP291: int = SE_SIDM_KRISHNAMURTI_VP291
+SIDM_LAHIRI_ICRC: int = SE_SIDM_LAHIRI_ICRC
 SIDM_USER: int = SE_SIDM_USER
 
 

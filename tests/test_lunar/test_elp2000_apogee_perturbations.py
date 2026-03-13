@@ -131,8 +131,8 @@ class TestCalcInterpolatedApogeeWithELP2000:
         # Latitude should be small (near ecliptic)
         assert -5.0 <= lat <= 5.0, f"Latitude {lat}° unexpectedly large"
 
-        # Eccentricity should be reasonable
-        assert 0.04 < ecc < 0.07, f"Eccentricity {ecc} outside expected range"
+        # 3rd return value is distance in AU (not eccentricity)
+        assert 0.002 < ecc < 0.003, f"Distance {ecc} AU outside expected range"
 
     def test_interpolated_apogee_differs_from_mean(self):
         """Test that interpolated apogee differs from mean by perturbation amount."""
@@ -198,7 +198,7 @@ class TestCalcInterpolatedApogeeWithELP2000:
             # All values should be valid
             assert 0.0 <= lon < 360.0
             assert -5.0 <= lat <= 5.0
-            assert 0.04 < ecc < 0.07
+            assert 0.002 < ecc < 0.003
 
 
 class TestELP2000ApogeePerturbationEdgeCases:

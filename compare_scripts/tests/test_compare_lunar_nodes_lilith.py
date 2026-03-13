@@ -150,10 +150,10 @@ ALL_BODIES = PRIMARY_BODIES + INTERPOLATED_BODIES
 
 # Longitude tolerance in degrees
 LON_TOL = {
-    SE_MEAN_NODE: 0.01,  # ~36 arcsec
-    SE_TRUE_NODE: 0.15,  # ~540 arcsec (different oscillation model)
+    SE_MEAN_NODE: 0.001,  # ~3.6 arcsec
+    SE_TRUE_NODE: 0.001,  # ~3.6 arcsec (verified <0.01" vs JPL Horizons)
     SE_MEAN_APOG: 0.01,  # ~36 arcsec (SE-compatible algorithm)
-    SE_OSCU_APOG: 0.1,  # ~360 arcsec (eccentricity vector method)
+    SE_OSCU_APOG: 0.001,  # ~3.6 arcsec (verified <0.5" vs SE in 200-date dense comparison)
     SE_INTP_APOG: 0.6,  # ~2160 arcsec (ELP2000-82B series, max observed ~0.59°)
     SE_INTP_PERG: 5.5,  # Intentional deviation: LibEphemeris interpolates actual JPL DE440 physical passages, while Swiss Ephemeris uses truncated ELP2000 theory (up to 5° diff). See docs/methodology_lunar_apsides.md
 }
@@ -210,6 +210,27 @@ SPEED_DIST_TOL = {
 
 # Sidereal tolerance multiplier (sidereal adds ayanamsha uncertainty)
 SIDEREAL_LON_MULTIPLIER = 1.5
+
+# J2000 frame tolerance in degrees (precession model differences: IAU 2006 vs older)
+# The ~0.004° systematic offset is from frame transformation, not body calculation
+J2000_LON_TOL = {
+    SE_MEAN_NODE: 0.006,  # ~22 arcsec (precession model difference)
+    SE_TRUE_NODE: 0.006,  # ~22 arcsec (precession model difference)
+    SE_MEAN_APOG: 0.015,  # ~54 arcsec
+    SE_OSCU_APOG: 0.006,  # ~22 arcsec (precession model difference)
+    SE_INTP_APOG: 0.6,  # interpolated bodies have larger spread
+    SE_INTP_PERG: 5.5,  # intentional deviation
+}
+
+# Extended date range tolerance in degrees (accuracy degrades far from J2000)
+EXTENDED_LON_TOL = {
+    SE_MEAN_NODE: 0.002,  # ~7 arcsec
+    SE_TRUE_NODE: 0.002,  # ~7 arcsec
+    SE_MEAN_APOG: 0.02,  # ~72 arcsec
+    SE_OSCU_APOG: 0.02,  # ~72 arcsec (True Lilith diverges near DE440 edges)
+    SE_INTP_APOG: 1.2,  # interpolated bodies
+    SE_INTP_PERG: 11.0,  # intentional deviation
+}
 
 # Equatorial coordinate tolerance in degrees (transformation adds some error)
 EQUATORIAL_TOL = {
@@ -731,7 +752,7 @@ class TestJ2000Frame:
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
         pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
 
-        tol = LON_TOL[body_id] * 1.5
+        tol = J2000_LON_TOL[body_id]
         diff = angular_diff(pos_swe[0], pos_py[0])
 
         assert diff < tol, (
@@ -748,7 +769,7 @@ class TestJ2000Frame:
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
         pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
 
-        tol = LON_TOL[body_id] * 1.5
+        tol = J2000_LON_TOL[body_id]
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         assert diff_lon < tol, (
             f"{body_name} J2000+speed at {date_desc}: lon diff {diff_lon:.6f}°"
@@ -1179,7 +1200,7 @@ class TestExtendedDateRange:
         pos_swe, _ = swe.calc_ut(jd, body_id, 0)
         pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
 
-        tol = LON_TOL[body_id] * 2.0
+        tol = EXTENDED_LON_TOL[body_id]
         diff = angular_diff(pos_swe[0], pos_py[0])
 
         assert diff < tol, (
@@ -1200,7 +1221,7 @@ class TestExtendedDateRange:
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_speed = abs(pos_swe[3] - pos_py[3])
 
-        tol_lon = LON_TOL[body_id] * 2.0
+        tol_lon = EXTENDED_LON_TOL[body_id]
         tol_speed = SPEED_LON_TOL[body_id] * 2.0
 
         assert diff_lon < tol_lon, (
@@ -1219,7 +1240,7 @@ class TestExtendedDateRange:
         pos_swe, _ = swe.calc_ut(jd, body_id, 0)
         pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
 
-        tol = LON_TOL[body_id] * 2.0
+        tol = EXTENDED_LON_TOL[body_id]
         diff = angular_diff(pos_swe[0], pos_py[0])
 
         assert diff < tol, f"{body_name} at {date_desc}: diff {diff:.6f}°"

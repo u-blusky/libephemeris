@@ -38,13 +38,13 @@ class TestOsculatingPerigeeBasic:
         # Latitude should be less than 10 degrees
         assert -10 < lat < 10, f"Latitude {lat} unexpectedly large"
 
-    def test_returns_valid_eccentricity(self):
-        """calc_osculating_perigee should return reasonable eccentricity."""
+    def test_returns_valid_distance(self):
+        """calc_osculating_perigee should return reasonable distance in AU."""
         jd_j2000 = 2451545.0
-        lon, lat, ecc = lunar.calc_osculating_perigee(jd_j2000)
+        lon, lat, dist = lunar.calc_osculating_perigee(jd_j2000)
 
-        # Lunar eccentricity is approximately 0.055
-        assert 0.03 < ecc < 0.08, f"Eccentricity {ecc} out of expected range"
+        # 3rd return value is perigee distance in AU (~0.0024)
+        assert 0.002 < dist < 0.003, f"Distance {dist} AU out of expected range"
 
     def test_works_for_historical_dates(self):
         """Should work for historical dates in ephemeris range."""
@@ -53,7 +53,7 @@ class TestOsculatingPerigeeBasic:
 
         assert 0 <= lon < 360
         assert -90 < lat < 90
-        assert 0.03 < ecc < 0.08
+        assert 0.002 < ecc < 0.003
 
     def test_works_for_future_dates(self):
         """Should work for future dates in ephemeris range."""
@@ -62,7 +62,7 @@ class TestOsculatingPerigeeBasic:
 
         assert 0 <= lon < 360
         assert -90 < lat < 90
-        assert 0.03 < ecc < 0.08
+        assert 0.002 < ecc < 0.003
 
 
 class TestOsculatingPerigeeVsApogee:
@@ -122,15 +122,21 @@ class TestOsculatingPerigeeVsApogee:
             f"but apogee_lat={apogee_lat:.6f}, perigee_lat={perigee_lat:.6f}"
         )
 
-    def test_eccentricity_same_as_apogee(self):
-        """Perigee and apogee should have the same eccentricity magnitude."""
+    def test_distance_values_reasonable(self):
+        """Apogee and perigee distances should both be valid and apogee > perigee."""
         jd = 2451545.0
 
-        _, _, apogee_ecc = lunar.calc_true_lilith(jd)
-        _, _, perigee_ecc = lunar.calc_osculating_perigee(jd)
+        _, _, apogee_dist = lunar.calc_true_lilith(jd)
+        _, _, perigee_dist = lunar.calc_osculating_perigee(jd)
 
-        assert abs(apogee_ecc - perigee_ecc) < 1e-10, (
-            f"Eccentricity differs: apogee={apogee_ecc}, perigee={perigee_ecc}"
+        # Both should be valid lunar distances in AU
+        assert 0.002 < apogee_dist < 0.003, f"Apogee distance {apogee_dist} AU invalid"
+        assert 0.002 < perigee_dist < 0.003, (
+            f"Perigee distance {perigee_dist} AU invalid"
+        )
+        # Apogee distance should be greater than perigee distance
+        assert apogee_dist > perigee_dist, (
+            f"Apogee dist ({apogee_dist}) should exceed perigee dist ({perigee_dist})"
         )
 
 
@@ -179,7 +185,7 @@ class TestInterpolatedPerigeeImprovement:
 
             assert 0 <= lon < 360, f"Invalid longitude at JD {jd}"
             assert -10 < lat < 10, f"Invalid latitude at JD {jd}"
-            assert 0.03 < ecc < 0.08, f"Invalid eccentricity at JD {jd}"
+            assert 0.002 < ecc < 0.003, f"Invalid distance at JD {jd}"
 
 
 class TestInterpolatedPerigeeDeviation:

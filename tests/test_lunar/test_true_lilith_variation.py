@@ -210,7 +210,7 @@ class TestVariationEffectOnTrueLilith:
         # Verify results are valid (variation doesn't break the calculation)
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
         assert -10 < lat < 10, f"Latitude {lat} unexpectedly large"
-        assert 0.03 < e_mag < 0.08, f"Eccentricity {e_mag} out of expected range"
+        assert 0.002 < e_mag < 0.003, f"Distance {e_mag} AU out of expected range"
 
         # Log the variation contribution for reference
         assert abs(expected_variation) <= 0.66, (
@@ -394,7 +394,7 @@ class TestVariationIntegration:
             # All values should be valid
             assert 0 <= lon < 360, f"Invalid lon at period {period}"
             assert -10 < lat < 10, f"Latitude {lat} unexpectedly large"
-            assert 0.03 < e_mag < 0.08, f"Eccentricity {e_mag} out of range"
+            assert 0.002 < e_mag < 0.003, f"Distance {e_mag} AU out of range"
 
     def test_variation_stability_over_years(self):
         """Variation correction should remain stable over long time spans."""

@@ -46,9 +46,10 @@ class TestHeliacalBasic:
             jd_start, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
         )
 
-        # Should find an event within a year
+        # Venus synodic period is ~584 days, so the next heliacal rising
+        # after inferior conjunction may be up to ~500 days away
         assert jd_event > jd_start
-        assert jd_event < jd_start + 365
+        assert jd_event < jd_start + 600
         assert retflag == SE_HELIACAL_RISING
 
     def test_mercury_heliacal_rising_returns_valid_result(self):
@@ -300,10 +301,11 @@ class TestSweHeliacalUt:
         # Should return a tuple of 3 floats (jd1, jd2, jd3)
         assert isinstance(result, tuple)
         assert len(result) == 3
-        # Should find an event within a year
+        # Venus synodic period is ~584 days, so next heliacal rising
+        # after inferior conjunction may be up to ~500 days away
         if result[0] > 0:
             assert result[0] > jd_start
-            assert result[0] < jd_start + 365
+            assert result[0] < jd_start + 600
 
     def test_swe_heliacal_ut_with_planet_name_mercury(self):
         """Test swe_heliacal_ut with Mercury."""

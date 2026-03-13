@@ -424,6 +424,122 @@ All four were **restored**, and `_calc_nutation_obliquity()` was updated to use
 
 ---
 
+### Photometric Models (pheno_ut) — Phase Angle, Magnitude, Diameter
+
+**File:** `libephemeris/planets.py`, functions `_calc_pheno()`, `_calc_planet_magnitude()`, `_calc_moon_magnitude()`
+
+**Date:** March 2026
+
+Six issues were identified and fixed in `swe_pheno_ut()` through systematic comparison
+with Swiss Ephemeris across 500 dates × 10 bodies, then cross-validated against
+Mallama & Hilton (2018) published formulas and IAU 2015 standards.
+
+#### Phase Angle — 3D Vector Dot Product (Critical)
+
+**Problem:**
+The phase angle (Sun-Body-Earth angle) was computed using the law of cosines on
+the triangle formed by heliocentric distance, geocentric distance, and Sun-Earth
+distance. For the Moon, this triangle is extremely elongated (Sun ~1 AU,
+Moon ~0.003 AU from Earth), making the law-of-cosines numerically unstable.
+Errors reached **180--537 arcseconds** for the Moon.
+
+**Fix applied:**
+Replaced with 3D vector dot product approach using geocentric position vectors:
+
+```python
+# Vector from body to Sun: sun_geo - body_geo
+# Vector from body to Earth: -body_geo (Earth is at origin)
+# Phase angle = angle between these vectors via dot product
+cos_phase = dot(body_to_sun, body_to_earth) / (|body_to_sun| * |body_to_earth|)
+phase_angle = arccos(clamp(cos_phase, -1, 1))
+```
+
+Same fix applied to all planets (not just Moon).
+
+**Impact:**
+
+| Body | Before | After |
+|------|--------|-------|
+| Moon | 180--537" error | < 1" |
+| Planets | 10--100" error | 4--24" (irreducible DE440 vs DE431) |
+
+#### Moon Magnitude — Astronomical Almanac Formula
+
+**Problem:**
+Used a Hapke photometric model with V0=-12.74 and quadratic/opposition-surge
+terms that diverged from Swiss Ephemeris by **0.3--0.5 magnitudes**.
+
+**Fix applied:**
+Replaced with the Astronomical Almanac formula (Allen's Astrophysical Quantities):
+
+```python
+V = -12.73 + 0.026 * |alpha| + 4e-9 * |alpha|^4
+```
+
+with distance correction `5 * log10(d / d_mean)`.
+
+**Impact:** Error reduced from 0.3--0.5 mag to **0.03 mag** for normal phases
+(alpha < 150 degrees). Thin crescents (alpha > 165 degrees) still show 0.2 mag divergence
+due to inherent formula limitation.
+
+#### Sun Magnitude — V(1,0) Correction
+
+**Problem:** V(1,0) was -26.74, should be **-26.86** (Mallama & Hilton 2018).
+Constant 0.12 mag offset.
+
+**Fix:** Changed constant. Error: **0.0000 mag**.
+
+#### Neptune Magnitude — Secular Brightness Variation
+
+**Problem:** Neptune uses a fixed V(1,0) = -7.00, but Neptune's albedo has been
+changing over its 165-year orbital period. Swiss Ephemeris models this with a
+secular V(1,0) that transitions from -6.89 (pre-1980) to -7.00 (by J2000.0).
+Our fixed value produced 0.11 mag error at pre-1980 dates.
+
+Additionally, the `tjd` parameter was not being passed to `_calc_planet_magnitude()`
+for non-Saturn planets (it was initialized to `0.0` instead of `t.tt`), so the
+year calculation gave ~4712 BC regardless of actual date.
+
+**Fix applied (2 changes):**
+
+1. Implemented secular V(1,0) variation with linear interpolation:
+   - Before 1980: V(1,0) = -6.89
+   - 1980--2000: linear interpolation
+   - After 2000: V(1,0) = -7.00
+
+2. Changed `tjd = 0.0` to `tjd = t.tt` for all planets (not just Saturn).
+
+**Impact:** Error reduced from 0.11 mag (pre-1980 dates) to **0.0000 mag** across all epochs.
+
+**References:** Lockwood & Thompson (1991), Sromovsky et al. (2003).
+
+#### Uranus Magnitude — V(1,0) Correction
+
+**Problem:** V(1,0) was -7.19, should be **-7.15** (Mallama & Hilton 2018).
+
+**Fix:** Changed constant + phase coefficient b1=0.002. Error: **< 0.01 mag**.
+
+#### Apparent Diameter — IAU 2015 Equatorial Radii (Intentional Divergence)
+
+**Investigation:**
+Swiss Ephemeris uses **mean volumetric radii** for giant planets, producing
+systematically smaller apparent diameters (2--3.5% for Jupiter/Saturn).
+LibEphemeris uses **IAU 2015 equatorial radii**, which is the standard adopted
+by the Astronomical Almanac for apparent diameter computation.
+
+**Decision: NOT CHANGED.** The equatorial radius is the correct choice for
+apparent angular size (maximum visible cross-section). This is documented as
+an intentional divergence where LibEphemeris is more accurate than Swiss Ephemeris.
+
+| Body | Our radius (IAU eq.) | SE radius (mean vol.) | Difference |
+|------|---------------------|----------------------|------------|
+| Jupiter | 71,492 km | 69,911 km | +2.3% |
+| Saturn | 60,268 km | 58,232 km | +3.5% |
+| Uranus | 25,559 km | 25,362 km | +0.8% |
+| Neptune | 24,764 km | 24,622 km | +0.6% |
+
+---
+
 ## Investigations: ELP2000 Perturbations Not Applied
 
 ### True Node (SE_TRUE_NODE)

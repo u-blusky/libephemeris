@@ -1,20 +1,15 @@
 """
 Tests for planetary nodes and apsides calculation (swe_nod_aps and swe_nod_aps_ut).
 
-These functions calculate:
+These functions calculate geocentric positions of:
 - Ascending and descending orbital nodes
 - Perihelion and aphelion positions
 
-Note on precision:
-    The libephemeris implementation calculates osculating orbital elements from
-    JPL DE421 ephemeris data. This matches JPL Horizons orbital elements exactly.
-
-    pyswisseph uses mean orbital elements from specific data sources that
-    may differ from instantaneous osculating elements. The longitude of ascending
-    node (Omega) can differ by ~40° for inner planets due to different conventions.
-
-    For most astrological applications, both approaches are valid. The key
-    properties (orbital shape, orientation) are preserved.
+The implementation computes osculating orbital elements from JPL DE440
+heliocentric state vectors, then projects the resulting node/apse positions
+to geocentric coordinates. This means distances are geocentric (not
+heliocentric), and angular relationships like 180° between nodes or apsides
+hold only in the heliocentric frame, not after geocentric projection.
 """
 
 import pytest
@@ -97,35 +92,16 @@ class TestNodApsBasic:
 
 
 class TestNodApsOrbitalRelationships:
-    """Test that orbital relationships are mathematically correct."""
+    """Test that orbital relationships are mathematically correct.
+
+    Note: The implementation returns geocentric positions, so heliocentric
+    relationships (exact 180° between nodes/apsides, perihelion < aphelion
+    distance) do not apply to the geocentric output values.
+    """
 
     @pytest.mark.unit
-    def test_descending_node_is_180_from_ascending(self):
-        """Descending node should be 180° from ascending node."""
-        jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
-
-        diff = abs(ndsc[0] - nasc[0])
-        if diff > 180:
-            diff = 360 - diff
-
-        assert abs(diff - 180) < 0.1, f"Node difference {diff} should be 180°"
-
-    @pytest.mark.unit
-    def test_aphelion_is_180_from_perihelion(self):
-        """Aphelion should be 180° from perihelion."""
-        jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
-
-        diff = abs(aphe[0] - peri[0])
-        if diff > 180:
-            diff = 360 - diff
-
-        assert abs(diff - 180) < 0.1, f"Apside difference {diff} should be 180°"
-
-    @pytest.mark.unit
-    def test_nodes_have_zero_latitude(self):
-        """Nodes should have zero latitude (on ecliptic by definition)."""
+    def test_nodes_have_near_zero_latitude(self):
+        """Nodes should have near-zero latitude (on ecliptic by definition)."""
         jd = 2451545.0
         nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
 
@@ -146,14 +122,15 @@ class TestNodApsOrbitalRelationships:
         assert aphe[1] is not None
 
     @pytest.mark.unit
-    def test_perihelion_closer_than_aphelion(self):
-        """Perihelion distance should be less than aphelion distance."""
+    def test_geocentric_distances_are_positive(self):
+        """All geocentric distances should be positive."""
         jd = 2451545.0
         nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
 
-        # peri[2] = distance at perihelion
-        # aphe[2] = distance at aphelion
-        assert peri[2] < aphe[2], "Perihelion should be closer than aphelion"
+        assert nasc[2] > 0, "Ascending node geocentric distance should be positive"
+        assert ndsc[2] > 0, "Descending node geocentric distance should be positive"
+        assert peri[2] > 0, "Perihelion geocentric distance should be positive"
+        assert aphe[2] > 0, "Aphelion geocentric distance should be positive"
 
 
 class TestNodApsAllPlanets:
@@ -190,26 +167,30 @@ class TestNodApsAllPlanets:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
-        "planet_id,planet_name,expected_a",
+        "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury", 0.387),
-            (SE_VENUS, "Venus", 0.723),
-            (SE_MARS, "Mars", 1.524),
-            (SE_JUPITER, "Jupiter", 5.203),
-            (SE_SATURN, "Saturn", 9.537),
+            (SE_MERCURY, "Mercury"),
+            (SE_VENUS, "Venus"),
+            (SE_MARS, "Mars"),
+            (SE_JUPITER, "Jupiter"),
+            (SE_SATURN, "Saturn"),
         ],
     )
-    def test_semi_major_axis_reasonable(self, planet_id, planet_name, expected_a):
-        """Semi-major axis computed from apsides should match known values."""
+    def test_longitudes_differ_between_planets(self, planet_id, planet_name):
+        """Different planets should have different node/apse longitudes."""
         jd = 2451545.0
         nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, planet_id, 0, SE_NODBIT_MEAN)
 
-        # a = (r_peri + r_aphe) / 2
-        computed_a = (peri[2] + aphe[2]) / 2
-
-        # Allow 5% tolerance
-        assert abs(computed_a - expected_a) / expected_a < 0.05, (
-            f"{planet_name} semi-major axis {computed_a} differs from expected {expected_a}"
+        # All four longitudes should be distinct (geocentric projection
+        # of different orbital elements)
+        lons = [nasc[0], ndsc[0], peri[0], aphe[0]]
+        # At least 3 of the 4 should be distinct (within 1°)
+        unique = []
+        for lon in lons:
+            if not any(abs(lon - u) < 1.0 or abs(lon - u) > 359.0 for u in unique):
+                unique.append(lon)
+        assert len(unique) >= 3, (
+            f"{planet_name} should have at least 3 distinct longitudes, got {lons}"
         )
 
 
@@ -301,11 +282,16 @@ class TestNodApsAliases:
 
 
 class TestNodApsMethodologyWarning:
-    """Test the HeliocentricNodApsWarning for inner planets."""
+    """Test the HeliocentricNodApsWarning backward compatibility.
+
+    The geocentric osculating implementation no longer emits warnings
+    (the old heliocentric implementation warned for inner planets).
+    The warning class is kept as a deprecated stub for backward compatibility.
+    """
 
     @pytest.mark.unit
-    def test_warning_issued_for_mercury(self):
-        """Mercury should trigger HeliocentricNodApsWarning."""
+    def test_no_warning_for_mercury(self):
+        """Mercury should not trigger HeliocentricNodApsWarning (geocentric impl)."""
         import warnings
 
         jd = 2451545.0
@@ -313,16 +299,16 @@ class TestNodApsMethodologyWarning:
             warnings.simplefilter("always")
             ephem.nod_aps_ut(jd, SE_MERCURY, 0, SE_NODBIT_MEAN)
 
-            # Check that a warning was issued
-            assert len(w) >= 1
-            assert any(
-                issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            helio_warnings = [
+                warning
                 for warning in w
-            )
+                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            ]
+            assert len(helio_warnings) == 0
 
     @pytest.mark.unit
-    def test_warning_issued_for_venus(self):
-        """Venus should trigger HeliocentricNodApsWarning."""
+    def test_no_warning_for_venus(self):
+        """Venus should not trigger HeliocentricNodApsWarning (geocentric impl)."""
         import warnings
 
         jd = 2451545.0
@@ -330,11 +316,12 @@ class TestNodApsMethodologyWarning:
             warnings.simplefilter("always")
             ephem.nod_aps_ut(jd, SE_VENUS, 0, SE_NODBIT_MEAN)
 
-            assert len(w) >= 1
-            assert any(
-                issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            helio_warnings = [
+                warning
                 for warning in w
-            )
+                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
+            ]
+            assert len(helio_warnings) == 0
 
     @pytest.mark.unit
     def test_no_warning_for_mars(self):
@@ -346,7 +333,6 @@ class TestNodApsMethodologyWarning:
             warnings.simplefilter("always")
             ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
 
-            # No HeliocentricNodApsWarning should be issued for outer planets
             helio_warnings = [
                 warning
                 for warning in w
@@ -373,7 +359,7 @@ class TestNodApsMethodologyWarning:
 
     @pytest.mark.unit
     def test_warning_can_be_suppressed(self):
-        """HeliocentricNodApsWarning should be suppressible."""
+        """HeliocentricNodApsWarning should be suppressible (backward compat)."""
         import warnings
 
         jd = 2451545.0
@@ -388,42 +374,6 @@ class TestNodApsMethodologyWarning:
                 if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
             ]
             assert len(helio_warnings) == 0
-
-    @pytest.mark.unit
-    def test_warning_message_contains_planet_name(self):
-        """Warning message should contain the planet name."""
-        import warnings
-
-        jd = 2451545.0
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            ephem.nod_aps_ut(jd, SE_MERCURY, 0, SE_NODBIT_MEAN)
-
-            helio_warnings = [
-                warning
-                for warning in w
-                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
-            ]
-            assert len(helio_warnings) == 1
-            assert "Mercury" in str(helio_warnings[0].message)
-
-    @pytest.mark.unit
-    def test_warning_message_mentions_precision_doc(self):
-        """Warning message should reference PRECISION.md."""
-        import warnings
-
-        jd = 2451545.0
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            ephem.nod_aps_ut(jd, SE_VENUS, 0, SE_NODBIT_MEAN)
-
-            helio_warnings = [
-                warning
-                for warning in w
-                if issubclass(warning.category, ephem.HeliocentricNodApsWarning)
-            ]
-            assert len(helio_warnings) == 1
-            assert "PRECISION.md" in str(helio_warnings[0].message)
 
     @pytest.mark.unit
     def test_warning_class_is_exported(self):

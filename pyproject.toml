@@ -78,6 +78,7 @@ dev = [
     "twine>=5.0.0",
     "pytest-sugar>=1.1.1",
     "spiceypy>=6.0.0",  # For generating compact planet center SPK files
+    "astropy>=5.0.0",  # Cross-validation against professional astronomy standards (dev only)
 ]
 docs = [
     "sphinx>=7.0.0",

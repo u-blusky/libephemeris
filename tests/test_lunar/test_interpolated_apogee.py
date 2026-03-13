@@ -48,8 +48,8 @@ class TestInterpolatedApogeeBasic:
         # Latitude should be reasonable (typically small for lunar apogee)
         assert -10 < lat < 10, f"Latitude {lat} seems unreasonable"
 
-        # Eccentricity (returned as dist) should be reasonable (~0.055)
-        assert 0.04 < dist < 0.07, f"Eccentricity {dist} seems unreasonable"
+        # Distance in AU (apogee ~0.00271 AU ≈ 405,500 km)
+        assert 0.002 < dist < 0.003, f"Distance {dist} AU seems unreasonable"
 
     def test_calc_returns_valid_position(self):
         """Test that swe_calc (TT) returns a valid position for SE_INTP_APOG."""
@@ -239,22 +239,24 @@ class TestInterpolatedApogeeDirectFunctions:
         from libephemeris import lunar
 
         jd_tt = 2451545.0
-        lon, lat, ecc = lunar.calc_interpolated_apogee(jd_tt)
+        lon, lat, dist = lunar.calc_interpolated_apogee(jd_tt)
 
         assert 0 <= lon < 360
         assert -10 < lat < 10
-        assert 0.04 < ecc < 0.07
+        # Distance in AU (apogee ~0.00271 AU)
+        assert 0.002 < dist < 0.003
 
     def test_calc_interpolated_perigee_directly(self):
         """Test calling calc_interpolated_perigee directly."""
         from libephemeris import lunar
 
         jd_tt = 2451545.0
-        lon, lat, ecc = lunar.calc_interpolated_perigee(jd_tt)
+        lon, lat, dist = lunar.calc_interpolated_perigee(jd_tt)
 
         assert 0 <= lon < 360
         assert -10 < lat < 10
-        assert 0.04 < ecc < 0.07
+        # Distance in AU (perigee ~0.00239 AU)
+        assert 0.002 < dist < 0.003
 
 
 class TestInterpolatedApogeeConsistency:

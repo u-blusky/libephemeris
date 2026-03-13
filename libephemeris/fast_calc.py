@@ -23,9 +23,11 @@ from .constants import (
     SEFLG_BARYCTR,
     SEFLG_EQUATORIAL,
     SEFLG_HELCTR,
+    SEFLG_ICRS,
     SEFLG_J2000,
     SEFLG_MOSEPH,
     SEFLG_NOABERR,
+    SEFLG_NOGDEFL,
     SEFLG_NONUT,
     SEFLG_RADIANS,
     SEFLG_SIDEREAL,
@@ -780,9 +782,12 @@ def _pipeline_icrs(
 
     # 5. Gravitational deflection by Sun, Jupiter, Saturn (PPN formula).
     #    Dominant correction: up to ~4" for Saturn near the Sun's limb.
-    #    Skipped for helio/bary/truepos and for the Moon (negligible at
+    #    Skipped for helio/bary/truepos/nogdefl and for the Moon (negligible at
     #    ~0.0026 AU, deflection < 0.000001").
-    if not (iflag & (SEFLG_NOABERR | SEFLG_HELCTR | SEFLG_BARYCTR | SEFLG_TRUEPOS)):
+    if not (
+        iflag
+        & (SEFLG_NOABERR | SEFLG_NOGDEFL | SEFLG_HELCTR | SEFLG_BARYCTR | SEFLG_TRUEPOS)
+    ):
         if ipl != SE_MOON and lt > 0.0:
             geo = _apply_gravitational_deflection(geo, observer, jd_tt, lt, reader)
 
@@ -1024,6 +1029,8 @@ def fast_calc_ut(
         raise KeyError("SEFLG_RADIANS not supported in LEB mode")
     if iflag & SEFLG_NONUT:
         raise KeyError("SEFLG_NONUT not supported in LEB mode")
+    if iflag & SEFLG_ICRS:
+        raise KeyError("SEFLG_ICRS not supported in LEB mode")
 
     # Strip SEFLG_MOSEPH (always ignored)
     iflag = iflag & ~SEFLG_MOSEPH
@@ -1095,6 +1102,8 @@ def fast_calc_tt(
         raise KeyError("SEFLG_RADIANS not supported in LEB mode")
     if iflag & SEFLG_NONUT:
         raise KeyError("SEFLG_NONUT not supported in LEB mode")
+    if iflag & SEFLG_ICRS:
+        raise KeyError("SEFLG_ICRS not supported in LEB mode")
 
     iflag = iflag & ~SEFLG_MOSEPH
 

@@ -440,24 +440,24 @@ class TestMoonMagnitudeHapkeEdgeCases:
 
 
 class TestMoonMagnitudeHapkeFunction:
-    """Direct tests for the _calc_moon_magnitude_hapke function."""
+    """Direct tests for the _calc_moon_magnitude function."""
 
     @pytest.mark.unit
     def test_function_exists(self):
         """The Hapke magnitude function should be accessible."""
-        from libephemeris.planets import _calc_moon_magnitude_hapke
+        from libephemeris.planets import _calc_moon_magnitude
 
-        assert callable(_calc_moon_magnitude_hapke)
+        assert callable(_calc_moon_magnitude)
 
     @pytest.mark.unit
     def test_function_at_zero_phase(self):
         """At zero phase angle, should return bright magnitude."""
-        from libephemeris.planets import _calc_moon_magnitude_hapke
+        from libephemeris.planets import _calc_moon_magnitude
 
         # Mean distance in AU
         mean_dist = 384400.0 / 149597870.7
 
-        mag = _calc_moon_magnitude_hapke(0.0, mean_dist)
+        mag = _calc_moon_magnitude(0.0, mean_dist)
 
         # Full moon at mean distance should be around -12.7 to -13.5
         # (opposition surge makes it brighter than base -12.74)
@@ -466,14 +466,14 @@ class TestMoonMagnitudeHapkeFunction:
     @pytest.mark.unit
     def test_function_phase_dependence(self):
         """Magnitude should increase (get dimmer) with phase angle."""
-        from libephemeris.planets import _calc_moon_magnitude_hapke
+        from libephemeris.planets import _calc_moon_magnitude
 
         mean_dist = 384400.0 / 149597870.7
 
-        mag_0 = _calc_moon_magnitude_hapke(0.0, mean_dist)
-        mag_45 = _calc_moon_magnitude_hapke(45.0, mean_dist)
-        mag_90 = _calc_moon_magnitude_hapke(90.0, mean_dist)
-        mag_135 = _calc_moon_magnitude_hapke(135.0, mean_dist)
+        mag_0 = _calc_moon_magnitude(0.0, mean_dist)
+        mag_45 = _calc_moon_magnitude(45.0, mean_dist)
+        mag_90 = _calc_moon_magnitude(90.0, mean_dist)
+        mag_135 = _calc_moon_magnitude(135.0, mean_dist)
 
         # Magnitude should increase (more positive = dimmer)
         assert mag_0 < mag_45 < mag_90 < mag_135, (
@@ -484,15 +484,15 @@ class TestMoonMagnitudeHapkeFunction:
     @pytest.mark.unit
     def test_function_distance_dependence(self):
         """Magnitude should vary with distance."""
-        from libephemeris.planets import _calc_moon_magnitude_hapke
+        from libephemeris.planets import _calc_moon_magnitude
 
         mean_dist = 384400.0 / 149597870.7
         near_dist = mean_dist * 0.9  # 10% closer
         far_dist = mean_dist * 1.1  # 10% farther
 
-        mag_near = _calc_moon_magnitude_hapke(30.0, near_dist)
-        mag_mean = _calc_moon_magnitude_hapke(30.0, mean_dist)
-        mag_far = _calc_moon_magnitude_hapke(30.0, far_dist)
+        mag_near = _calc_moon_magnitude(30.0, near_dist)
+        mag_mean = _calc_moon_magnitude(30.0, mean_dist)
+        mag_far = _calc_moon_magnitude(30.0, far_dist)
 
         # Closer = brighter (more negative magnitude)
         assert mag_near < mag_mean < mag_far, (
@@ -503,21 +503,21 @@ class TestMoonMagnitudeHapkeFunction:
     @pytest.mark.unit
     def test_function_typical_values(self):
         """Test typical magnitude values across phases."""
-        from libephemeris.planets import _calc_moon_magnitude_hapke
+        from libephemeris.planets import _calc_moon_magnitude
 
         mean_dist = 384400.0 / 149597870.7
 
         # Test typical values
         # Full Moon: -12.5 to -13.5
-        mag_full = _calc_moon_magnitude_hapke(2.0, mean_dist)
+        mag_full = _calc_moon_magnitude(2.0, mean_dist)
         assert -14 < mag_full < -12, f"Full moon mag {mag_full:.2f} unexpected"
 
         # Quarter Moon: -10 to -11
-        mag_quarter = _calc_moon_magnitude_hapke(90.0, mean_dist)
+        mag_quarter = _calc_moon_magnitude(90.0, mean_dist)
         assert -12 < mag_quarter < -9, f"Quarter moon mag {mag_quarter:.2f} unexpected"
 
         # Crescent: -7 to -9
-        mag_crescent = _calc_moon_magnitude_hapke(135.0, mean_dist)
+        mag_crescent = _calc_moon_magnitude(135.0, mean_dist)
         assert -10 < mag_crescent < -6, (
             f"Crescent moon mag {mag_crescent:.2f} unexpected"
         )

@@ -117,7 +117,7 @@ class TestInterpolatedApogeeAtBoundary:
         # Results should be valid
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
         assert -10 < lat < 10, f"Latitude {lat} seems unreasonable"
-        assert 0.02 < ecc < 0.10, f"Eccentricity {ecc} seems unreasonable"
+        assert 0.002 < ecc < 0.003, f"Distance {ecc} AU seems unreasonable"
 
     def test_apogee_near_end_of_ephemeris(self):
         """Test interpolated apogee calculation near end of ephemeris."""
@@ -133,7 +133,7 @@ class TestInterpolatedApogeeAtBoundary:
         # Results should be valid
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
         assert -10 < lat < 10, f"Latitude {lat} seems unreasonable"
-        assert 0.02 < ecc < 0.10, f"Eccentricity {ecc} seems unreasonable"
+        assert 0.002 < ecc < 0.003, f"Distance {ecc} AU seems unreasonable"
 
     def test_apogee_at_exact_start_boundary(self):
         """Test interpolated apogee at the exact start of ephemeris range."""
@@ -178,7 +178,7 @@ class TestInterpolatedPerigeeAtBoundary:
         # Results should be valid
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
         assert -10 < lat < 10, f"Latitude {lat} seems unreasonable"
-        assert 0.02 < ecc < 0.10, f"Eccentricity {ecc} seems unreasonable"
+        assert 0.002 < ecc < 0.003, f"Distance {ecc} AU seems unreasonable"
 
     def test_perigee_near_end_of_ephemeris(self):
         """Test interpolated perigee calculation near end of ephemeris."""
@@ -193,7 +193,7 @@ class TestInterpolatedPerigeeAtBoundary:
         # Results should be valid
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
         assert -10 < lat < 10, f"Latitude {lat} seems unreasonable"
-        assert 0.02 < ecc < 0.10, f"Eccentricity {ecc} seems unreasonable"
+        assert 0.002 < ecc < 0.003, f"Distance {ecc} AU seems unreasonable"
 
 
 class TestLongitudeWrappingInInterpolation:
@@ -217,7 +217,7 @@ class TestLongitudeWrappingInInterpolation:
             # Check that the result is always valid
             assert 0 <= lon < 360, f"Invalid longitude {lon} at JD {jd}"
             assert -10 < lat < 10, f"Unreasonable latitude {lat} at JD {jd}"
-            assert 0.02 < ecc < 0.10, f"Unreasonable eccentricity {ecc} at JD {jd}"
+            assert 0.002 < ecc < 0.003, f"Unreasonable distance {ecc} AU at JD {jd}"
 
             # If we're near 0 or 360, the algorithm handled the wrap correctly
             if lon < 5 or lon > 355:
@@ -241,7 +241,7 @@ class TestLongitudeWrappingInInterpolation:
             # Check that the result is always valid
             assert 0 <= lon < 360, f"Invalid longitude {lon} at JD {jd}"
             assert -10 < lat < 10, f"Unreasonable latitude {lat} at JD {jd}"
-            assert 0.02 < ecc < 0.10, f"Unreasonable eccentricity {ecc} at JD {jd}"
+            assert 0.002 < ecc < 0.003, f"Unreasonable distance {ecc} AU at JD {jd}"
 
     def test_continuity_across_zero_boundary(self):
         """

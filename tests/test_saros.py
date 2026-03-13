@@ -41,26 +41,26 @@ class TestSolarSarosNumber:
         saros = get_saros_number(jd_eclipse, eclipse_type="solar")
         assert saros == 139
 
-    def test_august_2017_total_eclipse_is_saros_136(self):
-        """The August 21, 2017 total solar eclipse is Saros 136."""
-        # JD for 2017-Aug-21 ~18:26 UT (maximum)
-        jd_eclipse = 2457987.768
+    def test_august_2017_total_eclipse_is_saros_145(self):
+        """The August 21, 2017 total solar eclipse is Saros 145."""
+        # JD for 2017-Aug-21 maximum (verified against NASA canon)
+        jd_eclipse = 2457987.268
         saros = get_saros_number(jd_eclipse, eclipse_type="solar")
-        assert saros == 136
+        assert saros == 145
 
-    def test_december_2020_total_eclipse_is_saros_140(self):
-        """The December 14, 2020 total solar eclipse is Saros 140."""
-        # JD for 2020-Dec-14 ~16:14 UT (maximum)
-        jd_eclipse = 2459203.676
+    def test_december_2020_annular_eclipse_is_saros_142(self):
+        """The December 14, 2020 solar eclipse is Saros 142."""
+        # JD for 2020-Dec-14 maximum (verified against NASA canon)
+        jd_eclipse = 2459198.176
         saros = get_saros_number(jd_eclipse, eclipse_type="solar")
-        assert saros == 140
+        assert saros == 142
 
-    def test_june_2021_annular_eclipse_is_saros_132(self):
-        """The June 10, 2021 annular solar eclipse is Saros 132."""
-        # JD for 2021-Jun-10 ~10:43 UT (maximum)
-        jd_eclipse = 2459375.947
+    def test_june_2021_annular_eclipse_is_saros_147(self):
+        """The June 10, 2021 annular solar eclipse is Saros 147."""
+        # JD for 2021-Jun-10 maximum (verified against NASA canon)
+        jd_eclipse = 2459375.946
         saros = get_saros_number(jd_eclipse, eclipse_type="solar")
-        assert saros == 132
+        assert saros == 147
 
     def test_integration_with_sol_eclipse_when_glob(self):
         """Test that get_saros_number works with sol_eclipse_when_glob output."""
@@ -80,17 +80,17 @@ class TestSolarSarosNumber:
 
     def test_consecutive_saros_eclipses_same_series(self):
         """Eclipses separated by one Saros cycle should have same series number."""
-        # August 21, 2017 eclipse (Saros 136)
-        jd_2017 = 2457987.768
+        # August 21, 2017 eclipse (Saros 145)
+        jd_2017 = 2457987.268
 
-        # The previous eclipse in Saros 136 was August 11, 1999
+        # The previous eclipse in Saros 145 was August 11, 1999
         # ~18 years, 11 days earlier
         jd_1999 = jd_2017 - SAROS_CYCLE_DAYS
 
         saros_2017 = get_saros_number(jd_2017, "solar")
         saros_1999 = get_saros_number(jd_1999, "solar")
 
-        assert saros_2017 == saros_1999 == 136
+        assert saros_2017 == saros_1999 == 145
 
 
 class TestLunarSarosNumber:
@@ -168,10 +168,10 @@ class TestSarosEdgeCases:
 
     def test_distant_past_eclipse(self):
         """Should handle eclipses far in the past."""
-        # The 1999 August 11 total solar eclipse (Saros 136)
+        # The 1999 August 11 total solar eclipse (Saros 145)
         jd_1999 = swe_julday(1999, 8, 11, 11.0)
         saros = get_saros_number(jd_1999, "solar")
-        assert saros == 136
+        assert saros == 145
 
     def test_distant_future_eclipse(self):
         """Should handle eclipses in the future."""

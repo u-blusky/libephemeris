@@ -36,6 +36,14 @@ from typing import Sequence, Tuple, Union
 from .constants import (
     SE_SUN,
     SE_MOON,
+    SE_MERCURY,
+    SE_VENUS,
+    SE_MARS,
+    SE_JUPITER,
+    SE_SATURN,
+    SE_URANUS,
+    SE_NEPTUNE,
+    SE_PLUTO,
     SEFLG_SPEED,
     SEFLG_SWIEPH,
     SE_ECL_TOTAL,
@@ -68,6 +76,47 @@ EARTH_RADIUS_KM = 6378.137  # Earth equatorial radius in km (WGS84)
 SHALLOW_ECLIPSE_MAG_THRESHOLD = 0.01  # Minimum magnitude for reliable contact times
 NEAR_MISS_GAMMA_MARGIN = 0.02  # Margin from gamma limit for edge case handling
 MINIMUM_SEPARATION_FOR_LENS = 1e-10  # Minimum separation to avoid division by zero
+
+# 1 AU in km (IAU 2012 definition)
+_AU_KM = 149597870.7
+
+# Physical equatorial radii of planets in km
+# Sources: IAU 2015 nominal values, NASA Planetary Fact Sheet
+# Used for dynamic angular radius computation (matching SE's pla_diam[] approach)
+_PLANET_RADIUS_KM = {
+    SE_MERCURY: 2439.7,
+    SE_VENUS: 6051.8,
+    SE_MARS: 3396.2,
+    SE_JUPITER: 71492.0,
+    SE_SATURN: 60268.0,  # Disc only, excludes rings
+    SE_URANUS: 25559.0,
+    SE_NEPTUNE: 24764.0,
+    SE_PLUTO: 1188.3,
+}
+
+
+def _calc_planet_angular_radius(planet_id: int, dist_au: float) -> float:
+    """Compute angular radius of a planet in degrees from its geocentric distance.
+
+    Uses the exact geometric formula: angular_radius = arcsin(physical_radius / distance),
+    matching the Swiss Ephemeris approach of computing angular sizes dynamically from
+    physical radii and actual distance rather than using static lookup tables.
+
+    Args:
+        planet_id: Planet constant (SE_MERCURY, SE_VENUS, etc.)
+        dist_au: Geocentric distance in AU.
+
+    Returns:
+        Angular radius in degrees. Returns 0.0001° (~0.4") for unknown bodies
+        (point source approximation).
+    """
+    radius_km = _PLANET_RADIUS_KM.get(planet_id)
+    if radius_km is None:
+        return 0.0001  # Point source for unknown bodies
+    dist_km = dist_au * _AU_KM
+    if dist_km <= 0:
+        return 0.0001
+    return math.degrees(math.asin(min(1.0, radius_km / dist_km)))
 
 
 def _is_shallow_eclipse(magnitude: float) -> bool:
@@ -151,7 +200,9 @@ def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
         d: Center-to-center separation in degrees
 
     Returns:
-        Obscuration as a fraction (0 to 1)
+        Obscuration as a fraction. For total eclipses where Moon is larger
+        than Sun, this can exceed 1.0 (matching reference API behavior where
+        obscuration = (r_moon/r_sun)^2 represents the disc area ratio).
     """
     # Handle edge case: no overlap
     if d >= r_sun + r_moon:
@@ -159,15 +210,14 @@ def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
 
     # Handle edge case: one disk entirely within the other
     if d <= abs(r_sun - r_moon):
-        if r_moon >= r_sun:
-            return 1.0
-        else:
-            return (r_moon / r_sun) ** 2
+        # Both total and annular: obscuration = disc area ratio
+        # For total eclipses (r_moon >= r_sun), this is >= 1.0
+        # For annular eclipses (r_moon < r_sun), this is < 1.0
+        return (r_moon / r_sun) ** 2
 
     # Handle edge case: zero or near-zero separation
     if d < MINIMUM_SEPARATION_FOR_LENS:
-        # At zero separation, use the smaller radius ratio
-        return min(1.0, (r_moon / r_sun) ** 2)
+        return (r_moon / r_sun) ** 2
 
     # Calculate lens-shaped intersection area
     # d1 is distance from Sun center to intersection chord
@@ -192,7 +242,7 @@ def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
     sun_area = math.pi * r_sun * r_sun
 
     obscuration = intersection_area / sun_area
-    return max(0.0, min(1.0, obscuration))
+    return max(0.0, obscuration)
 
 
 def _calculate_magnitude_safe(
@@ -808,16 +858,20 @@ def _calculate_eclipse_phases_besselian(
     t_sunset = 0.0
 
     return (
-        jd_max,
-        t_first_contact if t_first_contact else jd_max - 1.0 / 24.0,
-        t_second_contact,
-        t_third_contact,
-        t_fourth_contact if t_fourth_contact else jd_max + 1.0 / 24.0,
-        t_sunrise,
-        t_sunset,
-        0.0,  # Reserved for annular-total start
-        0.0,  # Reserved for annular-total end
-        0.0,  # Reserved
+        jd_max,  # [0] Time of maximum eclipse
+        0.0,  # [1] Time at local apparent noon (not implemented)
+        t_first_contact
+        if t_first_contact
+        else jd_max - 1.0 / 24.0,  # [2] Eclipse begin
+        t_fourth_contact
+        if t_fourth_contact
+        else jd_max + 1.0 / 24.0,  # [3] Eclipse end
+        t_second_contact,  # [4] Totality begin (or 0)
+        t_third_contact,  # [5] Totality end (or 0)
+        0.0,  # [6] Center line begin (not implemented)
+        0.0,  # [7] Center line end (not implemented)
+        0.0,  # [8] Annular-total becomes total
+        0.0,  # [9] Annular-total becomes annular again
     )
 
 
@@ -1489,7 +1543,8 @@ def _calculate_local_eclipse_phases(
 
         sun_app = observer_at.at(t).observe(sun).apparent()
         alt, az, _ = sun_app.altaz()
-        return alt.degrees, az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     # First check if Sun is above horizon at global maximum
     sun_alt, sun_az = _get_sun_altaz(jd_max_global)
@@ -2043,6 +2098,8 @@ def swe_sol_eclipse_when_loc(
 
         # Sun altitude and azimuth
         sun_alt, sun_az, _ = sun_app.altaz()
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        sun_az_se = (sun_az.degrees + 180.0) % 360.0
 
         # Distances
         sun_dist_au = sun_app.distance().au
@@ -2051,11 +2108,11 @@ def swe_sol_eclipse_when_loc(
         return (
             sep,
             sun_alt.degrees,
-            sun_az.degrees,
+            sun_az_se,
             sun_dist_au,
             moon_dist_au,
             sun_alt.degrees,
-            sun_az.degrees,
+            sun_az_se,
         )
 
     def _get_sun_altaz(jd: float) -> Tuple[float, float, float]:
@@ -2082,7 +2139,8 @@ def swe_sol_eclipse_when_loc(
         else:
             apparent_alt = true_alt
 
-        return true_alt, az.degrees, apparent_alt
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return true_alt, (az.degrees + 180.0) % 360.0, apparent_alt
 
     def _get_angular_sizes(jd: float) -> Tuple[float, float, float, float]:
         """Get angular radii and diameters of Sun and Moon."""
@@ -2479,7 +2537,7 @@ def swe_sol_eclipse_when_loc(
             ecl_type |= SE_ECL_4TH_VISIBLE
         ecl_type |= SE_ECL_MAX_VISIBLE
 
-        # Prepare tret tuple (7 elements matching reference API)
+        # Prepare tret tuple (10 elements matching pyswisseph layout)
         tret = (
             jd_local_max,  # [0] Maximum eclipse
             jd_first,  # [1] First contact
@@ -2488,9 +2546,12 @@ def swe_sol_eclipse_when_loc(
             jd_fourth,  # [4] Fourth contact
             jd_sunrise,  # [5] Sunrise during eclipse
             jd_sunset,  # [6] Sunset during eclipse
+            0.0,  # [7] Reserved
+            0.0,  # [8] Reserved
+            0.0,  # [9] Reserved
         )
 
-        # Prepare attr tuple (8 elements matching reference API)
+        # Prepare attr tuple (20 elements matching pyswisseph layout)
         attr = (
             magnitude,  # [0] Fraction of solar diameter covered
             ratio,  # [1] Ratio of lunar to solar diameter
@@ -2499,7 +2560,20 @@ def swe_sol_eclipse_when_loc(
             sun_az,  # [4] Azimuth of sun at maximum
             true_alt,  # [5] True altitude of sun at maximum
             apparent_alt,  # [6] Apparent altitude with refraction
-            min_separation,  # [7] Angular distance of moon center from sun center
+            min_separation,  # [7] Angular distance Moon-Sun centers
+            ratio
+            if (ecl_type & (SE_ECL_TOTAL | SE_ECL_ANNULAR))
+            else magnitude,  # [8] Magnitude acc. to NASA
+            *_get_saros_info(jd_max_global, "solar"),  # [9] Saros, [10] member
+            0.0,  # [11] Reserved
+            0.0,  # [12] Reserved
+            0.0,  # [13] Reserved
+            0.0,  # [14] Reserved
+            0.0,  # [15] Reserved
+            0.0,  # [16] Reserved
+            0.0,  # [17] Reserved
+            0.0,  # [18] Reserved
+            0.0,  # [19] Reserved
         )
 
         return ecl_type, tret, attr
@@ -2687,7 +2761,8 @@ def swe_sol_eclipse_where(
         # Get Sun altitude and azimuth at central line
         sun_alt, sun_az, _ = sun_app.altaz()
         sun_altitude = sun_alt.degrees
-        sun_azimuth = sun_az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        sun_azimuth = (sun_az.degrees + 180.0) % 360.0
 
         # Calculate apparent altitude with refraction
         if sun_altitude > -1.0:
@@ -2730,10 +2805,9 @@ def swe_sol_eclipse_where(
         if separation >= sum_radii:
             obscuration = 0.0
         elif separation <= abs(local_moon_radius - local_sun_radius):
-            if local_moon_radius >= local_sun_radius:
-                obscuration = 1.0
-            else:
-                obscuration = (local_moon_radius / local_sun_radius) ** 2
+            # Both total and annular: obscuration = disc area ratio
+            # For total eclipses (moon >= sun), this is >= 1.0
+            obscuration = (local_moon_radius / local_sun_radius) ** 2
         else:
             r_sun = local_sun_radius
             r_moon = local_moon_radius
@@ -2749,7 +2823,7 @@ def swe_sol_eclipse_where(
                 max(0, r_moon * r_moon - d2 * d2)
             )
             obscuration = (area1 + area2) / (math.pi * r_sun * r_sun)
-        obscuration = max(0.0, min(1.0, obscuration))
+        obscuration = max(0.0, obscuration)
 
         # Calculate path width (km)
         sun_radius_km = 696340.0
@@ -3015,9 +3089,10 @@ def swe_sol_eclipse_where(
         sun_altitude,  # [5] True altitude of sun
         apparent_alt,  # [6] Apparent altitude with refraction
         separation,  # [7] Angular distance Moon-Sun centers
-        0.0,  # [8] Reserved
-        0.0,  # [9] Reserved
-        0.0,  # [10] Reserved
+        local_ratio
+        if (eclipse_type & (SE_ECL_TOTAL | SE_ECL_ANNULAR))
+        else magnitude,  # [8] Magnitude acc. to NASA
+        *_get_saros_info(tjd_ut, "solar"),  # [9] Saros, [10] member
         0.0,  # [11] Reserved
         0.0,  # [12] Reserved
         0.0,  # [13] Reserved
@@ -3188,7 +3263,8 @@ def swe_sol_eclipse_how(
     # Get Sun altitude and azimuth
     sun_alt, sun_az, _ = sun_app.altaz()
     sun_altitude = sun_alt.degrees
-    sun_azimuth = sun_az.degrees
+    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+    sun_azimuth = (sun_az.degrees + 180.0) % 360.0
 
     # Calculate apparent altitude with refraction
     if sun_altitude > -1.0:
@@ -3288,10 +3364,9 @@ def swe_sol_eclipse_how(
         obscuration = 0.0
     elif d <= abs(r_sun - r_moon):
         # One disk entirely within the other
-        if r_moon >= r_sun:
-            obscuration = 1.0  # Total eclipse
-        else:
-            obscuration = (r_moon / r_sun) ** 2  # Annular eclipse
+        # Both total and annular: obscuration = disc area ratio
+        # For total eclipses (r_moon >= r_sun), this is >= 1.0
+        obscuration = (r_moon / r_sun) ** 2
     else:
         # Partial overlap - use lens formula
         # Area of intersection of two circles
@@ -3315,7 +3390,7 @@ def swe_sol_eclipse_how(
         else:
             obscuration = 0.0
 
-    obscuration = max(0.0, min(1.0, obscuration))
+    obscuration = max(0.0, obscuration)
 
     # Calculate core shadow width (for central eclipses only)
     shadow_width_km = 0.0
@@ -3378,9 +3453,10 @@ def swe_sol_eclipse_how(
         sun_altitude,  # [5] True altitude of sun
         apparent_alt,  # [6] Apparent altitude with refraction
         separation,  # [7] Angular distance Moon-Sun centers
-        0.0,  # [8] magnitude acc. to NASA
-        0.0,  # [9] saros series number
-        0.0,  # [10] saros series member number
+        ratio
+        if (eclipse_type & (SE_ECL_TOTAL | SE_ECL_ANNULAR))
+        else magnitude,  # [8] Magnitude acc. to NASA
+        *_get_saros_info(tjd_ut, "solar"),  # [9] Saros, [10] member
         0.0,  # [11] reserved
         0.0,  # [12] reserved
         0.0,  # [13] reserved
@@ -3535,7 +3611,8 @@ def swe_sol_eclipse_how_details(
         """Get Sun altitude and azimuth at given JD."""
         sun_app, _ = _get_sun_moon_positions(jd)
         alt, az, _ = sun_app.altaz()
-        return alt.degrees, az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _get_angular_sizes(jd: float) -> tuple:
         """Get angular radii of Sun and Moon."""
@@ -3739,10 +3816,9 @@ def swe_sol_eclipse_how_details(
     if d >= sun_r_max + moon_r_max:
         max_obscuration = 0.0
     elif d <= abs(sun_r_max - moon_r_max):
-        if moon_r_max >= sun_r_max:
-            max_obscuration = 1.0
-        else:
-            max_obscuration = (moon_r_max / sun_r_max) ** 2
+        # Both total and annular: obscuration = disc area ratio
+        # For total eclipses (moon >= sun), this is >= 1.0
+        max_obscuration = (moon_r_max / sun_r_max) ** 2
     else:
         d1 = (d * d + sun_r_max * sun_r_max - moon_r_max * moon_r_max) / (2 * d)
         d2 = d - d1
@@ -3763,7 +3839,7 @@ def swe_sol_eclipse_how_details(
         else:
             max_obscuration = 0.0
 
-    max_obscuration = max(0.0, min(1.0, max_obscuration))
+    max_obscuration = max(0.0, max_obscuration)
     result["max_obscuration"] = max_obscuration
     result["max_obscuration_percent"] = max_obscuration * 100.0
 
@@ -4335,13 +4411,15 @@ def _calculate_lunar_eclipse_phases(
 
     return (
         jd_max,  # [0] Maximum
-        t_partial_begin,  # [1] Partial begins (enters umbra)
-        t_total_begin,  # [2] Total begins
-        t_total_end,  # [3] Total ends
-        t_partial_end,  # [4] Partial ends (leaves umbra)
-        t_pen_begin,  # [5] Penumbral begins
-        t_pen_end,  # [6] Penumbral ends
-        0.0,  # [7] Reserved
+        0.0,  # [1] Reserved
+        t_partial_begin,  # [2] Partial begins (enters umbra)
+        t_partial_end,  # [3] Partial ends (leaves umbra)
+        t_total_begin,  # [4] Total begins
+        t_total_end,  # [5] Total ends
+        t_pen_begin,  # [6] Penumbral begins
+        t_pen_end,  # [7] Penumbral ends
+        0.0,  # [8] Reserved
+        0.0,  # [9] Reserved
     )
 
 
@@ -4441,8 +4519,10 @@ def lun_eclipse_when(
                 umbra_radius,
             ) = _calculate_lunar_eclipse_type_and_magnitude(jd_max)
 
-            if ecl_type != 0:
-                # Eclipse found - check if matches filter
+            if ecl_type != 0 and not (ecl_type & SE_ECL_GRAZING):
+                # Eclipse found (skip grazing near-misses for pyswisseph
+                # compatibility — these have sub-threshold penumbral
+                # magnitudes that Swiss Ephemeris does not consider eclipses)
                 type_matches = (
                     (eclipse_type & SE_ECL_TOTAL and ecl_type & SE_ECL_TOTAL)
                     or (eclipse_type & SE_ECL_PARTIAL and ecl_type & SE_ECL_PARTIAL)
@@ -4576,7 +4656,8 @@ def lun_eclipse_when_loc(
         observer_at = earth + observer
         moon_app = observer_at.at(t).observe(moon).apparent()
         alt, az, _ = moon_app.altaz()
-        return alt.degrees, az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _is_moon_visible(jd: float, min_alt: float = -1.0) -> bool:
         """Check if Moon is above horizon (with margin for refraction)."""
@@ -4596,12 +4677,12 @@ def lun_eclipse_when_loc(
             )
 
         jd_max = global_times[0]
-        jd_pen_begin = global_times[5]
-        jd_pen_end = global_times[6]
-        jd_partial_begin = global_times[1]
-        jd_partial_end = global_times[4]
-        jd_total_begin = global_times[2]
-        jd_total_end = global_times[3]
+        jd_partial_begin = global_times[2]
+        jd_partial_end = global_times[3]
+        jd_total_begin = global_times[4]
+        jd_total_end = global_times[5]
+        jd_pen_begin = global_times[6]
+        jd_pen_end = global_times[7]
 
         # Check if Moon is visible during any part of the eclipse
         # Sample at key phases: penumbral begin/end, partial begin/end, maximum
@@ -4707,33 +4788,41 @@ def lun_eclipse_when_loc(
                         t_high = t_mid
                 moonset_time = (t_low + t_high) / 2
 
-        # Prepare times tuple (10 elements)
+        # Prepare times tuple (10 elements matching pyswisseph layout)
         times = (
             global_times[0],  # [0] Maximum
-            global_times[1],  # [1] Partial begins (enters umbra)
-            global_times[2],  # [2] Total begins
-            global_times[3],  # [3] Total ends
-            global_times[4],  # [4] Partial ends (leaves umbra)
-            global_times[5],  # [5] Penumbral begins
-            global_times[6],  # [6] Penumbral ends
-            moonrise_time,  # [7] Moonrise during eclipse
-            moonset_time,  # [8] Moonset during eclipse
-            0.0,  # [9] Reserved
+            0.0,  # [1] Reserved
+            global_times[2],  # [2] Partial begins (enters umbra)
+            global_times[3],  # [3] Partial ends (leaves umbra)
+            global_times[4],  # [4] Total begins
+            global_times[5],  # [5] Total ends
+            global_times[6],  # [6] Penumbral begins
+            global_times[7],  # [7] Penumbral ends
+            moonrise_time,  # [8] Moonrise during eclipse
+            moonset_time,  # [9] Moonset during eclipse
         )
 
-        # Prepare attributes tuple (11 elements)
+        # Prepare attributes tuple (20 elements matching pyswisseph layout)
         attr = (
             umbral_mag,  # [0] Umbral magnitude
             penumbral_mag,  # [1] Penumbral magnitude
             0.0,  # [2] Reserved
-            moon_az,  # [3] Azimuth of Moon at maximum
-            moon_alt,  # [4] Altitude of Moon at maximum
-            moon_diameter,  # [5] Apparent diameter of Moon
-            umbra_diameter,  # [6] Apparent diameter of umbra
-            penumbra_diameter,  # [7] Apparent diameter of penumbra
-            0.0,  # [8] Saros (not implemented)
-            0.0,  # [9] Reserved
-            0.0,  # [10] Reserved
+            0.0,  # [3] Reserved
+            moon_az,  # [4] Azimuth of Moon at maximum
+            moon_alt,  # [5] True altitude of Moon at maximum
+            moon_alt,  # [6] Apparent altitude (approx)
+            0.0,  # [7] Distance from opposition (degrees)
+            umbral_mag,  # [8] Umbral magnitude (equals [0])
+            *_get_saros_info(global_times[0], "lunar"),  # [9] Saros, [10] member
+            0.0,  # [11] Reserved
+            0.0,  # [12] Reserved
+            0.0,  # [13] Reserved
+            0.0,  # [14] Reserved
+            0.0,  # [15] Reserved
+            0.0,  # [16] Reserved
+            0.0,  # [17] Reserved
+            0.0,  # [18] Reserved
+            0.0,  # [19] Reserved
         )
 
         return ecl_type, times, attr
@@ -4843,13 +4932,14 @@ def lun_eclipse_how(
     try:
         moon_app = observer_at.at(t).observe(moon).apparent()
     except Exception:
-        # If calculation fails, return zeros
-        return 0, (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        # If calculation fails, return zeros (20 elements)
+        return 0, tuple([0.0] * 20)
 
     # Get Moon altitude and azimuth
     moon_alt, moon_az, _ = moon_app.altaz()
     moon_altitude = moon_alt.degrees
-    moon_azimuth = moon_az.degrees
+    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+    moon_azimuth = (moon_az.degrees + 180.0) % 360.0
 
     # Get Moon's distance for angular size calculation
     moon_dist_au = moon_app.distance().au
@@ -4876,17 +4966,26 @@ def lun_eclipse_how(
     if penumbral_mag <= 0 and umbral_mag <= 0:
         # No eclipse - Moon too far from Earth's shadow
         return 0, (
-            0.0,  # umbral magnitude
-            0.0,  # penumbral magnitude
-            0.0,  # reserved
-            moon_azimuth,  # Moon azimuth
-            moon_altitude,  # Moon altitude
-            moon_diameter,  # Moon diameter
-            umbra_diameter,  # Umbra diameter
-            penumbra_diameter,  # Penumbra diameter
-            0.0,  # Saros
-            0.0,  # Reserved
-            0.0,  # Reserved
+            0.0,  # [0] umbral magnitude
+            0.0,  # [1] penumbral magnitude
+            0.0,  # [2] reserved
+            0.0,  # [3] reserved
+            moon_azimuth,  # [4] Moon azimuth
+            moon_altitude,  # [5] true altitude
+            moon_altitude,  # [6] apparent altitude
+            0.0,  # [7] distance from opposition
+            0.0,  # [8] eclipse magnitude
+            0.0,  # [9] Saros series number
+            0.0,  # [10] Saros series member
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,  # [11-19] Reserved
         )
 
     # There is an eclipse - set type flags
@@ -4897,19 +4996,27 @@ def lun_eclipse_how(
         eclipse_type |= SE_ECL_VISIBLE
         eclipse_type |= SE_ECL_MAX_VISIBLE
 
-    # Prepare attributes tuple (11 elements)
+    # Prepare attributes tuple (20 elements matching pyswisseph layout)
     attr = (
         max(0.0, umbral_mag),  # [0] Umbral magnitude
         max(0.0, penumbral_mag),  # [1] Penumbral magnitude
         0.0,  # [2] Reserved
-        moon_azimuth,  # [3] Azimuth of Moon
-        moon_altitude,  # [4] Altitude of Moon
-        moon_diameter,  # [5] Apparent diameter of Moon
-        umbra_diameter,  # [6] Apparent diameter of umbra
-        penumbra_diameter,  # [7] Apparent diameter of penumbra
-        0.0,  # [8] Saros (not implemented)
-        0.0,  # [9] Reserved
-        0.0,  # [10] Reserved
+        0.0,  # [3] Reserved
+        moon_azimuth,  # [4] Azimuth of Moon
+        moon_altitude,  # [5] True altitude of Moon
+        moon_altitude,  # [6] Apparent altitude (approx)
+        0.0,  # [7] Distance from opposition (degrees)
+        max(0.0, umbral_mag),  # [8] Eclipse magnitude (equals [0])
+        *_get_saros_info(jd, "lunar"),  # [9] Saros, [10] member
+        0.0,  # [11] Reserved
+        0.0,  # [12] Reserved
+        0.0,  # [13] Reserved
+        0.0,  # [14] Reserved
+        0.0,  # [15] Reserved
+        0.0,  # [16] Reserved
+        0.0,  # [17] Reserved
+        0.0,  # [18] Reserved
+        0.0,  # [19] Reserved
     )
 
     return eclipse_type, attr
@@ -5024,13 +5131,14 @@ def swe_lun_eclipse_how(
     try:
         moon_app = observer_at.at(t).observe(moon).apparent()
     except Exception:
-        # If calculation fails, return zeros
-        return 0, (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        # If calculation fails, return zeros (20 elements)
+        return 0, tuple([0.0] * 20)
 
     # Get Moon altitude and azimuth
     moon_alt, moon_az, _ = moon_app.altaz()
     moon_altitude = moon_alt.degrees
-    moon_azimuth = moon_az.degrees
+    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+    moon_azimuth = (moon_az.degrees + 180.0) % 360.0
 
     # Get Moon's distance for angular size calculation
     moon_dist_au = moon_app.distance().au
@@ -5085,17 +5193,26 @@ def swe_lun_eclipse_how(
     if penumbral_mag <= 0 and umbral_mag <= 0:
         # No eclipse - Moon too far from Earth's shadow
         return 0, (
-            0.0,  # umbral magnitude
-            0.0,  # penumbral magnitude
-            0.0,  # reserved
-            0.0,  # reserved
-            moon_azimuth,  # Moon azimuth
-            moon_altitude,  # true altitude
-            apparent_altitude,  # apparent altitude
-            center_distance_radii,  # distance from shadow axis
-            0.0,  # eclipse type at moment
-            moon_diameter,  # Moon diameter
-            umbra_diameter,  # Umbra diameter
+            0.0,  # [0] umbral magnitude
+            0.0,  # [1] penumbral magnitude
+            0.0,  # [2] reserved
+            0.0,  # [3] reserved
+            moon_azimuth,  # [4] Moon azimuth
+            moon_altitude,  # [5] true altitude
+            apparent_altitude,  # [6] apparent altitude
+            center_distance_radii,  # [7] distance from opposition
+            0.0,  # [8] eclipse magnitude
+            0.0,  # [9] Saros series number
+            0.0,  # [10] Saros series member
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,  # [11-19] Reserved
         )
 
     # There is an eclipse - set type flags
@@ -5117,7 +5234,7 @@ def swe_lun_eclipse_how(
         if current_phase_type:
             eclipse_type |= SE_ECL_MAX_VISIBLE
 
-    # Prepare attributes tuple (11 elements matching reference API format)
+    # Prepare attributes tuple (20 elements matching pyswisseph layout)
     attr = (
         max(0.0, umbral_mag),  # [0] Umbral magnitude
         max(0.0, penumbral_mag),  # [1] Penumbral magnitude
@@ -5126,10 +5243,18 @@ def swe_lun_eclipse_how(
         moon_azimuth,  # [4] Azimuth of Moon
         moon_altitude,  # [5] True altitude of Moon
         apparent_altitude,  # [6] Apparent altitude with refraction
-        center_distance_radii,  # [7] Distance from shadow axis (Moon radii)
-        float(current_phase_type),  # [8] Eclipse type at this moment
-        moon_diameter,  # [9] Apparent diameter of Moon
-        umbra_diameter,  # [10] Apparent diameter of umbra
+        center_distance_radii,  # [7] Distance from opposition (degrees)
+        max(0.0, umbral_mag),  # [8] Eclipse magnitude (equals [0])
+        *_get_saros_info(tjd_ut, "lunar"),  # [9] Saros, [10] member
+        0.0,  # [11] Reserved
+        0.0,  # [12] Reserved
+        0.0,  # [13] Reserved
+        0.0,  # [14] Reserved
+        0.0,  # [15] Reserved
+        0.0,  # [16] Reserved
+        0.0,  # [17] Reserved
+        0.0,  # [18] Reserved
+        0.0,  # [19] Reserved
     )
 
     return eclipse_type, attr
@@ -5250,18 +5375,6 @@ def lun_occult_when_glob(
     # 932.56 arcsec at mean distance (0.002569 AU)
     MOON_MEAN_ANGULAR_RADIUS_DEG = 932.56 / 3600.0
 
-    # Approximate angular radius for planets (arcsec) - rough values for detection
-    PLANET_ANGULAR_RADII_ARCSEC = {
-        SE_MERCURY: 6.0,  # 3-6 arcsec
-        SE_VENUS: 30.0,  # 10-30 arcsec
-        SE_MARS: 12.0,  # 4-12 arcsec
-        SE_JUPITER: 24.0,  # 30-50 arcsec
-        SE_SATURN: 10.0,  # 15-20 arcsec
-        SE_URANUS: 2.0,  # ~2 arcsec
-        SE_NEPTUNE: 1.2,  # ~1.2 arcsec
-        SE_PLUTO: 0.1,  # ~0.1 arcsec
-    }
-
     def _get_moon_position(jd: float) -> Tuple[float, float, float, float]:
         """Get Moon's geocentric RA, Dec, distance in AU, and angular radius."""
         t = ts.ut1_jd(jd)
@@ -5308,8 +5421,8 @@ def lun_occult_when_glob(
             target_app = earth.at(t).observe(target).apparent()
             ra, dec, dist = target_app.radec(epoch="date")
 
-            # Get planet angular radius
-            angular_radius = PLANET_ANGULAR_RADII_ARCSEC.get(planet, 1.0) / 3600.0
+            # Dynamic angular radius from physical radius and distance
+            angular_radius = _calc_planet_angular_radius(planet, dist.au)
 
             return ra.hours * 15.0, dec.degrees, angular_radius
 
@@ -5884,25 +5997,14 @@ def lun_occult_when_loc(
     # Moon's mean angular radius in degrees
     MOON_MEAN_ANGULAR_RADIUS_DEG = 932.56 / 3600.0
 
-    # Approximate angular radius for planets (arcsec)
-    PLANET_ANGULAR_RADII_ARCSEC = {
-        SE_MERCURY: 6.0,
-        SE_VENUS: 30.0,
-        SE_MARS: 12.0,
-        SE_JUPITER: 24.0,
-        SE_SATURN: 10.0,
-        SE_URANUS: 2.0,
-        SE_NEPTUNE: 1.2,
-        SE_PLUTO: 0.1,
-    }
-
     def _get_moon_altaz(jd: float) -> Tuple[float, float]:
         """Get Moon altitude and azimuth at given JD from observer location."""
         t = ts.ut1_jd(jd)
         observer_at = earth + observer
         moon_app = observer_at.at(t).observe(moon_body).apparent()
         alt, az, _ = moon_app.altaz()
-        return alt.degrees, az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _get_target_altaz(jd: float) -> Tuple[float, float]:
         """Get target altitude and azimuth at given JD from observer location."""
@@ -5933,7 +6035,8 @@ def lun_occult_when_loc(
             )
             star_app = observer_at.at(t).observe(star_obj).apparent()
             alt, az, _ = star_app.altaz()
-            return alt.degrees, az.degrees
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            return alt.degrees, (az.degrees + 180.0) % 360.0
         else:
             # Planet
             if planet not in _PLANET_MAP:
@@ -5943,7 +6046,8 @@ def lun_occult_when_loc(
             target = get_planet_target(eph, target_name)
             target_app = observer_at.at(t).observe(target).apparent()
             alt, az, _ = target_app.altaz()
-            return alt.degrees, az.degrees
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _is_visible(jd: float, min_alt: float = -1.0) -> bool:
         """Check if both Moon and target are above horizon."""
@@ -5961,13 +6065,22 @@ def lun_occult_when_loc(
         moon_diameter = 2 * MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist)
         return moon_diameter, dist, MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist)
 
-    def _get_target_angular_info() -> float:
-        """Get target's angular diameter."""
+    def _get_target_angular_info(jd: float) -> float:
+        """Get target's angular diameter in degrees at given JD."""
         if planet == 0:
             # Fixed star - negligible angular size
             return 0.0001  # ~0.4 arcsec for point source
         else:
-            return PLANET_ANGULAR_RADII_ARCSEC.get(planet, 1.0) / 3600.0 * 2
+            # Compute distance to planet for dynamic angular size
+            if planet not in _PLANET_MAP:
+                return 0.0001
+            target_name = _PLANET_MAP[planet]
+            target = get_planet_target(eph, target_name)
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            target_app = observer_at.at(t).observe(target).apparent()
+            dist = target_app.distance().au
+            return 2 * _calc_planet_angular_radius(planet, dist)
 
     jd = jd_start
 
@@ -6169,7 +6282,7 @@ def lun_occult_when_loc(
 
         # Get apparent diameters
         moon_diameter, moon_dist, moon_radius = _get_moon_angular_info(jd_max_local)
-        target_diameter = _get_target_angular_info()
+        target_diameter = _get_target_angular_info(jd_max_local)
         target_radius = target_diameter / 2
 
         # Get minimum separation at local maximum
@@ -6558,18 +6671,6 @@ def lun_occult_where(
     # 932.56 arcsec at mean distance (0.002569 AU)
     MOON_MEAN_ANGULAR_RADIUS_DEG = 932.56 / 3600.0
 
-    # Approximate angular radius for planets (arcsec)
-    PLANET_ANGULAR_RADII_ARCSEC = {
-        SE_MERCURY: 6.0,
-        SE_VENUS: 30.0,
-        SE_MARS: 12.0,
-        SE_JUPITER: 24.0,
-        SE_SATURN: 10.0,
-        SE_URANUS: 2.0,
-        SE_NEPTUNE: 1.2,
-        SE_PLUTO: 0.1,
-    }
-
     # Zero return values for no occultation
     zero_geopos = (0.0,) * 10
     zero_attr = (0.0,) * 20
@@ -6614,8 +6715,8 @@ def lun_occult_where(
             target_app = earth.at(t).observe(target).apparent()
             ra, dec, dist = target_app.radec(epoch="date")
 
-            # Get planet angular radius
-            angular_radius = PLANET_ANGULAR_RADII_ARCSEC.get(planet, 1.0) / 3600.0
+            # Dynamic angular radius from physical radius and distance
+            angular_radius = _calc_planet_angular_radius(planet, dist.au)
 
             return ra.hours * 15.0, dec.degrees, angular_radius
 
@@ -6794,7 +6895,8 @@ def lun_occult_where(
         # Get Moon altitude and azimuth at central line
         moon_alt, moon_az, _ = moon_app.altaz()
         moon_altitude = moon_alt.degrees
-        moon_azimuth = moon_az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        moon_azimuth = (moon_az.degrees + 180.0) % 360.0
 
         # Calculate apparent altitude with refraction
         if moon_altitude > -1.0:
@@ -7110,7 +7212,8 @@ def rise_trans(
         observer_at = earth + observer
         body_app = observer_at.at(t).observe(target).apparent()
         alt, az, _ = body_app.altaz()
-        return alt.degrees, az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
         """Get body's RA and Dec at given JD (epoch of date)."""
@@ -7523,7 +7626,8 @@ def rise_trans_true_hor(
         observer_at = earth + observer
         body_app = observer_at.at(t).observe(target).apparent()
         alt, az, _ = body_app.altaz()
-        return alt.degrees, az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
         """Get body's RA and Dec at given JD (epoch of date)."""
@@ -7716,7 +7820,8 @@ def heliacal_ut(
         body_app = observer_at.at(t).observe(target).apparent()
         body_alt, body_az, _ = body_app.altaz()
 
-        return sun_alt.degrees, body_alt.degrees, body_az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return sun_alt.degrees, body_alt.degrees, (body_az.degrees + 180.0) % 360.0
 
     def _get_elongation(jd: float) -> float:
         """Get the elongation of body from Sun in degrees."""
@@ -8191,13 +8296,15 @@ def heliacal_pheno_ut(
     sun_app = observer_at.at(t).observe(sun).apparent()
     sun_alt_topo, sun_az, _ = sun_app.altaz()
     sun_alt_deg = sun_alt_topo.degrees
-    sun_az_deg = sun_az.degrees
+    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+    sun_az_deg = (sun_az.degrees + 180.0) % 360.0
 
     # Calculate body position
     body_app = observer_at.at(t).observe(target).apparent()
     body_alt_topo, body_az, body_dist = body_app.altaz()
     body_alt_deg = body_alt_topo.degrees
-    body_az_deg = body_az.degrees
+    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+    body_az_deg = (body_az.degrees + 180.0) % 360.0
 
     # Get geocentric altitude (without refraction or topocentric correction)
     body_geo = earth.at(t).observe(target).apparent()
@@ -12103,44 +12210,118 @@ SAROS_CYCLE_DAYS = 6585.3211  # More precise: 6585.3211 days
 # but shifted by one lunar node (ascending to descending or vice versa).
 INEX_CYCLE_DAYS = 10571.9509  # 358 * 29.530588853 = 10571.9509 days
 
-# Reference solar eclipses with known Saros series numbers
-# These are well-documented historical eclipses from NASA's eclipse catalogs
-# Format: (JD of eclipse maximum, Saros series number)
+# Reference solar eclipses with known Saros series and member numbers
+# Comprehensive coverage of all ~25 active solar Saros series (2015-2028)
+# Data from NASA's Five Millennium Canon of Solar Eclipses (Espenak & Meeus)
+# Format: (JD of eclipse maximum, Saros series number, member number)
 _SOLAR_SAROS_REFERENCES = (
-    # Saros 136 - includes the famous 2017 total solar eclipse
-    (2457987.767, 136),  # 2017-Aug-21 total solar eclipse (Saros 136)
-    # Saros 139 - includes the 2024 total solar eclipse
-    (2460409.296, 139),  # 2024-Apr-08 total solar eclipse (Saros 139)
-    # Saros 127 - includes 2018 partial eclipse
-    (2458309.917, 127),  # 2018-Jul-13 partial solar eclipse (Saros 127)
-    # Saros 132 - includes 2021 annular eclipse
-    (2459369.971, 132),  # 2021-Jun-10 annular solar eclipse (Saros 132)
-    # Saros 140 - includes 2020 total eclipse
-    (2459203.604, 140),  # 2020-Dec-14 total solar eclipse (Saros 140)
-    # Saros 124 - includes 2019 total eclipse
-    (2458675.604, 124),  # 2019-Jul-02 total solar eclipse (Saros 124)
-    # Saros 126 - includes 2019 annular eclipse
-    (2458826.900, 126),  # 2019-Dec-26 annular solar eclipse (Saros 126)
+    (2457101.907, 120, 61),
+    (2457278.788, 125, 54),
+    (2457456.581, 130, 52),
+    (2457632.880, 135, 39),
+    (2457811.120, 140, 29),
+    (2457987.268, 145, 22),
+    (2458165.369, 150, 17),
+    (2458312.626, 117, 69),
+    (2458489.571, 122, 58),
+    (2458667.308, 127, 58),
+    (2458843.721, 132, 46),
+    (2459021.778, 137, 36),
+    (2459198.176, 142, 23),
+    (2459375.946, 147, 23),
+    (2459552.815, 152, 13),
+    (2459700.362, 119, 66),
+    (2459877.958, 124, 55),
+    (2460054.678, 129, 52),
+    (2460232.250, 134, 44),
+    (2460409.262, 139, 30),
+    (2460586.281, 144, 17),
+    (2460763.950, 149, 21),
+    (2460940.321, 154, 7),
+    (2461089.008, 121, 61),
+    (2461265.240, 126, 48),
 )
 
-# Reference lunar eclipses with known Saros series numbers
-# Format: (JD of eclipse maximum, Saros series number)
+# Reference lunar eclipses with known Saros series and member numbers
+# Comprehensive coverage of all ~30 active lunar Saros series (2015-2030)
+# Data from NASA's Five Millennium Canon of Lunar Eclipses (Espenak & Meeus)
+# Format: (JD of eclipse maximum, Saros series number, member number)
 _LUNAR_SAROS_REFERENCES = (
-    # Saros 136 - includes 2022 total lunar eclipse
-    (2459891.459, 136),  # 2022-Nov-08 total lunar eclipse (Saros 136)
-    # Saros 132 - includes 2021 total lunar eclipse
-    (2459356.917, 132),  # 2021-May-26 total lunar eclipse (Saros 132)
-    # Saros 129 - includes 2018 total lunar eclipse
-    (2458310.835, 129),  # 2018-Jul-27 total lunar eclipse (Saros 129)
-    # Saros 134 - includes 2019 total lunar eclipse
-    (2458497.459, 134),  # 2019-Jan-21 total lunar eclipse (Saros 134)
-    # Saros 137 - includes 2023 partial lunar eclipse
-    (2460232.146, 137),  # 2023-Oct-28 partial lunar eclipse (Saros 137)
-    # Saros 131 - includes 2022 total lunar eclipse
-    (2459695.604, 131),  # 2022-May-16 total lunar eclipse (Saros 131)
-    # Saros 141 - includes 2021 partial lunar eclipse
-    (2459534.417, 141),  # 2021-Nov-19 partial lunar eclipse (Saros 141)
+    (2457117.000, 132, 30),
+    (2457293.616, 137, 26),
+    (2457470.991, 142, 18),
+    (2457648.288, 147, 8),
+    (2457795.530, 114, 59),
+    (2457973.264, 119, 61),
+    (2458150.062, 124, 49),
+    (2458327.348, 129, 38),
+    (2458504.717, 134, 27),
+    (2458681.396, 139, 21),
+    (2458859.299, 144, 16),
+    (2459006.309, 111, 67),
+    (2459183.905, 116, 58),
+    (2459360.971, 121, 55),
+    (2459537.877, 126, 45),
+    (2459715.675, 131, 34),
+    (2459891.958, 136, 20),
+    (2460070.224, 141, 24),
+    (2460246.343, 146, 11),
+    (2460394.801, 113, 64),
+    (2460571.614, 118, 52),
+    (2460748.791, 123, 53),
+    (2460926.258, 128, 41),
+    (2461102.982, 133, 27),
+    (2461280.676, 138, 29),
+    (2461457.467, 143, 18),
+    (2461605.169, 110, 72),
+    (2461782.676, 115, 58),
+    (2461959.264, 120, 58),
+    (2462137.203, 125, 49),
 )
+
+
+def _get_saros_info(
+    jd_eclipse: float,
+    eclipse_type: str = "solar",
+) -> Tuple[float, float]:
+    """Return (saros_series, saros_member) for an eclipse as floats.
+
+    Internal helper used to populate attr[9] and attr[10] in eclipse
+    attribute tuples. Returns (0.0, 0.0) if no match is found.
+
+    Args:
+        jd_eclipse: Julian Day (UT) of the eclipse maximum.
+        eclipse_type: "solar" or "lunar".
+
+    Returns:
+        Tuple of (saros_series_number, saros_member_number) as floats.
+    """
+    if eclipse_type.lower() == "solar":
+        references = _SOLAR_SAROS_REFERENCES
+    elif eclipse_type.lower() == "lunar":
+        references = _LUNAR_SAROS_REFERENCES
+    else:
+        return (0.0, 0.0)
+
+    best_series = 0
+    best_member = 0
+    best_residual = float("inf")
+
+    for ref_jd, ref_saros, ref_member in references:
+        delta = jd_eclipse - ref_jd
+        n_cycles = round(delta / SAROS_CYCLE_DAYS)
+        residual = abs(delta - n_cycles * SAROS_CYCLE_DAYS)
+
+        if residual < best_residual:
+            best_residual = residual
+            best_series = ref_saros
+            best_member = ref_member + n_cycles
+
+    # Sanity check: residual should be < ~1 day for a valid eclipse
+    if best_residual > 2.0:
+        return (0.0, 0.0)
+
+    return (float(best_series), float(best_member))
 
 
 def get_saros_number(
@@ -12204,44 +12385,12 @@ def get_saros_number(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - van Gent, R.H. "A Catalogue of Eclipse Cycles"
     """
-    if eclipse_type.lower() == "solar":
-        references = _SOLAR_SAROS_REFERENCES
-    elif eclipse_type.lower() == "lunar":
-        references = _LUNAR_SAROS_REFERENCES
-    else:
+    if eclipse_type.lower() not in ("solar", "lunar"):
         raise ValueError(
             f"eclipse_type must be 'solar' or 'lunar', got '{eclipse_type}'"
         )
-
-    # Use the first reference eclipse as our anchor point
-    ref_jd, ref_saros = references[0]
-
-    # Calculate how many Saros cycles separate the input from the reference
-    delta_days = jd_eclipse - ref_jd
-
-    # Number of complete Saros cycles (can be positive or negative)
-    # We round to the nearest integer since eclipses within a series
-    # are separated by almost exactly one Saros cycle
-    cycles = round(delta_days / SAROS_CYCLE_DAYS)
-
-    # The Saros series number stays the same within a series
-    # Different series are offset by different amounts in time
-    # To find the correct series, we need to find which reference
-    # gives us a cycle count close to an integer
-
-    best_match_series = ref_saros
-    best_match_residual = abs(delta_days - cycles * SAROS_CYCLE_DAYS)
-
-    for ref_jd_test, ref_saros_test in references:
-        delta = jd_eclipse - ref_jd_test
-        cycles_test = round(delta / SAROS_CYCLE_DAYS)
-        residual = abs(delta - cycles_test * SAROS_CYCLE_DAYS)
-
-        if residual < best_match_residual:
-            best_match_residual = residual
-            best_match_series = ref_saros_test
-
-    return best_match_series
+    saros_series, _ = _get_saros_info(jd_eclipse, eclipse_type)
+    return int(saros_series)
 
 
 # =============================================================================
@@ -13200,12 +13349,9 @@ def sol_eclipse_obscuration_at_loc(
         return 0.0
     elif d <= abs(r_sun - r_moon):
         # One disk entirely within the other
-        if r_moon >= r_sun:
-            # Total eclipse - Moon completely covers Sun
-            return 1.0
-        else:
-            # Annular eclipse - Moon entirely within Sun's disc
-            return (r_moon / r_sun) ** 2
+        # Both total and annular: obscuration = disc area ratio
+        # For total eclipses (r_moon >= r_sun), this is >= 1.0
+        return (r_moon / r_sun) ** 2
     else:
         # Partial overlap - use lens formula for intersection of two circles
         # The intersection area is the sum of two circular segments
@@ -13240,7 +13386,7 @@ def sol_eclipse_obscuration_at_loc(
         else:
             obscuration = 0.0
 
-    return max(0.0, min(1.0, obscuration))
+    return max(0.0, obscuration)
 
 
 def swe_sol_eclipse_obscuration_at_loc(
@@ -13782,38 +13928,6 @@ def planet_occult_when_glob(
 
     earth = eph["earth"]
 
-    # Angular radii for planets at mean distances (arcsec)
-    # These vary with distance but provide good approximations
-    PLANET_ANGULAR_RADII_ARCSEC = {
-        SE_MERCURY: 5.0,  # 3.2-6.5 arcsec
-        SE_VENUS: 25.0,  # 9.5-32 arcsec
-        SE_MARS: 9.0,  # 3.5-12.5 arcsec
-        SE_JUPITER: 35.0,  # 29-50 arcsec
-        SE_SATURN: 15.0,  # 14-20 arcsec (disc)
-        SE_URANUS: 1.8,  # 3.3-4.1 arcsec
-        SE_NEPTUNE: 1.1,  # 2.1-2.4 arcsec
-        SE_PLUTO: 0.06,  # ~0.06-0.11 arcsec
-    }
-
-    def _get_body_angular_radius(planet_id: int, dist_au: float) -> float:
-        """Get angular radius in degrees based on distance."""
-        # Mean distance in AU for each planet (used to scale angular radius)
-        MEAN_DISTANCES = {
-            SE_MERCURY: 1.0,  # geocentric mean ~1 AU
-            SE_VENUS: 1.0,
-            SE_MARS: 1.5,
-            SE_JUPITER: 5.2,
-            SE_SATURN: 9.5,
-            SE_URANUS: 19.2,
-            SE_NEPTUNE: 30.1,
-            SE_PLUTO: 39.5,
-        }
-        mean_radius = PLANET_ANGULAR_RADII_ARCSEC.get(planet_id, 1.0)
-        mean_dist = MEAN_DISTANCES.get(planet_id, 1.0)
-        # Scale radius by distance (closer = larger)
-        scaled_radius = mean_radius * (mean_dist / max(dist_au, 0.1))
-        return scaled_radius / 3600.0  # Convert arcsec to degrees
-
     def _get_planet_position(
         jd: float, planet_id: int
     ) -> Tuple[float, float, float, float]:
@@ -13829,7 +13943,7 @@ def planet_occult_when_glob(
         target_app = earth.at(t).observe(target).apparent()
         ra, dec, dist = target_app.radec(epoch="date")
 
-        angular_radius = _get_body_angular_radius(planet_id, dist.au)
+        angular_radius = _calc_planet_angular_radius(planet_id, dist.au)
 
         return ra.hours * 15.0, dec.degrees, dist.au, angular_radius
 
@@ -14179,17 +14293,6 @@ def planet_occult_when_loc(
     observer = wgs84.latlon(lat, lon, altitude)
     observer_at = earth + observer
 
-    PLANET_ANGULAR_RADII_ARCSEC = {
-        SE_MERCURY: 5.0,
-        SE_VENUS: 25.0,
-        SE_MARS: 9.0,
-        SE_JUPITER: 35.0,
-        SE_SATURN: 15.0,
-        SE_URANUS: 1.8,
-        SE_NEPTUNE: 1.1,
-        SE_PLUTO: 0.06,
-    }
-
     def _get_body_altitude(jd: float, planet_id: int) -> Tuple[float, float]:
         """Get planet's altitude and azimuth from observer location."""
         from .planets import get_planet_target
@@ -14201,7 +14304,8 @@ def planet_occult_when_loc(
         target_app = observer_at.at(t).observe(target).apparent()
         alt, az, _ = target_app.altaz()
 
-        return alt.degrees, az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _get_target_altitude(jd: float) -> Tuple[float, float]:
         """Get target body's altitude and azimuth from observer location."""
@@ -14231,7 +14335,8 @@ def planet_occult_when_loc(
             target_app = observer_at.at(t).observe(target).apparent()
 
         alt, az, _ = target_app.altaz()
-        return alt.degrees, az.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _is_visible_at_location(jd: float) -> bool:
         """Check if both bodies are above horizon at given time."""
@@ -14303,14 +14408,14 @@ def planet_occult_when_loc(
                 separation = occ_app.separation_from(target_app).degrees
 
                 # Calculate magnitude (simplified)
-                occ_radius = (
-                    PLANET_ANGULAR_RADII_ARCSEC.get(occulting_planet, 1.0) / 3600.0
-                )
+                occ_dist = occ_app.distance().au
+                occ_radius = _calc_planet_angular_radius(occulting_planet, occ_dist)
                 if occulted_planet == 0:
                     target_radius = 0.0001
                 else:
-                    target_radius = (
-                        PLANET_ANGULAR_RADII_ARCSEC.get(occulted_planet, 1.0) / 3600.0
+                    target_dist = target_app.distance().au
+                    target_radius = _calc_planet_angular_radius(
+                        occulted_planet, target_dist
                     )
 
                 if target_radius > 0:
