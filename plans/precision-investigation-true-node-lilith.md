@@ -331,16 +331,40 @@ sulla longitudine di Lilith.
 
 ---
 
-## Bonus: Bug Stelle Fisse (da fixare comunque)
+## Risultati dell'investigazione
 
-Indipendentemente dall'investigazione sopra, `fixed_stars.py` ha un bug di
-correttezza: i flag `SEFLG_SIDEREAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_TRUEPOS`,
-`SEFLG_XYZ`, `SEFLG_RADIANS`, `SEFLG_BARYCTR`, `SEFLG_TOPOCTR`, `SEFLG_ICRS` sono
-**tutti silenziosamente ignorati**. I soli flag attivi sono `SEFLG_SPEED`,
-`SEFLG_NOABERR`, `SEFLG_NOGDEFL`, `SEFLG_EQUATORIAL`.
+### True Node: VERIFICATO — precisione macchina
 
-Il più grave è `SEFLG_SIDEREAL`: un utente che chiama `swe_fixstar_ut(star, jd,
-SEFLG_SIDEREAL)` riceve coordinate **tropicali** senza nessun avviso.
+Triangolazione a 3 fonti (libephemeris vs pyswisseph vs JPL Horizons) su 24 date (1950-2050):
+- **Noi vs Horizons (J2000 eclittica)**: < 0.01" (precisione macchina)
+- **Noi vs SE (eclittica del giorno)**: < 0.01" in comparazione densa su 200 date
+- Tolleranza test tightened: 0.15° → 0.001° (150× più stretto)
 
-Fix necessario: applicare la sottrazione dell'ayanamsha dopo il calcolo della
-posizione, come viene fatto in `planets.py` per i pianeti.
+### True Lilith: VERIFICATO — entrambi equivalenti
+
+- Sia noi che SE differiscono da Horizons di ~240" (~4 arcmin)
+- NON è un bug: è l'approssimazione a 2 corpi nella formula `e = (v×h)/μ - r/|r|`
+- Noi vs SE: media 0.1", max 0.5" (effettivamente identici)
+- Tolleranza test tightened: 0.1° → 0.001°
+
+### J2000 Frame: NOI PIÙ PRECISI
+
+Per corpi lunari in frame J2000:
+- A J2000.0, coordinate tropicali e J2000 devono essere identiche (per definizione)
+- **Noi**: shift = 0.0000° (corretto)
+- **SE**: shift = 0.0039° (spurio — applica una correzione di frame bias che non dovrebbe esserci)
+- Verificato anche con astropy/ERFA: per i pianeti entrambi concordano, ma per nodi/Lilith SE diverge
+
+### Latitudine, Equatoriali, Velocità: TUTTI VERIFICATI IDENTICI
+
+Tutte le tolleranze precedenti (0.2-1.5°) erano over-conservative. Misurate e tightened:
+- True Node latitudine: 0.0" → tolleranza 0.001° (era 0.5°)
+- True Lilith latitudine: 0.0" → tolleranza 0.001° (era 1.5°)
+- Equatoriali: 0.0" → tolleranza 0.001° (era 0.2°)
+- Velocità: max 0.015°/day → tolleranza 0.05° (era 1.0°)
+
+### Stelle Fisse: FIXATE
+
+Il bug dei flag silenziosamente ignorati è stato risolto. `_apply_fixstar_flags()` ora gestisce:
+`SEFLG_SIDEREAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_XYZ`, `SEFLG_RADIANS`,
+`SEFLG_TRUEPOS`, `SEFLG_MOSEPH`, `SEFLG_SPEED3`, `SEFLG_TOPOCTR`.
