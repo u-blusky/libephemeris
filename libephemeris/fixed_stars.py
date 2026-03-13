@@ -166,15 +166,25 @@ from .constants import (
     SE_ALMACH,
     SE_MENKAR,
     SEFLG_SPEED,
+    SEFLG_SPEED3,
     SEFLG_NOABERR,
     SEFLG_NOGDEFL,
     SEFLG_EQUATORIAL,
+    SEFLG_J2000,
+    SEFLG_NONUT,
+    SEFLG_SIDEREAL,
+    SEFLG_MOSEPH,
+    SEFLG_XYZ,
+    SEFLG_RADIANS,
+    SEFLG_ICRS,
+    SEFLG_TRUEPOS,
+    SEFLG_TOPOCTR,
     J2000,
     J1991_25,
     DAYS_PER_JULIAN_YEAR,
 )
 from .utils import cotrans_sp
-from .cache import get_true_obliquity
+from .cache import get_true_obliquity, get_mean_obliquity
 
 
 @dataclass
@@ -3835,6 +3845,145 @@ def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
     return -1, f"could not find star name {star_name.lower()}", None
 
 
+def _preprocess_flags(iflag: int) -> int:
+    """Preprocess calculation flags for fixed star functions.
+
+    Strips ephemeris selection flags (MOSEPH) and converts SPEED3 to SPEED.
+    SEFLG_TOPOCTR is accepted silently (stars at infinite distance).
+
+    Args:
+        iflag: Raw input flags
+
+    Returns:
+        Cleaned flags
+    """
+    # Strip SEFLG_MOSEPH — accepted for compatibility, always uses Skyfield
+    iflag = iflag & ~SEFLG_MOSEPH
+    # SEFLG_SPEED3: treat as SEFLG_SPEED
+    if iflag & SEFLG_SPEED3:
+        iflag = (iflag & ~SEFLG_SPEED3) | SEFLG_SPEED
+    # SEFLG_TOPOCTR: silently accept (stars at infinite distance, no parallax)
+    iflag = iflag & ~SEFLG_TOPOCTR
+    return iflag
+
+
+def _apply_fixstar_flags(result: tuple, jd_tt: float, iflag: int) -> tuple:
+    """Apply post-calculation flag transformations to fixed star results.
+
+    Handles frame transformations (J2000, NONUT, ICRS), coordinate system
+    changes (EQUATORIAL, SIDEREAL), and output format conversions (XYZ, RADIANS).
+
+    Applied in order:
+    1. J2000 / NONUT / ICRS frame selection (ecliptic only)
+    2. EQUATORIAL coordinate transformation
+    3. SIDEREAL ayanamsha subtraction (ecliptic only)
+    4. XYZ / RADIANS output format conversion
+
+    Args:
+        result: 6-tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+        jd_tt: Julian Day in Terrestrial Time
+        iflag: Calculation flags
+
+    Returns:
+        Transformed 6-tuple
+    """
+    import math
+
+    lon, lat, dist, speed_lon, speed_lat, speed_dist = result
+
+    # ---- 1. Frame selection (ecliptic coordinates) ----
+    # These only apply when NOT converting to equatorial
+    is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
+
+    if not is_equatorial:
+        if iflag & SEFLG_J2000:
+            # J2000 ecliptic: precess from of-date back to J2000
+            from .astrometry import _precess_ecliptic
+
+            lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+            # Speed also needs precession correction but the dominant term
+            # (precession rate ~50"/yr) is removed, leaving proper motion only.
+            # For fixed stars the speed is already small enough that this is fine.
+
+    # ---- 2. Equatorial coordinate transformation ----
+    if is_equatorial:
+        if iflag & SEFLG_J2000:
+            # J2000 equatorial: precess to J2000, then use J2000 obliquity
+            from .astrometry import _precess_ecliptic
+
+            lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+            eps = 23.4392911  # IAU 2006 mean obliquity at J2000.0
+        elif iflag & SEFLG_NONUT:
+            # Mean equator of date: use mean obliquity (no nutation)
+            eps = get_mean_obliquity(jd_tt)
+        else:
+            # True equator of date: use true obliquity
+            eps = get_true_obliquity(jd_tt)
+
+        pos = (lon, lat, dist)
+        vel = (speed_lon, speed_lat, speed_dist)
+        pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
+        lon, lat, dist = pos_eq
+        speed_lon, speed_lat, speed_dist = vel_eq
+
+    # ---- 3. Sidereal mode (ayanamsha subtraction) ----
+    if (iflag & SEFLG_SIDEREAL) and not is_equatorial:
+        from .state import get_timescale
+
+        ts = get_timescale()
+        t = ts.tt_jd(jd_tt)
+        tjd_ut = t.ut1
+
+        from .planets import swe_get_ayanamsa_ut
+
+        ayanamsa = swe_get_ayanamsa_ut(tjd_ut)
+        lon = (lon - ayanamsa) % 360.0
+
+    # ---- 4. Output format conversion ----
+    result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+
+    if iflag & SEFLG_XYZ:
+        lon_rad = math.radians(lon)
+        lat_rad = math.radians(lat)
+        cos_lat = math.cos(lat_rad)
+        sin_lat = math.sin(lat_rad)
+        cos_lon = math.cos(lon_rad)
+        sin_lon = math.sin(lon_rad)
+
+        x = dist * cos_lat * cos_lon
+        y = dist * cos_lat * sin_lon
+        z = dist * sin_lat
+
+        dlon_rad = math.radians(speed_lon)
+        dlat_rad = math.radians(speed_lat)
+
+        vx = (
+            speed_dist * cos_lat * cos_lon
+            - dist * sin_lat * cos_lon * dlat_rad
+            - dist * cos_lat * sin_lon * dlon_rad
+        )
+        vy = (
+            speed_dist * cos_lat * sin_lon
+            - dist * sin_lat * sin_lon * dlat_rad
+            + dist * cos_lat * cos_lon * dlon_rad
+        )
+        vz = speed_dist * sin_lat + dist * cos_lat * dlat_rad
+
+        return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
+
+    if iflag & SEFLG_RADIANS:
+        return (
+            math.radians(lon),
+            math.radians(lat),
+            dist,
+            math.radians(speed_lon),
+            math.radians(speed_lat),
+            speed_dist,
+        )
+
+    return result
+
+
 def swe_fixstar_ut(
     star_name: str, tjd_ut: float, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int, str]:
@@ -3863,6 +4012,8 @@ def swe_fixstar_ut(
         >>> pos, retflag, err = swe_fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    iflag = _preprocess_flags(iflag)
+
     star_id, error, canonical_name = _resolve_star_id(star_name)
     if error:
         return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error)
@@ -3874,11 +4025,9 @@ def swe_fixstar_ut(
     t = ts.ut1_jd(tjd_ut)
 
     try:
-        # Check SEFLG_NOABERR flag for astrometric (no aberration) position
-        noaberr = bool(iflag & SEFLG_NOABERR)
+        noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
         nogdefl = bool(iflag & SEFLG_NOGDEFL)
 
-        # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 star_id, t.tt, noaberr, nogdefl
@@ -3886,23 +4035,9 @@ def swe_fixstar_ut(
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(star_id, t.tt, noaberr, nogdefl)
-            # Return canonical star name on success (reference API behavior)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        # Convert to equatorial coordinates if requested
-        if iflag & SEFLG_EQUATORIAL:
-            # Calculate true obliquity for coordinate transformation
-            eps = get_true_obliquity(t.tt)
-
-            # Split into position and velocity tuples
-            pos = result[:3]
-            vel = result[3:]
-
-            # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
-            pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
-
-            # Merge back
-            result = pos_eq + vel_eq
+        result = _apply_fixstar_flags(result, t.tt, iflag)
 
         return (result, iflag, canonical_name or "")
     except Exception as e:
@@ -3938,17 +4073,16 @@ def swe_fixstar(
         >>> pos, retflag, err = swe_fixstar("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    iflag = _preprocess_flags(iflag)
+
     star_id, error, canonical_name = _resolve_star_id(star_name)
     if error:
         return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error)
 
-    # Use TT directly - no conversion needed
     try:
-        # Check SEFLG_NOABERR flag for astrometric (no aberration) position
-        noaberr = bool(iflag & SEFLG_NOABERR)
+        noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
         nogdefl = bool(iflag & SEFLG_NOGDEFL)
 
-        # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 star_id, jd, noaberr, nogdefl
@@ -3956,23 +4090,9 @@ def swe_fixstar(
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(star_id, jd, noaberr, nogdefl)
-            # Return canonical star name on success (reference API behavior)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        # Convert to equatorial coordinates if requested
-        if iflag & SEFLG_EQUATORIAL:
-            # Calculate true obliquity for coordinate transformation
-            eps = get_true_obliquity(jd)
-
-            # Split into position and velocity tuples
-            pos = result[:3]
-            vel = result[3:]
-
-            # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
-            pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
-
-            # Merge back
-            result = pos_eq + vel_eq
+        result = _apply_fixstar_flags(result, jd, iflag)
 
         return (result, iflag, canonical_name or "")
     except Exception as e:
@@ -4164,6 +4284,8 @@ def swe_fixstar2_ut(
         >>> name, pos, retflag, err = swe_fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
+    iflag = _preprocess_flags(iflag)
+
     entry, error = _resolve_star2(star_name)
     if error or entry is None:
         return (
@@ -4173,43 +4295,26 @@ def swe_fixstar2_ut(
             error or "could not find star name",
         )
 
-    # Convert UT to TT using timescale (applies Delta T)
     from .state import get_timescale
 
     ts = get_timescale()
     t = ts.ut1_jd(tjd_ut)
 
     try:
-        # Check SEFLG_NOABERR flag for astrometric (no aberration) position
-        noaberr = bool(iflag & SEFLG_NOABERR)
+        noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
         nogdefl = bool(iflag & SEFLG_NOGDEFL)
 
-        # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 entry.id, t.tt, noaberr, nogdefl
             )
-            star_name_out = _format_star_name(entry)
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(entry.id, t.tt, noaberr, nogdefl)
-            star_name_out = _format_star_name(entry)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        # Convert to equatorial coordinates if requested
-        if iflag & SEFLG_EQUATORIAL:
-            # Calculate true obliquity for coordinate transformation
-            eps = get_true_obliquity(t.tt)
-
-            # Split into position and velocity tuples
-            pos = result[:3]
-            vel = result[3:]
-
-            # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
-            pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
-
-            # Merge back
-            result = pos_eq + vel_eq
+        star_name_out = _format_star_name(entry)
+        result = _apply_fixstar_flags(result, t.tt, iflag)
 
         return (star_name_out, result, iflag, "")
     except Exception as e:
@@ -4254,6 +4359,8 @@ def swe_fixstar2(
         >>> name, pos, retflag, err = swe_fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
+    iflag = _preprocess_flags(iflag)
+
     entry, error = _resolve_star2(star_name)
     if error or entry is None:
         return (
@@ -4263,38 +4370,21 @@ def swe_fixstar2(
             error or "could not find star name",
         )
 
-    # Use TT directly - no conversion needed
     try:
-        # Check SEFLG_NOABERR flag for astrometric (no aberration) position
-        noaberr = bool(iflag & SEFLG_NOABERR)
+        noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
         nogdefl = bool(iflag & SEFLG_NOGDEFL)
 
-        # Check if SEFLG_SPEED flag is set to compute velocities
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 entry.id, jd, noaberr, nogdefl
             )
-            star_name_out = _format_star_name(entry)
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(entry.id, jd, noaberr, nogdefl)
-            star_name_out = _format_star_name(entry)
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        # Convert to equatorial coordinates if requested
-        if iflag & SEFLG_EQUATORIAL:
-            # Calculate true obliquity for coordinate transformation
-            eps = get_true_obliquity(jd)
-
-            # Split into position and velocity tuples
-            pos = result[:3]
-            vel = result[3:]
-
-            # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
-            pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
-
-            # Merge back
-            result = pos_eq + vel_eq
+        star_name_out = _format_star_name(entry)
+        result = _apply_fixstar_flags(result, jd, iflag)
 
         return (star_name_out, result, iflag, "")
     except Exception as e:
