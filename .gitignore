@@ -45,3 +45,6 @@ data/leb/*.leb
 *.p12
 data/leb/.DS_Store
 data/.DS_Store
+
+# Manual build output (EPUB/PDF)
+docs/build/

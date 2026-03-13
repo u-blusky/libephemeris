@@ -420,6 +420,28 @@ cmd = "python scripts/release_leb.py --version ${version} --dry-run"
 help = "Dry run: show what LEB files would be uploaded"
 args = [{name = "version", positional = true, required = true, help = "Version string (e.g. 0.22.0)"}]
 
+# Manual build — EPUB and PDF from docs/manual and docs/manual-eng
+# Requires: brew install pandoc tectonic
+[tool.poe.tasks."manual:build"]
+cmd = "python scripts/build_manual.py"
+help = "Build all manuals (EPUB + PDF, IT + EN)"
+
+[tool.poe.tasks."manual:build:epub"]
+cmd = "python scripts/build_manual.py --format epub"
+help = "Build all manuals (EPUB only)"
+
+[tool.poe.tasks."manual:build:pdf"]
+cmd = "python scripts/build_manual.py --format pdf"
+help = "Build all manuals (PDF only)"
+
+[tool.poe.tasks."manual:build:it"]
+cmd = "python scripts/build_manual.py --lang it"
+help = "Build Italian manual (EPUB + PDF)"
+
+[tool.poe.tasks."manual:build:en"]
+cmd = "python scripts/build_manual.py --lang en"
+help = "Build English manual (EPUB + PDF)"
+
 [tool.pytest.ini_options]
 markers = [
     "leb_compare: LEB vs Skyfield comparison tests (medium tier)",
