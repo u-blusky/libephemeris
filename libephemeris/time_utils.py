@@ -323,6 +323,9 @@ def date_conversion(
         >>> date_conversion(1582, 10, 5, 12.0, 'g')
         (1582, 10, 15, 12.0)
     """
+    # Accept bytes calendar (pyswisseph uses b'g'/b'j')
+    if isinstance(calendar, bytes):
+        calendar = calendar.decode("ascii")
     calendar = calendar.lower()
     if calendar not in ("j", "g"):
         raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")
@@ -348,6 +351,47 @@ def date_conversion(
 
     # Convert via Julian Day to target calendar
     return swe_revjul(jd, target_cal)
+
+
+# Dates on which a positive leap second was inserted at 23:59:60 UTC.
+# Leap seconds are always inserted at the end of June 30 or December 31.
+# Source: IERS Bulletin C / BIPM.  Last entry: 2016-12-31 (TAI-UTC = 37s).
+_LEAP_SECOND_DATES: frozenset[tuple[int, int, int]] = frozenset(
+    [
+        (1972, 6, 30),
+        (1972, 12, 31),
+        (1973, 12, 31),
+        (1974, 12, 31),
+        (1975, 12, 31),
+        (1976, 12, 31),
+        (1977, 12, 31),
+        (1978, 12, 31),
+        (1979, 12, 31),
+        (1981, 6, 30),
+        (1982, 6, 30),
+        (1983, 6, 30),
+        (1985, 6, 30),
+        (1987, 12, 31),
+        (1989, 12, 31),
+        (1990, 12, 31),
+        (1992, 6, 30),
+        (1993, 6, 30),
+        (1994, 6, 30),
+        (1995, 12, 31),
+        (1997, 6, 30),
+        (1998, 12, 31),
+        (2005, 12, 31),
+        (2008, 12, 31),
+        (2012, 6, 30),
+        (2015, 6, 30),
+        (2016, 12, 31),
+    ]
+)
+
+
+def _is_leap_second_date(year: int, month: int, day: int) -> bool:
+    """Return True if a positive leap second was inserted at the end of this date."""
+    return (year, month, day) in _LEAP_SECOND_DATES
 
 
 def utc_to_jd(
@@ -395,6 +439,20 @@ def utc_to_jd(
         >>> print(f"JD(TT): {jd_tt:.6f}, JD(UT1): {jd_ut:.6f}")
         JD(TT): 2451545.000743, JD(UT1): 2451545.000004
     """
+    # Validate leap second: second=60 is only valid at 23:59:60 on dates
+    # where a leap second was actually inserted (end of June 30 or Dec 31).
+    if second >= 60.0:
+        if hour != 23 or minute != 59:
+            raise ValueError(
+                f"invalid time (no leap second!): "
+                f"{hour:02d}:{minute:02d}:{second:05.2f}"
+            )
+        if not _is_leap_second_date(year, month, day):
+            raise ValueError(
+                f"invalid time (no leap second!): "
+                f"{hour:02d}:{minute:02d}:{second:05.2f}"
+            )
+
     ts = get_timescale()
 
     if calendar == SE_JUL_CAL:

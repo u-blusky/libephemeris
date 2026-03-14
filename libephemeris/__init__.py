@@ -579,7 +579,57 @@ julday = swe_julday
 revjul = swe_revjul
 deltat = swe_deltat
 deltat_ex = swe_deltat_ex
-# date_conversion already uses snake_case, no alias needed
+
+
+def swe_date_conversion(
+    year: int,
+    month: int,
+    day: int,
+    hour: float,
+    calendar: "str | bytes",
+) -> "tuple[bool, float, tuple[int, int, int, float]]":
+    """Convert and validate a calendar date, returning Julian Day number.
+
+    Wrapper matching pyswisseph's ``swe_date_conversion`` return convention:
+    ``(valid, jd, (year, month, day, hour))``.
+
+    Args:
+        year: Calendar year.
+        month: Month (1-12).
+        day: Day of month (1-31).
+        hour: Decimal hour (0.0-23.999...).
+        calendar: ``'g'`` / ``b'g'`` for Gregorian, ``'j'`` / ``b'j'`` for Julian.
+
+    Returns:
+        Tuple of ``(valid, jd, (year, month, day, hour))`` where *valid* is
+        ``True`` when the date exists in the requested calendar, *jd* is the
+        Julian Day number, and the inner tuple holds the (possibly normalised)
+        date components.
+    """
+    if isinstance(calendar, bytes):
+        calendar = calendar.decode("ascii")
+    cal_char = calendar.lower()
+    if cal_char not in ("j", "g"):
+        raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")
+
+    cal_flag = SE_JUL_CAL if cal_char == "j" else SE_GREG_CAL
+    jd = swe_julday(year, month, day, hour, cal_flag)
+    # Round-trip to check validity: convert JD back to calendar date
+    y2, m2, d2, h2 = swe_revjul(jd, cal_flag)
+    valid = y2 == year and m2 == month and d2 == day
+    return (valid, jd, (y2, m2, d2, h2))
+
+
+swe_day_of_week = day_of_week
+swe_utc_to_jd = utc_to_jd
+swe_jdet_to_utc = jdet_to_utc
+swe_jdut1_to_utc = jdut1_to_utc
+swe_utc_time_zone = utc_time_zone
+swe_time_equ = time_equ
+swe_lat_to_lmt = lat_to_lmt
+swe_lmt_to_lat = lmt_to_lat
+swe_sidtime = sidtime
+swe_sidtime0 = sidtime0
 
 # Planet calculation
 calc_ut = swe_calc_ut
@@ -728,16 +778,27 @@ __all__ = [
     "swe_deltat_ex",
     "deltat_ex",
     "date_conversion",
+    "swe_date_conversion",
     "day_of_week",
+    "swe_day_of_week",
     "utc_to_jd",
+    "swe_utc_to_jd",
     "jdet_to_utc",
+    "swe_jdet_to_utc",
     "jdut1_to_utc",
+    "swe_jdut1_to_utc",
     "utc_time_zone",
+    "swe_utc_time_zone",
     "time_equ",
+    "swe_time_equ",
     "lat_to_lmt",
+    "swe_lat_to_lmt",
     "lmt_to_lat",
+    "swe_lmt_to_lat",
     "sidtime",
+    "swe_sidtime",
     "sidtime0",
+    "swe_sidtime0",
     # TAI (International Atomic Time) functions
     "TT_TAI_OFFSET_SECONDS",
     "TT_TAI_OFFSET_DAYS",
