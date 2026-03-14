@@ -889,18 +889,30 @@ class TestHeliacalPhenoAlias:
     """Test swe_heliacal_pheno_ut alias."""
 
     def test_swe_alias_works(self):
-        """Test that swe_heliacal_pheno_ut is an alias for heliacal_pheno_ut."""
+        """Test that swe_heliacal_pheno_ut wrapper returns consistent data."""
         jd = julday(2024, 1, 15, 6)
         lat, lon = 41.9028, 12.4964
 
-        result1 = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
-        )
-        result2 = swe_heliacal_pheno_ut(
+        # Internal API returns (data_tuple, retflag)
+        result1, _ = heliacal_pheno_ut(
             jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
         )
 
-        assert result1 == result2
+        # Reference-compatible wrapper returns flat 50-tuple
+        geopos = (lon, lat, 0)
+        datm = (1013.25, 15.0, 50.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+        result2 = swe_heliacal_pheno_ut(
+            jd, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        )
+
+        # Both should return 50-element tuples with matching key fields
+        assert len(result1) == 50
+        assert len(result2) == 50
+        # Altitudes and azimuths should match (same body, same time)
+        assert abs(result1[0] - result2[0]) < 0.1  # AltO
+        assert abs(result1[3] - result2[3]) < 0.1  # AziO
+        assert abs(result1[20] - result2[20]) < 0.1  # Magnitude
 
 
 class TestHeliacalPhenoMoon:

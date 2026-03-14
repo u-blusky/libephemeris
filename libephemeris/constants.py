@@ -950,16 +950,41 @@ MORNING_LAST: int = SE_MORNING_LAST
 # =============================================================================
 # Flags for vis_limit_mag() and heliacal calculations
 
+SE_HELFLAG_LONG_SEARCH: int = 128  # Long search (extended search period)
+SE_HELFLAG_HIGH_PRECISION: int = 256  # High precision mode
 SE_HELFLAG_OPTICAL_PARAMS: int = 1 << 9  # 512 - Use optical instrument parameters
 SE_HELFLAG_NO_DETAILS: int = 1 << 10  # 1024 - Skip detailed calculations
-SE_HELFLAG_VISLIM_DARK: int = 1 << 11  # 2048 - Assume Sun at nadir (dark sky)
-SE_HELFLAG_VISLIM_NOMOON: int = 1 << 12  # 4096 - Exclude Moon's contribution
+SE_HELFLAG_SEARCH_1_PERIOD: int = 1 << 11  # 2048 - Search one synodic period only
+SE_HELFLAG_VISLIM_DARK: int = 1 << 12  # 4096 - Assume Sun at nadir (dark sky)
+SE_HELFLAG_VISLIM_NOMOON: int = 1 << 13  # 8192 - Exclude Moon's contribution
+SE_HELFLAG_VISLIM_PHOTOPIC: int = 1 << 14  # 16384 - Force photopic vision mode
+SE_HELFLAG_AV: int = 1 << 16  # 65536 - Arcus visionis method (VR)
+SE_HELFLAG_AVKIND_VR: int = 1 << 16  # 65536 - Alias for HELFLAG_AV
+SE_HELFLAG_AVKIND_PTO: int = 1 << 17  # 131072 - Ptolemy method
+SE_HELFLAG_AVKIND_MIN7: int = 1 << 18  # 262144 - Babylonian method (min 7°)
+SE_HELFLAG_AVKIND_MIN9: int = 1 << 19  # 524288 - Babylonian method (min 9°)
+SE_HELFLAG_AVKIND: int = (  # 983040 - Mask for all AV kind bits
+    SE_HELFLAG_AVKIND_VR
+    | SE_HELFLAG_AVKIND_PTO
+    | SE_HELFLAG_AVKIND_MIN7
+    | SE_HELFLAG_AVKIND_MIN9
+)
 
 # reference API-compatible aliases (without SE_ prefix)
+HELFLAG_LONG_SEARCH: int = SE_HELFLAG_LONG_SEARCH
+HELFLAG_HIGH_PRECISION: int = SE_HELFLAG_HIGH_PRECISION
 HELFLAG_OPTICAL_PARAMS: int = SE_HELFLAG_OPTICAL_PARAMS
 HELFLAG_NO_DETAILS: int = SE_HELFLAG_NO_DETAILS
+HELFLAG_SEARCH_1_PERIOD: int = SE_HELFLAG_SEARCH_1_PERIOD
 HELFLAG_VISLIM_DARK: int = SE_HELFLAG_VISLIM_DARK
 HELFLAG_VISLIM_NOMOON: int = SE_HELFLAG_VISLIM_NOMOON
+HELFLAG_VISLIM_PHOTOPIC: int = SE_HELFLAG_VISLIM_PHOTOPIC
+HELFLAG_AV: int = SE_HELFLAG_AV
+HELFLAG_AVKIND_VR: int = SE_HELFLAG_AVKIND_VR
+HELFLAG_AVKIND_PTO: int = SE_HELFLAG_AVKIND_PTO
+HELFLAG_AVKIND_MIN7: int = SE_HELFLAG_AVKIND_MIN7
+HELFLAG_AVKIND_MIN9: int = SE_HELFLAG_AVKIND_MIN9
+HELFLAG_AVKIND: int = SE_HELFLAG_AVKIND
 
 # Visibility result codes for vis_limit_mag()
 SE_HELFLAG_BELOW_HORIZON: int = -2  # Object is below horizon

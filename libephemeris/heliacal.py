@@ -2069,13 +2069,14 @@ def heliacal_pheno_ut(
     # Geocentric arcus visionis
     arcv_act = geo_alt_deg - sun_alt_deg
 
-    # Azimuth difference
+    # Azimuth difference (absolute value, matching reference API convention)
     daz_act = body_az_deg - sun_az_deg
     # Normalize to -180 to +180
     while daz_act > 180:
         daz_act -= 360
     while daz_act < -180:
         daz_act += 360
+    daz_act = abs(daz_act)
 
     # Get elongation (longitude difference) from Sun
     # For fixed stars, always calculate manually since swe_pheno_ut doesn't support them
@@ -2090,13 +2091,17 @@ def heliacal_pheno_ut(
             pheno, _ = swe_pheno_ut(jd, body, flags)
             elongation = pheno[2]  # Elongation
             magnitude = pheno[4]  # Visual magnitude
-            phase_angle = pheno[1]  # Phase angle
+            phase_angle = pheno[0]  # Phase angle (index 0, not 1)
         except Exception:
             # Calculate elongation manually
             sun_geo = earth.at(t).observe(sun).apparent()
             elongation = body_geo.separation_from(sun_geo).degrees
             magnitude = 0.0
             phase_angle = 0.0
+
+    # ARCLact: actual arc length between body and Sun in horizontal coords
+    # Computed as great-circle distance: sqrt(ARCV² + DAZ²)
+    arcl_act = math.sqrt(arcv_act**2 + daz_act**2)
 
     # Use Schaefer model for extinction and arcus visionis
     schaefer = create_schaefer_model(
@@ -2180,10 +2185,16 @@ def heliacal_pheno_ut(
     else:
         tvis_vr = 0.0
 
+    # Illumination percentage for all bodies
+    # For planets: (1 + cos(phase_angle)) / 2 * 100
+    if not is_star and phase_angle > 0:
+        illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
+    else:
+        illumination = 0.0
+
     # For Moon-specific calculations
     w_moon = 0.0  # Crescent width
     l_moon = 0.0  # Crescent length
-    illumination = 0.0
 
     if body == SE_MOON:
         # Calculate Moon phase and crescent geometry
@@ -2254,7 +2265,7 @@ def heliacal_pheno_ut(
     dret[6] = tav_act  # TAVact - topocentric arcus visionis
     dret[7] = arcv_act  # ARCVact - geocentric arcus visionis
     dret[8] = daz_act  # DAZact - azimuth difference
-    dret[9] = elongation  # ARCLact - elongation from Sun
+    dret[9] = arcl_act  # ARCLact - actual arc distance between body and Sun
     dret[10] = k_act  # kact - extinction coefficient
     dret[11] = min_tav  # minTAV - minimum topocentric arcus visionis
     dret[12] = t_first_vr  # TfirstVR - first visibility time
@@ -2278,8 +2289,66 @@ def heliacal_pheno_ut(
     return tuple(dret), flags
 
 
-# Alias for reference API compatibility
-swe_heliacal_pheno_ut = heliacal_pheno_ut
+def swe_heliacal_pheno_ut(
+    jd: float,
+    geopos: tuple,
+    datm: tuple,
+    dobs: tuple,
+    object_name: str,
+    event_type: int,
+    hel_flag: int = SEFLG_SWIEPH,
+) -> Tuple[float, ...]:
+    """
+    Provides data relevant for the calculation of heliacal risings and settings.
+
+    This is the reference-compatible wrapper around heliacal_pheno_ut(). It
+    accepts the same parameter layout as pyswisseph's swe_heliacal_pheno_ut
+    and returns a flat 50-element tuple.
+
+    Args:
+        jd: Julian Day (UT) for the calculation
+        geopos: Geographic position (lon, lat, alt_m)
+        datm: Atmospheric conditions (pressure, temperature, humidity%, met_range)
+        dobs: Observer description (age, snellen, binocular, mag, aperture, transmission)
+        object_name: Name of planet or fixed star (e.g., "Venus", "Sirius")
+        event_type: Type of heliacal event (1-4)
+        hel_flag: Calculation flags
+
+    Returns:
+        Flat tuple of 50 floats with heliacal phenomena data.
+    """
+    # Parse geopos
+    lon = geopos[0] if len(geopos) > 0 else 0.0
+    lat = geopos[1] if len(geopos) > 1 else 0.0
+    altitude = geopos[2] if len(geopos) > 2 else 0.0
+
+    # Parse datm with defaults
+    pressure = datm[0] if len(datm) > 0 and datm[0] > 0 else 1013.25
+    temperature = datm[1] if len(datm) > 1 else 15.0
+    humidity_pct = datm[2] if len(datm) > 2 else 40.0
+
+    # Convert humidity from percent to 0-1 range
+    humidity = humidity_pct / 100.0 if humidity_pct > 1.0 else humidity_pct
+
+    # Parse object name to body ID
+    body_id = _parse_object_name(object_name)
+
+    # Call internal function
+    dret, retflag = heliacal_pheno_ut(
+        jd=jd,
+        lat=lat,
+        lon=lon,
+        altitude=altitude,
+        pressure=pressure,
+        temperature=temperature,
+        humidity=humidity,
+        body=body_id,
+        event_type=event_type,
+        flags=hel_flag,
+    )
+
+    # Return flat 50-tuple (matching reference API)
+    return dret
 
 
 def vis_limit_mag(
@@ -2552,7 +2621,7 @@ def vis_limit_mag(
     # Check if object is below horizon
     if obj_alt < 0:
         # Match reference API: return all zeros in data when below horizon
-        dret = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        dret = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         return SE_HELFLAG_BELOW_HORIZON, dret
 
     # Apply HELFLAG options
@@ -2624,7 +2693,7 @@ def vis_limit_mag(
     else:
         vision_type = SE_HELFLAG_SCOTOPIC
 
-    # Build result tuple
+    # Build result tuple (10 elements to match reference API)
     dret = (
         limiting_mag,  # 0: Limiting visual magnitude
         obj_alt,  # 1: Altitude of object
@@ -2634,6 +2703,8 @@ def vis_limit_mag(
         moon_alt,  # 5: Altitude of Moon
         moon_az,  # 6: Azimuth of Moon
         apparent_obj_mag,  # 7: Apparent magnitude of object (with extinction)
+        0.0,  # 8: Reserved
+        0.0,  # 9: Reserved
     )
 
     return vision_type, dret
