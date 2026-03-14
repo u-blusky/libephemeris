@@ -39,6 +39,7 @@ References:
     - Landscheidt: "Cosmic Cybernetics" (1973)
 """
 
+import erfa
 import math
 import re
 from dataclasses import dataclass, field
@@ -734,27 +735,29 @@ TRANSPLUTO_KEPLERIAN_ELEMENTS = TransplutoKeplerianElements(
 @dataclass
 class UranianKeplerianElements:
     """
-    Unified Keplerian orbital elements for Uranian (Hamburg School) planets.
+    Keplerian orbital elements for Uranian (Hamburg School) planets.
 
-    This dataclass supports both circular orbits (e=0) and elliptic orbits
-    with small eccentricity. For circular orbits, M0 represents the mean
-    longitude at epoch; for elliptic orbits, it represents the mean anomaly.
+    All eight Hamburg School planets use these elements with full Keplerian
+    propagation including Kepler's equation, Gaussian (PQR) vector
+    transformation, and equinox precession to J2000.
 
     Attributes:
         name: Name of the hypothetical body
         epoch: Reference epoch (Julian Day TT)
+        equinox_jd: Equinox epoch for coordinate frame (Julian Day TT)
         a: Semi-major axis (AU)
         e: Eccentricity (0 for circular orbits)
-        i: Inclination (degrees)
-        omega: Argument of perihelion (degrees)
-        Omega: Longitude of ascending node (degrees)
-        M0: Mean anomaly at epoch (degrees) - for circular orbits, this is
-            the mean longitude since omega=Omega=0
-        n: Mean motion (degrees per day)
+        i: Inclination (degrees, in equinox frame)
+        omega: Argument of perihelion (degrees, in equinox frame)
+        Omega: Longitude of ascending node (degrees, in equinox frame)
+        M0: Mean anomaly at epoch (degrees)
+        n: Mean motion (degrees per day) - from Gaussian gravitational
+            constant: n = 0.9856076686 / a^1.5
     """
 
     name: str
     epoch: float
+    equinox_jd: float
     a: float
     e: float
     i: float
@@ -765,103 +768,122 @@ class UranianKeplerianElements:
 
 
 # Unified dictionary of all Uranian planet Keplerian elements
-# All elements use J1900.0 (JD 2415020.0) as epoch, matching the orbital elements data
+# All elements use J1900.0 (JD 2415020.0) as epoch and equinox.
 #
-# IMPORTANT: The simplified propagation model for Uranian planets uses:
-#   - Longitude: L = L0 + n*t (linear mean longitude propagation)
-#   - Latitude: lat = i * sin(L - Omega) (oscillation from inclination)
-#   - Distance: approximately a (semi-major axis with small e variations)
+# Full Keplerian propagation model:
+#   1. Propagate mean anomaly: M = M0 + n*(t - t0) where n = K_GAUSS_DEG/a^1.5
+#   2. Solve Kepler's equation: M = E - e*sin(E) -> eccentric anomaly E
+#   3. Position in orbital plane: x = a*(cosE - e), y = a*sqrt(1-e²)*sinE
+#   4. Transform via Gaussian vectors (PQR matrix) to ecliptic in equinox frame
+#   5. Rotate ecliptic -> equatorial at equinox obliquity
+#   6. Precess equatorial from equinox to J2000
+#   7. Rotate equatorial -> ecliptic at J2000 obliquity
 #
-# The L0 and n values are derived from Witte/Sieggrun 1928 ephemeris tables.
-# Orbital elements (a, e, i, omega, Omega) from the orbital elements data (Witte/Sieggruen refined by James Neely)
+# Orbital elements: Witte/Sieggruen, refined by James Neely
+# M0 values are MEAN ANOMALY at epoch (not mean longitude)
+#
+# Gaussian gravitational constant: k = 0.01720209895 rad/day
+# -> daily motion = 0.9856076686 deg/day / a^1.5
+
+# Gaussian gravitational constant squared, in degrees/day per AU^1.5
+_K_GAUSS_DEG: float = 0.9856076686
+
 URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
     SE_CUPIDO: UranianKeplerianElements(
         name="Cupido",
         epoch=2415020.0,  # J1900.0
-        a=40.99837,  # Semi-major axis from orbital elements data
-        e=0.00460,  # Eccentricity from orbital elements data
-        i=1.0833,  # Inclination from orbital elements data
-        omega=171.4333,  # Argument of perihelion from orbital elements data
-        Omega=129.8325,  # Longitude of ascending node from orbital elements data
-        M0=105.301693,  # Mean longitude (L0) at J1900 (Witte/Sieggrun 1928)
-        n=0.0037945179,  # Mean motion deg/day (Kepler's 3rd law, a=40.99837 AU)
+        equinox_jd=2415020.0,  # J1900.0
+        a=40.99837,
+        e=0.00460,
+        i=1.0833,
+        omega=171.4333,
+        Omega=129.8325,
+        M0=163.7409,  # Mean anomaly at J1900 (from orbital data)
+        n=_K_GAUSS_DEG / 40.99837**1.5,
     ),
     SE_HADES: UranianKeplerianElements(
         name="Hades",
         epoch=2415020.0,  # J1900.0
-        a=50.66744,  # Semi-major axis from orbital elements data
-        e=0.00245,  # Eccentricity from orbital elements data
-        i=1.0500,  # Inclination from orbital elements data
-        omega=148.1796,  # Argument of perihelion from orbital elements data
-        Omega=161.3339,  # Longitude of ascending node from orbital elements data
-        M0=336.363662,  # Mean longitude (L0) at J1900 (Witte/Sieggrun 1928)
-        n=0.0027875901,  # Mean motion deg/day (Kepler's 3rd law, a=50.66744 AU)
+        equinox_jd=2415020.0,  # J1900.0
+        a=50.66744,
+        e=0.00245,
+        i=1.0500,
+        omega=148.1796,
+        Omega=161.3339,
+        M0=27.6496,  # Mean anomaly at J1900 (from orbital data)
+        n=_K_GAUSS_DEG / 50.66744**1.5,
     ),
     SE_ZEUS: UranianKeplerianElements(
         name="Zeus",
         epoch=2415020.0,  # J1900.0
-        a=59.21436,  # Semi-major axis from orbital elements data
-        e=0.00120,  # Eccentricity from orbital elements data
-        i=0.0,  # Inclination from orbital elements data
-        omega=299.0440,  # Argument of perihelion from orbital elements data
-        Omega=0.0,  # Longitude of ascending node from orbital elements data
-        M0=104.289095,  # Mean longitude (L0) at J1900 (Witte/Sieggrun 1928)
-        n=0.0022203750,  # Mean motion deg/day (Kepler's 3rd law, a=59.21436 AU)
+        equinox_jd=2415020.0,  # J1900.0
+        a=59.21436,
+        e=0.00120,
+        i=0.0,
+        omega=299.0440,
+        Omega=0.0,
+        M0=165.1232,  # Mean anomaly at J1900 (from orbital data)
+        n=_K_GAUSS_DEG / 59.21436**1.5,
     ),
     SE_KRONOS: UranianKeplerianElements(
         name="Kronos",
         epoch=2415020.0,  # J1900.0
-        a=64.81690,  # Semi-major axis from orbital elements data
-        e=0.00305,  # Eccentricity from orbital elements data
-        i=0.0,  # Inclination from orbital elements data
-        omega=208.8801,  # Argument of perihelion from orbital elements data
-        Omega=0.0,  # Longitude of ascending node from orbital elements data
-        M0=17.111353,  # Mean longitude (L0) at J1900 (Witte/Sieggrun 1928)
-        n=0.0019351856,  # Mean motion deg/day (Kepler's 3rd law, a=64.81690 AU)
+        equinox_jd=2415020.0,  # J1900.0
+        a=64.81690,
+        e=0.00305,
+        i=0.0,
+        omega=208.8801,
+        Omega=0.0,
+        M0=169.0193,  # Mean anomaly at J1900 (from orbital data)
+        n=_K_GAUSS_DEG / 64.81690**1.5,
     ),
     SE_APOLLON: UranianKeplerianElements(
         name="Apollon",
         epoch=2415020.0,  # J1900.0
-        a=70.29949,  # Semi-major axis from orbital elements data
-        e=0.00,  # Eccentricity from orbital elements data (circular)
-        i=0.0,  # Inclination from orbital elements data
-        omega=0.0,  # Argument of perihelion from orbital elements data
-        Omega=0.0,  # Longitude of ascending node from orbital elements data
-        M0=138.565328,  # Mean longitude (L0) at J1900 (Witte/Sieggrun 1928)
-        n=0.0017177599,  # Mean motion deg/day (Kepler's 3rd law, a=70.29949 AU)
+        equinox_jd=2415020.0,  # J1900.0
+        a=70.29949,
+        e=0.00000,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=138.0533,  # Mean anomaly at J1900 (from orbital data)
+        n=_K_GAUSS_DEG / 70.29949**1.5,
     ),
     SE_ADMETOS: UranianKeplerianElements(
         name="Admetos",
         epoch=2415020.0,  # J1900.0
-        a=73.62765,  # Semi-major axis from orbital elements data
-        e=0.00,  # Eccentricity from orbital elements data (circular)
-        i=0.0,  # Inclination from orbital elements data
-        omega=0.0,  # Argument of perihelion from orbital elements data
-        Omega=0.0,  # Longitude of ascending node from orbital elements data
-        M0=350.613913,  # Mean longitude (L0) at J1900 (Witte/Sieggrun 1928)
-        n=0.0016016766,  # Mean motion deg/day (Kepler's 3rd law, a=73.62765 AU)
+        equinox_jd=2415020.0,  # J1900.0
+        a=73.62765,
+        e=0.00000,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=351.3350,  # Mean anomaly at J1900 (from orbital data)
+        n=_K_GAUSS_DEG / 73.62765**1.5,
     ),
     SE_VULKANUS: UranianKeplerianElements(
         name="Vulkanus",
         epoch=2415020.0,  # J1900.0
-        a=77.25568,  # Semi-major axis from orbital elements data
-        e=0.00,  # Eccentricity from orbital elements data (circular)
-        i=0.0,  # Inclination from orbital elements data
-        omega=0.0,  # Argument of perihelion from orbital elements data
-        Omega=0.0,  # Longitude of ascending node from orbital elements data
-        M0=55.397715,  # Mean longitude (L0) at J1900 (Witte/Sieggrun 1928)
-        n=0.0015069325,  # Mean motion deg/day (Kepler's 3rd law, a=77.25568 AU)
+        equinox_jd=2415020.0,  # J1900.0
+        a=77.25568,
+        e=0.00000,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=55.8983,  # Mean anomaly at J1900 (from orbital data)
+        n=_K_GAUSS_DEG / 77.25568**1.5,
     ),
     SE_POSEIDON: UranianKeplerianElements(
         name="Poseidon",
         epoch=2415020.0,  # J1900.0
-        a=83.66907,  # Semi-major axis from orbital elements data
-        e=0.00,  # Eccentricity from orbital elements data (circular)
-        i=0.0,  # Inclination from orbital elements data
-        omega=0.0,  # Argument of perihelion from orbital elements data
-        Omega=0.0,  # Longitude of ascending node from orbital elements data
-        M0=166.140256,  # Mean longitude (L0) at J1900 (Witte/Sieggrun 1928)
-        n=0.0013256078,  # Mean motion deg/day (Kepler's 3rd law, a=83.66907 AU)
+        equinox_jd=2415020.0,  # J1900.0
+        a=83.66907,
+        e=0.00000,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=165.5163,  # Mean anomaly at J1900 (from orbital data)
+        n=_K_GAUSS_DEG / 83.66907**1.5,
     ),
 }
 
@@ -2659,23 +2681,154 @@ def _calc_transpluto_raw(jd_tt: float) -> Tuple[float, float, float]:
     return (longitude, latitude, distance)
 
 
+# J2000.0 epoch Julian Day for precession calculations
+_J2000_JD: float = 2451545.0
+
+
+def _keplerian_to_ecliptic_j2000(
+    elements: UranianKeplerianElements, jd_tt: float
+) -> Tuple[float, float, float]:
+    """
+    Full Keplerian propagation with equinox precession to J2000 ecliptic frame.
+
+    Implements the standard celestial mechanics algorithm for propagating
+    orbital elements:
+
+    1. Propagate mean anomaly from epoch using Gaussian gravitational constant
+    2. Solve Kepler's equation (Newton-Raphson) for eccentric anomaly E
+    3. Compute position in orbital plane: x = a*(cosE - e), y = a*sqrt(1-e^2)*sinE
+    4. Apply Gaussian vectors (PQR matrix) to transform to ecliptic Cartesian
+       coordinates in the equinox reference frame
+    5. If equinox != J2000: rotate ecliptic -> equatorial at equinox obliquity,
+       precess equatorial from equinox epoch to J2000, then rotate back to
+       ecliptic J2000
+
+    This algorithm matches standard Keplerian orbit propagation as described
+    in Meeus "Astronomical Algorithms" Ch. 33 and other celestial mechanics
+    references.
+
+    Args:
+        elements: Orbital elements including equinox information
+        jd_tt: Julian Day in Terrestrial Time
+
+    Returns:
+        Tuple of (longitude_deg, latitude_deg, distance_AU) in J2000 ecliptic
+    """
+    # Time since epoch in days
+    dt = jd_tt - elements.epoch
+
+    # Mean anomaly at date (radians)
+    M_deg = (elements.M0 + elements.n * dt) % 360.0
+    M_rad = math.radians(M_deg)
+
+    # Solve Kepler's equation: M = E - e*sin(E)
+    e = elements.e
+    if e < 1e-10:
+        # Circular orbit: E = M, no need to solve
+        E = M_rad
+    else:
+        E = _solve_kepler_equation(M_rad, e)
+
+    # Position in orbital plane (Cartesian, origin at focus)
+    cos_E = math.cos(E)
+    sin_E = math.sin(E)
+    fac = math.sqrt((1.0 - e) * (1.0 + e))  # sqrt(1 - e^2), numerically stable
+
+    x_orb = elements.a * (cos_E - e)
+    y_orb = elements.a * fac * sin_E
+
+    # Gaussian vectors (PQR matrix) - standard orbital mechanics
+    # Transforms from orbital plane to ecliptic Cartesian in the equinox frame
+    # Reference: Meeus "Astronomical Algorithms", Ch. 33
+    omega_rad = math.radians(elements.omega)
+    Omega_rad = math.radians(elements.Omega)
+    incl_rad = math.radians(elements.i)
+
+    cos_omega = math.cos(omega_rad)
+    sin_omega = math.sin(omega_rad)
+    cos_Omega = math.cos(Omega_rad)
+    sin_Omega = math.sin(Omega_rad)
+    cos_incl = math.cos(incl_rad)
+    sin_incl = math.sin(incl_rad)
+
+    # PQR matrix elements (Gaussian vectors)
+    # P = direction of perihelion, Q = 90 degrees ahead in orbit
+    Px = cos_omega * cos_Omega - sin_omega * cos_incl * sin_Omega
+    Qx = -sin_omega * cos_Omega - cos_omega * cos_incl * sin_Omega
+    Py = cos_omega * sin_Omega + sin_omega * cos_incl * cos_Omega
+    Qy = -sin_omega * sin_Omega + cos_omega * cos_incl * cos_Omega
+    Pz = sin_omega * sin_incl
+    Qz = cos_omega * sin_incl
+
+    # Ecliptic Cartesian in equinox frame
+    x_ecl = Px * x_orb + Qx * y_orb
+    y_ecl = Py * x_orb + Qy * y_orb
+    z_ecl = Pz * x_orb + Qz * y_orb
+
+    # If equinox != J2000, transform to J2000 frame via precession
+    tequ = elements.equinox_jd
+    if abs(tequ - _J2000_JD) > 1e-6:
+        # Step 1: Ecliptic -> equatorial at equinox epoch obliquity
+        # Rotation around x-axis by -eps (ecliptic to equator)
+        eps = float(erfa.obl06(_J2000_JD, tequ - _J2000_JD))
+        cos_eps = math.cos(eps)
+        sin_eps = math.sin(eps)
+
+        x_eq = x_ecl
+        y_eq = y_ecl * cos_eps - z_ecl * sin_eps
+        z_eq = y_ecl * sin_eps + z_ecl * cos_eps
+
+        # Step 2: Precess equatorial from equinox epoch to J2000
+        # erfa.pmat06 gives the rotation matrix FROM J2000 TO date.
+        # To go from date TO J2000, apply the transpose (inverse of rotation).
+        P = erfa.pmat06(_J2000_JD, tequ - _J2000_JD)
+        # P^T maps date -> J2000
+        x_j2000 = P[0][0] * x_eq + P[1][0] * y_eq + P[2][0] * z_eq
+        y_j2000 = P[0][1] * x_eq + P[1][1] * y_eq + P[2][1] * z_eq
+        z_j2000 = P[0][2] * x_eq + P[1][2] * y_eq + P[2][2] * z_eq
+
+        # Step 3: Equatorial J2000 -> ecliptic J2000
+        # Rotation around x-axis by +eps_j2000 (equator to ecliptic)
+        eps_j2000 = float(erfa.obl06(_J2000_JD, 0.0))
+        cos_eps0 = math.cos(eps_j2000)
+        sin_eps0 = math.sin(eps_j2000)
+
+        x_ecl_final = x_j2000
+        y_ecl_final = y_j2000 * cos_eps0 + z_j2000 * sin_eps0
+        z_ecl_final = -y_j2000 * sin_eps0 + z_j2000 * cos_eps0
+    else:
+        x_ecl_final = x_ecl
+        y_ecl_final = y_ecl
+        z_ecl_final = z_ecl
+
+    # Cartesian -> spherical coordinates
+    r = math.sqrt(x_ecl_final**2 + y_ecl_final**2 + z_ecl_final**2)
+    longitude = math.degrees(math.atan2(y_ecl_final, x_ecl_final)) % 360.0
+    if r > 0:
+        sin_lat = max(-1.0, min(1.0, z_ecl_final / r))
+        latitude = math.degrees(math.asin(sin_lat))
+    else:
+        latitude = 0.0
+
+    return (longitude, latitude, r)
+
+
 def calc_uranian_planet(
     body_id: int, jd_tt: float
 ) -> Tuple[float, float, float, float, float, float]:
     """
-    Calculate the position of any Uranian planet using Keplerian propagation.
+    Calculate the position of any Uranian planet using full Keplerian propagation.
 
-    This generic function handles all eight Hamburg School Uranian planets
-    (Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon) by
-    looking up their orbital elements from the URANIAN_KEPLERIAN_ELEMENTS
-    dictionary and using the simplified propagation model.
+    Handles all eight Hamburg School Uranian planets (Cupido, Hades, Zeus,
+    Kronos, Apollon, Admetos, Vulkanus, Poseidon) using proper Keplerian
+    orbit propagation with:
 
-    The simplified propagation model for Uranian planets uses:
-        - Longitude: L = L0 + n*t (linear mean longitude propagation)
-        - Latitude: lat = i * sin(L - Omega) (oscillation from inclination)
-        - Distance: semi-major axis (with small eccentricity variations)
+    - Mean anomaly propagation using Gaussian gravitational constant
+    - Kepler's equation solving (Newton-Raphson iteration)
+    - Gaussian vector (PQR) transformation to ecliptic coordinates
+    - Equinox precession from J1900 coordinate frame to J2000
 
-    This produces accurate results for the 1900-2100 range.
+    Velocity is computed via central-difference numerical differentiation.
 
     Args:
         body_id: Uranian planet ID (SE_CUPIDO through SE_POSEIDON, i.e., 40-47)
@@ -2683,8 +2836,8 @@ def calc_uranian_planet(
 
     Returns:
         Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
-            - longitude: Ecliptic longitude in degrees (0-360)
-            - latitude: Ecliptic latitude in degrees
+            - longitude: Ecliptic longitude in degrees (0-360), J2000 frame
+            - latitude: Ecliptic latitude in degrees, J2000 frame
             - distance: Distance from Sun in AU
             - dlon: Daily longitude change in degrees/day
             - dlat: Daily latitude change in degrees/day
@@ -2706,43 +2859,24 @@ def calc_uranian_planet(
 
     elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
 
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
+    # Position at requested time
+    pos = _keplerian_to_ecliptic_j2000(elements, jd_tt)
+    longitude, latitude, distance = pos
 
-    # Simplified model: linear mean longitude propagation
-    # L = L0 + n*t
-    longitude = (elements.M0 + elements.n * dt) % 360.0
+    # Velocity via central-difference numerical differentiation
+    dt_step = 1.0  # 1 day step for daily velocity
+    pos_prev = _keplerian_to_ecliptic_j2000(elements, jd_tt - dt_step)
+    pos_next = _keplerian_to_ecliptic_j2000(elements, jd_tt + dt_step)
 
-    # For planets with inclination, latitude oscillates as: lat = i * sin(L - Omega)
-    # For planets on the ecliptic (i=0), latitude is 0
-    if elements.i != 0.0:
-        lat_arg = longitude - elements.Omega
-        latitude = elements.i * math.sin(math.radians(lat_arg))
-    else:
-        latitude = 0.0
+    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
+    # Handle wrap-around at 0/360 boundary
+    if dlon > 180.0:
+        dlon -= 360.0
+    elif dlon < -180.0:
+        dlon += 360.0
 
-    # Distance: semi-major axis (constant for e=0, small variation for e>0)
-    # For the simplified model, we use the semi-major axis
-    distance = elements.a
-
-    # Velocity: dlon = n (constant), dlat oscillates, ddist ≈ 0
-    dlon = elements.n
-
-    # dlat = d/dt[i * sin(L - Omega)] = i * cos(L - Omega) * dL/dt = i * cos(lat_arg) * n
-    if elements.i != 0.0:
-        lat_arg = longitude - elements.Omega
-        dlat = (
-            elements.i
-            * math.cos(math.radians(lat_arg))
-            * elements.n
-            * (math.pi / 180.0)
-        )
-        # Convert from radians to degrees: the sin derivative gives radians, we want deg/day
-        dlat = elements.i * math.cos(math.radians(lat_arg)) * (elements.n / 57.29577951)
-    else:
-        dlat = 0.0
-
-    ddist = 0.0
+    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
+    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 
@@ -2751,13 +2885,8 @@ def _calc_uranian_planet_raw(body_id: int, jd_tt: float) -> Tuple[float, float, 
     """
     Calculate raw Uranian planet position without velocity (helper for differentiation).
 
-    This internal helper function calculates only position (no velocity) for use
-    in numerical differentiation to compute velocities.
-
-    Uses the simplified propagation model:
-        - Longitude: L = L0 + n*t (linear mean longitude propagation)
-        - Latitude: lat = i * sin(L - Omega) (oscillation from inclination)
-        - Distance: semi-major axis
+    Uses full Keplerian propagation with Gaussian vectors and equinox precession
+    to J2000.
 
     Args:
         body_id: Uranian planet ID
@@ -2767,24 +2896,7 @@ def _calc_uranian_planet_raw(body_id: int, jd_tt: float) -> Tuple[float, float, 
         Tuple of (longitude, latitude, distance)
     """
     elements = URANIAN_KEPLERIAN_ELEMENTS[body_id]
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # Simplified model: linear mean longitude propagation
-    longitude = (elements.M0 + elements.n * dt) % 360.0
-
-    # Latitude from inclination: lat = i * sin(L - Omega)
-    if elements.i != 0.0:
-        lat_arg = longitude - elements.Omega
-        latitude = elements.i * math.sin(math.radians(lat_arg))
-    else:
-        latitude = 0.0
-
-    # Distance: semi-major axis
-    distance = elements.a
-
-    return (longitude, latitude, distance)
+    return _keplerian_to_ecliptic_j2000(elements, jd_tt)
 
 
 def calc_vulcan(jd_tt: float) -> Tuple[float, float, float, float, float, float]:

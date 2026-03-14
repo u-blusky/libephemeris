@@ -1807,23 +1807,143 @@ def _calc_body(
     # Handle Uranian planets (Hamburg School hypothetical bodies, IDs 40-47)
     if SE_CUPIDO <= ipl <= SE_POSEIDON:
         from . import hypothetical
+        from skyfield.framelib import ecliptic_J2000_frame
 
         jd_tt = t.tt
-        # Use calc_uranian_planet() which uses Keplerian orbital elements
-        # for Keplerian orbital element-based Uranian planet calculations
-        pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
-        pos = _maybe_equatorial_convert(pos, jd_tt, iflag)
-        return _to_native_floats(pos), iflag
+        is_helio = bool(iflag & SEFLG_HELCTR)
+        is_j2000 = bool(iflag & SEFLG_J2000)
+
+        if is_helio:
+            # Heliocentric: calc_uranian_planet returns heliocentric J2000 ecliptic
+            pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
+            lon, lat, dist = pos[0], pos[1], pos[2]
+            dlon, dlat, ddist = pos[3], pos[4], pos[5]
+            if not is_j2000:
+                from .astrometry import _precess_ecliptic
+
+                lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+            result = (lon, lat, dist, dlon, dlat, ddist)
+            # Strip J2000 flag since we already handled precession
+            result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
+            return _to_native_floats(result), iflag
+
+        # Geocentric: convert heliocentric J2000 ecliptic to geocentric
+        def _get_uranian_geo_j2000(jd):
+            """Geocentric J2000 ecliptic position for a Uranian body."""
+            h = hypothetical.calc_uranian_planet(ipl, jd)
+            lon_r = math.radians(h[0])
+            lat_r = math.radians(h[1])
+            cl = math.cos(lat_r)
+            xh = h[2] * cl * math.cos(lon_r)
+            yh = h[2] * cl * math.sin(lon_r)
+            zh = h[2] * math.sin(lat_r)
+
+            ts_i = get_timescale()
+            t_i = ts_i.tt_jd(jd)
+            earth_h = planets["sun"].at(t_i).observe(planets["earth"])
+            exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
+
+            xg = xh - float(exyz[0])
+            yg = yh - float(exyz[1])
+            zg = zh - float(exyz[2])
+            rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+            lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
+            sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
+            lat_g = math.degrees(math.asin(sin_lat))
+            return lon_g, lat_g, rg
+
+        lon, lat, dist = _get_uranian_geo_j2000(jd_tt)
+
+        # Velocity via central difference (geocentric J2000)
+        dt_v = 1.0  # 1 day
+        prev = _get_uranian_geo_j2000(jd_tt - dt_v)
+        nxt = _get_uranian_geo_j2000(jd_tt + dt_v)
+        dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
+        if dlon > 180.0:
+            dlon -= 360.0
+        elif dlon < -180.0:
+            dlon += 360.0
+        dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
+        ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+
+        # Precess J2000 -> ecliptic of date (unless J2000 output requested)
+        if not is_j2000:
+            from .astrometry import _precess_ecliptic
+
+            lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
+        result = (lon, lat, dist, dlon, dlat, ddist)
+        # Strip J2000 flag since we already handled precession
+        result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
+        return _to_native_floats(result), iflag
 
     # Handle Transpluto (Isis) - hypothetical trans-Plutonian planet (ID 48)
     if ipl == SE_ISIS:
         from . import hypothetical
+        from skyfield.framelib import ecliptic_J2000_frame
 
         jd_tt = t.tt
-        # Use calc_transpluto() which uses Keplerian orbital elements
-        pos = hypothetical.calc_transpluto(jd_tt)
-        pos = _maybe_equatorial_convert(pos, jd_tt, iflag)
-        return _to_native_floats(pos), iflag
+        is_helio = bool(iflag & SEFLG_HELCTR)
+        is_j2000 = bool(iflag & SEFLG_J2000)
+
+        if is_helio:
+            pos = hypothetical.calc_transpluto(jd_tt)
+            lon, lat, dist = pos[0], pos[1], pos[2]
+            dlon, dlat, ddist = pos[3], pos[4], pos[5]
+            if not is_j2000:
+                from .astrometry import _precess_ecliptic
+
+                lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+            result = (lon, lat, dist, dlon, dlat, ddist)
+            result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
+            return _to_native_floats(result), iflag
+
+        # Geocentric conversion
+        def _get_transpluto_geo_j2000(jd):
+            """Geocentric J2000 ecliptic position for Transpluto."""
+            h = hypothetical.calc_transpluto(jd)
+            lon_r = math.radians(h[0])
+            lat_r = math.radians(h[1])
+            cl = math.cos(lat_r)
+            xh = h[2] * cl * math.cos(lon_r)
+            yh = h[2] * cl * math.sin(lon_r)
+            zh = h[2] * math.sin(lat_r)
+
+            ts_i = get_timescale()
+            t_i = ts_i.tt_jd(jd)
+            earth_h = planets["sun"].at(t_i).observe(planets["earth"])
+            exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
+
+            xg = xh - float(exyz[0])
+            yg = yh - float(exyz[1])
+            zg = zh - float(exyz[2])
+            rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+            lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
+            sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
+            lat_g = math.degrees(math.asin(sin_lat))
+            return lon_g, lat_g, rg
+
+        lon, lat, dist = _get_transpluto_geo_j2000(jd_tt)
+
+        dt_v = 1.0
+        prev = _get_transpluto_geo_j2000(jd_tt - dt_v)
+        nxt = _get_transpluto_geo_j2000(jd_tt + dt_v)
+        dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
+        if dlon > 180.0:
+            dlon -= 360.0
+        elif dlon < -180.0:
+            dlon += 360.0
+        dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
+        ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+
+        if not is_j2000:
+            from .astrometry import _precess_ecliptic
+
+            lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
+        result = (lon, lat, dist, dlon, dlat, ddist)
+        result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
+        return _to_native_floats(result), iflag
 
     # Handle minor bodies (asteroids and TNOs)
     # Strategy: try to get a type21 VectorFunction target so we can route

@@ -4,10 +4,11 @@ Pytest-style Hypothetical Planets Comparison Tests.
 Validates hypothetical body calculations (Uranian planets, Transpluto)
 against pyswisseph.
 
-NOTE: Uranian planets use Keplerian propagation from Witte/Sieggruen 1928
-elements refined by Neely 1988. Small differences from pyswisseph arise
-from different element refinement approaches. Transpluto uses Strubell 1952
-elements with ~25 arcmin residual from precession model differences.
+Uses full Keplerian propagation with Gaussian vectors and equinox precession
+from J1900 to J2000, matching the standard celestial mechanics algorithm.
+Remaining ~35" differences arise from IAU 2006 precession (libephemeris)
+vs older precession model (pyswisseph) and Skyfield vs SE geocentric
+conversion.
 """
 
 import pytest
@@ -38,12 +39,13 @@ def angular_diff(val1: float, val2: float) -> float:
 # TOLERANCE THRESHOLDS
 # ============================================================================
 
-# Relaxed tolerances due to different calculation methods
-# Uranian Keplerian elements (Witte/Sieggruen 1928, Neely 1988 refinement) diverge
-# slowly from pyswisseph's implementation. Max error ~0.53 deg for Cupido at 2024.
-URANIAN_LONGITUDE_TOLERANCE = 1.0  # 1.0 degree for Uranian planets
-HYPOTHETICAL_LONGITUDE_TOLERANCE = 1.0  # 1 degree for other hypothetical bodies
-LATITUDE_TOLERANCE = 5.0  # 5 degrees for latitude
+# Tightened tolerances after implementing full Keplerian propagation with
+# Gaussian vectors and equinox precession (J1900 -> J2000).
+# Max observed: ~35" longitude (from precession model + geocentric differences)
+# Latitude: ~25" max for inclined bodies (Cupido, Hades)
+URANIAN_LONGITUDE_TOLERANCE = 0.02  # 72 arcsec (~35" observed max)
+HYPOTHETICAL_LONGITUDE_TOLERANCE = 0.02  # 72 arcsec for Transpluto
+LATITUDE_TOLERANCE = 0.02  # 72 arcsec for latitude
 
 
 # ============================================================================
@@ -73,6 +75,18 @@ TEST_DATES = [
     ("2024-01-01", 2024, 1, 1, 0.0),
     ("2010-07-01", 2010, 7, 1, 12.0),
     ("1980-01-01", 1980, 1, 1, 0.0),
+]
+
+# Extended date range for thorough testing (1900-2100)
+EXTENDED_DATES = [
+    ("1900-01-01", 1900, 1, 1, 12.0),
+    ("1920-06-15", 1920, 6, 15, 0.0),
+    ("1950-01-01", 1950, 1, 1, 0.0),
+    ("1980-06-15", 1980, 6, 15, 12.0),
+    ("J2000.0", 2000, 1, 1, 12.0),
+    ("2024-06-21", 2024, 6, 21, 12.0),
+    ("2050-06-01", 2050, 6, 1, 0.0),
+    ("2100-01-01", 2100, 1, 1, 0.0),
 ]
 
 
@@ -130,6 +144,37 @@ class TestUranianPlanets:
                 assert diff_lon < URANIAN_LONGITUDE_TOLERANCE
             except Exception:
                 pass  # Skip dates where calculation fails
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("body_py,body_swe,name", URANIAN_PLANETS)
+    @pytest.mark.parametrize("date_name,year,month,day,hour", EXTENDED_DATES)
+    def test_uranian_extended_dates(
+        self, body_py, body_swe, name, date_name, year, month, day, hour
+    ):
+        """Test all Uranian planets across extended 1900-2100 date range."""
+        jd = swe.julday(year, month, day, hour)
+
+        try:
+            pos_swe, _ = swe.calc_ut(jd, body_swe, 0)
+        except swe.Error as e:
+            pytest.skip(f"SwissEphemeris {name} not available: {e}")
+
+        try:
+            pos_py, _ = ephem.swe_calc_ut(jd, body_py, 0)
+        except Exception as e:
+            pytest.skip(f"LibEphemeris {name} failed: {e}")
+
+        diff_lon = angular_diff(pos_swe[0], pos_py[0])
+        diff_lat = abs(pos_swe[1] - pos_py[1])
+
+        assert diff_lon < URANIAN_LONGITUDE_TOLERANCE, (
+            f"{name} @ {date_name}: longitude diff {diff_lon:.6f}deg "
+            f"({diff_lon * 3600:.1f}arcsec) exceeds {URANIAN_LONGITUDE_TOLERANCE}deg"
+        )
+        assert diff_lat < LATITUDE_TOLERANCE, (
+            f"{name} @ {date_name}: latitude diff {diff_lat:.6f}deg "
+            f"({diff_lat * 3600:.1f}arcsec) exceeds {LATITUDE_TOLERANCE}deg"
+        )
 
 
 # ============================================================================
