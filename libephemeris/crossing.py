@@ -2,7 +2,7 @@
 Crossing event calculations for libephemeris.
 
 Finds exact times when the Sun or Moon cross specific ecliptic longitudes.
-Uses Newton-Raphson iteration for sub-arcsecond precision, with Brent's method
+Uses Newton-Raphson iteration for sub-milliarcsecond precision, with Brent's method
 as a fallback near retrograde stations.
 
 Functions:
@@ -11,7 +11,7 @@ Functions:
 - swe_cross_ut: Generic planet crossing
 
 Precision: Newton-Raphson convergence tolerance
-Tolerance: 0.001 arcsecond for Sun (sub-milliarcsecond), 0.05 arcsecond for Moon, 0.1 arcsecond for planets
+Tolerance: 0.001 arcsecond (sub-milliarcsecond) for all bodies (Sun, Moon, planets)
 Iterations: Adaptive based on planet speed:
     - 50 for Sun/fast planets (speed >= 0.1°/day)
     - 30 for Moon (rapid convergence due to high speed ~13°/day)
@@ -44,22 +44,20 @@ from .planets import swe_calc_ut, swe_calc
 STATION_SPEED_THRESHOLD = 0.01  # degrees/day
 
 # Newton-Raphson convergence constants
-# 0.1 arcsecond tolerance for reference API compatibility
-NR_TOLERANCE = 0.1 / 3600.0  # 0.1 arcsecond in degrees
-# Tighter tolerance for Sun: achieves < 0.001 arcsec (sub-milliarcsecond)
-NR_TOLERANCE_SUN = 0.001 / 3600.0  # 0.001 arcsecond in degrees
-# Moon tolerance: 0.05 arcsecond - sub-arcsecond precision with fast convergence
-# due to Moon's high speed (~13°/day). Tighter than generic planets.
-NR_TOLERANCE_MOON = 0.05 / 3600.0  # 0.05 arcsecond in degrees
+# Sub-milliarcsecond tolerance for all bodies — ensures timing precision
+# limited only by the underlying ephemeris model, not by NR convergence.
+# At Moon's ~13°/day, 0.001" ≈ 0.006ms timing; at Saturn's ~0.03°/day,
+# 0.001" ≈ 0.3ms timing. This eliminates NR-induced timing jitter.
+NR_TOLERANCE = 0.001 / 3600.0  # 0.001 arcsecond in degrees (all planets)
+NR_TOLERANCE_SUN = 0.001 / 3600.0  # 0.001 arcsecond in degrees (Sun)
+NR_TOLERANCE_MOON = 0.001 / 3600.0  # 0.001 arcsecond in degrees (Moon)
 NR_MAX_ITER_SUN = 50  # Max iterations for Sun
-# Moon iterations: 30 is sufficient given rapid convergence.
-# - Longitude crossings: Moon moves ~13°/day, typical 7-12 iterations
-# - Node crossings: latitude speed ~1°/day at nodes, up to 15-20 iterations
-# - 30 provides 1.5-2.5x safety margin for edge cases near nodes
-# See CALCS.md for Moon motion details (±5.15° latitude, ~27 day cycle)
-NR_MAX_ITER_MOON = 30  # Max iterations for Moon
-NR_MAX_ITER_PLANET = 50  # Max iterations for generic planets
-NR_MAX_ITER_HELIO = 60  # Max iterations for heliocentric (slow planets)
+# Moon iterations: 50 provides sufficient margin for the tighter 0.001"
+# tolerance. Longitude crossings: Moon moves ~13°/day, typical 7-12 iters.
+# Node crossings: latitude speed ~1°/day at nodes, up to 20-25 iterations.
+NR_MAX_ITER_MOON = 50  # Max iterations for Moon
+NR_MAX_ITER_PLANET = 60  # Max iterations for generic planets
+NR_MAX_ITER_HELIO = 80  # Max iterations for heliocentric (slow planets)
 NR_MAX_ITER_VERY_SLOW = 80  # Max iterations for very slow planets (Pluto, TNOs)
 NR_MAX_ITER_STATION = 100  # Max iterations near retrograde stations
 
@@ -512,7 +510,7 @@ def swe_mooncross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
         More variable speed than Sun due to orbit eccentricity.
 
     Precision:
-        Typically < 0.05 arcsecond (sub-arcsecond) for fast convergence
+        Typically < 0.001 arcsecond (sub-milliarcsecond)
 
     Example:
         >>> # Find next new moon (Sun-Moon conjunction at same longitude)
@@ -564,7 +562,7 @@ def swe_mooncross_ut(x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.05 arcsecond for Moon)
+        # Check convergence (< 0.001 arcsecond for Moon)
         if abs(diff) < NR_TOLERANCE_MOON:
             return jd
 
@@ -613,10 +611,10 @@ def swe_mooncross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> flo
         1. Get current Moon position and velocity
         2. Linear estimate: dt = (target - current) / velocity
         3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
-        4. Converge to < 0.05 arcsecond (sub-arcsecond precision)
+        4. Converge to < 0.001 arcsecond (sub-milliarcsecond precision)
 
     Precision:
-        Typically < 0.05 arcsecond (sub-arcsecond) for fast convergence
+        Typically < 0.001 arcsecond (sub-milliarcsecond)
 
     Example:
         >>> # Find next new moon (Sun-Moon conjunction at same longitude) using TT
@@ -667,7 +665,7 @@ def swe_mooncross(x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH) -> flo
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.05 arcsecond for Moon)
+        # Check convergence (< 0.001 arcsecond for Moon)
         if abs(diff) < NR_TOLERANCE_MOON:
             return jd
 
@@ -829,7 +827,7 @@ def swe_mooncross_node(
                 f"Failed to calculate Moon position during iteration: {e}"
             )
 
-        # Check convergence (< 0.05 arcsecond for Moon)
+        # Check convergence (< 0.001 arcsecond for Moon)
         if abs(lat) < NR_TOLERANCE_MOON:
             if jd > jd_tt + 0.001:
                 # Return tuple (jd_cross, xlon, xlat) matching reference API
@@ -877,7 +875,7 @@ def swe_cross_ut(
         Slower planets (Jupiter, Saturn) may need more iterations.
 
     Precision:
-        Typically < 0.1 arcsecond
+        Typically < 0.001 arcsecond
 
     Example:
         >>> # Mars ingress into Aries
@@ -992,7 +990,7 @@ def swe_cross_ut(
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.1 arcsecond)
+        # Check convergence (< 0.001 arcsecond)
         if abs(diff) < NR_TOLERANCE:
             return jd
 
@@ -1101,7 +1099,7 @@ def swe_helio_cross_ut(
         1. Get current heliocentric position and velocity
         2. Linear estimate: dt = (target - current) / velocity
         3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
-        4. Converge to < 0.1 arcsecond
+        4. Converge to < 0.001 arcsecond
 
     Example:
         >>> # Find when Mars crosses 0° heliocentric longitude
@@ -1201,7 +1199,7 @@ def swe_helio_cross_ut(
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.1 arcsecond = 0.1/3600 degree)
+        # Check convergence (< 0.001 arcsecond)
         if abs(diff) < NR_TOLERANCE:
             return jd
 
@@ -1262,7 +1260,7 @@ def swe_helio_cross(
         1. Get current heliocentric position and velocity
         2. Linear estimate: dt = (target - current) / velocity
         3. Refine with Newton-Raphson: jd_new = jd + (target - actual) / velocity
-        4. Converge to < 0.1 arcsecond
+        4. Converge to < 0.001 arcsecond
 
     Example:
         >>> # Find when Mars crosses 0° heliocentric longitude using TT
@@ -1355,7 +1353,7 @@ def swe_helio_cross(
         if diff > 180:
             diff -= 360
 
-        # Check convergence (< 0.1 arcsecond = 0.1/3600 degree)
+        # Check convergence (< 0.001 arcsecond)
         if abs(diff) < NR_TOLERANCE:
             return jd
 
