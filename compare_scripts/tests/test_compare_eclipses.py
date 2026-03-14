@@ -437,7 +437,10 @@ class TestEclipsePathWidth:
         width_attr = lib_result[2][3]
 
         # They should be consistent (same function internally)
-        assert abs(width_func - width_attr) < 1.0, (
+        # Note: sol_eclipse_where attr[3] uses sign convention (negative for
+        # total/umbra, positive for annular/antumbra), while
+        # calc_eclipse_path_width returns absolute values.
+        assert abs(width_func - abs(width_attr)) < 1.0, (
             f"Path width mismatch: calc_eclipse_path_width={width_func:.1f}, "
             f"sol_eclipse_where attr[3]={width_attr:.1f}"
         )

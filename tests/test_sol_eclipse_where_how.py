@@ -145,11 +145,15 @@ class TestSweSolEclipseWhereApril2024:
         # Ratio should be around 1.0
         assert 0.9 < ratio < 1.1, f"Ratio {ratio} out of range"
 
-        # Obscuration should be ~1.0 for total
-        assert 0.9 < obscuration <= 1.0, f"Obscuration {obscuration} out of range"
+        # Obscuration for total eclipses: (r_moon/r_sun)^2, typically > 1.0
+        # when Moon is larger than Sun (matching reference API behavior)
+        assert 0.9 < obscuration < 1.3, f"Obscuration {obscuration} out of range"
 
-        # Path width should be reasonable (50-300 km typically)
-        assert 0 < path_width < 500, f"Path width {path_width} km out of range"
+        # Path width is negative for total eclipses (sign convention)
+        assert path_width < 0, (
+            f"Path width {path_width} km should be negative for total"
+        )
+        assert abs(path_width) < 500, f"|Path width| {abs(path_width)} km out of range"
 
         # Azimuth should be 0-360
         assert 0 <= azimuth < 360, f"Azimuth {azimuth} out of range"
@@ -284,11 +288,14 @@ class TestSweSolEclipseHowDallasApril2024:
         # Ratio should be around 1.0
         assert 0.9 < ratio < 1.1, f"Ratio {ratio} out of range"
 
-        # Obscuration should be ~1.0 for total
-        assert 0.9 < obscuration <= 1.0, f"Obscuration {obscuration} out of range"
+        # Obscuration for total eclipses: (r_moon/r_sun)^2, typically > 1.0
+        # when Moon is larger than Sun (matching reference API behavior)
+        assert 0.9 < obscuration < 1.3, f"Obscuration {obscuration} out of range"
 
-        # Shadow width should be > 0 for central eclipse
-        assert shadow_width >= 0, f"Shadow width {shadow_width} km should be >= 0"
+        # Shadow width is negative for total eclipses (sign convention)
+        assert shadow_width < 0, (
+            f"Shadow width {shadow_width} km should be negative for total"
+        )
 
         # Azimuth should be 0-360
         assert 0 <= azimuth < 360, f"Azimuth {azimuth} out of range"

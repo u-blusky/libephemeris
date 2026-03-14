@@ -248,11 +248,13 @@ class TestEclipsePathWidthEdgeCases:
 
         # Both should be non-zero for central eclipse
         assert calc_width > 0, "Path width should be positive"
-        assert where_width > 0, "swe_sol_eclipse_where width should be positive"
+        # swe_sol_eclipse_where attr[3] is negative for total eclipses (sign convention)
+        assert where_width != 0, "swe_sol_eclipse_where width should be non-zero"
 
         # Both should be in the same order of magnitude
         # Allow for differences in calculation method
-        ratio = calc_width / where_width if where_width > 0 else 0
+        # Use absolute value of where_width since it's negative for total eclipses
+        ratio = calc_width / abs(where_width) if where_width != 0 else 0
         assert 0.3 < ratio < 3.0, (
             f"Path width ratio {ratio:.2f} is too different "
             f"(calc={calc_width:.1f}, where={where_width:.1f})"

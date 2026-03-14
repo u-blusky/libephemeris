@@ -2252,10 +2252,10 @@ def swe_sol_eclipse_when_loc(
         if d >= r_sun + r_moon:
             return 0.0
         elif d <= abs(r_sun - r_moon):
-            if r_moon >= r_sun:
-                return 1.0
-            else:
-                return (r_moon / r_sun) ** 2
+            # Both total and annular: obscuration = disc area ratio
+            # For total eclipses (r_moon >= r_sun), this is >= 1.0
+            # matching reference API behavior
+            return (r_moon / r_sun) ** 2
         else:
             # Partial overlap - lens formula
             d1 = (d * d + r_sun * r_sun - r_moon * r_moon) / (2 * d)
@@ -2339,17 +2339,6 @@ def swe_sol_eclipse_when_loc(
         # Find local maximum at this location
         jd_local_max = _find_local_maximum(jd_max_global)
 
-        # Check if Sun is above horizon
-        true_alt, sun_az, apparent_alt = _get_sun_altaz(jd_local_max)
-
-        if true_alt < -1.0:
-            # Sun below horizon - eclipse not visible
-            if backward:
-                jd = jd_max_global - 1
-            else:
-                jd = jd_max_global + 25
-            continue
-
         # Get angular sizes at local maximum
         sun_radius, moon_radius, sun_diam, moon_diam = _get_angular_sizes(jd_local_max)
         min_separation = _get_separation(jd_local_max)
@@ -2363,6 +2352,64 @@ def swe_sol_eclipse_when_loc(
             else:
                 jd = jd_max_global + 25
             continue
+
+        # Check if Sun is above horizon at local max
+        true_alt, sun_az, apparent_alt = _get_sun_altaz(jd_local_max)
+
+        if apparent_alt < 0.0:
+            # Sun is below horizon (accounting for refraction) at local
+            # maximum, but the eclipse may still be visible during sunrise
+            # or sunset. Check if the eclipse is ongoing (separation <
+            # sum_radii) when the Sun rises above the horizon. Search for
+            # a time when both conditions are met: Sun visible (apparent
+            # altitude >= 0) AND eclipse still in progress.
+            horizon_eclipse_found = False
+
+            # Check times around the local max for Sun above horizon
+            # while eclipse is still in progress
+            for dt_minutes in range(-180, 181, 5):
+                jd_test = jd_local_max + dt_minutes / 1440.0
+                test_alt, test_az, test_app_alt = _get_sun_altaz(jd_test)
+                if test_app_alt >= 0.0:
+                    test_sep = _get_separation(jd_test)
+                    if test_sep < sum_radii:
+                        # Eclipse visible above horizon at this time!
+                        # Use this as the effective local maximum for
+                        # the visible portion of the eclipse
+                        horizon_eclipse_found = True
+                        # Find the best visible time (minimum separation
+                        # while Sun is above horizon)
+                        jd_best = jd_test
+                        sep_best = test_sep
+                        for dt2 in range(dt_minutes, min(dt_minutes + 120, 181), 2):
+                            jd_t2 = jd_local_max + dt2 / 1440.0
+                            alt_t2, _, app_alt_t2 = _get_sun_altaz(jd_t2)
+                            if app_alt_t2 < 0.0:
+                                break
+                            sep_t2 = _get_separation(jd_t2)
+                            if sep_t2 >= sum_radii:
+                                break
+                            if sep_t2 < sep_best:
+                                sep_best = sep_t2
+                                jd_best = jd_t2
+                        # Update local max to the best visible time
+                        jd_local_max = jd_best
+                        min_separation = sep_best
+                        true_alt, sun_az, apparent_alt = _get_sun_altaz(jd_local_max)
+                        # Recalculate angular sizes at new time
+                        sun_radius, moon_radius, sun_diam, moon_diam = (
+                            _get_angular_sizes(jd_local_max)
+                        )
+                        sum_radii = sun_radius + moon_radius
+                        break
+
+            if not horizon_eclipse_found:
+                # Eclipse truly not visible from this location
+                if backward:
+                    jd = jd_max_global - 1
+                else:
+                    jd = jd_max_global + 25
+                continue
 
         # Eclipse visible! Calculate all parameters
 
@@ -2494,10 +2541,12 @@ def swe_sol_eclipse_when_loc(
                 # Total eclipse - umbra
                 umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
                 umbra_radius_km = max(0, umbra_radius_km)
+                is_total_shadow = True
             else:
                 # Annular - antumbra
                 umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
                 umbra_radius_km = max(0, abs(umbra_radius_km))
+                is_total_shadow = False
 
             # Path width affected by Sun altitude
             if true_alt > 0:
@@ -2507,7 +2556,12 @@ def swe_sol_eclipse_when_loc(
             else:
                 shadow_width_km = 0.0
 
-            shadow_width_km = max(0.0, min(1000.0, shadow_width_km))
+            shadow_width_km = min(1000.0, shadow_width_km)
+
+            # Sign convention: negative for total eclipses (umbra),
+            # positive for annular eclipses (antumbra)
+            if is_total_shadow:
+                shadow_width_km = -shadow_width_km
         else:
             shadow_width_km = 0.0
 
@@ -2838,10 +2892,12 @@ def swe_sol_eclipse_where(
             # Total eclipse - umbra reaches Earth
             umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
             umbra_radius_km = max(0, umbra_radius_km)
+            is_total_shadow = True
         else:
             # Annular eclipse - antumbra
             umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
             umbra_radius_km = max(0, abs(umbra_radius_km))
+            is_total_shadow = False
 
         # Path width affected by Sun altitude
         if sun_altitude > 0:
@@ -2851,7 +2907,12 @@ def swe_sol_eclipse_where(
         else:
             path_width_km = 0.0
 
-        path_width_km = max(0.0, min(1000.0, path_width_km))
+        path_width_km = min(1000.0, path_width_km)
+
+        # Sign convention: negative for total eclipses (umbra),
+        # positive for annular eclipses (antumbra)
+        if is_total_shadow:
+            path_width_km = -path_width_km
 
     except Exception:
         # If calculation fails, return zeros (10-element geopos, 20-element attr)
@@ -3411,10 +3472,12 @@ def swe_sol_eclipse_how(
             # Total eclipse - umbra
             umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
             umbra_radius_km = max(0, umbra_radius_km)
+            is_total_shadow = True
         else:
             # Annular - antumbra
             umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
             umbra_radius_km = max(0, abs(umbra_radius_km))
+            is_total_shadow = False
 
         # Path width affected by Sun altitude
         if sun_altitude > 0:
@@ -3424,7 +3487,12 @@ def swe_sol_eclipse_how(
         else:
             shadow_width_km = 0.0
 
-        shadow_width_km = max(0.0, min(1000.0, shadow_width_km))
+        shadow_width_km = min(1000.0, shadow_width_km)
+
+        # Sign convention: negative for total eclipses (umbra),
+        # positive for annular eclipses (antumbra)
+        if is_total_shadow:
+            shadow_width_km = -shadow_width_km
 
     # Determine eclipse type flags
     eclipse_type = SE_ECL_VISIBLE
