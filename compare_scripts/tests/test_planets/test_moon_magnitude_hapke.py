@@ -456,8 +456,9 @@ class TestMoonMagnitudeHapkeFunction:
 
         # Mean distance in AU
         mean_dist = 384400.0 / 149597870.7
+        helio_dist = 1.0  # ~1 AU Sun-Moon distance
 
-        mag = _calc_moon_magnitude(0.0, mean_dist)
+        mag = _calc_moon_magnitude(0.0, mean_dist, helio_dist)
 
         # Full moon at mean distance should be around -12.7 to -13.5
         # (opposition surge makes it brighter than base -12.74)
@@ -469,11 +470,12 @@ class TestMoonMagnitudeHapkeFunction:
         from libephemeris.planets import _calc_moon_magnitude
 
         mean_dist = 384400.0 / 149597870.7
+        helio_dist = 1.0  # ~1 AU Sun-Moon distance
 
-        mag_0 = _calc_moon_magnitude(0.0, mean_dist)
-        mag_45 = _calc_moon_magnitude(45.0, mean_dist)
-        mag_90 = _calc_moon_magnitude(90.0, mean_dist)
-        mag_135 = _calc_moon_magnitude(135.0, mean_dist)
+        mag_0 = _calc_moon_magnitude(0.0, mean_dist, helio_dist)
+        mag_45 = _calc_moon_magnitude(45.0, mean_dist, helio_dist)
+        mag_90 = _calc_moon_magnitude(90.0, mean_dist, helio_dist)
+        mag_135 = _calc_moon_magnitude(135.0, mean_dist, helio_dist)
 
         # Magnitude should increase (more positive = dimmer)
         assert mag_0 < mag_45 < mag_90 < mag_135, (
@@ -489,10 +491,11 @@ class TestMoonMagnitudeHapkeFunction:
         mean_dist = 384400.0 / 149597870.7
         near_dist = mean_dist * 0.9  # 10% closer
         far_dist = mean_dist * 1.1  # 10% farther
+        helio_dist = 1.0  # ~1 AU Sun-Moon distance
 
-        mag_near = _calc_moon_magnitude(30.0, near_dist)
-        mag_mean = _calc_moon_magnitude(30.0, mean_dist)
-        mag_far = _calc_moon_magnitude(30.0, far_dist)
+        mag_near = _calc_moon_magnitude(30.0, near_dist, helio_dist)
+        mag_mean = _calc_moon_magnitude(30.0, mean_dist, helio_dist)
+        mag_far = _calc_moon_magnitude(30.0, far_dist, helio_dist)
 
         # Closer = brighter (more negative magnitude)
         assert mag_near < mag_mean < mag_far, (
@@ -506,18 +509,19 @@ class TestMoonMagnitudeHapkeFunction:
         from libephemeris.planets import _calc_moon_magnitude
 
         mean_dist = 384400.0 / 149597870.7
+        helio_dist = 1.0  # ~1 AU Sun-Moon distance
 
         # Test typical values
         # Full Moon: -12.5 to -13.5
-        mag_full = _calc_moon_magnitude(2.0, mean_dist)
+        mag_full = _calc_moon_magnitude(2.0, mean_dist, helio_dist)
         assert -14 < mag_full < -12, f"Full moon mag {mag_full:.2f} unexpected"
 
         # Quarter Moon: -10 to -11
-        mag_quarter = _calc_moon_magnitude(90.0, mean_dist)
+        mag_quarter = _calc_moon_magnitude(90.0, mean_dist, helio_dist)
         assert -12 < mag_quarter < -9, f"Quarter moon mag {mag_quarter:.2f} unexpected"
 
         # Crescent: -7 to -9
-        mag_crescent = _calc_moon_magnitude(135.0, mean_dist)
+        mag_crescent = _calc_moon_magnitude(135.0, mean_dist, helio_dist)
         assert -10 < mag_crescent < -6, (
             f"Crescent moon mag {mag_crescent:.2f} unexpected"
         )

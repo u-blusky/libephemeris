@@ -3907,14 +3907,42 @@ def _calc_nod_aps(
 
     target_pos = target.at(t)
 
-    # For Moon, use geocentric orbit (around Earth); for planets, heliocentric
+    # For Moon, use mean node and mean apogee from the lunar theory rather
+    # than computing osculating elements from geocentric state vectors.
+    # This matches pyswisseph which returns SE_MEAN_NODE / SE_MEAN_APOG
+    # values for the Moon's nod_aps results.
     if ipl == SE_MOON:
-        # Geocentric ICRS vectors (Moon relative to Earth)
-        r_icrs = target_pos.position.au - earth_pos.position.au
-        v_icrs = target_pos.velocity.au_per_d - earth_pos.velocity.au_per_d
-        # GM_Earth in AU^3/day^2
-        GM = 0.01720209895**2 / 332946.0
-        is_geocentric = True
+        jd_ut = t.ut1
+        # Mean node longitude from lunar theory
+        node_pos, _ = swe_calc_ut(jd_ut, SE_MEAN_NODE, iflag & ~SEFLG_SPEED)
+        node_lon = node_pos[0]
+        node_lat = node_pos[1]
+        node_dist = node_pos[2]
+
+        # Mean apogee (Black Moon Lilith) from lunar theory
+        apog_pos, _ = swe_calc_ut(jd_ut, SE_MEAN_APOG, iflag & ~SEFLG_SPEED)
+        apog_lon = apog_pos[0]
+        apog_lat = apog_pos[1]
+        apog_dist = apog_pos[2]
+
+        # Perigee is 180° from apogee
+        peri_lon = (apog_lon + 180.0) % 360.0
+
+        # Build output: nodes and apsides from lunar theory
+        xnasc: PosTuple = (node_lon, node_lat, node_dist, 0.0, 0.0, 0.0)
+        xndsc: PosTuple = (
+            (node_lon + 180.0) % 360.0,
+            -node_lat,
+            node_dist,
+            0.0,
+            0.0,
+            0.0,
+        )
+        xperi: PosTuple = (peri_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
+        xaphe: PosTuple = (apog_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
+
+        return (xnasc, xndsc, xperi, xaphe)
+
     else:
         # Heliocentric ICRS vectors
         r_icrs = target_pos.position.au - sun_pos.position.au
@@ -4006,6 +4034,28 @@ def _calc_nod_aps(
         ze = (sin_omega * sin_incl) * x_orb + (cos_omega * sin_incl) * y_orb
         return (xe, ye, ze, r_orb)
 
+    def _focal_point_3d():
+        """Compute the second focal point of the orbit ellipse.
+
+        The second (empty) focus is located at distance 2ae from the
+        primary focus (Sun or Earth) along the apse line, in the
+        anti-perihelion direction. In the perifocal frame this is the
+        point (-2ae, 0, 0).
+
+        This matches the pyswisseph convention which returns the second
+        focal point in the aphelion/apogee slot of nod_aps results.
+        """
+        # Distance from primary focus to second focus = 2 * a * e
+        f_dist = 2.0 * a * e_mag
+        # In perifocal frame, the second focus is at (-f_dist, 0, 0)
+        # (negative x = anti-perihelion direction)
+        fx_orb = -f_dist
+        # Rotate to ecliptic
+        fxe = (cos_Omega * cos_omega - sin_Omega * sin_omega * cos_incl) * fx_orb
+        fye = (sin_Omega * cos_omega + cos_Omega * sin_omega * cos_incl) * fx_orb
+        fze = (sin_omega * sin_incl) * fx_orb
+        return (fxe, fye, fze, f_dist)
+
     def _to_geo_lonlat(center_pos):
         """Convert center-relative ecliptic position to geocentric lon/lat/dist.
 
@@ -4034,8 +4084,8 @@ def _calc_nod_aps(
     pos_dsc = _orbit_pos_3d(math.pi - omega)
     # Perihelion/perigee: true anomaly = 0
     pos_peri = _orbit_pos_3d(0.0)
-    # Aphelion/apogee: true anomaly = pi
-    pos_aphe = _orbit_pos_3d(math.pi)
+    # Second focal point (replaces aphelion to match pyswisseph convention)
+    pos_aphe = _focal_point_3d()
 
     # Convert to geocentric ecliptic coordinates
     geo_asc = _to_geo_lonlat(pos_asc)
@@ -4706,19 +4756,23 @@ def _calc_nod_aps_osculating(
 # PLANETARY PHENOMENA: Phase, Elongation, Magnitude
 # =============================================================================
 
-# Physical equatorial radii of celestial bodies in kilometers
-# Sources: IAU 2015 nominal values, NASA Planetary Fact Sheet
-# These are used to calculate apparent angular diameters
+# Physical radii of celestial bodies in kilometers
+# Sources: NASA Planetary Fact Sheet volumetric mean radii
+# For gas/ice giants (Jupiter, Saturn, Uranus, Neptune), volumetric mean radii
+# are used rather than equatorial radii, as these better represent the
+# sphere-equivalent size for apparent diameter calculations. This matches
+# the convention used by standard ephemeris implementations.
+# Reference: https://nssdc.gsfc.nasa.gov/planetary/factsheet/
 _BODY_RADIUS_KM = {
-    SE_SUN: 695700.0,  # Solar radius (IAU 2015 nominal)
-    SE_MOON: 1737.4,  # Lunar mean radius
-    SE_MERCURY: 2439.7,  # Mercury equatorial radius
-    SE_VENUS: 6051.8,  # Venus equatorial radius
-    SE_MARS: 3396.2,  # Mars equatorial radius
-    SE_JUPITER: 71492.0,  # Jupiter equatorial radius
-    SE_SATURN: 60268.0,  # Saturn equatorial radius (disk only, excludes rings)
-    SE_URANUS: 25559.0,  # Uranus equatorial radius
-    SE_NEPTUNE: 24764.0,  # Neptune equatorial radius
+    SE_SUN: 696000.0,  # Solar radius (NASA fact sheet)
+    SE_MOON: 1737.5,  # Lunar mean radius (NASA fact sheet)
+    SE_MERCURY: 2439.4,  # Mercury volumetric mean radius
+    SE_VENUS: 6051.8,  # Venus volumetric mean radius
+    SE_MARS: 3389.5,  # Mars volumetric mean radius
+    SE_JUPITER: 69911.0,  # Jupiter volumetric mean radius
+    SE_SATURN: 58232.0,  # Saturn volumetric mean radius (disk only, excludes rings)
+    SE_URANUS: 25362.0,  # Uranus volumetric mean radius
+    SE_NEPTUNE: 24622.0,  # Neptune volumetric mean radius
     SE_PLUTO: 1188.3,  # Pluto mean radius
 }
 
@@ -4772,58 +4826,79 @@ _PLANET_MAG_PARAMS = {
 # J2000 epoch for Saturn ring calculations
 _J2000 = 2451545.0
 
-# Mean Earth-Moon distance in AU (384,400 km)
-_MEAN_MOON_DISTANCE_AU = 384400.0 / 149597870.7
 
-
-def _calc_moon_magnitude(phase_angle: float, distance_au: float) -> float:
+def _calc_moon_magnitude(
+    phase_angle: float, geo_dist_au: float, helio_dist_au: float
+) -> float:
     """
-    Calculate Moon's visual magnitude using the Astronomical Almanac formula.
+    Calculate Moon's visual magnitude using a piecewise photometric model.
 
-    Uses the standard photometric model from the Astronomical Almanac
-    (based on Allen's Astrophysical Quantities) with a linear phase
-    coefficient and a quartic term that captures the steep brightening
-    at opposition and the rapid dimming for thin crescents.
+    For moderate phase angles (α ≤ 147.14°), uses the Allen (1976) formula
+    from Astrophysical Quantities with a linear phase coefficient and a
+    quartic brightening/dimming term.
 
-    The formula is: V = V0 + 5*log10(d/d_mean) + 0.026*|α| + 4e-9*|α|⁴
+    For large phase angles (α > 147.14°), switches to the Samaha et al. (1969)
+    cube-phase model which correctly captures the rapid dimming of the thin
+    crescent Moon approaching new Moon. The stitch angle (147.14°) is chosen
+    so the two formulas produce equal magnitudes at the transition.
+
+    Distance correction uses both geocentric and heliocentric (Sun-Moon)
+    distances, converting the geocentric distance to Earth radii for the
+    standard 5·log10 distance modulus.
 
     Reference values:
-    - Full Moon at mean distance: V = -12.73 mag
+    - Full Moon at mean distance: V ≈ -12.73 mag
     - Quarter Moon (α≈90°): V ≈ -10.0 to -10.5
-    - Full Moon at perigee: V ≈ -12.89 mag
-    - Full Moon at apogee: V ≈ -12.54 mag
+    - New Moon (α≈180°): V → +∞ (vanishingly dim)
 
     Args:
         phase_angle: Sun-Moon-Earth angle in degrees (0° = full, 180° = new)
-        distance_au: Earth-Moon distance in AU
+        geo_dist_au: Earth-Moon distance in AU
+        helio_dist_au: Sun-Moon distance in AU
 
     Returns:
         Visual magnitude (more negative = brighter)
 
     References:
-        - Astronomical Almanac, Section K
-        - Allen's Astrophysical Quantities, 4th ed., Table 12.16
+        - Allen, C.W., 1976, Astrophysical Quantities
+        - Samaha, A.E., Asaad, A.S., Mikhail, J.S. (1969), "Visibility of
+          the New Moon", Bulletin of Observatory Helwan, 84
     """
-    # Full Moon magnitude at mean distance
-    V0 = -12.73
-
-    # Distance correction: magnitude scales with distance squared
-    if distance_au > 0:
-        dist_correction = 5.0 * math.log10(distance_au / _MEAN_MOON_DISTANCE_AU)
-    else:
-        dist_correction = 0.0
+    # Constants for distance correction
+    # AUNIT and EARTH_RADIUS from IAU/AA standards
+    aunit_m = 1.49597870700e11  # 1 AU in meters (DE431)
+    earth_radius_m = 6378136.6  # Earth equatorial radius in meters (AA 2006)
 
     alpha = abs(phase_angle)
 
-    # Phase function from the Astronomical Almanac:
-    # Linear term dominates at moderate phases (0.026 mag/degree)
-    # Quartic term adds steep brightening near opposition and
-    # rapid dimming for thin crescents
-    phase_darkening = 0.026 * alpha + 4.0e-9 * alpha**4
+    # Distance correction: 5 * log10(d_geo_earthradii * d_helio_au)
+    # Converts geocentric distance from AU to Earth radii, then applies
+    # the standard distance modulus with heliocentric distance in AU
+    if geo_dist_au > 0 and helio_dist_au > 0:
+        dist_correction = 5.0 * math.log10(
+            geo_dist_au * helio_dist_au * aunit_m / earth_radius_m
+        )
+    else:
+        dist_correction = 0.0
 
-    magnitude = V0 + dist_correction + phase_darkening
+    # Stitch angle where Allen and Samaha formulas produce equal magnitudes
+    _stitch_angle = 147.1385465
 
-    return magnitude
+    if alpha <= _stitch_angle:
+        # Allen (1976) formula from Astrophysical Quantities
+        # V = -21.62 + 0.026·|α| + 4e-9·α⁴ + dist_correction
+        base = -21.62 + 0.026 * alpha + 4.0e-9 * alpha**4
+    else:
+        # Samaha et al. (1969) cube-phase model for thin crescent
+        # V = -4.5444 - 2.5·log10((180-α)³) + dist_correction
+        # This properly diverges to +∞ as α→180° (new Moon)
+        remainder = 180.0 - alpha
+        if remainder > 0:
+            base = -4.5444 - 2.5 * math.log10(remainder**3)
+        else:
+            # At exactly α=180° (geometrically impossible in practice)
+            base = 50.0
+    return base + dist_correction
 
 
 def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
@@ -5050,8 +5125,9 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         moon_radius_km = _BODY_RADIUS_KM.get(SE_MOON, 1737.4)
         diameter = _calc_apparent_diameter(moon_radius_km, r_moon)
 
-        # Moon's magnitude using Astronomical Almanac photometric model
-        magnitude = _calc_moon_magnitude(phase_angle, r_moon)
+        # Moon's magnitude using piecewise Allen/Samaha photometric model
+        # mag_ms is the Sun-Moon distance (heliocentric distance of Moon) in AU
+        magnitude = _calc_moon_magnitude(phase_angle, r_moon, mag_ms)
 
         attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
         return attr, iflag
