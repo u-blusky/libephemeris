@@ -4223,15 +4223,33 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     penumbra_radius *= _SHADOW_ENLARGEMENT
     umbra_radius *= _SHADOW_ENLARGEMENT
 
-    # Moon's distance from the shadow axis (in degrees)
-    moon_distance_from_axis = abs(moon_lat)
+    # Moon's distance from the shadow axis (in degrees).
+    # The shadow centre is at the anti-solar point (Sun + 180° in longitude,
+    # negated latitude).  At eclipse maximum the longitude term is nearly
+    # zero and |moon_lat| alone is sufficient, but at non-maximum times
+    # (e.g. moonrise/moonset) the longitude offset can be significant
+    # and must be included.
+    sun_lon = sun_pos[0]
+    moon_lon = moon_pos[0]
+    shadow_lon = (sun_lon + 180.0) % 360.0
+
+    delta_lon = moon_lon - shadow_lon
+    if delta_lon > 180.0:
+        delta_lon -= 360.0
+    elif delta_lon < -180.0:
+        delta_lon += 360.0
+
+    # Small-angle approximation for angular separation on the ecliptic
+    # (cos correction for longitude at the Moon's latitude)
+    cos_lat = math.cos(math.radians(moon_lat))
+    moon_distance_from_axis = math.sqrt((delta_lon * cos_lat) ** 2 + moon_lat**2)
 
     # Gamma: Moon's distance from shadow axis in Earth radii
     # Edge case: protect against zero earth_semidiameter
     if abs(earth_semidiameter) < 1e-10:
         gamma = 0.0
     else:
-        gamma = moon_lat / earth_semidiameter
+        gamma = moon_distance_from_axis / earth_semidiameter
 
     # Calculate eclipse magnitudes
     # Edge case: protect against zero moon_semidiameter
@@ -4260,13 +4278,13 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     if penumbral_mag > 0 and penumbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
         # Very shallow penumbral eclipse - mark as grazing
         eclipse_type = SE_ECL_PENUMBRAL | SE_ECL_GRAZING
-        penumbral_mag = max(0.0, min(1.0, penumbral_mag))
+        penumbral_mag = max(0.0, penumbral_mag)
         return eclipse_type, 0.0, penumbral_mag, gamma, penumbra_radius, umbra_radius
 
     if umbral_mag <= 0:
         # Penumbral only
         eclipse_type = SE_ECL_PENUMBRAL
-        penumbral_mag = max(0.0, min(1.0, penumbral_mag))
+        penumbral_mag = max(0.0, penumbral_mag)
         return eclipse_type, 0.0, penumbral_mag, gamma, penumbra_radius, umbra_radius
 
     # Edge case: shallow umbral (partial) eclipse
@@ -4274,7 +4292,7 @@ def _calculate_lunar_eclipse_type_and_magnitude(
         # Very shallow partial umbral eclipse - mark as grazing
         eclipse_type = SE_ECL_PARTIAL | SE_ECL_GRAZING
         umbral_mag = max(0.0, min(1.0, umbral_mag))
-        penumbral_mag = max(0.0, min(2.0, penumbral_mag))
+        penumbral_mag = max(0.0, penumbral_mag)
         return (
             eclipse_type,
             umbral_mag,
@@ -4288,12 +4306,12 @@ def _calculate_lunar_eclipse_type_and_magnitude(
         # Total umbral eclipse
         eclipse_type = SE_ECL_TOTAL
         umbral_mag = max(0.0, umbral_mag)
-        penumbral_mag = max(0.0, min(2.0, penumbral_mag))
+        penumbral_mag = max(0.0, penumbral_mag)
     else:
         # Partial umbral eclipse
         eclipse_type = SE_ECL_PARTIAL
         umbral_mag = max(0.0, min(1.0, umbral_mag))
-        penumbral_mag = max(0.0, min(2.0, penumbral_mag))
+        penumbral_mag = max(0.0, penumbral_mag)
 
     return eclipse_type, umbral_mag, penumbral_mag, gamma, penumbra_radius, umbra_radius
 
@@ -4718,8 +4736,23 @@ def lun_eclipse_when_loc(
     moon = eph["moon"]
     observer = wgs84.latlon(lat, lon, altitude)
 
+    # Geometric center altitude threshold for moonrise/moonset.
+    # Atmospheric refraction near the horizon lifts the Moon's apparent
+    # position by roughly 34'.  The reference API considers the Moon
+    # "visible" until refraction can no longer bring its centre above
+    # the geometric horizon, which occurs at a geometric centre altitude
+    # of approximately -0.36°.  This empirical value matches the
+    # reference API's moonrise/moonset times to within a few seconds
+    # across a wide range of eclipses and observer locations.
+    _MOON_HORIZON_ALT = -0.36
+
     def _get_moon_altaz(jd: float) -> Tuple[float, float]:
-        """Get Moon altitude and azimuth at given JD from observer location."""
+        """Get Moon geometric altitude and azimuth at given JD.
+
+        Returns:
+            Tuple of (geometric_altitude_degrees, azimuth_degrees).
+            Azimuth uses the reference API convention (S=0, W=90).
+        """
         t = ts.ut1_jd(jd)
         observer_at = earth + observer
         moon_app = observer_at.at(t).observe(moon).apparent()
@@ -4727,10 +4760,30 @@ def lun_eclipse_when_loc(
         # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
         return alt.degrees, (az.degrees + 180.0) % 360.0
 
+    def _get_moon_apparent_alt(jd: float) -> float:
+        """Get Moon apparent altitude with atmospheric refraction.
+
+        Uses standard atmosphere (T=10°C, P=1013.25 mbar) for
+        atmospheric refraction correction, matching the conditions
+        used by the reference API.
+
+        Returns:
+            Apparent altitude in degrees (refraction-corrected).
+        """
+        t = ts.ut1_jd(jd)
+        observer_at = earth + observer
+        moon_app = observer_at.at(t).observe(moon).apparent()
+        alt, _, _ = moon_app.altaz(temperature_C=10.0, pressure_mbar=1013.25)
+        return alt.degrees
+
     def _is_moon_visible(jd: float, min_alt: float = -1.0) -> bool:
-        """Check if Moon is above horizon (with margin for refraction)."""
+        """Check if Moon is above horizon (accounting for refraction).
+
+        Uses the geometric centre altitude threshold that corresponds
+        to the refraction-corrected horizon.
+        """
         alt, _ = _get_moon_altaz(jd)
-        return alt > min_alt
+        return alt > max(min_alt, _MOON_HORIZON_ALT)
 
     jd = jd_start
 
@@ -4785,11 +4838,79 @@ def lun_eclipse_when_loc(
 
         # Eclipse visible! Calculate local circumstances
 
-        # Get Moon position at maximum
-        moon_pos, _ = swe_calc_ut(jd_max, SE_MOON, SEFLG_SPEED)
+        # Find moonrise/moonset during eclipse first, as we need these
+        # both for the local maximum determination and for the output.
+        eclipse_start = jd_pen_begin if jd_pen_begin > 0 else jd_max - 3 / 24
+        eclipse_end = jd_pen_end if jd_pen_end > 0 else jd_max + 3 / 24
+
+        moonrise_time = 0.0
+        moonset_time = 0.0
+
+        if eclipse_start > 0 and eclipse_end > 0:
+            alt_start, _ = _get_moon_altaz(eclipse_start)
+            alt_end, _ = _get_moon_altaz(eclipse_end)
+
+            # Use refraction-corrected horizon threshold for rise/set.
+            horizon = _MOON_HORIZON_ALT
+
+            if alt_start < horizon < alt_end:
+                # Moon rises during eclipse — binary search for crossing
+                t_low, t_high = eclipse_start, eclipse_end
+                for _ in range(50):
+                    t_mid = (t_low + t_high) / 2
+                    alt_mid, _ = _get_moon_altaz(t_mid)
+                    if alt_mid < horizon:
+                        t_low = t_mid
+                    else:
+                        t_high = t_mid
+                    if t_high - t_low < 1e-9:
+                        break
+                moonrise_time = (t_low + t_high) / 2
+
+            elif alt_start > horizon > alt_end:
+                # Moon sets during eclipse — binary search for crossing
+                t_low, t_high = eclipse_start, eclipse_end
+                for _ in range(50):
+                    t_mid = (t_low + t_high) / 2
+                    alt_mid, _ = _get_moon_altaz(t_mid)
+                    if alt_mid > horizon:
+                        t_low = t_mid
+                    else:
+                        t_high = t_mid
+                    if t_high - t_low < 1e-9:
+                        break
+                moonset_time = (t_low + t_high) / 2
+
+        # Determine the local maximum time. If Moon is below the
+        # refraction-corrected horizon at the global maximum, use the
+        # moonrise or moonset time as the local max (matching reference
+        # API behavior — reports the horizon crossing as the "maximum"
+        # for partially-visible eclipses).
+        moon_alt_at_max, _ = _get_moon_altaz(jd_max)
+
+        jd_local_max = jd_max
+        if moon_alt_at_max < _MOON_HORIZON_ALT:
+            # Moon is below horizon at global max. Use moonrise/moonset
+            # as local max, whichever is closest to the global max.
+            if moonset_time > 0 and moonrise_time > 0:
+                # Both rise and set during eclipse — use whichever is
+                # closer to the global max
+                if abs(moonset_time - jd_max) < abs(moonrise_time - jd_max):
+                    jd_local_max = moonset_time
+                else:
+                    jd_local_max = moonrise_time
+            elif moonset_time > 0:
+                jd_local_max = moonset_time
+            elif moonrise_time > 0:
+                jd_local_max = moonrise_time
+            # else: fall back to global max (shouldn't happen since
+            # moon_visible check passed above)
+
+        # Get Moon position at local maximum
+        moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, SEFLG_SPEED)
         moon_dist = moon_pos[2]
 
-        # Get eclipse type and magnitude
+        # Get eclipse type and magnitude at local maximum
         (
             ecl_type_flags,
             umbral_mag,
@@ -4797,10 +4918,11 @@ def lun_eclipse_when_loc(
             gamma,
             penumbra_radius,
             umbra_radius,
-        ) = _calculate_lunar_eclipse_type_and_magnitude(jd_max)
+        ) = _calculate_lunar_eclipse_type_and_magnitude(jd_local_max)
 
-        # Get Moon's alt/az at maximum
-        moon_alt, moon_az = _get_moon_altaz(jd_max)
+        # Get Moon's alt/az at local maximum
+        moon_alt, moon_az = _get_moon_altaz(jd_local_max)
+        moon_app_alt = _get_moon_apparent_alt(jd_local_max)
 
         # Calculate apparent diameters
         # Moon semi-diameter: 932.56 arcsec at mean distance 0.002569 AU
@@ -4824,48 +4946,38 @@ def lun_eclipse_when_loc(
             ecl_type |= SE_ECL_MAX_VISIBLE
         ecl_type |= SE_ECL_VISIBLE
 
-        # Find moonrise/moonset during eclipse (simplified - we just check endpoints)
-        moonrise_time = 0.0
-        moonset_time = 0.0
+        # Filter contact times by Moon visibility — zero out phases
+        # where the Moon is below the horizon (not visible to observer)
+        local_partial_begin = jd_partial_begin
+        local_partial_end = jd_partial_end
+        local_total_begin = jd_total_begin
+        local_total_end = jd_total_end
+        local_pen_begin = jd_pen_begin
+        local_pen_end = jd_pen_end
 
-        # Check if Moon rises during eclipse
-        if jd_pen_begin > 0 and jd_pen_end > 0:
-            alt_begin, _ = _get_moon_altaz(jd_pen_begin)
-            alt_end, _ = _get_moon_altaz(jd_pen_end)
-            if alt_begin < 0 < alt_end:
-                # Moon rises during eclipse - find approximate time
-                # Simple binary search
-                t_low, t_high = jd_pen_begin, jd_pen_end
-                for _ in range(20):
-                    t_mid = (t_low + t_high) / 2
-                    alt_mid, _ = _get_moon_altaz(t_mid)
-                    if alt_mid < 0:
-                        t_low = t_mid
-                    else:
-                        t_high = t_mid
-                moonrise_time = (t_low + t_high) / 2
-            elif alt_begin > 0 > alt_end:
-                # Moon sets during eclipse - find approximate time
-                t_low, t_high = jd_pen_begin, jd_pen_end
-                for _ in range(20):
-                    t_mid = (t_low + t_high) / 2
-                    alt_mid, _ = _get_moon_altaz(t_mid)
-                    if alt_mid > 0:
-                        t_low = t_mid
-                    else:
-                        t_high = t_mid
-                moonset_time = (t_low + t_high) / 2
+        if local_pen_begin > 0 and not _is_moon_visible(local_pen_begin):
+            local_pen_begin = 0.0
+        if local_pen_end > 0 and not _is_moon_visible(local_pen_end):
+            local_pen_end = 0.0
+        if local_partial_begin > 0 and not _is_moon_visible(local_partial_begin):
+            local_partial_begin = 0.0
+        if local_partial_end > 0 and not _is_moon_visible(local_partial_end):
+            local_partial_end = 0.0
+        if local_total_begin > 0 and not _is_moon_visible(local_total_begin):
+            local_total_begin = 0.0
+        if local_total_end > 0 and not _is_moon_visible(local_total_end):
+            local_total_end = 0.0
 
         # Prepare times tuple (10 elements matching pyswisseph layout)
         times = (
-            global_times[0],  # [0] Maximum
+            jd_local_max,  # [0] Maximum (local visibility)
             0.0,  # [1] Reserved
-            global_times[2],  # [2] Partial begins (enters umbra)
-            global_times[3],  # [3] Partial ends (leaves umbra)
-            global_times[4],  # [4] Total begins
-            global_times[5],  # [5] Total ends
-            global_times[6],  # [6] Penumbral begins
-            global_times[7],  # [7] Penumbral ends
+            local_partial_begin,  # [2] Partial begins (enters umbra)
+            local_partial_end,  # [3] Partial ends (leaves umbra)
+            local_total_begin,  # [4] Total begins
+            local_total_end,  # [5] Total ends
+            local_pen_begin,  # [6] Penumbral begins
+            local_pen_end,  # [7] Penumbral ends
             moonrise_time,  # [8] Moonrise during eclipse
             moonset_time,  # [9] Moonset during eclipse
         )
@@ -4878,7 +4990,7 @@ def lun_eclipse_when_loc(
             0.0,  # [3] Reserved
             moon_az,  # [4] Azimuth of Moon at maximum
             moon_alt,  # [5] True altitude of Moon at maximum
-            moon_alt,  # [6] Apparent altitude (approx)
+            moon_app_alt,  # [6] Apparent altitude (with refraction)
             0.0,  # [7] Distance from opposition (degrees)
             umbral_mag,  # [8] Umbral magnitude (equals [0])
             *_get_saros_info(global_times[0], "lunar"),  # [9] Saros, [10] member
