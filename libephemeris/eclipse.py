@@ -7374,7 +7374,13 @@ def rise_trans(
     initial_sd = _get_semi_diameter(jd_start, planet)
 
     # Account for disc semi-diameter
-    if rsmi & SE_BIT_DISC_CENTER:
+    # Twilight modes use Sun's geometric center at the depression angle;
+    # disc semi-diameter is not applied (confirmed by independent testing:
+    # twilight with DISC_CENTER flag gives identical results to without).
+    is_twilight = bool(
+        rsmi & (SE_BIT_CIVIL_TWILIGHT | SE_BIT_NAUTIC_TWILIGHT | SE_BIT_ASTRO_TWILIGHT)
+    )
+    if is_twilight or (rsmi & SE_BIT_DISC_CENTER):
         disc_correction = 0.0
     elif rsmi & SE_BIT_DISC_BOTTOM:
         # Lower limb: add semi-diameter (rises later, sets earlier)
@@ -7764,17 +7770,30 @@ def rise_trans_true_hor(
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
 
-    # Determine refraction
-    # Standard refraction at horizon is about 34 arcminutes
+    # Clamp negative horizon altitudes to 0.0 for API compatibility.
+    # Confirmed by independent testing: negative horizon_altitude values
+    # produce identical results to horizon_altitude=0.0 in the reference
+    # implementation.
+    effective_horizon = max(0.0, horizon_altitude)
+
+    # Determine refraction using Bennett (1982) formula
+    # R = 1/tan(h + 7.31/(h+4.4)) arcminutes, where h = apparent altitude in degrees
+    # For true_hor, refraction depends on the custom horizon altitude, not a flat value.
+    # Apply pressure/temperature correction: factor = (P/1010) * (283/(273+T))
     if rsmi & SE_BIT_NO_REFRACTION:
         refraction = 0.0
     else:
-        # Simple refraction model (more accurate would use pressure/temperature)
-        # Standard refraction at horizon: ~34 arcminutes = 0.5667 degrees
-        refraction = 0.5667
+        # Bennett (1982) refraction at the horizon altitude
+        # Use the effective horizon altitude for the refraction estimate
+        h = effective_horizon
+        r_arcmin = 1.0 / math.tan(math.radians(h + 7.31 / (h + 4.4)))
+        # Apply pressure/temperature correction (standard: 1010 mbar, 10°C = 283K)
+        pressure_factor = pressure / 1010.0
+        temperature_factor = 283.0 / (273.0 + temperature)
+        refraction = max(0.0, r_arcmin / 60.0 * pressure_factor * temperature_factor)
 
-    # Use the custom horizon altitude provided by the user
-    horizon_alt = horizon_altitude
+    # Use the effective (clamped) horizon altitude
+    horizon_alt = effective_horizon
 
     # Account for disc semi-diameter
     # Sun: ~16 arcmin, Moon: ~16 arcmin (varies)

@@ -78,7 +78,9 @@ class TestSunPhenomena:
         elongation = attr[2]
 
         assert phase_angle == 0.0, "Sun phase angle should be 0"
-        assert phase == 1.0, "Sun phase should be 1.0"
+        assert phase == 0.0, (
+            "Sun phase should be 0.0 (inapplicable for self-luminous body)"
+        )
         assert elongation == 0.0, "Sun elongation from itself should be 0"
 
     @pytest.mark.unit
@@ -578,9 +580,11 @@ class TestSwePheno20Values:
         # Must have exactly 20 values
         assert len(lib_attr) == 20
 
-        # Phase angle = 0, phase = 1.0, elongation = 0
+        # Phase angle = 0, phase = 0.0 (inapplicable), elongation = 0
         assert lib_attr[0] == 0.0, "Sun phase angle should be 0"
-        assert lib_attr[1] == 1.0, "Sun phase should be 1.0"
+        assert lib_attr[1] == 0.0, (
+            "Sun phase should be 0.0 (inapplicable for self-luminous body)"
+        )
         assert lib_attr[2] == 0.0, "Sun elongation should be 0"
 
         # Diameter check (both return degrees)
@@ -1053,8 +1057,8 @@ class TestIlluminatedFractionAllPlanets:
 
         for jd in test_dates:
             attr, _ = ephem.pheno_ut(jd, SE_SUN, 0)
-            assert attr[1] == 1.0, (
-                f"Sun at JD {jd}: illuminated fraction should be 1.0, got {attr[1]}"
+            assert attr[1] == 0.0, (
+                f"Sun at JD {jd}: illuminated fraction should be 0.0 (inapplicable), got {attr[1]}"
             )
 
     @pytest.mark.unit

@@ -104,8 +104,12 @@ class TestRiseTransTrueHorBasic:
         diff_minutes = (jd_set_std - jd_set_mountain) * 24 * 60
         assert 20 < diff_minutes < 120
 
-    def test_negative_horizon_advances_sunrise(self):
-        """Test that negative horizon_altitude (observer on mountain) advances sunrise."""
+    def test_negative_horizon_clamped_to_zero(self):
+        """Test that negative horizon_altitude is clamped to 0.0.
+
+        The reference implementation clamps negative horizon altitudes to 0.0,
+        so the result should be identical to horizon_altitude=0.0.
+        """
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964  # Rome
 
@@ -114,13 +118,13 @@ class TestRiseTransTrueHorBasic:
             jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
         )
 
-        # Sunrise with depressed horizon (observer on high mountain)
-        jd_rise_elevated, _ = rise_trans_true_hor(
+        # Sunrise with negative horizon (clamped to 0)
+        jd_rise_neg, _ = rise_trans_true_hor(
             jd_start, SE_SUN, lat, lon, horizon_altitude=-5.0, rsmi=SE_CALC_RISE
         )
 
-        # Observer sees sunrise earlier when horizon is depressed
-        assert jd_rise_elevated < jd_rise_std
+        # Negative horizon is clamped to 0, so results should be identical
+        assert jd_rise_neg == jd_rise_std
 
     def test_transit_unaffected_by_horizon(self):
         """Test that transit times are not affected by horizon altitude."""

@@ -4930,7 +4930,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         _, _, sun_dist = sun_pos.radec()
 
         phase_angle = 0.0
-        phase = 1.0
+        phase = 0.0  # Phase (illuminated fraction) is inapplicable for the Sun
         elongation = 0.0
 
         # Apparent diameter of Sun based on physical radius
