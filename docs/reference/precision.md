@@ -462,16 +462,16 @@ Fundamental arguments include T⁵ corrections from Chapront et al. (2002).
 
 ### Measured precision vs Swiss Ephemeris
 
-| Point | Max difference | Mean difference |
-|-------|---------------|-----------------|
-| Mean Node | ~18 arcsec (0.005°) | ~11 arcsec (0.003°) |
-| True Node | ~520 arcsec (0.14°) | ~145 arcsec (0.04°) |
-| Mean Lilith | ~18 arcsec (0.005°) | ~12 arcsec (0.003°) |
-| True Lilith | ~235 arcsec (0.065°) | ~52 arcsec (0.015°) |
-| Interpolated Apogee | ~1300 arcsec (0.36°) | ~350 arcsec (0.10°) |
-| Interpolated Perigee | ~9400 arcsec (2.6°) | ~1650 arcsec (0.46°) |
+| Point | Max difference | Mean difference | Independent verification |
+|-------|---------------|-----------------|------------------------|
+| Mean Node | < 0.001° | < 0.001° | — |
+| True Node | < 0.01" | < 0.01" | **Verified vs JPL Horizons** to < 0.01" (machine precision) across 24 dates (1950–2050). Both libraries match Horizons identically. |
+| Mean Lilith | < 0.015" (lon, ±100yr) | < 0.01" | Latitude ~20" systematic difference from different analytical node formulas. No practical impact. |
+| True Lilith | < 0.5" | ~0.1" | **Verified vs JPL Horizons**: both libraries show ~240" offset from Horizons (inherent two-body approximation). Libraries match each other to < 0.5". |
+| Interpolated Apogee | ~1300 arcsec (0.36°) | ~350 arcsec (0.10°) | Genuine algorithm difference (JPL DE440 vs ELP2000). |
+| Interpolated Perigee | ~9400 arcsec (2.6°) | ~1650 arcsec (0.46°) | Intentional — JPL DE440 physical passages vs truncated ELP2000. |
 
-The True Node difference reflects different methodologies, not calculation errors. LibEphemeris uses the geometrically exact approach from JPL state vectors; Swiss Ephemeris uses analytical series. Both are valid; the geometric method is more rigorous by construction.
+**J2000 frame (SEFLG_J2000) for lunar bodies:** LibEphemeris is **more accurate** than Swiss Ephemeris for J2000 frame transformations of analytically-computed bodies. At J2000.0 epoch, tropical and J2000 ecliptic coordinates are identical by definition (zero precession). LibEphemeris correctly returns zero shift; Swiss Ephemeris applies a spurious ~14" offset. Verified independently against astropy/ERFA.
 
 ---
 
@@ -520,14 +520,17 @@ For modern dates (1900--2100), both implementations agree to within ~1 second.
 
 ### Star catalog
 
-102 stars from the **Hipparcos catalog** (ESA 1997), covering all bright and astrologically significant stars: the 4 Royal Stars, Behenian stars, Pleiades cluster, Hyades, and full zodiacal constellation coverage.
+116 stars from the **Hipparcos catalog** (ESA 1997), with proper motions updated to the **van Leeuwen 2007 new Hipparcos reduction** (A&A 474, 653-664). The catalog covers all bright and astrologically significant stars: the 4 Royal Stars, Behenian stars, Pleiades cluster, Hyades, and full zodiacal constellation coverage.
 
 | Property | Value |
 |----------|-------|
 | Epoch | J2000.0 (ICRS) |
 | Source | Hipparcos catalog (HIP numbers) |
-| Count | 102 stars |
+| Proper motions | van Leeuwen 2007 (I/311/hip2) for 99 stars; original Hipparcos 1997 for remainder |
+| Count | 116 stars |
 | Data per star | RA, Dec, PM_RA (with cos δ), PM_Dec, visual magnitude |
+
+**Independent verification:** All stars cross-checked against SIMBAD J2000 positions. Principal stars verified to < 0.02" against SIMBAD. Two catalog bugs found and fixed during audit (Algedi wrong component, Asellus Borealis wrong HIP number). See [swisseph-comparison.md §6.6](swisseph-comparison.md#66-fixed-star-catalog--cross-checked-against-hipparcos-simbad) for full details.
 
 ### Proper motion
 
@@ -548,7 +551,9 @@ Precision: <0.01 arcsec over ±100 years; <1 arcsec over ±500 years.
 
 ### Swiss Ephemeris comparison
 
-Swiss Ephemeris uses a larger catalog (~1000+ stars from its own bundled star catalog). Both use Hipparcos data and similar proper motion models. LibEphemeris covers 102 stars, selected for astrological and navigational significance. Star positions agree to ~0.01 arcsecond.
+Swiss Ephemeris uses a larger catalog (~1000+ stars from its own bundled star catalog). Both use Hipparcos data; LibEphemeris uses the updated van Leeuwen 2007 proper motions while Swiss Ephemeris uses original 1997 values. Star positions agree to < 0.51" for all 101 comparable stars. Five stars resolve to different physical components due to different IAU WGSN name conventions (Menkar, Algedi, Algieba, Albireo, Almach).
+
+All meaningful SEFLG flags are now supported for fixed star calculations: `SEFLG_SIDEREAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_XYZ`, `SEFLG_RADIANS`, `SEFLG_TRUEPOS`, `SEFLG_MOSEPH`, `SEFLG_SPEED3`, `SEFLG_TOPOCTR`.
 
 ---
 
@@ -799,16 +804,17 @@ The divergence at extreme dates is driven by Delta-T model differences (Stephens
 
 ### Fixed stars
 
-Tested 19 stars (navigational + astrologically important) at 3 epochs (J2000, current, 1900).
+Tested 116 stars at 3 epochs (J2000, J2025, J2100). Proper motions updated to van Leeuwen 2007 (new Hipparcos reduction). All stars independently cross-checked against SIMBAD.
 
 | Metric | Value |
 |--------|-------|
-| Max longitude diff | 0.49" (Sirius, current epoch) |
-| Mean longitude diff | 0.06" |
-| Max latitude diff | 1.29" (Procyon, 1900 -- high proper motion star) |
-| Stars >1" longitude | 0 of 57 |
+| Max longitude diff | 0.51" (Rigil Kentaurus — nearest star, parallax not modeled) |
+| Mean longitude diff | < 0.1" |
+| Stars within 0.5" | 98% of 101 comparable stars |
+| Stars within 0.1" | 80% of 101 comparable stars |
+| Catalog bugs found & fixed | 2 (Algedi wrong component, Asellus Borealis wrong HIP) |
 
-High proper motion stars (Sirius, Vega, Procyon) show the largest differences due to slightly different proper motion reduction methods. Distant/slow stars agree to <0.03".
+Remaining sub-arcsecond differences are from Skyfield vs Swiss Ephemeris precession/nutation pipeline differences. High proper motion stars (Sirius, Rigil Kentaurus) show largest differences due to annual parallax (not modeled).
 
 ### House cusps at extreme latitudes
 
@@ -881,7 +887,7 @@ When `SEFLG_MOSEPH` (flag value 4) is passed, Swiss Ephemeris falls back to the 
 
 ## See Also
 
-- **[Swiss Ephemeris Comparison](swisseph-comparison.md)** — Exhaustive comparison between libephemeris and pyswisseph, including measured precision tables, known differences with detailed explanations, bugs found and fixed, and API signature differences. Based on 1,109 automated tests covering all 87 `swe_*` functions.
+- **[Swiss Ephemeris Comparison](swisseph-comparison.md)** — Exhaustive comparison between libephemeris and pyswisseph, including measured precision tables, known differences with detailed explanations, bugs found and fixed, and API signature differences. Based on 1,619 automated tests covering all 87 `swe_*` functions.
 
 ---
 

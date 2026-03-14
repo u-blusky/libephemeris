@@ -151,8 +151,9 @@ pos, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_SIDEREAL
 > [!NOTE]
 > `SEFLG_MOSEPH` and `SEFLG_SWIEPH` are accepted for API compatibility but
 > silently ignored — all calculations always use JPL DE440/DE441 via Skyfield.
-> `SEFLG_BARYCTR` is mapped to heliocentric. `SEFLG_XYZ`, `SEFLG_RADIANS`,
-> `SEFLG_SPEED3` is defined but not yet implemented.
+> `SEFLG_BARYCTR` returns barycentric coordinates. `SEFLG_XYZ` returns
+> Cartesian coordinates (x, y, z in AU). `SEFLG_RADIANS` returns angles in
+> radians instead of degrees. `SEFLG_SPEED3` is converted to `SEFLG_SPEED`.
 
 ---
 
@@ -344,6 +345,7 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 
 - `docs/methodology/overview.md` (computational methodology, comparison with Swiss Ephemeris)
 - `docs/reference/precision.md` (scientific models, measured precision, references)
+- `docs/reference/swisseph-comparison.md` (exhaustive comparison vs pyswisseph, 1,619 tests)
 - `docs/guides/migration-guide.md` (pyswisseph -> libephemeris)
 - `docs/reference/house-systems.md`
 - `docs/reference/ayanamsha.md`

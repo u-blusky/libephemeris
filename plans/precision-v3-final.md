@@ -37,14 +37,15 @@ sources before we can document them as advantages or fix them as bugs.
 For every area with tolerance > 0.001°, we perform a 3-source triangulation:
 **us vs SE vs independent source** (JPL Horizons, astropy/ERFA, Gaia/SIMBAD).
 
-### A1. J2000 Frame — systematic ~0.004° offset (nodes/Lilith)
+### A1. J2000 Frame — systematic ~0.004° offset (nodes/Lilith) ✅ COMPLETED — WE ARE MORE ACCURATE
 
 - **Symptom:** ~14-22" systematic offset when `SEFLG_J2000` is used
 - **Ground truth:** JPL Horizons "ecliptic J2000" output + astropy ICRS-to-ecliptic-J2000
-- **Hypothesis:** Different precession model in frame transformation (IAU 2006 vs older)
-- **Test:** Compute True Node / Lilith in J2000 ecliptic for 10 dates, compare with Horizons
-- **If we win:** Document "IAU 2006 precession produces more accurate J2000 frame transformation"
-- **Priority:** HIGH (potential selling point)
+- **Results:**
+  - SE applies a spurious ~14" offset at J2000 epoch that should not exist
+  - Our IAU 2006 precession produces the correct J2000 frame transformation
+  - Verified independently against JPL Horizons and astropy/ERFA
+- **Conclusion:** Documented as a selling point — our J2000 frame is more accurate than SE's
 
 ### A2. Mean Lilith (MEAN_APOG) — 0.01° (~36") ✅ COMPLETED — NOT a bug
 
@@ -56,31 +57,35 @@ For every area with tolerance > 0.001°, we perform a 3-source triangulation:
   - Speed: < 0.00005°/day — perfect agreement.
 - **Conclusion:** No action needed. Differences are inherent to the different analytical approaches (DE404-fitted Chapront coefficients vs SE internal coefficients). Mean Lilith is a mathematical point, not a physical body — sub-arcsecond longitude agreement is excellent.
 
-### A3. Equatorial Coordinates — TRUE_NODE 0.2°, OSCU_APOG 0.15°
+### A3. Equatorial Coordinates — TRUE_NODE 0.2°, OSCU_APOG 0.15° ✅ COMPLETED — <0.2"
 
 - **Symptom:** Large tolerances in ecliptic-to-equatorial transformation
 - **Ground truth:** Independent calculation with pyerfa `erfa.ecl2equ()`
-- **Hypothesis:** Different obliquity value (true vs mean, nutation model)
-- **Test:** Compute RA/Dec independently with pyerfa and compare
-- **If we win:** Document "Equatorial transformation uses IAU 2006/2000A obliquity via ERFA"
-- **Priority:** HIGH (these are suspiciously large)
+- **Results:**
+  - Tolerances tightened from 0.2° to <0.2" (<0.001°) — sub-arcsecond agreement
+  - Verified independently against pyerfa/ERFA obliquity calculations
+  - Old tolerances were massively over-conservative
+- **Conclusion:** No bug. Tightened in commit `f852000`
 
-### A4. Latitude nodes/Lilith — TRUE_NODE 0.5°, OSCU_APOG 1.5°
+### A4. Latitude nodes/Lilith — TRUE_NODE 0.5°, OSCU_APOG 1.5° ✅ COMPLETED — <0.02"
 
 - **Symptom:** Very large differences in latitude
 - **Ground truth:** JPL Horizons ecliptic latitude
-- **Hypothesis:** Could be a real bug in the eccentricity vector latitude calculation
-- **Test:** Compare with Horizons for 20 dates
-- **If it's our bug:** Fix it
-- **If we win:** Document
-- **Priority:** HIGHEST (1.5° could be a real bug)
+- **Results:**
+  - Tolerances tightened from 1.5° to <0.02" (<0.001°) — sub-arcsecond agreement
+  - Old tolerances were massively over-conservative (by ~5400x)
+  - No bug in eccentricity vector latitude calculation
+- **Conclusion:** No bug. Tightened in commit `f852000`
 
-### A5. Velocity nodes/Lilith — TRUE_NODE 0.2°/day, OSCU_APOG 1.0°/day
+### A5. Velocity nodes/Lilith — TRUE_NODE 0.2°/day, OSCU_APOG 1.0°/day ✅ COMPLETED — <0.015°/day
 
 - **Symptom:** Large tolerance in velocity values
 - **Ground truth:** Numerical differentiation of Horizons positions (t-0.5 and t+0.5)
-- **Test:** 10 dates, compare numerical velocities vs ours vs SE
-- **Priority:** MEDIUM (velocities are secondary to positions)
+- **Results:**
+  - Tolerances tightened from 1.0°/day to <0.015°/day
+  - Sub-arcsecond velocity agreement for most bodies
+  - True Lilith velocity tolerance <0.05°/day (slightly larger due to osculating element sensitivity)
+- **Conclusion:** No bug. Tightened in commit `f852000`
 
 ### A6. Fixed Stars — 0.002° (7.2") ✅ COMPLETED
 
@@ -96,11 +101,14 @@ For every area with tolerance > 0.001°, we perform a 3-source triangulation:
   - Sirius 0.24" and Fomalhaut 0.11" offsets traced to annual parallax (not modeled)
   - Post-update: 100% of 101 comparable stars within 0.002° of SE, 98% within 0.5"
 
-### A7. Star-based Sidereal Ayanamshas — 0.1°
+### A7. Star-based Sidereal Ayanamshas — 0.1° ✅ COMPLETED — up to 19", expected
 
 - **Depends on:** A6 results. If our star positions are more precise, ayanamsha is too
-- **Test:** Compute Lahiri ayanamsha (Spica-based) independently
-- **Priority:** LOW
+- **Results:**
+  - Up to 19" difference for star-dependent ayanamsha modes (Lahiri, Raman, etc.)
+  - Differences are expected and directly traceable to different star catalog positions (van Leeuwen 2007 vs original Hipparcos 1997)
+  - Formula-based ayanamshas (not star-dependent) agree to <0.001°
+- **Conclusion:** No action needed. Star-based ayanamshas inherit the star position differences from A6.
 
 ### A8. Heliocentric/Barycentric Planets — 0.03° ✅ COMPLETED
 
@@ -120,36 +128,38 @@ For every area with tolerance > 0.001°, we perform a 3-source triangulation:
 
 ---
 
-## BLOCK B — Fix `fixed_stars.py` (Silently Ignored Flags)
+## BLOCK B — Fix `fixed_stars.py` (Silently Ignored Flags) ✅ COMPLETED
 
-### B1. Problem
+### B1. Problem (FIXED in commit `f852000`)
 
-`fixed_stars.py` only handles 4 of 19 SEFLG flags (`SPEED`, `NOABERR`, `NOGDEFL`,
-`EQUATORIAL`). All others are **silently ignored**. Most critical: `SEFLG_SIDEREAL`
-returns tropical coordinates without any warning.
+`fixed_stars.py` originally only handled 4 of 19 SEFLG flags (`SPEED`, `NOABERR`, `NOGDEFL`,
+`EQUATORIAL`). All others were **silently ignored**. Most critical: `SEFLG_SIDEREAL`
+returned tropical coordinates without any warning.
 
-### B2. Implementation
+**9 new flags implemented:** SIDEREAL, J2000, NONUT, XYZ, RADIANS, TRUEPOS, MOSEPH, SPEED3, TOPOCTR.
 
-Apply to all 4 public functions (`swe_fixstar_ut`, `swe_fixstar`, `swe_fixstar2_ut`,
-`swe_fixstar2`). Extract shared logic into a helper.
+### B2. Implementation (DONE)
 
-| Flag | Priority | Implementation |
-|------|----------|----------------|
-| `SEFLG_SIDEREAL` | **Critical** | `lon = (lon - ayanamsha) % 360` after calc, like planets.py |
-| `SEFLG_J2000` | High | Use `ecliptic_J2000_frame` instead of `ecliptic_frame` |
-| `SEFLG_NONUT` | High | Use mean ecliptic frame (no nutation) |
-| `SEFLG_XYZ` | Medium | Spherical-to-Cartesian (reuse pattern from planets.py) |
-| `SEFLG_RADIANS` | Medium | Degrees-to-radians (reuse pattern from planets.py) |
-| `SEFLG_ICRS` | Medium | ICRS frame without frame bias |
-| `SEFLG_TRUEPOS` | Low | Geometric position (use `astrometric` directly) |
-| `SEFLG_MOSEPH` | Low | Silent strip like planets.py |
-| `SEFLG_SPEED3` | Low | Convert to `SEFLG_SPEED` |
-| `SEFLG_TOPOCTR` | Low | Accept silently (stars at infinite distance) |
+Applied to all 4 public functions (`swe_fixstar_ut`, `swe_fixstar`, `swe_fixstar2_ut`,
+`swe_fixstar2`). Shared logic extracted into helpers.
 
-### B3. Tests
+| Flag | Status | Implementation |
+|------|--------|----------------|
+| `SEFLG_SIDEREAL` | ✅ Done | `lon = (lon - ayanamsha) % 360` after calc, like planets.py |
+| `SEFLG_J2000` | ✅ Done | Use `ecliptic_J2000_frame` instead of `ecliptic_frame` |
+| `SEFLG_NONUT` | ✅ Done | Use mean ecliptic frame (no nutation) |
+| `SEFLG_XYZ` | ✅ Done | Spherical-to-Cartesian (reuse pattern from planets.py) |
+| `SEFLG_RADIANS` | ✅ Done | Degrees-to-radians (reuse pattern from planets.py) |
+| `SEFLG_ICRS` | N/A | Already handled before this work |
+| `SEFLG_TRUEPOS` | ✅ Done | Geometric position (use `astrometric` directly) |
+| `SEFLG_MOSEPH` | ✅ Done | Silent strip like planets.py |
+| `SEFLG_SPEED3` | ✅ Done | Convert to `SEFLG_SPEED` |
+| `SEFLG_TOPOCTR` | ✅ Done | Accept silently (stars at infinite distance) |
 
-Add comparison tests in `test_compare_fixedstars.py`:
-- `SEFLG_SIDEREAL` with at least 3 ayanamshas
+### B3. Tests (DONE)
+
+Comparison tests added in `test_compare_fixedstars.py`:
+- `SEFLG_SIDEREAL` with multiple ayanamshas
 - `SEFLG_J2000`
 - `SEFLG_NONUT`
 - `SEFLG_XYZ` + `SEFLG_RADIANS`
@@ -190,14 +200,14 @@ Update `plans/precision-investigation-true-node-lilith.md` with results.
 
 ## Execution Order
 
-| Step | Block | Description |
-|------|-------|-------------|
-| 1 | A4 | Latitude cross-check (possible bug, highest priority) |
-| 2 | A1 | J2000 frame cross-check (selling point) |
-| 3 | A3 | Equatorial coordinates cross-check |
-| 4 | A5 | Velocity cross-check |
-| 5 | A6 | Fixed stars cross-check |
-| 6 | B1/B2/B3 | Fix fixed_stars.py flags + tests |
-| 7 | A2, A7, A8 | Remaining cross-checks |
-| 8 | C1-C4 | Documentation updates |
-| 9 | Commit | Final commit on dev/precision-v3 |
+| Step | Block | Description | Status |
+|------|-------|-------------|--------|
+| 1 | A4 | Latitude cross-check (possible bug, highest priority) | ✅ Done (Session 10) — <0.02", tightened |
+| 2 | A1 | J2000 frame cross-check (selling point) | ✅ Done (Session 10) — WE ARE MORE ACCURATE |
+| 3 | A3 | Equatorial coordinates cross-check | ✅ Done (Session 10) — <0.2", tightened |
+| 4 | A5 | Velocity cross-check | ✅ Done (Session 10) — <0.015°/day, tightened |
+| 5 | A6 | Fixed stars cross-check | ✅ Done (Session 11) — 99 stars updated, 2 bugs fixed |
+| 6 | B1/B2/B3 | Fix fixed_stars.py flags + tests | ✅ Done (Session 10) — 9 flags implemented |
+| 7 | A2, A7, A8 | Remaining cross-checks | ✅ Done (Sessions 11-12) — all verified |
+| 8 | C1-C4 | Documentation updates | ✅ Partially done — swisseph-comparison.md updated |
+| 9 | Commit | Final commit on dev/precision-v3 | ✅ All merged to main (5 commits ahead of origin) |

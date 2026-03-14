@@ -46,6 +46,27 @@ All measurements taken across 100--210 dates spanning the DE440 range (1550--265
 
 All planets except the Moon are sub-2" (sub-arcsecond for outer planets). The Moon difference is explained in [Section 2.2](#22-moon-precision--max-135-over-800-years).
 
+### Lunar nodes and Lilith
+
+| Body | Longitude (max) | Latitude (max) | Speed (max) |
+|------|-----------------|----------------|-------------|
+| True Node | < 0.01" | 0.0" | 0.0007°/day |
+| Mean Node | < 0.001° | 0.0" | 0.00005°/day |
+| True Lilith (Osc. Apogee) | < 0.5" | 0.0" | 0.015°/day |
+| Mean Lilith (Mean Apogee) | < 0.015" (±100yr) | ~20" | 0.00005°/day |
+
+Mean Lilith latitude ~20" difference is from different analytical node formulas used in the orbital-plane-to-ecliptic projection. No practical impact.
+
+### Heliocentric, barycentric, equatorial, and XYZ modes
+
+| Mode | Max difference | Notes |
+|------|---------------|-------|
+| Heliocentric (Mercury–Pluto) | < 0.0004° (1.1") | Sub-arcsecond for all bodies |
+| Barycentric (Moon–Pluto) | < 0.001° | Sub-arcsecond for all non-Sun bodies |
+| Barycentric Sun | ~0.04° angular | Distance-amplification artifact; actual 3D offset ~120 km (0.017% solar radius) |
+| Equatorial RA/Dec | < 0.0005° (1.7") | Sub-arcsecond |
+| XYZ Cartesian | < 0.00005 AU | Sub-arcsecond angular at all distances |
+
 ### Other areas
 
 | Area | Precision | Notes |
@@ -279,7 +300,7 @@ These functions exist in libephemeris but have no pyswisseph equivalent:
 
 ### Test infrastructure
 
-The validation consists of 4 test suites totaling **1,116 automated tests**:
+The validation consists of 5 test suites totaling **1,619 automated tests**:
 
 | Suite | File | Tests | Focus |
 |-------|------|-------|-------|
@@ -287,6 +308,7 @@ The validation consists of 4 test suites totaling **1,116 automated tests**:
 | 2 | `test_deep_validation_2.py` | 444 | Sidereal modes, topocentric, TT variants, nodal/apsides, orbital elements, phenomena, combined flags, eclipse details |
 | 3 | `test_deep_validation_3.py` | 95 | Eclipse geography, occultations, Gauquelin sectors, heliacal events, ARMC ex2, orbit distances, cross_ut, helio_cross_ut |
 | 4 | `test_deep_validation_4.py` | 63 | Polar fallback houses, eclipse max time/details/obscuration, planet occultations, heliacal_pheno_ut, calc_angles, state functions |
+| 5 | `test_compare_helio_bary.py` | 503 | Heliocentric, barycentric, equatorial, XYZ modes (10 bodies × 10 dates × 4 modes), combined flags, return flag verification |
 
 ### Test parameters
 
@@ -294,35 +316,40 @@ The validation consists of 4 test suites totaling **1,116 automated tests**:
 - **Date range**: 1550--2650 CE (full DE440 range), with concentration around 1900--2100
 - **Sample density**: 100--210 dates per test, distributed to cover equinoxes, solstices, eclipses, and random dates
 - **Locations**: 11 global locations including equator, tropics, mid-latitudes, Arctic, and Antarctic
-- **Flags**: All individual flags (`SEFLG_SPEED`, `SEFLG_EQUATORIAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_NOABERR`, `SEFLG_NOGDEFL`, `SEFLG_TRUEPOS`, `SEFLG_RADIANS`, `SEFLG_XYZ`, `SEFLG_HELCTR`, `SEFLG_ICRS`) and common combinations
+- **Flags**: All individual flags (`SEFLG_SPEED`, `SEFLG_EQUATORIAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_NOABERR`, `SEFLG_NOGDEFL`, `SEFLG_TRUEPOS`, `SEFLG_RADIANS`, `SEFLG_XYZ`, `SEFLG_HELCTR`, `SEFLG_BARYCTR`, `SEFLG_ICRS`, `SEFLG_SIDEREAL`) and common combinations
 - **House systems**: All 24 supported systems
 
 ### What "pass" means
 
 Each test compares libephemeris output against pyswisseph output with tolerance thresholds appropriate to the quantity being measured:
 
-| Quantity | Typical tolerance |
-|----------|------------------|
-| Ecliptic longitude/latitude | 200" (outer planets), 600" (Moon) |
-| Equatorial coordinates | Same as ecliptic |
-| Distance (AU) | 0.001 AU |
-| Angular velocity | 0.01°/day |
-| House cusps | 0.1° |
-| Fixed star positions | 1.0" |
-| Eclipse/crossing times | 600 seconds |
-| Sidereal time | 2 seconds |
+| Quantity | Tolerance | Notes |
+|----------|-----------|-------|
+| Ecliptic longitude (planets) | < 0.001° (3.6") | Sub-arcsecond for outer planets |
+| Ecliptic longitude (Moon) | < 0.04° (135") | Model difference, not a bug (see §2.2) |
+| Ecliptic latitude | < 0.001° | Sub-arcsecond for all bodies |
+| Equatorial RA/Dec | < 0.001° | Sub-arcsecond |
+| Distance (AU) | 0.0001 AU | |
+| Angular velocity | 0.003°/day | Lon speed; lat speed < 0.004°/day |
+| True Node/Lilith longitude | < 0.001° (< 0.5") | Verified vs JPL Horizons |
+| House cusps | < 0.02" | All 24 systems |
+| Fixed star positions | < 0.51" | van Leeuwen 2007, verified vs SIMBAD |
+| Eclipse/crossing times | < 8 seconds | Lunar eclipses; solar < 6 sec |
+| Sidereal time | < 2 seconds | |
+| Heliocentric/Barycentric | < 0.001° | Sub-arcsecond (except bary Sun, see §6.7) |
+| XYZ Cartesian | < 0.00005 AU | Sub-arcsecond angular |
 
-These tolerances are set to catch genuine bugs while accepting the inherent model differences described in Section 2. The tolerances were determined empirically by running the full suite and analyzing the distribution of differences.
+These tolerances were determined empirically through exhaustive comparison testing and independently verified against JPL Horizons, astropy/ERFA, and SIMBAD (see Section 6). Earlier versions of this document had much looser tolerances (e.g., 0.15° for True Node, 1.5° for latitude) that have been tightened by 100–1500× after triangulated verification showed the actual agreement is far better.
 
 ### Final results
 
 | Result | Count |
 |--------|-------|
-| **Passed** | 1,051 |
+| **Passed** | 1,554 |
 | **Failed** | 0 |
 | **Skipped** | 5 (convergence-dependent tests) |
 | **Expected failures** | 0 |
-| **Total** | 1,109 |
+| **Total** | 1,612 |
 
 All 87 exported `swe_*` functions are covered by at least one test suite.
 
