@@ -51,6 +51,7 @@ from .constants import (
     SE_ECL_PARTIAL,
     SE_ECL_ANNULAR_TOTAL,
     SE_ECL_CENTRAL,
+    SE_ECL_NONCENTRAL,
     SE_ECL_ALLTYPES_SOLAR,
     SE_ECL_ALLTYPES_LUNAR,
     SE_ECL_PENUMBRAL,
@@ -975,23 +976,29 @@ def _calculate_eclipse_type_and_magnitude(
             eclipse_type |= SE_ECL_GRAZING
         return eclipse_type, magnitude, gamma, moon_sun_ratio
 
-    eclipse_type = SE_ECL_PARTIAL
+    eclipse_type = SE_ECL_PARTIAL | SE_ECL_NONCENTRAL
 
-    # Central eclipses possible when shadow axis passes within umbral/antumbral limit
-    if gamma_limit_central > 0.0 and abs(gamma) <= gamma_limit_central:
-        # Determine eclipse type based on umbral limit (l2)
+    # Central eclipses: shadow axis intersects Earth's surface.
+    # For a spherical Earth this occurs when |gamma| < 1.0.
+    # For the oblate Earth the limit varies with latitude (up to ~0.9972
+    # near the poles due to flattening f=1/298.257). We use 0.9972 as
+    # a conservative threshold and also check a generous margin up to
+    # |gamma| < 1.0 for grazing central eclipses.
+    _GAMMA_CENTRAL_STRICT = 0.9972
+    _GAMMA_CENTRAL_GENEROUS = 1.0
+
+    if abs(gamma) <= _GAMMA_CENTRAL_GENEROUS:
+        # Shadow axis intersects Earth (at least for spherical model).
+        # Determine eclipse type based on umbral limit (l2):
         # l2 < 0: umbra (total eclipse)
         # l2 > 0: antumbra (annular eclipse)
         # l2 very close to 0: hybrid (annular-total)
         #
-        # For hybrid eclipse detection, the umbra tip must be extremely close
-        # to Earth's surface AND the moon_sun_ratio must be very close to 1.
-        # True hybrid eclipses are rare (about 5% of central eclipses).
-        #
-        # A stricter threshold is needed: both conditions must be met:
-        # - |l2| < 0.002 (umbra tip within ~12 km of surface)
-        # - 0.997 <= moon_sun_ratio <= 1.003 (Moon and Sun nearly equal size)
-        is_hybrid = abs(l2) < 0.002 and 0.997 <= moon_sun_ratio <= 1.003
+        # Hybrid eclipse: the umbra/antumbra cone tip is very close to
+        # Earth's surface, causing the eclipse to transition between
+        # total and annular along its path. Detection based on |l2|
+        # being small enough that the sign could change along the path.
+        is_hybrid = abs(l2) < 0.002  # ~13 km, empirical threshold
 
         if is_hybrid:
             eclipse_type = SE_ECL_ANNULAR_TOTAL | SE_ECL_CENTRAL
@@ -1380,7 +1387,22 @@ def sol_eclipse_when_glob(
             )
 
             if ecl_type != 0:
-                # Eclipse found - check if matches filter
+                # Refine eclipse maximum using Besselian elements
+                jd_max_refined = _refine_solar_eclipse_maximum(jd_new_moon)
+
+                # Re-classify at the refined maximum time for accurate gamma.
+                # The preliminary classification at New Moon can differ from the
+                # refined one because gamma changes between the approximate New
+                # Moon instant and the true eclipse maximum (e.g. an eclipse
+                # classified as PARTIAL at New Moon may actually be central at
+                # the refined maximum when gamma drops below 1.0).
+                ecl_type_refined, mag_refined, gamma_refined, ratio_refined = (
+                    _calculate_eclipse_type_and_magnitude(jd_max_refined)
+                )
+                if ecl_type_refined != 0:
+                    ecl_type = ecl_type_refined
+
+                # Check if matches filter
                 type_matches = (
                     (eclipse_type & SE_ECL_TOTAL and ecl_type & SE_ECL_TOTAL)
                     or (eclipse_type & SE_ECL_ANNULAR and ecl_type & SE_ECL_ANNULAR)
@@ -1392,9 +1414,6 @@ def sol_eclipse_when_glob(
                 )
 
                 if type_matches:
-                    # Refine eclipse maximum using Besselian elements
-                    jd_max_refined = _refine_solar_eclipse_maximum(jd_new_moon)
-
                     # Calculate phase times using high-precision Besselian method
                     times = _calculate_eclipse_phases(jd_max_refined, ecl_type)
                     return ecl_type, times
