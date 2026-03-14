@@ -852,6 +852,9 @@ def _sidtime_internal(
     This is the full implementation used by both sidtime() and sidtime0().
     For most applications, use sidtime(jd) or sidtime0(jd, eps, nut) instead.
 
+    Uses the IAU 2006 GMST formula (Capitaine et al. 2003) via ERFA for
+    maximum precision, with an IAU 1982 polynomial fallback.
+
     Args:
         jd: Julian Day number in UT (Universal Time)
         longitude: Geographic longitude in degrees (positive East, negative West)
@@ -863,48 +866,19 @@ def _sidtime_internal(
     """
     import math
 
-    # Get JD at 0h UT of this day
-    # JD has noon as integer, so 0h UT = JD - 0.5 rounded
-    jd_0h = math.floor(jd + 0.5) - 0.5
-
-    # Calculate centuries from J2000.0 for the 0h UT moment
-    # J2000.0 is 2451545.0 = Jan 1, 2000, 12:00 TT (noon)
-    T = (jd_0h - 2451545.0) / 36525.0
-
-    # Calculate Greenwich Mean Sidereal Time at 0h UT using IAU 1982 formula
-    # Reference: Meeus "Astronomical Algorithms" Chapter 12, equation 12.4
-    # GMST at 0h UT in seconds
-    theta0_seconds = (
-        24110.54841 + 8640184.812866 * T + 0.093104 * T**2 - 0.0000062 * T**3
-    )
-
-    # Convert to hours
-    theta0_hours = theta0_seconds / 3600.0
-
-    # Calculate UT hours since 0h UT
-    ut_hours = (jd - jd_0h) * 24.0
-
-    # Convert UT hours to sidereal hours
-    # Sidereal rate: 1.00273790935 sidereal hours per solar hour
-    sidereal_from_ut = ut_hours * 1.00273790935
-
-    # Greenwich Mean Sidereal Time
-    gmst = theta0_hours + sidereal_from_ut
+    # Compute GMST using IAU 2006 formula (requires both UT1 and TT)
+    gmst_rad = _gmst06(jd)
+    gmst_hours = math.degrees(gmst_rad) / 15.0
 
     # Apply equation of equinoxes to get Greenwich Apparent Sidereal Time (GAST)
     # Equation of equinoxes = nutation in longitude * cos(obliquity)
-    # Convert obliquity to radians for cos calculation
     obliquity_rad = math.radians(obliquity)
-
-    # Nutation contribution to sidereal time (convert from degrees to hours)
-    # Nutation in longitude (degrees) * cos(obliquity) gives the correction in degrees
-    # 15 degrees = 1 hour, so divide by 15 to get hours
+    # Nutation in longitude (degrees) * cos(obliquity) -> degrees, /15 -> hours
     equation_of_equinoxes = (nutation * math.cos(obliquity_rad)) / 15.0
 
-    gast = gmst + equation_of_equinoxes
+    gast = gmst_hours + equation_of_equinoxes
 
     # Convert longitude to hours (15° = 1 hour)
-    # Positive longitude (East) means local time is ahead of Greenwich
     longitude_hours = longitude / 15.0
 
     # Local Apparent Sidereal Time
@@ -916,6 +890,45 @@ def _sidtime_internal(
         last += 24.0
 
     return last
+
+
+def _gmst06(jd_ut1: float) -> float:
+    """Compute Greenwich Mean Sidereal Time using IAU 2006 formula.
+
+    Uses ``erfa.gmst06()`` (Capitaine et al. 2003) which is the current
+    IAU standard.  Falls back to the IAU 1982 polynomial when pyerfa is
+    unavailable.
+
+    Args:
+        jd_ut1: Julian Day number in UT1.
+
+    Returns:
+        GMST in radians (unwrapped, may exceed 2*pi).
+    """
+    import math
+
+    # IAU 2006 GMST requires both UT1 and TT.  Compute Delta-T to get TT.
+    delta_t = swe_deltat(jd_ut1)  # days
+    jd_tt = jd_ut1 + delta_t
+
+    try:
+        import erfa
+
+        return float(erfa.gmst06(jd_ut1, 0.0, jd_tt, 0.0))
+    except ImportError:
+        pass
+
+    # ----- Fallback: IAU 1982 polynomial (Meeus Ch.12 eq.12.4) -----
+    jd_0h = math.floor(jd_ut1 + 0.5) - 0.5
+    T = (jd_0h - 2451545.0) / 36525.0
+    theta0_seconds = (
+        24110.54841 + 8640184.812866 * T + 0.093104 * T**2 - 0.0000062 * T**3
+    )
+    theta0_hours = theta0_seconds / 3600.0
+    ut_hours = (jd_ut1 - jd_0h) * 24.0
+    sidereal_from_ut = ut_hours * 1.00273790935
+    gmst_hours = theta0_hours + sidereal_from_ut
+    return math.radians(gmst_hours * 15.0)
 
 
 def sidtime(
