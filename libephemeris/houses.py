@@ -387,16 +387,17 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
         mc: Midheaven longitude in degrees (for hemisphere verification)
 
     Returns:
-        Vertex longitude in degrees (western hemisphere), or 0.0 at equator
+        Vertex longitude in degrees (western hemisphere), or 180.0 at equator
 
     Precision: ~0.001° for non-equatorial latitudes
     """
     eps_rad = math.radians(eps)
 
     # At equator (lat=0), Vertex is mathematically undefined (Prime Vertical
-    # coincides with the horizon plane). Returns 0.0 as fallback.
+    # coincides with the horizon plane). Returns 180.0 as fallback,
+    # following the Swiss Ephemeris convention.
     if abs(lat) < 1e-10:  # Effectively zero latitude (~0.00036 arcsec)
-        return 0.0
+        return 180.0
 
     # Standard formula for non-zero latitudes
     # Vertex is where Prime Vertical intersects ecliptic in West
@@ -1352,9 +1353,11 @@ def swe_houses_armc(
         cusps = _houses_equal_mc(asc, mc)
     elif hsys_char in ("I", "i"):  # Sunshine (Makransky)
         # Sunshine requires Sun's declination which needs JD.
-        # swe_houses_armc doesn't have JD, so fall back to Porphyry.
-        # Use swe_houses() for proper Sunshine calculation.
-        cusps = _houses_porphyry(asc, mc)
+        # swe_houses_armc doesn't have JD, so use sun_dec=0 (equinox
+        # approximation). This matches Swiss Ephemeris behavior for
+        # houses_armc with Sunshine system.
+        cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, 0.0)
+        ascmc[1] = cusps[10]
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -1545,12 +1548,20 @@ def swe_houses_ex(
     if flags & SEFLG_SIDEREAL:
         ayanamsa = swe_get_ayanamsa_ut(tjdut)
 
-        # First compute sidereal angles
+        # Compute sidereal angles
+        # All ecliptic longitudes in ascmc get ayanamsa correction EXCEPT
+        # ascmc[2] (ARMC) which is an equatorial/geometric quantity.
         ascmc_list = list(ascmc)
         sid_asc = (ascmc_list[0] - ayanamsa) % 360.0
         sid_mc = (ascmc_list[1] - ayanamsa) % 360.0
         ascmc_list[0] = sid_asc
         ascmc_list[1] = sid_mc
+        # ascmc[2] = ARMC — geometric, NOT corrected
+        ascmc_list[3] = (ascmc_list[3] - ayanamsa) % 360.0  # Vertex
+        ascmc_list[4] = (ascmc_list[4] - ayanamsa) % 360.0  # EquAsc
+        ascmc_list[5] = (ascmc_list[5] - ayanamsa) % 360.0  # CoAsc Koch
+        ascmc_list[6] = (ascmc_list[6] - ayanamsa) % 360.0  # CoAsc Munkasey
+        ascmc_list[7] = (ascmc_list[7] - ayanamsa) % 360.0  # PolarAsc
         ascmc = tuple(ascmc_list)
 
         # Normalize hsys to a character for comparison
@@ -4489,17 +4500,18 @@ def house_pos(
         # Morinus
         # Project the ecliptic longitude onto the equatorial frame via:
         # tan(ra_equiv) = tan(λ) / cos(ε)
-        # atan2(sin(λ), cos(λ)·cos(ε)) avoids the intermediate tangent variable
-        # and handles the λ=90°/270° singularity natively.
+        # atan2(sin(λ), cos(λ)·cos(ε)) gives the RA-equivalent in [-180, 180],
+        # then % 360 maps to [0, 360).
         a = lon
         if abs(a - 90.0) > VERY_SMALL and abs(a - 270.0) > VERY_SMALL:
-            hpos_deg = math.degrees(
-                math.atan2(
-                    math.sin(math.radians(a)), math.cos(math.radians(a)) * cos_eps
+            hpos_deg = (
+                math.degrees(
+                    math.atan2(
+                        math.sin(math.radians(a)), math.cos(math.radians(a)) * cos_eps
+                    )
                 )
+                % 360.0
             )
-            if a > 90.0 and a <= 270.0:
-                hpos_deg = (hpos_deg + 180.0) % 360.0
         else:
             hpos_deg = 90.0 if abs(a - 90.0) <= VERY_SMALL else 270.0
         hpos_deg = (hpos_deg - armc - 90.0) % 360.0
