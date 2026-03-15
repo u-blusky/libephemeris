@@ -2482,7 +2482,11 @@ def swe_sol_eclipse_when_loc(
             jd_second = 0.0
             jd_third = 0.0
 
-        # Check visibility of each contact
+        # Check visibility of each contact — save original geometric times
+        # for sunrise/sunset search before zeroing invisible contacts.
+        jd_first_geom = jd_first
+        jd_fourth_geom = jd_fourth
+
         first_alt, _, _ = _get_sun_altaz(jd_first)
         fourth_alt, _, _ = _get_sun_altaz(jd_fourth)
 
@@ -2501,18 +2505,19 @@ def swe_sol_eclipse_when_loc(
             if third_alt < -1.0:
                 jd_third = 0.0
 
-        # Check for sunrise/sunset during eclipse
+        # Check for sunrise/sunset during eclipse using original geometric
+        # contact times (before visibility filtering zeroed them out).
         jd_sunrise = 0.0
         jd_sunset = 0.0
 
         # Check if Sun rises during eclipse
-        if jd_first > 0 and jd_fourth > 0:
-            alt_first, _, _ = _get_sun_altaz(jd_first)
-            alt_fourth, _, _ = _get_sun_altaz(jd_fourth)
+        if jd_first_geom > 0 and jd_fourth_geom > 0:
+            alt_first, _, _ = _get_sun_altaz(jd_first_geom)
+            alt_fourth, _, _ = _get_sun_altaz(jd_fourth_geom)
 
             if alt_first < 0 < alt_fourth:
                 # Sun rises during eclipse - find approximate time
-                t_low, t_high = jd_first, jd_fourth
+                t_low, t_high = jd_first_geom, jd_fourth_geom
                 for _ in range(30):
                     t_mid = (t_low + t_high) / 2
                     alt_mid, _, _ = _get_sun_altaz(t_mid)
@@ -2526,7 +2531,7 @@ def swe_sol_eclipse_when_loc(
 
             elif alt_first > 0 > alt_fourth:
                 # Sun sets during eclipse
-                t_low, t_high = jd_first, jd_fourth
+                t_low, t_high = jd_first_geom, jd_fourth_geom
                 for _ in range(30):
                     t_mid = (t_low + t_high) / 2
                     alt_mid, _, _ = _get_sun_altaz(t_mid)
@@ -2538,51 +2543,49 @@ def swe_sol_eclipse_when_loc(
                         break
                 jd_sunset = (t_low + t_high) / 2
 
-        # Calculate core shadow width (for central eclipses only)
-        if min_separation < diff_radii:
-            # This is a central eclipse - calculate shadow width
-            # Shadow width depends on umbra/antumbra cone geometry
-            moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, ifl | SEFLG_SPEED)
-            sun_pos, _ = swe_calc_ut(jd_local_max, SE_SUN, ifl | SEFLG_SPEED)
+        # Calculate core shadow width.
+        # This is always computed regardless of whether the eclipse is central
+        # at the observer's location — it represents the shadow cone geometry
+        # projected through the observer's Sun altitude at maximum.
+        moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, ifl | SEFLG_SPEED)
+        sun_pos, _ = swe_calc_ut(jd_local_max, SE_SUN, ifl | SEFLG_SPEED)
 
-            moon_dist_au = moon_pos[2]
-            sun_dist_au = sun_pos[2]
+        moon_dist_au = moon_pos[2]
+        sun_dist_au = sun_pos[2]
 
-            sun_radius_km = 696340.0
-            moon_radius_km = 1737.4
-            sun_dist_km = sun_dist_au * 149597870.7
-            moon_dist_km = moon_dist_au * 149597870.7
+        sun_radius_km = 696340.0
+        moon_radius_km = 1737.4
+        sun_dist_km = sun_dist_au * 149597870.7
+        moon_dist_km = moon_dist_au * 149597870.7
 
-            # Umbra/antumbra cone geometry
-            alpha = math.atan((sun_radius_km - moon_radius_km) / sun_dist_km)
+        # Umbra/antumbra cone geometry
+        alpha = math.atan((sun_radius_km - moon_radius_km) / sun_dist_km)
 
-            if ratio >= 1.0:
-                # Total eclipse - umbra
-                umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
-                umbra_radius_km = max(0, umbra_radius_km)
-                is_total_shadow = True
-            else:
-                # Annular - antumbra
-                umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
-                umbra_radius_km = max(0, abs(umbra_radius_km))
-                is_total_shadow = False
+        if ratio >= 1.0:
+            # Total eclipse - umbra
+            umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
+            umbra_radius_km = max(0, umbra_radius_km)
+            is_total_shadow = True
+        else:
+            # Annular - antumbra
+            umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
+            umbra_radius_km = max(0, abs(umbra_radius_km))
+            is_total_shadow = False
 
-            # Path width affected by Sun altitude
-            if true_alt > 0:
-                cos_alt = math.cos(math.radians(90 - true_alt))
-                cos_alt = max(0.1, cos_alt)
-                shadow_width_km = 2 * umbra_radius_km / cos_alt
-            else:
-                shadow_width_km = 0.0
-
-            shadow_width_km = min(1000.0, shadow_width_km)
-
-            # Sign convention: negative for total eclipses (umbra),
-            # positive for annular eclipses (antumbra)
-            if is_total_shadow:
-                shadow_width_km = -shadow_width_km
+        # Path width affected by Sun altitude
+        if true_alt > 0:
+            cos_alt = math.cos(math.radians(90 - true_alt))
+            cos_alt = max(0.1, cos_alt)
+            shadow_width_km = 2 * umbra_radius_km / cos_alt
         else:
             shadow_width_km = 0.0
+
+        shadow_width_km = min(1000.0, shadow_width_km)
+
+        # Sign convention: negative for total eclipses (umbra),
+        # positive for annular eclipses (antumbra)
+        if is_total_shadow:
+            shadow_width_km = -shadow_width_km
 
         # Determine eclipse type flags
         ecl_type = SE_ECL_VISIBLE
@@ -3472,48 +3475,49 @@ def swe_sol_eclipse_how(
 
     obscuration = max(0.0, obscuration)
 
-    # Calculate core shadow width (for central eclipses only)
+    # Calculate core shadow width.
+    # Always computed regardless of whether the eclipse is central at the
+    # observer — represents the shadow cone geometry projected through the
+    # observer's Sun altitude.
     shadow_width_km = 0.0
-    diff_radii = abs(moon_angular_radius - sun_angular_radius)
 
-    if separation < diff_radii:
-        # Central eclipse - calculate shadow width
-        AU_TO_KM = 149597870.7
-        sun_radius_km = 696340.0
-        moon_radius_km = 1737.4
-        sun_dist_km = sun_dist_au * AU_TO_KM
-        moon_dist_km = moon_dist_au * AU_TO_KM
+    AU_TO_KM = 149597870.7
+    sun_radius_km = 696340.0
+    moon_radius_km = 1737.4
+    sun_dist_km = sun_dist_au * AU_TO_KM
+    moon_dist_km = moon_dist_au * AU_TO_KM
 
-        # Umbra cone semi-angle
-        alpha = math.atan((sun_radius_km - moon_radius_km) / sun_dist_km)
+    # Umbra cone semi-angle
+    alpha = math.atan((sun_radius_km - moon_radius_km) / sun_dist_km)
 
-        if ratio >= 1.0:
-            # Total eclipse - umbra
-            umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
-            umbra_radius_km = max(0, umbra_radius_km)
-            is_total_shadow = True
-        else:
-            # Annular - antumbra
-            umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
-            umbra_radius_km = max(0, abs(umbra_radius_km))
-            is_total_shadow = False
+    if ratio >= 1.0:
+        # Total eclipse - umbra
+        umbra_radius_km = moon_radius_km - moon_dist_km * math.tan(alpha)
+        umbra_radius_km = max(0, umbra_radius_km)
+        is_total_shadow = True
+    else:
+        # Annular - antumbra
+        umbra_radius_km = moon_dist_km * math.tan(alpha) - moon_radius_km
+        umbra_radius_km = max(0, abs(umbra_radius_km))
+        is_total_shadow = False
 
-        # Path width affected by Sun altitude
-        if sun_altitude > 0:
-            sin_alt = math.sin(math.radians(sun_altitude))
-            sin_alt = max(0.1, sin_alt)
-            shadow_width_km = 2 * umbra_radius_km / sin_alt
-        else:
-            shadow_width_km = 0.0
+    # Path width affected by Sun altitude
+    if sun_altitude > 0:
+        sin_alt = math.sin(math.radians(sun_altitude))
+        sin_alt = max(0.1, sin_alt)
+        shadow_width_km = 2 * umbra_radius_km / sin_alt
+    else:
+        shadow_width_km = 0.0
 
-        shadow_width_km = min(1000.0, shadow_width_km)
+    shadow_width_km = min(1000.0, shadow_width_km)
 
-        # Sign convention: negative for total eclipses (umbra),
-        # positive for annular eclipses (antumbra)
-        if is_total_shadow:
-            shadow_width_km = -shadow_width_km
+    # Sign convention: negative for total eclipses (umbra),
+    # positive for annular eclipses (antumbra)
+    if is_total_shadow:
+        shadow_width_km = -shadow_width_km
 
     # Determine eclipse type flags
+    diff_radii = abs(moon_angular_radius - sun_angular_radius)
     eclipse_type = SE_ECL_VISIBLE
     moon_sun_ratio = moon_angular_radius / sun_angular_radius
 

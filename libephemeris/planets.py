@@ -5176,9 +5176,50 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         else:
             phase_angle = 0.0
     else:
-        # Heliocentric case - no elongation from Sun
-        elongation = 0.0
-        phase_angle = 0.0
+        # Heliocentric case: phase angle and elongation are geometric
+        # properties of the Sun-Planet-Earth triangle, computed from
+        # Earth's perspective regardless of observer flag.
+        if iflag & SEFLG_TRUEPOS:
+            _earth_target = earth.at(t).observe(target)
+            _earth_sun = earth.at(t).observe(sun)
+        else:
+            _earth_target = earth.at(t).observe(target).apparent()
+            _earth_sun = earth.at(t).observe(sun).apparent()
+
+        planet_ra, planet_dec, _ = _earth_target.radec()
+        sun_ra, sun_dec, _ = _earth_sun.radec()
+
+        planet_ra_rad = planet_ra.radians
+        planet_dec_rad = planet_dec.radians
+        sun_ra_rad = sun_ra.radians
+        sun_dec_rad = sun_dec.radians
+
+        cos_elong = math.sin(planet_dec_rad) * math.sin(sun_dec_rad) + math.cos(
+            planet_dec_rad
+        ) * math.cos(sun_dec_rad) * math.cos(planet_ra_rad - sun_ra_rad)
+        cos_elong = max(-1.0, min(1.0, cos_elong))
+        elongation = math.degrees(math.acos(cos_elong))
+
+        # Phase angle using 3D vectors from Earth
+        P = _earth_target.position.au
+        S = _earth_sun.position.au
+
+        vec_planet_to_sun = S - P
+        vec_planet_to_earth = -P
+
+        dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
+        mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))
+        mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
+
+        if mag_ps > 0 and mag_pe > 0:
+            cos_phase = dot_prod / (mag_ps * mag_pe)
+            cos_phase = max(-1.0, min(1.0, cos_phase))
+            phase_angle = math.degrees(math.acos(cos_phase))
+        else:
+            phase_angle = 0.0
+
+        # Fix geocentric distance (target_geo_dist was heliocentric above)
+        target_geo_dist = math.sqrt(sum(x**2 for x in _earth_target.position.au))
 
     # Phase (illuminated fraction)
     phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
