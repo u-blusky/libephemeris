@@ -3269,24 +3269,26 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             val = node - 240.0
 
         elif sid_mode == SE_SIDM_GALEQU_TRUE:
-            # True Galactic Equator (same node formula as IAU 1958 but using the
-            # actual current position of the galactic pole instead of a fixed epoch).
+            # True Galactic Equator — uses the modern (Hipparcos-era) galactic
+            # frame definition which differs from the IAU 1958 frame by ~190.5"
+            # (0.052920°). The ascending node offset is adjusted to reflect the
+            # updated zero-point of the true galactic equator on the ecliptic.
             gp_lon = _get_star_position_ecliptic(
                 STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
             )
             node = (gp_lon + 90.0) % 360.0
-            val = node - 240.0
+            val = node - 239.94708
 
         elif sid_mode == SE_SIDM_GALEQU_MULA:
             # Galactic Equator at Mula nakshatra.
             # The node offset is adjusted so that 0° Sagittarius of the galactic frame
             # falls at the middle of Mula (Lambda Scorpii region).
-            # Offset 246.62° places the ayanamsha ~23.4° at J2000 (Mula alignment).
+            # Offset 246.6137° places the ayanamsha ~23.41° at J2000 (Mula alignment).
             gp_lon = _get_star_position_ecliptic(
                 STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
             )
             node = (gp_lon + 90.0) % 360.0
-            val = node - 246.62
+            val = node - 246.6137
 
         elif sid_mode == SE_SIDM_GALALIGN_MARDYKS:
             # Galactic Alignment (Raymond Mardyks).
@@ -3298,11 +3300,12 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             val = node - 240.0
 
         elif sid_mode == SE_SIDM_TRUE_SHEORAN:
-            # True Sheoran: Spica (alpha Virginis) at 24°00' Virgo (= 174° sidereal).
-            # ayanamsha = star_lon - 178.607° (empirically derived offset placing Spica
-            # at the Sheoran target; validated at J2000: Spica ~203.8°, ayan ~25.2°).
+            # True Sheoran: Spica (alpha Virginis) defines the reference.
+            # The target sidereal position of Spica is 178.60170° (28°36' Virgo).
+            # ayanamsha = star_lon - 178.60170
+            # At J2000: Spica ~203.836°, ayanamsha ~25.234°.
             star_lon = _get_star_position_ecliptic(STARS["SPICA"], tjd_tt, eps_true)
-            val = star_lon - 178.607
+            val = star_lon - 178.60170
 
         elif sid_mode == SE_SIDM_GALCENT_MULA_WILHELM:
             # Galactic Center at Middle of Mula nakshatra (Ernst Wilhelm).
@@ -3341,11 +3344,12 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             return val % 360.0
 
         elif sid_mode == SE_SIDM_VALENS_MOON:
-            # Valens (Moon): Spica (alpha Virginis) at 2°47'38.4" Virgo (= 152.796° sidereal).
-            # ayanamsha = star_lon - 181.0458° (derived from Spica ~203.84° at J2000
-            # placing the target at ~22.80°; offset = 203.8414 - 22.7956 = 181.0458).
+            # Valens (Moon): Spica (alpha Virginis) defines the reference.
+            # The target sidereal position of Spica is 181.04054° (1°02'26\" Libra).
+            # ayanamsha = star_lon - 181.04054
+            # At J2000: Spica ~203.836°, ayanamsha ~22.796°.
             star_lon = _get_star_position_ecliptic(STARS["SPICA"], tjd_tt, eps_true)
-            val = star_lon - 181.0458
+            val = star_lon - 181.04054
 
         return val % 360.0
 
