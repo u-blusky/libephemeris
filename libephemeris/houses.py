@@ -4566,17 +4566,25 @@ def house_pos(
 
         xp0 = 0.0
         if not is_invalid and abs(samc) > 0:
+            # Small tolerance for floating-point boundary checks.
+            # When a body is exactly on the MC or IC, dfac can be
+            # -1e-17 instead of 0.0 due to IEEE 754 rounding.
+            _KOCH_DFAC_TOL = 1e-6
             if mdd >= 0:  # east
                 dfac = (mdd - adp + admc) / samc
-                xp0 = (dfac - 1.0) * 90.0
-                if dfac > 2.0 or dfac < 0.0:
+                if dfac > 2.0 + _KOCH_DFAC_TOL or dfac < -_KOCH_DFAC_TOL:
                     is_invalid = True
+                else:
+                    dfac = max(0.0, min(2.0, dfac))
+                    xp0 = (dfac - 1.0) * 90.0
             else:  # west
                 mdn_val = mdd + 180.0
                 dfac = (mdn_val + adp + admc) / samc
-                xp0 = (dfac + 1.0) * 90.0
-                if dfac > 2.0 or dfac < 0.0:
+                if dfac > 2.0 + _KOCH_DFAC_TOL or dfac < -_KOCH_DFAC_TOL:
                     is_invalid = True
+                else:
+                    dfac = max(0.0, min(2.0, dfac))
+                    xp0 = (dfac + 1.0) * 90.0
 
         if is_invalid:
             # Koch position failed in circumpolar area — return 0.0
