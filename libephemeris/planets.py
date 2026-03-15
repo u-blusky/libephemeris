@@ -1812,6 +1812,7 @@ def _calc_body(
         jd_tt = t.tt
         is_helio = bool(iflag & SEFLG_HELCTR)
         is_j2000 = bool(iflag & SEFLG_J2000)
+        is_sidereal = bool(iflag & SEFLG_SIDEREAL)
 
         if is_helio:
             # Heliocentric: calc_uranian_planet returns heliocentric J2000 ecliptic
@@ -1822,6 +1823,16 @@ def _calc_body(
                 from .astrometry import _precess_ecliptic
 
                 lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+            # Apply sidereal correction if requested (not for equatorial output)
+            if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
+                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
+                lon = (lon - ayanamsa) % 360.0
+                if iflag & SEFLG_SPEED:
+                    dt_aya = 1.0 / 86400.0
+                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
+                    da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
+                    dlon -= da
             result = (lon, lat, dist, dlon, dlat, ddist)
             # Strip J2000 flag since we already handled precession
             result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
@@ -1872,6 +1883,17 @@ def _calc_body(
 
             lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
+        # Apply sidereal correction if requested (not for equatorial output)
+        if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
+            ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
+            lon = (lon - ayanamsa) % 360.0
+            if iflag & SEFLG_SPEED:
+                dt_aya = 1.0 / 86400.0
+                ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
+                da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
+                dlon -= da
+
         result = (lon, lat, dist, dlon, dlat, ddist)
         # Strip J2000 flag since we already handled precession
         result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
@@ -1885,6 +1907,7 @@ def _calc_body(
         jd_tt = t.tt
         is_helio = bool(iflag & SEFLG_HELCTR)
         is_j2000 = bool(iflag & SEFLG_J2000)
+        is_sidereal = bool(iflag & SEFLG_SIDEREAL)
 
         if is_helio:
             pos = hypothetical.calc_transpluto(jd_tt)
@@ -1894,6 +1917,16 @@ def _calc_body(
                 from .astrometry import _precess_ecliptic
 
                 lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+            # Apply sidereal correction if requested (not for equatorial output)
+            if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
+                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
+                lon = (lon - ayanamsa) % 360.0
+                if iflag & SEFLG_SPEED:
+                    dt_aya = 1.0 / 86400.0
+                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
+                    da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
+                    dlon -= da
             result = (lon, lat, dist, dlon, dlat, ddist)
             result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
             return _to_native_floats(result), iflag
@@ -1940,6 +1973,17 @@ def _calc_body(
             from .astrometry import _precess_ecliptic
 
             lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
+        # Apply sidereal correction if requested (not for equatorial output)
+        if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
+            ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
+            lon = (lon - ayanamsa) % 360.0
+            if iflag & SEFLG_SPEED:
+                dt_aya = 1.0 / 86400.0
+                ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
+                da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
+                dlon -= da
 
         result = (lon, lat, dist, dlon, dlat, ddist)
         result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
