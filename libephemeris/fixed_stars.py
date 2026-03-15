@@ -54,7 +54,7 @@ from dataclasses import dataclass
 from typing import List, Tuple
 
 from skyfield.api import Star
-from skyfield.framelib import ecliptic_frame
+from skyfield.framelib import ecliptic_frame, ecliptic_J2000_frame
 
 from .constants import (
     SE_REGULUS,
@@ -3575,7 +3575,11 @@ def get_canonical_star_name(star_id: int) -> str | None:
 
 
 def _calc_star_position_skyfield(
-    star_id: int, jd_tt: float, noaberr: bool = False, nogdefl: bool = False
+    star_id: int,
+    jd_tt: float,
+    noaberr: bool = False,
+    nogdefl: bool = False,
+    j2000_frame: bool = False,
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position using Skyfield Star class with proper aberration.
@@ -3592,6 +3596,10 @@ def _calc_star_position_skyfield(
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
         nogdefl: If True, skip gravitational deflection but keep aberration
+        j2000_frame: If True, return J2000 ecliptic coordinates instead of
+            ecliptic of date.  This avoids the ~5" error from precessing
+            Skyfield's ecliptic-of-date back to J2000 with a different
+            precession model.
 
     Returns:
         Tuple of (longitude, latitude, distance) in degrees and AU
@@ -3636,8 +3644,9 @@ def _calc_star_position_skyfield(
     else:
         pos = astrometric.apparent()
 
-    # Transform to ecliptic coordinates of date
-    ecl = pos.frame_latlon(ecliptic_frame)
+    # Transform to ecliptic coordinates
+    frame = ecliptic_J2000_frame if j2000_frame else ecliptic_frame
+    ecl = pos.frame_latlon(frame)
 
     # ecl returns (latitude, longitude, distance) as Skyfield Angle/Distance objects
     lat = ecl[0].degrees
@@ -3650,7 +3659,11 @@ def _calc_star_position_skyfield(
 
 
 def calc_fixed_star_position(
-    star_id: int, jd_tt: float, noaberr: bool = False, nogdefl: bool = False
+    star_id: int,
+    jd_tt: float,
+    noaberr: bool = False,
+    nogdefl: bool = False,
+    j2000_frame: bool = False,
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position of a fixed star at given date.
@@ -3666,11 +3679,12 @@ def calc_fixed_star_position(
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
         nogdefl: If True, skip gravitational deflection but keep aberration
+        j2000_frame: If True, return J2000 ecliptic coordinates
 
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
-            - longitude: Ecliptic longitude of date in degrees (0-360)
-            - latitude: Ecliptic latitude of date in degrees
+            - longitude: Ecliptic longitude in degrees (0-360)
+            - latitude: Ecliptic latitude in degrees
             - distance: Arbitrary large value (AU) - stars are effectively infinite
 
     Raises:
@@ -3684,19 +3698,20 @@ def calc_fixed_star_position(
         IAU 2006 precession (Capitaine et al.)
         Skyfield library for apparent position calculation
     """
-    return _calc_star_position_skyfield(star_id, jd_tt, noaberr, nogdefl)
+    return _calc_star_position_skyfield(star_id, jd_tt, noaberr, nogdefl, j2000_frame)
 
 
 def calc_fixed_star_velocity(
-    star_id: int, jd_tt: float, noaberr: bool = False, nogdefl: bool = False
+    star_id: int,
+    jd_tt: float,
+    noaberr: bool = False,
+    nogdefl: bool = False,
+    j2000_frame: bool = False,
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Calculate ecliptic position and velocity of a fixed star at given date.
 
-    Uses a hybrid approach for velocity calculation:
-    1. Central difference for longitude velocity (captures precession rate)
-    2. Analytical proper motion transformation for latitude velocity sign
-       to match reference API convention
+    Uses central finite difference for velocity calculation.
 
     The velocity represents the rate of change of the star's ecliptic
     coordinates due to:
@@ -3713,6 +3728,7 @@ def calc_fixed_star_velocity(
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
         nogdefl: If True, skip gravitational deflection but keep aberration
+        j2000_frame: If True, compute in J2000 ecliptic frame
 
     Returns:
         Tuple[float, float, float, float, float, float]:
@@ -3721,29 +3737,26 @@ def calc_fixed_star_velocity(
     Raises:
         ValueError: If star_id not in catalog
     """
-    import numpy as np
-    from .state import get_timescale, get_planets
-
     if star_id not in FIXED_STARS:
         raise ValueError(f"could not find star name {star_id}")
-
-    star_data = FIXED_STARS[star_id]
 
     # Half-day step for central difference
     h = 0.5
 
     # Calculate position at current time (for return value)
-    lon, lat, dist = calc_fixed_star_position(star_id, jd_tt, noaberr, nogdefl)
+    lon, lat, dist = calc_fixed_star_position(
+        star_id, jd_tt, noaberr, nogdefl, j2000_frame
+    )
 
     # Calculate positions at t-0.5 and t+0.5 for central difference
     lon_prev, lat_prev, _ = calc_fixed_star_position(
-        star_id, jd_tt - h, noaberr, nogdefl
+        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame
     )
     lon_next, lat_next, _ = calc_fixed_star_position(
-        star_id, jd_tt + h, noaberr, nogdefl
+        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame
     )
 
-    # Central difference for longitude: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
+    # Central difference: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
     speed_lon = lon_next - lon_prev
 
     # Handle wraparound at 360° (e.g., 359° -> 1° should give +2°, not -358°)
@@ -3752,74 +3765,8 @@ def calc_fixed_star_velocity(
     elif speed_lon < -180.0:
         speed_lon += 360.0
 
-    # Compute latitude velocity using analytical proper motion transformation
-    # This matches the pyswisseph sign convention by transforming the proper
-    # motion velocity vector through the same coordinate transformations
-    ts = get_timescale()
-    eph = get_planets()
-    earth = eph["earth"]
-
-    # Create Skyfield Star object with proper motion
-    star = Star(
-        ra_hours=star_data.ra_j2000 / 15.0,
-        dec_degrees=star_data.dec_j2000,
-        ra_mas_per_year=star_data.pm_ra * 1000.0,
-        dec_mas_per_year=star_data.pm_dec * 1000.0,
-    )
-
-    t = ts.tt_jd(jd_tt)
-    astrometric = earth.at(t).observe(star)
-
-    if noaberr:
-        pos = astrometric
-    elif nogdefl:
-        pos = astrometric.apparent(deflectors=())
-    else:
-        pos = astrometric.apparent()
-
-    # Get ecliptic Cartesian position and velocity
-    r_ecl, v_ecl = pos.frame_xyz_and_velocity(ecliptic_frame)
-    x, y, z = r_ecl.au
-    vx, vy, vz = v_ecl.au_per_d
-
-    # Apply SE's swi_cartpol_sp algorithm to convert Cartesian velocity to angular
-    rxy_sq = x * x + y * y
-    rxy = np.sqrt(rxy_sq)
-    r = np.sqrt(rxy_sq + z * z)
-
-    coslon = x / rxy
-    sinlon = y / rxy
-    coslat = rxy / r
-    sinlat = z / r
-
-    # Rotate velocity by longitude
-    xx3 = vx * coslon + vy * sinlon
-
-    # Rotate by latitude to get latitude velocity
-    xx4_new = -sinlat * xx3 + coslat * vz
-    speed_lat_analytical = np.degrees(xx4_new / r)
-
-    # Compute latitude velocity from finite difference
-    speed_lat_fd = lat_next - lat_prev
-
-    # For stars with very small proper motion (like Regulus), the finite difference
-    # can give incorrect sign due to numerical effects. In these cases, the
-    # analytical proper motion direction is more reliable.
-    # When signs disagree AND the velocity is very small, use analytical sign.
-    #
-    # Threshold: 1e-6 deg/day (~0.3 arcsec/day) - below this, trust analytical
-    SMALL_VELOCITY_THRESHOLD = 1.0e-6
-
-    fd_sign = 1.0 if speed_lat_fd >= 0 else -1.0
-    analytical_sign = 1.0 if speed_lat_analytical >= 0 else -1.0
-
-    if fd_sign != analytical_sign and abs(speed_lat_fd) < SMALL_VELOCITY_THRESHOLD:
-        # Signs disagree and magnitude is very small - use analytical sign
-        # This handles stars like Regulus with tiny proper motion
-        speed_lat = analytical_sign * abs(speed_lat_fd)
-    else:
-        # Use finite difference directly (correct for most stars)
-        speed_lat = speed_lat_fd
+    # Latitude speed: pure finite difference (no wraparound needed for latitude)
+    speed_lat = lat_next - lat_prev
 
     # Distance velocity is 0 (stellar distances don't measurably change)
     speed_dist = 0.0
@@ -3875,7 +3822,9 @@ def _preprocess_flags(iflag: int) -> int:
     return iflag
 
 
-def _apply_fixstar_flags(result: tuple, jd_tt: float, iflag: int) -> tuple:
+def _apply_fixstar_flags(
+    result: tuple, jd_tt: float, iflag: int, j2000_native: bool = False
+) -> tuple:
     """Apply post-calculation flag transformations to fixed star results.
 
     Handles frame transformations (J2000, NONUT, ICRS), coordinate system
@@ -3891,6 +3840,8 @@ def _apply_fixstar_flags(result: tuple, jd_tt: float, iflag: int) -> tuple:
         result: 6-tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         jd_tt: Julian Day in Terrestrial Time
         iflag: Calculation flags
+        j2000_native: If True, positions are already in J2000 ecliptic frame
+            (computed natively by Skyfield), so skip backward precession.
 
     Returns:
         Transformed 6-tuple
@@ -3905,21 +3856,22 @@ def _apply_fixstar_flags(result: tuple, jd_tt: float, iflag: int) -> tuple:
 
     if not is_equatorial:
         if iflag & SEFLG_J2000:
-            # J2000 ecliptic: precess from of-date back to J2000
-            from .astrometry import _precess_ecliptic
+            if not j2000_native:
+                # J2000 ecliptic: precess from of-date back to J2000
+                from .astrometry import _precess_ecliptic
 
-            lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
-            # Speed also needs precession correction but the dominant term
-            # (precession rate ~50"/yr) is removed, leaving proper motion only.
-            # For fixed stars the speed is already small enough that this is fine.
+                lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+            # else: already in J2000 frame from Skyfield's ecliptic_J2000_frame
 
     # ---- 2. Equatorial coordinate transformation ----
     if is_equatorial:
         if iflag & SEFLG_J2000:
-            # J2000 equatorial: precess to J2000, then use J2000 obliquity
-            from .astrometry import _precess_ecliptic
+            if not j2000_native:
+                # J2000 equatorial: precess to J2000, then use J2000 obliquity
+                from .astrometry import _precess_ecliptic
 
-            lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+                lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+            # Already in J2000 ecliptic — use J2000 obliquity
             eps = 23.4392911  # IAU 2006 mean obliquity at J2000.0
         elif iflag & SEFLG_NONUT:
             # Mean equator of date: use mean obliquity (no nutation)
@@ -4035,17 +3987,23 @@ def swe_fixstar_ut(
     try:
         noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
         nogdefl = bool(iflag & SEFLG_NOGDEFL)
+        # Compute natively in J2000 ecliptic frame when requested.
+        # This avoids the ~5" error from precessing Skyfield's ecliptic-of-date
+        # back to J2000 with a different precession model.
+        use_j2000 = bool(iflag & SEFLG_J2000)
 
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, t.tt, noaberr, nogdefl
+                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
-            lon, lat, dist = calc_fixed_star_position(star_id, t.tt, noaberr, nogdefl)
+            lon, lat, dist = calc_fixed_star_position(
+                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+            )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        result = _apply_fixstar_flags(result, t.tt, iflag)
+        result = _apply_fixstar_flags(result, t.tt, iflag, j2000_native=use_j2000)
 
         return (result, iflag, canonical_name or "")
     except Exception as e:
@@ -4090,17 +4048,20 @@ def swe_fixstar(
     try:
         noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
         nogdefl = bool(iflag & SEFLG_NOGDEFL)
+        use_j2000 = bool(iflag & SEFLG_J2000)
 
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, jd, noaberr, nogdefl
+                star_id, jd, noaberr, nogdefl, j2000_frame=use_j2000
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
-            lon, lat, dist = calc_fixed_star_position(star_id, jd, noaberr, nogdefl)
+            lon, lat, dist = calc_fixed_star_position(
+                star_id, jd, noaberr, nogdefl, j2000_frame=use_j2000
+            )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        result = _apply_fixstar_flags(result, jd, iflag)
+        result = _apply_fixstar_flags(result, jd, iflag, j2000_native=use_j2000)
 
         return (result, iflag, canonical_name or "")
     except Exception as e:
@@ -4311,18 +4272,21 @@ def swe_fixstar2_ut(
     try:
         noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
         nogdefl = bool(iflag & SEFLG_NOGDEFL)
+        use_j2000 = bool(iflag & SEFLG_J2000)
 
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, t.tt, noaberr, nogdefl
+                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
-            lon, lat, dist = calc_fixed_star_position(entry.id, t.tt, noaberr, nogdefl)
+            lon, lat, dist = calc_fixed_star_position(
+                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+            )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         star_name_out = _format_star_name(entry)
-        result = _apply_fixstar_flags(result, t.tt, iflag)
+        result = _apply_fixstar_flags(result, t.tt, iflag, j2000_native=use_j2000)
 
         return (star_name_out, result, iflag, "")
     except Exception as e:
@@ -4381,18 +4345,21 @@ def swe_fixstar2(
     try:
         noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
         nogdefl = bool(iflag & SEFLG_NOGDEFL)
+        use_j2000 = bool(iflag & SEFLG_J2000)
 
         if iflag & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, jd, noaberr, nogdefl
+                entry.id, jd, noaberr, nogdefl, j2000_frame=use_j2000
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
-            lon, lat, dist = calc_fixed_star_position(entry.id, jd, noaberr, nogdefl)
+            lon, lat, dist = calc_fixed_star_position(
+                entry.id, jd, noaberr, nogdefl, j2000_frame=use_j2000
+            )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         star_name_out = _format_star_name(entry)
-        result = _apply_fixstar_flags(result, jd, iflag)
+        result = _apply_fixstar_flags(result, jd, iflag, j2000_native=use_j2000)
 
         return (star_name_out, result, iflag, "")
     except Exception as e:
