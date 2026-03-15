@@ -7574,6 +7574,14 @@ def _calculate_rise_set(
     # For circumpolar: min_alt > target_altitude (never sets)
     # For never rises: max_alt < target_altitude
 
+    # For fast-moving bodies (esp. Moon ~13°/day), declination changes
+    # significantly during the search window. We estimate the declination
+    # speed and add a margin to avoid false circumpolar detection.
+    max_search = 2.0  # Search up to 2 days ahead
+    _, dec2 = _get_body_ra_dec(jd_start + 1.0 / 24.0)
+    dec_speed = abs(dec2 - dec) * 24.0  # degrees per day
+    margin = dec_speed * max_search  # total possible dec change in search window
+
     # Calculate the altitude at upper and lower transit
     if lat >= 0:  # Northern hemisphere
         max_alt = 90.0 - abs(lat - dec)  # At upper transit
@@ -7582,9 +7590,9 @@ def _calculate_rise_set(
         max_alt = 90.0 - abs(lat - dec)
         min_alt = -dec - (90.0 + lat)
 
-    # Check circumpolar conditions
-    is_circumpolar_above = min_alt > target_altitude  # Never sets
-    is_circumpolar_below = max_alt < target_altitude  # Never rises
+    # Check circumpolar conditions with margin for declination change
+    is_circumpolar_above = (min_alt - margin) > target_altitude  # Never sets
+    is_circumpolar_below = (max_alt + margin) < target_altitude  # Never rises
 
     if event_type == SE_CALC_RISE and is_circumpolar_below:
         return 0.0, -2  # Never rises
@@ -7595,8 +7603,19 @@ def _calculate_rise_set(
     if event_type == SE_CALC_SET and is_circumpolar_below:
         return 0.0, -2  # Always below horizon, no set
 
-    # Rough estimate: search within 1 day
-    search_step = 1.0 / 24.0  # 1 hour steps
+    # Determine search step based on how close to grazing conditions.
+    # For the Moon at high latitudes, rise and set can be very close together
+    # (< 30 min), so 1-hour steps would miss the crossing entirely.
+    # Use finer steps when altitude extremes are close to the target.
+    grazing_margin = min(abs(max_alt - target_altitude), abs(min_alt - target_altitude))
+    if grazing_margin < 2.0:
+        # Near-grazing: use 10-minute steps to catch brief crossings
+        search_step = 10.0 / 1440.0  # 10 minutes
+    elif grazing_margin < 5.0:
+        # Moderately close: use 20-minute steps
+        search_step = 20.0 / 1440.0  # 20 minutes
+    else:
+        search_step = 1.0 / 24.0  # 1 hour steps
 
     # Find bracket where altitude crosses target
     jd = jd_start
