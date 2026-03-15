@@ -339,7 +339,8 @@ class LEBReader:
             pos.append(val)
             vel.append(deriv * scale)
 
-        # Wrap longitude for ecliptic/geo-ecliptic bodies
+        # Wrap longitude for ecliptic-frame bodies (COORD_GEO_ECLIPTIC is
+        # reserved/unused but included for format completeness)
         if body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_GEO_ECLIPTIC):
             pos[0] = pos[0] % 360.0
 

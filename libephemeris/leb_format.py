@@ -35,7 +35,7 @@ VERSION = 1
 COORD_ICRS_BARY = 0  # ICRS barycentric planet center (x, y, z) in AU
 COORD_ECLIPTIC = 1  # Ecliptic of date (lon, lat, dist) in deg/deg/AU
 COORD_HELIO_ECL = 2  # Heliocentric ecliptic (lon, lat, dist) in deg/deg/AU
-COORD_GEO_ECLIPTIC = 3  # Geocentric ecliptic of date (lon, lat, dist) in deg/deg/AU
+COORD_GEO_ECLIPTIC = 3  # Reserved — not used (retrograde cusps; see algorithms.md §16)
 COORD_ICRS_BARY_SYSTEM = 4  # ICRS system barycenter (x, y, z) in AU — runtime COB
 
 # Section IDs
