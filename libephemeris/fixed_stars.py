@@ -3831,10 +3831,14 @@ def _apply_fixstar_flags(
     changes (EQUATORIAL, SIDEREAL), and output format conversions (XYZ, RADIANS).
 
     Applied in order:
-    1. J2000 / NONUT / ICRS frame selection (ecliptic only)
+    1. J2000 / NONUT frame selection (ecliptic longitude adjustment)
     2. EQUATORIAL coordinate transformation
-    3. SIDEREAL ayanamsha subtraction (ecliptic only)
+    3. SIDEREAL ayanamsha subtraction (from lon or RA)
     4. XYZ / RADIANS output format conversion
+
+    Note: For fixed stars, SE applies sidereal correction AFTER equatorial
+    conversion — subtracting ayanamsha from RA. This differs from planets
+    where SE ignores sidereal for equatorial output entirely.
 
     Args:
         result: 6-tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
@@ -3850,28 +3854,31 @@ def _apply_fixstar_flags(
 
     lon, lat, dist, speed_lon, speed_lat, speed_dist = result
 
-    # ---- 1. Frame selection (ecliptic coordinates) ----
-    # These only apply when NOT converting to equatorial
     is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
 
-    if not is_equatorial:
-        if iflag & SEFLG_J2000:
-            if not j2000_native:
-                # J2000 ecliptic: precess from of-date back to J2000
-                from .astrometry import _precess_ecliptic
+    # ---- 1. Frame selection ----
+    # J2000: precess from ecliptic-of-date back to J2000 ecliptic
+    # NONUT: remove nutation from ecliptic longitude (mean ecliptic of date)
+    # These apply regardless of equatorial output (adjust ecliptic first).
+    if iflag & SEFLG_J2000:
+        if not j2000_native:
+            from .astrometry import _precess_ecliptic
 
-                lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
-            # else: already in J2000 frame from Skyfield's ecliptic_J2000_frame
+            lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+        # else: already in J2000 frame from Skyfield's ecliptic_J2000_frame
+    elif iflag & SEFLG_NONUT:
+        # Skyfield returns positions on the true ecliptic of date (with nutation).
+        # NONUT means output on the mean ecliptic of date, so subtract dpsi
+        # (nutation in longitude) from the ecliptic longitude.
+        from .cache import get_cached_nutation
+
+        dpsi_rad, _ = get_cached_nutation(jd_tt)
+        lon = (lon - math.degrees(dpsi_rad)) % 360.0
 
     # ---- 2. Equatorial coordinate transformation ----
     if is_equatorial:
         if iflag & SEFLG_J2000:
-            if not j2000_native:
-                # J2000 equatorial: precess to J2000, then use J2000 obliquity
-                from .astrometry import _precess_ecliptic
-
-                lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
-            # Already in J2000 ecliptic — use J2000 obliquity
+            # J2000 obliquity for J2000 equatorial frame
             eps = 23.4392911  # IAU 2006 mean obliquity at J2000.0
         elif iflag & SEFLG_NONUT:
             # Mean equator of date: use mean obliquity (no nutation)
@@ -3887,7 +3894,10 @@ def _apply_fixstar_flags(
         speed_lon, speed_lat, speed_dist = vel_eq
 
     # ---- 3. Sidereal mode (ayanamsha subtraction) ----
-    if (iflag & SEFLG_SIDEREAL) and not is_equatorial:
+    # For fixed stars, SE subtracts ayanamsha from the first coordinate
+    # (ecliptic longitude or RA) AFTER equatorial conversion. This differs
+    # from planets where SE ignores sidereal for equatorial output entirely.
+    if iflag & SEFLG_SIDEREAL:
         from .state import get_timescale
 
         ts = get_timescale()
