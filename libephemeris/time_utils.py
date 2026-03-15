@@ -10,6 +10,7 @@ Functions provide pyswisseph-compatible API signatures.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 
+from math import floor as _floor
 from typing import Any, Optional
 
 from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH
@@ -43,16 +44,19 @@ def swe_julday(
         year -= 1
         month += 12
 
-    a = int(year / 100)
+    # Meeus INT() is defined as floor(), not truncation toward zero.
+    # Python's int() truncates toward zero which gives wrong results
+    # for negative years (e.g. int(-30/4)=-7 but floor(-30/4)=-8).
+    a = _floor(year / 100)
 
     if gregflag == SE_GREG_CAL:
-        b = 2 - a + int(a / 4)
+        b = 2 - a + _floor(a / 4)
     else:
         b = 0
 
     jd = (
-        int(365.25 * (year + 4716))
-        + int(30.6001 * (month + 1))
+        _floor(365.25 * (year + 4716))
+        + _floor(30.6001 * (month + 1))
         + day
         + hour / 24.0
         + b
@@ -81,24 +85,23 @@ def swe_revjul(jd: float, gregflag: int = SE_GREG_CAL) -> tuple[int, int, int, f
         unless Julian calendar explicitly requested.
     """
     jd = jd + 0.5
-    z = int(jd)
+    z = _floor(jd)
     f = jd - z
 
-    if z < 2299161:
-        a = z
+    # Always respect gregflag — SE uses proleptic Gregorian for ancient dates
+    # when SE_GREG_CAL is requested, not auto-detection by JD threshold.
+    if gregflag == SE_GREG_CAL:
+        alpha = _floor((z - 1867216.25) / 36524.25)
+        a = z + 1 + alpha - _floor(alpha / 4)
     else:
-        if gregflag == SE_GREG_CAL:
-            alpha = int((z - 1867216.25) / 36524.25)
-            a = z + 1 + alpha - int(alpha / 4)
-        else:
-            a = z
+        a = z
 
     b = a + 1524
-    c = int((b - 122.1) / 365.25)
-    d = int(365.25 * c)
-    e = int((b - d) / 30.6001)
+    c = _floor((b - 122.1) / 365.25)
+    d = _floor(365.25 * c)
+    e = _floor((b - d) / 30.6001)
 
-    day = b - d - int(30.6001 * e) + f
+    day = b - d - _floor(30.6001 * e) + f
     if e < 14:
         month = e - 1
     else:
