@@ -80,7 +80,7 @@ dev = [
     "spiceypy>=6.0.0",  # For generating compact planet center SPK files
     "astropy>=5.0.0",  # Cross-validation against professional astronomy standards (dev only)
     "ebooklib>=0.20",  # EPUB generation for manual (scripts/generate_manual_epub.py)
-    "markdown>=3.10.0",  # Markdown-to-HTML for EPUB manual generation
+    "markdown>=3.7",  # Markdown-to-HTML for EPUB manual generation
     "pyyaml>=6.0",  # YAML metadata parsing for EPUB manual generation
 ]
 docs = [
