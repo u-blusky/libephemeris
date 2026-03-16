@@ -5,6 +5,211 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-03-16
+
+### Summary
+
+**Precision V3: sub-arcsecond accuracy across the full API surface, comprehensive
+pyswisseph compatibility audit, and 30+ critical bug fixes.** This release
+represents the most thorough correctness audit in the project's history, with
+42 commits covering every major subsystem: eclipses, fixed stars, house systems,
+crossing functions, sidereal/ayanamsha, hypothetical bodies, rise/set, heliacal
+events, and time functions.
+
+Previous worst-case errors ranged from 2° (hypothetical bodies) to 18.9"
+(nutation-dependent modes). After this release, all primary computation modes
+achieve sub-arcsecond agreement with the reference API, with most achieving
+sub-milliarcsecond precision.
+
+### Added
+
+#### Precision V3 — full API audit and IP independence (acdb204)
+
+Major precision overhaul across the entire API surface (84 files changed,
++16,577 / -2,082 lines):
+
+- **SEFLG_NOGDEFL**: new flag to skip gravitational light deflection while
+  retaining aberration
+- **SEFLG_ICRS**: frame bias correction (GCRS to ICRS) per IAU 2006 Resolution B2
+- **SEFLG_SPEED3**: numerical three-point speed computation
+- **Saros series**: eclipse attributes now include Saros series number (`attr[9]`)
+  and member number (`attr[10]`)
+- **4 missing sidereal modes**: LAHIRI_1940, LAHIRI_VP285, KRISHNAMURTI_VP291,
+  LAHIRI_ICRC
+- **Dynamic planet angular radii** and variable Moon apparent diameter for eclipse
+  calculations
+- **NOTICE.md**: formal declaration of independent provenance and IP status
+
+#### Fixed star flag support (f852000)
+
+Implement all missing SEFLG flags for fixed star functions via shared
+`_apply_fixstar_flags()` helper:
+
+- SEFLG_SIDEREAL, SEFLG_J2000, SEFLG_NONUT, SEFLG_XYZ, SEFLG_RADIANS,
+  SEFLG_TRUEPOS, SEFLG_MOSEPH, SEFLG_SPEED3, SEFLG_TOPOCTR
+
+#### swe_ prefixed time function aliases (a2d8713)
+
+Add all missing `swe_` prefixed aliases for time functions (`swe_date_conversion`,
+`swe_day_of_week`, `swe_utc_to_jd`, `swe_jdet_to_utc`, `swe_jdut1_to_utc`,
+`swe_utc_time_zone`, `swe_time_equ`, `swe_lat_to_lmt`, `swe_lmt_to_lat`,
+`swe_sidtime`, `swe_sidtime0`) for full API compatibility.
+
+- `swe_date_conversion` wrapper with proper pyswisseph return type:
+  `(valid, jd, (year, month, day, hour))`
+- Accept bytes calendar parameter (`b'g'`/`b'j'`) in `date_conversion`
+- Leap second validation in `utc_to_jd`: reject `second=60` on non-leap-second
+  dates, with `_LEAP_SECOND_DATES` frozenset (27 historical leap seconds)
+
+#### EPUB manual generator (9e13854)
+
+Pandoc-free EPUB generator (`scripts/generate_manual_epub.py`) using
+ebooklib+markdown with proper chapter splitting, NCX/NAV navigation, and
+CSS optimized for Kobo e-readers. New poe tasks:
+`docs:manual:generate[:it|:en]`.
+
+#### Documentation
+
+- English translation of the complete user manual (16 chapters)
+- Manual build pipeline for EPUB and PDF generation (pandoc-based)
+- Independent verification results against JPL Horizons and astropy/ERFA
+- NOTICE.md with formal IP provenance declaration
+- Reorganized 233 comparison scripts into 17 semantic categories
+
+### Fixed
+
+#### Hypothetical bodies — full Keplerian propagation (4312c64)
+
+Replace simplified linear mean longitude propagation with full Keplerian
+orbital mechanics for Uranian/hypothetical planets:
+
+- Newton-Raphson Kepler equation solver
+- J1900-to-J2000 equinox precession using IAU 2006 precession model
+- Gaussian gravitational constant for mean motion
+- Heliocentric-to-geocentric conversion via Skyfield
+- SEFLG_HELCTR and SEFLG_J2000 flag support
+
+Precision improved from ~2° (7200") to ~35" max error (**200x improvement**).
+
+#### Fixed stars — J2000 frame and catalog update (47f1a26, 1f12543)
+
+- J2000 frame now uses native Skyfield `ecliptic_J2000_frame` instead of
+  manual precession back-rotation, fixing ~5.4" systematic offset
+- Speed computation uses analytical proper motion derivatives
+- Updated proper motions for 99/116 stars from van Leeuwen 2007 new Hipparcos
+  reduction (independently sourced from CDS/VizieR I/311/hip2)
+- Fixed Algedi (Alpha-2 Cap) and Asellus Borealis coordinates/HIP numbers
+- NONUT flag now subtracts dpsi (nutation in longitude) for mean ecliptic output
+- SIDEREAL+EQUATORIAL combination fixed for stars
+
+#### Eclipse calculations (1a7d482, e1731d2, 6136114, 31844a4)
+
+Solar eclipses:
+- Hybrid eclipse classification with proper threshold and re-classification
+  at refined maximum
+- NONCENTRAL flag handling
+- Obscuration returns `(r_moon/r_sun)^2` for total eclipses instead of
+  capping at 1.0
+- Shadow width sign convention: negative for total (umbra), positive for
+  annular (antumbra)
+- Sunrise/sunset eclipse visibility with refraction-corrected horizon
+
+Lunar eclipses:
+- Shadow axis distance now includes both longitude and latitude components
+  (was latitude-only, causing magnitude errors up to 2.2)
+- Moonrise/moonset binary search uses refraction-corrected horizon threshold
+  (-0.36° geometric altitude), fixing ~120s timing errors
+- Apparent altitude computed with Skyfield atmospheric refraction
+- Removed incorrect penumbral magnitude caps
+
+Eclipse shadow width and sunrise/sunset contacts always computed regardless
+of central eclipse status.
+
+#### House systems (feb066d, 1cdb87c)
+
+- Vertex equator fallback for house calculations near the equator
+- Sidereal ascmc ayanamsha correction
+- Morinus house_pos quadrant determination
+- Sunshine houses_armc calculation
+- Koch house_pos floating-point boundary check for bodies on MC/IC axis
+
+#### Crossing functions — sub-milliarcsecond convergence (91d65d1, 69ef526, 8e60277)
+
+- All Newton-Raphson tolerances unified to 0.001" (was 0.05-0.1")
+- Moon node latitude residual: 0.045" to 0.001" (45x better)
+- Moon TT crossing median: 9ms to 1.5ms timing precision (6x better)
+- Brent fallback for retrograde planets (Mars 180° was failing)
+- Scaled bracket search window for slow planets (Saturn/Jupiter helio crossings)
+- Full-orbit crossing search for Jupiter 0° (10+ year searches)
+
+#### Rise/set and transit (6f5a546, 9448e9d)
+
+- Circumpolar detection margin for fast-moving bodies (Moon at 65° latitude
+  was falsely flagged as circumpolar due to ~13°/day declination change)
+- Adaptive search steps for grazing conditions (10-minute steps for
+  near-grazing, 20-minute for moderate)
+- Twilight disc correction: twilight modes now use geometric center at
+  depression angle, not upper limb
+- Bennett (1982) altitude-dependent refraction formula replaces flat 0.5667°
+
+#### Node/apsides and lunar theory (9299c38)
+
+- Aphelion computation returns orbit second focal point instead of orbital
+  aphelion position
+- Moon branch uses mean lunar theory values instead of osculating elements
+  from geocentric state vectors (fixing 1-26° errors)
+- Planet radii updated to NASA volumetric mean values for gas/ice giants
+- Moon magnitude uses piecewise Allen/Samaha photometric model
+
+#### Sidereal time — IAU 2006 GMST (a1f5b38)
+
+Replace IAU 1982 polynomial (Meeus Ch.12) with IAU 2006 GMST via
+`erfa.gmst06()` (Capitaine et al. 2003). The old formula diverged from the
+current IAU standard by up to 0.13s at 50 years from J2000.
+
+#### Ayanamsha reference offsets (5276c8d, 2a2834c)
+
+- GALEQU_TRUE: node offset 240.0 to 239.94708 (Hipparcos-era galactic frame)
+- GALEQU_MULA: 246.62 to 246.6137 (~32" correction)
+- TRUE_SHEORAN: Spica offset 178.607 to 178.60170 (~19" correction)
+- VALENS_MOON: Spica offset 181.0458 to 181.04054 (~19" correction)
+- Sidereal ayanamsha correction now applied to hypothetical/Uranian bodies
+  and Transpluto
+
+#### Heliacal API (cf95c2c)
+
+- HELFLAG_VISLIM_DARK (was 2048, now 4096) and HELFLAG_VISLIM_NOMOON
+  (was 4096, now 8192) — wrong bit positions
+- 6 missing HELFLAG constants added
+- vis_limit_mag returns 10 elements (was 8)
+- Proper heliacal_pheno_ut wrapper with reference-compatible signature
+
+#### Date handling (4bf77b9)
+
+`swe_julday()` and `swe_revjul()` now use `math.floor()` instead of `int()`
+for correct BCE date handling. `int(-30/4)=-7` but `floor(-30/4)=-8`, causing
++1 day errors for negative years. `swe_revjul()` also respects the gregflag
+parameter for proleptic Gregorian output.
+
+#### Other fixes
+
+- SEFLG_XYZ and SEFLG_RADIANS preserved in retflag (552f7bc)
+- Heliocentric pheno computation returns phase angle/elongation from Earth's
+  perspective instead of zeros (31844a4)
+- Sun phase value returns 0.0 in pheno_ut (inapplicable for self-luminous
+  body) (9448e9d)
+- LEB fast path passes user ayanamsha parameters (t0, ayan_t0) (928bb1a)
+- Markdown dependency minimum lowered to 3.7 for Python 3.9 (77e634f)
+
+### Changed
+
+- Verification scripts reorganized from 233 flat files into 17 semantic
+  categories under `compare_scripts/rounds/`
+- LEB precision V3 document rewritten as historical record of the abandoned
+  COORD_GEO_ECLIPTIC approach
+- Comparison test tolerances tightened across all subsystems based on
+  empirical measurement
+
 ## [0.23.0] - 2026-03-09
 
 ### Summary
@@ -1571,8 +1776,10 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.21.0...HEAD
-[0.21.0]: https://github.com/g-battaglia/libephemeris/compare/v0.20.0...v0.21.0
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/g-battaglia/libephemeris/compare/v0.23.0...v0.24.0
+[0.23.0]: https://github.com/g-battaglia/libephemeris/compare/v0.22.0...v0.23.0
+[0.22.0]: https://github.com/g-battaglia/libephemeris/compare/v0.20.0...v0.22.0
 [0.20.0]: https://github.com/g-battaglia/libephemeris/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/g-battaglia/libephemeris/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/g-battaglia/libephemeris/compare/v0.17.0...v0.18.0
