@@ -153,9 +153,18 @@ test = "pytest -m \"not slow\""
 "test:unit:fast" = "pytest tests/ -n auto -m \"not slow\""
 
 # Comparison tests (compare_scripts/tests/ directory)
+# Default: Skyfield (JPL) mode — live DE440 calculations vs pyswisseph
 "test:compare" = "pytest compare_scripts/tests/ -v -m \"not slow\""
 "test:compare:full" = "pytest compare_scripts/tests/ -v"
 "test:compare:fast" = "pytest compare_scripts/tests/ -n auto -m \"not slow\""
+
+# Comparison tests: explicit JPL/Skyfield mode (same as default, explicit)
+"test:compare:jpl" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", env = {LIBEPHEMERIS_COMPARE_MODE = "skyfield"}}
+"test:compare:jpl:full" = {cmd = "pytest compare_scripts/tests/ -v", env = {LIBEPHEMERIS_COMPARE_MODE = "skyfield"}}
+
+# Comparison tests: LEB mode — precomputed Chebyshev ephemeris vs pyswisseph
+"test:compare:leb" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", env = {LIBEPHEMERIS_COMPARE_MODE = "leb", LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}}
+"test:compare:leb:full" = {cmd = "pytest compare_scripts/tests/ -v", env = {LIBEPHEMERIS_COMPARE_MODE = "leb", LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}}
 
 # Tier diagnostics - show all bodies with coordinates, velocities, and data source
 "diag:base" = "python scripts/tier_diagnostic_base.py"
@@ -213,11 +222,13 @@ typecheck = "mypy libephemeris"
 "test:leb:precision" = "pytest tests/test_leb/test_leb_precision.py -v"
 "test:leb:precision:quick" = "pytest tests/test_leb/test_leb_precision.py -v -k \"medium\""
 
-# LEB vs Skyfield comparison tests (medium tier)
-"test:leb:compare" = "pytest tests/test_leb/compare/ -v -m leb_compare --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
-"test:leb:compare:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
-"test:leb:compare:medium" = "pytest tests/test_leb/compare/ -v -m leb_compare --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
-"test:leb:compare:medium:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
+# LEB vs Skyfield comparison tests (medium tier — old-style at parent level)
+"test:leb:compare" = "pytest tests/test_leb/compare/ -v -m leb_compare --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/medium --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
+"test:leb:compare:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/medium --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
+
+# LEB vs Skyfield comparison tests (medium tier — new structured tests)
+"test:leb:compare:medium" = "pytest tests/test_leb/compare/medium/ -v -m leb_compare_medium"
+"test:leb:compare:medium:quick" = "pytest tests/test_leb/compare/medium/ -v -m \"leb_compare_medium and not slow\""
 
 # LEB vs Skyfield comparison tests (base tier)
 "test:leb:compare:base" = "pytest tests/test_leb/compare/base/ -v -m leb_compare_base"

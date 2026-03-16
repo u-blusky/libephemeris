@@ -12,13 +12,35 @@ import pytest
 import random
 import swisseph as swe
 
-# Force Skyfield mode for all comparison tests. This prevents the LEB binary
-# ephemeris from intercepting swe_calc_ut calls with precomputed values,
-# ensuring we always test the live Skyfield calculation path.
-os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
+# Calculation mode for comparison tests.
+#
+# By default, use Skyfield (live JPL DE440 calculations) to compare against
+# pyswisseph.  Set LIBEPHEMERIS_COMPARE_MODE=leb to test the LEB binary
+# ephemeris path instead — this verifies that LEB produces results within
+# the same tolerances as Skyfield when compared to pyswisseph.
+#
+# The env var LIBEPHEMERIS_COMPARE_MODE is checked here; LIBEPHEMERIS_MODE
+# is set accordingly so that libephemeris picks it up at import time.
+_COMPARE_MODE = os.environ.get("LIBEPHEMERIS_COMPARE_MODE", "skyfield").lower()
+
+if _COMPARE_MODE == "leb":
+    # LEB mode: let auto-discovery find the LEB file, or use an explicit path.
+    # Do NOT force skyfield — we want LEB to intercept swe_calc_ut calls.
+    os.environ.pop("LIBEPHEMERIS_MODE", None)
+else:
+    # Skyfield mode (default): force skyfield to prevent LEB interception.
+    os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 
 import libephemeris as ephem
 from libephemeris.constants import *
+
+# When running in LEB mode, activate the LEB file explicitly if
+# LIBEPHEMERIS_LEB is set, and switch to auto calc mode.
+if _COMPARE_MODE == "leb":
+    _leb_path = os.environ.get("LIBEPHEMERIS_LEB")
+    if _leb_path:
+        ephem.set_leb_file(_leb_path)
+    ephem.set_calc_mode("auto")
 
 # Set ephemeris data path for star-based ayanamsha calculations.
 # Without this, pyswisseph falls back to Moshier analytical ephemeris which
