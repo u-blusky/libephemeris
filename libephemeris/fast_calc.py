@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from .constants import (
     SE_EARTH,
+    SE_MEAN_APOG,
+    SE_MEAN_NODE,
     SE_MOON,
     SE_SUN,
     SEFLG_BARYCTR,
@@ -896,6 +898,17 @@ def _pipeline_ecliptic(
     """
     (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
 
+    # Bodies 10 (MeanNode) and 12 (MeanApogee) are stored as mean ecliptic
+    # of date (pure Meeus polynomial, no nutation).  The Skyfield reference
+    # path outputs true ecliptic of date by adding dpsi (nutation in
+    # longitude).  Apply the same correction here so LEB matches Skyfield.
+    # Note: SEFLG_NONUT falls back to Skyfield before reaching this point,
+    # so we always add dpsi here.  Velocity is NOT corrected — the Skyfield
+    # path also computes velocity from the un-nutated polynomial.
+    if ipl in (SE_MEAN_NODE, SE_MEAN_APOG):
+        _, dpsi_rad, _, _ = _get_skyfield_frame_data(jd_tt)
+        lon = (lon + math.degrees(dpsi_rad)) % 360.0
+
     # Coordinate transforms for ecliptic-direct bodies.
     # Input coords are always ecliptic of date.
     if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
@@ -979,12 +992,139 @@ def _pipeline_helio(
 ) -> Tuple[float, float, float, float, float, float]:
     """Pipeline C: evaluate heliocentric ecliptic bodies (Uranians, Transpluto).
 
-    Same as Pipeline B -- these bodies are already in heliocentric ecliptic.
+    LEB stores these as heliocentric J2000 ecliptic (lon, lat, dist).
+    Default output is geocentric ecliptic of date, matching the Skyfield
+    reference path in planets.py.
 
     Returns:
         (lon, lat, dist, dlon, dlat, ddist)
     """
-    return _pipeline_ecliptic(reader, jd_tt, ipl, iflag)
+    is_helio = bool(iflag & SEFLG_HELCTR)
+
+    if is_helio:
+        # Heliocentric: LEB data is already heliocentric J2000 ecliptic
+        (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
+    else:
+        # Geocentric: convert heliocentric J2000 ecliptic → geocentric J2000
+        cos_e = math.cos(OBLIQUITY_J2000_RAD)
+        sin_e = math.sin(OBLIQUITY_J2000_RAD)
+
+        def _geo_j2000(jd: float) -> Tuple[float, float, float]:
+            """Geocentric J2000 ecliptic position from LEB data."""
+            (h_lon, h_lat, h_dist), _ = reader.eval_body(ipl, jd)
+            # Heliocentric J2000 ecliptic → Cartesian
+            h_lon_r = math.radians(h_lon)
+            h_lat_r = math.radians(h_lat)
+            cl = math.cos(h_lat_r)
+            xh = h_dist * cl * math.cos(h_lon_r)
+            yh = h_dist * cl * math.sin(h_lon_r)
+            zh = h_dist * math.sin(h_lat_r)
+            # Earth heliocentric: bary(Earth) - bary(Sun) in ICRS
+            # Apply light-time correction to match Skyfield's .observe():
+            # the reference path uses sun.at(t).observe(earth) which evaluates
+            # Earth at the retarded time (t - light_time_earth_sun).
+            earth_pos, _ = reader.eval_body(SE_EARTH, jd)
+            sun_pos, _ = reader.eval_body(SE_SUN, jd)
+            ex0 = earth_pos[0] - sun_pos[0]
+            ey0 = earth_pos[1] - sun_pos[1]
+            ez0 = earth_pos[2] - sun_pos[2]
+            r_es = math.sqrt(ex0 * ex0 + ey0 * ey0 + ez0 * ez0)
+            lt_es = r_es / C_LIGHT_AU_DAY
+            earth_ret, _ = reader.eval_body(SE_EARTH, jd - lt_es)
+            ex = earth_ret[0] - sun_pos[0]
+            ey = earth_ret[1] - sun_pos[1]
+            ez = earth_ret[2] - sun_pos[2]
+            # Rotate ICRS (≈J2000 equatorial) → J2000 ecliptic
+            earth_ecl_x = ex
+            earth_ecl_y = ey * cos_e + ez * sin_e
+            earth_ecl_z = -ey * sin_e + ez * cos_e
+            # Geocentric = body_helio - earth_helio
+            xg = xh - earth_ecl_x
+            yg = yh - earth_ecl_y
+            zg = zh - earth_ecl_z
+            rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+            lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
+            sin_b = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
+            lat_g = math.degrees(math.asin(sin_b))
+            return lon_g, lat_g, rg
+
+        lon, lat, dist = _geo_j2000(jd_tt)
+        # Velocity via central difference (matching Skyfield path: dt=1.0 day)
+        dt_v = 1.0
+        prev = _geo_j2000(jd_tt - dt_v)
+        nxt = _geo_j2000(jd_tt + dt_v)
+        dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
+        if dlon > 180.0:
+            dlon -= 360.0
+        elif dlon < -180.0:
+            dlon += 360.0
+        dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
+        ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+
+    # Position is now J2000 ecliptic (helio or geo).
+    # Precess to ecliptic of date; flag handler converts back if J2000 requested.
+    lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
+
+    # Coordinate flag transforms (same logic as _pipeline_ecliptic)
+    if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
+        eps = OBLIQUITY_J2000_DEG
+
+        def _ecl_date_to_eq_j2000(lo: float, la: float) -> tuple[float, float]:
+            lo_j, la_j = _precess_ecliptic(lo, la, jd_tt, J2000)
+            return _cotrans(lo_j, la_j, -eps)
+
+        dt_step = 0.001
+        eq_now_lon, eq_now_lat = _ecl_date_to_eq_j2000(lon, lat)
+        eq_fwd_lon, eq_fwd_lat = _ecl_date_to_eq_j2000(
+            lon + dlon * dt_step, lat + dlat * dt_step
+        )
+        d_eq_lon = eq_fwd_lon - eq_now_lon
+        if d_eq_lon > 180.0:
+            d_eq_lon -= 360.0
+        elif d_eq_lon < -180.0:
+            d_eq_lon += 360.0
+        dlon = d_eq_lon / dt_step
+        dlat = (eq_fwd_lat - eq_now_lat) / dt_step
+        lon = eq_now_lon
+        lat = eq_now_lat
+
+    elif iflag & SEFLG_EQUATORIAL:
+        _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+        eps_mean = _mean_obliquity_iau2006(jd_tt)
+        eps = eps_mean + math.degrees(deps)
+
+        dt_step = 0.001
+        eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
+        eq_fwd_lon, eq_fwd_lat = _cotrans(
+            lon + dlon * dt_step, lat + dlat * dt_step, -eps
+        )
+        d_eq_lon = eq_fwd_lon - eq_now_lon
+        if d_eq_lon > 180.0:
+            d_eq_lon -= 360.0
+        elif d_eq_lon < -180.0:
+            d_eq_lon += 360.0
+        dlon = d_eq_lon / dt_step
+        dlat = (eq_fwd_lat - eq_now_lat) / dt_step
+        lon = eq_now_lon
+        lat = eq_now_lat
+
+    elif iflag & SEFLG_J2000:
+        dt_step = 0.001
+        j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+        j_fwd_lon, j_fwd_lat = _precess_ecliptic(
+            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt, J2000
+        )
+        d_j_lon = j_fwd_lon - j_now_lon
+        if d_j_lon > 180.0:
+            d_j_lon -= 360.0
+        elif d_j_lon < -180.0:
+            d_j_lon += 360.0
+        dlon = d_j_lon / dt_step
+        dlat = (j_fwd_lat - j_now_lat) / dt_step
+        lon = j_now_lon
+        lat = j_now_lat
+
+    return lon, lat, dist, dlon, dlat, ddist
 
 
 # =============================================================================

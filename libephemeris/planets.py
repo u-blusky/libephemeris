@@ -864,6 +864,18 @@ def swe_calc_ut(
     from .state import get_leb_reader
     from .logging_config import get_logger
 
+    reader = get_leb_reader()
+    if reader is not None:
+        try:
+            from . import fast_calc
+
+            result = fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
+            get_logger().debug("body=%d jd=%.1f source=LEB", ipl, tjd_ut)
+            return result
+        except (KeyError, ValueError):
+            get_logger().debug("body=%d jd=%.1f source=LEB->fallback", ipl, tjd_ut)
+    # --- END LEB fast path ---
+
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
         validate_jd_range(tjd_ut, ipl, "swe_calc_ut")
@@ -935,6 +947,18 @@ def swe_calc(
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
     from .logging_config import get_logger
+
+    reader = get_leb_reader()
+    if reader is not None:
+        try:
+            from . import fast_calc
+
+            result = fast_calc.fast_calc_tt(reader, tjd, ipl, iflag)
+            get_logger().debug("body=%d jd=%.1f source=LEB", ipl, tjd)
+            return result
+        except (KeyError, ValueError):
+            get_logger().debug("body=%d jd=%.1f source=LEB->fallback", ipl, tjd)
+    # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(ipl):
