@@ -1062,33 +1062,15 @@ def _pipeline_helio(
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
     # Position is now J2000 ecliptic (helio or geo).
-    # Precess to ecliptic of date; flag handler converts back if J2000 requested.
-    lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
+    # The Skyfield reference path precesses J2000 → ecliptic of date ONLY when
+    # the J2000 flag is NOT set.  For EQ+J2000, it converts J2000 ecliptic to
+    # equatorial using obliquity of date (not J2000).  We must match this.
+    is_j2000 = bool(iflag & SEFLG_J2000)
+    is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
 
-    # Coordinate flag transforms (same logic as _pipeline_ecliptic)
-    if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
-        eps = OBLIQUITY_J2000_DEG
-
-        def _ecl_date_to_eq_j2000(lo: float, la: float) -> tuple[float, float]:
-            lo_j, la_j = _precess_ecliptic(lo, la, jd_tt, J2000)
-            return _cotrans(lo_j, la_j, -eps)
-
-        dt_step = 0.001
-        eq_now_lon, eq_now_lat = _ecl_date_to_eq_j2000(lon, lat)
-        eq_fwd_lon, eq_fwd_lat = _ecl_date_to_eq_j2000(
-            lon + dlon * dt_step, lat + dlat * dt_step
-        )
-        d_eq_lon = eq_fwd_lon - eq_now_lon
-        if d_eq_lon > 180.0:
-            d_eq_lon -= 360.0
-        elif d_eq_lon < -180.0:
-            d_eq_lon += 360.0
-        dlon = d_eq_lon / dt_step
-        dlat = (eq_fwd_lat - eq_now_lat) / dt_step
-        lon = eq_now_lon
-        lat = eq_now_lat
-
-    elif iflag & SEFLG_EQUATORIAL:
+    if is_equatorial and is_j2000:
+        # EQ+J2000: Skyfield strips J2000 before _maybe_equatorial_convert,
+        # so it uses true obliquity of date on J2000 ecliptic coords.
         _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
         eps_mean = _mean_obliquity_iau2006(jd_tt)
         eps = eps_mean + math.degrees(deps)
@@ -1108,21 +1090,35 @@ def _pipeline_helio(
         lon = eq_now_lon
         lat = eq_now_lat
 
-    elif iflag & SEFLG_J2000:
+    elif is_equatorial:
+        # Equatorial of date: precess J2000 → date, then ecliptic → equatorial
+        lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
+        _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+        eps_mean = _mean_obliquity_iau2006(jd_tt)
+        eps = eps_mean + math.degrees(deps)
+
         dt_step = 0.001
-        j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
-        j_fwd_lon, j_fwd_lat = _precess_ecliptic(
-            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt, J2000
+        eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
+        eq_fwd_lon, eq_fwd_lat = _cotrans(
+            lon + dlon * dt_step, lat + dlat * dt_step, -eps
         )
-        d_j_lon = j_fwd_lon - j_now_lon
-        if d_j_lon > 180.0:
-            d_j_lon -= 360.0
-        elif d_j_lon < -180.0:
-            d_j_lon += 360.0
-        dlon = d_j_lon / dt_step
-        dlat = (j_fwd_lat - j_now_lat) / dt_step
-        lon = j_now_lon
-        lat = j_now_lat
+        d_eq_lon = eq_fwd_lon - eq_now_lon
+        if d_eq_lon > 180.0:
+            d_eq_lon -= 360.0
+        elif d_eq_lon < -180.0:
+            d_eq_lon += 360.0
+        dlon = d_eq_lon / dt_step
+        dlat = (eq_fwd_lat - eq_now_lat) / dt_step
+        lon = eq_now_lon
+        lat = eq_now_lat
+
+    elif is_j2000:
+        # J2000 ecliptic: already in J2000, no transform needed
+        pass
+
+    else:
+        # Default: ecliptic of date
+        lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
 
     return lon, lat, dist, dlon, dlat, ddist
 
