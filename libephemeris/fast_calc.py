@@ -494,6 +494,34 @@ def _get_skyfield_frame_data(
     return pn_mat, float(dpsi), float(deps), eps_true_rad
 
 
+def _get_precession_matrix(
+    jd_tt: float,
+) -> Tuple[Tuple[float, float, float], ...]:
+    """Get precession-only matrix (P) from Skyfield.
+
+    Returns the ICRS→mean-equatorial-of-date rotation matrix, which applies
+    only precession (no nutation, no frame bias).  Used for sidereal+equatorial
+    output where pyswisseph uses the mean equator.
+
+    Args:
+        jd_tt: Julian Day in TT.
+
+    Returns:
+        3x3 P matrix as nested tuples.
+    """
+    from .state import get_timescale
+
+    ts = get_timescale()
+    t = ts.tt_jd(jd_tt)
+
+    P = t.P
+    return (
+        (float(P[0][0]), float(P[0][1]), float(P[0][2])),
+        (float(P[1][0]), float(P[1][1]), float(P[1][2])),
+        (float(P[2][0]), float(P[2][1]), float(P[2][2])),
+    )
+
+
 def _mat3_vec3(
     mat: Tuple[Tuple[float, float, float], ...],
     vec: Tuple[float, float, float],
@@ -801,8 +829,17 @@ def _pipeline_icrs(
         geo = _apply_aberration(geo, earth_vel, lt)
 
     # 6. Coordinate transform — apply the same transform to velocity
+    #
+    # Sidereal handling for Pipeline A (ICRS bodies):
+    #   SID+EQ: use mean equator (P matrix, no nutation) — NO ayanamsha subtraction
+    #   SID+EQ+J2K: same as non-sidereal EQ+J2K (ICRS ≡ J2000 equatorial)
+    #   SID only: output ecliptic-of-date, ayanamsha subtracted in _fast_calc_core
+    #   SID+J2K: output J2000 ecliptic, ayanamsha subtracted in _fast_calc_core
+    _is_sidereal = bool(iflag & SEFLG_SIDEREAL)
+
     if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
         # ICRS J2000 equatorial -- geo is already in this frame
+        # (same for sidereal and non-sidereal: ICRS ≡ J2000 equatorial)
         lon_deg, lat_deg, dist = _cartesian_to_spherical(geo[0], geo[1], geo[2])
         if want_velocity:
             dlon, dlat, ddist = _cartesian_velocity_to_spherical(
@@ -814,8 +851,27 @@ def _pipeline_icrs(
                 geo_vel[2],
             )
 
+    elif (iflag & SEFLG_EQUATORIAL) and _is_sidereal:
+        # Sidereal equatorial of date: use MEAN equator (P matrix, no nutation)
+        # Pyswisseph uses the precession-only frame for SID+EQ output.
+        p_mat = _get_precession_matrix(jd_tt)
+        geo_eq = _mat3_vec3(p_mat, geo)
+        lon_deg, lat_deg, dist = _cartesian_to_spherical(
+            geo_eq[0], geo_eq[1], geo_eq[2]
+        )
+        if want_velocity:
+            vel_eq = _mat3_vec3(p_mat, geo_vel)
+            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                geo_eq[0],
+                geo_eq[1],
+                geo_eq[2],
+                vel_eq[0],
+                vel_eq[1],
+                vel_eq[2],
+            )
+
     elif iflag & SEFLG_EQUATORIAL:
-        # True equator of date
+        # True equator of date (non-sidereal)
         pn_mat, _, _, _ = _get_skyfield_frame_data(jd_tt)
         geo_eq = _mat3_vec3(pn_mat, geo)
         lon_deg, lat_deg, dist = _cartesian_to_spherical(
@@ -1349,7 +1405,20 @@ def _fast_calc_core(
         raise ValueError(f"Unknown coord_type {body.coord_type}")
 
     # Sidereal correction
-    if (iflag & SEFLG_SIDEREAL) and not (iflag & SEFLG_EQUATORIAL):
+    #
+    # When EQUATORIAL is set, pyswisseph does NOT subtract ayanamsha from RA
+    # for any body type:
+    #   - Pipeline A (ICRS): already outputs equatorial coordinates using the
+    #     mean equator (P matrix) when sidereal is set.
+    #   - Pipeline B/C (ecliptic/helio): the pipeline handles equatorial
+    #     conversion internally; sidereal correction is not applied.
+    # So skip sidereal correction entirely when EQUATORIAL is requested.
+    #
+    # For J2000 output, coordinates are already in J2000 ecliptic (no nutation),
+    # so we use mean ayanamsha; for ecliptic of date we use true ayanamsha.
+    _skip_sidereal = bool(iflag & SEFLG_EQUATORIAL)
+
+    if (iflag & SEFLG_SIDEREAL) and not _skip_sidereal:
         try:
             mean_aya = _calc_ayanamsa_from_leb(
                 reader,
@@ -1358,16 +1427,21 @@ def _fast_calc_core(
                 sid_t0=sid_t0,
                 sid_ayan_t0=sid_ayan_t0,
             )
-            # True ayanamsa: add nutation in longitude (Δψ) to mean ayanamsa.
-            # Ecliptic longitude from pipelines includes nutation, so we must
-            # subtract the true ayanamsa (mean + Δψ) for correct cancellation.
-            try:
-                _, dpsi_sid, _, _ = _get_skyfield_frame_data(jd_tt)
-                nutation_deg = math.degrees(dpsi_sid)
-                aya = mean_aya + nutation_deg
-            except (ValueError, Exception):
+            # J2000 ecliptic has no nutation component → mean ayanamsha.
+            # Ecliptic of date includes nutation → true ayanamsha (mean + Δψ).
+            is_j2000 = bool(iflag & SEFLG_J2000)
+            if is_j2000:
                 aya = mean_aya
+            else:
+                try:
+                    _, dpsi_sid, _, _ = _get_skyfield_frame_data(jd_tt)
+                    nutation_deg = math.degrees(dpsi_sid)
+                    aya = mean_aya + nutation_deg
+                except (ValueError, Exception):
+                    aya = mean_aya
+
             lon = (lon - aya) % 360.0
+
             # Sidereal speed correction: subtract precession rate from dlon
             # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
             # Convert: deg/day = (arcsec/century) / 3600 / 36525
@@ -1375,6 +1449,7 @@ def _fast_calc_core(
             prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
             prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
             dlon -= prec_rate_deg_day
+
         except KeyError:
             # Star-based sidereal mode, fall back
             raise

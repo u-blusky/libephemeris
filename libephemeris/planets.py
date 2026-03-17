@@ -3507,7 +3507,9 @@ def _get_true_ayanamsa(tjd_ut: float) -> float:
 def _get_ayanamsa_for_flags(tjd_ut: float, iflag: int) -> float:
     """Get appropriate ayanamsha based on calculation flags.
 
-    When SEFLG_NONUT is set, returns mean ayanamsha (without nutation).
+    Returns mean ayanamsha (no nutation) when SEFLG_NONUT or SEFLG_J2000 is
+    set.  J2000 ecliptic coordinates contain no nutation component, so the
+    true ayanamsha (mean + Δψ) would introduce a spurious ~9-17″ offset.
     Otherwise returns true ayanamsha (mean + nutation in longitude).
 
     Args:
@@ -3517,7 +3519,7 @@ def _get_ayanamsa_for_flags(tjd_ut: float, iflag: int) -> float:
     Returns:
         Ayanamsha in degrees
     """
-    if iflag & SEFLG_NONUT:
+    if (iflag & SEFLG_NONUT) or (iflag & SEFLG_J2000):
         sid_mode = get_sid_mode()
         assert isinstance(sid_mode, int)
         return _calc_ayanamsa(tjd_ut, sid_mode)
