@@ -1380,11 +1380,13 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     from .cache import get_true_obliquity
     from .utils import cotrans_sp
 
-    # For J2000 frame, use J2000 obliquity; otherwise use obliquity of date
+    # For J2000 frame, use J2000 obliquity; otherwise use obliquity of date.
+    # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph
+    # which converts to equatorial using the precession-only frame.
     if iflag & SEFLG_J2000:
         eps = 23.4392911  # Mean obliquity at J2000.0
-    elif iflag & SEFLG_NONUT:
-        # NONUT: use mean obliquity (no nutation correction)
+    elif (iflag & SEFLG_NONUT) or (iflag & SEFLG_SIDEREAL):
+        # NONUT / SIDEREAL: use mean obliquity (no nutation correction)
         from .cache import get_mean_obliquity
 
         eps = get_mean_obliquity(jd_tt)
@@ -1588,7 +1590,10 @@ def _calc_body(
             # The Meeus polynomial returns mean ecliptic of date.
             # Swiss Ephemeris outputs in the true ecliptic of date,
             # so add nutation in longitude (dpsi) unless NONUT is set.
-            if not (iflag & SEFLG_NONUT):
+            # When SIDEREAL+EQUATORIAL, pyswisseph outputs mean ecliptic
+            # (no nutation) converted with mean obliquity, so skip dpsi.
+            _sid_eq = is_sidereal and bool(iflag & SEFLG_EQUATORIAL)
+            if not (iflag & SEFLG_NONUT) and not _sid_eq:
                 from .cache import get_cached_nutation
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -1625,7 +1630,10 @@ def _calc_body(
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
             # TrueNode includes nutation effects in its perturbation terms.
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
-            if iflag & SEFLG_NONUT:
+            # When SIDEREAL+EQUATORIAL, pyswisseph also outputs mean ecliptic
+            # (no nutation) converted with mean obliquity, so strip dpsi too.
+            _sid_eq = is_sidereal and bool(iflag & SEFLG_EQUATORIAL)
+            if (iflag & SEFLG_NONUT) or _sid_eq:
                 from .cache import get_cached_nutation
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -1695,7 +1703,10 @@ def _calc_body(
             # The analytical formula returns mean ecliptic of date.
             # Swiss Ephemeris outputs in the true ecliptic of date,
             # so add nutation in longitude (dpsi) unless NONUT is set.
-            if not (iflag & SEFLG_NONUT):
+            # When SIDEREAL+EQUATORIAL, pyswisseph outputs mean ecliptic
+            # (no nutation) converted with mean obliquity, so skip dpsi.
+            _sid_eq = is_sidereal and bool(iflag & SEFLG_EQUATORIAL)
+            if not (iflag & SEFLG_NONUT) and not _sid_eq:
                 from .cache import get_cached_nutation
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -1734,7 +1745,10 @@ def _calc_body(
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
             # OscuApog includes nutation effects in its orbital computation.
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
-            if iflag & SEFLG_NONUT:
+            # When SIDEREAL+EQUATORIAL, pyswisseph also outputs mean ecliptic
+            # (no nutation) converted with mean obliquity, so strip dpsi too.
+            _sid_eq = is_sidereal and bool(iflag & SEFLG_EQUATORIAL)
+            if (iflag & SEFLG_NONUT) or _sid_eq:
                 from .cache import get_cached_nutation
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)

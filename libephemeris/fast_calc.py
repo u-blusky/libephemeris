@@ -21,7 +21,9 @@ from .constants import (
     SE_MEAN_APOG,
     SE_MEAN_NODE,
     SE_MOON,
+    SE_OSCU_APOG,
     SE_SUN,
+    SE_TRUE_NODE,
     SEFLG_BARYCTR,
     SEFLG_EQUATORIAL,
     SEFLG_HELCTR,
@@ -954,16 +956,27 @@ def _pipeline_ecliptic(
     """
     (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
 
-    # Bodies 10 (MeanNode) and 12 (MeanApogee) are stored as mean ecliptic
-    # of date (pure Meeus polynomial, no nutation).  The Skyfield reference
-    # path outputs true ecliptic of date by adding dpsi (nutation in
-    # longitude).  Apply the same correction here so LEB matches Skyfield.
-    # Note: SEFLG_NONUT falls back to Skyfield before reaching this point,
-    # so we always add dpsi here.  Velocity is NOT corrected — the Skyfield
-    # path also computes velocity from the un-nutated polynomial.
+    # Nutation in longitude (dpsi) handling.
+    # When SIDEREAL+EQUATORIAL: pyswisseph outputs mean ecliptic (no nutation)
+    # converted with mean obliquity.  For SID-only ecliptic output, dpsi is
+    # added here and later cancelled by true ayanamsha subtraction (true_aya
+    # = mean_aya + dpsi).  SEFLG_NONUT falls back to Skyfield before reaching
+    # this point.  Velocity is NOT corrected — the Skyfield path also computes
+    # velocity from the un-nutated polynomial.
+    _sid_eq = bool(iflag & SEFLG_SIDEREAL) and bool(iflag & SEFLG_EQUATORIAL)
     if ipl in (SE_MEAN_NODE, SE_MEAN_APOG):
-        _, dpsi_rad, _, _ = _get_skyfield_frame_data(jd_tt)
-        lon = (lon + math.degrees(dpsi_rad)) % 360.0
+        # Mean bodies are stored without nutation.  Add dpsi for true ecliptic
+        # output, UNLESS sidereal+equatorial (which needs mean ecliptic).
+        if not _sid_eq:
+            _, dpsi_rad, _, _ = _get_skyfield_frame_data(jd_tt)
+            lon = (lon + math.degrees(dpsi_rad)) % 360.0
+    elif ipl in (SE_TRUE_NODE, SE_OSCU_APOG):
+        # True/osculating bodies naturally include nutation from orbital
+        # computation.  When sidereal+equatorial, strip dpsi to get mean
+        # ecliptic, matching pyswisseph behavior.
+        if _sid_eq:
+            _, dpsi_rad, _, _ = _get_skyfield_frame_data(jd_tt)
+            lon = (lon - math.degrees(dpsi_rad)) % 360.0
 
     # Coordinate transforms for ecliptic-direct bodies.
     # Input coords are always ecliptic of date.
@@ -993,10 +1006,14 @@ def _pipeline_ecliptic(
         lat = eq_now_lat
 
     elif iflag & SEFLG_EQUATORIAL:
-        # True equatorial of date: rotate ecliptic-of-date -> equatorial-of-date
-        _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
-        eps_mean = _mean_obliquity_iau2006(jd_tt)
-        eps = eps_mean + math.degrees(deps)
+        # Equatorial of date: rotate ecliptic-of-date → equatorial-of-date.
+        # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
+        if iflag & SEFLG_SIDEREAL:
+            eps = _mean_obliquity_iau2006(jd_tt)
+        else:
+            _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+            eps_mean = _mean_obliquity_iau2006(jd_tt)
+            eps = eps_mean + math.degrees(deps)
 
         # Velocity via finite difference on original ecliptic coords
         dt_step = 0.001  # days
@@ -1127,9 +1144,13 @@ def _pipeline_helio(
     if is_equatorial and is_j2000:
         # EQ+J2000: Skyfield strips J2000 before _maybe_equatorial_convert,
         # so it uses true obliquity of date on J2000 ecliptic coords.
-        _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
-        eps_mean = _mean_obliquity_iau2006(jd_tt)
-        eps = eps_mean + math.degrees(deps)
+        # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
+        if iflag & SEFLG_SIDEREAL:
+            eps = _mean_obliquity_iau2006(jd_tt)
+        else:
+            _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+            eps_mean = _mean_obliquity_iau2006(jd_tt)
+            eps = eps_mean + math.degrees(deps)
 
         dt_step = 0.001
         eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
@@ -1147,11 +1168,15 @@ def _pipeline_helio(
         lat = eq_now_lat
 
     elif is_equatorial:
-        # Equatorial of date: precess J2000 → date, then ecliptic → equatorial
+        # Equatorial of date: precess J2000 → date, then ecliptic → equatorial.
+        # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
         lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
-        _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
-        eps_mean = _mean_obliquity_iau2006(jd_tt)
-        eps = eps_mean + math.degrees(deps)
+        if iflag & SEFLG_SIDEREAL:
+            eps = _mean_obliquity_iau2006(jd_tt)
+        else:
+            _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+            eps_mean = _mean_obliquity_iau2006(jd_tt)
+            eps = eps_mean + math.degrees(deps)
 
         dt_step = 0.001
         eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
