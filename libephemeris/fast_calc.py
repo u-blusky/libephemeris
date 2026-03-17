@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from .constants import (
     SE_EARTH,
+    SE_INTP_APOG,
+    SE_INTP_PERG,
     SE_MEAN_APOG,
     SE_MEAN_NODE,
     SE_MOON,
@@ -980,7 +982,17 @@ def _pipeline_ecliptic(
 
     # Coordinate transforms for ecliptic-direct bodies.
     # Input coords are always ecliptic of date.
-    if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
+    #
+    # When SIDEREAL is set, pyswisseph ignores SEFLG_J2000 for "non-mean"
+    # Pipeline B bodies (TrueNode, OscuApog, IntpApog, IntpPerg).  These
+    # bodies output sidereal ecliptic of date regardless of J2000 flag.
+    # Mean bodies (MeanNode, MeanApog) DO precess to J2000 normally.
+    _SID_J2K_SKIP_BODIES = (SE_TRUE_NODE, SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG)
+    _effective_j2000 = bool(iflag & SEFLG_J2000) and not (
+        bool(iflag & SEFLG_SIDEREAL) and ipl in _SID_J2K_SKIP_BODIES
+    )
+
+    if (iflag & SEFLG_EQUATORIAL) and _effective_j2000:
         # J2000 equatorial: precess ecliptic-of-date -> J2000 ecliptic,
         # then rotate J2000 ecliptic -> J2000 equatorial.
         eps = OBLIQUITY_J2000_DEG
@@ -1031,7 +1043,7 @@ def _pipeline_ecliptic(
         lon = eq_now_lon
         lat = eq_now_lat
 
-    elif iflag & SEFLG_J2000:
+    elif _effective_j2000:
         # J2000 ecliptic: precess from ecliptic of date to J2000
         # Velocity must also be transformed via finite difference
         dt_step = 0.001  # days
@@ -1454,8 +1466,12 @@ def _fast_calc_core(
             )
             # J2000 ecliptic has no nutation component → mean ayanamsha.
             # Ecliptic of date includes nutation → true ayanamsha (mean + Δψ).
-            is_j2000 = bool(iflag & SEFLG_J2000)
-            if is_j2000:
+            # For TrueNode/OscuApog/IntpApog/IntpPerg, J2000 precession is
+            # skipped when sidereal is set (coords remain ecliptic of date),
+            # so use true ayanamsha even if SEFLG_J2000 is in the flags.
+            _J2K_SKIP = (SE_TRUE_NODE, SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG)
+            _eff_j2000 = bool(iflag & SEFLG_J2000) and ipl not in _J2K_SKIP
+            if _eff_j2000:
                 aya = mean_aya
             else:
                 try:
