@@ -501,28 +501,36 @@ def _get_skyfield_frame_data(
 def _get_precession_matrix(
     jd_tt: float,
 ) -> Tuple[Tuple[float, float, float], ...]:
-    """Get precession-only matrix (P) from Skyfield.
+    """Get mean-equator-of-date rotation matrix from Skyfield.
 
-    Returns the ICRS→mean-equatorial-of-date rotation matrix, which applies
-    only precession (no nutation, no frame bias).  Used for sidereal+equatorial
-    output where pyswisseph uses the mean equator.
+    Returns the ICRS→mean-equatorial-of-date rotation matrix used for
+    sidereal+equatorial output, where pyswisseph uses the mean equator.
+
+    Uses Skyfield's ``mean_equator_and_equinox_of_date`` frame, which is the
+    dynamical mean equator (precession-only, no nutation, no ICRS frame bias).
+    This matches the Skyfield reference path in ``planets.py`` line 2436-2440
+    and produces results consistent with pyswisseph's SID+EQ output.
+
+    Note: ``t.P`` was previously used here but it includes the ICRS frame bias
+    (~17 mas), causing up to 0.015″ excess error vs the Skyfield reference path.
 
     Args:
         jd_tt: Julian Day in TT.
 
     Returns:
-        3x3 P matrix as nested tuples.
+        3x3 rotation matrix as nested tuples.
     """
     from .state import get_timescale
+    from skyfield.framelib import mean_equator_and_equinox_of_date
 
     ts = get_timescale()
     t = ts.tt_jd(jd_tt)
 
-    P = t.P
+    R = mean_equator_and_equinox_of_date.rotation_at(t)
     return (
-        (float(P[0][0]), float(P[0][1]), float(P[0][2])),
-        (float(P[1][0]), float(P[1][1]), float(P[1][2])),
-        (float(P[2][0]), float(P[2][1]), float(P[2][2])),
+        (float(R[0][0]), float(R[0][1]), float(R[0][2])),
+        (float(R[1][0]), float(R[1][1]), float(R[1][2])),
+        (float(R[2][0]), float(R[2][1]), float(R[2][2])),
     )
 
 
@@ -1392,6 +1400,10 @@ def _fast_calc_core(
 
     body = reader._bodies[ipl]
 
+    # Flag for deferred J2000 precession — set True only by Pipeline B for
+    # mean bodies (MeanNode, MeanApog) with SID+J2K (no EQ).
+    _mean_sid_j2k = False
+
     # Dispatch to appropriate pipeline based on coordinate type
     if body.coord_type == COORD_ICRS_BARY:
         # Pipeline A: ICRS barycentric with analytical velocity
@@ -1426,8 +1438,23 @@ def _fast_calc_core(
 
     elif body.coord_type == COORD_ECLIPTIC:
         # Pipeline B: ecliptic direct
+        #
+        # For mean bodies (MeanNode, MeanApog) with SID+J2K (no EQ), defer
+        # J2000 precession so ayanamsha can be subtracted first in ecliptic-
+        # of-date coordinates, matching the Skyfield path order:
+        #   Skyfield: ecl_date → −aya → precess_to_J2000
+        #   LEB old:  ecl_date → precess_to_J2000 → −aya  (WRONG — non-commutative)
+        #   LEB fix:  ecl_date → −aya → precess_to_J2000  (matches Skyfield)
+        _MEAN_BODIES = (SE_MEAN_NODE, SE_MEAN_APOG)
+        _mean_sid_j2k = (
+            ipl in _MEAN_BODIES
+            and bool(iflag & SEFLG_SIDEREAL)
+            and bool(iflag & SEFLG_J2000)
+            and not bool(iflag & SEFLG_EQUATORIAL)
+        )
+        _pipe_flags = (iflag & ~SEFLG_J2000) if _mean_sid_j2k else iflag
         lon, lat, dist, dlon, dlat, ddist = _pipeline_ecliptic(
-            reader, jd_tt, ipl, iflag
+            reader, jd_tt, ipl, _pipe_flags
         )
         if not (iflag & SEFLG_SPEED):
             dlon, dlat, ddist = 0.0, 0.0, 0.0
@@ -1494,5 +1521,25 @@ def _fast_calc_core(
         except KeyError:
             # Star-based sidereal mode, fall back
             raise
+
+    # Deferred J2000 precession for mean Pipeline B bodies with SID+J2K.
+    # The pipeline was run without SEFLG_J2000 so ayanamsha could be
+    # subtracted in ecliptic-of-date first (matching the Skyfield path
+    # order).  Now precess the sidereal-corrected coords to J2000.
+    if _mean_sid_j2k:
+        dt_step = 0.001  # days
+        j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+        j_fwd_lon, j_fwd_lat = _precess_ecliptic(
+            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt, J2000
+        )
+        d_j_lon = j_fwd_lon - j_now_lon
+        if d_j_lon > 180.0:
+            d_j_lon -= 360.0
+        elif d_j_lon < -180.0:
+            d_j_lon += 360.0
+        dlon = d_j_lon / dt_step
+        dlat = (j_fwd_lat - j_now_lat) / dt_step
+        lon = j_now_lon
+        lat = j_now_lat
 
     return (lon, lat, dist, dlon, dlat, ddist), iflag
