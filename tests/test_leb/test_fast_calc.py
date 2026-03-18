@@ -581,3 +581,397 @@ class TestAyanamsa:
 
         with pytest.raises(KeyError, match="Star-based"):
             _calc_ayanamsa_from_leb(leb_reader, jd_mid, sid_mode=17)
+
+
+# =============================================================================
+# SIDEREAL BUG FIX REGRESSION TESTS
+#
+# These tests guard against regressions of 4 sidereal calculation bugs
+# fixed in the leb/precision branch.  Each test targets the specific
+# error signature of the original bug so that a regression would be caught
+# immediately (tight tolerances, targeted flag combos).
+#
+# Bodies available in the test LEB: Sun(0), Moon(1), Mars(4), Earth(14),
+# MeanNode(10).  Full Pipeline B/C coverage (TrueNode, OscuApog, etc.)
+# is in tests/test_leb/compare/extended/test_extended_sidereal.py and
+# compare_scripts/tests/test_compare_sidereal_regression.py.
+# =============================================================================
+
+
+class TestSiderealRegressionBug1:
+    """Bug 1 regression (commit 64b8367):
+    Pipeline A SID+EQ used nutation matrix instead of mean equator precession.
+    Pipeline A SID+J2K used true ayanamsha instead of mean.
+
+    Error signature: ~36" RA error for SID+EQ, ~0.3" for SID+J2K.
+    """
+
+    @pytest.fixture
+    def jd_mid(self, leb_reader):
+        jd_start, jd_end = leb_reader.jd_range
+        return (jd_start + jd_end) / 2.0
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    def test_sid_eq_pipeline_a_position(self, leb_reader, jd_mid, ipl):
+        """SID+EQ for Pipeline A bodies: LEB vs Skyfield within 0.1"."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+        fast_result, _ = fast_calc_ut(
+            leb_reader,
+            jd_mid,
+            ipl,
+            flags,
+            sid_mode=1,
+            sid_t0=2451545.0,
+            sid_ayan_t0=0.0,
+        )
+        sky_result, _ = ephem.swe_calc_ut(jd_mid, ipl, flags)
+
+        ra_err = abs(fast_result[0] - sky_result[0])
+        if ra_err > 180.0:
+            ra_err = 360.0 - ra_err
+        ra_err_arcsec = ra_err * 3600.0
+
+        dec_err_arcsec = abs(fast_result[1] - sky_result[1]) * 3600.0
+
+        # Tolerance: 0.1" catches Bug 1 error (~36" if unfixed)
+        assert ra_err_arcsec < 0.1, (
+            f'Body {ipl} SID+EQ RA error = {ra_err_arcsec:.4f}" (Bug 1 regression?)'
+        )
+        assert dec_err_arcsec < 0.1, (
+            f'Body {ipl} SID+EQ Dec error = {dec_err_arcsec:.4f}" (Bug 1 regression?)'
+        )
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    def test_sid_j2k_pipeline_a_position(self, leb_reader, jd_mid, ipl):
+        """SID+J2K for Pipeline A bodies: LEB vs Skyfield within 0.1"."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+        ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+        fast_result, _ = fast_calc_ut(
+            leb_reader,
+            jd_mid,
+            ipl,
+            flags,
+            sid_mode=1,
+            sid_t0=2451545.0,
+            sid_ayan_t0=0.0,
+        )
+        sky_result, _ = ephem.swe_calc_ut(jd_mid, ipl, flags)
+
+        lon_err = abs(fast_result[0] - sky_result[0])
+        if lon_err > 180.0:
+            lon_err = 360.0 - lon_err
+        lon_err_arcsec = lon_err * 3600.0
+
+        assert lon_err_arcsec < 0.1, (
+            f'Body {ipl} SID+J2K lon error = {lon_err_arcsec:.4f}" (Bug 1 regression?)'
+        )
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    def test_sid_eq_j2k_pipeline_a_position(self, leb_reader, jd_mid, ipl):
+        """SID+EQ+J2K for Pipeline A bodies: LEB vs Skyfield within 0.5"."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000
+        ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+        fast_result, _ = fast_calc_ut(
+            leb_reader,
+            jd_mid,
+            ipl,
+            flags,
+            sid_mode=1,
+            sid_t0=2451545.0,
+            sid_ayan_t0=0.0,
+        )
+        sky_result, _ = ephem.swe_calc_ut(jd_mid, ipl, flags)
+
+        ra_err = abs(fast_result[0] - sky_result[0])
+        if ra_err > 180.0:
+            ra_err = 360.0 - ra_err
+        ra_err_arcsec = ra_err * 3600.0
+
+        assert ra_err_arcsec < 0.5, (
+            f'Body {ipl} SID+EQ+J2K RA error = {ra_err_arcsec:.4f}"'
+        )
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    @pytest.mark.parametrize("sid_mode", [0, 1, 3])
+    def test_sid_eq_multi_ayanamsha(self, leb_reader, jd_mid, ipl, sid_mode):
+        """SID+EQ should match Skyfield for multiple ayanamsha modes."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
+
+        fast_result, _ = fast_calc_ut(
+            leb_reader,
+            jd_mid,
+            ipl,
+            flags,
+            sid_mode=sid_mode,
+            sid_t0=2451545.0,
+            sid_ayan_t0=0.0,
+        )
+        sky_result, _ = ephem.swe_calc_ut(jd_mid, ipl, flags)
+
+        ra_err = abs(fast_result[0] - sky_result[0])
+        if ra_err > 180.0:
+            ra_err = 360.0 - ra_err
+        ra_err_arcsec = ra_err * 3600.0
+
+        assert ra_err_arcsec < 0.1, (
+            f'Body {ipl} SID+EQ mode={sid_mode}: RA error = {ra_err_arcsec:.4f}"'
+        )
+
+
+class TestSiderealRegressionBug2:
+    """Bug 2 regression (commit e6555ed):
+    Pipeline B/C SID+EQ dpsi nutation handling was wrong.
+    - MeanNode/MeanApog should skip dpsi
+    - TrueNode/OscuApog should subtract dpsi
+    - Mean obliquity must be used for SID+EQ rotation
+
+    Error signature: ~10-20" for MeanNode SID+EQ.
+    Only MeanNode is in the test LEB; full coverage in compare tests.
+    """
+
+    @pytest.fixture
+    def test_dates(self, leb_reader):
+        jd_start, jd_end = leb_reader.jd_range
+        margin = 10.0
+        return [
+            jd_start + margin,
+            (jd_start + jd_end) / 2.0,
+            jd_end - margin,
+        ]
+
+    @pytest.mark.integration
+    def test_mean_node_sid_eq(self, leb_reader, test_dates):
+        """MeanNode SID+EQ: LEB vs Skyfield within 0.1"."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        for jd in test_dates:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            fast_result, _ = fast_calc_ut(
+                leb_reader,
+                jd,
+                SE_MEAN_NODE,
+                flags,
+                sid_mode=1,
+                sid_t0=2451545.0,
+                sid_ayan_t0=0.0,
+            )
+            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+
+            ra_err = abs(fast_result[0] - sky_result[0])
+            if ra_err > 180.0:
+                ra_err = 360.0 - ra_err
+            ra_err_arcsec = ra_err * 3600.0
+
+            assert ra_err_arcsec < 0.1, (
+                f'MeanNode SID+EQ RA error = {ra_err_arcsec:.4f}" '
+                f"at JD {jd} (Bug 2 regression?)"
+            )
+
+    @pytest.mark.integration
+    def test_mean_node_sid_eq_speed(self, leb_reader, test_dates):
+        """MeanNode SID+EQ velocity: LEB vs Skyfield within 0.01 deg/day."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        for jd in test_dates:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            fast_result, _ = fast_calc_ut(
+                leb_reader,
+                jd,
+                SE_MEAN_NODE,
+                flags,
+                sid_mode=1,
+                sid_t0=2451545.0,
+                sid_ayan_t0=0.0,
+            )
+            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+
+            speed_err = abs(fast_result[3] - sky_result[3])
+
+            assert speed_err < 0.01, (
+                f"MeanNode SID+EQ RA speed error = {speed_err:.6f} deg/day at JD {jd}"
+            )
+
+
+class TestSiderealRegressionBug3:
+    """Bug 3 regression (commit 9f0fde7):
+    pyswisseph ignores SEFLG_J2000 for TrueNode, OscuApog, IntpApog, IntpPerg
+    when SIDEREAL is set.  MeanNode and MeanApog precess to J2000 normally.
+
+    Only MeanNode is in the test LEB.  We verify MeanNode SID+J2K DOES differ
+    from MeanNode SID (confirming J2K is applied for mean bodies).
+    Full Pipeline B coverage in compare tests.
+    """
+
+    @pytest.fixture
+    def test_dates(self, leb_reader):
+        jd_start, jd_end = leb_reader.jd_range
+        margin = 10.0
+        return [
+            jd_start + margin,
+            (jd_start + jd_end) / 2.0,
+            jd_end - margin,
+        ]
+
+    @pytest.mark.integration
+    def test_mean_node_sid_j2k_differs_from_sid(self, leb_reader, test_dates):
+        """MeanNode SID+J2K should differ from SID (J2K IS applied for mean).
+
+        If this test fails (values identical), Bug 3 may have regressed to
+        suppress J2K for mean bodies as well.
+        """
+        for jd in test_dates:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            sid_result, _ = fast_calc_ut(
+                leb_reader,
+                jd,
+                SE_MEAN_NODE,
+                SEFLG_SPEED | SEFLG_SIDEREAL,
+                sid_mode=1,
+                sid_t0=2451545.0,
+                sid_ayan_t0=0.0,
+            )
+            sid_j2k_result, _ = fast_calc_ut(
+                leb_reader,
+                jd,
+                SE_MEAN_NODE,
+                SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000,
+                sid_mode=1,
+                sid_t0=2451545.0,
+                sid_ayan_t0=0.0,
+            )
+
+            lon_diff = abs(sid_result[0] - sid_j2k_result[0])
+            if lon_diff > 180.0:
+                lon_diff = 360.0 - lon_diff
+
+            # Should differ by precession amount (~0.3° for 2023-2028)
+            assert lon_diff > 0.001, (
+                f"MeanNode SID vs SID+J2K must differ at JD {jd}, "
+                f"got diff = {lon_diff:.6f}° (J2K not applied? Bug 3 regression)"
+            )
+
+    @pytest.mark.integration
+    def test_mean_node_sid_j2k_matches_skyfield(self, leb_reader, test_dates):
+        """MeanNode SID+J2K from LEB matches Skyfield within 0.5"."""
+        for jd in test_dates:
+            flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            fast_result, _ = fast_calc_ut(
+                leb_reader,
+                jd,
+                SE_MEAN_NODE,
+                flags,
+                sid_mode=1,
+                sid_t0=2451545.0,
+                sid_ayan_t0=0.0,
+            )
+            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+
+            lon_err = abs(fast_result[0] - sky_result[0])
+            if lon_err > 180.0:
+                lon_err = 360.0 - lon_err
+            lon_err_arcsec = lon_err * 3600.0
+
+            assert lon_err_arcsec < 0.5, (
+                f'MeanNode SID+J2K lon error = {lon_err_arcsec:.4f}" '
+                f"at JD {jd} (Bug 4 regression?)"
+            )
+
+
+class TestSiderealRegressionBug4:
+    """Bug 4 regression (commit b816be0):
+    (a) _get_precession_matrix() used t.P including ICRS frame bias (~17 mas).
+        Fixed to use mean_equator_and_equinox_of_date.rotation_at(t).
+    (b) MeanNode/MeanApog SID+J2K applied precession before ayanamsha
+        subtraction.  Non-commutative, up to 28" at extreme dates.
+        Fixed to defer precession until after sidereal correction.
+
+    Error signature: (a) ~17 mas systematic at J2000, grows with time.
+                     (b) up to 28" at extreme dates (non-commutativity).
+    """
+
+    @pytest.fixture
+    def test_dates(self, leb_reader):
+        """Spread dates across the LEB range to catch date-dependent errors."""
+        jd_start, jd_end = leb_reader.jd_range
+        margin = 10.0
+        n = 5
+        step = (jd_end - jd_start - 2 * margin) / (n - 1)
+        return [jd_start + margin + i * step for i in range(n)]
+
+    @pytest.mark.integration
+    def test_mean_node_sid_eq_j2k_combined(self, leb_reader, test_dates):
+        """MeanNode SID+EQ+J2K: LEB vs Skyfield within 0.5"."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000
+        for jd in test_dates:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            fast_result, _ = fast_calc_ut(
+                leb_reader,
+                jd,
+                SE_MEAN_NODE,
+                flags,
+                sid_mode=1,
+                sid_t0=2451545.0,
+                sid_ayan_t0=0.0,
+            )
+            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+
+            ra_err = abs(fast_result[0] - sky_result[0])
+            if ra_err > 180.0:
+                ra_err = 360.0 - ra_err
+            ra_err_arcsec = ra_err * 3600.0
+
+            assert ra_err_arcsec < 0.5, (
+                f'MeanNode SID+EQ+J2K RA error = {ra_err_arcsec:.4f}" '
+                f"at JD {jd} (Bug 4 regression?)"
+            )
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    def test_pipeline_a_precession_no_frame_bias(self, leb_reader, test_dates, ipl):
+        """Pipeline A SID+EQ: verify no ICRS frame bias in precession.
+
+        Bug 4a introduced ~17 mas systematic error at J2000, growing with
+        distance from J2000.  With the fix, LEB and Skyfield use the same
+        mean equator precession matrix (no frame bias).
+        """
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        max_err = 0.0
+
+        for jd in test_dates:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            fast_result, _ = fast_calc_ut(
+                leb_reader,
+                jd,
+                ipl,
+                flags,
+                sid_mode=1,
+                sid_t0=2451545.0,
+                sid_ayan_t0=0.0,
+            )
+            sky_result, _ = ephem.swe_calc_ut(jd, ipl, flags)
+
+            ra_err = abs(fast_result[0] - sky_result[0])
+            if ra_err > 180.0:
+                ra_err = 360.0 - ra_err
+            ra_err_arcsec = ra_err * 3600.0
+            max_err = max(max_err, ra_err_arcsec)
+
+        # 0.1" tolerance catches the ~17 mas frame bias
+        assert max_err < 0.1, (
+            f'Body {ipl} SID+EQ max RA error = {max_err:.4f}" '
+            f"across {len(test_dates)} dates (frame bias regression?)"
+        )

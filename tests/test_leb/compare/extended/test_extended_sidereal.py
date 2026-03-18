@@ -1,0 +1,493 @@
+"""
+LEB vs Skyfield Comparison: Sidereal Mode (Extended Tier).
+
+Validates sidereal positions for all body pipelines (A, B, C) across
+all flag combinations: SID, SID+EQ, SID+J2K, SID+EQ+J2K.
+
+This fills the critical gap: no sidereal tests existed for the extended tier.
+It also serves as regression coverage for all 4 sidereal bug fixes.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+import libephemeris as ephem
+from libephemeris.constants import (
+    SE_SUN,
+    SE_MOON,
+    SE_MARS,
+    SE_JUPITER,
+    SE_SATURN,
+    SE_MEAN_NODE,
+    SE_TRUE_NODE,
+    SE_MEAN_APOG,
+    SE_OSCU_APOG,
+    SE_INTP_APOG,
+    SE_INTP_PERG,
+    SE_CHIRON,
+    SEFLG_SPEED,
+    SEFLG_SIDEREAL,
+    SEFLG_EQUATORIAL,
+    SEFLG_J2000,
+)
+
+from tests.test_leb.compare.conftest import (
+    CompareHelper,
+    FORMULA_SIDEREAL_MODES,
+    lon_error_arcsec,
+)
+
+from .conftest import TOLS_EXT
+
+
+# ============================================================================
+# BODY LISTS
+# ============================================================================
+
+# Pipeline A (ICRS barycentric)
+PIPELINE_A_BODIES = [
+    (SE_SUN, "Sun"),
+    (SE_MOON, "Moon"),
+    (SE_MARS, "Mars"),
+    (SE_JUPITER, "Jupiter"),
+    (SE_SATURN, "Saturn"),
+]
+
+# Pipeline B (ecliptic direct) — mean bodies
+PIPELINE_B_MEAN = [
+    (SE_MEAN_NODE, "MeanNode"),
+    (SE_MEAN_APOG, "MeanApog"),
+]
+
+# Pipeline B (ecliptic direct) — true/osculating bodies
+PIPELINE_B_TRUE = [
+    (SE_TRUE_NODE, "TrueNode"),
+    (SE_OSCU_APOG, "OscuApog"),
+]
+
+# Pipeline B (ecliptic direct) — interpolated bodies
+PIPELINE_B_INTERP = [
+    (SE_INTP_APOG, "IntpApog"),
+    (SE_INTP_PERG, "IntpPerg"),
+]
+
+ALL_ECLIPTIC_BODIES = PIPELINE_B_MEAN + PIPELINE_B_TRUE + PIPELINE_B_INTERP
+
+# Sidereal tolerance: LEB vs Skyfield should be near-zero since both
+# use the same formula-based ayanamsha.  The position tolerance is the
+# Chebyshev approximation error, NOT ayanamsha model difference.
+SID_POSITION_TOL = TOLS_EXT.SIDEREAL_ARCSEC  # 0.001"
+SID_ECLIPTIC_TOL = TOLS_EXT.ECLIPTIC_ARCSEC  # 0.1" (Meeus polynomial limits)
+
+# Cross-mode sidereal speed tolerance (analytical vs finite-diff ~5e-5 deg/day)
+SID_SPEED_TOL = 0.001  # deg/day
+
+# A subset of formula-based sidereal modes for combinatorial tests
+SID_MODES_SUBSET = [
+    0,
+    1,
+    2,
+    3,
+    5,
+]  # Fagan-Bradley, Lahiri, De Luce, Raman, Krishnamurti
+
+
+# ============================================================================
+# SIDEREAL ECLIPTIC (SEFLG_SIDEREAL only)
+# ============================================================================
+
+
+class TestExtSiderealEcliptic:
+    """Sidereal ecliptic longitude: LEB vs Skyfield."""
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_A_BODIES)
+    @pytest.mark.parametrize("sid_mode", SID_MODES_SUBSET)
+    def test_pipeline_a_sidereal(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+        sid_mode: int,
+    ):
+        """Pipeline A sidereal lon matches Skyfield within tolerance."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < SID_POSITION_TOL, (
+            f'{body_name} SID mode={sid_mode}: max error = {max_err:.4f}" '
+            f"at JD {worst_jd:.1f}"
+        )
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", ALL_ECLIPTIC_BODIES)
+    def test_pipeline_b_sidereal(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Pipeline B sidereal lon matches Skyfield within tolerance."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)  # Lahiri
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < SID_ECLIPTIC_TOL, (
+            f'{body_name} SID Lahiri: max error = {max_err:.4f}" at JD {worst_jd:.1f}'
+        )
+
+
+# ============================================================================
+# SIDEREAL + EQUATORIAL (Bug 1 & Bug 2 regression)
+# ============================================================================
+
+
+class TestExtSiderealEquatorial:
+    """Sidereal equatorial: LEB vs Skyfield."""
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_A_BODIES)
+    def test_pipeline_a_sid_eq(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Pipeline A SID+EQ RA matches Skyfield (Bug 1 regression)."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < SID_POSITION_TOL, (
+            f'{body_name} SID+EQ: max RA error = {max_err:.4f}" at JD {worst_jd:.1f}'
+        )
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_B_MEAN + PIPELINE_B_TRUE)
+    def test_pipeline_b_sid_eq(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Pipeline B SID+EQ RA matches Skyfield (Bug 2 regression)."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < SID_ECLIPTIC_TOL, (
+            f'{body_name} SID+EQ: max RA error = {max_err:.4f}" at JD {worst_jd:.1f}'
+        )
+
+
+# ============================================================================
+# SIDEREAL + J2000 (Bug 3 & Bug 4 regression)
+# ============================================================================
+
+
+class TestExtSiderealJ2000:
+    """Sidereal J2000: LEB vs Skyfield."""
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_A_BODIES)
+    def test_pipeline_a_sid_j2k(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Pipeline A SID+J2K lon matches Skyfield."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < SID_POSITION_TOL, (
+            f'{body_name} SID+J2K: max error = {max_err:.4f}" at JD {worst_jd:.1f}'
+        )
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_B_TRUE)
+    def test_true_body_sid_j2k_equals_sid(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """True bodies SID+J2K should equal SID (J2K suppressed, Bug 3).
+
+        LEB and Skyfield should both suppress J2K for TrueNode/OscuApog.
+        """
+        for jd in ext_dates_50[:10]:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            leb_sid, _ = compare.leb(
+                ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED | SEFLG_SIDEREAL
+            )
+            leb_j2k, _ = compare.leb(
+                ephem.swe_calc_ut,
+                jd,
+                body_id,
+                SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000,
+            )
+
+            diff_arcsec = lon_error_arcsec(leb_sid[0], leb_j2k[0])
+
+            assert diff_arcsec < 0.001, (
+                f'{body_name}: SID and SID+J2K differ by {diff_arcsec:.4f}" '
+                f"at JD {jd:.1f} (J2K should be suppressed)"
+            )
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_B_MEAN)
+    def test_mean_body_sid_j2k(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Mean bodies SID+J2K: LEB vs Skyfield (Bug 4 regression)."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < SID_ECLIPTIC_TOL, (
+            f'{body_name} SID+J2K: max error = {max_err:.4f}" at JD {worst_jd:.1f}'
+        )
+
+
+# ============================================================================
+# SIDEREAL + EQUATORIAL + J2000 (all bugs combined)
+# ============================================================================
+
+
+class TestExtSiderealEqJ2k:
+    """Sidereal equatorial J2000: LEB vs Skyfield."""
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_A_BODIES[:3])
+    def test_pipeline_a_sid_eq_j2k(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Pipeline A SID+EQ+J2K RA matches Skyfield."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < SID_POSITION_TOL, (
+            f'{body_name} SID+EQ+J2K: max RA error = {max_err:.4f}" '
+            f"at JD {worst_jd:.1f}"
+        )
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_B_MEAN)
+    def test_mean_body_sid_eq_j2k(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+    ):
+        """Mean bodies SID+EQ+J2K: LEB vs Skyfield."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000
+        max_err = 0.0
+        worst_jd = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
+
+        assert max_err < SID_ECLIPTIC_TOL, (
+            f'{body_name} SID+EQ+J2K: max RA error = {max_err:.4f}" '
+            f"at JD {worst_jd:.1f}"
+        )
+
+
+# ============================================================================
+# SIDEREAL SPEED
+# ============================================================================
+
+
+class TestExtSiderealSpeed:
+    """Sidereal speed precision across all flag combos."""
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_A_BODIES[:3])
+    @pytest.mark.parametrize(
+        "extra_flags,flag_name",
+        [
+            (0, "SID"),
+            (SEFLG_EQUATORIAL, "SID+EQ"),
+            (SEFLG_J2000, "SID+J2K"),
+            (SEFLG_EQUATORIAL | SEFLG_J2000, "SID+EQ+J2K"),
+        ],
+    )
+    def test_sidereal_speed(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+        extra_flags: int,
+        flag_name: str,
+    ):
+        """Sidereal speed matches Skyfield within tolerance."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | extra_flags
+        max_err = 0.0
+
+        for jd in ext_dates_50:
+            ephem.set_sid_mode(1, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = abs(ref[3] - leb[3])
+            max_err = max(max_err, err)
+
+        assert max_err < SID_SPEED_TOL, (
+            f"{body_name} {flag_name}: max speed error = {max_err:.6f} deg/day"
+        )
+
+
+# ============================================================================
+# MULTI-AYANAMSHA SWEEP
+# ============================================================================
+
+
+class TestExtSiderealMultiAyanamsha:
+    """All 27+ formula-based ayanamsha modes for sidereal position."""
+
+    @pytest.mark.leb_compare_extended
+    @pytest.mark.slow
+    @pytest.mark.parametrize("body_id,body_name", [(SE_SUN, "Sun"), (SE_MARS, "Mars")])
+    @pytest.mark.parametrize("sid_mode", FORMULA_SIDEREAL_MODES)
+    def test_all_formula_modes(
+        self,
+        compare: CompareHelper,
+        ext_dates_50: list[float],
+        body_id: int,
+        body_name: str,
+        sid_mode: int,
+    ):
+        """Sidereal lon matches Skyfield for all formula-based modes."""
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        max_err = 0.0
+
+        for jd in ext_dates_50[:10]:  # Reduced for combinatorial test
+            ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
+
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+
+            err = lon_error_arcsec(ref[0], leb[0])
+            max_err = max(max_err, err)
+
+        assert max_err < SID_POSITION_TOL, (
+            f'{body_name} SID mode={sid_mode}: max error = {max_err:.4f}"'
+        )
