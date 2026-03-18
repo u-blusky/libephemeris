@@ -77,11 +77,18 @@ ALL_ECLIPTIC_BODIES = PIPELINE_B_MEAN + PIPELINE_B_TRUE + PIPELINE_B_INTERP
 # Sidereal tolerance: LEB vs Skyfield should be near-zero since both
 # use the same formula-based ayanamsha.  The position tolerance is the
 # Chebyshev approximation error, NOT ayanamsha model difference.
-SID_POSITION_TOL = TOLS_EXT.SIDEREAL_ARCSEC  # 0.001"
+# Extended tier uses 0.005" instead of 0.001" because nutation polynomial
+# degradation beyond +-20 centuries from J2000 adds ~0.003" (known limitation #12).
+# This still catches real sidereal bugs (10-36" errors) with >2000x margin.
+SID_POSITION_TOL = 0.005  # arcsec (relaxed for nutation degradation at extreme dates)
 SID_ECLIPTIC_TOL = TOLS_EXT.ECLIPTIC_ARCSEC  # 0.1" (Meeus polynomial limits)
 
-# Cross-mode sidereal speed tolerance (analytical vs finite-diff ~5e-5 deg/day)
-SID_SPEED_TOL = 0.001  # deg/day
+# Cross-mode sidereal speed tolerance.  The sidereal path uses mean precession
+# rate (analytical) while Skyfield uses true ayanamsha rate (finite-diff),
+# giving a cross-mode delta of ~5e-5 deg/day.  On top of that, the Chebyshev
+# speed approximation error for Moon can reach ~0.001 deg/day at extreme dates.
+# Combined: up to ~0.002 deg/day for Moon.  Other bodies are well below 0.001.
+SID_SPEED_TOL = 0.002  # deg/day (Moon-dominated, other bodies <0.001)
 
 # A subset of formula-based sidereal modes for combinatorial tests
 SID_MODES_SUBSET = [
