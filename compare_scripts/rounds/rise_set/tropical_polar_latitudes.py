@@ -55,7 +55,10 @@ def compare_rise_set(label, body, jd, lat, lon, alt, rsmi, tol_sec=30.0):
         se_jd = None
 
     try:
-        le_jd = ephem.swe_rise_trans(jd, body, lat, lon, alt, 1013.25, 15.0, 2, rsmi)
+        le_result = ephem.swe_rise_trans(
+            jd, body, rsmi, [lon, lat, alt], 1013.25, 15.0, 2
+        )
+        le_jd = le_result[1][0]
     except Exception as e:
         le_err = str(e)
         le_jd = None
@@ -290,9 +293,10 @@ for horhgt in horizon_alts:
                 se_jd = None
 
             try:
-                le_jd = ephem.swe_rise_trans_true_hor(
-                    jd, swe.SUN, lat, 0.0, 0.0, 1013.25, 15.0, horhgt, 2, rsmi
+                le_result = ephem.swe_rise_trans_true_hor(
+                    jd, swe.SUN, rsmi, [0.0, lat, 0.0], 1013.25, 15.0, horhgt, 2
                 )
+                le_jd = le_result[1][0]
             except Exception:
                 le_jd = None
 

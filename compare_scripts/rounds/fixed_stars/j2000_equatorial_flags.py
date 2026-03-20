@@ -76,7 +76,7 @@ for label, jd in test_dates:
                 se_d = se_r[0]
 
                 le_r = ephem.swe_fixstar2_ut(star_name, jd, flags)
-                le_d = le_r[1]  # (name, data_tuple, retflag, err)
+                le_d = le_r[0]  # (pos_tuple, star_name, retflag)
 
                 for i, (cn, mult, tol) in enumerate(
                     [

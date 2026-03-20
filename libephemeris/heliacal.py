@@ -2546,11 +2546,9 @@ def vis_limit_mag(
     if is_fixed_star:
         # Fixed star calculation
         try:
-            star_name_out, star_result, retflag, error = swe_fixstar2_ut(
+            star_result, star_name_out, retflag = swe_fixstar2_ut(
                 objname, jd, flags & 0xFF
             )
-            if error:
-                raise ValueError(f"could not find star name {objname.lower()}: {error}")
 
             # star_result is (lon, lat, dist, lon_speed, lat_speed, dist_speed)
             # We need to convert ecliptic to horizontal
@@ -2558,10 +2556,10 @@ def vis_limit_mag(
             star_lat = star_result[1]
 
             # Get star magnitude
-            star_name_mag, star_mag_val, mag_error = swe_fixstar2_mag(objname)
-            if not mag_error:
+            try:
+                star_mag_val, _star_name_mag = swe_fixstar2_mag(objname)
                 obj_mag = star_mag_val
-            else:
+            except Exception:
                 obj_mag = 2.0  # Default magnitude if not found
 
             # Convert ecliptic to equatorial then to horizontal

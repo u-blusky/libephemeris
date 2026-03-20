@@ -57,7 +57,7 @@ class TestFixedStarVelocity:
 
     def test_swe_fixstar_ut_without_speed_flag(self, standard_jd):
         """Test that without SEFLG_SPEED, velocities are zero."""
-        pos, retflag, err = swe_fixstar_ut("Regulus", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Regulus", standard_jd, 0)
 
         # Velocities should all be zero
         assert pos[3] == 0.0, f"speed_lon should be 0, got {pos[3]}"
@@ -66,22 +66,22 @@ class TestFixedStarVelocity:
 
         # Position should still be valid
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.4f}"
-        assert err == "" or "Regulus" in err, f"Unexpected error: {err}"
+        assert "Regulus" in name, f"Unexpected name: {name}"
 
     def test_swe_fixstar_ut_with_speed_flag(self, standard_jd):
         """Test that with SEFLG_SPEED, velocities are computed."""
-        pos, retflag, err = swe_fixstar_ut("Regulus", standard_jd, SEFLG_SPEED)
+        pos, name, retflag = swe_fixstar_ut("Regulus", standard_jd, SEFLG_SPEED)
 
         # Velocities should be non-zero
         assert pos[3] != 0.0, f"speed_lon should be non-zero, got {pos[3]}"
 
         # Position should still be valid
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.4f}"
-        assert err == "" or "Regulus" in err, f"Unexpected error: {err}"
+        assert "Regulus" in name, f"Unexpected name: {name}"
 
     def test_swe_fixstar_with_speed_flag(self, standard_jd):
         """Test swe_fixstar (TT version) with SEFLG_SPEED."""
-        pos, retflag, err = swe_fixstar("Regulus", standard_jd, SEFLG_SPEED)
+        pos, name, retflag = swe_fixstar("Regulus", standard_jd, SEFLG_SPEED)
 
         # Velocities should be non-zero
         assert pos[3] != 0.0, f"speed_lon should be non-zero, got {pos[3]}"
@@ -91,7 +91,7 @@ class TestFixedStarVelocity:
 
     def test_swe_fixstar2_ut_with_speed_flag(self, standard_jd):
         """Test swe_fixstar2_ut with SEFLG_SPEED."""
-        name, pos, retflag, err = swe_fixstar2_ut("Regulus", standard_jd, SEFLG_SPEED)
+        pos, name, retflag = swe_fixstar2_ut("Regulus", standard_jd, SEFLG_SPEED)
 
         # Name should be returned
         assert "Regulus" in name, f"Expected Regulus in name, got {name}"
@@ -104,7 +104,7 @@ class TestFixedStarVelocity:
 
     def test_swe_fixstar2_with_speed_flag(self, standard_jd):
         """Test swe_fixstar2 (TT version) with SEFLG_SPEED."""
-        name, pos, retflag, err = swe_fixstar2("Regulus", standard_jd, SEFLG_SPEED)
+        pos, name, retflag = swe_fixstar2("Regulus", standard_jd, SEFLG_SPEED)
 
         # Name should be returned
         assert "Regulus" in name, f"Expected Regulus in name, got {name}"
@@ -124,10 +124,7 @@ class TestFixedStarVelocity:
     )
     def test_velocity_for_multiple_stars(self, standard_jd, star_name):
         """Test velocity calculation for multiple stars."""
-        pos, retflag, err = swe_fixstar_ut(star_name, standard_jd, SEFLG_SPEED)
-
-        if err and "could not find" in err.lower():
-            pytest.skip(f"Star {star_name} not found")
+        pos, name, retflag = swe_fixstar_ut(star_name, standard_jd, SEFLG_SPEED)
 
         # Longitude velocity should be primarily due to precession and aberration
         # ~50.3 arcsec/year = 0.0000378 deg/day for precession
@@ -155,7 +152,7 @@ class TestFixedStarVelocityVsPyswisseph:
         but signs now match after implementing SE-compatible velocity sign logic.
         """
         # Get libephemeris velocity
-        pos_lib, retflag, err = swe_fixstar_ut(
+        pos_lib, name, retflag = swe_fixstar_ut(
             "Regulus", standard_jd, SEFLG_SWIEPH | SEFLG_SPEED
         )
 
@@ -199,7 +196,7 @@ class TestFixedStarVelocityVsPyswisseph:
     def test_spica_velocity_vs_pyswisseph(self, standard_jd):
         """Compare Spica velocity with pyswisseph within 10%."""
         # Get libephemeris velocity
-        pos_lib, retflag, err = swe_fixstar_ut(
+        pos_lib, name, retflag = swe_fixstar_ut(
             "Spica", standard_jd, SEFLG_SWIEPH | SEFLG_SPEED
         )
 
@@ -227,7 +224,7 @@ class TestFixedStarVelocityVsPyswisseph:
 
     def test_precession_rate_magnitude(self, standard_jd):
         """Verify velocity magnitude matches expected precession rate."""
-        pos, retflag, err = swe_fixstar_ut(
+        pos, name, retflag = swe_fixstar_ut(
             "Regulus", standard_jd, SEFLG_SWIEPH | SEFLG_SPEED
         )
 
@@ -255,8 +252,8 @@ class TestBackwardCompatibility:
         # Test all four fixstar functions
         pos1, _, _ = swe_fixstar_ut("Regulus", standard_jd, 0)
         pos2, _, _ = swe_fixstar("Regulus", standard_jd, 0)
-        name3, pos3, _, _ = swe_fixstar2_ut("Regulus", standard_jd, 0)
-        name4, pos4, _, _ = swe_fixstar2("Regulus", standard_jd, 0)
+        pos3, name3, _ = swe_fixstar2_ut("Regulus", standard_jd, 0)
+        pos4, name4, _ = swe_fixstar2("Regulus", standard_jd, 0)
 
         for i, (pos, func_name) in enumerate(
             [

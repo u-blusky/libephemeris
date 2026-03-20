@@ -256,14 +256,14 @@ def test_240():
             except:
                 continue
             t += 1
-            d = adiff(le_r[1][0], se_r[0][0]) * 3600
+            d = adiff(le_r[0][0], se_r[0][0]) * 3600
             if d <= 10.0:
                 p += 1
             else:
                 f += 1
                 fails.append(f'  {star} jd={jd:.0f} RA diff={d:.4f}"')
             t += 1
-            d = abs(le_r[1][1] - se_r[0][1]) * 3600
+            d = abs(le_r[0][1] - se_r[0][1]) * 3600
             if d <= 10.0:
                 p += 1
             else:
@@ -617,7 +617,7 @@ def test_250():
             except:
                 continue
             t += 1
-            d = adiff(le_r[1][0], se_r[0][0]) * 3600
+            d = adiff(le_r[0][0], se_r[0][0]) * 3600
             if d <= 15.0:
                 p += 1  # known ~5" sidereal offset
             else:
@@ -748,18 +748,16 @@ def test_254():
                     le_r = ephem.swe_rise_trans(
                         jd,
                         ephem.SE_SUN,
-                        lat,
-                        lon,
-                        alt,
+                        rsmi,
+                        [lon, lat, alt],
                         1013.25,
                         15.0,
                         ephem.SEFLG_SWIEPH,
-                        rsmi,
                     )
                     se_r = swe.rise_trans(
                         jd, swe.SUN, rsmi, [lon, lat, alt], 1013.25, 15.0
                     )
-                    le_jd = le_r[0] if isinstance(le_r, (tuple, list)) else float(le_r)
+                    le_jd = le_r[1][0]
                     se_jd = se_r[1][0]
                 except:
                     continue

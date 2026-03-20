@@ -92,12 +92,9 @@ def test_rise_set_polar():
                     # libephemeris
                     try:
                         le_result = ephem.swe_rise_trans(
-                            jd, le_body, lat, lon, alt, pressure, temp, 0, rsmi
+                            jd, le_body, rsmi, [lon, lat, alt], pressure, temp
                         )
-                        if isinstance(le_result, tuple):
-                            le_jd = le_result[0]
-                        else:
-                            le_jd = float(le_result)
+                        le_jd = le_result[1][0]
                         le_ok = True
                     except Exception as e:
                         le_ok = False

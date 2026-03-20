@@ -69,8 +69,8 @@ for date_str, jd in TEST_DATES:
                 continue
             try:
                 le_r = ephem.swe_fixstar2_ut(star_name, jd, flags)
-                le_name = le_r[0]
-                le_pos = le_r[1]
+                le_name = le_r[1]
+                le_pos = le_r[0]
             except Exception:
                 skipped += 1
                 continue

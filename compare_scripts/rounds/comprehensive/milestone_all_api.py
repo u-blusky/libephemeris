@@ -179,7 +179,7 @@ def test_fixed_stars():
         for star in FIXED_STARS:
             try:
                 le_r = ephem.swe_fixstar2_ut(star, jd, FLAGS)
-                le_lon = le_r[1][0]
+                le_lon = le_r[0][0]
 
                 se_r = swe.fixstar2(star, jd, swe.FLG_SWIEPH | swe.FLG_SPEED)
                 se_lon = se_r[0][0]

@@ -16,42 +16,33 @@ class TestFixstarTT:
 
     def test_fixstar_basic_regulus(self, standard_jd):
         """Test basic Regulus calculation with TT."""
-        pos, retflag, err = ephem.swe_fixstar("Regulus", standard_jd, 0)
+        pos, name, retflag = ephem.swe_fixstar("Regulus", standard_jd, 0)
 
-        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f} out of range"
         assert -1 < pos[1] < 2, f"Regulus lat: {pos[1]:.2f} out of range"
         assert pos[2] > 1000, "Fixed stars should be very distant"
 
     def test_fixstar_basic_spica(self, standard_jd):
         """Test basic Spica calculation with TT."""
-        pos, retflag, err = ephem.swe_fixstar("Spica", standard_jd, 0)
+        pos, name, retflag = ephem.swe_fixstar("Spica", standard_jd, 0)
 
-        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
         assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.2f} out of range"
         assert -3 < pos[1] < -1, f"Spica lat: {pos[1]:.2f} out of range"
         assert pos[2] > 1000, "Fixed stars should be very distant"
 
     def test_fixstar_unknown_star(self, standard_jd):
         """Test handling of unknown star name."""
-        pos, retflag, err = ephem.swe_fixstar("UnknownStar", standard_jd, 0)
+        from libephemeris.exceptions import Error
 
-        assert "could not find star name" in err, (
-            "Should report star not found (pyswisseph format)"
-        )
-        assert pos == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), "Position should be zero tuple"
+        with pytest.raises(Error, match="could not find star name"):
+            ephem.swe_fixstar("UnknownStar", standard_jd, 0)
 
     def test_fixstar_case_insensitive(self, standard_jd):
         """Test that star name lookup is case insensitive."""
-        pos_upper, _, err1 = ephem.swe_fixstar("REGULUS", standard_jd, 0)
-        pos_lower, _, err2 = ephem.swe_fixstar("regulus", standard_jd, 0)
-        pos_mixed, _, err3 = ephem.swe_fixstar("ReGuLuS", standard_jd, 0)
+        pos_upper, _, _ = ephem.swe_fixstar("REGULUS", standard_jd, 0)
+        pos_lower, _, _ = ephem.swe_fixstar("regulus", standard_jd, 0)
+        pos_mixed, _, _ = ephem.swe_fixstar("ReGuLuS", standard_jd, 0)
 
-        assert (
-            "could not find" not in err1.lower()
-            and "could not find" not in err2.lower()
-            and "could not find" not in err3.lower()
-        )
         assert pos_upper[0] == pos_lower[0] == pos_mixed[0]
 
     def test_fixstar_vs_fixstar_ut_relationship(self, standard_jd):
@@ -78,8 +69,7 @@ class TestFixstarTT:
 
     def test_fixstar_vs_swisseph_regulus(self, standard_jd):
         """Compare Regulus with SwissEph fixstar."""
-        pos_py, _, err = ephem.swe_fixstar("Regulus", standard_jd, 0)
-        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
+        pos_py, _, _ = ephem.swe_fixstar("Regulus", standard_jd, 0)
 
         try:
             # SwissEph fixstar (TT version)
@@ -97,8 +87,7 @@ class TestFixstarTT:
 
     def test_fixstar_vs_swisseph_spica(self, standard_jd):
         """Compare Spica with SwissEph fixstar."""
-        pos_py, _, err = ephem.swe_fixstar("Spica", standard_jd, 0)
-        assert "could not find" not in err.lower(), f"Unexpected error: {err}"
+        pos_py, _, _ = ephem.swe_fixstar("Spica", standard_jd, 0)
 
         try:
             pos_swe, name_swe, err_swe = swe.fixstar("Spica", standard_jd, 0)
@@ -117,10 +106,10 @@ class TestFixstarTT:
         """Test the return structure of swe_fixstar."""
         result = ephem.swe_fixstar("Regulus", standard_jd, 0)
 
-        # Should return a 3-tuple
-        assert len(result) == 3, "Should return 3-tuple (pos, iflag, error)"
+        # Should return a 3-tuple (pos, star_name, retflag)
+        assert len(result) == 3, "Should return 3-tuple (pos, star_name, retflag)"
 
-        pos, iflag, err = result
+        pos, name, retflag = result
 
         # Position should be 6-tuple
         assert len(pos) == 6, "Position should be 6-tuple"
@@ -136,33 +125,28 @@ class TestFixstarTT:
         assert pos[4] == 0.0, "Speed lat should be 0.0"
         assert pos[5] == 0.0, "Speed dist should be 0.0"
 
-        # iflag should be int
-        assert isinstance(iflag, int), "iflag should be int"
+        # name should be string
+        assert isinstance(name, str), "star_name should be string"
 
-        # err should be string
-        assert isinstance(err, str), "error should be string"
+        # retflag should be int
+        assert isinstance(retflag, int), "retflag should be int"
 
     def test_fixstar_alias(self, standard_jd):
         """Test that fixstar is an alias for swe_fixstar."""
-        pos1, flag1, err1 = ephem.swe_fixstar("Regulus", standard_jd, 0)
-        pos2, flag2, err2 = ephem.fixstar("Regulus", standard_jd, 0)
+        pos1, name1, flag1 = ephem.swe_fixstar("Regulus", standard_jd, 0)
+        pos2, name2, flag2 = ephem.fixstar("Regulus", standard_jd, 0)
 
         assert pos1 == pos2
+        assert name1 == name2
         assert flag1 == flag2
-        assert err1 == err2
 
     def test_fixstar_multiple_dates(self):
         """Test fixstar at different dates to verify proper motion."""
         jd_2000 = ephem.swe_julday(2000, 1, 1, 12.0)
         jd_2050 = ephem.swe_julday(2050, 1, 1, 12.0)
 
-        pos_2000, _, err1 = ephem.swe_fixstar("Regulus", jd_2000, 0)
-        pos_2050, _, err2 = ephem.swe_fixstar("Regulus", jd_2050, 0)
-
-        assert (
-            "could not find" not in err1.lower()
-            and "could not find" not in err2.lower()
-        )
+        pos_2000, _, _ = ephem.swe_fixstar("Regulus", jd_2000, 0)
+        pos_2050, _, _ = ephem.swe_fixstar("Regulus", jd_2050, 0)
 
         # Star should have moved due to proper motion + precession
         diff = abs(pos_2050[0] - pos_2000[0])
@@ -173,9 +157,8 @@ class TestFixstarTT:
     def test_fixstar_with_comma_in_name(self, standard_jd):
         """Test star name with comma (common in catalogs)."""
         # Some catalog formats use "Regulus,alLeo" style
-        pos, _, err = ephem.swe_fixstar("Regulus,alLeo", standard_jd, 0)
+        pos, _, _ = ephem.swe_fixstar("Regulus,alLeo", standard_jd, 0)
 
-        assert "could not find" not in err.lower(), "Should handle comma in star name"
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f}"
 
     def test_fixstar_whitespace_in_name(self, standard_jd):
@@ -215,12 +198,10 @@ class TestFixstarAndFixstarUtConsistency:
 
     def test_both_functions_work(self, standard_jd):
         """Test that both fixstar and fixstar_ut work correctly."""
-        pos_tt, _, err_tt = ephem.swe_fixstar("Spica", standard_jd, 0)
-        pos_ut, _, err_ut = ephem.swe_fixstar_ut("Spica", standard_jd, 0)
+        pos_tt, name_tt, retflag_tt = ephem.swe_fixstar("Spica", standard_jd, 0)
+        pos_ut, name_ut, retflag_ut = ephem.swe_fixstar_ut("Spica", standard_jd, 0)
 
-        assert (
-            "could not find" not in err_tt.lower()
-            and "could not find" not in err_ut.lower()
-        )
+        assert isinstance(name_tt, str)
+        assert isinstance(name_ut, str)
         assert 203 < pos_tt[0] < 205
         assert 203 < pos_ut[0] < 205

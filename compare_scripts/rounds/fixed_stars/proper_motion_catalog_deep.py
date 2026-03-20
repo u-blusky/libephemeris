@@ -60,9 +60,9 @@ for star in STARS:
             se = swe.fixstar2_ut(star, jd, FLAGS)
             le = ephem.swe_fixstar2_ut(star, jd, FLAGS)
             # SE returns (pos_tuple, starname, retflag)
-            # LE returns (starname, pos_tuple, retflag, error)
+            # LE returns (pos_tuple, starname, retflag)
             se_lon = se[0][0]
-            le_lon = le[1][0]
+            le_lon = le[0][0]
             diff = abs(se_lon - le_lon)
             if diff > 180:
                 diff = 360 - diff
@@ -93,7 +93,7 @@ for star in STARS:
             se = swe.fixstar2_ut(star, jd, FLAGS)
             le = ephem.swe_fixstar2_ut(star, jd, FLAGS)
             se_lat = se[0][1]
-            le_lat = le[1][1]
+            le_lat = le[0][1]
             diff = abs(se_lat - le_lat) * 3600
             if diff < 10.0:
                 passed += 1
@@ -111,7 +111,7 @@ for star in STARS[:15]:
         se = swe.fixstar2_ut(star, jd, FLAGS)
         le = ephem.swe_fixstar2_ut(star, jd, FLAGS)
         se_dist = se[0][2]
-        le_dist = le[1][2]
+        le_dist = le[0][2]
         if se_dist > 0 and le_dist > 0:
             ratio = le_dist / se_dist
             if 0.9 < ratio < 1.1:
@@ -137,7 +137,7 @@ for star in STARS[:20]:
         le_2100 = ephem.swe_fixstar2_ut(star, jd_2100, FLAGS)
 
         se_drift = se_2100[0][0] - se_2000[0][0]
-        le_drift = le_2100[1][0] - le_2000[1][0]
+        le_drift = le_2100[0][0] - le_2000[0][0]
         if abs(se_drift) > 180:
             se_drift = se_drift - 360 if se_drift > 0 else se_drift + 360
         if abs(le_drift) > 180:
@@ -163,7 +163,7 @@ for star in STARS[:15]:
         try:
             se = swe.fixstar2_ut(star, jd, J2000)
             le = ephem.swe_fixstar2_ut(star, jd, J2000)
-            diff = abs(se[0][0] - le[1][0])
+            diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
             if diff * 3600 < 5.0:
@@ -182,7 +182,7 @@ for star in STARS[:15]:
         se = swe.fixstar2_ut(star, jd, FLAGS)
         le = ephem.swe_fixstar2_ut(star, jd, FLAGS)
         se_lon_spd = se[0][3]
-        le_lon_spd = le[1][3]
+        le_lon_spd = le[0][3]
         diff = abs(se_lon_spd - le_lon_spd)
         if diff < 0.001:  # 0.001 deg/day
             passed += 1

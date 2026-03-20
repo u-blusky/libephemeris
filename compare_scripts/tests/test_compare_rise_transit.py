@@ -56,16 +56,16 @@ class TestRiseSet:
         try:
             # SE_CALC_RISE = 1
             rise_swe = swe.rise_trans(jd, planet_id, 1, geopos, 1013.25, 15.0)
-            rise_py = ephem.rise_trans(jd, planet_id, lat, lon, altitude=alt, rsmi=1)
+            rise_py = ephem.rise_trans(jd, planet_id, 1, [lon, lat, alt], 1013.25, 15.0)
         except Exception as e:
             pytest.skip(f"Rise calculation not available: {e}")
             return
 
-        if rise_swe[0] != 0 or rise_py[0] == 0:
+        if rise_swe[0] != 0 or rise_py[0] != 0:
             pytest.skip("No rise event found")
             return
 
-        diff_seconds = abs(rise_swe[1][0] - rise_py[0]) * 86400
+        diff_seconds = abs(rise_swe[1][0] - rise_py[1][0]) * 86400
 
         assert diff_seconds < TIME_TOL_SECONDS, (
             f"{planet_name} rise at {name}: diff {diff_seconds:.1f}s exceeds tolerance"
@@ -81,16 +81,16 @@ class TestRiseSet:
         try:
             # SE_CALC_MTRANSIT = 4
             trans_swe = swe.rise_trans(jd, SE_SUN, 4, geopos, 1013.25, 15.0)
-            trans_py = ephem.rise_trans(jd, SE_SUN, lat, lon, altitude=alt, rsmi=4)
+            trans_py = ephem.rise_trans(jd, SE_SUN, 4, [lon, lat, alt], 1013.25, 15.0)
         except Exception as e:
             pytest.skip(f"Transit calculation not available: {e}")
             return
 
-        if trans_swe[0] != 0 or trans_py[0] == 0:
+        if trans_swe[0] != 0 or trans_py[0] != 0:
             pytest.skip("No transit event found")
             return
 
-        diff_seconds = abs(trans_swe[1][0] - trans_py[0]) * 86400
+        diff_seconds = abs(trans_swe[1][0] - trans_py[1][0]) * 86400
 
         assert diff_seconds < TIME_TOL_SECONDS, (
             f"Sun transit at {name}: diff {diff_seconds:.1f}s exceeds tolerance"
@@ -109,16 +109,16 @@ class TestMoonRiseSet:
 
         try:
             rise_swe = swe.rise_trans(jd, SE_MOON, 1, geopos, 1013.25, 15.0)
-            rise_py = ephem.rise_trans(jd, SE_MOON, lat, lon, altitude=alt, rsmi=1)
+            rise_py = ephem.rise_trans(jd, SE_MOON, 1, [lon, lat, alt], 1013.25, 15.0)
         except Exception as e:
             pytest.skip(f"Moon rise calculation not available: {e}")
             return
 
-        if rise_swe[0] != 0 or rise_py[0] == 0:
+        if rise_swe[0] != 0 or rise_py[0] != 0:
             pytest.skip("No moonrise found")
             return
 
-        diff_seconds = abs(rise_swe[1][0] - rise_py[0]) * 86400
+        diff_seconds = abs(rise_swe[1][0] - rise_py[1][0]) * 86400
 
         # Moon can have slightly larger tolerance due to parallax
         assert diff_seconds < TIME_TOL_SECONDS * 2, (

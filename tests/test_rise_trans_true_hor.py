@@ -33,14 +33,14 @@ class TestRiseTransTrueHorBasic:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Regular rise_trans
-        jd_rise_std, flag_std = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE
-        )
+        flag_std, tret_std = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0])
+        jd_rise_std = tret_std[0]
 
         # rise_trans_true_hor with zero horizon
-        jd_rise_hor, flag_hor = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+        flag_hor, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
         )
+        jd_rise_hor = tret[0]
 
         # Should match to within a few seconds (0.0001 JD = ~8.6 seconds)
         assert abs(jd_rise_std - jd_rise_hor) < 0.0001
@@ -52,10 +52,10 @@ class TestRiseTransTrueHorBasic:
         lat, lon = 41.9028, 12.4964
 
         result1 = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=5.0, rsmi=SE_CALC_RISE
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=5.0
         )
         result2 = swe_rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=5.0, rsmi=SE_CALC_RISE
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=5.0
         )
 
         assert result1 == result2
@@ -66,14 +66,16 @@ class TestRiseTransTrueHorBasic:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Standard sunrise (horizon at 0)
-        jd_rise_std, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
         )
+        jd_rise_std = tret[0]
 
         # Sunrise with mountains at 10 degrees
-        jd_rise_mountain, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=10.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=10.0
         )
+        jd_rise_mountain = tret[0]
 
         # Sun needs to rise higher before it appears, so sunrise is later
         assert jd_rise_mountain > jd_rise_std
@@ -88,14 +90,16 @@ class TestRiseTransTrueHorBasic:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Standard sunset (horizon at 0)
-        jd_set_std, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_SET
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0.0], horhgt=0.0
         )
+        jd_set_std = tret[0]
 
         # Sunset with mountains at 10 degrees
-        jd_set_mountain, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=10.0, rsmi=SE_CALC_SET
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0.0], horhgt=10.0
         )
+        jd_set_mountain = tret[0]
 
         # Sun sets behind mountain earlier
         assert jd_set_mountain < jd_set_std
@@ -114,14 +118,16 @@ class TestRiseTransTrueHorBasic:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Standard sunrise (horizon at 0)
-        jd_rise_std, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
         )
+        jd_rise_std = tret[0]
 
         # Sunrise with negative horizon (clamped to 0)
-        jd_rise_neg, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=-5.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=-5.0
         )
+        jd_rise_neg = tret[0]
 
         # Negative horizon is clamped to 0, so results should be identical
         assert jd_rise_neg == jd_rise_std
@@ -132,14 +138,16 @@ class TestRiseTransTrueHorBasic:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Transit with standard horizon
-        jd_transit_std, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_MTRANSIT
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_MTRANSIT, [lon, lat, 0.0], horhgt=0.0
         )
+        jd_transit_std = tret[0]
 
         # Transit with elevated horizon
-        jd_transit_mountain, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=10.0, rsmi=SE_CALC_MTRANSIT
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_MTRANSIT, [lon, lat, 0.0], horhgt=10.0
         )
+        jd_transit_mountain = tret[0]
 
         # Transit time should be identical (within computational precision)
         assert abs(jd_transit_std - jd_transit_mountain) < 0.0001
@@ -153,17 +161,19 @@ class TestRiseTransTrueHorMoon:
         jd_start = julday(2024, 1, 15, 0)
         lat, lon = 51.5074, -0.1278  # London
 
-        jd_rise_std, _ = rise_trans_true_hor(
-            jd_start, SE_MOON, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_MOON, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
         )
+        jd_rise_std = tret[0]
 
-        jd_rise_hor, flag = rise_trans_true_hor(
-            jd_start, SE_MOON, lat, lon, horizon_altitude=5.0, rsmi=SE_CALC_RISE
+        flag, tret = rise_trans_true_hor(
+            jd_start, SE_MOON, SE_CALC_RISE, [lon, lat, 0.0], horhgt=5.0
         )
+        jd_rise_hor = tret[0]
 
         assert jd_rise_hor > jd_start
         assert jd_rise_hor > jd_rise_std  # Delayed by horizon
-        assert flag == SE_CALC_RISE
+        assert flag == 0
 
 
 class TestRiseTransTrueHorPlanets:
@@ -179,17 +189,19 @@ class TestRiseTransTrueHorPlanets:
         lat, lon = 40.7128, -74.0060  # New York
 
         try:
-            jd_rise_std, _ = rise_trans_true_hor(
-                jd_start, SE_MARS, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+            _, tret = rise_trans_true_hor(
+                jd_start, SE_MARS, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
             )
+            jd_rise_std = tret[0]
 
-            jd_rise_hor, flag = rise_trans_true_hor(
-                jd_start, SE_MARS, lat, lon, horizon_altitude=8.0, rsmi=SE_CALC_RISE
+            flag, tret = rise_trans_true_hor(
+                jd_start, SE_MARS, SE_CALC_RISE, [lon, lat, 0.0], horhgt=8.0
             )
+            jd_rise_hor = tret[0]
 
             assert jd_rise_hor > jd_start
             assert jd_rise_hor > jd_rise_std
-            assert flag == SE_CALC_RISE
+            assert flag == 0
         except KeyError as e:
             if "mars" in str(e).lower():
                 pytest.skip("Mars not available in current ephemeris")
@@ -206,15 +218,17 @@ class TestRiseTransTrueHorCircumpolar:
         lat, lon = 55.0, 10.0  # Denmark
 
         # With standard horizon, sun rises and sets
-        jd_rise_std, flag_std = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+        flag_std, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
         )
-        assert flag_std == SE_CALC_RISE  # Sun does rise
+        jd_rise_std = tret[0]
+        assert flag_std == 0  # Sun does rise
 
         # With very high horizon (unrealistic, but tests the logic)
-        jd_rise_high, flag_high = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=15.0, rsmi=SE_CALC_RISE
+        flag_high, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=15.0
         )
+        jd_rise_high = tret[0]
 
         # Sun might not rise above 15 degrees at this latitude in winter
         # Either it's circumpolar below horizon (-2) or rises very late
@@ -236,19 +250,20 @@ class TestRiseTransTrueHorFlags:
         horizon = 5.0
 
         # With upper limb (default)
-        jd_rise_limb, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=horizon, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=horizon
         )
+        jd_rise_limb = tret[0]
 
         # With disc center
-        jd_rise_center, _ = rise_trans_true_hor(
+        _, tret = rise_trans_true_hor(
             jd_start,
             SE_SUN,
-            lat,
-            lon,
-            horizon_altitude=horizon,
-            rsmi=SE_CALC_RISE | SE_BIT_DISC_CENTER,
+            SE_CALC_RISE | SE_BIT_DISC_CENTER,
+            [lon, lat, 0.0],
+            horhgt=horizon,
         )
+        jd_rise_center = tret[0]
 
         # Center rise should be later than upper limb rise
         assert jd_rise_center > jd_rise_limb
@@ -260,19 +275,20 @@ class TestRiseTransTrueHorFlags:
         horizon = 5.0
 
         # With refraction (default)
-        jd_rise_refr, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=horizon, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=horizon
         )
+        jd_rise_refr = tret[0]
 
         # Without refraction
-        jd_rise_no_refr, _ = rise_trans_true_hor(
+        _, tret = rise_trans_true_hor(
             jd_start,
             SE_SUN,
-            lat,
-            lon,
-            horizon_altitude=horizon,
-            rsmi=SE_CALC_RISE | SE_BIT_NO_REFRACTION,
+            SE_CALC_RISE | SE_BIT_NO_REFRACTION,
+            [lon, lat, 0.0],
+            horhgt=horizon,
         )
+        jd_rise_no_refr = tret[0]
 
         # Without refraction, rise should be later
         assert jd_rise_no_refr > jd_rise_refr
@@ -287,24 +303,28 @@ class TestRiseTransTrueHorLocations:
         lat, lon = 0.0, 0.0  # Equator
         horizon = 5.0
 
-        jd_rise, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=horizon, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=horizon
         )
-        jd_set, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=horizon, rsmi=SE_CALC_SET
+        jd_rise = tret[0]
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0.0], horhgt=horizon
         )
+        jd_set = tret[0]
 
         # Both events should occur
         assert jd_rise > jd_start
         assert jd_set > jd_rise
 
         # Day length with elevated horizon should be shorter
-        jd_rise_std, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
         )
-        jd_set_std, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_SET
+        jd_rise_std = tret[0]
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0.0], horhgt=0.0
         )
+        jd_set_std = tret[0]
 
         day_length_std = (jd_set_std - jd_rise_std) * 24
         day_length_hor = (jd_set - jd_rise) * 24
@@ -317,12 +337,13 @@ class TestRiseTransTrueHorLocations:
         lat, lon = -33.8688, 151.2093  # Sydney
         horizon = 3.0
 
-        jd_rise, flag_rise = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=horizon, rsmi=SE_CALC_RISE
+        flag_rise, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=horizon
         )
+        jd_rise = tret[0]
 
         assert jd_rise > jd_start
-        assert flag_rise == SE_CALC_RISE
+        assert flag_rise == 0
 
 
 class TestRiseTransTrueHorErrors:
@@ -334,7 +355,7 @@ class TestRiseTransTrueHorErrors:
 
         with pytest.raises(ValueError, match="illegal planet number"):
             rise_trans_true_hor(
-                jd_start, 9999, 41.9, 12.5, horizon_altitude=5.0, rsmi=SE_CALC_RISE
+                jd_start, 9999, SE_CALC_RISE, [12.5, 41.9, 0.0], horhgt=5.0
             )
 
     def test_invalid_rsmi_raises_error(self):
@@ -342,14 +363,10 @@ class TestRiseTransTrueHorErrors:
         jd_start = julday(2024, 6, 21, 0)
 
         with pytest.raises(ValueError, match="Invalid event type"):
-            rise_trans_true_hor(
-                jd_start, SE_SUN, 41.9, 12.5, horizon_altitude=5.0, rsmi=0
-            )
+            rise_trans_true_hor(jd_start, SE_SUN, 0, [12.5, 41.9, 0.0], horhgt=5.0)
 
         with pytest.raises(ValueError, match="Invalid event type"):
-            rise_trans_true_hor(
-                jd_start, SE_SUN, 41.9, 12.5, horizon_altitude=5.0, rsmi=16
-            )
+            rise_trans_true_hor(jd_start, SE_SUN, 16, [12.5, 41.9, 0.0], horhgt=5.0)
 
 
 class TestRiseTransTrueHorVariousAngles:
@@ -361,12 +378,14 @@ class TestRiseTransTrueHorVariousAngles:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Typical building might add 2-3 degrees to horizon
-        jd_rise_std, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
         )
-        jd_rise_bldg, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=3.0, rsmi=SE_CALC_RISE
+        jd_rise_std = tret[0]
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=3.0
         )
+        jd_rise_bldg = tret[0]
 
         # Should be slightly later
         assert jd_rise_bldg > jd_rise_std
@@ -380,11 +399,12 @@ class TestRiseTransTrueHorVariousAngles:
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964  # Rome
 
-        jd_rise, flag = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=5.0, rsmi=SE_CALC_RISE
+        flag, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=5.0
         )
+        jd_rise = tret[0]
 
-        assert flag == SE_CALC_RISE
+        assert flag == 0
         assert jd_rise > jd_start
 
         # Verify the date
@@ -399,14 +419,16 @@ class TestRiseTransTrueHorVariousAngles:
         lat, lon = 46.0, 7.0  # Swiss Alps region
 
         # With flat horizon
-        jd_rise_flat, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=0.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=0.0
         )
+        jd_rise_flat = tret[0]
 
         # With mountain horizon (10 degrees)
-        jd_rise_mountain, _ = rise_trans_true_hor(
-            jd_start, SE_SUN, lat, lon, horizon_altitude=10.0, rsmi=SE_CALC_RISE
+        _, tret = rise_trans_true_hor(
+            jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], horhgt=10.0
         )
+        jd_rise_mountain = tret[0]
 
         # Significant delay expected
         diff_minutes = (jd_rise_mountain - jd_rise_flat) * 24 * 60

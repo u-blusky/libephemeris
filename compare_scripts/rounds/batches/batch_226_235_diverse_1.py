@@ -367,14 +367,14 @@ def test_232():
                 except:
                     continue
                 t += 1
-                d = angular_diff(le_r[1][0], se_r[0][0]) * 3600
+                d = angular_diff(le_r[0][0], se_r[0][0]) * 3600
                 if d <= 10.0:
                     p += 1
                 else:
                     f += 1
                     fails.append(f'  {star} {flabel} jd={jd:.0f} lon diff={d:.4f}"')
                 t += 1
-                d = abs(le_r[1][1] - se_r[0][1]) * 3600
+                d = abs(le_r[0][1] - se_r[0][1]) * 3600
                 if d <= 10.0:
                     p += 1
                 else:

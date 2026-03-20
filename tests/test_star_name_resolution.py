@@ -9,6 +9,7 @@ Tests the pyswisseph-compatible star name resolution system including:
 
 import pytest
 import libephemeris as ephem
+from libephemeris.exceptions import Error
 from libephemeris.fixed_stars import (
     STAR_ALIASES,
     STAR_CATALOG,
@@ -185,23 +186,23 @@ class TestSweFixstarUtWithAliases:
 
     def test_exact_name_works(self, standard_jd):
         """Test swe_fixstar_ut with exact canonical names."""
-        pos, retflag, name = swe_fixstar_ut("Regulus", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Regulus", standard_jd, 0)
         assert name == "Regulus"
         assert 149 < pos[0] < 151  # Regulus longitude
 
     def test_returns_canonical_name(self, standard_jd):
         """Test that swe_fixstar_ut returns canonical star name."""
-        pos, retflag, name = swe_fixstar_ut("Alpha Leo", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Alpha Leo", standard_jd, 0)
         assert name == "Regulus", f"Expected 'Regulus', got '{name}'"
 
-        pos, retflag, name = swe_fixstar_ut("Dog Star", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Dog Star", standard_jd, 0)
         assert name == "Sirius", f"Expected 'Sirius', got '{name}'"
 
     def test_case_insensitive(self, standard_jd):
         """Test case-insensitive star name lookup."""
-        pos1, _, name1 = swe_fixstar_ut("SIRIUS", standard_jd, 0)
-        pos2, _, name2 = swe_fixstar_ut("sirius", standard_jd, 0)
-        pos3, _, name3 = swe_fixstar_ut("Sirius", standard_jd, 0)
+        pos1, name1, _ = swe_fixstar_ut("SIRIUS", standard_jd, 0)
+        pos2, name2, _ = swe_fixstar_ut("sirius", standard_jd, 0)
+        pos3, name3, _ = swe_fixstar_ut("Sirius", standard_jd, 0)
 
         assert name1 == name2 == name3 == "Sirius"
         assert abs(pos1[0] - pos2[0]) < 0.0001
@@ -209,15 +210,15 @@ class TestSweFixstarUtWithAliases:
 
     def test_comma_prefix_search(self, standard_jd):
         """Test comma-prefix partial search."""
-        pos, retflag, name = swe_fixstar_ut(",alg", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut(",alg", standard_jd, 0)
         assert name == "Algol", f"Expected 'Algol', got '{name}'"
 
     def test_bayer_designation(self, standard_jd):
         """Test Bayer designation lookup."""
-        pos, _, name = swe_fixstar_ut("Alpha Leo", standard_jd, 0)
+        pos, name, _ = swe_fixstar_ut("Alpha Leo", standard_jd, 0)
         assert name == "Regulus"
 
-        pos, _, name = swe_fixstar_ut("Alpha CMa", standard_jd, 0)
+        pos, name, _ = swe_fixstar_ut("Alpha CMa", standard_jd, 0)
         assert name == "Sirius"
 
     def test_identical_results_for_aliases(self, standard_jd):
@@ -232,21 +233,20 @@ class TestSweFixstarUtWithAliases:
         assert abs(pos_sirius[0] - pos_alpha_cma[0]) < 0.0001
 
     def test_unknown_star_returns_error(self, standard_jd):
-        """Test that unknown star returns error message."""
-        pos, retflag, msg = swe_fixstar_ut("UnknownStar", standard_jd, 0)
-        assert "could not find star name" in msg.lower()
-        assert pos == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        """Test that unknown star raises an error."""
+        with pytest.raises(Exception):
+            swe_fixstar_ut("UnknownStar", standard_jd, 0)
 
     def test_backward_compatibility_regulus(self, standard_jd):
         """Test backward compatibility - Regulus still works."""
-        pos, retflag, name = swe_fixstar_ut("Regulus", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Regulus", standard_jd, 0)
         assert name == "Regulus"
         assert 149 < pos[0] < 151
         assert -1 < pos[1] < 2
 
     def test_backward_compatibility_spica(self, standard_jd):
         """Test backward compatibility - Spica still works."""
-        pos, retflag, name = swe_fixstar_ut("Spica", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Spica", standard_jd, 0)
         assert name == "Spica"
         assert 203 < pos[0] < 205
         assert -3 < pos[1] < -1
@@ -263,17 +263,17 @@ class TestSweFixstarWithAliases:
 
     def test_exact_name_works(self, standard_jd):
         """Test swe_fixstar with exact canonical names."""
-        pos, retflag, name = swe_fixstar("Regulus", standard_jd, 0)
+        pos, name, retflag = swe_fixstar("Regulus", standard_jd, 0)
         assert name == "Regulus"
 
     def test_alias_works(self, standard_jd):
         """Test swe_fixstar with aliases."""
-        pos, retflag, name = swe_fixstar("Alpha Leo", standard_jd, 0)
+        pos, name, retflag = swe_fixstar("Alpha Leo", standard_jd, 0)
         assert name == "Regulus"
 
     def test_comma_prefix_works(self, standard_jd):
         """Test swe_fixstar with comma-prefix search."""
-        pos, retflag, name = swe_fixstar(",sir", standard_jd, 0)
+        pos, name, retflag = swe_fixstar(",sir", standard_jd, 0)
         assert name == "Sirius"
 
 
@@ -343,21 +343,21 @@ class TestPyswissephCompatibility:
 
     def test_comma_prefix_finds_algol(self, standard_jd):
         """Test that ,alg finds Algol (pyswisseph behavior)."""
-        pos, retflag, name = swe_fixstar_ut(",alg", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut(",alg", standard_jd, 0)
         assert name == "Algol"
         # Algol is around 26 Taurus = 56 degrees
         assert 55 < pos[0] < 57
 
     def test_alpha_leo_finds_regulus(self, standard_jd):
         """Test that Alpha Leo finds Regulus (pyswisseph behavior)."""
-        pos, retflag, name = swe_fixstar_ut("Alpha Leo", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Alpha Leo", standard_jd, 0)
         assert name == "Regulus"
 
     def test_sirius_case_variations_identical(self, standard_jd):
         """Test SIRIUS and sirius return identical results."""
-        pos_upper, _, name_upper = swe_fixstar_ut("SIRIUS", standard_jd, 0)
-        pos_lower, _, name_lower = swe_fixstar_ut("sirius", standard_jd, 0)
-        pos_mixed, _, name_mixed = swe_fixstar_ut("Sirius", standard_jd, 0)
+        pos_upper, name_upper, _ = swe_fixstar_ut("SIRIUS", standard_jd, 0)
+        pos_lower, name_lower, _ = swe_fixstar_ut("sirius", standard_jd, 0)
+        pos_mixed, name_mixed, _ = swe_fixstar_ut("Sirius", standard_jd, 0)
 
         # All should return Sirius as canonical name
         assert name_upper == name_lower == name_mixed == "Sirius"
@@ -368,7 +368,7 @@ class TestPyswissephCompatibility:
 
     def test_alpha_cma_finds_sirius(self, standard_jd):
         """Test that Alpha CMa finds Sirius (pyswisseph behavior)."""
-        pos, retflag, name = swe_fixstar_ut("Alpha CMa", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Alpha CMa", standard_jd, 0)
         assert name == "Sirius"
 
 
@@ -388,18 +388,18 @@ class TestReturnTypeStructure:
         assert isinstance(result, tuple)
         assert len(result) == 3
 
-        pos, retflag, name = result
+        pos, name, retflag = result
 
         # Position tuple should have 6 elements
         assert isinstance(pos, tuple)
         assert len(pos) == 6
 
-        # retflag should be an int
-        assert isinstance(retflag, int)
-
         # name should be a string (canonical star name)
         assert isinstance(name, str)
         assert name == "Regulus"
+
+        # retflag should be an int
+        assert isinstance(retflag, int)
 
     def test_swe_fixstar_return_structure(self, standard_jd):
         """Test swe_fixstar returns correct tuple structure."""
@@ -408,10 +408,10 @@ class TestReturnTypeStructure:
         assert isinstance(result, tuple)
         assert len(result) == 3
 
-        pos, retflag, name = result
+        pos, name, retflag = result
 
         assert isinstance(pos, tuple)
         assert len(pos) == 6
-        assert isinstance(retflag, int)
         assert isinstance(name, str)
         assert name == "Spica"
+        assert isinstance(retflag, int)

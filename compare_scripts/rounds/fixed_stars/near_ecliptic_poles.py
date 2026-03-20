@@ -69,7 +69,7 @@ def main():
 
                 try:
                     le_res = ephem.swe_fixstar2_ut(star, jd, flags)
-                    le_pos = le_res[1]
+                    le_pos = le_res[0]
                 except Exception:
                     continue
 

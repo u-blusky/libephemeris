@@ -84,16 +84,13 @@ def example_star_positions() -> None:
     for star_name, description in NOTABLE_STARS[:10]:
         try:
             # Get star position
-            pos, retflag, err = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+            pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
 
-            if pos is not None:
-                # Get magnitude
-                mag, mag_err = eph.swe_fixstar_mag(star_name)
+            # Get magnitude
+            mag = eph.swe_fixstar_mag(star_name)
 
-                formatted = format_zodiac(pos[0])
-                print(f"{star_name:<14}{formatted:>18}{pos[1]:>11.4f}°{mag:>6.2f}")
-            else:
-                print(f"{star_name:<14} - Error: {err}")
+            formatted = format_zodiac(pos[0])
+            print(f"{star_name:<14}{formatted:>18}{pos[1]:>11.4f}°{mag:>6.2f}")
         except Exception as e:
             print(f"{star_name:<14} - Error: {e}")
 
@@ -113,13 +110,10 @@ def example_star_lookup() -> None:
 
     for term in search_terms:
         try:
-            full_name, pos, retflag, err = eph.swe_fixstar2_ut(term, jd, SEFLG_SWIEPH)
+            pos, full_name, retflag = eph.swe_fixstar2_ut(term, jd, SEFLG_SWIEPH)
 
-            if pos is not None:
-                print(f"  Search '{term}' -> {full_name}")
-                print(f"    Position: {format_zodiac(pos[0])}")
-            else:
-                print(f"  Search '{term}' -> Not found: {err}")
+            print(f"  Search '{term}' -> {full_name}")
+            print(f"    Position: {format_zodiac(pos[0])}")
         except Exception as e:
             print(f"  Search '{term}' -> Error: {e}")
 
@@ -150,7 +144,7 @@ def example_star_magnitude() -> None:
     star_mags = []
     for star_name in bright_stars:
         try:
-            mag, err = eph.swe_fixstar_mag(star_name)
+            mag = eph.swe_fixstar_mag(star_name)
             star_mags.append((star_name, mag))
         except Exception:
             pass
@@ -197,10 +191,9 @@ def example_proper_motion() -> None:
         for year in years:
             jd = eph.swe_julday(year, 1, 1, 0.0)
             try:
-                pos, retflag, err = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
-                if pos is not None:
-                    positions.append((year, pos[0], pos[1]))
-                    print(f"  {year}: {pos[0]:>10.6f}° lon, {pos[1]:>10.6f}° lat")
+                pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+                positions.append((year, pos[0], pos[1]))
+                print(f"  {year}: {pos[0]:>10.6f}° lon, {pos[1]:>10.6f}° lat")
             except Exception:
                 pass
 
@@ -239,15 +232,14 @@ def example_conjunction_with_planet() -> None:
 
     for star_name, description in NOTABLE_STARS:
         try:
-            pos, retflag, err = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
-            if pos is not None:
-                # Calculate angular separation
-                diff = abs(pos[0] - sun_lon)
-                if diff > 180:
-                    diff = 360 - diff
+            pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+            # Calculate angular separation
+            diff = abs(pos[0] - sun_lon)
+            if diff > 180:
+                diff = 360 - diff
 
-                if diff <= 5:
-                    stars_near.append((star_name, pos[0], diff))
+            if diff <= 5:
+                stars_near.append((star_name, pos[0], diff))
         except Exception:
             pass
 
@@ -289,10 +281,9 @@ def example_royal_stars() -> None:
 
     for star_name, title, archangel in royal_stars:
         try:
-            pos, retflag, err = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
-            if pos is not None:
-                formatted = format_zodiac(pos[0])
-                print(f"{star_name:<12}{title:<22}{archangel:<18}{formatted:>18}")
+            pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+            formatted = format_zodiac(pos[0])
+            print(f"{star_name:<12}{title:<22}{archangel:<18}{formatted:>18}")
         except Exception as e:
             print(f"{star_name:<12} Error: {e}")
 
@@ -332,13 +323,9 @@ def example_behenian_stars() -> None:
 
     for star_name, planets in behenian_stars:
         try:
-            pos, retflag, err = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
-            if pos is not None:
-                formatted = format_zodiac(pos[0])
-                print(f"{star_name:<12}{planets:<16}{formatted:>22}")
-            else:
-                # Some stars might have different spellings in the catalog
-                print(f"{star_name:<12}{planets:<16}{'(not found)':>22}")
+            pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+            formatted = format_zodiac(pos[0])
+            print(f"{star_name:<12}{planets:<16}{formatted:>22}")
         except Exception:
             print(f"{star_name:<12}{planets:<16}{'(not found)':>22}")
 

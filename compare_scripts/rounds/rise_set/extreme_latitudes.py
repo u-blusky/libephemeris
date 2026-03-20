@@ -96,17 +96,16 @@ def se_rise_trans(jd, body, geopos, rsmi, atpress=1013.25, attemp=15.0):
 def le_rise_trans(jd, body, geopos, rsmi, atpress=1013.25, attemp=15.0):
     """Call libephemeris swe_rise_trans.
 
-    libephemeris sig: (jd_start, planet, lat, lon, altitude, pressure, temperature, flags, rsmi)
-    Returns: (jd_event, retflag) where retflag=-2 means circumpolar
+    libephemeris sig: (tjdut, body, rsmi, geopos, atpress, attemp, flags)
+    Returns: (retflag, tret) where retflag=-2 means circumpolar, tret[0] = JD
     """
     try:
-        lon, lat, alt = geopos
-        jd_event, retflag = ephem.swe_rise_trans(
-            jd, body, lat, lon, alt, atpress, attemp, 0, rsmi
+        retflag, tret = ephem.swe_rise_trans(
+            jd, body, rsmi, list(geopos), atpress, attemp
         )
-        if retflag == -2 or jd_event == 0.0:
+        if retflag == -2 or tret[0] == 0.0:
             return None  # circumpolar
-        return jd_event
+        return tret[0]
     except Exception:
         return None
 
@@ -134,17 +133,16 @@ def le_rise_trans_true_hor(
 ):
     """Call libephemeris swe_rise_trans_true_hor.
 
-    libephemeris sig: (jd_start, planet, lat, lon, altitude, pressure, temperature,
-                       horizon_altitude, flags, rsmi)
+    libephemeris sig: (tjdut, body, rsmi, geopos, atpress, attemp, horhgt, flags)
+    Returns: (retflag, tret) where tret[0] = JD
     """
     try:
-        lon, lat, alt = geopos
-        jd_event, retflag = ephem.swe_rise_trans_true_hor(
-            jd, body, lat, lon, alt, atpress, attemp, horiz_alt, 0, rsmi
+        retflag, tret = ephem.swe_rise_trans_true_hor(
+            jd, body, rsmi, list(geopos), atpress, attemp, horiz_alt
         )
-        if retflag == -2 or jd_event == 0.0:
+        if retflag == -2 or tret[0] == 0.0:
             return None
-        return jd_event
+        return tret[0]
     except Exception:
         return None
 

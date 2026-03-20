@@ -97,13 +97,10 @@ for y, m, d in ASTRO_DATES:
 
                 try:
                     le_result2 = ephem.swe_rise_trans(
-                        jd_start, le_body, lat, lon, float(alt), 1013.25, 15.0, 0, event
+                        jd_start, le_body, event, [lon, lat, float(alt)], 1013.25, 15.0
                     )
-                    # swe_rise_trans returns a tuple (jd, ...) or just jd
-                    if isinstance(le_result2, (list, tuple)):
-                        le_jd = le_result2[0] if len(le_result2) > 0 else 0.0
-                    else:
-                        le_jd = float(le_result2)
+                    # swe_rise_trans returns (retflag, tret) where tret[0] = JD of event
+                    le_jd = le_result2[1][0]
                 except Exception:
                     skipped += 1
                     continue

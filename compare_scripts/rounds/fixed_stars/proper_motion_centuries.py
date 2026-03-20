@@ -90,8 +90,8 @@ def safe_fixstar2(name, jd, iflag=0):
 
     try:
         le_result = ephem.swe_fixstar2_ut(name, jd, iflag)
-        # libephemeris: (starname_str, pos_tuple, retflag, error_str)
-        le_pos = le_result[1]
+        # libephemeris: (pos_tuple, starname_str, retflag)
+        le_pos = le_result[0]
     except Exception:
         return None
 
@@ -299,15 +299,15 @@ def phase5():
             # fixstar2_ut
             try:
                 le2 = ephem.swe_fixstar2_ut(star, jd, 0)
-                # Returns (starname, pos_tuple, retflag, error)
-                le2_pos = le2[1]
+                # Returns (pos_tuple, starname, retflag)
+                le2_pos = le2[0]
             except Exception:
                 continue
 
             # fixstar_ut
             try:
                 le1 = ephem.swe_fixstar_ut(star, jd, 0)
-                # Returns (pos_tuple, retflag, starname)
+                # Returns (pos_tuple, starname, retflag)
                 le1_pos = le1[0]
             except Exception:
                 continue

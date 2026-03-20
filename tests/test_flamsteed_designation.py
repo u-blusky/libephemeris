@@ -9,6 +9,7 @@ This feature is required for swe_fixstar2 compatibility with designation search.
 
 import pytest
 
+from libephemeris.exceptions import Error
 from libephemeris.fixed_stars import (
     _parse_flamsteed_designation,
     resolve_star_name,
@@ -329,39 +330,34 @@ class TestSweFixstar2WithFlamsteed:
     def test_swe_fixstar2_ut_87_leonis(self):
         """swe_fixstar2_ut should find Regulus via '87 Leonis'."""
         jd = 2451545.0  # J2000.0
-        name, pos, flag, err = swe_fixstar2_ut("87 Leonis", jd, 0)
-        assert err == "", f"Unexpected error: {err}"
+        pos, name, flag = swe_fixstar2_ut("87 Leonis", jd, 0)
         assert "Regulus" in name
         assert 110 < pos[0] < 160  # Rough longitude check
 
     def test_swe_fixstar2_ut_67_virginis(self):
         """swe_fixstar2_ut should find Spica via '67 Virginis'."""
         jd = 2451545.0
-        name, pos, flag, err = swe_fixstar2_ut("67 Virginis", jd, 0)
-        assert err == "", f"Unexpected error: {err}"
+        pos, name, flag = swe_fixstar2_ut("67 Virginis", jd, 0)
         assert "Spica" in name
         assert 200 < pos[0] < 210  # Rough longitude check
 
     def test_swe_fixstar2_26_persei(self):
         """swe_fixstar2 (TT) should find Algol via '26 Persei'."""
         jd = 2451545.0
-        name, pos, flag, err = swe_fixstar2("26 Persei", jd, 0)
-        assert err == "", f"Unexpected error: {err}"
+        pos, name, flag = swe_fixstar2("26 Persei", jd, 0)
         assert "Algol" in name
 
     def test_swe_fixstar2_21_tauri(self):
         """swe_fixstar2 should find Asterope via '21 Tauri'."""
         jd = 2451545.0
-        name, pos, flag, err = swe_fixstar2("21 Tauri", jd, 0)
-        assert err == "", f"Unexpected error: {err}"
+        pos, name, flag = swe_fixstar2("21 Tauri", jd, 0)
         assert "Asterope" in name
 
     def test_swe_fixstar2_ut_star_not_found(self):
-        """swe_fixstar2_ut should return error for star not in catalog."""
+        """swe_fixstar2_ut should raise error for star not in catalog."""
         jd = 2451545.0
-        name, pos, flag, err = swe_fixstar2_ut("99 Leonis", jd, 0)
-        assert err != ""
-        assert "could not find" in err.lower()
+        with pytest.raises(Error):
+            swe_fixstar2_ut("99 Leonis", jd, 0)
 
 
 @pytest.mark.unit

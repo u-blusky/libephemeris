@@ -260,9 +260,9 @@ class TestNogdeflFixedStars:
         lib_result = ephem.swe_fixstar2_ut(star_name, jd, iflag)
 
         # pyswisseph fixstar2_ut returns (position_tuple, star_name, retflag)
-        # libephemeris returns (star_name, position_tuple, retflag, err)
+        # libephemeris returns (position_tuple, star_name, retflag)
         swe_pos = swe_result[0]
-        lib_pos = lib_result[1]
+        lib_pos = lib_result[0]
 
         lon_diff = angular_diff(swe_pos[0], lib_pos[0])
         lat_diff = abs(swe_pos[1] - lib_pos[1])

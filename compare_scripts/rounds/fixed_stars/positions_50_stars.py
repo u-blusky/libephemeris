@@ -160,7 +160,7 @@ def se_fixstar(star, jd, flags):
 def le_fixstar(star, jd, flags):
     """Call libephemeris swe_fixstar_ut, return (lon, lat, dist, slon, slat, sdist)."""
     result = ephem.swe_fixstar_ut(star, jd, flags)
-    # libephemeris returns (pos_tuple, iflag, error_msg)
+    # libephemeris returns (pos_tuple, star_name, retflag)
     return result[0]
 
 
@@ -415,7 +415,7 @@ def run_part6():
         label = f"Mag {star}"
         try:
             se_mag = swe.fixstar_mag(star)
-            le_mag, le_err = ephem.swe_fixstar_mag(star)
+            le_mag = ephem.swe_fixstar_mag(star)
         except Exception as e:
             r.fail(f"{label}: {e}")
             continue

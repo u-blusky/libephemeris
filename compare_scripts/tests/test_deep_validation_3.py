@@ -824,7 +824,7 @@ class TestFixstar2TT:
         tt_result = ephem.swe_fixstar2(star, jd_tt, SEFLG_SWIEPH)
 
         # Extract positions
-        ut_name, ut_pos, ut_flags, ut_err = ut_result
+        ut_pos, ut_name, ut_flags = ut_result
         tt_name, tt_pos, tt_flags, tt_err = tt_result
 
         # Positions should be essentially identical

@@ -65,12 +65,9 @@ for y, m, d in TEST_DATES:
                     continue
                 try:
                     le_r = ephem.swe_rise_trans(
-                        jd_start, le_body, lat, lon, float(alt), 1013.25, 15.0, 0, event
+                        jd_start, le_body, event, [lon, lat, float(alt)], 1013.25, 15.0
                     )
-                    if isinstance(le_r, (list, tuple)):
-                        le_jd = le_r[0] if len(le_r) > 0 else 0.0
-                    else:
-                        le_jd = float(le_r)
+                    le_jd = le_r[1][0]
                 except Exception:
                     skipped += 1
                     continue

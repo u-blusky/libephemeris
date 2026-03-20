@@ -299,7 +299,7 @@ def main():
 
             try:
                 le_res = ephem.swe_fixstar2_ut(star, jd, SEFLG_SPEED)
-                le_pos = le_res[1]  # (name, pos_tuple, retflag, err)
+                le_pos = le_res[0]  # (pos_tuple, star_name, retflag)
             except Exception:
                 continue
 

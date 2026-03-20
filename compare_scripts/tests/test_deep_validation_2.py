@@ -787,10 +787,10 @@ class TestFixedStarV2:
         except Exception:
             pytest.skip(f"Star {star} not found")
 
-        # fixstar_ut returns (positions, flags, star_name)
-        # fixstar2_ut returns (star_name, positions, flags, error_msg)
+        # fixstar_ut returns (positions, star_name, retflag)
+        # fixstar2_ut returns (positions, star_name, retflag)
         pos1 = result1[0]
-        pos2 = result2[1]
+        pos2 = result2[0]
 
         lon_diff = angular_diff(float(pos1[0]), float(pos2[0]))
         assert lon_diff < 1e-8, f"fixstar2_ut vs fixstar_ut {star}: lon diff {lon_diff}"
@@ -806,7 +806,7 @@ class TestFixedStarV2:
         except Exception:
             pytest.skip(f"Star {star} not found in one implementation")
 
-        lib_lon = float(lib_result[1][0])
+        lib_lon = float(lib_result[0][0])
         swe_lon = float(swe_result[0][0])
 
         lon_diff = angular_diff(lib_lon, swe_lon)
@@ -824,9 +824,9 @@ class TestFixedStarV2:
         except Exception:
             pytest.skip(f"Star {star} not found in one implementation")
 
-        # lib returns (star_name, magnitude, error_msg)
+        # lib returns (magnitude, star_name)
         # swe returns (magnitude, star_name)
-        lib_mag = float(lib_result[1])
+        lib_mag = float(lib_result[0])
         swe_mag = float(swe_result[0])
 
         diff = abs(lib_mag - swe_mag)
@@ -908,23 +908,21 @@ class TestRiseTransTrueHorizon:
             result_true = ephem.swe_rise_trans_true_hor(
                 jd,
                 SE_SUN,
-                lat,
-                lon,
-                alt,
+                SE_CALC_RISE,
+                [lon, lat, alt],
                 1013.25,
                 15.0,
                 hor_alt,
                 SEFLG_SWIEPH,
-                SE_CALC_RISE,
             )
             result_std = ephem.swe_rise_trans(
-                jd, SE_SUN, lat, lon, alt, 1013.25, 15.0, SEFLG_SWIEPH, SE_CALC_RISE
+                jd, SE_SUN, SE_CALC_RISE, [lon, lat, alt], 1013.25, 15.0, SEFLG_SWIEPH
             )
         except Exception:
             pytest.skip(f"rise_trans_true_hor not available at {name}")
 
-        jd_true = float(result_true[0])
-        jd_std = float(result_std[0])
+        jd_true = float(result_true[1][0])
+        jd_std = float(result_std[1][0])
 
         # With different horizon altitudes, times should differ but be reasonable
         diff_min = abs(jd_true - jd_std) * 1440  # minutes
@@ -941,13 +939,13 @@ class TestRiseTransTrueHorizon:
         lat, lon = 41.9028, 12.4964
 
         lib_result = ephem.swe_rise_trans_true_hor(
-            jd, SE_SUN, lat, lon, 0.0, 0.0, 0.0, 0.5, SEFLG_SWIEPH, SE_CALC_RISE
+            jd, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], 0.0, 0.0, 0.5, SEFLG_SWIEPH
         )
         swe_result = swe.rise_trans_true_hor(
             jd, swe.SUN, swe.CALC_RISE, [lon, lat, 0], 0, 0, 0.5
         )
 
-        lib_jd = float(lib_result[0])
+        lib_jd = float(lib_result[1][0])
         swe_jd = float(swe_result[1][0])
 
         diff_sec = jd_diff_seconds(lib_jd, swe_jd)
@@ -1305,14 +1303,26 @@ class TestRiseSetEdgeCases:
 
             try:
                 rise = ephem.swe_rise_trans(
-                    jd, SE_SUN, lat, lon, 0.0, 1013.25, 15.0, SEFLG_SWIEPH, SE_CALC_RISE
+                    jd,
+                    SE_SUN,
+                    SE_CALC_RISE,
+                    [lon, lat, 0.0],
+                    1013.25,
+                    15.0,
+                    SEFLG_SWIEPH,
                 )
                 sett = ephem.swe_rise_trans(
-                    jd, SE_SUN, lat, lon, 0.0, 1013.25, 15.0, SEFLG_SWIEPH, SE_CALC_SET
+                    jd,
+                    SE_SUN,
+                    SE_CALC_SET,
+                    [lon, lat, 0.0],
+                    1013.25,
+                    15.0,
+                    SEFLG_SWIEPH,
                 )
 
-                rise_jd = float(rise[0])
-                set_jd = float(sett[0])
+                rise_jd = float(rise[1][0])
+                set_jd = float(sett[1][0])
 
                 # At equinox, day length should be approximately 12 hours
                 day_hours = (set_jd - rise_jd) * 24
@@ -1336,19 +1346,17 @@ class TestRiseSetEdgeCases:
                 lib_rise = ephem.swe_rise_trans(
                     jd,
                     planet_id,
-                    lat,
-                    lon,
-                    0.0,
+                    SE_CALC_RISE,
+                    [lon, lat, 0.0],
                     1013.25,
                     15.0,
                     SEFLG_SWIEPH,
-                    SE_CALC_RISE,
                 )
                 swe_rise = swe.rise_trans(
                     jd, planet_id, swe.CALC_RISE, [lon, lat, 0], 1013.25, 15.0
                 )
 
-                lib_jd = float(lib_rise[0])
+                lib_jd = float(lib_rise[1][0])
                 swe_jd = float(swe_rise[1][0])
 
                 diff_sec = jd_diff_seconds(lib_jd, swe_jd)
@@ -1365,13 +1373,13 @@ class TestRiseSetEdgeCases:
         lat, lon = 41.9028, 12.4964
 
         lib_transit = ephem.swe_rise_trans(
-            jd, SE_SUN, lat, lon, 0.0, 1013.25, 15.0, SEFLG_SWIEPH, SE_CALC_MTRANSIT
+            jd, SE_SUN, SE_CALC_MTRANSIT, [lon, lat, 0.0], 1013.25, 15.0, SEFLG_SWIEPH
         )
         swe_transit = swe.rise_trans(
             jd, swe.SUN, swe.CALC_MTRANSIT, [lon, lat, 0], 1013.25, 15.0
         )
 
-        lib_jd = float(lib_transit[0])
+        lib_jd = float(lib_transit[1][0])
         swe_jd = float(swe_transit[1][0])
 
         diff_sec = jd_diff_seconds(lib_jd, swe_jd)

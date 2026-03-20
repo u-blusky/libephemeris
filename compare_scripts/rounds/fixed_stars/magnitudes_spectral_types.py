@@ -157,18 +157,18 @@ def safe_fixstar(name, jd, flags=0):
 def safe_le_fixstar(name, jd, flags=0):
     """Call LE swe_fixstar2_ut, return (pos, retflag, starname) or None.
 
-    libephemeris fixstar2_ut returns: (starname_str, pos_tuple, retflag_int, error_str)
+    libephemeris fixstar2_ut returns: (pos_tuple, starname_str, retflag_int)
     We normalize to: (pos_tuple, retflag, starname)
     """
     try:
         result = ephem.swe_fixstar2_ut(name, jd, flags)
-        # LE returns (starname, pos, retflag, error) -> normalize to (pos, retflag, starname)
-        return (result[1], result[2], result[0])
+        # LE returns (pos, starname, retflag) -> normalize to (pos, retflag, starname)
+        return (result[0], result[2], result[1])
     except Exception:
         try:
             result = ephem.swe_fixstar_ut(name, jd, flags)
-            # fixstar_ut returns (pos, retflag, starname)
-            return (result[0], result[1], result[2])
+            # fixstar_ut returns (pos, starname, retflag)
+            return (result[0], result[2], result[1])
         except Exception:
             return None
 
@@ -404,10 +404,10 @@ def phase5():
 
             if le1 is not None and le2 is not None:
                 # Both should return same positions
-                # fixstar_ut returns (pos, retflag, starname)
-                # fixstar2_ut returns (starname, pos, retflag, error)
+                # fixstar_ut returns (pos, starname, retflag)
+                # fixstar2_ut returns (pos, starname, retflag)
                 pos1 = le1[0]
-                pos2 = le2[1]
+                pos2 = le2[0]
                 lon_diff = abs(pos1[0] - pos2[0]) * 3600
                 lat_diff = abs(pos1[1] - pos2[1]) * 3600
 

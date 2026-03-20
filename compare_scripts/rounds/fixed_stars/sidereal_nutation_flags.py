@@ -120,8 +120,8 @@ def le_fixstar(star, jd, flags):
     """Get fixed star position from libephemeris."""
     try:
         result = ephem.swe_fixstar2_ut(star, jd, flags)
-        # result = (starname, pos_tuple, retflag, error)
-        return result[1], result[0]
+        # result = (pos_tuple, starname, retflag)
+        return result[0], result[1]
     except Exception as e:
         return None, str(e)
 

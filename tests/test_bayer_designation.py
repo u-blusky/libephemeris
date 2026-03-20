@@ -9,6 +9,7 @@ This feature is required for swe_fixstar2 compatibility with designation search.
 
 import pytest
 
+from libephemeris.exceptions import Error
 from libephemeris.fixed_stars import (
     _parse_bayer_designation,
     resolve_star_name,
@@ -315,9 +316,8 @@ class TestSweFixstar2WithBayer:
     def test_swe_fixstar2_ut_alpha_leonis(self):
         """swe_fixstar2_ut should find Regulus via 'Alpha Leonis'."""
         jd = 2451545.0  # J2000
-        name, pos, flag, err = swe_fixstar2_ut("Alpha Leonis", jd, 0)
+        pos, name, flag = swe_fixstar2_ut("Alpha Leonis", jd, 0)
 
-        assert err == ""
         assert "Regulus" in name
         assert "alLeo" in name
         # Regulus at ~149-150° at J2000
@@ -326,9 +326,8 @@ class TestSweFixstar2WithBayer:
     def test_swe_fixstar2_ut_beta_persei(self):
         """swe_fixstar2_ut should find Algol via 'Beta Persei'."""
         jd = 2451545.0
-        name, pos, flag, err = swe_fixstar2_ut("Beta Persei", jd, 0)
+        pos, name, flag = swe_fixstar2_ut("Beta Persei", jd, 0)
 
-        assert err == ""
         assert "Algol" in name
         assert "bePer" in name
         # Algol at ~55-57° at J2000
@@ -337,9 +336,8 @@ class TestSweFixstar2WithBayer:
     def test_swe_fixstar2_alpha_virginis(self):
         """swe_fixstar2 (TT) should find Spica via 'Alpha Virginis'."""
         jd = 2451545.0
-        name, pos, flag, err = swe_fixstar2("Alpha Virginis", jd, 0)
+        pos, name, flag = swe_fixstar2("Alpha Virginis", jd, 0)
 
-        assert err == ""
         assert "Spica" in name
         assert "alVir" in name
         # Spica at ~203-204° at J2000
@@ -348,19 +346,16 @@ class TestSweFixstar2WithBayer:
     def test_swe_fixstar2_gamma_orionis(self):
         """swe_fixstar2 should find Bellatrix via 'Gamma Orionis'."""
         jd = 2451545.0
-        name, pos, flag, err = swe_fixstar2("Gamma Orionis", jd, 0)
+        pos, name, flag = swe_fixstar2("Gamma Orionis", jd, 0)
 
-        assert err == ""
         assert "Bellatrix" in name
         assert "gaOri" in name
 
     def test_swe_fixstar2_ut_star_not_found(self):
-        """swe_fixstar2_ut should return error for star not in catalog."""
+        """swe_fixstar2_ut should raise error for star not in catalog."""
         jd = 2451545.0
-        name, pos, flag, err = swe_fixstar2_ut("Gamma Virginis", jd, 0)
-
-        assert name == ""
-        assert "could not find" in err.lower()
+        with pytest.raises(Error):
+            swe_fixstar2_ut("Gamma Virginis", jd, 0)
 
 
 @pytest.mark.unit

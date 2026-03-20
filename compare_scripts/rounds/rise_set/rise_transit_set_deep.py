@@ -120,15 +120,13 @@ for name, lat, lon, alt in LOCATIONS:
                     le_ret = ephem.rise_trans(
                         jd_date,
                         body_id,
-                        lat,
-                        lon,
-                        altitude=alt,
-                        pressure=1013.25,
-                        temperature=15.0,
-                        rsmi=rsmi,
+                        rsmi,
+                        [lon, lat, alt],
+                        1013.25,
+                        15.0,
                     )
-                    le_jd = le_ret[0]
-                    le_flag = le_ret[1]
+                    le_jd = le_ret[1][0]
+                    le_flag = le_ret[0]
                 except Exception as e:
                     print(
                         "  LE ERROR {}/{}/{}: {}".format(name, body_name, event_name, e)
@@ -219,14 +217,12 @@ for name, lat, lon, alt in LOCATIONS[:6]:  # 6 locations
                     le_ret = ephem.rise_trans(
                         jd_date,
                         body_id,
-                        lat,
-                        lon,
-                        altitude=alt,
-                        pressure=1013.25,
-                        temperature=15.0,
-                        rsmi=rsmi,
+                        rsmi,
+                        [lon, lat, alt],
+                        1013.25,
+                        15.0,
                     )
-                    le_jd = le_ret[0]
+                    le_jd = le_ret[1][0]
                 except Exception:
                     part2_skip += 1
                     continue
@@ -311,14 +307,12 @@ for name, lat, lon, alt in LOCATIONS[:4]:  # 4 locations
                 le_ret = ephem.rise_trans(
                     jd_test,
                     body_id,
-                    lat,
-                    lon,
-                    altitude=alt,
-                    pressure=1013.25,
-                    temperature=15.0,
-                    rsmi=rsmi,
+                    rsmi,
+                    [lon, lat, alt],
+                    1013.25,
+                    15.0,
                 )
-                le_jd = le_ret[0]
+                le_jd = le_ret[1][0]
             except Exception as e:
                 print(
                     "  LE ERROR {}/{}/flag={}: {}".format(
@@ -399,15 +393,13 @@ for name, lat, lon, alt in LOCATIONS[:4]:
                 le_ret = ephem.rise_trans_true_hor(
                     jd_test4,
                     swe.SUN,
-                    lat,
-                    lon,
-                    altitude=alt,
-                    pressure=1013.25,
-                    temperature=15.0,
-                    horizon_altitude=hor_alt,
-                    rsmi=rsmi_base,
+                    rsmi_base,
+                    [lon, lat, alt],
+                    1013.25,
+                    15.0,
+                    hor_alt,
                 )
-                le_jd = le_ret[0]
+                le_jd = le_ret[1][0]
             except Exception as e:
                 print(
                     "  LE ERROR {}/hor={}/{}): {}".format(
@@ -552,17 +544,13 @@ part6_total = 0
 for name, lat, lon, alt in LOCATIONS[:6]:
     for jd_date in DATES[:4]:
         try:
-            rise_ret = ephem.rise_trans(
-                jd_date, swe.SUN, lat, lon, altitude=alt, rsmi=1
-            )
-            trans_ret = ephem.rise_trans(
-                jd_date, swe.SUN, lat, lon, altitude=alt, rsmi=4
-            )
-            set_ret = ephem.rise_trans(jd_date, swe.SUN, lat, lon, altitude=alt, rsmi=2)
+            rise_ret = ephem.rise_trans(jd_date, swe.SUN, 1, [lon, lat, alt])
+            trans_ret = ephem.rise_trans(jd_date, swe.SUN, 4, [lon, lat, alt])
+            set_ret = ephem.rise_trans(jd_date, swe.SUN, 2, [lon, lat, alt])
 
-            jd_rise = rise_ret[0]
-            jd_trans = trans_ret[0]
-            jd_set = set_ret[0]
+            jd_rise = rise_ret[1][0]
+            jd_trans = trans_ret[1][0]
+            jd_set = set_ret[1][0]
         except Exception:
             continue
 
@@ -574,10 +562,8 @@ for name, lat, lon, alt in LOCATIONS[:6]:
         # Find the set AFTER the rise
         if jd_set < jd_rise:
             try:
-                set_ret2 = ephem.rise_trans(
-                    jd_rise + 0.01, swe.SUN, lat, lon, altitude=alt, rsmi=2
-                )
-                jd_set = set_ret2[0]
+                set_ret2 = ephem.rise_trans(jd_rise + 0.01, swe.SUN, 2, [lon, lat, alt])
+                jd_set = set_ret2[1][0]
             except Exception:
                 continue
 
@@ -585,9 +571,9 @@ for name, lat, lon, alt in LOCATIONS[:6]:
         if jd_trans < jd_rise or jd_trans > jd_set:
             try:
                 trans_ret2 = ephem.rise_trans(
-                    jd_rise + 0.01, swe.SUN, lat, lon, altitude=alt, rsmi=4
+                    jd_rise + 0.01, swe.SUN, 4, [lon, lat, alt]
                 )
-                jd_trans = trans_ret2[0]
+                jd_trans = trans_ret2[1][0]
             except Exception:
                 continue
 
@@ -628,14 +614,12 @@ for name, lat, lon, alt in LOCATIONS[:6]:
                 le_ret = ephem.rise_trans(
                     jd_date,
                     swe.MOON,
-                    lat,
-                    lon,
-                    altitude=alt,
-                    pressure=1013.25,
-                    temperature=15.0,
-                    rsmi=rsmi,
+                    rsmi,
+                    [lon, lat, alt],
+                    1013.25,
+                    15.0,
                 )
-                le_jd = le_ret[0]
+                le_jd = le_ret[1][0]
             except Exception:
                 continue
 

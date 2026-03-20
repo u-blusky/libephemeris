@@ -21,6 +21,14 @@ SE_HOR2EQU: int = 1  # Horizontal to equatorial coordinates
 SE_TRUE_TO_APP: int = 0  # True altitude to apparent altitude
 SE_APP_TO_TRUE: int = 1  # Apparent altitude to true altitude
 
+# reference API-compatible aliases (without SE_ prefix)
+ECL2HOR: int = SE_ECL2HOR
+EQU2HOR: int = SE_EQU2HOR
+HOR2ECL: int = SE_HOR2ECL
+HOR2EQU: int = SE_HOR2EQU
+TRUE_TO_APP: int = SE_TRUE_TO_APP
+APP_TO_TRUE: int = SE_APP_TO_TRUE
+
 
 def cotrans_sp(
     coord: Tuple[float, float, float],

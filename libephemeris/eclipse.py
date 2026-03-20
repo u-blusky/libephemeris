@@ -7214,16 +7214,14 @@ swe_lun_occult_where = lun_occult_where
 
 
 def rise_trans(
-    jd_start: float,
-    planet: int,
-    lat: float,
-    lon: float,
-    altitude: float = 0.0,
-    pressure: float = 1013.25,
-    temperature: float = 15.0,
+    tjdut: float,
+    body: int,
+    rsmi: int,
+    geopos: Sequence[float],
+    atpress: float = 0.0,
+    attemp: float = 0.0,
     flags: int = SEFLG_SWIEPH,
-    rsmi: int = 1,
-) -> Tuple[float, int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate rise, set, or transit time for a celestial body.
 
@@ -7232,14 +7230,8 @@ def rise_trans(
     geographic location.
 
     Args:
-        jd_start: Julian Day (UT) to start search from
-        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
-        lat: Observer latitude in degrees (positive = North, negative = South)
-        lon: Observer longitude in degrees (positive = East, negative = West)
-        altitude: Observer altitude in meters above sea level (default 0)
-        pressure: Atmospheric pressure in mbar/hPa for refraction (default 1013.25)
-        temperature: Temperature in Celsius for refraction (default 15)
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        tjdut: Julian Day (UT) to start search from
+        body: Planet/body ID (SE_SUN, SE_MOON, etc.)
         rsmi: Event type and calculation flags (bitmask):
             - SE_CALC_RISE (1): Rise time (body crossing horizon going up)
             - SE_CALC_SET (2): Set time (body crossing horizon going down)
@@ -7252,20 +7244,26 @@ def rise_trans(
             - SE_BIT_CIVIL_TWILIGHT (1024): Sun at -6 degrees
             - SE_BIT_NAUTIC_TWILIGHT (2048): Sun at -12 degrees
             - SE_BIT_ASTRO_TWILIGHT (4096): Sun at -18 degrees
+        geopos: Geographic position as sequence [lon, lat, alt]:
+            - 0: geographic longitude in degrees (eastern positive)
+            - 1: geographic latitude in degrees (northern positive)
+            - 2: geographic altitude in meters above sea level
+        atpress: Atmospheric pressure in mbar/hPa for refraction (default 0.0)
+        attemp: Atmospheric temperature in degrees Celsius (default 0.0)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
         Tuple containing:
-            - jd_event: Julian Day (UT) of the event, or 0.0 if not found
-            - retflag: Return flag (same as rsmi on success, or error indicator)
-                       Returns -2 if body is circumpolar (never rises/sets)
+            - res: integer flag (0 = event found, -2 = circumpolar)
+            - tret: tuple of 10 floats, of which tret[0] = JD of event
 
     Raises:
         ValueError: If invalid planet ID or parameters
 
     Note:
         For circumpolar objects (always above or below horizon at the given
-        latitude), the function returns (0.0, -2). For transits, circumpolar
-        objects still have valid transit times.
+        latitude), the function returns (-2, tret) with tret[0] = 0.0.
+        For transits, circumpolar objects still have valid transit times.
 
     Algorithm:
         1. For transits: Find when body crosses the local meridian
@@ -7281,9 +7279,9 @@ def rise_trans(
     Example:
         >>> from libephemeris import julday, rise_trans, SE_SUN, SE_CALC_RISE
         >>> jd = julday(2024, 6, 21, 0)
-        >>> # Find sunrise at Rome
-        >>> jd_rise, _ = rise_trans(jd, SE_SUN, 41.9, 12.5, rsmi=SE_CALC_RISE)
-        >>> print(f"Sunrise at JD {jd_rise:.5f}")
+        >>> # Find sunrise at Rome (geopos = [lon, lat, alt])
+        >>> res, tret = rise_trans(jd, SE_SUN, SE_CALC_RISE, [12.5, 41.9, 0])
+        >>> print(f"Sunrise at JD {tret[0]:.5f}")
 
     References:
         - Reference API: swe_rise_trans()
@@ -7305,6 +7303,17 @@ def rise_trans(
     )
     from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
+
+    # Unpack geopos: [longitude, latitude, altitude]
+    lon = float(geopos[0])
+    lat = float(geopos[1])
+    altitude = float(geopos[2]) if len(geopos) > 2 else 0.0
+
+    # Map parameter names for internal use
+    planet = body
+    jd_start = tjdut
+    pressure = atpress
+    temperature = attemp
 
     # Extract event type from rsmi (lower bits)
     event_type = rsmi & 0x0F  # First 4 bits for event type
@@ -7334,6 +7343,16 @@ def rise_trans(
 
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
+
+    # Handle atpress=0: estimate pressure from altitude (pyswisseph convention).
+    # When atpress is 0, Swiss Ephemeris estimates pressure using the
+    # barometric formula. We replicate this behavior.
+    if pressure == 0.0:
+        # Barometric formula: P = 1013.25 * (1 - 2.25577e-5 * h)^5.25588
+        pressure = 1013.25 * (1.0 - 2.25577e-5 * altitude) ** 5.25588
+        if temperature == 0.0:
+            # Standard temperature lapse rate: T = 15 - 0.0065 * h
+            temperature = 15.0 - 0.0065 * altitude
 
     # Determine the altitude threshold for rise/set
     if rsmi & SE_BIT_CIVIL_TWILIGHT:
@@ -7464,6 +7483,15 @@ def rise_trans(
     )
 
 
+def _make_tret(jd_event: float = 0.0) -> Tuple[float, ...]:
+    """Build a 10-element tret tuple for rise_trans return value.
+
+    pyswisseph returns a 10-element tuple where only index 0 is meaningful
+    (the Julian Day of the event). Remaining elements are always 0.0.
+    """
+    return (jd_event, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
 def _calculate_transit(
     jd_start: float,
     lat: float,
@@ -7474,7 +7502,7 @@ def _calculate_transit(
     target,
     observer,
     SE_CALC_ITRANSIT: int,
-) -> Tuple[float, int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """Calculate meridian transit time."""
     # Transit occurs when body's RA = Local Sidereal Time
     # LST = GMST + longitude (in hours)
@@ -7535,7 +7563,7 @@ def _calculate_transit(
 
         # Check convergence (< 1 arcsecond in HA = < 0.07 seconds in time)
         if abs(ha) < 1.0 / 3600.0:
-            return jd_guess, event_type
+            return 0, _make_tret(jd_guess)
 
         # Rate of change of HA: approximately 360°/sidereal day
         ha_rate = 360.0 / sidereal_day  # degrees/day
@@ -7544,7 +7572,7 @@ def _calculate_transit(
         jd_guess -= ha / ha_rate
 
     # If we get here, convergence failed but return best estimate
-    return jd_guess, event_type
+    return 0, _make_tret(jd_guess)
 
 
 def _calculate_rise_set(
@@ -7562,7 +7590,7 @@ def _calculate_rise_set(
     SE_CALC_RISE: int,
     SE_CALC_SET: int,
     rsmi: int,
-) -> Tuple[float, int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """Calculate rise or set time using bisection and Newton-Raphson."""
 
     # Get current altitude and declination
@@ -7599,13 +7627,13 @@ def _calculate_rise_set(
     is_circumpolar_below = (max_alt + margin) < target_altitude  # Never rises
 
     if event_type == SE_CALC_RISE and is_circumpolar_below:
-        return 0.0, -2  # Never rises
+        return -2, _make_tret()  # Never rises
     if event_type == SE_CALC_SET and is_circumpolar_above:
-        return 0.0, -2  # Never sets
+        return -2, _make_tret()  # Never sets
     if event_type == SE_CALC_RISE and is_circumpolar_above:
-        return 0.0, -2  # Always above horizon, no rise
+        return -2, _make_tret()  # Always above horizon, no rise
     if event_type == SE_CALC_SET and is_circumpolar_below:
-        return 0.0, -2  # Always below horizon, no set
+        return -2, _make_tret()  # Always below horizon, no set
 
     # Determine search step based on how close to grazing conditions.
     # For the Moon at high latitudes, rise and set can be very close together
@@ -7651,7 +7679,7 @@ def _calculate_rise_set(
 
     if jd_cross_start is None:
         # No crossing found in search range - might be circumpolar or rare case
-        return 0.0, -2
+        return -2, _make_tret()
 
     # jd_cross_end is always set when jd_cross_start is set
     assert jd_cross_end is not None
@@ -7666,7 +7694,7 @@ def _calculate_rise_set(
         if (
             abs(alt_mid - target_altitude) < 0.0001
         ):  # ~0.36 arcsec (improved from 0.001°)
-            return jd_mid, rsmi & 0x0F
+            return 0, _make_tret(jd_mid)
 
         if event_type == SE_CALC_RISE:
             if alt_mid < target_altitude:
@@ -7679,7 +7707,7 @@ def _calculate_rise_set(
             else:
                 jd_cross_end = jd_mid
 
-    return (jd_cross_start + jd_cross_end) / 2, rsmi & 0x0F
+    return 0, _make_tret((jd_cross_start + jd_cross_end) / 2)
 
 
 # Alias for reference API compatibility
@@ -7687,17 +7715,15 @@ swe_rise_trans = rise_trans
 
 
 def rise_trans_true_hor(
-    jd_start: float,
-    planet: int,
-    lat: float,
-    lon: float,
-    altitude: float = 0.0,
-    pressure: float = 1013.25,
-    temperature: float = 15.0,
-    horizon_altitude: float = 0.0,
+    tjdut: float,
+    body: int,
+    rsmi: int,
+    geopos: Sequence[float],
+    atpress: float = 0.0,
+    attemp: float = 0.0,
+    horhgt: float = 0.0,
     flags: int = SEFLG_SWIEPH,
-    rsmi: int = 1,
-) -> Tuple[float, int]:
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate rise, set, or transit time with a custom horizon altitude.
 
@@ -7706,18 +7732,8 @@ def rise_trans_true_hor(
     that occlude the real horizon.
 
     Args:
-        jd_start: Julian Day (UT) to start search from
-        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
-        lat: Observer latitude in degrees (positive = North, negative = South)
-        lon: Observer longitude in degrees (positive = East, negative = West)
-        altitude: Observer altitude in meters above sea level (default 0)
-        pressure: Atmospheric pressure in mbar/hPa for refraction (default 1013.25)
-        temperature: Temperature in Celsius for refraction (default 15)
-        horizon_altitude: Custom horizon altitude in degrees (default 0.0).
-            Positive values mean the horizon is elevated (e.g., mountains),
-            so rise times will be later and set times earlier.
-            Negative values mean the horizon is depressed (e.g., observer on a mountain).
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        tjdut: Julian Day (UT) to start search from
+        body: Planet/body ID (SE_SUN, SE_MOON, etc.)
         rsmi: Event type and calculation flags (bitmask):
             - SE_CALC_RISE (1): Rise time (body crossing horizon going up)
             - SE_CALC_SET (2): Set time (body crossing horizon going down)
@@ -7727,24 +7743,35 @@ def rise_trans_true_hor(
             - SE_BIT_DISC_CENTER (256): Use disc center instead of upper limb
             - SE_BIT_DISC_BOTTOM (8192): Use lower limb of disc
             - SE_BIT_NO_REFRACTION (512): Ignore atmospheric refraction
+        geopos: Geographic position as sequence [lon, lat, alt]:
+            - 0: geographic longitude in degrees (eastern positive)
+            - 1: geographic latitude in degrees (northern positive)
+            - 2: geographic altitude in meters above sea level
+        atpress: Atmospheric pressure in mbar/hPa for refraction (default 0.0)
+        attemp: Atmospheric temperature in degrees Celsius (default 0.0)
+        horhgt: Height of local horizon in degrees (default 0.0).
+            Positive values mean the horizon is elevated (e.g., mountains),
+            so rise times will be later and set times earlier.
+            Negative values mean the horizon is depressed (e.g., observer
+            on a mountain).
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
         Tuple containing:
-            - jd_event: Julian Day (UT) of the event, or 0.0 if not found
-            - retflag: Return flag (same as rsmi on success, or error indicator)
-                       Returns -2 if body is circumpolar (never rises/sets)
+            - res: integer flag (0 = event found, -2 = circumpolar)
+            - tret: tuple of 10 floats, of which tret[0] = JD of event
 
     Raises:
         ValueError: If invalid planet ID or parameters
 
     Note:
         For circumpolar objects (always above or below horizon at the given
-        latitude), the function returns (0.0, -2). For transits, circumpolar
-        objects still have valid transit times.
+        latitude), the function returns (-2, tret) with tret[0] = 0.0.
+        For transits, circumpolar objects still have valid transit times.
 
         Twilight flags (SE_BIT_CIVIL_TWILIGHT, SE_BIT_NAUTIC_TWILIGHT,
         SE_BIT_ASTRO_TWILIGHT) are NOT supported in this function since
-        the horizon_altitude parameter already specifies the target altitude.
+        the horhgt parameter already specifies the target altitude.
 
     Algorithm:
         1. For transits: Find when body crosses the local meridian
@@ -7760,10 +7787,10 @@ def rise_trans_true_hor(
     Example:
         >>> from libephemeris import julday, rise_trans_true_hor, SE_SUN, SE_CALC_RISE
         >>> jd = julday(2024, 6, 21, 0)
-        >>> # Find sunrise with mountains at 5° above horizon at Rome
-        >>> jd_rise, _ = rise_trans_true_hor(jd, SE_SUN, 41.9, 12.5,
-        ...                                   horizon_altitude=5.0, rsmi=SE_CALC_RISE)
-        >>> print(f"Sunrise at JD {jd_rise:.5f}")
+        >>> # Find sunrise with mountains at 5 deg above horizon at Rome
+        >>> res, tret = rise_trans_true_hor(jd, SE_SUN, SE_CALC_RISE,
+        ...                                [12.5, 41.9, 0], horhgt=5.0)
+        >>> print(f"Sunrise at JD {tret[0]:.5f}")
 
     References:
         - Reference API: swe_rise_trans_true_hor()
@@ -7782,6 +7809,18 @@ def rise_trans_true_hor(
     )
     from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
+
+    # Unpack geopos: [longitude, latitude, altitude]
+    lon = float(geopos[0])
+    lat = float(geopos[1])
+    altitude = float(geopos[2]) if len(geopos) > 2 else 0.0
+
+    # Map parameter names for internal use
+    planet = body
+    jd_start = tjdut
+    pressure = atpress
+    temperature = attemp
+    horizon_altitude = horhgt
 
     # Extract event type from rsmi (lower bits)
     event_type = rsmi & 0x0F  # First 4 bits for event type
@@ -7811,6 +7850,16 @@ def rise_trans_true_hor(
 
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
+
+    # Handle atpress=0: estimate pressure from altitude (pyswisseph convention).
+    # When atpress is 0, Swiss Ephemeris estimates pressure using the
+    # barometric formula. We replicate this behavior.
+    if pressure == 0.0:
+        # Barometric formula: P = 1013.25 * (1 - 2.25577e-5 * h)^5.25588
+        pressure = 1013.25 * (1.0 - 2.25577e-5 * altitude) ** 5.25588
+        if temperature == 0.0:
+            # Standard temperature lapse rate: T = 15 - 0.0065 * h
+            temperature = 15.0 - 0.0065 * altitude
 
     # Clamp negative horizon altitudes to 0.0 for API compatibility.
     # Confirmed by independent testing: negative horizon_altitude values
@@ -8996,11 +9045,9 @@ def vis_limit_mag(
     if is_fixed_star:
         # Fixed star calculation
         try:
-            star_name_out, star_result, retflag, error = swe_fixstar2_ut(
+            star_result, star_name_out, retflag = swe_fixstar2_ut(
                 objname, jd, flags & 0xFF
             )
-            if error:
-                raise ValueError(f"could not find star name {objname.lower()}: {error}")
 
             # star_result is (lon, lat, dist, lon_speed, lat_speed, dist_speed)
             # We need to convert ecliptic to horizontal
@@ -9008,10 +9055,10 @@ def vis_limit_mag(
             star_lat = star_result[1]
 
             # Get star magnitude
-            star_name_mag, star_mag_val, mag_error = swe_fixstar2_mag(objname)
-            if not mag_error:
+            try:
+                star_mag_val, _star_name_mag = swe_fixstar2_mag(objname)
                 obj_mag = star_mag_val
-            else:
+            except Exception:
                 obj_mag = 2.0  # Default magnitude if not found
 
             # Convert ecliptic to equatorial then to horizontal

@@ -4781,96 +4781,90 @@ def _gauquelin_sector_from_rise_set(
 
     try:
         # Find next rise after jd
-        jd_next_rise, retflag = rise_trans(
+        retflag, tret = rise_trans(
             jd,
             planet,
-            lat,
-            lon,
-            altitude,
+            SE_CALC_RISE | rsmi_flags,
+            [lon, lat, altitude],
             pressure,
             temperature,
             flags,
-            SE_CALC_RISE | rsmi_flags,
         )
         if retflag == -2:
             return fallback()  # Circumpolar
+        jd_next_rise = tret[0]
 
         # Find next set after jd
-        jd_next_set, retflag = rise_trans(
+        retflag, tret = rise_trans(
             jd,
             planet,
-            lat,
-            lon,
-            altitude,
+            SE_CALC_SET | rsmi_flags,
+            [lon, lat, altitude],
             pressure,
             temperature,
             flags,
-            SE_CALC_SET | rsmi_flags,
         )
         if retflag == -2:
             return fallback()  # Circumpolar
+        jd_next_set = tret[0]
 
         # Find previous rise before jd by searching before the next rise
         # (planets rise roughly once per day, so ~1.5 days before next rise
         # should find the previous rise)
-        jd_prev_rise, retflag = rise_trans(
+        retflag, tret = rise_trans(
             jd_next_rise - 1.5,
             planet,
-            lat,
-            lon,
-            altitude,
+            SE_CALC_RISE | rsmi_flags,
+            [lon, lat, altitude],
             pressure,
             temperature,
             flags,
-            SE_CALC_RISE | rsmi_flags,
         )
         if retflag == -2:
             return fallback()
+        jd_prev_rise = tret[0]
         # Verify this rise is actually before jd
         if jd_prev_rise >= jd:
             # Try searching earlier
-            jd_prev_rise, retflag = rise_trans(
+            retflag, tret = rise_trans(
                 jd_next_rise - 2.5,
                 planet,
-                lat,
-                lon,
-                altitude,
+                SE_CALC_RISE | rsmi_flags,
+                [lon, lat, altitude],
                 pressure,
                 temperature,
                 flags,
-                SE_CALC_RISE | rsmi_flags,
             )
+            jd_prev_rise = tret[0]
             if retflag == -2 or jd_prev_rise >= jd:
                 return fallback()
 
         # Find previous set before jd by searching before the next set
-        jd_prev_set, retflag = rise_trans(
+        retflag, tret = rise_trans(
             jd_next_set - 1.5,
             planet,
-            lat,
-            lon,
-            altitude,
+            SE_CALC_SET | rsmi_flags,
+            [lon, lat, altitude],
             pressure,
             temperature,
             flags,
-            SE_CALC_SET | rsmi_flags,
         )
         if retflag == -2:
             return fallback()
+        jd_prev_set = tret[0]
         # Verify this set is actually before jd
         if jd_prev_set >= jd:
             # Try searching earlier
-            jd_prev_set, retflag = rise_trans(
+            retflag, tret = rise_trans(
                 jd_next_set - 2.5,
                 planet,
-                lat,
-                lon,
-                altitude,
+                SE_CALC_SET | rsmi_flags,
+                [lon, lat, altitude],
                 pressure,
                 temperature,
                 flags,
-                SE_CALC_SET | rsmi_flags,
             )
+            jd_prev_set = tret[0]
             if retflag == -2 or jd_prev_set >= jd:
                 return fallback()
 

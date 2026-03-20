@@ -1161,7 +1161,7 @@ class TestFixedStarsDeep:
             except Exception:
                 continue
 
-            # swe.fixstar_ut returns (name, pos, retflag) or (pos, retflag)
+            # swe.fixstar_ut may return (pos, name, retflag) or (name, pos, retflag)
             if isinstance(result_swe, tuple):
                 if isinstance(result_swe[0], str):
                     pos_swe = result_swe[1]
@@ -1170,13 +1170,8 @@ class TestFixedStarsDeep:
             else:
                 continue
 
-            if isinstance(result_lib, tuple):
-                if isinstance(result_lib[0], str):
-                    pos_lib = result_lib[1]
-                else:
-                    pos_lib = result_lib[0]
-            else:
-                continue
+            # libephemeris returns (pos_tuple, star_name, retflag)
+            pos_lib = result_lib[0]
 
             d_lon = angular_diff(pos_swe[0], pos_lib[0])
             errors.append(d_lon)
@@ -1210,9 +1205,8 @@ class TestFixedStarsDeep:
 
             if isinstance(mag_swe, tuple):
                 mag_swe = mag_swe[0] if mag_swe else None
-            if isinstance(mag_lib, tuple):
-                mag_lib = mag_lib[0] if mag_lib else None
 
+            # mag_lib is now a bare float
             if mag_swe is not None and mag_lib is not None:
                 d = abs(mag_swe - mag_lib)
                 print(f"  {star}: swe={mag_swe:.2f} lib={mag_lib:.2f} diff={d:.4f}")
@@ -1892,15 +1886,15 @@ class TestRiseTransitDeep:
                         res_swe = swe.rise_trans(
                             jd, planet_id, event, geopos, atpress, attemp, flags
                         )
-                        # libephemeris: swe_rise_trans(jd, planet, lat, lon, alt, pressure, temp, flags, rsmi)
+                        # libephemeris: swe_rise_trans(tjdut, body, rsmi, geopos, atpress, attemp, flags)
                         res_lib = ephem.swe_rise_trans(
-                            jd, planet_id, lat, lon, alt, atpress, attemp, flags, event
+                            jd, planet_id, event, geopos, atpress, attemp, flags
                         )
                     except Exception:
                         continue
 
                     # pyswisseph returns (retflag, tret_tuple)
-                    # libephemeris returns (jd_result, retflag)
+                    # libephemeris returns (retflag, tret_tuple)
                     try:
                         if isinstance(res_swe, tuple) and len(res_swe) >= 2:
                             tret_swe = res_swe[1]
@@ -1911,8 +1905,12 @@ class TestRiseTransitDeep:
                         else:
                             continue
 
-                        if isinstance(res_lib, tuple) and len(res_lib) >= 1:
-                            jd_lib = res_lib[0]
+                        if isinstance(res_lib, tuple) and len(res_lib) >= 2:
+                            tret_lib = res_lib[1]
+                            if isinstance(tret_lib, (list, tuple)):
+                                jd_lib = tret_lib[0]
+                            else:
+                                jd_lib = tret_lib
                         else:
                             jd_lib = res_lib
                     except Exception:
@@ -1959,13 +1957,11 @@ class TestRiseTransitDeep:
                     res_lib = ephem.swe_rise_trans(
                         jd,
                         SE_SUN,
-                        lat,
-                        lon,
-                        alt,
+                        SE_CALC_MTRANSIT,
+                        geopos,
                         1013.25,
                         15.0,
                         SEFLG_SWIEPH,
-                        SE_CALC_MTRANSIT,
                     )
                 except Exception:
                     continue
@@ -1980,7 +1976,7 @@ class TestRiseTransitDeep:
                         )
                     else:
                         continue
-                    jd_lib = res_lib[0] if isinstance(res_lib, tuple) else res_lib
+                    jd_lib = res_lib[1][0] if isinstance(res_lib, tuple) else res_lib
                 except Exception:
                     continue
 

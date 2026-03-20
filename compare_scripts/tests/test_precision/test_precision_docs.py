@@ -486,14 +486,9 @@ class TestDocumentedLimitations:
         """Verify fixed star velocities are small but non-zero due to precession."""
         jd = 2451545.0
 
-        # fixstar_ut returns (position, flags, error_string)
+        # fixstar_ut returns (position, star_name, retflag) — raises Error on failure
         result = ephem.swe_fixstar_ut("Regulus", jd, SEFLG_SPEED)
         pos = result[0]  # First element is the position tuple
-        error = result[2] if len(result) > 2 else ""
-
-        # Skip if star not found
-        if "not found" in error.lower():
-            pytest.skip(f"Star not in catalog: {error}")
 
         # Fixed stars have small non-zero velocities due to precession of equinoxes
         # (approximately 3.8e-05 degrees/day), consistent with pyswisseph behavior

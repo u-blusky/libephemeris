@@ -13,6 +13,7 @@ Key formats verified:
 
 import pytest
 import re
+from libephemeris.exceptions import Error
 
 
 class TestErrorMessageFormat:
@@ -37,16 +38,15 @@ class TestErrorMessageFormat:
 
         pyswisseph uses format: "could not find star name {name}"
         """
-        import libephemeris as ephem
         from libephemeris.fixed_stars import swe_fixstar_ut, swe_fixstar2_ut
 
         # Test swe_fixstar_ut
-        pos, retflag, error = swe_fixstar_ut("NonExistentStar123", 2451545.0, 0)
-        assert "could not find star name" in error.lower()
+        with pytest.raises(Error, match="could not find star name"):
+            swe_fixstar_ut("NonExistentStar123", 2451545.0, 0)
 
         # Test swe_fixstar2_ut
-        name, pos, retflag, error = swe_fixstar2_ut("NonExistentStar123", 2451545.0, 0)
-        assert "could not find star name" in error.lower()
+        with pytest.raises(Error, match="could not find star name"):
+            swe_fixstar2_ut("NonExistentStar123", 2451545.0, 0)
 
     def test_polar_circle_error_format_houses(self):
         """
@@ -56,7 +56,7 @@ class TestErrorMessageFormat:
         "(within Northern polar circle)" with suggestions for alternatives.
         """
         import libephemeris as ephem
-        from libephemeris.exceptions import Error, PolarCircleError
+        from libephemeris.exceptions import PolarCircleError
 
         # Test swe_houses with high latitude (polar circle condition)
         # For Placidus system at high latitude
@@ -72,7 +72,7 @@ class TestErrorMessageFormat:
         Error messages for polar circle in swe_houses_armc should indicate polar region.
         """
         import libephemeris as ephem
-        from libephemeris.exceptions import Error, PolarCircleError
+        from libephemeris.exceptions import PolarCircleError
 
         # Test swe_houses_armc with high latitude
         with pytest.raises(PolarCircleError) as excinfo:
@@ -136,8 +136,10 @@ class TestPatternMatchingCompatibility:
         """Client code should be able to detect 'could not find star name' pattern."""
         from libephemeris.fixed_stars import swe_fixstar_ut
 
-        pos, retflag, error = swe_fixstar_ut("FakeStar", 2451545.0, 0)
+        with pytest.raises(Error) as excinfo:
+            swe_fixstar_ut("FakeStar", 2451545.0, 0)
 
+        error = str(excinfo.value)
         # Pattern matching that client code might use
         star_pattern = re.search(r"could not find star name (\w+)", error.lower())
         assert star_pattern is not None, f"Pattern not found in: {error}"
@@ -146,7 +148,7 @@ class TestPatternMatchingCompatibility:
     def test_can_detect_polar_circle_pattern(self):
         """Client code should be able to detect 'polar circle' pattern."""
         import libephemeris as ephem
-        from libephemeris.exceptions import Error, PolarCircleError
+        from libephemeris.exceptions import PolarCircleError
 
         try:
             ephem.swe_houses(2451545.0, 85.0, 0.0, ord("P"))

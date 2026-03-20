@@ -412,13 +412,13 @@ def test_285():  # Fixed star magnitude comparison
         try:
             lr = ephem.swe_fixstar2_ut(star, jd, LF)
             sr = swe.fixstar2(star, jd, SF)
-            # lr = (starname, (lon,lat,dist,...), retflag, err)
+            # lr = (pos_tuple, starname, retflag)
             # sr = ((lon,lat,dist,...), starname, retflag)
         except:
             continue
         # Compare longitude
         t += 1
-        le_lon = lr[1][0]
+        le_lon = lr[0][0]
         se_lon = sr[0][0]
         d = adiff(le_lon, se_lon) * 3600
         if d <= 1.0:
@@ -428,7 +428,7 @@ def test_285():  # Fixed star magnitude comparison
             fails.append(f'  {star} lon diff={d:.4f}"')
         # Compare latitude
         t += 1
-        le_lat = lr[1][1]
+        le_lat = lr[0][1]
         se_lat = sr[0][1]
         d = abs(le_lat - se_lat) * 3600
         if d <= 1.0:

@@ -66,9 +66,9 @@ def compare_star(star_name, jd):
 
     try:
         le_r = ephem.swe_fixstar2_ut(star_name, jd, FLAGS)
-        # Returns (starname, (lon, lat, dist, lon_spd, lat_spd, dist_spd), retflag, err)
-        le_name = le_r[0]
-        le_pos = le_r[1]
+        # Returns (pos_tuple, starname, retflag)
+        le_name = le_r[1]
+        le_pos = le_r[0]
     except Exception as e:
         return
 
@@ -134,8 +134,8 @@ def compare_star(star_name, jd):
         # Get J2000 position for reference
         try:
             le_j2000 = ephem.swe_fixstar2_ut(star_name, 2451545.0, FLAGS)
-            expected_drift = (jd - 2451545.0) * le_j2000[1][3]  # days * speed deg/day
-            actual_drift = le_pos[0] - le_j2000[1][0]
+            expected_drift = (jd - 2451545.0) * le_j2000[0][3]  # days * speed deg/day
+            actual_drift = le_pos[0] - le_j2000[0][0]
             if actual_drift > 180:
                 actual_drift -= 360
             elif actual_drift < -180:

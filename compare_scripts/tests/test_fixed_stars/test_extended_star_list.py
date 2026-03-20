@@ -128,11 +128,8 @@ class TestExtendedStarListValidity:
     def test_star_recognized_by_libephemeris(self, star_name):
         """Each star should be recognized by libephemeris."""
         jd = 2451545.0  # J2000
-        pos, retflag, err = ephem.swe_fixstar(star_name, jd, 0)
+        pos, name, retflag = ephem.swe_fixstar(star_name, jd, 0)
 
-        assert "could not find" not in err.lower(), (
-            f"Star '{star_name}' not recognized by libephemeris: {err}"
-        )
         assert pos[0] != 0.0 or pos[1] != 0.0, (
             f"Star '{star_name}' returned zero position"
         )
@@ -167,9 +164,7 @@ class TestExtendedStarListAstrology:
     def test_alcyone_pleiades_position(self):
         """Alcyone (brightest Pleiad) should be in late Taurus."""
         jd = 2451545.0  # J2000
-        pos, _, err = ephem.swe_fixstar("Alcyone", jd, 0)
-
-        assert "could not find" not in err.lower()
+        pos, _, retflag = ephem.swe_fixstar("Alcyone", jd, 0)
         # Alcyone should be around 29-30° Taurus (59-60° absolute)
         assert 59 < pos[0] < 61, (
             f"Alcyone position {pos[0]:.2f}° not in expected Taurus range"
@@ -178,9 +173,7 @@ class TestExtendedStarListAstrology:
     def test_algol_demon_star_position(self):
         """Algol (Demon Star) should be in Taurus."""
         jd = 2451545.0  # J2000
-        pos, _, err = ephem.swe_fixstar("Algol", jd, 0)
-
-        assert "could not find" not in err.lower()
+        pos, _, retflag = ephem.swe_fixstar("Algol", jd, 0)
         # Algol should be around 26° Taurus (56° absolute)
         assert 55 < pos[0] < 58, (
             f"Algol position {pos[0]:.2f}° not in expected Taurus range"
@@ -189,9 +182,7 @@ class TestExtendedStarListAstrology:
     def test_prima_hyadum_hyades_position(self):
         """Prima Hyadum (first Hyad) should be in Gemini."""
         jd = 2451545.0  # J2000
-        pos, _, err = ephem.swe_fixstar("Prima Hyadum", jd, 0)
-
-        assert "could not find" not in err.lower()
+        pos, _, retflag = ephem.swe_fixstar("Prima Hyadum", jd, 0)
         # Prima Hyadum should be around 5° Gemini (65° absolute)
         assert 64 < pos[0] < 67, (
             f"Prima Hyadum position {pos[0]:.2f}° not in expected Gemini range"
@@ -200,9 +191,7 @@ class TestExtendedStarListAstrology:
     def test_deneb_algedi_behenian_position(self):
         """Deneb Algedi (tail of the goat) should be in Aquarius."""
         jd = 2451545.0  # J2000
-        pos, _, err = ephem.swe_fixstar("Deneb Algedi", jd, 0)
-
-        assert "could not find" not in err.lower()
+        pos, _, retflag = ephem.swe_fixstar("Deneb Algedi", jd, 0)
         # Deneb Algedi should be around 23° Aquarius (323° absolute)
         assert 322 < pos[0] < 325, (
             f"Deneb Algedi position {pos[0]:.2f}° not in expected Aquarius range"
@@ -211,9 +200,7 @@ class TestExtendedStarListAstrology:
     def test_alphecca_behenian_position(self):
         """Alphecca (gem in crown) should be in Scorpio."""
         jd = 2451545.0  # J2000
-        pos, _, err = ephem.swe_fixstar("Alphecca", jd, 0)
-
-        assert "could not find" not in err.lower()
+        pos, _, retflag = ephem.swe_fixstar("Alphecca", jd, 0)
         # Alphecca should be around 12° Scorpio (222° absolute)
         assert 221 < pos[0] < 224, (
             f"Alphecca position {pos[0]:.2f}° not in expected Scorpio range"
@@ -222,9 +209,7 @@ class TestExtendedStarListAstrology:
     def test_algorab_behenian_position(self):
         """Algorab (the crow) should be in Libra."""
         jd = 2451545.0  # J2000
-        pos, _, err = ephem.swe_fixstar("Algorab", jd, 0)
-
-        assert "could not find" not in err.lower()
+        pos, _, retflag = ephem.swe_fixstar("Algorab", jd, 0)
         # Algorab should be around 13° Libra (193° absolute)
         assert 192 < pos[0] < 195, (
             f"Algorab position {pos[0]:.2f}° not in expected Libra range"

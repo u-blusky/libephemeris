@@ -76,9 +76,9 @@ def get_star_pos(star_name, jd, flags=SEFLG_SPEED):
     se_result = swe.fixstar2(star_name, jd, flags)
     se_pos = se_result[0]  # (lon, lat, dist, lon_spd, lat_spd, dist_spd)
 
-    # LE: swe_fixstar2_ut(name, jd, flags) -> (starname, pos_tuple, retflag, error)
+    # LE: swe_fixstar2_ut(name, jd, flags) -> (pos_tuple, starname, retflag)
     le_result = ephem.swe_fixstar2_ut(star_name, jd, flags)
-    le_pos = le_result[1]  # (lon, lat, dist, lon_spd, lat_spd, dist_spd)
+    le_pos = le_result[0]  # (lon, lat, dist, lon_spd, lat_spd, dist_spd)
 
     return se_pos, le_pos
 
@@ -324,8 +324,8 @@ jd = 2451545.0
 for star in ALL_STARS:
     try:
         le_result = ephem.swe_fixstar2_ut(star, jd, SEFLG_SPEED)
-        le_name = le_result[0]
-        le_pos = le_result[1]
+        le_name = le_result[1]
+        le_pos = le_result[0]
 
         # Check position is reasonable
         lon = le_pos[0]

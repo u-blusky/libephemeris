@@ -193,6 +193,7 @@ from .constants import (
 )
 from .utils import cotrans_sp
 from .cache import get_true_obliquity, get_mean_obliquity
+from .exceptions import Error
 
 
 @dataclass
@@ -3956,7 +3957,7 @@ def _apply_fixstar_flags(
 
 def swe_fixstar_ut(
     star_name: str, tjd_ut: float, iflag: int
-) -> Tuple[Tuple[float, float, float, float, float, float], int, str]:
+) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Universal Time.
 
@@ -3970,8 +3971,11 @@ def swe_fixstar_ut(
     Returns:
         Tuple containing:
             - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            - iflag: Return flags
-            - error_msg: Error message if any, empty string on success
+            - star_name: Resolved star name (e.g. "Regulus")
+            - retflags: Return flags (int)
+
+    Raises:
+        Error: If the star cannot be found.
 
     Note:
         UT (Universal Time) is converted to TT (Terrestrial Time) internally
@@ -3979,14 +3983,14 @@ def swe_fixstar_ut(
         Delta T is about 69 seconds (as of 2020).
 
     Example:
-        >>> pos, retflag, err = swe_fixstar_ut("Regulus", 2451545.0, 0)
+        >>> pos, name, retflag = swe_fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
     iflag = _preprocess_flags(iflag)
 
     star_id, error, canonical_name = _resolve_star_id(star_name)
     if error:
-        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error)
+        raise Error(error)
 
     # Convert UT to TT using timescale (applies Delta T)
     from .state import get_timescale
@@ -4015,14 +4019,16 @@ def swe_fixstar_ut(
 
         result = _apply_fixstar_flags(result, t.tt, iflag, j2000_native=use_j2000)
 
-        return (result, iflag, canonical_name or "")
+        return (result, canonical_name or "", iflag)
+    except Error:
+        raise
     except Exception as e:
-        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
+        raise Error(str(e)) from e
 
 
 def swe_fixstar(
     star_name: str, jd: float, iflag: int
-) -> Tuple[Tuple[float, float, float, float, float, float], int, str]:
+) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Terrestrial Time (TT).
 
@@ -4037,8 +4043,11 @@ def swe_fixstar(
     Returns:
         Tuple containing:
             - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            - iflag: Return flags
-            - error_msg: Error message if any, empty string on success
+            - star_name: Resolved star name (e.g. "Regulus")
+            - retflags: Return flags (int)
+
+    Raises:
+        Error: If the star cannot be found.
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
@@ -4046,14 +4055,14 @@ def swe_fixstar(
         For most astrological applications, use swe_fixstar_ut() instead.
 
     Example:
-        >>> pos, retflag, err = swe_fixstar("Regulus", 2451545.0, 0)
+        >>> pos, name, retflag = swe_fixstar("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
     iflag = _preprocess_flags(iflag)
 
     star_id, error, canonical_name = _resolve_star_id(star_name)
     if error:
-        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, error)
+        raise Error(error)
 
     try:
         noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
@@ -4073,9 +4082,11 @@ def swe_fixstar(
 
         result = _apply_fixstar_flags(result, jd, iflag, j2000_native=use_j2000)
 
-        return (result, iflag, canonical_name or "")
+        return (result, canonical_name or "", iflag)
+    except Error:
+        raise
     except Exception as e:
-        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
+        raise Error(str(e)) from e
 
 
 def _format_star_name(entry: StarCatalogEntry) -> str:
@@ -4226,7 +4237,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
 
 def swe_fixstar2_ut(
     star_name: str, tjd_ut: float, iflag: int
-) -> Tuple[str, Tuple[float, float, float, float, float, float], int, str]:
+) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Universal Time with flexible lookup.
 
@@ -4236,7 +4247,7 @@ def swe_fixstar2_ut(
     - Hipparcos with HIP prefix: "HIP 49669", "HIP65474"
     - Bayer/Flamsteed designation: "alLeo", "alVir"
 
-    Returns the full star name along with the position, allowing identification
+    Returns the position and full star name, allowing identification
     of which star was matched when using partial searches.
 
     Args:
@@ -4246,33 +4257,31 @@ def swe_fixstar2_ut(
 
     Returns:
         Tuple containing:
-            - star_name_out: Full star name "Name,Nomenclature" (e.g. "Regulus,alLeo")
             - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            - iflag: Return flags
-            - error_msg: Error message if any, empty string on success
+            - star_name_out: Full star name "Name,Nomenclature"
+              (e.g. "Regulus,alLeo")
+            - retflags: Return flags (int)
+
+    Raises:
+        Error: If the star cannot be found.
 
     Note:
         UT (Universal Time) is converted to TT (Terrestrial Time) internally
         using Delta T before calculating the star position.
 
     Example:
-        >>> name, pos, retflag, err = swe_fixstar2_ut("Reg", 2451545.0, 0)
+        >>> pos, name, retflag = swe_fixstar2_ut("Reg", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo"
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
 
-        >>> name, pos, retflag, err = swe_fixstar2_ut("49669", 2451545.0, 0)
+        >>> pos, name, retflag = swe_fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
     iflag = _preprocess_flags(iflag)
 
     entry, error = _resolve_star2(star_name)
     if error or entry is None:
-        return (
-            "",
-            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            iflag,
-            error or "could not find star name",
-        )
+        raise Error(error or "could not find star name")
 
     from .state import get_timescale
 
@@ -4298,14 +4307,16 @@ def swe_fixstar2_ut(
         star_name_out = _format_star_name(entry)
         result = _apply_fixstar_flags(result, t.tt, iflag, j2000_native=use_j2000)
 
-        return (star_name_out, result, iflag, "")
+        return (result, star_name_out, iflag)
+    except Error:
+        raise
     except Exception as e:
-        return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
+        raise Error(str(e)) from e
 
 
 def swe_fixstar2(
     star_name: str, jd: float, iflag: int
-) -> Tuple[str, Tuple[float, float, float, float, float, float], int, str]:
+) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Terrestrial Time with flexible lookup.
 
@@ -4314,7 +4325,7 @@ def swe_fixstar2(
     - Hipparcos catalog number: "49669", ",49669"
     - Bayer/Flamsteed designation: "alLeo", "alVir"
 
-    Returns the full star name along with the position, allowing identification
+    Returns the position and full star name, allowing identification
     of which star was matched when using partial searches.
 
     Args:
@@ -4324,33 +4335,31 @@ def swe_fixstar2(
 
     Returns:
         Tuple containing:
-            - star_name_out: Full star name "Name,Nomenclature" (e.g. "Regulus,alLeo")
             - Position tuple: (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            - iflag: Return flags
-            - error_msg: Error message if any, empty string on success
+            - star_name_out: Full star name "Name,Nomenclature"
+              (e.g. "Spica,alVir")
+            - retflags: Return flags (int)
+
+    Raises:
+        Error: If the star cannot be found.
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T.
         For most astrological applications, use swe_fixstar2_ut() instead.
 
     Example:
-        >>> name, pos, retflag, err = swe_fixstar2("Spica", 2451545.0, 0)
+        >>> pos, name, retflag = swe_fixstar2("Spica", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir"
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
 
-        >>> name, pos, retflag, err = swe_fixstar2("65474", 2451545.0, 0)
+        >>> pos, name, retflag = swe_fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
     iflag = _preprocess_flags(iflag)
 
     entry, error = _resolve_star2(star_name)
     if error or entry is None:
-        return (
-            "",
-            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            iflag,
-            error or "could not find star name",
-        )
+        raise Error(error or "could not find star name")
 
     try:
         noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
@@ -4371,9 +4380,11 @@ def swe_fixstar2(
         star_name_out = _format_star_name(entry)
         result = _apply_fixstar_flags(result, jd, iflag, j2000_native=use_j2000)
 
-        return (star_name_out, result, iflag, "")
+        return (result, star_name_out, iflag)
+    except Error:
+        raise
     except Exception as e:
-        return ("", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag, str(e))
+        raise Error(str(e)) from e
 
 
 # Magnitude values for legacy _resolve_star_id lookup
@@ -5507,36 +5518,40 @@ def get_hip_from_star_name(name: str) -> int | None:
     return None
 
 
-def swe_fixstar_mag(star_name: str) -> Tuple[float, str]:
+def swe_fixstar_mag(star_name: str) -> float:
     """
     Get the visual magnitude of a fixed star without calculating position.
 
     Lightweight function that returns only the magnitude, useful for
     visibility calculations where position is not needed.
 
+    Compatible with pyswisseph: returns a bare float on success,
+    raises Error if the star is not found.
+
     Args:
         star_name: Name of star (e.g. "Regulus", "Spica")
 
     Returns:
-        Tuple containing:
-            - magnitude: Visual magnitude (float), or 0.0 on error
-            - error_msg: Error message if any, empty string on success
+        Visual magnitude as a float (e.g. 1.40 for Regulus).
+
+    Raises:
+        Error: If the star cannot be found or magnitude is unavailable.
 
     Example:
-        >>> mag, err = swe_fixstar_mag("Regulus")
+        >>> mag = swe_fixstar_mag("Regulus")
         >>> print(f"Regulus magnitude: {mag}")  # 1.40
     """
     star_id, error, _canonical_name = _resolve_star_id(star_name)
     if error:
-        return (0.0, error)
+        raise Error(error)
 
     if star_id in _STAR_MAGNITUDES:
-        return (_STAR_MAGNITUDES[star_id], "")
+        return _STAR_MAGNITUDES[star_id]
     else:
-        return (0.0, f"Magnitude not available for star ID {star_id}")
+        raise Error(f"Magnitude not available for star ID {star_id}")
 
 
-def swe_fixstar2_mag(star_name: str) -> Tuple[str, float, str]:
+def swe_fixstar2_mag(star_name: str) -> Tuple[float, str]:
     """
     Get the visual magnitude of a fixed star with flexible lookup.
 
@@ -5545,28 +5560,34 @@ def swe_fixstar2_mag(star_name: str) -> Tuple[str, float, str]:
     - Hipparcos catalog number: "49669", ",49669"
     - Bayer/Flamsteed designation: "alLeo", "alVir"
 
-    Returns the full star name along with the magnitude, useful for
+    Returns the magnitude and the full star name, useful for
     visibility calculations where position is not needed.
+
+    Compatible with pyswisseph: returns (magnitude, star_name) on success,
+    raises Error if the star is not found.
 
     Args:
         star_name: Star identifier (name, catalog number, or partial search)
 
     Returns:
         Tuple containing:
-            - star_name_out: Full star name "Name,Nomenclature" (e.g. "Regulus,alLeo")
-            - magnitude: Visual magnitude (float), or 0.0 on error
-            - error_msg: Error message if any, empty string on success
+            - magnitude: Visual magnitude (float)
+            - star_name_out: Full star name "Name,Nomenclature"
+              (e.g. "Regulus,alLeo")
+
+    Raises:
+        Error: If the star cannot be found.
 
     Example:
-        >>> name, mag, err = swe_fixstar2_mag("Reg")
+        >>> mag, name = swe_fixstar2_mag("Reg")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
 
-        >>> name, mag, err = swe_fixstar2_mag("49669")
+        >>> mag, name = swe_fixstar2_mag("49669")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
     """
     entry, error = _resolve_star2(star_name)
     if error or entry is None:
-        return ("", 0.0, error or "could not find star name")
+        raise Error(error or "could not find star name")
 
     star_name_out = _format_star_name(entry)
-    return (star_name_out, entry.magnitude, "")
+    return (entry.magnitude, star_name_out)

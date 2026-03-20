@@ -161,8 +161,8 @@ for jd in TEST_JDS:
 
         try:
             le_result = ephem.swe_fixstar2_ut(star_name, jd, flags)
-            le_lon = le_result[1][0]
-            le_lat = le_result[1][1]
+            le_lon = le_result[0][0]
+            le_lat = le_result[0][1]
         except Exception as e:
             not_found_le += 1
             print(f"NOT_FOUND_LE {star_name}: {e}")

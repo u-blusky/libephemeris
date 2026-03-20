@@ -96,7 +96,7 @@ def test_311():  # Fixed star speed consistency
                 continue
             # lon speed
             t += 1
-            d = abs(lr[1][3] - sr[0][3]) * 3600
+            d = abs(lr[0][3] - sr[0][3]) * 3600
             if d <= 5.0:  # "/day
                 p += 1
             else:
@@ -104,7 +104,7 @@ def test_311():  # Fixed star speed consistency
                 fails.append(f'  {star} lon_spd jd={jd:.0f} d={d:.4f}"/day')
             # lat speed
             t += 1
-            d = abs(lr[1][4] - sr[0][4]) * 3600
+            d = abs(lr[0][4] - sr[0][4]) * 3600
             if d <= 5.0:
                 p += 1
             else:
@@ -422,7 +422,7 @@ def test_320():  # Ultimate all-API sweep
         lr = ephem.swe_fixstar2_ut("Regulus", jd, LF)
         sr = swe.fixstar2("Regulus", jd, SF)
         t += 1
-        d = adiff(lr[1][0], sr[0][0]) * 3600
+        d = adiff(lr[0][0], sr[0][0]) * 3600
         if d <= 1.0:
             p += 1
         else:

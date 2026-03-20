@@ -839,6 +839,17 @@ SIDM_USER: int = SE_SIDM_USER
 SE_JUL_CAL: int = 0  # Julian calendar
 SE_GREG_CAL: int = 1  # Gregorian calendar
 
+# reference API-compatible aliases (without SE_ prefix)
+JUL_CAL: int = SE_JUL_CAL
+GREG_CAL: int = SE_GREG_CAL
+
+# =============================================================================
+# ASTRONOMICAL CONSTANTS
+# =============================================================================
+
+AUNIT: float = 149597870.7  # Astronomical Unit in km (IAU 2012 standard)
+SE_AUNIT: float = AUNIT
+
 # =============================================================================
 # ECLIPSE TYPES AND FLAGS
 # =============================================================================
@@ -874,8 +885,24 @@ SE_ECL_3RD_VISIBLE: int = 2048  # Third contact visible
 SE_ECL_4TH_VISIBLE: int = 4096  # Fourth contact visible
 SE_ECL_ONE_TRY: int = 32768  # Try only once (optimization flag)
 
-# reference API-compatible alias for grazing occultation
+# reference API-compatible aliases (without SE_ prefix)
+ECL_CENTRAL: int = SE_ECL_CENTRAL
+ECL_NONCENTRAL: int = SE_ECL_NONCENTRAL
+ECL_TOTAL: int = SE_ECL_TOTAL
+ECL_ANNULAR: int = SE_ECL_ANNULAR
+ECL_PARTIAL: int = SE_ECL_PARTIAL
+ECL_ANNULAR_TOTAL: int = SE_ECL_ANNULAR_TOTAL
+ECL_PENUMBRAL: int = SE_ECL_PENUMBRAL
 ECL_GRAZING: int = SE_ECL_GRAZING
+ECL_ALLTYPES_SOLAR: int = SE_ECL_ALLTYPES_SOLAR
+ECL_ALLTYPES_LUNAR: int = SE_ECL_ALLTYPES_LUNAR
+ECL_VISIBLE: int = SE_ECL_VISIBLE
+ECL_MAX_VISIBLE: int = SE_ECL_MAX_VISIBLE
+ECL_1ST_VISIBLE: int = SE_ECL_1ST_VISIBLE
+ECL_2ND_VISIBLE: int = SE_ECL_2ND_VISIBLE
+ECL_3RD_VISIBLE: int = SE_ECL_3RD_VISIBLE
+ECL_4TH_VISIBLE: int = SE_ECL_4TH_VISIBLE
+ECL_ONE_TRY: int = SE_ECL_ONE_TRY
 
 # ============================================================================
 # NODAL/APSIDAL CALCULATION METHOD FLAGS

@@ -164,9 +164,9 @@ class TestSweFixstarUtWithFuzzy:
 
     def test_betelgeuse_variants(self, standard_jd):
         """Test swe_fixstar_ut finds Betelgeuse with alternate spellings."""
-        pos1, _, name1 = swe_fixstar_ut("Betelgeuse", standard_jd, 0)
-        pos2, _, name2 = swe_fixstar_ut("Betelgeux", standard_jd, 0)
-        pos3, _, name3 = swe_fixstar_ut("Beetlejuice", standard_jd, 0)
+        pos1, name1, _ = swe_fixstar_ut("Betelgeuse", standard_jd, 0)
+        pos2, name2, _ = swe_fixstar_ut("Betelgeux", standard_jd, 0)
+        pos3, name3, _ = swe_fixstar_ut("Beetlejuice", standard_jd, 0)
 
         # All should return Betelgeuse
         assert name1 == "Betelgeuse"
@@ -179,8 +179,8 @@ class TestSweFixstarUtWithFuzzy:
 
     def test_fomalhaut_variants(self, standard_jd):
         """Test swe_fixstar_ut finds Fomalhaut with alternate spellings."""
-        pos1, _, name1 = swe_fixstar_ut("Fomalhaut", standard_jd, 0)
-        pos2, _, name2 = swe_fixstar_ut("Formalhaut", standard_jd, 0)
+        pos1, name1, _ = swe_fixstar_ut("Fomalhaut", standard_jd, 0)
+        pos2, name2, _ = swe_fixstar_ut("Formalhaut", standard_jd, 0)
 
         assert name1 == "Fomalhaut"
         assert name2 == "Fomalhaut"
@@ -198,14 +198,9 @@ class TestSweFixstar2UtWithFuzzy:
 
     def test_betelgeuse_variants(self, standard_jd):
         """Test swe_fixstar2_ut finds Betelgeuse with alternate spellings."""
-        name1, pos1, _, err1 = swe_fixstar2_ut("Betelgeuse", standard_jd, 0)
-        name2, pos2, _, err2 = swe_fixstar2_ut("Betelgeux", standard_jd, 0)
-        name3, pos3, _, err3 = swe_fixstar2_ut("Beetlejuice", standard_jd, 0)
-
-        # All should succeed
-        assert err1 == ""
-        assert err2 == ""
-        assert err3 == ""
+        pos1, name1, _ = swe_fixstar2_ut("Betelgeuse", standard_jd, 0)
+        pos2, name2, _ = swe_fixstar2_ut("Betelgeux", standard_jd, 0)
+        pos3, name3, _ = swe_fixstar2_ut("Beetlejuice", standard_jd, 0)
 
         # All should return Betelgeuse with nomenclature
         assert "Betelgeuse" in name1
@@ -218,14 +213,9 @@ class TestSweFixstar2UtWithFuzzy:
 
     def test_fomalhaut_variants(self, standard_jd):
         """Test swe_fixstar2_ut finds Fomalhaut with alternate spellings."""
-        name1, pos1, _, err1 = swe_fixstar2_ut("Fomalhaut", standard_jd, 0)
-        name2, pos2, _, err2 = swe_fixstar2_ut("Formalhaut", standard_jd, 0)
-        name3, pos3, _, err3 = swe_fixstar2_ut("Fomalaut", standard_jd, 0)
-
-        # All should succeed
-        assert err1 == ""
-        assert err2 == ""
-        assert err3 == ""
+        pos1, name1, _ = swe_fixstar2_ut("Fomalhaut", standard_jd, 0)
+        pos2, name2, _ = swe_fixstar2_ut("Formalhaut", standard_jd, 0)
+        pos3, name3, _ = swe_fixstar2_ut("Fomalaut", standard_jd, 0)
 
         # All should return Fomalhaut
         assert "Fomalhaut" in name1
@@ -234,12 +224,8 @@ class TestSweFixstar2UtWithFuzzy:
 
     def test_aldebaran_variants(self, standard_jd):
         """Test swe_fixstar2_ut finds Aldebaran with alternate spellings."""
-        name1, pos1, _, err1 = swe_fixstar2_ut("Aldebaran", standard_jd, 0)
-        name2, pos2, _, err2 = swe_fixstar2_ut("Aldebran", standard_jd, 0)
-
-        # Both should succeed
-        assert err1 == ""
-        assert err2 == ""
+        pos1, name1, _ = swe_fixstar2_ut("Aldebaran", standard_jd, 0)
+        pos2, name2, _ = swe_fixstar2_ut("Aldebran", standard_jd, 0)
 
         # Both should return Aldebaran
         assert "Aldebaran" in name1
@@ -291,14 +277,14 @@ class TestPyswissephCompatibility:
         """Test that alternate spellings work like pyswisseph."""
         # In pyswisseph, swe_fixstar can find stars by various names
         # Our implementation should be compatible
-        pos, retflag, name = swe_fixstar_ut("Betelgeux", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Betelgeux", standard_jd, 0)
         assert name == "Betelgeuse", f"Expected 'Betelgeuse', got '{name}'"
         # Betelgeuse is in Gemini/Orion, around 87-89 degrees
         assert 80 < pos[0] < 95, f"Betelgeuse longitude {pos[0]} out of expected range"
 
     def test_pyswisseph_fomalhaut_variant_behavior(self, standard_jd):
         """Test that Fomalhaut alternate spellings work like pyswisseph."""
-        pos, retflag, name = swe_fixstar_ut("Formalhaut", standard_jd, 0)
+        pos, name, retflag = swe_fixstar_ut("Formalhaut", standard_jd, 0)
         assert name == "Fomalhaut", f"Expected 'Fomalhaut', got '{name}'"
         # Fomalhaut is around 3-4 degrees Pisces (333-334 degrees ecliptic)
         assert 330 < pos[0] < 340, f"Fomalhaut longitude {pos[0]} out of expected range"
@@ -312,7 +298,7 @@ class TestPyswissephCompatibility:
             ("Formalhaut", "Fomalhaut"),  # Watcher of the South
         ]
         for variant, expected_name in royal_star_tests:
-            pos, retflag, name = swe_fixstar_ut(variant, standard_jd, 0)
+            pos, name, retflag = swe_fixstar_ut(variant, standard_jd, 0)
             assert name == expected_name, (
                 f"For '{variant}', expected '{expected_name}', got '{name}'"
             )

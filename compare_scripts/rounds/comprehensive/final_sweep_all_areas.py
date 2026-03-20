@@ -143,7 +143,7 @@ def test_all_bodies():
             except Exception:
                 continue
             total += 1
-            d = abs(le_r[1][0] - se_r[0][0])
+            d = abs(le_r[0][0] - se_r[0][0])
             if d > 180:
                 d = 360 - d
             if d * 3600 <= 1.0:

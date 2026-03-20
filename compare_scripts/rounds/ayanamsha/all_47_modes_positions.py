@@ -568,7 +568,7 @@ def test_part8_fixstar_sidereal():
             pos_se, name_se, retflag_se = ret_se
 
             ret_le = ephem.swe_fixstar2_ut(star_name, jd, SEFLG_SIDEREAL)
-            name_le, pos_le, retflag_le, err_le = ret_le
+            pos_le, name_le, retflag_le = ret_le
 
             lon_se = float(pos_se[0])
             lon_le = float(pos_le[0])

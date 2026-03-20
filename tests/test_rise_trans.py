@@ -39,12 +39,13 @@ class TestRiseTransBasic:
         # Rome, Italy
         lat, lon = 41.9028, 12.4964
 
-        jd_rise, retflag = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        retflag, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
 
         # Should find sunrise on June 21
         assert jd_rise > jd_start
         assert jd_rise < jd_start + 1  # Within 24 hours
-        assert retflag == SE_CALC_RISE
+        assert retflag == 0
 
         # Verify it's in the morning (before noon local time)
         year, month, day, hour = revjul(jd_rise)
@@ -59,12 +60,13 @@ class TestRiseTransBasic:
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964  # Rome
 
-        jd_set, retflag = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+        retflag, tret = rise_trans(jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0])
+        jd_set = tret[0]
 
         # Should find sunset on June 21
         assert jd_set > jd_start
         assert jd_set < jd_start + 1
-        assert retflag == SE_CALC_SET
+        assert retflag == 0
 
         # Verify it's in the evening (after noon)
         year, month, day, hour = revjul(jd_set)
@@ -78,14 +80,13 @@ class TestRiseTransBasic:
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964  # Rome
 
-        jd_transit, retflag = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_MTRANSIT
-        )
+        retflag, tret = rise_trans(jd_start, SE_SUN, SE_CALC_MTRANSIT, [lon, lat, 0])
+        jd_transit = tret[0]
 
         # Should find transit on June 21
         assert jd_transit > jd_start
         assert jd_transit < jd_start + 1
-        assert retflag == SE_CALC_MTRANSIT
+        assert retflag == 0
 
         # Verify it's around solar noon (12:00-13:00 local)
         year, month, day, hour = revjul(jd_transit)
@@ -98,22 +99,21 @@ class TestRiseTransBasic:
         jd_start = julday(2024, 6, 21, 12)  # Start at noon
         lat, lon = 41.9028, 12.4964  # Rome
 
-        jd_itransit, retflag = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_ITRANSIT
-        )
+        retflag, tret = rise_trans(jd_start, SE_SUN, SE_CALC_ITRANSIT, [lon, lat, 0])
+        jd_itransit = tret[0]
 
         # Should find lower transit around midnight
         assert jd_itransit > jd_start
         assert jd_itransit < jd_start + 1
-        assert retflag == SE_CALC_ITRANSIT
+        assert retflag == 0
 
     def test_swe_alias_works(self):
         """Test that swe_rise_trans is an alias for rise_trans."""
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964
 
-        result1 = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
-        result2 = swe_rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        result1 = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        result2 = swe_rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
 
         assert result1 == result2
 
@@ -126,35 +126,36 @@ class TestRiseTransMoon:
         jd_start = julday(2024, 1, 15, 0)
         lat, lon = 51.5074, -0.1278  # London
 
-        jd_rise, retflag = rise_trans(jd_start, SE_MOON, lat, lon, rsmi=SE_CALC_RISE)
+        retflag, tret = rise_trans(jd_start, SE_MOON, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
 
         assert jd_rise > jd_start
         assert jd_rise < jd_start + 2  # Moon can rise any time
-        assert retflag == SE_CALC_RISE
+        assert retflag == 0
 
     def test_moonset_valid(self):
         """Test moonset calculation."""
         jd_start = julday(2024, 1, 15, 0)
         lat, lon = 51.5074, -0.1278  # London
 
-        jd_set, retflag = rise_trans(jd_start, SE_MOON, lat, lon, rsmi=SE_CALC_SET)
+        retflag, tret = rise_trans(jd_start, SE_MOON, SE_CALC_SET, [lon, lat, 0])
+        jd_set = tret[0]
 
         assert jd_set > jd_start
         assert jd_set < jd_start + 2
-        assert retflag == SE_CALC_SET
+        assert retflag == 0
 
     def test_moon_transit_valid(self):
         """Test Moon transit calculation."""
         jd_start = julday(2024, 1, 15, 0)
         lat, lon = 51.5074, -0.1278  # London
 
-        jd_transit, retflag = rise_trans(
-            jd_start, SE_MOON, lat, lon, rsmi=SE_CALC_MTRANSIT
-        )
+        retflag, tret = rise_trans(jd_start, SE_MOON, SE_CALC_MTRANSIT, [lon, lat, 0])
+        jd_transit = tret[0]
 
         assert jd_transit > jd_start
         assert jd_transit < jd_start + 1.5  # Moon transit within ~1 day
-        assert retflag == SE_CALC_MTRANSIT
+        assert retflag == 0
 
 
 class TestRiseTransPlanets:
@@ -165,24 +166,26 @@ class TestRiseTransPlanets:
         jd_start = julday(2024, 1, 15, 0)
         lat, lon = 40.7128, -74.0060  # New York
 
-        jd_rise, retflag = rise_trans(jd_start, SE_MARS, lat, lon, rsmi=SE_CALC_RISE)
+        retflag, tret = rise_trans(jd_start, SE_MARS, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
 
         assert jd_rise > jd_start
         assert jd_rise < jd_start + 2
-        assert retflag == SE_CALC_RISE
+        assert retflag == 0
 
     def test_jupiter_transit(self):
         """Test Jupiter transit calculation."""
         jd_start = julday(2024, 1, 15, 0)
         lat, lon = 40.7128, -74.0060  # New York
 
-        jd_transit, retflag = rise_trans(
-            jd_start, SE_JUPITER, lat, lon, rsmi=SE_CALC_MTRANSIT
+        retflag, tret = rise_trans(
+            jd_start, SE_JUPITER, SE_CALC_MTRANSIT, [lon, lat, 0]
         )
+        jd_transit = tret[0]
 
         assert jd_transit > jd_start
         assert jd_transit < jd_start + 1.5
-        assert retflag == SE_CALC_MTRANSIT
+        assert retflag == 0
 
 
 class TestRiseTransCircumpolar:
@@ -194,11 +197,11 @@ class TestRiseTransCircumpolar:
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 78.0, 16.0  # Svalbard
 
-        jd_set, retflag = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+        retflag, tret = rise_trans(jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0])
 
         # Should return -2 for circumpolar (never sets)
         assert retflag == -2
-        assert jd_set == 0.0
+        assert tret[0] == 0.0
 
     def test_sun_circumpolar_arctic_winter(self):
         """Test that Sun doesn't rise in Arctic winter (polar night)."""
@@ -206,11 +209,11 @@ class TestRiseTransCircumpolar:
         jd_start = julday(2024, 12, 21, 0)
         lat, lon = 78.0, 16.0  # Svalbard
 
-        jd_rise, retflag = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        retflag, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
 
         # Should return -2 for circumpolar (never rises)
         assert retflag == -2
-        assert jd_rise == 0.0
+        assert tret[0] == 0.0
 
     def test_transit_still_works_for_circumpolar(self):
         """Test that transit calculations work for circumpolar objects."""
@@ -218,14 +221,13 @@ class TestRiseTransCircumpolar:
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 78.0, 16.0  # Svalbard
 
-        jd_transit, retflag = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_MTRANSIT
-        )
+        retflag, tret = rise_trans(jd_start, SE_SUN, SE_CALC_MTRANSIT, [lon, lat, 0])
+        jd_transit = tret[0]
 
         # Transit should still be calculable
         assert jd_transit > jd_start
         assert jd_transit < jd_start + 1
-        assert retflag == SE_CALC_MTRANSIT
+        assert retflag == 0
 
 
 class TestRiseTransFlags:
@@ -237,12 +239,14 @@ class TestRiseTransFlags:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # With upper limb (default)
-        jd_rise_limb, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise_limb = tret[0]
 
         # With disc center
-        jd_rise_center, _ = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_DISC_CENTER
+        _, tret = rise_trans(
+            jd_start, SE_SUN, SE_CALC_RISE | SE_BIT_DISC_CENTER, [lon, lat, 0]
         )
+        jd_rise_center = tret[0]
 
         # Center rise should be later than upper limb rise
         assert jd_rise_center > jd_rise_limb
@@ -256,12 +260,14 @@ class TestRiseTransFlags:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # With refraction (default)
-        jd_rise_refr, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise_refr = tret[0]
 
         # Without refraction
-        jd_rise_no_refr, _ = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_NO_REFRACTION
+        _, tret = rise_trans(
+            jd_start, SE_SUN, SE_CALC_RISE | SE_BIT_NO_REFRACTION, [lon, lat, 0]
         )
+        jd_rise_no_refr = tret[0]
 
         # Without refraction, rise should be later (Sun appears lower)
         assert jd_rise_no_refr > jd_rise_refr
@@ -275,12 +281,14 @@ class TestRiseTransFlags:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Civil twilight begins (Sun at -6 degrees)
-        jd_twilight, _ = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_CIVIL_TWILIGHT
+        _, tret = rise_trans(
+            jd_start, SE_SUN, SE_CALC_RISE | SE_BIT_CIVIL_TWILIGHT, [lon, lat, 0]
         )
+        jd_twilight = tret[0]
 
         # Regular sunrise
-        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
 
         # Civil twilight should be before sunrise
         assert jd_twilight < jd_rise
@@ -294,14 +302,16 @@ class TestRiseTransFlags:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Nautical twilight begins (Sun at -12 degrees)
-        jd_nautical, _ = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_NAUTIC_TWILIGHT
+        _, tret = rise_trans(
+            jd_start, SE_SUN, SE_CALC_RISE | SE_BIT_NAUTIC_TWILIGHT, [lon, lat, 0]
         )
+        jd_nautical = tret[0]
 
         # Civil twilight
-        jd_civil, _ = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_CIVIL_TWILIGHT
+        _, tret = rise_trans(
+            jd_start, SE_SUN, SE_CALC_RISE | SE_BIT_CIVIL_TWILIGHT, [lon, lat, 0]
         )
+        jd_civil = tret[0]
 
         # Nautical twilight should be before civil twilight
         assert jd_nautical < jd_civil
@@ -312,14 +322,16 @@ class TestRiseTransFlags:
         lat, lon = 41.9028, 12.4964  # Rome
 
         # Astronomical twilight begins (Sun at -18 degrees)
-        jd_astro, _ = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_ASTRO_TWILIGHT
+        _, tret = rise_trans(
+            jd_start, SE_SUN, SE_CALC_RISE | SE_BIT_ASTRO_TWILIGHT, [lon, lat, 0]
         )
+        jd_astro = tret[0]
 
         # Nautical twilight
-        jd_nautical, _ = rise_trans(
-            jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE | SE_BIT_NAUTIC_TWILIGHT
+        _, tret = rise_trans(
+            jd_start, SE_SUN, SE_CALC_RISE | SE_BIT_NAUTIC_TWILIGHT, [lon, lat, 0]
         )
+        jd_nautical = tret[0]
 
         # Astronomical twilight should be before nautical twilight
         assert jd_astro < jd_nautical
@@ -333,8 +345,10 @@ class TestRiseTransLocations:
         jd_start = julday(2024, 3, 20, 0)  # Near equinox
         lat, lon = 0.0, 0.0  # Equator, prime meridian
 
-        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
-        jd_set, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0])
+        jd_set = tret[0]
 
         # At equator during equinox, day and night are nearly equal
         day_length = (jd_set - jd_rise) * 24
@@ -345,8 +359,10 @@ class TestRiseTransLocations:
         jd_start = julday(2024, 12, 21, 0)  # Southern summer
         lat, lon = -33.8688, 151.2093  # Sydney
 
-        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
-        jd_set, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0])
+        jd_set = tret[0]
 
         # Should have valid times
         assert jd_rise > jd_start
@@ -356,7 +372,8 @@ class TestRiseTransLocations:
         # (starting from midnight UTC, for Sydney the set might be before or after rise)
         if jd_set < jd_rise:
             # Sunset happened before sunrise, get next sunset after sunrise
-            jd_set2, _ = rise_trans(jd_rise + 0.01, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+            _, tret = rise_trans(jd_rise + 0.01, SE_SUN, SE_CALC_SET, [lon, lat, 0])
+            jd_set2 = tret[0]
             day_length = (jd_set2 - jd_rise) * 24
         else:
             day_length = (jd_set - jd_rise) * 24
@@ -369,8 +386,10 @@ class TestRiseTransLocations:
         jd_start = julday(2024, 3, 20, 0)  # Equinox
         lat, lon = 65.0, 25.0  # Northern Finland
 
-        jd_rise, flag_rise = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
-        jd_set, flag_set = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+        flag_rise, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
+        flag_set, tret = rise_trans(jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0])
+        jd_set = tret[0]
 
         # At equinox, even high latitudes have sunrise/sunset
         assert flag_rise != -2
@@ -387,17 +406,17 @@ class TestRiseTransErrors:
         jd_start = julday(2024, 6, 21, 0)
 
         with pytest.raises(ValueError, match="illegal planet number"):
-            rise_trans(jd_start, 9999, 41.9, 12.5, rsmi=SE_CALC_RISE)
+            rise_trans(jd_start, 9999, SE_CALC_RISE, [12.5, 41.9, 0])
 
     def test_invalid_rsmi_raises_error(self):
         """Test that invalid rsmi raises ValueError."""
         jd_start = julday(2024, 6, 21, 0)
 
         with pytest.raises(ValueError, match="Invalid event type"):
-            rise_trans(jd_start, SE_SUN, 41.9, 12.5, rsmi=0)
+            rise_trans(jd_start, SE_SUN, 0, [12.5, 41.9, 0])
 
         with pytest.raises(ValueError, match="Invalid event type"):
-            rise_trans(jd_start, SE_SUN, 41.9, 12.5, rsmi=16)
+            rise_trans(jd_start, SE_SUN, 16, [12.5, 41.9, 0])
 
 
 class TestRiseTransSequential:
@@ -410,7 +429,8 @@ class TestRiseTransSequential:
         sunrises = []
 
         for _ in range(3):
-            jd_rise, _ = rise_trans(jd, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
+            _, tret = rise_trans(jd, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+            jd_rise = tret[0]
             sunrises.append(jd_rise)
             jd = jd_rise + 0.5  # Start from noon after sunrise
 
@@ -424,8 +444,10 @@ class TestRiseTransSequential:
         jd_start = julday(2024, 6, 21, 0)  # Midnight
         lat, lon = 41.9028, 12.4964  # Rome
 
-        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
-        jd_set, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0])
+        jd_set = tret[0]
 
         # Sunrise should be before sunset (starting from midnight)
         assert jd_rise < jd_set
@@ -440,9 +462,12 @@ class TestRiseTransSequential:
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964  # Rome
 
-        jd_rise, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_RISE)
-        jd_transit, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_MTRANSIT)
-        jd_set, _ = rise_trans(jd_start, SE_SUN, lat, lon, rsmi=SE_CALC_SET)
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [lon, lat, 0])
+        jd_rise = tret[0]
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_MTRANSIT, [lon, lat, 0])
+        jd_transit = tret[0]
+        _, tret = rise_trans(jd_start, SE_SUN, SE_CALC_SET, [lon, lat, 0])
+        jd_set = tret[0]
 
         # Transit should be between rise and set
         assert jd_rise < jd_transit < jd_set

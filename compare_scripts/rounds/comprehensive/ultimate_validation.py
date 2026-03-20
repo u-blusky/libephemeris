@@ -211,7 +211,7 @@ def test_fixed_stars():
                 continue
 
             total += 1
-            lon_diff = abs(le_r[1][0] - se_r[0][0])
+            lon_diff = abs(le_r[0][0] - se_r[0][0])
             if lon_diff > 180:
                 lon_diff = 360 - lon_diff
             if lon_diff * 3600 <= 10.0:
@@ -223,7 +223,7 @@ def test_fixed_stars():
                 )
 
             total += 1
-            lat_diff = abs(le_r[1][1] - se_r[0][1]) * 3600
+            lat_diff = abs(le_r[0][1] - se_r[0][1]) * 3600
             if lat_diff <= 10.0:
                 passed += 1
             else:

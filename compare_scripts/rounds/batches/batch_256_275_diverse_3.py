@@ -203,7 +203,7 @@ def test_260():  # Fixed stars NOABERR
             except:
                 continue
             t += 1
-            d = adiff(lr[1][0], sr[0][0]) * 3600
+            d = adiff(lr[0][0], sr[0][0]) * 3600
             if d <= 10.0:
                 p += 1
             else:
@@ -480,14 +480,14 @@ def test_270():  # Fixed stars at 2050
         except:
             continue
         t += 1
-        d = adiff(lr[1][0], sr[0][0]) * 3600
+        d = adiff(lr[0][0], sr[0][0]) * 3600
         if d <= 10.0:
             p += 1
         else:
             f += 1
             fails.append(f'  {star} 2050 lon diff={d:.4f}"')
         t += 1
-        d = abs(lr[1][1] - sr[0][1]) * 3600
+        d = abs(lr[0][1] - sr[0][1]) * 3600
         if d <= 10.0:
             p += 1
         else:

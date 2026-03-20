@@ -121,7 +121,7 @@ def test_297():  # Fixed stars TRUEPOS
             except:
                 continue
             t += 1
-            d = adiff(lr[1][0], sr[0][0]) * 3600
+            d = adiff(lr[0][0], sr[0][0]) * 3600
             if d <= 1.0:
                 p += 1
             else:

@@ -95,24 +95,21 @@ class TestHipPrefixWithFixstar2:
     def test_swe_fixstar2_ut_hip_prefix_regulus(self):
         """Test swe_fixstar2_ut with HIP 49669 returns Regulus."""
         jd = 2451545.0  # J2000.0
-        name, pos, retflag, err = swe_fixstar2_ut("HIP 49669", jd, 0)
-        assert err == "", f"Unexpected error: {err}"
+        pos, name, retflag = swe_fixstar2_ut("HIP 49669", jd, 0)
         assert "Regulus" in name
         assert pos[0] > 0  # Longitude should be positive
 
     def test_swe_fixstar2_ut_hip_prefix_spica(self):
         """Test swe_fixstar2_ut with HIP 65474 returns Spica."""
         jd = 2451545.0  # J2000.0
-        name, pos, retflag, err = swe_fixstar2_ut("HIP 65474", jd, 0)
-        assert err == "", f"Unexpected error: {err}"
+        pos, name, retflag = swe_fixstar2_ut("HIP 65474", jd, 0)
         assert "Spica" in name
         assert pos[0] > 0
 
     def test_swe_fixstar2_ut_hip_prefix_no_space(self):
         """Test swe_fixstar2_ut with HIP65474 (no space) returns Spica."""
         jd = 2451545.0  # J2000.0
-        name, pos, retflag, err = swe_fixstar2_ut("HIP65474", jd, 0)
-        assert err == "", f"Unexpected error: {err}"
+        pos, name, retflag = swe_fixstar2_ut("HIP65474", jd, 0)
         assert "Spica" in name
 
 

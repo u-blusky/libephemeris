@@ -133,8 +133,8 @@ def test_star_catalog():
 
         try:
             le_r = ephem.swe_fixstar2_ut(star, JD, FLAGS)
-            le_lon = le_r[1][0]
-            le_lat = le_r[1][1]
+            le_lon = le_r[0][0]
+            le_lat = le_r[0][1]
             le_ok = True
         except Exception:
             pass
@@ -206,7 +206,7 @@ def test_star_catalog():
                 continue
 
             total += 1
-            lon_diff = abs(le_r[1][0] - se_r[0][0])
+            lon_diff = abs(le_r[0][0] - se_r[0][0])
             if lon_diff > 180:
                 lon_diff = 360 - lon_diff
             lon_as = lon_diff * 3600
