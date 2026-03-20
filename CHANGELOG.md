@@ -5,6 +5,106 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-03-20
+
+### Summary
+
+**LEB Sidereal Precision: 4 critical sidereal coordinate transform bugs fixed,
+537 new regression tests, and 134,000+ deep validation test cases across all
+3 LEB tiers.** This release resolves all sidereal calculation discrepancies
+between libephemeris and pyswisseph, adds comprehensive regression test coverage
+for sidereal modes, and performs the most exhaustive precision validation in the
+project's history — 160 waves covering every API function, all 31 LEB bodies,
+all 44 ayanamsha modes, all 24 house systems, eclipses, occultations, heliacal
+events, crossing functions, and numerical edge cases.
+
+### Fixed
+
+#### Sidereal equatorial and J2000 ayanamsha handling (64b8367)
+
+Pipeline A (ICRS barycentric bodies) used the nutation matrix instead of the
+mean equator precession matrix for SID+EQ coordinate transforms. SID+J2K used
+true ayanamsha instead of mean ayanamsha. Both paths now produce results
+matching pyswisseph exactly.
+
+#### Sidereal dpsi nutation for Pipeline B/C bodies (e6555ed)
+
+Pipeline B (ecliptic direct: nodes, apogees) and Pipeline C (heliocentric:
+Uranians, Transpluto) had incorrect dpsi nutation handling in sidereal+equatorial
+mode. MeanNode/MeanApog now correctly skip dpsi; TrueNode/OscuApog correctly
+subtract dpsi. Mean obliquity is now used for SID+EQ rotation in all pipelines.
+
+#### Sidereal J2000 suppression for TrueNode/OscuApog/IntpApog/IntpPerg (9f0fde7)
+
+pyswisseph ignores SEFLG_J2000 for TrueNode, OscuApog, IntpApog, and IntpPerg
+when SEFLG_SIDEREAL is set — these bodies always output sidereal ecliptic of
+date regardless. libephemeris was incorrectly applying J2000 precession.
+MeanNode and MeanApog continue to precess to J2000 normally.
+
+#### SID+EQ frame bias and SID+J2K precession order for mean bodies (b816be0)
+
+Two combined fixes: (a) `_get_precession_matrix()` used Skyfield's `t.P` which
+includes ICRS frame bias (~17 mas), replaced with
+`mean_equator_and_equinox_of_date.rotation_at(t)`. (b) MeanNode/MeanApog with
+SID+J2K applied precession before ayanamsha subtraction (non-commutative, up to
+28″ at extreme dates). Fixed by deferring J2000 precession until after sidereal
+correction.
+
+### Added
+
+#### Sidereal regression tests — 537 new tests (912db88)
+
+- 26 LEB vs Skyfield unit tests in `tests/test_leb/test_fast_calc.py`
+- 270 Swiss Ephemeris vs libephemeris comparison tests in
+  `compare_scripts/tests/test_compare_sidereal_regression.py`
+- 126 extended-tier sidereal tests, 25 asteroid tests, 32 distance tests,
+  40 flag combination tests, 18 lunar tests in
+  `tests/test_leb/compare/extended/`
+
+#### Deep validation plan — 160 waves, 134,000+ test cases
+
+Exhaustive precision validation across 14 blocks:
+
+- **Derived API functions** (Waves 51–62): swe_pheno_ut, swe_nod_aps_ut,
+  swe_calc_pctr, swe_get_orbital_elements_ut, swe_orbit_max_min_true_distance,
+  swe_gauquelin_sector, swe_house_pos, swe_time_equ, swe_sidtime,
+  swe_houses_ex2, swe_houses_armc_ex2 — 785 cases, all PASS
+- **Complete house system coverage** (Waves 63–68): all 24 systems including
+  sidereal (Lahiri), extreme dates, Gauquelin 36-cusp, Sunshine, polar circle
+  error handling — 25,586 cases, all PASS
+- **Crossing & station functions** (Waves 69–78): generic, heliocentric, Moon
+  node, sidereal crossings, station timing, retrograde duration — 190 cases,
+  known limitation for slow outer planet stations documented
+- **Eclipse functions deep** (Waves 79–92): solar/lunar eclipse circumstances,
+  contacts C1–C4, path width, magnitudes, gamma — 135 cases, all PASS
+- **Occultations** (Waves 93–98): lunar and planet occultations, timing chain
+  — 37 cases, all PASS with zero delta
+- **Heliacal & visibility** (Waves 99–102): heliacal rising/setting, phenomena,
+  limiting magnitude, true horizon rise/set — 558 cases, all PASS
+- **Sidereal three-way** (Waves 103–112): LEB vs Skyfield vs pyswisseph for
+  all sidereal flag combinations, all pipelines, HELCTR, BARYCTR, correction-
+  stripping flags — 402 cases, all PASS
+- **Fallback verification** (Waves 113–118): NONUT, ICRS, SPEED3, MOSEPH,
+  star-based ayanamsha, non-LEB body fallback — 182 cases, all bit-identical
+- **Extended tier dense** (Waves 119–126): 200-date sweep −5000 to +5000 CE,
+  SPK boundaries, polynomial degradation, Uranians — 1,090 cases, all PASS
+- **Numerical edge cases** (Waves 127–136): segment boundaries, sub-second JD
+  precision, mode/tier switching stress, J2000/Unix epoch — 596 cases, all PASS
+- **Pipeline-specific stress** (Waves 137–144): COB correction, light-time
+  iteration, gravitational deflection, aberration, dpsi, obliquity, Uranian
+  geocentric conversion, velocity — 650 cases, all PASS
+- **Complete three-way all 31 bodies** (Waves 145–148): LEB vs Skyfield vs
+  pyswisseph at J2000 and 2024 for every body — 127 cases, all PASS
+- **Ayanamsha deep** (Waves 149–153): all 44 modes, user-defined mode 255,
+  extreme dates, sidereal houses, rate consistency — 586 cases, all PASS
+- **Final mega-fuzz** (Waves 154–160): 50k random position fuzz, 10k three-way
+  fuzz, 5k house fuzz, 1k crossing stress, eclipse chain, 50 natal charts,
+  10k mixed-mode stress — 68,396 cases, all PASS
+
+### Changed
+
+- Version bumped from 0.24.0 to 0.25.0
+
 ## [0.24.0] - 2026-03-16
 
 ### Summary
@@ -1776,7 +1876,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/g-battaglia/libephemeris/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/g-battaglia/libephemeris/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/g-battaglia/libephemeris/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/g-battaglia/libephemeris/compare/v0.20.0...v0.22.0

@@ -715,7 +715,7 @@ from ._dotenv import load_dotenv
 # Constants (planet IDs, flags, sidereal modes)
 from .constants import *
 
-__version__ = "0.22.0"
+__version__ = "0.25.0"
 __author__ = "Giacomo Battaglia"
 __license__ = "LGPL-3.0"
 
