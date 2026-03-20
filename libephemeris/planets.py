@@ -1666,22 +1666,22 @@ def _calc_body(
                     # Return 0 for speed components
                     pass
             # Apply sidereal correction if requested (not for equatorial output).
-            # When sidereal is set, pyswisseph ignores J2000 for TrueNode —
-            # output is sidereal ecliptic of date, not J2000.  Strip J2000
-            # from flags for ayanamsha and equatorial conversion.
-            _eff_flags = iflag & ~SEFLG_J2000 if is_sidereal else iflag
+            # SEFLG_J2000 is honored for TrueNode, same as MeanNode.
+            # pyswisseph silently ignores J2000 for TrueNode when sidereal is
+            # set — LibEphemeris intentionally fixes this behavioral bug.
+            # See docs/reference/se-bug-sidereal-j2000-nodes.md
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_ayanamsa_for_flags(t.ut1, _eff_flags)
+                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
                 lon = (lon - ayanamsa) % 360.0
                 # Correct velocity for ayanamsha rate
                 if iflag & SEFLG_SPEED:
                     dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, _eff_flags)
-                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, _eff_flags)
+                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                     da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                     dlon -= da
             result = (lon, lat, dist, dlon, dlat, ddist)
-            result = _maybe_equatorial_convert(result, jd_tt, _eff_flags)
+            result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
 
     # South nodes are 180° from north nodes
@@ -1781,21 +1781,21 @@ def _calc_body(
                     # Return 0 for speed components
                     pass
             # Apply sidereal correction if requested (not for equatorial output).
-            # When sidereal is set, pyswisseph ignores J2000 for OscuApog —
-            # output is sidereal ecliptic of date, not J2000.  Strip J2000
-            # from flags for ayanamsha and equatorial conversion.
-            _eff_flags = iflag & ~SEFLG_J2000 if is_sidereal else iflag
+            # SEFLG_J2000 is honored for OscuApog, same as MeanApog.
+            # pyswisseph silently ignores J2000 for OscuApog when sidereal is
+            # set — LibEphemeris intentionally fixes this behavioral bug.
+            # See docs/reference/se-bug-sidereal-j2000-nodes.md
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_ayanamsa_for_flags(t.ut1, _eff_flags)
+                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
                 lon = (lon - ayanamsa) % 360.0
                 if iflag & SEFLG_SPEED:
                     dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, _eff_flags)
-                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, _eff_flags)
+                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                     da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                     dlon -= da
             result = (lon, lat, dist, dlon, dlat, ddist)
-            result = _maybe_equatorial_convert(result, jd_tt, _eff_flags)
+            result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
 
     # Handle Interpolated Apogee/Perigee
@@ -1837,21 +1837,21 @@ def _calc_body(
             dlat = (lat_next - lat_prev) / (2.0 * dt)
             ddist = (dist_next - dist_prev) / (2.0 * dt)
         # Apply sidereal correction if requested (not for equatorial output).
-        # When sidereal is set, pyswisseph ignores J2000 for IntpApog/IntpPerg —
-        # output is sidereal ecliptic of date, not J2000.  Strip J2000
-        # from flags for ayanamsha and equatorial conversion.
-        _eff_flags = iflag & ~SEFLG_J2000 if is_sidereal else iflag
+        # SEFLG_J2000 is honored for IntpApog/IntpPerg, same as MeanApog.
+        # pyswisseph silently ignores J2000 for these bodies when sidereal is
+        # set — LibEphemeris intentionally fixes this behavioral bug.
+        # See docs/reference/se-bug-sidereal-j2000-nodes.md
         if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-            ayanamsa = _get_ayanamsa_for_flags(t.ut1, _eff_flags)
+            ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
             lon = (lon - ayanamsa) % 360.0
             if iflag & SEFLG_SPEED:
                 dt_aya = 1.0 / 86400.0
-                ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, _eff_flags)
-                ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, _eff_flags)
+                ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
+                ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                 da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                 dlon -= da
         result = (lon, lat, dist, dlon, dlat, ddist)
-        result = _maybe_equatorial_convert(result, jd_tt, _eff_flags)
+        result = _maybe_equatorial_convert(result, jd_tt, iflag)
         return _to_native_floats(result), iflag
 
     # Handle Uranian planets (Hamburg School hypothetical bodies, IDs 40-47)

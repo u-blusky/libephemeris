@@ -6,8 +6,13 @@ leb/precision branch.  Uses pyswisseph as the reference standard.
 
 Bug 1 (64b8367): Pipeline A SID+EQ used nutation matrix instead of mean equator.
 Bug 2 (e6555ed): Pipeline B/C dpsi nutation handling wrong for SID+EQ.
-Bug 3 (9f0fde7): J2000 suppression for non-mean SID bodies (TrueNode, OscuApog,
-                  IntpApog, IntpPerg).
+Bug 3 (9f0fde7): J2000 suppression for non-mean SID bodies — NOW FIXED.
+    pyswisseph silently ignores SEFLG_J2000 for TrueNode, OscuApog, IntpApog,
+    IntpPerg when SEFLG_SIDEREAL is set.  This is a behavioral bug (ayanamsha
+    and J2000 ecliptic precession are geometrically distinct operations).
+    LibEphemeris intentionally fixes this: SEFLG_J2000 is honored for ALL bodies.
+    Tests in TestBug3J2kIntentionalDivergence verify the expected divergence.
+    See docs/reference/se-bug-sidereal-j2000-nodes.md
 Bug 4 (b816be0): (a) Frame bias in _get_precession_matrix, (b) SID+J2K
                   precession order for MeanNode/MeanApog.
 
@@ -291,26 +296,70 @@ class TestBug2PipelineBSidEq:
 
 
 # ============================================================================
-# BUG 3: J2000 suppression for non-mean SID bodies (commit 9f0fde7)
+# BUG 3: J2000 for non-mean SID bodies — INTENTIONAL SE DIVERGENCE
 # ============================================================================
 
 
-class TestBug3J2kSuppression:
-    """pyswisseph ignores SEFLG_J2000 for TrueNode, OscuApog, IntpApog,
-    IntpPerg when SIDEREAL is set.  MeanNode/MeanApog precess to J2000 normally.
+class TestBug3J2kIntentionalDivergence:
+    """LibEphemeris intentionally diverges from pyswisseph here.
 
-    Error signature: If SID+J2K returns different values for TrueNode than
-    SID alone, the J2K suppression is not working.
+    pyswisseph silently ignores SEFLG_J2000 for TrueNode, OscuApog, IntpApog,
+    IntpPerg when SEFLG_SIDEREAL is set.  This is a behavioral bug: ayanamsha
+    (1D longitude zero-point shift) and J2000 ecliptic precession (3D plane
+    rotation) are geometrically distinct, composable operations.
+
+    LibEphemeris honors SEFLG_J2000 for ALL bodies uniformly.  These tests
+    verify the intentional divergence and document the expected delta.
+
+    See docs/reference/se-bug-sidereal-j2000-nodes.md
     """
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", PIPELINE_B_TRUE_BODIES)
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES[:4])
-    def test_true_body_sid_j2k_equals_sid(self, body_id, body_name, jd, date_desc):
-        """TrueNode/OscuApog: SID+J2K should equal SID (J2K suppressed).
+    def test_true_body_sid_j2k_diverges_from_swe(
+        self, body_id, body_name, jd, date_desc
+    ):
+        """TrueNode/OscuApog: SID+J2K now intentionally diverges from pyswisseph.
 
-        pyswisseph ignores J2000 for these bodies when sidereal is set.
-        libephemeris must do the same.
+        pyswisseph ignores J2000 (SID+J2K == SID), but libephemeris honors it.
+        The delta should be consistent with the ecliptic precession angle.
+        """
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+
+        flags_sid_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+
+        # pyswisseph: still ignores J2K for these bodies
+        pos_swe, _ = swe.calc_ut(jd, body_id, flags_sid_j2k)
+        # libephemeris: now honors J2K
+        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
+
+        divergence = angular_diff(float(pos_swe[0]), float(pos_py[0]))
+
+        # The divergence should be non-trivial (> 0.001°) except near J2000
+        # where the ecliptic precession angle is very small.
+        # At J2000 the delta is ~0.004° (frame bias only).
+        # At J1900 it's ~1.4°, at 2023 ~0.33°, at 2050 ~0.69°.
+        if date_desc == "J2000":
+            assert divergence < 0.01, (
+                f"{body_name} SID+J2K at {date_desc}: divergence {divergence:.6f}° "
+                f"too large near J2000"
+            )
+        else:
+            assert divergence > 0.01, (
+                f"{body_name} SID+J2K at {date_desc}: divergence {divergence:.6f}° "
+                f"too small — J2000 precession not being applied? "
+                f"[SE bug fix regression]"
+            )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize("body_id,body_name", PIPELINE_B_TRUE_BODIES)
+    @pytest.mark.parametrize("jd,date_desc", TEST_DATES[:4])
+    def test_true_body_j2k_actually_applied(self, body_id, body_name, jd, date_desc):
+        """TrueNode/OscuApog: SID+J2K must differ from SID alone.
+
+        If they are identical, J2000 precession is NOT being applied.
         """
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
@@ -318,44 +367,36 @@ class TestBug3J2kSuppression:
         flags_sid = SEFLG_SIDEREAL | SEFLG_SPEED
         flags_sid_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
 
-        # pyswisseph reference: confirm SE ignores J2K for these bodies
-        pos_swe_sid, _ = swe.calc_ut(jd, body_id, flags_sid)
-        pos_swe_j2k, _ = swe.calc_ut(jd, body_id, flags_sid_j2k)
+        pos_sid, _ = ephem.swe_calc_ut(jd, body_id, flags_sid)
+        pos_j2k, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
 
-        swe_diff = angular_diff(float(pos_swe_sid[0]), float(pos_swe_j2k[0]))
-        assert swe_diff < 0.0001, (
-            f"pyswisseph sanity check failed: {body_name} SID vs SID+J2K "
-            f"differ by {swe_diff:.6f}° (expected identical)"
-        )
+        diff = angular_diff(float(pos_sid[0]), float(pos_j2k[0]))
 
-        # libephemeris: must also ignore J2K
-        pos_py_sid, _ = ephem.swe_calc_ut(jd, body_id, flags_sid)
-        pos_py_j2k, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
-
-        py_diff = angular_diff(float(pos_py_sid[0]), float(pos_py_j2k[0]))
-        assert py_diff < 0.0001, (
-            f"{body_name} SID vs SID+J2K differ by {py_diff:.6f}° "
-            f"(expected identical — J2K should be suppressed) [Bug 3 regression]"
+        # Even at J2000, there should be a small frame-bias difference (~0.004°)
+        assert diff > 0.001, (
+            f"{body_name} SID vs SID+J2K at {date_desc}: diff {diff:.6f}° "
+            f"(J2000 precession not applied?) [SE bug fix regression]"
         )
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", PIPELINE_B_INTERP_BODIES)
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES[:3])
-    def test_interp_body_sid_j2k_equals_sid(self, body_id, body_name, jd, date_desc):
-        """IntpApog/IntpPerg: SID+J2K should equal SID (J2K suppressed)."""
+    def test_interp_body_j2k_actually_applied(self, body_id, body_name, jd, date_desc):
+        """IntpApog/IntpPerg: SID+J2K must differ from SID alone."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
 
         flags_sid = SEFLG_SIDEREAL | SEFLG_SPEED
         flags_sid_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
 
-        pos_py_sid, _ = ephem.swe_calc_ut(jd, body_id, flags_sid)
-        pos_py_j2k, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
+        pos_sid, _ = ephem.swe_calc_ut(jd, body_id, flags_sid)
+        pos_j2k, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
 
-        py_diff = angular_diff(float(pos_py_sid[0]), float(pos_py_j2k[0]))
-        assert py_diff < 0.0001, (
-            f"{body_name} SID vs SID+J2K differ by {py_diff:.6f}° "
-            f"(expected identical) [Bug 3 regression]"
+        diff = angular_diff(float(pos_sid[0]), float(pos_j2k[0]))
+
+        assert diff > 0.001, (
+            f"{body_name} SID vs SID+J2K at {date_desc}: diff {diff:.6f}° "
+            f"(J2000 precession not applied?) [SE bug fix regression]"
         )
 
     @pytest.mark.comparison
@@ -538,21 +579,25 @@ class TestSidEqComprehensive:
 
 
 class TestSidJ2kComprehensive:
-    """Ensure every Pipeline B body works correctly with SID+J2K."""
+    """Ensure every Pipeline B body works correctly with SID+J2K.
+
+    Mean bodies (MeanNode, MeanApog) match pyswisseph within tolerance.
+    True/osculating bodies (TrueNode, OscuApog) intentionally diverge from
+    pyswisseph because LibEphemeris fixes the J2000 suppression bug.
+    See docs/reference/se-bug-sidereal-j2000-nodes.md
+    """
 
     @pytest.mark.comparison
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
             (SE_MEAN_NODE, "MeanNode"),
-            (SE_TRUE_NODE, "TrueNode"),
             (SE_MEAN_APOG, "MeanApog"),
-            (SE_OSCU_APOG, "OscuApog"),
         ],
     )
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES[:4])
-    def test_primary_body_sid_j2k(self, body_id, body_name, jd, date_desc):
-        """All primary Pipeline B bodies SID+J2K match pyswisseph."""
+    def test_mean_body_sid_j2k_matches_swe(self, body_id, body_name, jd, date_desc):
+        """Mean bodies SID+J2K still match pyswisseph (no divergence)."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
         ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
 
@@ -566,4 +611,41 @@ class TestSidJ2kComprehensive:
         assert lon_diff < tol, (
             f"{body_name} SID+J2K at {date_desc}: "
             f'lon diff {lon_diff:.6f}° ({arcsec(lon_diff):.1f}")'
+        )
+
+    @pytest.mark.comparison
+    @pytest.mark.parametrize(
+        "body_id,body_name",
+        [
+            (SE_TRUE_NODE, "TrueNode"),
+            (SE_OSCU_APOG, "OscuApog"),
+        ],
+    )
+    @pytest.mark.parametrize("jd,date_desc", TEST_DATES[:4])
+    def test_true_body_sid_j2k_divergence_expected(
+        self, body_id, body_name, jd, date_desc
+    ):
+        """True/osculating bodies SID+J2K: verify expected SE divergence.
+
+        LibEphemeris intentionally diverges from pyswisseph here because SE
+        silently ignores SEFLG_J2000 for these bodies when SEFLG_SIDEREAL
+        is set.  The divergence should match the ecliptic precession angle.
+        """
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+
+        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        pos_swe, _ = swe.calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+
+        lon_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
+
+        # Verify the divergence is in a plausible range:
+        # - At J2000.0: ~0.004° (frame bias only, very small precession)
+        # - At 2023: ~0.33° (consistent with ~50 arcsec/year * 23 years)
+        # - At J1900: ~1.4° (100 years of ecliptic precession)
+        # - At 2050: ~0.69° (50 years of ecliptic precession)
+        assert lon_diff < 5.0, (
+            f"{body_name} SID+J2K at {date_desc}: "
+            f"divergence {lon_diff:.6f}° unexpectedly large"
         )

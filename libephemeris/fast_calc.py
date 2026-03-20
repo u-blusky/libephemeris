@@ -991,14 +991,13 @@ def _pipeline_ecliptic(
     # Coordinate transforms for ecliptic-direct bodies.
     # Input coords are always ecliptic of date.
     #
-    # When SIDEREAL is set, pyswisseph ignores SEFLG_J2000 for "non-mean"
-    # Pipeline B bodies (TrueNode, OscuApog, IntpApog, IntpPerg).  These
-    # bodies output sidereal ecliptic of date regardless of J2000 flag.
-    # Mean bodies (MeanNode, MeanApog) DO precess to J2000 normally.
-    _SID_J2K_SKIP_BODIES = (SE_TRUE_NODE, SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG)
-    _effective_j2000 = bool(iflag & SEFLG_J2000) and not (
-        bool(iflag & SEFLG_SIDEREAL) and ipl in _SID_J2K_SKIP_BODIES
-    )
+    # SEFLG_J2000 is honored for ALL bodies, including TrueNode, OscuApog,
+    # IntpApog, and IntpPerg.  pyswisseph silently ignores J2000 for these
+    # four bodies when SEFLG_SIDEREAL is set — this is a behavioral bug
+    # (ayanamsha and J2000 ecliptic precession are geometrically distinct
+    # and composable operations).  LibEphemeris intentionally fixes this.
+    # See docs/reference/se-bug-sidereal-j2000-nodes.md
+    _effective_j2000 = bool(iflag & SEFLG_J2000)
 
     if (iflag & SEFLG_EQUATORIAL) and _effective_j2000:
         # J2000 equatorial: precess ecliptic-of-date -> J2000 ecliptic,
@@ -1400,9 +1399,12 @@ def _fast_calc_core(
 
     body = reader._bodies[ipl]
 
-    # Flag for deferred J2000 precession — set True only by Pipeline B for
-    # mean bodies (MeanNode, MeanApog) with SID+J2K (no EQ).
-    _mean_sid_j2k = False
+    # Flag for deferred J2000 precession — set True by Pipeline B for any
+    # ecliptic-direct body with SID+J2K (no EQ).  All Pipeline B bodies
+    # (MeanNode, MeanApog, TrueNode, OscuApog, IntpApog, IntpPerg) use
+    # the same deferred precession pattern: subtract ayanamsha first in
+    # ecliptic-of-date coords, then precess to J2000.
+    _deferred_sid_j2k = False
 
     # Dispatch to appropriate pipeline based on coordinate type
     if body.coord_type == COORD_ICRS_BARY:
@@ -1439,20 +1441,24 @@ def _fast_calc_core(
     elif body.coord_type == COORD_ECLIPTIC:
         # Pipeline B: ecliptic direct
         #
-        # For mean bodies (MeanNode, MeanApog) with SID+J2K (no EQ), defer
-        # J2000 precession so ayanamsha can be subtracted first in ecliptic-
-        # of-date coordinates, matching the Skyfield path order:
-        #   Skyfield: ecl_date → −aya → precess_to_J2000
-        #   LEB old:  ecl_date → precess_to_J2000 → −aya  (WRONG — non-commutative)
-        #   LEB fix:  ecl_date → −aya → precess_to_J2000  (matches Skyfield)
-        _MEAN_BODIES = (SE_MEAN_NODE, SE_MEAN_APOG)
-        _mean_sid_j2k = (
-            ipl in _MEAN_BODIES
-            and bool(iflag & SEFLG_SIDEREAL)
+        # For all ecliptic-direct bodies with SID+J2K (no EQ), defer J2000
+        # precession so ayanamsha can be subtracted first in ecliptic-of-date
+        # coordinates.  The correct order is:
+        #   ecl_date → −aya → precess_to_J2000
+        # NOT:
+        #   ecl_date → precess_to_J2000 → −aya  (wrong — non-commutative)
+        #
+        # This applies to ALL Pipeline B bodies uniformly: MeanNode, MeanApog,
+        # TrueNode, OscuApog, IntpApog, IntpPerg.  pyswisseph only does this
+        # for mean bodies (silently ignoring J2000 for the others when sidereal
+        # is set) — LibEphemeris intentionally corrects this behavioral bug.
+        # See docs/reference/se-bug-sidereal-j2000-nodes.md
+        _deferred_sid_j2k = (
+            bool(iflag & SEFLG_SIDEREAL)
             and bool(iflag & SEFLG_J2000)
             and not bool(iflag & SEFLG_EQUATORIAL)
         )
-        _pipe_flags = (iflag & ~SEFLG_J2000) if _mean_sid_j2k else iflag
+        _pipe_flags = (iflag & ~SEFLG_J2000) if _deferred_sid_j2k else iflag
         lon, lat, dist, dlon, dlat, ddist = _pipeline_ecliptic(
             reader, jd_tt, ipl, _pipe_flags
         )
@@ -1493,11 +1499,14 @@ def _fast_calc_core(
             )
             # J2000 ecliptic has no nutation component → mean ayanamsha.
             # Ecliptic of date includes nutation → true ayanamsha (mean + Δψ).
-            # For TrueNode/OscuApog/IntpApog/IntpPerg, J2000 precession is
-            # skipped when sidereal is set (coords remain ecliptic of date),
-            # so use true ayanamsha even if SEFLG_J2000 is in the flags.
-            _J2K_SKIP = (SE_TRUE_NODE, SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG)
-            _eff_j2000 = bool(iflag & SEFLG_J2000) and ipl not in _J2K_SKIP
+            #
+            # This applies uniformly to ALL bodies.  pyswisseph uses true
+            # ayanamsha for TrueNode/OscuApog/IntpApog/IntpPerg even when
+            # SEFLG_J2000 is set (because it skips J2000 precession for them).
+            # LibEphemeris intentionally fixes this: when J2000 is requested,
+            # mean ayanamsha is always used, for all bodies.
+            # See docs/reference/se-bug-sidereal-j2000-nodes.md
+            _eff_j2000 = bool(iflag & SEFLG_J2000)
             if _eff_j2000:
                 aya = mean_aya
             else:
@@ -1522,11 +1531,13 @@ def _fast_calc_core(
             # Star-based sidereal mode, fall back
             raise
 
-    # Deferred J2000 precession for mean Pipeline B bodies with SID+J2K.
+    # Deferred J2000 precession for Pipeline B bodies with SID+J2K.
     # The pipeline was run without SEFLG_J2000 so ayanamsha could be
-    # subtracted in ecliptic-of-date first (matching the Skyfield path
-    # order).  Now precess the sidereal-corrected coords to J2000.
-    if _mean_sid_j2k:
+    # subtracted in ecliptic-of-date first.  Now precess the sidereal-
+    # corrected coords to J2000.  This applies to ALL ecliptic-direct
+    # bodies uniformly (MeanNode, MeanApog, TrueNode, OscuApog, IntpApog,
+    # IntpPerg).  See docs/reference/se-bug-sidereal-j2000-nodes.md
+    if _deferred_sid_j2k:
         dt_step = 0.001  # days
         j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
         j_fwd_lon, j_fwd_lat = _precess_ecliptic(

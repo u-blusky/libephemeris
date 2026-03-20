@@ -476,7 +476,47 @@ Comprehensive testing across 4 coordinate modes, 10 bodies, 10 dates (1950–205
 
 ---
 
-## 7. References
+## 7. Intentional divergences from Swiss Ephemeris
+
+LibEphemeris aims for 1:1 compatibility with pyswisseph, but in specific
+cases where Swiss Ephemeris has a demonstrable behavioral bug, LibEphemeris
+prioritizes correctness over compatibility.
+
+### 7.1. SIDEREAL + J2000 for TrueNode, OscuApog, IntpApog, IntpPerg
+
+**Status:** Intentional divergence since leb/precision branch.
+
+**Observed behavior:** pyswisseph silently ignores `SEFLG_J2000` for
+`SE_TRUE_NODE`, `SE_OSCU_APOG`, `SE_INTP_APOG`, and `SE_INTP_PERG` when
+`SEFLG_SIDEREAL` is also set. The same combination works correctly for
+`SE_MEAN_NODE` and `SE_MEAN_APOG`. No error or warning is emitted.
+
+**Why it is incorrect:** Ayanamsha (1D longitude zero-point shift) and
+J2000 ecliptic precession (3D plane rotation) are geometrically distinct,
+composable operations. The internal inconsistency between mean and true
+bodies, combined with a growing error proportional to ecliptic precession
+(~0.34° at 2024, ~14° at 3000 CE, ~28° at 0 CE), confirms this is a
+code-path bug rather than a design decision.
+
+**Physical evidence:** With the pyswisseph behavior, the True Node ends up
+~29° from the Mean Node at 0 CE under `SIDEREAL | J2000` — physically
+impossible (the true node oscillates ±1.5° around the mean). With the
+LibEphemeris fix, the distance returns to ~1.04° (correct).
+
+**LibEphemeris fix:** `SEFLG_J2000` is honored for all bodies uniformly.
+The algorithm uses mean ayanamsha (no nutation component) and applies
+J2000 ecliptic precession after the sidereal correction — the same
+pipeline already used correctly for mean bodies.
+
+**Impact:** Only affects users who combine `SEFLG_SIDEREAL | SEFLG_J2000`
+on these four bodies. Using `SEFLG_SIDEREAL` alone (the standard
+astrological use case) produces identical results to pyswisseph.
+
+**Full analysis:** [se-bug-sidereal-j2000-nodes.md](se-bug-sidereal-j2000-nodes.md)
+
+---
+
+## 8. References
 
 1. Park, R.S. et al. (2021). "The JPL Planetary and Lunar Ephemerides DE440 and DE441." *Astronomical Journal*, 161(3), 105.
 2. Folkner, W.M. et al. (2014). "The Planetary and Lunar Ephemerides DE430 and DE431." *Interplanetary Network Progress Report*, 196, 1-81.

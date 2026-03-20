@@ -282,36 +282,39 @@ class TestExtSiderealJ2000:
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", PIPELINE_B_TRUE)
-    def test_true_body_sid_j2k_equals_sid(
+    def test_true_body_sid_j2k_leb_vs_skyfield(
         self,
         compare: CompareHelper,
         ext_dates_50: list[float],
         body_id: int,
         body_name: str,
     ):
-        """True bodies SID+J2K should equal SID (J2K suppressed, Bug 3).
+        """True bodies SID+J2K: LEB vs Skyfield (SE bug fix applied).
 
-        LEB and Skyfield should both suppress J2K for TrueNode/OscuApog.
+        LibEphemeris intentionally honors SEFLG_J2000 for TrueNode/OscuApog
+        (pyswisseph silently ignores it — this is a behavioral bug).
+        Both LEB and Skyfield paths must produce consistent results.
+        See docs/reference/se-bug-sidereal-j2000-nodes.md
         """
+        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+        max_err = 0.0
+        worst_jd = 0.0
+
         for jd in ext_dates_50[:10]:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            leb_sid, _ = compare.leb(
-                ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED | SEFLG_SIDEREAL
-            )
-            leb_j2k, _ = compare.leb(
-                ephem.swe_calc_ut,
-                jd,
-                body_id,
-                SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000,
-            )
+            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
 
-            diff_arcsec = lon_error_arcsec(leb_sid[0], leb_j2k[0])
+            err = lon_error_arcsec(ref[0], leb[0])
+            if err > max_err:
+                max_err = err
+                worst_jd = jd
 
-            assert diff_arcsec < 0.001, (
-                f'{body_name}: SID and SID+J2K differ by {diff_arcsec:.4f}" '
-                f"at JD {jd:.1f} (J2K should be suppressed)"
-            )
+        assert max_err < SID_ECLIPTIC_TOL, (
+            f'{body_name} SID+J2K: max LEB vs Skyfield error = {max_err:.4f}" '
+            f"at JD {worst_jd:.1f}"
+        )
 
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow
