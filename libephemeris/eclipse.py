@@ -8994,10 +8994,6 @@ def heliacal_pheno_ut(
     return tuple(dret), flags
 
 
-# Alias for reference API compatibility
-swe_heliacal_pheno_ut = heliacal_pheno_ut
-
-
 # =============================================================================
 # VISUAL LIMITING MAGNITUDE CALCULATIONS
 # =============================================================================
@@ -9422,10 +9418,6 @@ def vis_limit_mag(
     )
 
     return vision_type, dret
-
-
-# Alias for reference API compatibility
-swe_vis_limit_mag = vis_limit_mag
 
 
 # =============================================================================

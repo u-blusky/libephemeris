@@ -211,6 +211,8 @@ from .crossing import (
     swe_cross_ut,
     swe_helio_cross_ut,
     swe_helio_cross,
+    swe_find_station_ut,
+    swe_next_retrograde_ut,
 )
 from .lunar import (
     # Meeus polynomial validity warnings/errors
@@ -710,6 +712,8 @@ mooncross_node_ut = swe_mooncross_node_ut
 mooncross_node = swe_mooncross_node
 helio_cross_ut = swe_helio_cross_ut
 helio_cross = swe_helio_cross
+find_station_ut = swe_find_station_ut
+next_retrograde_ut = swe_next_retrograde_ut
 
 # pyswisseph swe_ prefixed aliases for utility functions
 swe_cotrans = cotrans
@@ -955,6 +959,10 @@ __all__ = [
     "helio_cross_ut",
     "swe_helio_cross",
     "helio_cross",
+    "swe_find_station_ut",
+    "find_station_ut",
+    "swe_next_retrograde_ut",
+    "next_retrograde_ut",
     # Eclipses
     "sol_eclipse_max_time",
     "swe_sol_eclipse_max_time",
