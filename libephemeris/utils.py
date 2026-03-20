@@ -305,49 +305,15 @@ def azalt(
         if temperature == 0:
             temperature = 15.0 - 0.0065 * altitude
 
-    # Calculate atmospheric refraction
+    # Calculate atmospheric refraction via ICAO ray-tracing
     if pressure > 0 and alt_true > -2.0:
-        # Bennett formula for atmospheric refraction
-        # R = 1.02 / tan(h + 10.3/(h + 5.11)) [arcminutes]
-        # Where h is apparent altitude in degrees
-        # This is an iterative formula since R depends on apparent altitude
-
-        # For true altitude, we use a modified approach:
-        # Start with true altitude and calculate refraction
-        # Refraction is applied as: apparent_alt = true_alt + R
-
-        # Pressure and temperature correction factors
-        # Standard conditions: 1010 mbar, 10°C
-        pressure_factor = pressure / 1010.0
-        temperature_factor = 283.0 / (273.0 + temperature)
-        correction = pressure_factor * temperature_factor
-
-        if alt_true > 15.0:
-            # Simple formula for high altitudes
-            # R = 58.1" * tan(z) - 0.07" * tan^3(z)  where z = zenith angle
-            z_rad = math.radians(90.0 - alt_true)
-            tan_z = math.tan(z_rad)
-            refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
-            refraction = refraction_arcsec / 3600.0 * correction
-        elif alt_true > -1.0:
-            # Bennett formula for lower altitudes
-            # More accurate near the horizon
-            h = alt_true
-            if h < 0.01:
-                h = 0.01  # Avoid division issues
-            # Refraction in arcminutes
-            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
-            refraction = r_arcmin / 60.0 * correction
-        else:
-            # Below horizon: extrapolate carefully
-            # Use a simple linear extrapolation from horizon value
-            h = -1.0
-            r_arcmin = 1.02 / math.tan(math.radians(h + 10.3 / (h + 5.11)))
-            refraction_at_horizon = r_arcmin / 60.0 * correction
-            # Linear decrease below horizon
-            refraction = refraction_at_horizon + (alt_true + 1.0) * 0.1
-
-        alt_apparent = alt_true + refraction
+        alt_apparent, _ = refrac_extended(
+            alt_true,
+            altitude,
+            pressure,
+            temperature,
+            calc_flag=SE_TRUE_TO_APP,
+        )
     else:
         # No refraction correction
         alt_apparent = alt_true
@@ -539,98 +505,32 @@ def refrac(
         >>> refrac(10.0, 0, 15.0, SE_TRUE_TO_APP)
         10.0  # returns input altitude unchanged
     """
+    from .refraction import calc_refraction_true_to_app, calc_refraction_app_to_true
+
     # No refraction if pressure is zero or negative
     if pressure <= 0:
         return altitude
 
-    # Pressure and temperature correction factors
-    # Standard conditions: 1010 mbar, 10°C (283 K)
-    pressure_factor = pressure / 1010.0
-    temperature_factor = 283.0 / (273.0 + temperature)
-    correction = pressure_factor * temperature_factor
-
     if calc_flag == SE_TRUE_TO_APP:
-        # True altitude to apparent altitude (add refraction)
-        # Uses Sæmundsson formula: R = 1.02 / tan(h + 10.3/(h+5.11)) arcminutes
-        alt = altitude
-
-        if alt > 15.0:
-            # Simple formula for high altitudes
-            # R = 58.1" * tan(z) - 0.07" * tan^3(z) where z = zenith angle
-            z_rad = math.radians(90.0 - alt)
-            tan_z = math.tan(z_rad)
-            refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
-            refraction = refraction_arcsec / 3600.0 * correction
-            return altitude + refraction
-        else:
-            # Sæmundsson formula with actual altitude (no clamping)
-            # Guard against singularity at h = -5.11
-            denom = alt + 5.11
-            if abs(denom) < 0.001:
-                return altitude  # Near singularity, refraction negligible
-            arg = alt + 10.3 / denom
-            if arg <= 0:
-                return altitude  # Formula not valid
-            r_arcmin = 1.02 / math.tan(math.radians(arg))
-            refraction = r_arcmin / 60.0 * correction
-
-            apparent = altitude + refraction
-            # If refraction can't bring object above horizon, return unchanged
-            if apparent < 0:
-                return altitude
-            return apparent
+        refr = calc_refraction_true_to_app(altitude, pressure, temperature)
+        apparent = altitude + refr
+        # Match reference API behaviour: if refraction can't bring
+        # the object above 0°, return input unchanged.
+        if apparent < 0:
+            return altitude
+        return apparent
 
     else:
-        # SE_APP_TO_TRUE: Apparent altitude to true altitude (subtract refraction)
-        # This is the inverse of TRUE_TO_APP.
-        #
-        # We need to find true_alt such that: apparent_alt = true_alt + R(true_alt)
-        # where R(true_alt) is the refraction at true altitude.
-        #
-        # Use iterative approach: start with apparent alt, compute refraction,
-        # subtract to get true estimate, iterate until converged.
-
-        # Calculate the refraction at true altitude 0° (horizon)
-        # This is the apparent altitude of the geometric horizon.
-        # Below this apparent altitude, no unique true altitude exists.
-        r_arcmin = 1.02 / math.tan(math.radians(10.3 / 5.11))
-        horizon_refraction = r_arcmin / 60.0 * correction
-
-        # If apparent altitude is below the horizon refraction, return unchanged
-        # (the object would be geometrically below the horizon)
-        if altitude < horizon_refraction:
+        # SE_APP_TO_TRUE
+        # Compute the refraction at the geometric horizon to establish a
+        # threshold: apparent altitudes below this value are returned
+        # unchanged (the object is geometrically below the horizon).
+        horizon_refr = calc_refraction_true_to_app(0.0, pressure, temperature)
+        if altitude < horizon_refr:
             return altitude
 
-        # Initial estimate: true alt ≈ apparent alt
-        true_alt = altitude
-
-        # Iterate to find true altitude
-        for _ in range(10):
-            # Calculate refraction at current estimate of true altitude
-            if true_alt > 15.0:
-                z_rad = math.radians(90.0 - true_alt)
-                tan_z = math.tan(z_rad)
-                refraction_arcsec = 58.1 * tan_z - 0.07 * tan_z**3
-                refraction = refraction_arcsec / 3600.0 * correction
-            else:
-                denom = true_alt + 5.11
-                if abs(denom) < 0.001:
-                    break
-                arg = true_alt + 10.3 / denom
-                if arg <= 0:
-                    break
-                r_arcmin = 1.02 / math.tan(math.radians(arg))
-                refraction = r_arcmin / 60.0 * correction
-
-            # Update estimate: true_alt + refraction should equal apparent_alt
-            new_true_alt = altitude - refraction
-
-            # Check convergence
-            if abs(new_true_alt - true_alt) < 1e-10:
-                break
-
-            true_alt = new_true_alt
-
+        refr = calc_refraction_app_to_true(altitude, pressure, temperature)
+        true_alt = altitude - refr
         return true_alt
 
 
@@ -702,72 +602,32 @@ def refrac_extended(
         -0.88
     """
     from .state import get_lapse_rate
+    from .refraction import (
+        calc_refraction_true_to_app,
+        calc_refraction_app_to_true,
+        calc_dip,
+    )
 
     # Use global lapse rate if none provided
     if lapse_rate is None:
         lapse_rate = get_lapse_rate()
 
-    # Earth's radius in meters
-    EARTH_RADIUS = 6371000.0
-
-    # Calculate refraction using the base refrac function
+    # Compute refraction via ICAO ray-tracing (observer altitude aware)
     if calc_flag == SE_TRUE_TO_APP:
         true_alt = altitude
-        apparent_alt = refrac(altitude, pressure, temperature, SE_TRUE_TO_APP)
-        refraction = apparent_alt - true_alt
+        refraction = calc_refraction_true_to_app(
+            altitude, pressure, temperature, altitude_geo, lapse_rate
+        )
+        apparent_alt = true_alt + refraction
     else:
         apparent_alt = altitude
-        true_alt = refrac(altitude, pressure, temperature, SE_APP_TO_TRUE)
-        refraction = apparent_alt - true_alt
+        refraction = calc_refraction_app_to_true(
+            altitude, pressure, temperature, altitude_geo, lapse_rate
+        )
+        true_alt = apparent_alt - refraction
 
-    # Calculate dip of the horizon for elevated observers
-    if altitude_geo <= 0:
-        dip = 0.0
-    else:
-        # Geometric dip angle (without atmospheric refraction)
-        # dip_geometric = arccos(R / (R + h)) ≈ sqrt(2h/R) for small h
-        # Using the more accurate formula:
-        ratio = EARTH_RADIUS / (EARTH_RADIUS + altitude_geo)
-        if ratio >= 1.0:
-            dip_geometric_rad = 0.0
-        else:
-            dip_geometric_rad = math.acos(ratio)
-
-        dip_geometric = math.degrees(dip_geometric_rad)
-
-        # Atmospheric refraction correction for the dip
-        # The ray from the observer to the visible horizon is bent by
-        # atmospheric refraction. This depends on the lapse rate.
-        #
-        # The refraction correction reduces the apparent dip (horizon appears
-        # higher due to refraction).
-        #
-        # The terrestrial refraction coefficient k relates observed dip to
-        # geometric dip: observed_dip = -dip_geometric * (1 - k).
-        # For a standard atmosphere (lapse rate Γ = 0.0065 K/m), the standard
-        # geodetic value is k ≈ 0.13 (≈1/7.7), meaning the observed dip is
-        # about 87% of the geometric dip.
-        #
-        # The linear approximation k(Γ) = 0.1117 + 3.5516·Γ models the
-        # dependence on lapse rate: steeper temperature gradients produce
-        # stronger density gradients and more refraction. At standard
-        # conditions this yields k = 0.1348, consistent with geodetic tables.
-        #
-        # References:
-        #   Bomford, "Geodesy" (1980), 4th ed., §2.17-2.20
-        #   Smart, "Textbook on Spherical Astronomy" (1977), Ch. VI
-        #   Torge, "Geodesy" (2001), 3rd ed., §5.1.1
-
-        if lapse_rate > 0:
-            # Calculate the refraction coefficient based on lapse rate
-            refraction_coef = 0.1117 + 3.5516 * lapse_rate
-        else:
-            # If lapse_rate is 0 or negative, use geometric dip only
-            refraction_coef = 0.0
-
-        # Apply atmospheric correction: observed dip is less than geometric dip
-        # due to refraction bending light downward
-        dip = -dip_geometric * (1.0 - refraction_coef)
+    # Dip of the horizon for elevated observers
+    dip = calc_dip(altitude_geo, lapse_rate)
 
     # Return the converted altitude and detail tuple
     if calc_flag == SE_TRUE_TO_APP:
