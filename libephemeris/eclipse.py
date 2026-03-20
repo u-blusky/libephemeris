@@ -7369,7 +7369,7 @@ def swe_lun_occult_where(
 
 def rise_trans(
     tjdut: float,
-    body: int,
+    body: "Union[int, str]",
     rsmi: int,
     geopos: Sequence[float],
     atpress: float = 0.0,
@@ -7385,7 +7385,8 @@ def rise_trans(
 
     Args:
         tjdut: Julian Day (UT) to start search from
-        body: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        body: Planet/body ID (int, e.g. SE_SUN, SE_MOON) or fixed star
+            name (str, e.g. "Sirius", "Regulus")
         rsmi: Event type and calculation flags (bitmask):
             - SE_CALC_RISE (1): Rise time (body crossing horizon going up)
             - SE_CALC_SET (2): Set time (body crossing horizon going down)
@@ -7412,7 +7413,7 @@ def rise_trans(
             - tret: tuple of 10 floats, of which tret[0] = JD of event
 
     Raises:
-        ValueError: If invalid planet ID or parameters
+        ValueError: If invalid planet ID or star name
 
     Note:
         For circumpolar objects (always above or below horizon at the given
@@ -7436,6 +7437,8 @@ def rise_trans(
         >>> # Find sunrise at Rome (geopos = [lon, lat, alt])
         >>> res, tret = rise_trans(jd, SE_SUN, SE_CALC_RISE, [12.5, 41.9, 0])
         >>> print(f"Sunrise at JD {tret[0]:.5f}")
+        >>> # Find Sirius rise time
+        >>> res, tret = rise_trans(jd, "Sirius", SE_CALC_RISE, [12.5, 41.9, 0])
 
     References:
         - Reference API: swe_rise_trans()
@@ -7464,10 +7467,10 @@ def rise_trans(
     altitude = float(geopos[2]) if len(geopos) > 2 else 0.0
 
     # Map parameter names for internal use
-    planet = body
     jd_start = tjdut
     pressure = atpress
     temperature = attemp
+    is_fixed_star = isinstance(body, str)
 
     # Extract event type from rsmi (lower bits)
     event_type = rsmi & 0x0F  # First 4 bits for event type
@@ -7480,20 +7483,35 @@ def rise_trans(
         SE_CALC_ITRANSIT,
     ):
         raise ValueError(
-            f"Invalid event type in rsmi: {rsmi}. Use SE_CALC_RISE, SE_CALC_SET, SE_CALC_MTRANSIT, or SE_CALC_ITRANSIT"
+            "Invalid event type in rsmi: %d. Use SE_CALC_RISE, SE_CALC_SET, SE_CALC_MTRANSIT, or SE_CALC_ITRANSIT"
+            % rsmi
         )
 
     # Get ephemeris and timescale
     eph = get_planets()
     ts = get_timescale()
-
-    # Validate planet and get target body
-    if planet not in _PLANET_MAP:
-        raise ValueError(f"illegal planet number {planet}.")
-
-    target_name = _PLANET_MAP[planet]
-    target = get_planet_target(eph, target_name)
     earth = eph["earth"]
+
+    # Resolve target body (planet or fixed star)
+    if is_fixed_star:
+        from skyfield.api import Star as SkyfieldStar
+        from .fixed_stars import FIXED_STARS, _resolve_star_id
+
+        star_id, err, _ = _resolve_star_id(body)
+        if err is not None:
+            raise ValueError(err)
+        star_entry = FIXED_STARS[star_id]
+        t_years = (jd_start - 2451545.0) / 365.25
+        ra_deg = star_entry.ra_j2000 + (star_entry.pm_ra * t_years) / 3600.0
+        dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
+        target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+        planet = -1  # Sentinel for fixed star (no semi-diameter)
+    else:
+        planet = body
+        if planet not in _PLANET_MAP:
+            raise ValueError("illegal planet number %d." % planet)
+        target_name = _PLANET_MAP[planet]
+        target = get_planet_target(eph, target_name)
 
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
@@ -7870,7 +7888,7 @@ swe_rise_trans = rise_trans
 
 def rise_trans_true_hor(
     tjdut: float,
-    body: int,
+    body: "Union[int, str]",
     rsmi: int,
     geopos: Sequence[float],
     atpress: float = 0.0,
@@ -7887,7 +7905,8 @@ def rise_trans_true_hor(
 
     Args:
         tjdut: Julian Day (UT) to start search from
-        body: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        body: Planet/body ID (int, e.g. SE_SUN, SE_MOON) or fixed star
+            name (str, e.g. "Sirius", "Regulus")
         rsmi: Event type and calculation flags (bitmask):
             - SE_CALC_RISE (1): Rise time (body crossing horizon going up)
             - SE_CALC_SET (2): Set time (body crossing horizon going down)
@@ -7916,7 +7935,7 @@ def rise_trans_true_hor(
             - tret: tuple of 10 floats, of which tret[0] = JD of event
 
     Raises:
-        ValueError: If invalid planet ID or parameters
+        ValueError: If invalid planet ID or star name
 
     Note:
         For circumpolar objects (always above or below horizon at the given
@@ -7970,11 +7989,11 @@ def rise_trans_true_hor(
     altitude = float(geopos[2]) if len(geopos) > 2 else 0.0
 
     # Map parameter names for internal use
-    planet = body
     jd_start = tjdut
     pressure = atpress
     temperature = attemp
     horizon_altitude = horhgt
+    is_fixed_star = isinstance(body, str)
 
     # Extract event type from rsmi (lower bits)
     event_type = rsmi & 0x0F  # First 4 bits for event type
@@ -7987,20 +8006,35 @@ def rise_trans_true_hor(
         SE_CALC_ITRANSIT,
     ):
         raise ValueError(
-            f"Invalid event type in rsmi: {rsmi}. Use SE_CALC_RISE, SE_CALC_SET, SE_CALC_MTRANSIT, or SE_CALC_ITRANSIT"
+            "Invalid event type in rsmi: %d. Use SE_CALC_RISE, SE_CALC_SET, SE_CALC_MTRANSIT, or SE_CALC_ITRANSIT"
+            % rsmi
         )
 
     # Get ephemeris and timescale
     eph = get_planets()
     ts = get_timescale()
-
-    # Validate planet and get target body
-    if planet not in _PLANET_MAP:
-        raise ValueError(f"illegal planet number {planet}.")
-
-    target_name = _PLANET_MAP[planet]
-    target = get_planet_target(eph, target_name)
     earth = eph["earth"]
+
+    # Resolve target body (planet or fixed star)
+    if is_fixed_star:
+        from skyfield.api import Star as SkyfieldStar
+        from .fixed_stars import FIXED_STARS, _resolve_star_id
+
+        star_id, err, _ = _resolve_star_id(body)
+        if err is not None:
+            raise ValueError(err)
+        star_entry = FIXED_STARS[star_id]
+        t_years = (jd_start - 2451545.0) / 365.25
+        ra_deg = star_entry.ra_j2000 + (star_entry.pm_ra * t_years) / 3600.0
+        dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
+        target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+        planet = -1  # Sentinel for fixed star (no semi-diameter)
+    else:
+        planet = body
+        if planet not in _PLANET_MAP:
+            raise ValueError("illegal planet number %d." % planet)
+        target_name = _PLANET_MAP[planet]
+        target = get_planet_target(eph, target_name)
 
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
