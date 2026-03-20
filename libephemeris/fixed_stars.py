@@ -3888,11 +3888,9 @@ def _apply_fixstar_flags(
             # True equator of date: use true obliquity
             eps = get_true_obliquity(jd_tt)
 
-        pos = (lon, lat, dist)
-        vel = (speed_lon, speed_lat, speed_dist)
-        pos_eq, vel_eq = cotrans_sp(pos, vel, -eps)
-        lon, lat, dist = pos_eq
-        speed_lon, speed_lat, speed_dist = vel_eq
+        result_sp = cotrans_sp((lon, lat, dist, speed_lon, speed_lat, speed_dist), -eps)
+        lon, lat, dist = result_sp[0], result_sp[1], result_sp[2]
+        speed_lon, speed_lat, speed_dist = result_sp[3], result_sp[4], result_sp[5]
 
     # ---- 3. Sidereal mode (ayanamsha subtraction) ----
     # For fixed stars, SE subtracts ayanamsha from the first coordinate

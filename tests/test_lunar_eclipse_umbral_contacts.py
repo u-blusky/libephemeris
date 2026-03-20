@@ -517,14 +517,14 @@ class TestUmbralContactsMultipleEclipses:
 class TestUmbralContactsWithLunEclipseWhen:
     """Test that umbral contacts match the times returned by lun_eclipse_when."""
 
-    def test_u1_matches_lun_eclipse_when_times1(self):
-        """Test that U1 closely matches times[1] from lun_eclipse_when."""
+    def test_u1_matches_lun_eclipse_when_times2(self):
+        """Test that U1 closely matches times[2] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
         _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
-        # times[1] is partial eclipse beginning from lun_eclipse_when
-        jd_partial_begin_from_when = times[1]
+        # times[2] is partial eclipse beginning from lun_eclipse_when
+        jd_partial_begin_from_when = times[2]
         jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
 
         # Both should calculate the same event
@@ -533,18 +533,18 @@ class TestUmbralContactsWithLunEclipseWhen:
         diff = abs(jd_u1 - jd_partial_begin_from_when)
 
         assert diff < tolerance_days, (
-            f"U1 and times[1] differ by {diff * 24 * 60:.1f} minutes. "
+            f"U1 and times[2] differ by {diff * 24 * 60:.1f} minutes. "
             f"Expected < 2 minutes"
         )
 
-    def test_u4_matches_lun_eclipse_when_times4(self):
-        """Test that U4 closely matches times[4] from lun_eclipse_when."""
+    def test_u4_matches_lun_eclipse_when_times3(self):
+        """Test that U4 closely matches times[3] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
         _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
-        # times[4] is partial eclipse ending from lun_eclipse_when
-        jd_partial_end_from_when = times[4]
+        # times[3] is partial eclipse ending from lun_eclipse_when
+        jd_partial_end_from_when = times[3]
         jd_u4 = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max)
 
         # Both should calculate the same event
@@ -552,18 +552,18 @@ class TestUmbralContactsWithLunEclipseWhen:
         diff = abs(jd_u4 - jd_partial_end_from_when)
 
         assert diff < tolerance_days, (
-            f"U4 and times[4] differ by {diff * 24 * 60:.1f} minutes. "
+            f"U4 and times[3] differ by {diff * 24 * 60:.1f} minutes. "
             f"Expected < 2 minutes"
         )
 
-    def test_u2_matches_lun_eclipse_when_times2(self):
-        """Test that U2 closely matches times[2] from lun_eclipse_when."""
+    def test_u2_matches_lun_eclipse_when_times4(self):
+        """Test that U2 closely matches times[4] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
         _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
-        # times[2] is total eclipse beginning from lun_eclipse_when
-        jd_total_begin_from_when = times[2]
+        # times[4] is total eclipse beginning from lun_eclipse_when
+        jd_total_begin_from_when = times[4]
         jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
 
         # Both should calculate the same event
@@ -571,18 +571,18 @@ class TestUmbralContactsWithLunEclipseWhen:
         diff = abs(jd_u2 - jd_total_begin_from_when)
 
         assert diff < tolerance_days, (
-            f"U2 and times[2] differ by {diff * 24 * 60:.1f} minutes. "
+            f"U2 and times[4] differ by {diff * 24 * 60:.1f} minutes. "
             f"Expected < 2 minutes"
         )
 
-    def test_u3_matches_lun_eclipse_when_times3(self):
-        """Test that U3 closely matches times[3] from lun_eclipse_when."""
+    def test_u3_matches_lun_eclipse_when_times5(self):
+        """Test that U3 closely matches times[5] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
         _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
-        # times[3] is total eclipse ending from lun_eclipse_when
-        jd_total_end_from_when = times[3]
+        # times[5] is total eclipse ending from lun_eclipse_when
+        jd_total_end_from_when = times[5]
         jd_u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max)
 
         # Both should calculate the same event
@@ -590,6 +590,6 @@ class TestUmbralContactsWithLunEclipseWhen:
         diff = abs(jd_u3 - jd_total_end_from_when)
 
         assert diff < tolerance_days, (
-            f"U3 and times[3] differ by {diff * 24 * 60:.1f} minutes. "
+            f"U3 and times[5] differ by {diff * 24 * 60:.1f} minutes. "
             f"Expected < 2 minutes"
         )

@@ -201,12 +201,12 @@ class TestLunarEclipseTimingPrecision:
         ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
 
         jd_max = times[0]
-        jd_partial_begin = times[1]
-        jd_total_begin = times[2]
-        jd_total_end = times[3]
-        jd_partial_end = times[4]
-        jd_pen_begin = times[5]
-        jd_pen_end = times[6]
+        jd_partial_begin = times[2]
+        jd_total_begin = times[4]
+        jd_total_end = times[5]
+        jd_partial_end = times[3]
+        jd_pen_begin = times[6]
+        jd_pen_end = times[7]
 
         # Penumbral < Partial < Total < Maximum < Total < Partial < Penumbral
         if jd_pen_begin > 0:

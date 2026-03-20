@@ -1393,17 +1393,15 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     else:
         eps = get_true_obliquity(jd_tt)
 
-    coord = (lon, lat, dist)
-    speed = (dlon, dlat, ddist)
     # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
-    new_coord, new_speed = cotrans_sp(coord, speed, -eps)
+    result = cotrans_sp((lon, lat, dist, dlon, dlat, ddist), -eps)
     return (
-        new_coord[0],
-        new_coord[1],
-        new_coord[2],
-        new_speed[0],
-        new_speed[1],
-        new_speed[2],
+        result[0],
+        result[1],
+        result[2],
+        result[3],
+        result[4],
+        result[5],
     )
 
 
@@ -4505,7 +4503,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # Time of perihelion passage (T)
     # T = t - M/n where M is in radians and n is radians/day
     if n > 0:
-        T_jd = t.tt - M / n
+        T_jd = float(t.tt) - M / n
     else:
         T_jd = 0.0
 
@@ -5001,7 +4999,7 @@ def _calc_moon_magnitude(
     return base + dist_correction
 
 
-def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
+def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Universal Time.
 
@@ -5014,14 +5012,13 @@ def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...]
         iflag: Calculation flags (SEFLG_TRUEPOS, SEFLG_HELCTR, etc.)
 
     Returns:
-        Tuple containing:
-            - attr: Tuple of at least 5 doubles:
-                - attr[0]: Phase angle (Earth-planet-Sun) in degrees
-                - attr[1]: Phase (illuminated fraction of disc, 0.0 to 1.0)
-                - attr[2]: Elongation of planet from Sun in degrees
-                - attr[3]: Apparent diameter of disc in arcseconds
-                - attr[4]: Apparent visual magnitude
-            - retflag: Return flag value
+        Tuple of 20 floats (matching pyswisseph):
+            - [0]: Phase angle (Earth-planet-Sun) in degrees
+            - [1]: Phase (illuminated fraction of disc, 0.0 to 1.0)
+            - [2]: Elongation of planet from Sun in degrees
+            - [3]: Apparent diameter of disc in arcseconds
+            - [4]: Apparent visual magnitude
+            - [5-19]: Reserved (0.0)
 
     Note:
         - For the Sun: phase angle = 0, phase = 1.0, elongation = 0
@@ -5030,7 +5027,7 @@ def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...]
         - Elongation is measured from the Sun (0° = conjunction, 180° = opposition)
 
     Example:
-        >>> attr, flag = swe_pheno_ut(2451545.0, SE_MARS, 0)
+        >>> attr = swe_pheno_ut(2451545.0, SE_MARS, 0)
         >>> print(f"Phase angle: {attr[0]:.2f}°")
         >>> print(f"Illumination: {attr[1]*100:.1f}%")
         >>> print(f"Elongation: {attr[2]:.2f}°")
@@ -5042,7 +5039,7 @@ def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...]
     return _calc_pheno(t, ipl, iflag)
 
 
-def swe_pheno(tjd_et: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
+def swe_pheno(tjd_et: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Ephemeris Time (TT/ET).
 
@@ -5054,9 +5051,9 @@ def swe_pheno(tjd_et: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], i
         iflag: Calculation flags
 
     Returns:
-        Tuple containing:
-            - attr: Tuple of phenomenon values (phase_angle, phase, elongation, diameter, magnitude)
-            - retflag: Return flag value
+        Tuple of 20 floats (matching pyswisseph):
+            - [0]: Phase angle, [1]: Phase, [2]: Elongation,
+            - [3]: Diameter, [4]: Magnitude, [5-19]: Reserved (0.0)
 
     See Also:
         swe_pheno_ut: Same function for Universal Time input
@@ -5066,7 +5063,7 @@ def swe_pheno(tjd_et: float, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], i
     return _calc_pheno(t, ipl, iflag)
 
 
-def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
+def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Internal function to compute planetary phenomena.
 
@@ -5083,7 +5080,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         iflag: Calculation flags
 
     Returns:
-        Tuple of (attr_tuple, return_flag)
+        Tuple of 20 floats (bare tuple, matching pyswisseph).
     """
 
     planets = get_planets()
@@ -5119,7 +5116,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         )
 
         attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
-        return attr, iflag
+        return attr
 
     # Get Earth, Sun, and target body positions
     earth = planets["earth"]
@@ -5141,7 +5138,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
     else:
         # Unsupported body - return zeros
         attr = (0.0,) * 20
-        return attr, iflag
+        return attr
 
     # Observer depends on flags
     if iflag & SEFLG_HELCTR:
@@ -5230,7 +5227,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
         magnitude = _calc_moon_magnitude(phase_angle, r_moon, mag_ms)
 
         attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
-        return attr, iflag
+        return attr
 
     # For planets: calculate elongation, phase angle, etc.
     if sun_pos_geo is not None:
@@ -5368,7 +5365,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[Tuple[float, ...], int]:
 
     # Return tuple with at least 20 elements (pyswisseph API compatibility)
     attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
-    return attr, iflag
+    return attr
 
 
 def _calc_planet_magnitude(

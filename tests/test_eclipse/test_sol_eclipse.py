@@ -143,9 +143,16 @@ class TestSolEclipseWhenGlob:
             # And in correct order
             assert t_second < t_third
 
-    def test_alias_matches_main_function(self):
-        """swe_sol_eclipse_when_glob should be an alias for sol_eclipse_when_glob."""
-        assert swe_sol_eclipse_when_glob is sol_eclipse_when_glob
+    def test_swe_wrapper_produces_same_results(self):
+        """swe_sol_eclipse_when_glob should produce same results as sol_eclipse_when_glob."""
+        jd_start = swe_julday(2024, 1, 1, 0)
+
+        ecl_type1, times1 = sol_eclipse_when_glob(jd_start)
+        ecl_type2, times2 = swe_sol_eclipse_when_glob(jd_start)
+
+        # Same eclipse should be found
+        assert abs(times1[0] - times2[0]) < 0.001
+        assert ecl_type1 == ecl_type2
 
     def test_flags_parameter_accepted(self):
         """Should accept flags parameter without error."""
@@ -453,7 +460,7 @@ class TestSolEclipseWhenLoc:
         # Call swe_sol_eclipse_when_loc (pyswisseph-style with geopos sequence)
         geopos = (lon, lat, altitude)  # Note: pyswisseph uses (lon, lat, alt) order
         ecl_type2, times2, attr2 = swe_sol_eclipse_when_loc(
-            jd_start, SEFLG_SWIEPH, geopos
+            jd_start, geopos, SEFLG_SWIEPH
         )
 
         # Both should find the same eclipse (same maximum time within tolerance)
@@ -914,7 +921,7 @@ class TestSolEclipseHow:
 
         # Call both versions
         ecl_type1, attr1 = sol_eclipse_how(times[0], lat, lon, altitude=altitude)
-        ecl_type2, attr2 = swe_sol_eclipse_how(times[0], SEFLG_SWIEPH, geopos)
+        ecl_type2, attr2 = swe_sol_eclipse_how(times[0], geopos, SEFLG_SWIEPH)
 
         # Results should be identical
         assert attr1 == attr2

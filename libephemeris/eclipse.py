@@ -1487,8 +1487,29 @@ def sol_eclipse_when_glob(
     )
 
 
-# Aliases for compatibility
-swe_sol_eclipse_when_glob = sol_eclipse_when_glob
+def swe_sol_eclipse_when_glob(
+    tjdut: float,
+    ifl: int = SEFLG_SWIEPH,
+    ifltype: int = 0,
+    backward: bool = False,
+) -> Tuple[int, Tuple[float, ...]]:
+    """Find the next (or previous) global solar eclipse (pyswisseph-compatible).
+
+    Wrapper around sol_eclipse_when_glob() matching pyswisseph signature.
+
+    Args:
+        tjdut: Julian Day (UT) to start search from.
+        ifl: Calculation flags (default SEFLG_SWIEPH).
+        ifltype: Eclipse type filter bitmask (0 = any).
+        backward: If True, search backward in time.
+
+    Returns:
+        Tuple of (retflag, tret) matching pyswisseph.
+    """
+    direction = "backward" if backward else "forward"
+    return sol_eclipse_when_glob(
+        tjdut, flags=ifl, eclipse_type=ifltype, search_direction=direction
+    )
 
 
 def _calculate_local_eclipse_phases(
@@ -2000,8 +2021,8 @@ _sol_eclipse_when_loc_legacy = sol_eclipse_when_loc
 
 def swe_sol_eclipse_when_loc(
     tjd_start: float,
-    ifl: int,
     geopos: "Sequence[float]",
+    ifl: int = SEFLG_SWIEPH,
     backward: bool = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
@@ -3214,13 +3235,13 @@ def sol_eclipse_how(
         See swe_sol_eclipse_how() for full specification.
     """
     geopos = (lon, lat, altitude)
-    return swe_sol_eclipse_how(jd, flags, geopos)
+    return swe_sol_eclipse_how(jd, geopos, flags)
 
 
 def swe_sol_eclipse_how(
     tjd_ut: float,
-    ifl: int,
     geopos: Sequence[float],
+    ifl: int = 0,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a solar eclipse at a specific location and time.
@@ -3278,7 +3299,7 @@ def swe_sol_eclipse_how(
         >>> from libephemeris import swe_sol_eclipse_how, SEFLG_SWIEPH
         >>> jd = 2460409.26  # During eclipse maximum
         >>> dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
-        >>> ecl_type, attr = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, dallas_geopos)
+        >>> ecl_type, attr = swe_sol_eclipse_how(jd, dallas_geopos, SEFLG_SWIEPH)
         >>> print(f"Obscuration: {attr[2]:.3f}")
 
     References:
@@ -3564,8 +3585,8 @@ def swe_sol_eclipse_how(
 
 def swe_sol_eclipse_how_details(
     tjd_ut: float,
-    ifl: int,
     geopos: Sequence[float],
+    ifl: int = 0,
 ) -> dict:
     """
     Calculate comprehensive solar eclipse circumstances at a specific location.
@@ -3650,7 +3671,7 @@ def swe_sol_eclipse_how_details(
         >>> from libephemeris import swe_sol_eclipse_how_details, SEFLG_SWIEPH
         >>> jd = 2460409.28  # During April 8, 2024 eclipse
         >>> dallas = [-96.797, 32.7767, 0]  # lon, lat, alt
-        >>> details = swe_sol_eclipse_how_details(jd, SEFLG_SWIEPH, dallas)
+        >>> details = swe_sol_eclipse_how_details(jd, dallas, SEFLG_SWIEPH)
         >>> print(f"Max obscuration: {details['max_obscuration_percent']:.1f}%")
         >>> print(f"First contact: JD {details['jd_c1']:.5f}")
         >>> print(f"Duration of totality: {details['duration_total_minutes']:.1f} min")
@@ -3818,7 +3839,7 @@ def swe_sol_eclipse_how_details(
         return (jd_low + jd_high) / 2
 
     # First, get basic eclipse info at the given time
-    eclipse_type, attr = swe_sol_eclipse_how(tjd_ut, ifl, geopos)
+    eclipse_type, attr = swe_sol_eclipse_how(tjd_ut, geopos, ifl)
 
     # Initialize result dictionary
     result = {
@@ -4072,7 +4093,7 @@ def sol_eclipse_how_details(
         See swe_sol_eclipse_how_details() for full specification.
     """
     geopos = (lon, lat, altitude)
-    return swe_sol_eclipse_how_details(jd, flags, geopos)
+    return swe_sol_eclipse_how_details(jd, geopos, flags)
 
 
 # =============================================================================
@@ -4118,6 +4139,72 @@ def _find_next_full_moon(jd_start: float) -> float:
         dt = (360.0 - elongation) / relative_speed
     else:
         dt = (-elongation) / relative_speed
+
+    jd_guess = jd_start + dt
+
+    # Newton-Raphson refinement
+    for _ in range(20):
+        sun_pos, _ = swe_calc_ut(jd_guess, SE_SUN, SEFLG_SPEED)
+        moon_pos, _ = swe_calc_ut(jd_guess, SE_MOON, SEFLG_SPEED)
+
+        sun_lon = sun_pos[0]
+        moon_lon = moon_pos[0]
+        sun_speed = sun_pos[3]
+        moon_speed = moon_pos[3]
+
+        # Elongation from opposition
+        diff = (moon_lon - sun_lon - 180.0) % 360.0
+        if diff > 180:
+            diff -= 360
+
+        # Convergence check (< 0.1 arcsec)
+        if abs(diff) < 1e-5:
+            return jd_guess
+
+        # Newton-Raphson step
+        rel_speed = moon_speed - sun_speed
+        if abs(rel_speed) < 0.1:
+            rel_speed = 12.19
+
+        jd_guess -= diff / rel_speed
+
+    return jd_guess
+
+
+def _find_previous_full_moon(jd_start: float) -> float:
+    """
+    Find the previous Full Moon (Sun-Moon opposition) before jd_start.
+
+    Uses iterative refinement to find exact moment of opposition.
+
+    Args:
+        jd_start: Julian Day (UT) to start search from
+
+    Returns:
+        Julian Day of previous Full Moon
+    """
+    # Get current positions
+    sun_pos, _ = swe_calc_ut(jd_start, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd_start, SE_MOON, SEFLG_SPEED)
+
+    sun_lon = sun_pos[0]
+    moon_lon = moon_pos[0]
+
+    # Calculate elongation from opposition (Moon - Sun - 180°)
+    elongation = (moon_lon - sun_lon - 180.0) % 360.0
+    if elongation > 180:
+        elongation -= 360
+
+    # Moon gains ~12.2° per day on Sun
+    relative_speed = 12.190749  # degrees/day
+
+    # Time since last opposition (go backwards)
+    if elongation > 0:
+        # Past opposition, last opposition was elongation/speed days ago
+        dt = -elongation / relative_speed
+    else:
+        # Before opposition, last opposition was (360 + elongation)/speed days ago
+        dt = -(360.0 + elongation) / relative_speed
 
     jd_guess = jd_start + dt
 
@@ -4664,8 +4751,26 @@ def lun_eclipse_when(
     )
 
 
-# Aliases for compatibility
-swe_lun_eclipse_when = lun_eclipse_when
+def swe_lun_eclipse_when(
+    tjdut: float,
+    ifl: int = SEFLG_SWIEPH,
+    ifltype: int = 0,
+    backward: bool = False,
+) -> Tuple[int, Tuple[float, ...]]:
+    """Find the next (or previous) lunar eclipse globally (pyswisseph-compatible).
+
+    Wrapper around lun_eclipse_when() matching pyswisseph signature.
+
+    Args:
+        tjdut: Julian Day (UT) to start search from.
+        ifl: Calculation flags (default SEFLG_SWIEPH).
+        ifltype: Eclipse type filter bitmask (0 = any).
+        backward: If True, search backward in time (not yet implemented).
+
+    Returns:
+        Tuple of (retflag, tret) matching pyswisseph.
+    """
+    return lun_eclipse_when(tjdut, flags=ifl, eclipse_type=ifltype)
 
 
 def lun_eclipse_when_loc(
@@ -5036,8 +5141,33 @@ def lun_eclipse_when_loc(
     )
 
 
-# Alias for reference API compatibility
-swe_lun_eclipse_when_loc = lun_eclipse_when_loc
+def swe_lun_eclipse_when_loc(
+    tjdut: float,
+    geopos: "Sequence[float]",
+    ifl: int = SEFLG_SWIEPH,
+    backward: bool = False,
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
+    """Find the next lunar eclipse visible from a geographic position (pyswisseph-compatible).
+
+    Wrapper around lun_eclipse_when_loc() matching pyswisseph signature.
+
+    Args:
+        tjdut: Julian Day (UT) to start search from.
+        geopos: Sequence of [longitude, latitude, altitude].
+        ifl: Calculation flags (default SEFLG_SWIEPH).
+        backward: If True, search backward in time (not yet implemented).
+
+    Returns:
+        Tuple of (retflag, tret, attr) matching pyswisseph.
+    """
+    if len(geopos) < 3:
+        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+
+    lon = float(geopos[0])
+    lat = float(geopos[1])
+    altitude = float(geopos[2])
+
+    return lun_eclipse_when_loc(tjdut, lat, lon, altitude, ifl)
 
 
 def lun_eclipse_how(
@@ -5227,8 +5357,8 @@ def lun_eclipse_how(
 
 def swe_lun_eclipse_how(
     tjd_ut: float,
-    ifl: int,
     geopos: Sequence[float],
+    ifl: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate detailed circumstances of a lunar eclipse from a specific location.
@@ -5293,7 +5423,7 @@ def swe_lun_eclipse_how(
         >>> from libephemeris import swe_lun_eclipse_how, SEFLG_SWIEPH
         >>> jd = 2459892.4  # Maximum of Nov 8, 2022 total lunar eclipse
         >>> la_geopos = [-118.24, 34.05, 0]  # lon, lat, alt
-        >>> ecl_type, attr = swe_lun_eclipse_how(jd, SEFLG_SWIEPH, la_geopos)
+        >>> ecl_type, attr = swe_lun_eclipse_how(jd, la_geopos, SEFLG_SWIEPH)
         >>> print(f"Umbral magnitude: {attr[0]:.3f}")
         >>> print(f"Moon altitude: {attr[5]:.1f}°")
 
@@ -8116,7 +8246,7 @@ def heliacal_ut(
     def _get_elongation(jd: float) -> float:
         """Get the elongation of body from Sun in degrees."""
         try:
-            pheno, _ = swe_pheno_ut(jd, body, flags)
+            pheno = swe_pheno_ut(jd, body, flags)
             return pheno[2]  # Elongation
         except Exception:
             # Fallback: calculate elongation manually
@@ -8128,7 +8258,7 @@ def heliacal_ut(
     def _get_body_magnitude(jd: float) -> float:
         """Get the visual magnitude of the body."""
         try:
-            pheno, _ = swe_pheno_ut(jd, body, flags)
+            pheno = swe_pheno_ut(jd, body, flags)
             return pheno[4]  # Visual magnitude
         except Exception:
             return 0.0  # Default to bright magnitude
@@ -8648,7 +8778,7 @@ def heliacal_pheno_ut(
 
     # Get elongation (longitude difference) from Sun using pheno
     try:
-        pheno, _ = swe_pheno_ut(jd, body, flags)
+        pheno = swe_pheno_ut(jd, body, flags)
         elongation = pheno[2]  # Elongation
         magnitude = pheno[4]  # Visual magnitude
         phase_angle = pheno[1]  # Phase angle
@@ -8754,7 +8884,7 @@ def heliacal_pheno_ut(
     if body == SE_MOON:
         # Calculate Moon phase and crescent geometry
         try:
-            moon_pheno, _ = swe_pheno_ut(jd, SE_MOON, flags)
+            moon_pheno = swe_pheno_ut(jd, SE_MOON, flags)
             phase = moon_pheno[0]  # Phase 0-1
             illumination = phase * 100.0  # Percentage
 
@@ -9099,7 +9229,7 @@ def vis_limit_mag(
 
             # Get magnitude from pheno
             try:
-                pheno_result, _ = swe_pheno_ut(jd, body_id, flags)
+                pheno_result = swe_pheno_ut(jd, body_id, flags)
                 obj_mag = pheno_result[4]  # Visual magnitude
             except Exception:
                 obj_mag = 0.0  # Default bright
@@ -9200,7 +9330,7 @@ def vis_limit_mag(
 
         # Get Moon phase
         try:
-            moon_pheno, _ = swe_pheno_ut(jd_ut, SE_MOON, flags & 0xFF)
+            moon_pheno = swe_pheno_ut(jd_ut, SE_MOON, flags & 0xFF)
             phase_angle = moon_pheno[0]  # Phase angle in degrees
             illumination = (1 + math.cos(math.radians(phase_angle))) / 2.0
         except Exception:
@@ -13451,8 +13581,8 @@ def sol_eclipse_magnitude_at_loc(
 
 def swe_sol_eclipse_magnitude_at_loc(
     tjd_ut: float,
-    ifl: int,
     geopos: Sequence[float],
+    ifl: int = SEFLG_SWIEPH,
 ) -> float:
     """
     Calculate the eclipse magnitude at a specific geographic location and time.
@@ -13679,8 +13809,8 @@ def sol_eclipse_obscuration_at_loc(
 
 def swe_sol_eclipse_obscuration_at_loc(
     tjd_ut: float,
-    ifl: int,
     geopos: Sequence[float],
+    ifl: int = SEFLG_SWIEPH,
 ) -> float:
     """
     Calculate the eclipse obscuration at a specific geographic location and time.

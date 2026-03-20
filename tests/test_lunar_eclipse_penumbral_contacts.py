@@ -242,14 +242,14 @@ class TestPenumbralContactKnownEclipses:
 class TestPenumbralContactsWithLunEclipseWhen:
     """Test that P1 and P4 match the times returned by lun_eclipse_when."""
 
-    def test_p1_matches_lun_eclipse_when_times5(self):
-        """Test that P1 closely matches times[5] from lun_eclipse_when."""
+    def test_p1_matches_lun_eclipse_when_times6(self):
+        """Test that P1 closely matches times[6] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
         _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
-        # times[5] is penumbral eclipse beginning from lun_eclipse_when
-        jd_pen_begin_from_when = times[5]
+        # times[6] is penumbral eclipse beginning from lun_eclipse_when
+        jd_pen_begin_from_when = times[6]
         jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
 
         # Both should calculate the same event
@@ -258,18 +258,18 @@ class TestPenumbralContactsWithLunEclipseWhen:
         diff = abs(jd_p1 - jd_pen_begin_from_when)
 
         assert diff < tolerance_days, (
-            f"P1 and times[5] differ by {diff * 24 * 60:.1f} minutes. "
+            f"P1 and times[6] differ by {diff * 24 * 60:.1f} minutes. "
             f"Expected < 2 minutes"
         )
 
-    def test_p4_matches_lun_eclipse_when_times6(self):
-        """Test that P4 closely matches times[6] from lun_eclipse_when."""
+    def test_p4_matches_lun_eclipse_when_times7(self):
+        """Test that P4 closely matches times[7] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
         _, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         jd_max = times[0]
 
-        # times[6] is penumbral eclipse ending from lun_eclipse_when
-        jd_pen_end_from_when = times[6]
+        # times[7] is penumbral eclipse ending from lun_eclipse_when
+        jd_pen_end_from_when = times[7]
         jd_p4 = calc_lunar_eclipse_penumbral_fourth_contact_p4(jd_max)
 
         # Both should calculate the same event
@@ -277,7 +277,7 @@ class TestPenumbralContactsWithLunEclipseWhen:
         diff = abs(jd_p4 - jd_pen_end_from_when)
 
         assert diff < tolerance_days, (
-            f"P4 and times[6] differ by {diff * 24 * 60:.1f} minutes. "
+            f"P4 and times[7] differ by {diff * 24 * 60:.1f} minutes. "
             f"Expected < 2 minutes"
         )
 

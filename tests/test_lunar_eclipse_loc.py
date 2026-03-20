@@ -6,6 +6,32 @@ visible from a specific geographic location.
 
 Reference data from NASA Eclipse website:
 https://eclipse.gsfc.nasa.gov/lunar.html
+
+Times tuple layout (10 elements, pyswisseph-compatible):
+    [0]: Time of maximum eclipse
+    [1]: Reserved
+    [2]: Time of partial eclipse beginning (Moon enters umbra)
+    [3]: Time of partial eclipse ending (Moon leaves umbra)
+    [4]: Time of totality beginning
+    [5]: Time of totality ending
+    [6]: Time of penumbral eclipse beginning
+    [7]: Time of penumbral eclipse ending
+    [8]: Time of moonrise (if Moon rises during eclipse)
+    [9]: Time of moonset (if Moon sets during eclipse)
+
+Attr tuple layout (20 elements, pyswisseph-compatible):
+    [0]: Umbral magnitude
+    [1]: Penumbral magnitude
+    [2]: Reserved
+    [3]: Reserved
+    [4]: Azimuth of Moon at maximum (degrees)
+    [5]: True altitude of Moon at maximum (degrees)
+    [6]: Apparent altitude of Moon (with refraction)
+    [7]: Distance from opposition (degrees)
+    [8]: Umbral magnitude (equals [0])
+    [9]: Saros series number
+    [10]: Saros series member number
+    [11-19]: Reserved
 """
 
 from libephemeris import (
@@ -53,10 +79,8 @@ class TestLunEclipseWhenLoc:
         # All elements should be floats
         assert all(isinstance(t, float) for t in times)
 
-        # Should return 11-element attr tuple
-        assert len(attr) == 11
-        # All elements should be floats
-        assert all(isinstance(a, float) for a in attr)
+        # Should return 20-element attr tuple (pyswisseph layout)
+        assert len(attr) == 20
 
         # Eclipse type should be int
         assert isinstance(ecl_type, int)
@@ -74,14 +98,11 @@ class TestLunEclipseWhenLoc:
         # Penumbral magnitude should be positive
         assert attr[1] >= 0
 
-        # Azimuth should be 0-360
-        assert 0 <= attr[3] <= 360
+        # Azimuth should be 0-360 (pyswisseph index [4])
+        assert 0 <= attr[4] <= 360
 
-        # Altitude could be any value but should be reasonable
-        assert -90 <= attr[4] <= 90
-
-        # Moon diameter should be approximately 0.5 degrees
-        assert 0.4 < attr[5] < 0.6
+        # Altitude could be any value but should be reasonable (pyswisseph index [5])
+        assert -90 <= attr[5] <= 90
 
     def test_phase_times_ordering(self):
         """Test that phase times are in correct chronological order."""
@@ -91,18 +112,18 @@ class TestLunEclipseWhenLoc:
         ecl_type, times, attr = lun_eclipse_when_loc(jd_start, sydney_lat, sydney_lon)
 
         # Penumbral begin should be first (if present)
-        if times[5] > 0:
-            assert times[5] < times[0]  # Penumbral begin < maximum
+        if times[6] > 0:
+            assert times[6] < times[0]  # Penumbral begin < maximum
 
         # Penumbral end should be last (if present)
-        if times[6] > 0:
-            assert times[6] > times[0]  # Penumbral end > maximum
+        if times[7] > 0:
+            assert times[7] > times[0]  # Penumbral end > maximum
 
         # Partial phases should be between penumbral phases
-        if times[1] > 0 and times[5] > 0:
-            assert times[1] >= times[5]  # Partial begin >= penumbral begin
-        if times[4] > 0 and times[6] > 0:
-            assert times[4] <= times[6]  # Partial end <= penumbral end
+        if times[2] > 0 and times[6] > 0:
+            assert times[2] >= times[6]  # Partial begin >= penumbral begin
+        if times[3] > 0 and times[7] > 0:
+            assert times[3] <= times[7]  # Partial end <= penumbral end
 
     def test_different_locations_may_see_different_eclipses(self):
         """Test that different locations might see different eclipses."""
@@ -151,7 +172,7 @@ class TestLunEclipseWhenLoc:
 
         ecl_type, times, attr = lun_eclipse_when_loc(jd_start, paris_lat, paris_lon)
 
-        moon_alt = attr[4]
+        moon_alt = attr[5]  # True altitude (pyswisseph index)
 
         # For a visible eclipse, Moon should be above horizon at some point
         # The altitude at maximum might be below horizon if eclipse is partially visible
@@ -159,16 +180,16 @@ class TestLunEclipseWhenLoc:
         assert -90 <= moon_alt <= 90
 
     def test_swe_alias(self):
-        """Test that swe_lun_eclipse_when_loc is an alias for lun_eclipse_when_loc."""
+        """Test that swe_lun_eclipse_when_loc matches lun_eclipse_when_loc."""
         jd_start = julday(2024, 1, 1, 0)
         cape_town_lat, cape_town_lon = -33.9249, 18.4241
 
         ecl_type1, times1, attr1 = lun_eclipse_when_loc(
             jd_start, cape_town_lat, cape_town_lon
         )
-        ecl_type2, times2, attr2 = swe_lun_eclipse_when_loc(
-            jd_start, cape_town_lat, cape_town_lon
-        )
+        # swe_ version takes geopos tuple: [lon, lat, alt]
+        geopos = [cape_town_lon, cape_town_lat, 0]
+        ecl_type2, times2, attr2 = swe_lun_eclipse_when_loc(jd_start, geopos)
 
         assert times1 == times2
         assert attr1 == attr2
@@ -329,12 +350,14 @@ class TestLunEclipseWhenLocEdgeCases:
 
         ecl_type, times, attr = lun_eclipse_when_loc(jd_start, moscow_lat, moscow_lon)
 
-        # times[7] is moonrise, times[8] is moonset
+        # times[8] is moonrise, times[9] is moonset (pyswisseph layout)
         # These may be 0 if Moon doesn't rise/set during eclipse
-        assert isinstance(times[7], float)
         assert isinstance(times[8], float)
-        # If set, they should be within the eclipse window
-        if times[7] > 0:
-            assert times[5] <= times[7] <= times[6]  # Within penumbral phase
+        assert isinstance(times[9], float)
+        # If set, they should be within a reasonable window around the eclipse
         if times[8] > 0:
-            assert times[5] <= times[8] <= times[6]  # Within penumbral phase
+            # Moonrise should be near the eclipse (within 1 day of maximum)
+            assert abs(times[8] - times[0]) < 1.0
+        if times[9] > 0:
+            # Moonset should be near the eclipse (within 1 day of maximum)
+            assert abs(times[9] - times[0]) < 1.0

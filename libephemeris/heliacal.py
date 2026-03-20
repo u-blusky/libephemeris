@@ -1048,7 +1048,7 @@ def heliacal_ut(
         """Get the elongation of body from Sun in degrees."""
         if not is_star:
             try:
-                pheno, _ = swe_pheno_ut(jd, body, flags)
+                pheno = swe_pheno_ut(jd, body, flags)
                 return pheno[2]  # Elongation
             except Exception:
                 pass
@@ -1068,7 +1068,7 @@ def heliacal_ut(
             # For fixed stars, return the catalog magnitude
             return star_magnitude
         try:
-            pheno, _ = swe_pheno_ut(jd, body, flags)
+            pheno = swe_pheno_ut(jd, body, flags)
             return pheno[4]  # Visual magnitude
         except Exception:
             return 0.0  # Default to bright magnitude
@@ -2088,7 +2088,7 @@ def heliacal_pheno_ut(
         phase_angle = 0.0  # Stars don't have phase angle
     else:
         try:
-            pheno, _ = swe_pheno_ut(jd, body, flags)
+            pheno = swe_pheno_ut(jd, body, flags)
             elongation = pheno[2]  # Elongation
             magnitude = pheno[4]  # Visual magnitude
             phase_angle = pheno[0]  # Phase angle (index 0, not 1)
@@ -2199,7 +2199,7 @@ def heliacal_pheno_ut(
     if body == SE_MOON:
         # Calculate Moon phase and crescent geometry
         try:
-            moon_pheno, _ = swe_pheno_ut(jd, SE_MOON, flags)
+            moon_pheno = swe_pheno_ut(jd, SE_MOON, flags)
             phase = moon_pheno[0]  # Phase 0-1
             illumination = phase * 100.0  # Percentage
 
@@ -2609,7 +2609,7 @@ def vis_limit_mag(
 
             # Get magnitude from pheno
             try:
-                pheno_result, _ = swe_pheno_ut(jd, body_id, flags)
+                pheno_result = swe_pheno_ut(jd, body_id, flags)
                 obj_mag = pheno_result[4]  # Visual magnitude
             except Exception:
                 obj_mag = 0.0  # Default bright
@@ -2648,7 +2648,7 @@ def vis_limit_mag(
     moon_obj_angle = 180.0
     sun_obj_angle = 180.0
     try:
-        moon_pheno, _ = swe_pheno_ut(jd, SE_MOON, flags & 0xFF)
+        moon_pheno = swe_pheno_ut(jd, SE_MOON, flags & 0xFF)
         phase_angle = moon_pheno[0]
         moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
 

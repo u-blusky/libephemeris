@@ -6,6 +6,18 @@ and calculates their phase times.
 
 Reference data from NASA Eclipse website:
 https://eclipse.gsfc.nasa.gov/lunar.html
+
+Times tuple layout (10 elements, pyswisseph-compatible):
+    [0]: Time of maximum eclipse
+    [1]: Reserved
+    [2]: Time of partial eclipse beginning (Moon enters umbra)
+    [3]: Time of partial eclipse ending (Moon leaves umbra)
+    [4]: Time of totality beginning
+    [5]: Time of totality ending
+    [6]: Time of penumbral eclipse beginning
+    [7]: Time of penumbral eclipse ending
+    [8]: Reserved
+    [9]: Reserved
 """
 
 from libephemeris import (
@@ -40,8 +52,8 @@ class TestLunEclipseWhen:
 
         ecl_type, times = lun_eclipse_when(jd_start)
 
-        # Should return 8-element tuple
-        assert len(times) == 8
+        # Should return 10-element tuple (pyswisseph layout)
+        assert len(times) == 10
         # All elements should be floats
         assert all(isinstance(t, float) for t in times)
         # Eclipse type should be int
@@ -54,24 +66,24 @@ class TestLunEclipseWhen:
         ecl_type, times = lun_eclipse_when(jd_start)
 
         # Penumbral begin should be first (if present)
-        if times[5] > 0:
-            assert times[5] < times[0]  # Penumbral begin < maximum
+        if times[6] > 0:
+            assert times[6] < times[0]  # Penumbral begin < maximum
 
         # Penumbral end should be last (if present)
-        if times[6] > 0:
-            assert times[6] > times[0]  # Penumbral end > maximum
+        if times[7] > 0:
+            assert times[7] > times[0]  # Penumbral end > maximum
 
         # Partial phases should be between penumbral phases
-        if times[1] > 0 and times[5] > 0:
-            assert times[1] >= times[5]  # Partial begin >= penumbral begin
-        if times[4] > 0 and times[6] > 0:
-            assert times[4] <= times[6]  # Partial end <= penumbral end
+        if times[2] > 0 and times[6] > 0:
+            assert times[2] >= times[6]  # Partial begin >= penumbral begin
+        if times[3] > 0 and times[7] > 0:
+            assert times[3] <= times[7]  # Partial end <= penumbral end
 
         # Total phases should be between partial phases
-        if times[2] > 0 and times[1] > 0:
-            assert times[2] >= times[1]  # Total begin >= partial begin
-        if times[3] > 0 and times[4] > 0:
-            assert times[3] <= times[4]  # Total end <= partial end
+        if times[4] > 0 and times[2] > 0:
+            assert times[4] >= times[2]  # Total begin >= partial begin
+        if times[5] > 0 and times[3] > 0:
+            assert times[5] <= times[3]  # Total end <= partial end
 
     def test_filter_total_eclipse(self):
         """Test filtering for total lunar eclipses."""
@@ -82,8 +94,8 @@ class TestLunEclipseWhen:
         # Should find a total eclipse
         assert ecl_type & SE_ECL_TOTAL
         # Total phase times should be present
-        assert times[2] > 0  # Total begin
-        assert times[3] > 0  # Total end
+        assert times[4] > 0  # Total begin
+        assert times[5] > 0  # Total end
 
     def test_filter_partial_eclipse(self):
         """Test filtering for partial lunar eclipses."""
@@ -94,8 +106,8 @@ class TestLunEclipseWhen:
         # Should find a partial eclipse
         assert ecl_type & SE_ECL_PARTIAL
         # Partial phase times should be present
-        assert times[1] > 0  # Partial begin
-        assert times[4] > 0  # Partial end
+        assert times[2] > 0  # Partial begin
+        assert times[3] > 0  # Partial end
 
     def test_filter_penumbral_eclipse(self):
         """Test filtering for penumbral lunar eclipses."""
@@ -106,8 +118,8 @@ class TestLunEclipseWhen:
         # Should find a penumbral eclipse
         assert ecl_type & SE_ECL_PENUMBRAL
         # Penumbral phase times should be present
-        assert times[5] > 0  # Penumbral begin
-        assert times[6] > 0  # Penumbral end
+        assert times[6] > 0  # Penumbral begin
+        assert times[7] > 0  # Penumbral end
 
     def test_known_total_eclipse_may_2022(self):
         """Test finding the known total lunar eclipse of May 16, 2022.
@@ -191,13 +203,13 @@ class TestLunEclipseWhen:
 
         if ecl_type == SE_ECL_PENUMBRAL:  # Pure penumbral, not partial
             # Umbral phase times should be zero
-            assert times[1] == 0.0  # Partial begin
-            assert times[4] == 0.0  # Partial end
-            assert times[2] == 0.0  # Total begin
-            assert times[3] == 0.0  # Total end
+            assert times[2] == 0.0  # Partial begin
+            assert times[3] == 0.0  # Partial end
+            assert times[4] == 0.0  # Total begin
+            assert times[5] == 0.0  # Total end
             # Penumbral times should be present
-            assert times[5] > 0.0
             assert times[6] > 0.0
+            assert times[7] > 0.0
 
 
 class TestLunEclipseEdgeCases:
@@ -231,5 +243,5 @@ class TestLunEclipseEdgeCases:
         ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
         assert ecl_type & SE_ECL_TOTAL
         # Total eclipse should also have partial phase times
-        assert times[1] > 0  # Partial begins
-        assert times[4] > 0  # Partial ends
+        assert times[2] > 0  # Partial begins
+        assert times[3] > 0  # Partial ends

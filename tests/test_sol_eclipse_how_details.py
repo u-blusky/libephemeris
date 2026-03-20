@@ -47,7 +47,7 @@ class TestSweSolEclipseHowDetailsSignature:
         tjd_ut = 2460409.28  # April 8, 2024 eclipse
         dallas_geopos = [-96.797, 32.7767, 0]
 
-        result = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, dallas_geopos)
+        result = swe_sol_eclipse_how_details(tjd_ut, dallas_geopos, SEFLG_SWIEPH)
 
         assert isinstance(result, dict)
 
@@ -56,7 +56,7 @@ class TestSweSolEclipseHowDetailsSignature:
         tjd_ut = 2460409.28
         dallas_geopos = [-96.797, 32.7767, 0]
 
-        result = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, dallas_geopos)
+        result = swe_sol_eclipse_how_details(tjd_ut, dallas_geopos, SEFLG_SWIEPH)
 
         required_keys = [
             # Eclipse type
@@ -113,7 +113,7 @@ class TestSweSolEclipseHowDetailsSignature:
         tjd_ut = 2460409.28
 
         with pytest.raises(ValueError):
-            swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, [0, 0])
+            swe_sol_eclipse_how_details(tjd_ut, [0, 0], SEFLG_SWIEPH)
 
 
 class TestSweSolEclipseHowDetailsDallasApril2024:
@@ -129,7 +129,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_identifies_total_eclipse(self):
         """Test that Dallas sees a total eclipse."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         assert result["is_visible"] is True
@@ -139,7 +139,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_contact_times_are_valid(self):
         """Test that all four contact times are returned."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         # All contact times should be non-zero for total eclipse
@@ -151,7 +151,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_contact_times_in_correct_order(self):
         """Test that contact times are in chronological order."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         assert result["jd_c1"] < result["jd_c2"], "C1 should be before C2"
@@ -162,7 +162,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_maximum_obscuration_is_total(self):
         """Test that maximum obscuration is ~100% for total eclipse."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         # For total eclipse, max obscuration should be 100%
@@ -174,7 +174,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_totality_duration_reasonable(self):
         """Test that totality duration is reasonable for Dallas."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         # Dallas had approximately 3-4 minutes of totality
@@ -186,7 +186,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_partial_phase_duration_reasonable(self):
         """Test that partial phase duration is reasonable."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         # Total eclipse duration (C1 to C4) typically 2-3 hours
@@ -198,7 +198,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_sun_above_horizon_at_all_contacts(self):
         """Test that Sun is above horizon at all contacts."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         assert result["sun_alt_c1"] > 0, "Sun should be above horizon at C1"
@@ -210,7 +210,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_position_angles_in_valid_range(self):
         """Test that position angles are in 0-360 degree range."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         for key in [
@@ -226,7 +226,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_azimuths_in_valid_range(self):
         """Test that azimuths are in 0-360 degree range."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         for key in ["sun_az_c1", "sun_az_c2", "sun_az_max", "sun_az_c3", "sun_az_c4"]:
@@ -237,7 +237,7 @@ class TestSweSolEclipseHowDetailsDallasApril2024:
     def test_angular_sizes_reasonable(self):
         """Test that angular sizes are in reasonable range."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         # Sun angular radius ~0.26-0.27 degrees (~16 arcmin)
@@ -259,7 +259,7 @@ class TestSweSolEclipseHowDetailsNYCApril2024:
 
     def test_identifies_partial_eclipse(self):
         """Test that NYC sees a partial eclipse."""
-        result = swe_sol_eclipse_how_details(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
+        result = swe_sol_eclipse_how_details(self.tjd_ut, self.geopos_nyc, SEFLG_SWIEPH)
 
         assert result["is_visible"] is True
         assert result["is_partial"] is True
@@ -267,7 +267,7 @@ class TestSweSolEclipseHowDetailsNYCApril2024:
 
     def test_c2_c3_are_zero_for_partial(self):
         """Test that C2 and C3 are zero for partial eclipse."""
-        result = swe_sol_eclipse_how_details(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
+        result = swe_sol_eclipse_how_details(self.tjd_ut, self.geopos_nyc, SEFLG_SWIEPH)
 
         # For partial eclipse, C2 and C3 don't exist
         assert result["jd_c2"] == 0.0
@@ -275,7 +275,7 @@ class TestSweSolEclipseHowDetailsNYCApril2024:
 
     def test_c1_c4_exist_for_partial(self):
         """Test that C1 and C4 exist for partial eclipse."""
-        result = swe_sol_eclipse_how_details(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
+        result = swe_sol_eclipse_how_details(self.tjd_ut, self.geopos_nyc, SEFLG_SWIEPH)
 
         assert result["jd_c1"] > 0
         assert result["jd_c4"] > 0
@@ -283,7 +283,7 @@ class TestSweSolEclipseHowDetailsNYCApril2024:
 
     def test_obscuration_is_partial(self):
         """Test that obscuration is partial (not 100%)."""
-        result = swe_sol_eclipse_how_details(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
+        result = swe_sol_eclipse_how_details(self.tjd_ut, self.geopos_nyc, SEFLG_SWIEPH)
 
         # NYC should have significant but not total obscuration
         assert 0.7 < result["max_obscuration"] < 1.0
@@ -291,7 +291,7 @@ class TestSweSolEclipseHowDetailsNYCApril2024:
 
     def test_totality_duration_is_zero(self):
         """Test that totality duration is zero for partial eclipse."""
-        result = swe_sol_eclipse_how_details(self.tjd_ut, SEFLG_SWIEPH, self.geopos_nyc)
+        result = swe_sol_eclipse_how_details(self.tjd_ut, self.geopos_nyc, SEFLG_SWIEPH)
 
         assert result["duration_total_minutes"] == 0.0
 
@@ -305,7 +305,7 @@ class TestSweSolEclipseHowDetailsNoEclipse:
         tjd_ut = julday(2024, 6, 15, 12.0)
         geopos = [-96.797, 32.7767, 0]
 
-        result = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos)
+        result = swe_sol_eclipse_how_details(tjd_ut, geopos, SEFLG_SWIEPH)
 
         # Should indicate no visible eclipse
         assert result["is_visible"] is False
@@ -332,7 +332,7 @@ class TestSolEclipseHowDetailsLegacy:
 
         # pyswisseph style: geopos = [lon, lat, alt]
         result_swe = swe_sol_eclipse_how_details(
-            tjd_ut, SEFLG_SWIEPH, [-96.797, 32.7767, 0]
+            tjd_ut, [-96.797, 32.7767, 0], SEFLG_SWIEPH
         )
 
         # Results should be equivalent
@@ -350,8 +350,8 @@ class TestSweSolEclipseHowDetailsConsistency:
         tjd_ut = 2460409.28
         geopos = [-96.797, 32.7767, 0]
 
-        details = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos)
-        _, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
+        details = swe_sol_eclipse_how_details(tjd_ut, geopos, SEFLG_SWIEPH)
+        _, attr = swe_sol_eclipse_how(tjd_ut, geopos, SEFLG_SWIEPH)
 
         # Magnitudes should be close (might differ slightly due to different JD)
         assert abs(details["magnitude"] - attr[0]) < 0.1
@@ -361,8 +361,8 @@ class TestSweSolEclipseHowDetailsConsistency:
         tjd_ut = 2460409.28
         geopos = [-96.797, 32.7767, 0]
 
-        details = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos)
-        _, attr = swe_sol_eclipse_how(tjd_ut, SEFLG_SWIEPH, geopos)
+        details = swe_sol_eclipse_how_details(tjd_ut, geopos, SEFLG_SWIEPH)
+        _, attr = swe_sol_eclipse_how(tjd_ut, geopos, SEFLG_SWIEPH)
 
         # Obscurations should be close
         assert abs(details["obscuration"] - attr[2]) < 0.1
@@ -376,7 +376,7 @@ class TestSweSolEclipseHowDetailsEdgeCases:
         tjd_ut = 2460409.28
         geopos_high = [-96.797, 32.7767, 5000]  # 5000m altitude
 
-        result = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos_high)
+        result = swe_sol_eclipse_how_details(tjd_ut, geopos_high, SEFLG_SWIEPH)
 
         # Should still work and find eclipse
         assert result["is_visible"] is True
@@ -387,7 +387,7 @@ class TestSweSolEclipseHowDetailsEdgeCases:
         # Location far from central line
         geopos_edge = [-70.0, 50.0, 0]  # Eastern Canada
 
-        result = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos_edge)
+        result = swe_sol_eclipse_how_details(tjd_ut, geopos_edge, SEFLG_SWIEPH)
 
         # Should return valid data without crashing
         assert isinstance(result, dict)
@@ -397,7 +397,7 @@ class TestSweSolEclipseHowDetailsEdgeCases:
         tjd_ut = 2460409.28
         geopos = (-96.797, 32.7767, 0)
 
-        result = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos)
+        result = swe_sol_eclipse_how_details(tjd_ut, geopos, SEFLG_SWIEPH)
 
         assert isinstance(result, dict)
 
@@ -406,7 +406,7 @@ class TestSweSolEclipseHowDetailsEdgeCases:
         tjd_ut = 2460409.28
         geopos = [-96.797, 32.7767, 0]
 
-        result = swe_sol_eclipse_how_details(tjd_ut, SEFLG_SWIEPH, geopos)
+        result = swe_sol_eclipse_how_details(tjd_ut, geopos, SEFLG_SWIEPH)
 
         assert isinstance(result, dict)
 
@@ -424,11 +424,11 @@ class TestSweSolEclipseHowDetailsContactTimes:
         # Get contact times from when_loc
         jd_start = julday(2024, 1, 1, 0)
         ecl_type, tret, attr = swe_sol_eclipse_when_loc(
-            jd_start, SEFLG_SWIEPH, self.geopos_dallas
+            jd_start, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         # Get details at the time of the eclipse
-        result = swe_sol_eclipse_how_details(tret[0], SEFLG_SWIEPH, self.geopos_dallas)
+        result = swe_sol_eclipse_how_details(tret[0], self.geopos_dallas, SEFLG_SWIEPH)
 
         # Contact times should be reasonably close (within 5 minutes)
         tolerance_jd = 5.0 / (24 * 60)  # 5 minutes in JD
@@ -446,7 +446,7 @@ class TestSweSolEclipseHowDetailsContactTimes:
     def test_c2_c3_timing_symmetric(self):
         """Test that C2 and C3 are roughly symmetric around maximum."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         if result["jd_c2"] > 0 and result["jd_c3"] > 0:
@@ -471,7 +471,7 @@ class TestSweSolEclipseHowDetailsPositionAngles:
     def test_position_angles_complementary(self):
         """Test that C1 and C4 position angles are roughly opposite."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         pa_c1 = result["position_angle_c1"]
@@ -492,7 +492,7 @@ class TestSweSolEclipseHowDetailsPositionAngles:
     def test_c2_c3_position_angles(self):
         """Test that C2 and C3 position angles are calculated for total eclipse."""
         result = swe_sol_eclipse_how_details(
-            self.tjd_ut, SEFLG_SWIEPH, self.geopos_dallas
+            self.tjd_ut, self.geopos_dallas, SEFLG_SWIEPH
         )
 
         if result["is_total"]:

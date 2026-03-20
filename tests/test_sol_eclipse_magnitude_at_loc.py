@@ -88,7 +88,7 @@ class TestSweSolEclipseMagnitudeAtLocSignature:
         jd = 2460409.28
         dallas_geopos = [-96.797, 32.7767, 0]
 
-        result = swe_sol_eclipse_magnitude_at_loc(jd, SEFLG_SWIEPH, dallas_geopos)
+        result = swe_sol_eclipse_magnitude_at_loc(jd, dallas_geopos, SEFLG_SWIEPH)
 
         assert isinstance(result, float)
 
@@ -97,7 +97,7 @@ class TestSweSolEclipseMagnitudeAtLocSignature:
         jd = 2460409.28
 
         with pytest.raises(ValueError):
-            swe_sol_eclipse_magnitude_at_loc(jd, SEFLG_SWIEPH, [0, 0])
+            swe_sol_eclipse_magnitude_at_loc(jd, [0, 0], SEFLG_SWIEPH)
 
 
 class TestMagnitudeDuringTotalEclipse:
@@ -206,7 +206,7 @@ class TestConsistencyWithSweEclipseHow:
         geopos = [lon, lat, 0]
 
         magnitude = sol_eclipse_magnitude_at_loc(jd, lat, lon)
-        _, attr = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
+        _, attr = swe_sol_eclipse_how(jd, geopos, SEFLG_SWIEPH)
 
         # Magnitudes should match closely
         assert abs(magnitude - attr[0]) < 0.01, (
@@ -223,7 +223,7 @@ class TestConsistencyWithSweEclipseHow:
 
         for jd in test_times:
             magnitude = sol_eclipse_magnitude_at_loc(jd, lat, lon)
-            _, attr = swe_sol_eclipse_how(jd, SEFLG_SWIEPH, geopos)
+            _, attr = swe_sol_eclipse_how(jd, geopos, SEFLG_SWIEPH)
 
             assert abs(magnitude - attr[0]) < 0.01, (
                 f"At JD {jd}: magnitude {magnitude:.4f} differs from "
@@ -244,7 +244,7 @@ class TestSweApiConvention:
 
         # swe version: geopos = [lon, lat, alt]
         result_swe = swe_sol_eclipse_magnitude_at_loc(
-            jd, SEFLG_SWIEPH, [dallas_lon, dallas_lat, 0]
+            jd, [dallas_lon, dallas_lat, 0], SEFLG_SWIEPH
         )
 
         # Results should be equivalent
@@ -292,7 +292,7 @@ class TestEdgeCases:
         jd = 2460409.28
         geopos = (-96.797, 32.7767, 0)
 
-        result = swe_sol_eclipse_magnitude_at_loc(jd, SEFLG_SWIEPH, geopos)
+        result = swe_sol_eclipse_magnitude_at_loc(jd, geopos, SEFLG_SWIEPH)
         assert isinstance(result, float)
 
     def test_accepts_list_geopos(self):
@@ -300,7 +300,7 @@ class TestEdgeCases:
         jd = 2460409.28
         geopos = [-96.797, 32.7767, 0]
 
-        result = swe_sol_eclipse_magnitude_at_loc(jd, SEFLG_SWIEPH, geopos)
+        result = swe_sol_eclipse_magnitude_at_loc(jd, geopos, SEFLG_SWIEPH)
         assert isinstance(result, float)
 
 

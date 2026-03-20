@@ -312,8 +312,8 @@ class TestLunarEclipseEdgeCases:
         # Eclipse maximum should be valid
         assert times[0] > jd_start
         # Penumbral times should be valid
-        assert times[5] > 0  # Penumbral begin
-        assert times[6] > 0  # Penumbral end
+        assert times[6] > 0  # Penumbral begin
+        assert times[7] > 0  # Penumbral end
 
     def test_partial_lunar_eclipse_contacts(self):
         """Test contact times for partial lunar eclipse."""
@@ -327,11 +327,11 @@ class TestLunarEclipseEdgeCases:
         # Maximum time should be valid
         assert times[0] > jd_start
         # Partial phase times should be present
-        assert times[1] > 0  # Partial begin
-        assert times[4] > 0  # Partial end
+        assert times[2] > 0  # Partial begin
+        assert times[3] > 0  # Partial end
         # Total phase times should be absent
-        assert times[2] == 0  # Total begin
-        assert times[3] == 0  # Total end
+        assert times[4] == 0  # Total begin
+        assert times[5] == 0  # Total end
 
 
 class TestEdgeCaseNumericalStability:

@@ -7,7 +7,7 @@ angular calculations and other mathematical utilities.
 
 import math
 import erfa
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 # Azalt calculation method flags (compatible with the reference API)
 SE_ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
@@ -31,43 +31,37 @@ APP_TO_TRUE: int = SE_APP_TO_TRUE
 
 
 def cotrans_sp(
-    coord: Tuple[float, float, float],
-    speed: Tuple[float, float, float],
-    obliquity: float,
-) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+    coord: "Sequence[float]",
+    eps: float,
+) -> Tuple[float, float, float, float, float, float]:
     """
     Transform coordinates and velocities between ecliptic and equatorial systems.
 
-    This function extends cotrans() to also transform velocity (speed) components,
-    using analytical derivatives of the coordinate transformation equations.
+    Matches the pyswisseph signature: cotrans_sp(coord_6, eps).
 
     The direction of transformation depends on the sign of obliquity:
     - Negative obliquity: ecliptic (lon, lat) -> equatorial (RA, Dec)
     - Positive obliquity: equatorial (RA, Dec) -> ecliptic (lon, lat)
 
     Args:
-        coord: Tuple of (longitude/RA, latitude/Dec, distance) in degrees
-        speed: Tuple of (lon_speed, lat_speed, dist_speed) in degrees/day
-        obliquity: Obliquity of the ecliptic in degrees.
-                   Negative for ecliptic->equatorial, positive for equatorial->ecliptic.
+        coord: Sequence of 6 floats: (lon, lat, dist, lon_speed, lat_speed, dist_speed)
+        eps: Obliquity of the ecliptic in degrees.
+             Negative for ecliptic->equatorial, positive for equatorial->ecliptic.
 
     Returns:
-        Tuple of (coord_transformed, speed_transformed) where:
-        - coord_transformed: (new_lon/RA, new_lat/Dec, distance)
-        - speed_transformed: (new_lon_speed, new_lat_speed, dist_speed)
-        Distance and distance speed are unchanged by the transformation.
+        Flat tuple of 6 floats: (new_lon, new_lat, dist, new_lon_speed, new_lat_speed, dist_speed)
 
     Examples:
-        >>> # Ecliptic to equatorial (negative obliquity)
-        >>> coord, speed = cotrans_sp((90.0, 0.0, 1.0), (1.0, 0.0, 0.0), -23.4)
-        >>> # Returns transformed position and velocity
+        >>> result = cotrans_sp((90.0, 0.0, 1.0, 1.0, 0.0, 0.0), -23.4)
+        >>> new_lon, new_lat, dist, new_lon_sp, new_lat_sp, dist_sp = result
     """
-    lon = coord[0]
-    lat = coord[1]
-    dist = coord[2]
-    lon_speed = speed[0]
-    lat_speed = speed[1]
-    dist_speed = speed[2]
+    lon = float(coord[0])
+    lat = float(coord[1])
+    dist = float(coord[2])
+    lon_speed = float(coord[3])
+    lat_speed = float(coord[4])
+    dist_speed = float(coord[5])
+    obliquity = eps
 
     # Convert to radians
     # Negate obliquity to match the pyswisseph API convention
@@ -157,10 +151,7 @@ def cotrans_sp(
     new_lon_speed = math.degrees(new_lon_speed_rad)
     new_lat_speed = math.degrees(new_lat_speed_rad)
 
-    return (
-        (new_lon, new_lat, dist),
-        (new_lon_speed, new_lat_speed, dist_speed),
-    )
+    return (new_lon, new_lat, dist, new_lon_speed, new_lat_speed, dist_speed)
 
 
 def azalt(
@@ -302,6 +293,17 @@ def azalt(
     azimuth = azimuth % 360.0
     if azimuth < 0:
         azimuth += 360.0
+
+    # When atpress=0, derive pressure from altitude via barometric formula
+    # (matching pyswisseph behavior: atpress=0 means "calculate from altitude")
+    if pressure == 0:
+        # International barometric formula: P = 1013.25 * (1 - 0.0065*h/288.15)^5.255
+        if altitude > 0:
+            pressure = 1013.25 * (1.0 - 0.0065 * altitude / 288.15) ** 5.255
+        else:
+            pressure = 1013.25
+        if temperature == 0:
+            temperature = 15.0 - 0.0065 * altitude
 
     # Calculate atmospheric refraction
     if pressure > 0 and alt_true > -2.0:

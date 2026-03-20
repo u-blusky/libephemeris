@@ -1202,3 +1202,213 @@ NAIF_DEIMOS: int = 402
 
 # Pluto system (9xx)
 NAIF_CHARON: int = 901
+
+# =============================================================================
+# BARE ALIASES FOR SE_* CONSTANTS (pyswisseph compatibility)
+# =============================================================================
+# These provide the same constants without the SE_ prefix, matching the names
+# that pyswisseph exposes as module-level attributes (e.g. swe.ECL_NUT,
+# swe.MEAN_NODE, swe.CHIRON, etc.).
+
+# Special values
+ECL_NUT: int = SE_ECL_NUT
+
+# Lunar nodes and apsides
+MEAN_NODE: int = SE_MEAN_NODE
+TRUE_NODE: int = SE_TRUE_NODE
+MEAN_APOG: int = SE_MEAN_APOG
+OSCU_APOG: int = SE_OSCU_APOG
+
+# Earth and centaurs
+EARTH: int = SE_EARTH
+CHIRON: int = SE_CHIRON
+PHOLUS: int = SE_PHOLUS
+
+# Main belt asteroids
+CERES: int = SE_CERES
+PALLAS: int = SE_PALLAS
+JUNO: int = SE_JUNO
+VESTA: int = SE_VESTA
+
+# Interpolated lunar apsides
+INTP_APOG: int = SE_INTP_APOG
+INTP_PERG: int = SE_INTP_PERG
+
+# Count and offsets
+NPLANETS: int = SE_NPLANETS
+FICT_OFFSET: int = SE_FICT_OFFSET
+NFICT_ELEM: int = SE_NFICT_ELEM
+COMET_OFFSET: int = SE_COMET_OFFSET
+VARUNA: int = SE_VARUNA
+
+# Moon offset
+MOON_OFFSET: int = SE_MOON_OFFSET
+
+# =============================================================================
+# ADDITIONAL PYSWISSEPH-COMPATIBLE CONSTANTS
+# =============================================================================
+# These constants match pyswisseph module-level attributes that were not
+# previously exported. Added for full API compatibility.
+
+# House cusps and special points
+ASC: int = 0
+MC: int = 1
+ARMC: int = 2
+VERTEX: int = 3
+EQUASC: int = 4
+COASC1: int = 5
+COASC2: int = 6
+POLASC: int = 7
+NASCMC: int = 8
+
+# Additional body IDs
+FIXSTAR: int = -10
+HARRINGTON: int = 50
+NEPTUNE_ADAMS: int = 52
+NEPTUNE_LEVERRIER: int = 51
+NIBIRU: int = 49
+PLUTO_LOWELL: int = 53
+PLUTO_PICKERING: int = 54
+
+# Counts and offsets
+FICT_MAX: int = 999
+FICT_OFFSET_1: int = 39
+MAX_STNAME: int = 256
+NALL_NAT_POINTS: int = 38
+PLMOON_OFFSET: int = 9000
+
+# Additional calculation flags
+FLG_CENTER_BODY: int = 1048576
+FLG_DEFAULTEPH: int = 2
+FLG_DPSIDEPS_1980: int = 262144
+FLG_JPLHOR: int = 262144
+FLG_JPLHOR_APPROX: int = 524288
+FLG_ORBEL_AA: int = 32768
+FLG_TEST_PLMOON: int = 2228280
+FLG_TROPICAL: int = 0
+
+# Ephemeris file names
+FNAME_DE200: str = "de200.eph"
+FNAME_DE403: str = "de403.eph"
+FNAME_DE404: str = "de404.eph"
+FNAME_DE405: str = "de405.eph"
+FNAME_DE406: str = "de406.eph"
+FNAME_DFT: str = "de431.eph"
+FNAME_DFT2: str = "de406.eph"
+
+# Additional eclipse constants
+ECL_HYBRID: int = 32
+ECL_OCC_BEG_DAYLIGHT: int = 8192
+ECL_OCC_END_DAYLIGHT: int = 16384
+ECL_PARTBEG_VISIBLE: int = 512
+ECL_PARTEND_VISIBLE: int = 4096
+ECL_PENUMBBEG_VISIBLE: int = 8192
+ECL_PENUMBEND_VISIBLE: int = 16384
+ECL_TOTBEG_VISIBLE: int = 1024
+ECL_TOTEND_VISIBLE: int = 2048
+
+# Sidereal mode constants
+NSIDM_PREDEF: int = 47
+SIDBITS: int = 256
+SIDBIT_ECL_DATE: int = 2048
+SIDBIT_ECL_T0: int = 256
+SIDBIT_NO_PREC_OFFSET: int = 4096
+SIDBIT_PREC_ORIG: int = 8192
+SIDBIT_SSY_PLANE: int = 512
+SIDBIT_USER_UT: int = 1024
+
+# Precession, nutation, and delta-T model constants
+MODEL_BIAS: int = 4
+MODEL_DELTAT: int = 0
+MODEL_JPLHORA_MODE: int = 6
+MODEL_JPLHOR_MODE: int = 5
+MODEL_NUT: int = 3
+MODEL_PREC_LONGTERM: int = 1
+MODEL_PREC_SHORTTERM: int = 2
+MODEL_SIDT: int = 7
+NSE_MODELS: int = 8
+
+MOD_BIAS_DEFAULT: int = 3
+MOD_BIAS_IAU2000: int = 2
+MOD_BIAS_IAU2006: int = 3
+MOD_BIAS_NONE: int = 1
+MOD_NBIAS: int = 3
+
+MOD_DELTAT_DEFAULT: int = 5
+MOD_DELTAT_ESPENAK_MEEUS_2006: int = 4
+MOD_DELTAT_STEPHENSON_1997: int = 2
+MOD_DELTAT_STEPHENSON_ETC_2016: int = 5
+MOD_DELTAT_STEPHENSON_MORRISON_1984: int = 1
+MOD_DELTAT_STEPHENSON_MORRISON_2004: int = 3
+MOD_NDELTAT: int = 5
+
+MOD_JPLHORA_1: int = 1
+MOD_JPLHORA_2: int = 2
+MOD_JPLHORA_3: int = 3
+MOD_JPLHORA_DEFAULT: int = 3
+MOD_NJPLHORA: int = 3
+
+MOD_JPLHOR_DEFAULT: int = 1
+MOD_JPLHOR_LONG_AGREEMENT: int = 1
+MOD_NJPLHOR: int = 2
+
+MOD_NUT_DEFAULT: int = 4
+MOD_NUT_IAU_1980: int = 1
+MOD_NUT_IAU_2000A: int = 3
+MOD_NUT_IAU_2000B: int = 4
+MOD_NUT_IAU_CORR_1987: int = 2
+MOD_NUT_WOOLARD: int = 5
+MOD_NNUT: int = 5
+
+MOD_PREC_BRETAGNON_2003: int = 7
+MOD_PREC_DEFAULT: int = 9
+MOD_PREC_DEFAULT_SHORT: int = 9
+MOD_PREC_IAU_1976: int = 1
+MOD_PREC_IAU_2000: int = 6
+MOD_PREC_IAU_2006: int = 8
+MOD_PREC_LASKAR_1986: int = 2
+MOD_PREC_NEWCOMB: int = 11
+MOD_PREC_OWEN_1990: int = 10
+MOD_PREC_SIMON_1994: int = 5
+MOD_PREC_VONDRAK_2011: int = 9
+MOD_PREC_WILLIAMS_1994: int = 4
+MOD_PREC_WILL_EPS_LASK: int = 3
+MOD_NPREC: int = 11
+
+# Heliacal/rise-set bit flags
+BIT_FORCE_SLOW_METHOD: int = 32768
+BIT_HINDU_RISING: int = 896
+
+# Rise/set type constants
+ACRONYCHAL_RISING: int = 5
+ACRONYCHAL_SETTING: int = 6
+COSMICAL_SETTING: int = 6
+
+# Tidal acceleration constants
+TIDAL_26: float = -26.0
+TIDAL_JPLEPH: float = -25.8
+TIDAL_MOSEPH: float = -25.58
+TIDAL_STEPHENSON_2016: float = -25.85
+TIDAL_SWIEPH: float = -25.8
+
+# File names and paths
+ASTNAMFILE: str = "seasnam.txt"
+EPHE_PATH: str = ".:/users/ephe2/:/users/ephe/"
+FICTFILE: str = "seorbel.txt"
+SE_FNAME_DE431: str = "de431.eph"
+STARFILE: str = "sefstars.txt"
+STARFILE_OLD: str = "fixstars.cat"
+
+# Unit conversion constants
+AUNIT_TO_KM: float = 149597870.7
+AUNIT_TO_LIGHTYEAR: float = 1.5812507409819728e-05
+AUNIT_TO_PARSEC: float = 4.848136811095274e-06
+
+# Miscellaneous
+DE_NUMBER: int = 431
+DELTAT_AUTOMATIC: float = -1e-10
+MIXEDOPIC_FLAG: int = 2
+PHOTOPIC_FLAG: int = 0
+SCOTOPIC_FLAG: int = 1
+SIMULATE_VICTORVB: int = 1
+TJD_INVALID: float = 99999999.0
