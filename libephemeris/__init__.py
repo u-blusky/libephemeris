@@ -711,6 +711,36 @@ mooncross_node = swe_mooncross_node
 helio_cross_ut = swe_helio_cross_ut
 helio_cross = swe_helio_cross
 
+# pyswisseph swe_ prefixed aliases for utility functions
+swe_cotrans = cotrans
+swe_cotrans_sp = cotrans_sp
+swe_azalt = azalt
+swe_azalt_rev = azalt_rev
+swe_refrac = refrac
+swe_refrac_extended = refrac_extended
+swe_split_deg = split_deg
+swe_degnorm = degnorm
+swe_radnorm = radnorm
+swe_difdeg2n = difdeg2n
+swe_difdegn = difdegn
+swe_difrad2n = difrad2n
+swe_difcs2n = difcs2n
+swe_difcsn = difcsn
+swe_csnorm = csnorm
+swe_csroundsec = csroundsec
+swe_cs2degstr = cs2degstr
+swe_cs2lonlatstr = cs2lonlatstr
+swe_cs2timestr = cs2timestr
+swe_d2l = d2l
+swe_deg_midp = deg_midp
+swe_rad_midp = rad_midp
+swe_get_planet_name = get_planet_name
+
+
+def swe_version() -> str:
+    """Return the library version string (pyswisseph-compatible)."""
+    return __version__
+
 
 # Helper for Arabic parts
 from .arabic_parts import calc_all_arabic_parts
@@ -1084,6 +1114,31 @@ __all__ = [
     "azalt_rev",
     "refrac",
     "refrac_extended",
+    # swe_ prefixed utility aliases (pyswisseph compatibility)
+    "swe_cotrans",
+    "swe_cotrans_sp",
+    "swe_azalt",
+    "swe_azalt_rev",
+    "swe_refrac",
+    "swe_refrac_extended",
+    "swe_split_deg",
+    "swe_degnorm",
+    "swe_radnorm",
+    "swe_difdeg2n",
+    "swe_difdegn",
+    "swe_difrad2n",
+    "swe_difcs2n",
+    "swe_difcsn",
+    "swe_csnorm",
+    "swe_csroundsec",
+    "swe_cs2degstr",
+    "swe_cs2lonlatstr",
+    "swe_cs2timestr",
+    "swe_d2l",
+    "swe_deg_midp",
+    "swe_rad_midp",
+    "swe_get_planet_name",
+    "swe_version",
     "SE_ECL2HOR",
     "SE_EQU2HOR",
     "SE_HOR2ECL",

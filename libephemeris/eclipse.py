@@ -7334,8 +7334,32 @@ def lun_occult_where(
     return eclipse_type, geopos, attr
 
 
-# Alias for reference API compatibility
-swe_lun_occult_where = lun_occult_where
+# Alias for internal API compatibility
+_lun_occult_where_internal = lun_occult_where
+
+
+def swe_lun_occult_where(
+    tjd_ut: float,
+    ipl: int,
+    starname: str,
+    ifl: int = SEFLG_SWIEPH,
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
+    """Calculate where on Earth a lunar occultation is visible (pyswisseph-compatible).
+
+    Wrapper around lun_occult_where() matching pyswisseph's 4-parameter signature.
+
+    Args:
+        tjd_ut: Julian Day (UT) of the moment to calculate.
+        ipl: Planet ID (int). Use 0 when specifying a fixed star via starname.
+        starname: Star name (str). Use empty string "" when specifying a planet via ipl.
+        ifl: Calculation flags (default SEFLG_SWIEPH).
+
+    Returns:
+        Tuple of (retflag, geopos, attr) matching pyswisseph.
+    """
+    # Determine body: star name takes precedence if non-empty
+    body: "Union[int, str]" = starname if starname else ipl
+    return _lun_occult_where_internal(tjd_ut, body, ifl)
 
 
 # =============================================================================
