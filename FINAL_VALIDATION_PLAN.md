@@ -455,20 +455,22 @@ This phase exists solely to guard against regressions of the 4 sidereal bugs fix
 - **Additional**: Verify MeanNode/MeanApog skip dpsi, TrueNode/OscuApog subtract dpsi
 - **Existing tests**: `test_compare_sidereal_regression.py::TestBug2*`, `test_fast_calc.py::TestSiderealRegressionBug2`
 
-### Round 3.3 — Bug 3 Regression: J2000 Suppression for Non-Mean Bodies — All Tiers
+### Round 3.3 — Bug 3 Fix: J2000 Honored for All Bodies (Intentional SE Divergence) — All Tiers
 
-- **Bug**: J2K flag was applied to TrueNode/OscuApog/IntpApog/IntpPerg when sidereal
-- **Error signature**: SID+J2K gives different values than SID for suppressed bodies
+- **Original bug**: pyswisseph silently ignores SEFLG_J2000 for TrueNode/OscuApog/IntpApog/IntpPerg when SEFLG_SIDEREAL is set
+- **Fix (commit d2e0d88)**: LibEphemeris now honors SEFLG_J2000 for ALL bodies uniformly — this is an **intentional divergence** from pyswisseph
+- **Rationale**: Ayanamsha (1D longitude shift) and J2000 ecliptic precession (3D plane rotation) are geometrically distinct, composable operations. The SE behavior is a behavioral bug, not a design choice. See `docs/reference/se-bug-sidereal-j2000-nodes.md`
 - **Tiers**: Base, Medium, Extended
 - **Bodies**: All 6 Pipeline B bodies
 - **Dates**: 20 dates from 1800-2200 CE per tier
 - **Tests**:
-  1. For TrueNode, OscuApog, IntpApog, IntpPerg: verify `|SID - SID+J2K| < 0.0001 deg`
-  2. For MeanNode, MeanApog: verify `|SID - SID+J2K| > 0.001 deg` (J2K IS applied)
-  3. Same checks on pyswisseph (reference), Skyfield, and LEB
-- **Reference**: pyswisseph behavior
-- **Acceptance**: 100% behavioral match with pyswisseph
-- **Existing tests**: `test_compare_sidereal_regression.py::TestBug3*`, `test_fast_calc.py::TestSiderealRegressionBug3`
+  1. For ALL Pipeline B bodies: verify `|SID - SID+J2K| > 0.001 deg` (J2K IS applied for all)
+  2. Physical sanity: `|TrueNode - MeanNode| < 2 deg` with SID+J2K at all dates
+  3. LEB vs Skyfield consistency: both paths produce identical SID+J2K results
+  4. SE divergence verification: delta from pyswisseph matches ecliptic precession magnitude
+- **Reference**: Internal consistency (LEB vs Skyfield) and physical sanity
+- **Acceptance**: LEB matches Skyfield < 0.5"; physical sanity holds; SE divergence in expected range
+- **Existing tests**: `test_se_bug_j2k_nodes.py`, `test_compare_sidereal_regression.py::TestBug3J2kIntentionalDivergence*`, `test_fast_calc.py::TestSiderealRegressionBug3`
 
 ### Round 3.4 — Bug 4a Regression: Frame Bias in Precession Matrix — All Tiers
 
@@ -1143,6 +1145,8 @@ These are inherent architectural or data limitations that are documented, unders
 
 14. **Asteroid SPK coverage**: ~1900-2100 CE only. Outside = Keplerian fallback (catastrophically wrong). Safe test range: 1920-2080 CE with 20-year margin.
 
+15. **Intentional SE divergence: SIDEREAL+J2000 for TrueNode/OscuApog/IntpApog/IntpPerg**: pyswisseph silently ignores SEFLG_J2000 for these four bodies when SEFLG_SIDEREAL is set. LibEphemeris intentionally corrects this behavioral bug — SEFLG_J2000 is honored for all bodies uniformly. Divergence from pyswisseph: ~0.34 deg at 2024, ~1.4 deg at 1900, growing with distance from J2000. Only affects the specific `SEFLG_SIDEREAL | SEFLG_J2000` combination on these four bodies. See `docs/reference/se-bug-sidereal-j2000-nodes.md`.
+
 ---
 
 ## Test File Mapping
@@ -1612,8 +1616,9 @@ Test Execution:
   Ad-hoc validation evaluations:    ~111,000+ across 3 tiers
   Total test evaluations:           ~121,000+
 
-Sidereal Bug Fixes:         4 commits (64b8367, e6555ed, 9f0fde7, b816be0)
-Regression Tests Added:     537 new tests
+Sidereal Bug Fixes:         5 commits (64b8367, e6555ed, 9f0fde7, b816be0, d2e0d88)
+SE Bug Correction:          1 intentional divergence (SIDEREAL+J2000 for nodes/apsides)
+Regression Tests Added:     537 + 60 = 597 new tests
 
 Acceptance Matrix:
   PASS cells:               268 / 278 (96.4%)
@@ -1626,7 +1631,8 @@ Precision (LEB vs Skyfield, worst case across all tiers):
   Speed:                    0.00137 deg/day (Moon) — tolerance 0.002 deg/day
   Three-way excess:         0.0023" max (Extended) — negligible vs baseline
 
-Known Limitations:          14 (all documented, understood, accepted)
+Known Limitations:          15 (all documented, understood, accepted)
+Intentional SE Divergences: 1 (SIDEREAL+J2000 for TrueNode/OscuApog/IntpApog/IntpPerg)
 Pre-existing Test Failures: 21 (orbital nod_aps_ut — identical in Skyfield mode)
 
 ---------------------------------------------------------------
@@ -1637,11 +1643,13 @@ GO / NO-GO VERDICT
 
 All three LEB tiers (base, medium, extended) are validated for
 production use. Zero FAIL cells in the acceptance matrix. All
-sidereal calculation bugs are fixed and regression-tested. LEB
-compression adds negligible error on top of the Skyfield-JPL
-baseline. All higher-level functions (houses, eclipses,
-rise/transit, crossings, elongation, Gauquelin) are fully
-LEB-transparent.
+sidereal calculation bugs are fixed and regression-tested.
+One intentional divergence from pyswisseph (SIDEREAL+J2000 for
+TrueNode/OscuApog/IntpApog/IntpPerg) corrects a behavioral bug
+and is fully documented and tested. LEB compression adds
+negligible error on top of the Skyfield-JPL baseline. All
+higher-level functions (houses, eclipses, rise/transit,
+crossings, elongation, Gauquelin) are fully LEB-transparent.
 
 ===============================================================
 ```
