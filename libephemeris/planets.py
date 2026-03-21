@@ -4002,20 +4002,31 @@ def _calc_nod_aps(
 
     target_pos = target.at(t)
 
-    # For Moon, use mean node and mean apogee from the lunar theory rather
-    # than computing osculating elements from geocentric state vectors.
-    # This matches pyswisseph which returns SE_MEAN_NODE / SE_MEAN_APOG
-    # values for the Moon's nod_aps results.
+    # For Moon, use lunar theory bodies rather than computing osculating
+    # elements from geocentric state vectors.
+    # NODBIT_MEAN → SE_MEAN_NODE + SE_MEAN_APOG
+    # NODBIT_OSCU → SE_TRUE_NODE + SE_OSCU_APOG
+    # This matches pyswisseph behavior.
     if ipl == SE_MOON:
         jd_ut = t.ut1
-        # Mean node longitude from lunar theory
-        node_pos, _ = swe_calc_ut(jd_ut, SE_MEAN_NODE, iflag & ~SEFLG_SPEED)
+        calc_flags = iflag & ~SEFLG_SPEED
+
+        # Select node and apogee bodies based on method
+        if method & SE_NODBIT_OSCU:
+            node_body = SE_TRUE_NODE
+            apog_body = SE_OSCU_APOG
+        else:
+            node_body = SE_MEAN_NODE
+            apog_body = SE_MEAN_APOG
+
+        # Node longitude from lunar theory
+        node_pos, _ = swe_calc_ut(jd_ut, node_body, calc_flags)
         node_lon = node_pos[0]
         node_lat = node_pos[1]
         node_dist = node_pos[2]
 
-        # Mean apogee (Black Moon Lilith) from lunar theory
-        apog_pos, _ = swe_calc_ut(jd_ut, SE_MEAN_APOG, iflag & ~SEFLG_SPEED)
+        # Apogee from lunar theory
+        apog_pos, _ = swe_calc_ut(jd_ut, apog_body, calc_flags)
         apog_lon = apog_pos[0]
         apog_lat = apog_pos[1]
         apog_dist = apog_pos[2]
@@ -4179,8 +4190,12 @@ def _calc_nod_aps(
     pos_dsc = _orbit_pos_3d(math.pi - omega)
     # Perihelion/perigee: true anomaly = 0
     pos_peri = _orbit_pos_3d(0.0)
-    # Second focal point (replaces aphelion to match pyswisseph convention)
-    pos_aphe = _focal_point_3d()
+    # Aphelion: true anomaly = π (farthest point from Sun)
+    # With NODBIT_FOPOINT, return the second focal point instead
+    if method & SE_NODBIT_FOPOINT:
+        pos_aphe = _focal_point_3d()
+    else:
+        pos_aphe = _orbit_pos_3d(math.pi)
 
     # Convert to geocentric ecliptic coordinates
     geo_asc = _to_geo_lonlat(pos_asc)
