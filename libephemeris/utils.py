@@ -1289,7 +1289,7 @@ def deg_midp(a: float, b: float) -> float:
         >>> deg_midp(10, 350)
         0.0
         >>> deg_midp(180, 0)
-        90.0
+        270.0
         >>> deg_midp(170, 190)
         180.0
         >>> deg_midp(-10, 10)
@@ -1302,13 +1302,17 @@ def deg_midp(a: float, b: float) -> float:
     # Calculate the difference
     diff = b - a
 
-    # If the absolute difference is greater than 180, go the shorter way
+    # When both arcs are equally long (diff exactly ±180) we follow the
+    # pyswisseph convention: always take the positive (clockwise) half,
+    # i.e. treat -180 the same as +180.
     if diff > 180.0:
         diff -= 360.0
     elif diff < -180.0:
         diff += 360.0
+    elif diff == -180.0:
+        diff = 180.0
 
-    # Calculate midpoint along the shorter arc
+    # Calculate midpoint along the chosen arc
     midp = a + diff / 2.0
 
     # Normalize result to [0, 360)
@@ -1336,8 +1340,8 @@ def rad_midp(a: float, b: float) -> float:
         0.7853981633974483
         >>> rad_midp(5.5, 0.5)  # Near 2*pi wraparound
         0.0  # approximately
-        >>> rad_midp(math.pi, 0)  # 180 to 0 -> 90 degrees
-        1.5707963267948966
+        >>> rad_midp(math.pi, 0)  # 180 to 0 -> 270 degrees
+        4.71238898038469
     """
     # Normalize both angles to [0, 2*pi)
     a = a % TWO_PI
@@ -1346,13 +1350,16 @@ def rad_midp(a: float, b: float) -> float:
     # Calculate the difference
     diff = b - a
 
-    # If the absolute difference is greater than pi, go the shorter way
+    # When both arcs are equally long (diff exactly ±π) we follow the
+    # pyswisseph convention: always take the positive (clockwise) half.
     if diff > math.pi:
         diff -= TWO_PI
     elif diff < -math.pi:
         diff += TWO_PI
+    elif diff == -math.pi:
+        diff = math.pi
 
-    # Calculate midpoint along the shorter arc
+    # Calculate midpoint along the chosen arc
     midp = a + diff / 2.0
 
     # Normalize result to [0, 2*pi)
@@ -1420,6 +1427,83 @@ SPLIT_DEG_KEEP_SIGN: int = 16  # Don't round to next zodiac sign/nakshatra
 SPLIT_DEG_KEEP_DEG: int = 32  # Don't round to next degree
 
 
+def _rounding_offset(roundflag: int) -> float:
+    """Compute the rounding offset based on which rounding flag is active.
+
+    Only one rounding level applies at a time, checked in order of
+    coarseness: degrees first, then minutes, then seconds.
+    """
+    if roundflag & SPLIT_DEG_ROUND_DEG:
+        return 0.5
+    if roundflag & SPLIT_DEG_ROUND_MIN:
+        return 0.5 / 60.0
+    if roundflag & SPLIT_DEG_ROUND_SEC:
+        return 0.5 / 3600.0
+    return 0.0
+
+
+def _decompose_to_dms(ddeg: float, has_rounding: bool) -> Tuple[int, int, int, float]:
+    """Break a non-negative decimal degree value into deg, min, sec, secfr.
+
+    Uses successive subtraction: each component is extracted as an integer
+    then removed from the running remainder before extracting the next one.
+
+    When *has_rounding* is ``True`` the sub-second fraction ``secfr`` is
+    set to the integer seconds value (as a float) rather than the true
+    fractional part.
+    """
+    ideg = int(ddeg)
+    ddeg -= ideg
+    imin = int(ddeg * 60.0)
+    ddeg -= imin / 60.0
+    isec = int(ddeg * 3600.0)
+    if has_rounding:
+        secfr = float(isec)
+    else:
+        secfr = ddeg * 3600.0 - isec
+    return ideg, imin, isec, secfr
+
+
+def _split_deg_nakshatra(
+    ddeg: float, roundflag: int
+) -> Tuple[int, int, int, float, int]:
+    """Nakshatra-mode split for non-negative degree values.
+
+    The ecliptic is divided into 27 equal segments (nakshatras) of
+    13°20' each.  Returns the position within the current nakshatra.
+    """
+    nakshatra_span = 360.0 / 27.0  # 13.33333...°
+
+    # Position within current nakshatra (needed for keep-flag checks)
+    pos_in_nak = math.fmod(ddeg, nakshatra_span)
+
+    # Determine and conditionally suppress rounding offset
+    offset = _rounding_offset(roundflag)
+    if offset > 0.0:
+        if roundflag & SPLIT_DEG_KEEP_DEG:
+            # Suppress when offset would bump the integer-degree part
+            if int(pos_in_nak + offset) - int(pos_in_nak) > 0:
+                offset = 0.0
+        elif roundflag & SPLIT_DEG_KEEP_SIGN:
+            # Suppress when offset would cross into next nakshatra
+            if pos_in_nak + offset >= nakshatra_span:
+                offset = 0.0
+
+    ddeg += offset
+
+    # Identify nakshatra index and reduce to within-nakshatra degrees
+    nak_idx = int(ddeg / nakshatra_span)
+    if nak_idx == 27:  # 360° wraps back to first nakshatra
+        nak_idx = 0
+    ddeg = math.fmod(ddeg, nakshatra_span)
+
+    has_rounding = bool(
+        roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
+    )
+    ideg, imin, isec, secfr = _decompose_to_dms(ddeg, has_rounding)
+    return (ideg, imin, isec, secfr, nak_idx)
+
+
 def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float, int]:
     """
     Split a degree value into sign/nakshatra, degrees, minutes, seconds, and fraction.
@@ -1472,123 +1556,52 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
         >>> split_deg(-30.5, SPLIT_DEG_ZODIACAL)  # Negative with zodiac: uses absolute
         (0, 30, 0, 0.0, 1)
     """
-    # Handle sign/negative values
-    is_negative = degrees < 0
-
-    # Determine if we should use zodiacal or nakshatra division
-    use_zodiacal = bool(roundflag & SPLIT_DEG_ZODIACAL)
-    use_nakshatra = bool(roundflag & SPLIT_DEG_NAKSHATRA)
-    round_sec = bool(roundflag & SPLIT_DEG_ROUND_SEC)
-    round_min = bool(roundflag & SPLIT_DEG_ROUND_MIN)
-    round_deg = bool(roundflag & SPLIT_DEG_ROUND_DEG)
-    keep_sign = bool(roundflag & SPLIT_DEG_KEEP_SIGN)
-    keep_deg = bool(roundflag & SPLIT_DEG_KEEP_DEG)
-
-    # For zodiacal/nakshatra modes, use absolute value
-    if use_zodiacal or use_nakshatra:
-        # Use absolute value (negative inputs are treated as positive longitudes)
-        deg_abs = abs(degrees)
-
-        if use_nakshatra:
-            # Nakshatra: 27 divisions, each 13°20' = 13.333... degrees
-            nakshatra_size = 360.0 / 27.0  # 13.333...
-            sign_num = int(deg_abs / nakshatra_size)
-            deg_in_sign = deg_abs - (sign_num * nakshatra_size)
-            # Handle wraparound for values >= 360
-            if sign_num >= 27:
-                sign_num = sign_num % 27
-        else:
-            # Zodiacal: 12 signs, each 30 degrees
-            sign_num = int(deg_abs / 30.0)
-            deg_in_sign = deg_abs - (sign_num * 30.0)
-            # Handle wraparound for values >= 360
-            if sign_num >= 12:
-                sign_num = sign_num % 12
+    # --- Negative handling and nakshatra dispatch ---
+    # Negative inputs never enter nakshatra mode; they are made positive
+    # and flagged with sign_out = -1.  Non-negative inputs with the
+    # NAKSHATRA flag take a dedicated path.
+    if degrees < 0:
+        sign_out = -1
+        ddeg = -degrees
+    elif roundflag & SPLIT_DEG_NAKSHATRA:
+        return _split_deg_nakshatra(degrees, roundflag)
     else:
-        # No zodiacal/nakshatra: use absolute degrees with sign indicator
-        deg_in_sign = abs(degrees)
-        sign_num = 1 if not is_negative else -1
+        sign_out = 1
+        ddeg = degrees
 
-    # Split into degrees, minutes, seconds, fraction
-    deg_part = int(deg_in_sign)
-    remainder = (deg_in_sign - deg_part) * 60.0
-    min_part = int(remainder)
-    remainder = (remainder - min_part) * 60.0
-    sec_part = int(remainder)
-    secfr = remainder - sec_part
+    # --- Rounding offset ---
+    # The offset is applied to the *full* degree value before any
+    # zodiacal division.  KEEP_DEG suppresses it when the integer
+    # degree part would change.  KEEP_SIGN suppresses it when a
+    # 30° sign boundary would be crossed.
+    has_rounding = bool(
+        roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
+    )
+    offset = _rounding_offset(roundflag)
 
-    # Store original values for ROUND_MIN and ROUND_DEG behavior
-    orig_sec_part = sec_part
-    orig_min_part = min_part
+    if offset > 0.0:
+        if roundflag & SPLIT_DEG_KEEP_DEG:
+            # Would the integer part of ddeg change?
+            if int(ddeg + offset) - int(ddeg) > 0:
+                offset = 0.0
+        elif roundflag & SPLIT_DEG_KEEP_SIGN:
+            # Would we cross the next 30° sign boundary?
+            if math.fmod(ddeg, 30.0) + offset >= 30.0:
+                offset = 0.0
 
-    # Apply rounding if requested
-    if round_sec or round_min or round_deg:
-        if round_sec:
-            # Round to nearest second
-            if secfr >= 0.5:
-                sec_part += 1
+    ddeg += offset
 
-            # Handle overflow: sec >= 60
-            if sec_part >= 60:
-                sec_part = 0
-                min_part += 1
-                # Handle overflow: min >= 60
-                if min_part >= 60:
-                    min_part = 0
-                    deg_part += 1
+    # --- Zodiacal sign extraction (after rounding) ---
+    if roundflag & SPLIT_DEG_ZODIACAL:
+        sign_out = int(ddeg / 30.0)
+        if sign_out == 12:  # exactly 360° maps back to sign 0
+            sign_out = 0
+        ddeg = math.fmod(ddeg, 30.0)
 
-            # When rounding to seconds, the fractional-seconds field receives
-            # the rounded integer value (AFTER overflow carry)
-            secfr = float(sec_part)
+    # --- Decompose into deg / min / sec / secfr ---
+    ideg, imin, isec, secfr = _decompose_to_dms(ddeg, has_rounding)
 
-        elif round_min:
-            # Round to nearest minute
-            # Check if seconds >= 30 to round up
-            total_sec = orig_sec_part + secfr
-            if total_sec >= 30.0:
-                min_part += 1
-            # When rounding to minutes, seconds fields retain their original
-            # unrounded values (backward-compatible return format)
-            sec_part = orig_sec_part
-            secfr = float(orig_sec_part)
-
-            # Handle overflow: min >= 60
-            if min_part >= 60:
-                min_part = 0
-                deg_part += 1
-
-        elif round_deg:
-            # Round to nearest degree
-            # Check if minutes >= 30 to round up
-            total_min = orig_min_part + (orig_sec_part + secfr) / 60.0
-            if total_min >= 30.0:
-                deg_part += 1
-            # When rounding to degrees, minutes are zeroed but seconds fields
-            # retain their original unrounded values (backward-compatible return format)
-            min_part = 0
-            sec_part = orig_sec_part
-            secfr = float(orig_sec_part)
-
-        # Handle degree overflow for zodiacal/nakshatra
-        if use_zodiacal or use_nakshatra:
-            max_deg = 30 if use_zodiacal else 14
-            max_signs = 12 if use_zodiacal else 27
-
-            if deg_part >= max_deg:
-                if keep_sign:
-                    # Don't advance to next sign - cap at max
-                    deg_part = max_deg - 1 if use_zodiacal else 13
-                    min_part = 59
-                    sec_part = 59
-                    secfr = 59.0
-                else:
-                    # Advance to next sign
-                    deg_part = 0
-                    sign_num += 1
-                    if sign_num >= max_signs:
-                        sign_num = 0
-
-    return (deg_part, min_part, sec_part, secfr, sign_num)
+    return (ideg, imin, isec, secfr, sign_out)
 
 
 def swe_calc_angles(jd_ut: float, lat: float, lon: float):

@@ -40,6 +40,9 @@ def swe_julday(
         Transition date: Oct 15, 1582 (Gregorian) = Oct 5, 1582 (Julian)
         JD 2451545.0 = Jan 1, 2000 12:00 TT (J2000.0 epoch)
     """
+    if gregflag not in (SE_GREG_CAL, SE_JUL_CAL):
+        raise ValueError(f"swisseph.julday: invalid calendar ({gregflag})")
+
     if month <= 2:
         year -= 1
         month += 12
@@ -84,6 +87,9 @@ def swe_revjul(jd: float, gregflag: int = SE_GREG_CAL) -> tuple[int, int, int, f
         Automatic Gregorian calendar used for JD >= 2299161 (Oct 15, 1582)
         unless Julian calendar explicitly requested.
     """
+    if gregflag not in (SE_GREG_CAL, SE_JUL_CAL):
+        raise ValueError(f"swisseph.revjul: invalid calendar ({gregflag})")
+
     jd = jd + 0.5
     z = _floor(jd)
     f = jd - z
