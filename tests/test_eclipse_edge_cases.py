@@ -303,7 +303,7 @@ class TestLunarEclipseEdgeCases:
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
 
         # Should find a penumbral eclipse
         assert ecl_type & SE_ECL_PENUMBRAL
@@ -318,7 +318,7 @@ class TestLunarEclipseEdgeCases:
         # Find a partial lunar eclipse
         jd_start = julday(2021, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
 
         # Should find a partial eclipse
         assert ecl_type & SE_ECL_PARTIAL

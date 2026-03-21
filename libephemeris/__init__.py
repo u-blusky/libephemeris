@@ -594,7 +594,7 @@ def swe_date_conversion(
     month: int,
     day: int,
     hour: float = 12.0,
-    calendar: "str | bytes" = b"g",
+    cal: "str | bytes" = b"g",
 ) -> "tuple[bool, float, tuple[int, int, int, float]]":
     """Convert and validate a calendar date, returning Julian Day number.
 
@@ -606,7 +606,7 @@ def swe_date_conversion(
         month: Month (1-12).
         day: Day of month (1-31).
         hour: Decimal hour (0.0-23.999...).
-        calendar: ``'g'`` / ``b'g'`` for Gregorian, ``'j'`` / ``b'j'`` for Julian.
+        cal: ``'g'`` / ``b'g'`` for Gregorian, ``'j'`` / ``b'j'`` for Julian.
 
     Returns:
         Tuple of ``(valid, jd, (year, month, day, hour))`` where *valid* is
@@ -614,11 +614,11 @@ def swe_date_conversion(
         Julian Day number, and the inner tuple holds the (possibly normalised)
         date components.
     """
-    if isinstance(calendar, bytes):
-        calendar = calendar.decode("ascii")
-    cal_char = calendar.lower()
+    if isinstance(cal, bytes):
+        cal = cal.decode("ascii")
+    cal_char = cal.lower()
     if cal_char not in ("j", "g"):
-        raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")
+        raise ValueError(f"calendar must be 'j' or 'g', got: {cal!r}")
 
     cal_flag = SE_JUL_CAL if cal_char == "j" else SE_GREG_CAL
     jd = swe_julday(year, month, day, hour, cal_flag)

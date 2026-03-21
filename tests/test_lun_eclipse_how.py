@@ -127,7 +127,7 @@ class TestLunEclipseHow:
         """Test that eclipse type is correctly detected."""
         # First find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        global_ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        global_ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Check circumstances at maximum
@@ -286,7 +286,7 @@ class TestSweLunEclipseHow:
         """Test that eclipse type at moment is returned in retflag."""
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        global_ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        global_ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         rio_geopos = [-43.1729, -22.9068, 0]
@@ -366,7 +366,7 @@ class TestLunEclipseHowEdgeCases:
         """Test circumstances during a partial lunar eclipse."""
         # Find a partial lunar eclipse
         jd_start = julday(2023, 10, 1, 0)
-        global_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PARTIAL)
+        global_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         # Check circumstances
@@ -381,7 +381,7 @@ class TestLunEclipseHowEdgeCases:
         """Test circumstances during a penumbral lunar eclipse."""
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        global_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PENUMBRAL)
+        global_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         # Check circumstances
@@ -449,7 +449,7 @@ class TestLunEclipseHowEdgeCases:
         """Test that SE_ECL_VISIBLE is not set when Moon is below horizon."""
         # Find an eclipse and test from a location where Moon is below horizon
         jd_start = julday(2022, 5, 1, 0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Test various locations - at least one should have Moon below horizon

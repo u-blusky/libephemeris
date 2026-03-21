@@ -702,14 +702,14 @@ def get_planet_target(planets, target_name: str):
         raise
 
 
-def get_planet_name(planet_id: int) -> str:
+def get_planet_name(planet: int) -> str:
     """
     Get the human-readable name of a planet given its ID.
 
     Useful for error messages and debugging output.
 
     Args:
-        planet_id: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
 
     Returns:
         Human-readable planet name as a string.
@@ -723,9 +723,9 @@ def get_planet_name(planet_id: int) -> str:
         >>> get_planet_name(4)
         'Mars'
     """
-    if planet_id in _PLANET_NAMES:
-        return _PLANET_NAMES[planet_id]
-    return f"Unknown ({planet_id})"
+    if planet in _PLANET_NAMES:
+        return _PLANET_NAMES[planet]
+    return f"Unknown ({planet})"
 
 
 def _try_auto_spk_download(t, ipl: int, iflag: int):
@@ -792,7 +792,7 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
 
 
 def swe_calc_ut(
-    tjd_ut: float, ipl: int, iflag: int = SEFLG_SWIEPH | SEFLG_SPEED
+    tjdut: float, planet: int, flags: int = SEFLG_SWIEPH | SEFLG_SPEED
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """
     Calculate planetary position for Universal Time.
@@ -800,14 +800,14 @@ def swe_calc_ut(
     Reference API compatible function.
 
     Args:
-        tjd_ut: Julian Day in Universal Time (UT1)
-        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
-        iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+        tjdut: Julian Day in Universal Time (UT1)
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        flags: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
 
     Returns:
         Tuple containing:
             - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
-            - Return flag: iflag value on success
+            - Return flag: flags value on success
 
     Raises:
         EphemerisRangeError: If the date is outside the ephemeris coverage
@@ -847,18 +847,18 @@ def swe_calc_ut(
     from .constants import SE_ECL_NUT, SEFLG_MOSEPH
 
     # Handle SE_ECL_NUT (-1) - returns nutation and obliquity
-    if ipl == SE_ECL_NUT:
-        return _calc_nutation_obliquity(tjd_ut, iflag)
+    if planet == SE_ECL_NUT:
+        return _calc_nutation_obliquity(tjdut, flags)
 
     # Strip SEFLG_MOSEPH bit — accepted for compatibility, always uses JPL
-    iflag = iflag & ~SEFLG_MOSEPH
+    flags = flags & ~SEFLG_MOSEPH
 
     # SEFLG_SPEED3: 3-position numerical differentiation for speed.
     # libephemeris already uses this method as its only speed computation,
     # so SPEED3 is treated as equivalent to SPEED (matching SE behavior
     # where SPEED takes priority if both are set).
-    if iflag & SEFLG_SPEED3:
-        iflag = (iflag & ~SEFLG_SPEED3) | SEFLG_SPEED
+    if flags & SEFLG_SPEED3:
+        flags = (flags & ~SEFLG_SPEED3) | SEFLG_SPEED
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -869,41 +869,41 @@ def swe_calc_ut(
         try:
             from . import fast_calc
 
-            result = fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
-            get_logger().debug("body=%d jd=%.1f source=LEB", ipl, tjd_ut)
+            result = fast_calc.fast_calc_ut(reader, tjdut, planet, flags)
+            get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdut)
             return result
         except (KeyError, ValueError):
-            get_logger().debug("body=%d jd=%.1f source=LEB->fallback", ipl, tjd_ut)
+            get_logger().debug("body=%d jd=%.1f source=LEB->fallback", planet, tjdut)
     # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
-    if _body_uses_jpl_ephemeris(ipl):
-        validate_jd_range(tjd_ut, ipl, "swe_calc_ut")
+    if _body_uses_jpl_ephemeris(planet):
+        validate_jd_range(tjdut, planet, "swe_calc_ut")
 
     # Strip SEFLG_XYZ and SEFLG_RADIANS from the flags passed to _calc_body
     # since they are output format flags, not calculation flags.
     # We apply them after the calculation is complete.
-    calc_iflag = iflag & ~SEFLG_XYZ & ~SEFLG_RADIANS
+    calc_iflag = flags & ~SEFLG_XYZ & ~SEFLG_RADIANS
 
     ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
+    t = ts.ut1_jd(tjdut)
     try:
-        pos, retflag = _calc_body(t, ipl, calc_iflag)
+        pos, retflag = _calc_body(t, planet, calc_iflag)
         # _calc_body logs the specific source (SPK, ASSIST, Keplerian)
         # for minor bodies; for standard planets it's always Skyfield
-        if ipl in _PLANET_MAP:
-            get_logger().debug("body=%d jd=%.1f source=Skyfield", ipl, tjd_ut)
+        if planet in _PLANET_MAP:
+            get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdut)
         # Apply output format flags (XYZ, RADIANS)
-        pos = _apply_output_flags(pos, iflag)
+        pos = _apply_output_flags(pos, flags)
         # Restore output format flags in retflag (they were stripped for calc)
-        retflag |= iflag & (SEFLG_XYZ | SEFLG_RADIANS)
+        retflag |= flags & (SEFLG_XYZ | SEFLG_RADIANS)
         return pos, retflag
     except SkyfieldRangeError as e:
-        raise _wrap_ephemeris_range_error(e, tjd_ut, ipl) from e
+        raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
 
 
 def swe_calc(
-    tjd: float, ipl: int, iflag: int = SEFLG_SWIEPH | SEFLG_SPEED
+    tjdet: float, planet: int, flags: int = SEFLG_SWIEPH | SEFLG_SPEED
 ) -> tuple[tuple[float, float, float, float, float, float], int]:
     """
     Calculate planetary position for Ephemeris Time (ET/TT).
@@ -912,14 +912,14 @@ def swe_calc(
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
 
     Args:
-        tjd: Julian Day in Terrestrial Time (TT/ET)
-        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
-        iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+        tjdet: Julian Day in Terrestrial Time (TT/ET)
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        flags: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
 
     Returns:
         Tuple containing:
             - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
-            - Return flag: iflag value on success
+            - Return flag: flags value on success
 
     Raises:
         EphemerisRangeError: If the date is outside the ephemeris coverage
@@ -938,11 +938,11 @@ def swe_calc(
     from .constants import SEFLG_MOSEPH
 
     # Strip SEFLG_MOSEPH bit — accepted for compatibility, always uses JPL
-    iflag = iflag & ~SEFLG_MOSEPH
+    flags = flags & ~SEFLG_MOSEPH
 
     # SEFLG_SPEED3: treat as SEFLG_SPEED (see swe_calc_ut for rationale)
-    if iflag & SEFLG_SPEED3:
-        iflag = (iflag & ~SEFLG_SPEED3) | SEFLG_SPEED
+    if flags & SEFLG_SPEED3:
+        flags = (flags & ~SEFLG_SPEED3) | SEFLG_SPEED
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -953,67 +953,67 @@ def swe_calc(
         try:
             from . import fast_calc
 
-            result = fast_calc.fast_calc_tt(reader, tjd, ipl, iflag)
-            get_logger().debug("body=%d jd=%.1f source=LEB", ipl, tjd)
+            result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
+            get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
             return result
         except (KeyError, ValueError):
-            get_logger().debug("body=%d jd=%.1f source=LEB->fallback", ipl, tjd)
+            get_logger().debug("body=%d jd=%.1f source=LEB->fallback", planet, tjdet)
     # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
-    if _body_uses_jpl_ephemeris(ipl):
-        validate_jd_range(tjd, ipl, "swe_calc")
+    if _body_uses_jpl_ephemeris(planet):
+        validate_jd_range(tjdet, planet, "swe_calc")
 
     # Strip SEFLG_XYZ and SEFLG_RADIANS from the flags passed to _calc_body
     # since they are output format flags, not calculation flags.
-    calc_iflag = iflag & ~SEFLG_XYZ & ~SEFLG_RADIANS
+    calc_iflag = flags & ~SEFLG_XYZ & ~SEFLG_RADIANS
 
     ts = get_timescale()
-    t = ts.tt_jd(tjd)
+    t = ts.tt_jd(tjdet)
     try:
-        pos, retflag = _calc_body(t, ipl, calc_iflag)
-        if ipl in _PLANET_MAP:
-            get_logger().debug("body=%d jd=%.1f source=Skyfield", ipl, tjd)
+        pos, retflag = _calc_body(t, planet, calc_iflag)
+        if planet in _PLANET_MAP:
+            get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdet)
         # Apply output format flags (XYZ, RADIANS)
-        pos = _apply_output_flags(pos, iflag)
+        pos = _apply_output_flags(pos, flags)
         # Restore output format flags in retflag (they were stripped for calc)
-        retflag |= iflag & (SEFLG_XYZ | SEFLG_RADIANS)
+        retflag |= flags & (SEFLG_XYZ | SEFLG_RADIANS)
         return pos, retflag
     except SkyfieldRangeError as e:
-        raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
+        raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
 
 
 def swe_calc_pctr(
-    tjd_ut: float, ipl: int, iplctr: int, iflag: int = SEFLG_SWIEPH | SEFLG_SPEED
+    tjdet: float, planet: int, center: int, flags: int = SEFLG_SWIEPH | SEFLG_SPEED
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """
     Calculate planetary position as seen from another planet (planet-centric).
 
     Reference API compatible function.
 
-    This function calculates the position of a target body (ipl) as observed
-    from another body (iplctr) rather than from Earth (geocentric) or Sun
+    This function calculates the position of a target body (planet) as observed
+    from another body (center) rather than from Earth (geocentric) or Sun
     (heliocentric). Useful for calculating, e.g., the position of Moon as
     seen from Mars, or Venus as seen from Jupiter.
 
     Args:
-        tjd_ut: Julian Day in Universal Time (UT1)
-        ipl: Target planet/body ID (SE_SUN, SE_MOON, etc.)
-        iplctr: Observer/center planet ID (the body from which to observe)
-        iflag: Calculation flags (SEFLG_SPEED, etc.)
+        tjdet: Julian Day in Universal Time (UT1)
+        planet: Target planet/body ID (SE_SUN, SE_MOON, etc.)
+        center: Observer/center planet ID (the body from which to observe)
+        flags: Calculation flags (SEFLG_SPEED, etc.)
 
     Returns:
         Tuple containing:
             - Position tuple: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
-            - Return flag: iflag value on success
+            - Return flag: flags value on success
 
     Raises:
         EphemerisRangeError: If the date is outside the ephemeris coverage
 
     Note:
-        - SEFLG_HELCTR and SEFLG_BARYCTR flags are ignored (observer is always iplctr)
+        - SEFLG_HELCTR and SEFLG_BARYCTR flags are ignored (observer is always center)
         - SEFLG_TOPOCTR is ignored (no topocentric correction on other planets)
-        - Distance is the distance from iplctr to ipl in AU
+        - Distance is the distance from center to planet in AU
 
     Example:
         >>> # Position of Moon as seen from Mars
@@ -1024,15 +1024,15 @@ def swe_calc_pctr(
     from .exceptions import validate_jd_range
 
     # Validate JD range for bodies that use the JPL ephemeris
-    if _body_uses_jpl_ephemeris(ipl) or _body_uses_jpl_ephemeris(iplctr):
-        validate_jd_range(tjd_ut, ipl, "swe_calc_pctr")
+    if _body_uses_jpl_ephemeris(planet) or _body_uses_jpl_ephemeris(center):
+        validate_jd_range(tjdet, planet, "swe_calc_pctr")
 
     ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
+    t = ts.ut1_jd(tjdet)
     try:
-        return _calc_body_pctr(t, ipl, iplctr, iflag)
+        return _calc_body_pctr(t, planet, center, flags)
     except SkyfieldRangeError as e:
-        raise _wrap_ephemeris_range_error(e, tjd_ut, ipl) from e
+        raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
 
 
 def _calc_body_pctr(
@@ -2740,7 +2740,7 @@ def _calc_body_pctr_with_context(
             state._ANGLES_CACHE = old_angles_cache
 
 
-def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
+def swe_get_ayanamsa_ut(tjdut: float) -> float:
     """
     Calculate ayanamsa (sidereal offset) for a given Universal Time date.
 
@@ -2749,7 +2749,7 @@ def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
     sidereal zodiacs. Use swe_set_sid_mode() to select the ayanamsa system.
 
     Args:
-        tjd_ut: Julian Day in Universal Time (UT1)
+        tjdut: Julian Day in Universal Time (UT1)
 
     Returns:
         Ayanamsa value in degrees (tropical_longitude - sidereal_longitude)
@@ -2771,8 +2771,8 @@ def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
         try:
             from .fast_calc import _calc_ayanamsa_from_leb
 
-            delta_t = reader.delta_t(tjd_ut)
-            jd_tt = tjd_ut + delta_t
+            delta_t = reader.delta_t(tjdut)
+            jd_tt = tjdut + delta_t
             return _calc_ayanamsa_from_leb(
                 reader,
                 jd_tt,
@@ -2784,10 +2784,10 @@ def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
             pass  # star-based mode or out of range, fall through
     # --- END LEB fast path ---
 
-    return _calc_ayanamsa(tjd_ut, sid_mode)
+    return _calc_ayanamsa(tjdut, sid_mode)
 
 
-def swe_get_ayanamsa_name(sid_mode: int) -> str:
+def swe_get_ayanamsa_name(sidmode: int) -> str:
     """
     Get the name of a sidereal mode.
     Compatible with swe.get_ayanamsa_name().
@@ -2842,7 +2842,7 @@ def swe_get_ayanamsa_name(sid_mode: int) -> str:
         SE_SIDM_LAHIRI_ICRC: "Lahiri ICRC",
         SE_SIDM_USER: "User Defined",
     }
-    return names.get(sid_mode, "Unknown")
+    return names.get(sidmode, "Unknown")
 
 
 @dataclass
@@ -3682,7 +3682,7 @@ def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
     return _calc_ayanamsa(tjd_ut, SE_SIDM_LAHIRI)
 
 
-def swe_set_sid_mode(sid_mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
+def swe_set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
     """
     Set the sidereal zodiac mode for calculations.
 
@@ -3690,7 +3690,7 @@ def swe_set_sid_mode(sid_mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
     Affects all subsequent position calculations with SEFLG_SIDEREAL flag.
 
     Args:
-        sid_mode: Sidereal mode constant (SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, etc.)
+        mode: Sidereal mode constant (SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, etc.)
         t0: Reference time (JD) for user-defined ayanamsa (only for SE_SIDM_USER)
         ayan_t0: Ayanamsa value at reference time t0 in degrees (only for SE_SIDM_USER)
 
@@ -3711,17 +3711,17 @@ def swe_set_sid_mode(sid_mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
     """
     from .state import set_sid_mode
 
-    set_sid_mode(sid_mode, t0, ayan_t0)
+    set_sid_mode(mode, t0, ayan_t0)
 
 
-def swe_get_ayanamsa(tjd_et: float) -> float:
+def swe_get_ayanamsa(tjdet: float) -> float:
     """
     Calculate ayanamsa for a given Ephemeris Time (ET/TT) date.
 
     Similar to swe_get_ayanamsa_ut() but takes Terrestrial Time instead of UT.
 
     Args:
-        tjd_et: Julian Day in Ephemeris Time (TT/ET)
+        tjdet: Julian Day in Ephemeris Time (TT/ET)
 
     Returns:
         Ayanamsa value in degrees
@@ -3733,12 +3733,12 @@ def swe_get_ayanamsa(tjd_et: float) -> float:
         consistency with the pyswisseph API contract.
     """
     ts = get_timescale()
-    t_tt = ts.tt_jd(tjd_et)
+    t_tt = ts.tt_jd(tjdet)
     tjd_ut = t_tt.ut1  # Proper TT to UT1 conversion using Delta T
     return swe_get_ayanamsa_ut(tjd_ut)
 
 
-def swe_get_ayanamsa_ex(tjd_et: float, flags: int = 0) -> Tuple[int, float]:
+def swe_get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     """
     Calculate ayanamsa with extended flags for Ephemeris Time.
 
@@ -3746,7 +3746,7 @@ def swe_get_ayanamsa_ex(tjd_et: float, flags: int = 0) -> Tuple[int, float]:
     value along with the return flags, matching pyswisseph signature.
 
     Args:
-        tjd_et: Julian Day in Ephemeris Time (TT/ET)
+        tjdet: Julian Day in Ephemeris Time (TT/ET)
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
@@ -3765,11 +3765,11 @@ def swe_get_ayanamsa_ex(tjd_et: float, flags: int = 0) -> Tuple[int, float]:
     """
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
-    ayanamsa = _calc_ayanamsa_ex_value(tjd_et, sid_mode)
+    ayanamsa = _calc_ayanamsa_ex_value(tjdet, sid_mode)
     return (flags, float(ayanamsa))
 
 
-def swe_get_ayanamsa_ex_ut(tjd_ut: float, flags: int = 0) -> Tuple[int, float]:
+def swe_get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
     """
     Calculate ayanamsa with extended flags for Universal Time.
 
@@ -3777,7 +3777,7 @@ def swe_get_ayanamsa_ex_ut(tjd_ut: float, flags: int = 0) -> Tuple[int, float]:
     from UT to TT before calculating.
 
     Args:
-        tjd_ut: Julian Day in Universal Time (UT1)
+        tjdut: Julian Day in Universal Time (UT1)
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
@@ -3795,7 +3795,7 @@ def swe_get_ayanamsa_ex_ut(tjd_ut: float, flags: int = 0) -> Tuple[int, float]:
         Internally converts UT to TT using Delta T before calculation.
     """
     ts = get_timescale()
-    t_ut = ts.ut1_jd(tjd_ut)
+    t_ut = ts.ut1_jd(tjdut)
     tjd_tt = t_ut.tt  # Convert UT1 to TT
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
@@ -3825,10 +3825,10 @@ PosTuple = Tuple[float, float, float, float, float, float]
 
 
 def swe_nod_aps_ut(
-    tjd_ut: float,
-    ipl: int,
+    tjdut: float,
+    planet: int,
     method: int = SE_NODBIT_MEAN,
-    iflag: int = SEFLG_SWIEPH | SEFLG_SPEED,
+    flags: int = SEFLG_SWIEPH | SEFLG_SPEED,
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
     """
     Calculate planetary nodes and apsides for Universal Time.
@@ -3841,14 +3841,14 @@ def swe_nod_aps_ut(
     points of closest (perihelion) and farthest (aphelion) approach to the Sun.
 
     Args:
-        tjd_ut: Julian Day in Universal Time (UT1)
-        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        tjdut: Julian Day in Universal Time (UT1)
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
         method: Method for node/apse calculation:
             - SE_NODBIT_MEAN (1): Mean orbital elements (averaged)
             - SE_NODBIT_OSCU (2): Osculating elements (instantaneous)
             - SE_NODBIT_OSCU_BAR (4): Barycentric osculating elements
             - SE_NODBIT_FOPOINT (256): Include focal point
-        iflag: Calculation flags (SEFLG_SPEED, etc.)
+        flags: Calculation flags (SEFLG_SPEED, etc.)
 
     Returns:
         Tuple of 4 position tuples, each containing 6 floats:
@@ -3869,15 +3869,15 @@ def swe_nod_aps_ut(
         Osculating elements can show rapid variations due to perturbations.
     """
     ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
-    return _calc_nod_aps(t, ipl, iflag, method)
+    t = ts.ut1_jd(tjdut)
+    return _calc_nod_aps(t, planet, flags, method)
 
 
 def swe_nod_aps(
-    tjd_et: float,
-    ipl: int,
+    tjdet: float,
+    planet: int,
     method: int = SE_NODBIT_MEAN,
-    iflag: int = SEFLG_SWIEPH | SEFLG_SPEED,
+    flags: int = SEFLG_SWIEPH | SEFLG_SPEED,
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
     """
     Calculate planetary nodes and apsides for Ephemeris Time (ET/TT).
@@ -3886,10 +3886,10 @@ def swe_nod_aps(
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
 
     Args:
-        tjd_et: Julian Day in Terrestrial Time (TT/ET)
-        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        tjdet: Julian Day in Terrestrial Time (TT/ET)
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
         method: Method for node/apse calculation (SE_NODBIT_MEAN, etc.)
-        iflag: Calculation flags (default: SEFLG_SWIEPH | SEFLG_SPEED)
+        flags: Calculation flags (default: SEFLG_SWIEPH | SEFLG_SPEED)
 
     Returns:
         Same as swe_nod_aps_ut: (xnasc, xndsc, xperi, xaphe)
@@ -3899,8 +3899,8 @@ def swe_nod_aps(
         >>> nasc, ndsc, peri, aphe = swe_nod_aps(2451545.0, SE_JUPITER, SE_NODBIT_OSCU)
     """
     ts = get_timescale()
-    t = ts.tt_jd(tjd_et)
-    return _calc_nod_aps(t, ipl, iflag, method)
+    t = ts.tt_jd(tjdet)
+    return _calc_nod_aps(t, planet, flags, method)
 
 
 class HeliocentricNodApsWarning(UserWarning):
@@ -4197,7 +4197,9 @@ def _calc_nod_aps(
     return (xnasc, xndsc, xperi, xaphe)
 
 
-def swe_get_orbital_elements(tjd_et: float, ipl: int, iflag: int) -> Tuple[float, ...]:
+def swe_get_orbital_elements(
+    tjdet: float, planet: int, flags: int
+) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for a celestial body.
 
@@ -4208,9 +4210,9 @@ def swe_get_orbital_elements(tjd_et: float, ipl: int, iflag: int) -> Tuple[float
     that the planet would follow if all perturbations ceased at that moment.
 
     Args:
-        tjd_et: Julian Day in Ephemeris Time (TT/ET)
-        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
-        iflag: Calculation flags (SEFLG_HELCTR for heliocentric, etc.)
+        tjdet: Julian Day in Ephemeris Time (TT/ET)
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        flags: Calculation flags (SEFLG_HELCTR for heliocentric, etc.)
 
     Returns:
         Flat tuple of 50 floats with orbital elements:
@@ -4245,8 +4247,8 @@ def swe_get_orbital_elements(tjd_et: float, ipl: int, iflag: int) -> Tuple[float
         - Elements change constantly due to perturbations from other planets
     """
     ts = get_timescale()
-    t = ts.tt_jd(tjd_et)
-    return _calc_orbital_elements(t, ipl, iflag)
+    t = ts.tt_jd(tjdet)
+    return _calc_orbital_elements(t, planet, flags)
 
 
 def swe_get_orbital_elements_ut(
@@ -4554,7 +4556,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
 
 def swe_orbit_max_min_true_distance(
-    tjd_ut: float, ipl: int, iflag: int
+    tjdet: float, planet: int, flags: int
 ) -> Tuple[float, float, float]:
     """
     Calculate the maximum, minimum, and current true geocentric distances.
@@ -4573,10 +4575,10 @@ def swe_orbit_max_min_true_distance(
     conjunction and the maximum near superior conjunction.
 
     Args:
-        tjd_ut: Julian Day in Universal Time (UT1) - used to determine current
+        tjdet: Julian Day in Universal Time (UT1) - used to determine current
                 orbital elements and current true distance.
-        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
-        iflag: Calculation flags (SEFLG_SWIEPH, etc.)
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
         Tuple of (max_distance, min_distance, true_distance) in AU.
@@ -4597,8 +4599,8 @@ def swe_orbit_max_min_true_distance(
           distance range.
     """
     ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
-    return _calc_orbit_max_min_true_distance(t, ipl, iflag, tjd_ut)
+    t = ts.ut1_jd(tjdet)
+    return _calc_orbit_max_min_true_distance(t, planet, flags, tjdet)
 
 
 def _calc_orbit_max_min_true_distance(
@@ -4997,7 +4999,7 @@ def _calc_moon_magnitude(
 
 
 def swe_pheno_ut(
-    tjd_ut: float, ipl: int, iflag: int = SEFLG_SWIEPH
+    tjdut: float, planet: int, flags: int = SEFLG_SWIEPH
 ) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Universal Time.
@@ -5006,9 +5008,9 @@ def swe_pheno_ut(
     and visual magnitude for planets and the Moon.
 
     Args:
-        tjd_ut: Julian Day in Universal Time (UT1)
-        ipl: Planet/body ID (SE_SUN, SE_MOON, SE_MERCURY, etc.)
-        iflag: Calculation flags (SEFLG_TRUEPOS, SEFLG_HELCTR, etc.)
+        tjdut: Julian Day in Universal Time (UT1)
+        planet: Planet/body ID (SE_SUN, SE_MOON, SE_MERCURY, etc.)
+        flags: Calculation flags (SEFLG_TRUEPOS, SEFLG_HELCTR, etc.)
 
     Returns:
         Tuple of 20 floats (matching pyswisseph):
@@ -5034,20 +5036,22 @@ def swe_pheno_ut(
         >>> print(f"Magnitude: {attr[4]:.2f}")
     """
     ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
-    return _calc_pheno(t, ipl, iflag)
+    t = ts.ut1_jd(tjdut)
+    return _calc_pheno(t, planet, flags)
 
 
-def swe_pheno(tjd_et: float, ipl: int, iflag: int = SEFLG_SWIEPH) -> Tuple[float, ...]:
+def swe_pheno(
+    tjdet: float, planet: int, flags: int = SEFLG_SWIEPH
+) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Ephemeris Time (TT/ET).
 
     Same as swe_pheno_ut() but takes Terrestrial Time instead of Universal Time.
 
     Args:
-        tjd_et: Julian Day in Ephemeris Time (TT/ET)
-        ipl: Planet/body ID (SE_SUN, SE_MOON, SE_MERCURY, etc.)
-        iflag: Calculation flags
+        tjdet: Julian Day in Ephemeris Time (TT/ET)
+        planet: Planet/body ID (SE_SUN, SE_MOON, SE_MERCURY, etc.)
+        flags: Calculation flags
 
     Returns:
         Tuple of 20 floats (matching pyswisseph):
@@ -5058,8 +5062,8 @@ def swe_pheno(tjd_et: float, ipl: int, iflag: int = SEFLG_SWIEPH) -> Tuple[float
         swe_pheno_ut: Same function for Universal Time input
     """
     ts = get_timescale()
-    t = ts.tt_jd(tjd_et)
-    return _calc_pheno(t, ipl, iflag)
+    t = ts.tt_jd(tjdet)
+    return _calc_pheno(t, planet, flags)
 
 
 def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:

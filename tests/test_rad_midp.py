@@ -88,9 +88,13 @@ class TestRadMidpOppositeAngles:
         assert result == pytest.approx(math.pi / 2)
 
     def test_rad_midp_pi_0(self):
-        """Test midpoint between pi and 0."""
+        """Test midpoint between pi and 0.
+
+        When both arcs are equally long (π), pyswisseph chooses the
+        positive (clockwise) arc, yielding 3π/2 not π/2.
+        """
         result = ephem.rad_midp(math.pi, 0)
-        assert result == pytest.approx(math.pi / 2)
+        assert result == pytest.approx(3 * math.pi / 2)
 
     def test_rad_midp_pi2_3pi2(self):
         """Test midpoint between pi/2 and 3*pi/2."""

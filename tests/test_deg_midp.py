@@ -74,9 +74,13 @@ class TestDegMidpOppositeAngles:
         assert result == pytest.approx(90.0)
 
     def test_deg_midp_180_0(self):
-        """Test midpoint between 180 and 0."""
+        """Test midpoint between 180 and 0.
+
+        When both arcs are equally long (180°), pyswisseph chooses the
+        positive (clockwise) arc, yielding 270° not 90°.
+        """
         result = ephem.deg_midp(180, 0)
-        assert result == pytest.approx(90.0)
+        assert result == pytest.approx(270.0)
 
     def test_deg_midp_90_270(self):
         """Test midpoint between 90 and 270."""

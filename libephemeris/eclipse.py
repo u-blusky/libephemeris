@@ -1489,9 +1489,9 @@ def sol_eclipse_when_glob(
 
 def swe_sol_eclipse_when_glob(
     tjdut: float,
-    ifl: int = SEFLG_SWIEPH,
-    ifltype: int = 0,
-    backward: bool = False,
+    flags: int = SEFLG_SWIEPH,
+    ecltype: int = 0,
+    backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """Find the next (or previous) global solar eclipse (pyswisseph-compatible).
 
@@ -1499,16 +1499,16 @@ def swe_sol_eclipse_when_glob(
 
     Args:
         tjdut: Julian Day (UT) to start search from.
-        ifl: Calculation flags (default SEFLG_SWIEPH).
-        ifltype: Eclipse type filter bitmask (0 = any).
-        backward: If True, search backward in time.
+        flags: Calculation flags (default SEFLG_SWIEPH).
+        ecltype: Eclipse type filter bitmask (0 = any).
+        backwards: If True, search backward in time.
 
     Returns:
         Tuple of (retflag, tret) matching pyswisseph.
     """
-    direction = "backward" if backward else "forward"
+    direction = "backward" if backwards else "forward"
     return sol_eclipse_when_glob(
-        tjdut, flags=ifl, eclipse_type=ifltype, search_direction=direction
+        tjdut, flags=flags, eclipse_type=ecltype, search_direction=direction
     )
 
 
@@ -2020,24 +2020,24 @@ _sol_eclipse_when_loc_legacy = sol_eclipse_when_loc
 
 
 def swe_sol_eclipse_when_loc(
-    tjd_start: float,
+    tjdut: float,
     geopos: "Sequence[float]",
-    ifl: int = SEFLG_SWIEPH,
-    backward: bool = False,
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next solar eclipse visible from a specific geographic location.
 
     This function matches the reference API signature exactly. It searches forward
-    (or backward if specified) in time from tjd_start to find the next solar
+    (or backward if specified) in time from tjdut to find the next solar
     eclipse visible from the observer's location specified by geopos.
 
     Args:
-        tjd_start: Julian Day (UT) to start search from
-        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+        tjdut: Julian Day (UT) to start search from
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
         geopos: Sequence of [longitude_degrees, latitude_degrees, altitude_meters]
                 NOTE: longitude comes first (this matches reference API convention)
-        backward: If True, search backward in time instead of forward
+        backwards: If True, search backward in time instead of forward
 
     Returns:
         Tuple containing:
@@ -2332,11 +2332,11 @@ def swe_sol_eclipse_when_loc(
         return jd - 29.5  # Fallback
 
     # Main search loop
-    jd = tjd_start
+    jd = tjdut
 
-    # For backward search, we need to find eclipses before tjd_start
-    if backward:
-        # Find the most recent global eclipse before tjd_start
+    # For backward search, we need to find eclipses before tjdut
+    if backwards:
+        # Find the most recent global eclipse before tjdut
         # We need to search backward in time
         search_direction = -1
     else:
@@ -2345,17 +2345,19 @@ def swe_sol_eclipse_when_loc(
     for _ in range(MAX_ECLIPSES):
         # Find next/previous global eclipse
         try:
-            if backward:
+            if backwards:
                 # For backward search, find a new moon before current position
                 # and check if there's an eclipse there
                 # We use a simpler approach: search forward from an earlier date
-                # and find eclipses until we get one before tjd_start
+                # and find eclipses until we get one before tjdut
                 earlier_jd = jd - 400  # About 1 year before
                 eclipses_found = []
                 temp_jd = earlier_jd
                 while temp_jd < jd:
                     try:
-                        global_type, global_times = sol_eclipse_when_glob(temp_jd, ifl)
+                        global_type, global_times = sol_eclipse_when_glob(
+                            temp_jd, flags
+                        )
                         if global_times[0] < jd:
                             eclipses_found.append((global_type, global_times))
                         temp_jd = global_times[0] + 25
@@ -2367,11 +2369,11 @@ def swe_sol_eclipse_when_loc(
                 # Take the most recent eclipse before jd
                 global_type, global_times = eclipses_found[-1]
             else:
-                global_type, global_times = sol_eclipse_when_glob(jd, ifl)
+                global_type, global_times = sol_eclipse_when_glob(jd, flags)
         except RuntimeError:
             raise RuntimeError(
                 f"No solar eclipse visible from lon={lon}, lat={lat} "
-                f"within {MAX_SEARCH_YEARS} years of JD {tjd_start}"
+                f"within {MAX_SEARCH_YEARS} years of JD {tjdut}"
             )
 
         jd_max_global = global_times[0]
@@ -2387,7 +2389,7 @@ def swe_sol_eclipse_when_loc(
         sum_radii = sun_radius + moon_radius
         if min_separation > sum_radii:
             # No eclipse visible from this location
-            if backward:
+            if backwards:
                 jd = jd_max_global - 1
             else:
                 jd = jd_max_global + 25
@@ -2445,7 +2447,7 @@ def swe_sol_eclipse_when_loc(
 
             if not horizon_eclipse_found:
                 # Eclipse truly not visible from this location
-                if backward:
+                if backwards:
                     jd = jd_max_global - 1
                 else:
                     jd = jd_max_global + 25
@@ -2568,8 +2570,8 @@ def swe_sol_eclipse_when_loc(
         # This is always computed regardless of whether the eclipse is central
         # at the observer's location — it represents the shadow cone geometry
         # projected through the observer's Sun altitude at maximum.
-        moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, ifl | SEFLG_SPEED)
-        sun_pos, _ = swe_calc_ut(jd_local_max, SE_SUN, ifl | SEFLG_SPEED)
+        moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, flags | SEFLG_SPEED)
+        sun_pos, _ = swe_calc_ut(jd_local_max, SE_SUN, flags | SEFLG_SPEED)
 
         moon_dist_au = moon_pos[2]
         sun_dist_au = sun_pos[2]
@@ -2677,7 +2679,7 @@ def swe_sol_eclipse_when_loc(
 
     raise RuntimeError(
         f"No solar eclipse visible from lon={lon}, lat={lat} "
-        f"within {MAX_SEARCH_YEARS} years of JD {tjd_start}"
+        f"within {MAX_SEARCH_YEARS} years of JD {tjdut}"
     )
 
 
@@ -2702,8 +2704,8 @@ def sol_eclipse_where(
 
 
 def swe_sol_eclipse_where(
-    tjd_ut: float,
-    ifl: int = SEFLG_SWIEPH,
+    tjdut: float,
+    flags: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the geographic location where a solar eclipse is at maximum at a given time.
@@ -2713,8 +2715,8 @@ def swe_sol_eclipse_where(
     for accurate geodetic calculations.
 
     Args:
-        tjd_ut: Julian Day (UT) during a solar eclipse
-        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+        tjdut: Julian Day (UT) during a solar eclipse
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
 
     Returns:
         Tuple containing:
@@ -2773,7 +2775,7 @@ def swe_sol_eclipse_where(
     # Get ephemeris and timescale
     eph = get_planets()
     ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
+    t = ts.ut1_jd(tjdut)
 
     # Get Earth, Sun, Moon objects
     earth = eph["earth"]
@@ -3035,12 +3037,12 @@ def swe_sol_eclipse_where(
     EARTH_FLATTENING_CALC = 1.0 / 298.257223563
 
     # Get Besselian elements at this time
-    x_bes = calc_besselian_x(tjd_ut, ifl)
-    y_bes = calc_besselian_y(tjd_ut, ifl)
-    d_bes = calc_besselian_d(tjd_ut, ifl)
-    mu_bes = calc_besselian_mu(tjd_ut, ifl)
-    l2_bes = calc_besselian_l2(tjd_ut, ifl)  # umbra/antumbra radius
-    l1_bes = calc_besselian_l1(tjd_ut, ifl)  # penumbra radius
+    x_bes = calc_besselian_x(tjdut, flags)
+    y_bes = calc_besselian_y(tjdut, flags)
+    d_bes = calc_besselian_d(tjdut, flags)
+    mu_bes = calc_besselian_mu(tjdut, flags)
+    l2_bes = calc_besselian_l2(tjdut, flags)  # umbra/antumbra radius
+    l1_bes = calc_besselian_l1(tjdut, flags)  # penumbra radius
 
     # Calculate gamma - distance from shadow axis to Earth center
     gamma = math.sqrt(x_bes * x_bes + y_bes * y_bes)
@@ -3196,7 +3198,7 @@ def swe_sol_eclipse_where(
         local_ratio
         if (eclipse_type & (SE_ECL_TOTAL | SE_ECL_ANNULAR))
         else magnitude,  # [8] Magnitude acc. to NASA
-        *_get_saros_info(tjd_ut, "solar"),  # [9] Saros, [10] member
+        *_get_saros_info(tjdut, "solar"),  # [9] Saros, [10] member
         0.0,  # [11] Reserved
         0.0,  # [12] Reserved
         0.0,  # [13] Reserved
@@ -3239,20 +3241,20 @@ def sol_eclipse_how(
 
 
 def swe_sol_eclipse_how(
-    tjd_ut: float,
+    tjdut: float,
     geopos: Sequence[float],
-    ifl: int = SEFLG_SWIEPH,
+    flags: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a solar eclipse at a specific location and time.
 
     This function does NOT search for eclipses - it assumes the caller knows
-    an eclipse is happening at tjd_ut and just calculates the circumstances
+    an eclipse is happening at tjdut and just calculates the circumstances
     at that exact moment from the specified location.
 
     Args:
-        tjd_ut: Julian Day (UT) of a specific time during an eclipse
-        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+        tjdut: Julian Day (UT) of a specific time during an eclipse
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
         geopos: Sequence of [longitude, latitude, altitude]:
             - longitude in degrees (East positive)
             - latitude in degrees (North positive)
@@ -3330,7 +3332,7 @@ def swe_sol_eclipse_how(
     earth = eph["earth"]
 
     # Get Skyfield time
-    t = ts.ut1_jd(tjd_ut)
+    t = ts.ut1_jd(tjdut)
 
     # Create observer position
     observer_at = earth + observer
@@ -3568,7 +3570,7 @@ def swe_sol_eclipse_how(
         ratio
         if (eclipse_type & (SE_ECL_TOTAL | SE_ECL_ANNULAR))
         else magnitude,  # [8] Magnitude acc. to NASA
-        *_get_saros_info(tjd_ut, "solar"),  # [9] Saros, [10] member
+        *_get_saros_info(tjdut, "solar"),  # [9] Saros, [10] member
         0.0,  # [11] reserved
         0.0,  # [12] reserved
         0.0,  # [13] reserved
@@ -4753,9 +4755,9 @@ def lun_eclipse_when(
 
 def swe_lun_eclipse_when(
     tjdut: float,
-    ifl: int = SEFLG_SWIEPH,
-    ifltype: int = 0,
-    backward: bool = False,
+    flags: int = SEFLG_SWIEPH,
+    ecltype: int = 0,
+    backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """Find the next (or previous) lunar eclipse globally (pyswisseph-compatible).
 
@@ -4763,14 +4765,14 @@ def swe_lun_eclipse_when(
 
     Args:
         tjdut: Julian Day (UT) to start search from.
-        ifl: Calculation flags (default SEFLG_SWIEPH).
-        ifltype: Eclipse type filter bitmask (0 = any).
-        backward: If True, search backward in time (not yet implemented).
+        flags: Calculation flags (default SEFLG_SWIEPH).
+        ecltype: Eclipse type filter bitmask (0 = any).
+        backwards: If True, search backward in time (not yet implemented).
 
     Returns:
         Tuple of (retflag, tret) matching pyswisseph.
     """
-    return lun_eclipse_when(tjdut, flags=ifl, eclipse_type=ifltype)
+    return lun_eclipse_when(tjdut, flags=flags, eclipse_type=ecltype)
 
 
 def lun_eclipse_when_loc(
@@ -5144,8 +5146,8 @@ def lun_eclipse_when_loc(
 def swe_lun_eclipse_when_loc(
     tjdut: float,
     geopos: "Sequence[float]",
-    ifl: int = SEFLG_SWIEPH,
-    backward: bool = False,
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """Find the next lunar eclipse visible from a geographic position (pyswisseph-compatible).
 
@@ -5154,8 +5156,8 @@ def swe_lun_eclipse_when_loc(
     Args:
         tjdut: Julian Day (UT) to start search from.
         geopos: Sequence of [longitude, latitude, altitude].
-        ifl: Calculation flags (default SEFLG_SWIEPH).
-        backward: If True, search backward in time (not yet implemented).
+        flags: Calculation flags (default SEFLG_SWIEPH).
+        backwards: If True, search backward in time (not yet implemented).
 
     Returns:
         Tuple of (retflag, tret, attr) matching pyswisseph.
@@ -5167,7 +5169,7 @@ def swe_lun_eclipse_when_loc(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    return lun_eclipse_when_loc(tjdut, lat, lon, altitude, ifl)
+    return lun_eclipse_when_loc(tjdut, lat, lon, altitude, flags)
 
 
 def lun_eclipse_how(
@@ -5356,9 +5358,9 @@ def lun_eclipse_how(
 
 
 def swe_lun_eclipse_how(
-    tjd_ut: float,
+    tjdut: float,
     geopos: Sequence[float],
-    ifl: int = SEFLG_SWIEPH,
+    flags: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate detailed circumstances of a lunar eclipse from a specific location.
@@ -5372,8 +5374,8 @@ def swe_lun_eclipse_how(
     the horizon from the observer's location.
 
     Args:
-        tjd_ut: Julian Day (UT) during a lunar eclipse
-        ifl: Calculation flags (SEFLG_SWIEPH, etc.)
+        tjdut: Julian Day (UT) during a lunar eclipse
+        flags: Calculation flags (SEFLG_SWIEPH, etc.)
         geopos: Sequence of [longitude, latitude, altitude]:
             - longitude in degrees (East positive) - NOTE: longitude first!
             - latitude in degrees (North positive)
@@ -5391,8 +5393,8 @@ def swe_lun_eclipse_how(
                 [1]: Penumbral eclipse magnitude
                 [2]: Reserved (0)
                 [3]: Reserved (0)
-                [4]: Azimuth of Moon at tjd_ut (degrees)
-                [5]: True altitude of Moon at tjd_ut (degrees)
+                [4]: Azimuth of Moon at tjdut (degrees)
+                [5]: True altitude of Moon at tjdut (degrees)
                 [6]: Apparent altitude of Moon with atmospheric refraction (degrees)
                 [7]: Distance of Moon center from shadow axis (in Moon radii)
                 [8]: Eclipse type at this moment (SE_ECL_TOTAL, SE_ECL_PARTIAL,
@@ -5455,7 +5457,7 @@ def swe_lun_eclipse_how(
     earth = eph["earth"]
 
     # Get Skyfield time
-    t = ts.ut1_jd(tjd_ut)
+    t = ts.ut1_jd(tjdut)
 
     # Create observer position
     observer_at = earth + observer
@@ -5500,7 +5502,7 @@ def swe_lun_eclipse_how(
         gamma,
         penumbra_radius,
         umbra_radius,
-    ) = _calculate_lunar_eclipse_type_and_magnitude(tjd_ut)
+    ) = _calculate_lunar_eclipse_type_and_magnitude(tjdut)
 
     # Calculate apparent diameters
     # Moon semi-diameter: 932.56 arcsec at mean distance 0.002569 AU
@@ -5511,7 +5513,7 @@ def swe_lun_eclipse_how(
 
     # Calculate distance from shadow axis in Moon radii
     # Get Moon's ecliptic latitude at this time
-    moon_pos, _ = swe_calc_ut(tjd_ut, SE_MOON, ifl | SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(tjdut, SE_MOON, flags | SEFLG_SPEED)
     moon_lat = moon_pos[1]
 
     # The center distance is how far the Moon center is from the shadow axis
@@ -5578,7 +5580,7 @@ def swe_lun_eclipse_how(
         apparent_altitude,  # [6] Apparent altitude with refraction
         center_distance_radii,  # [7] Distance from opposition (degrees)
         max(0.0, umbral_mag),  # [8] Eclipse magnitude (equals [0])
-        *_get_saros_info(tjd_ut, "lunar"),  # [9] Saros, [10] member
+        *_get_saros_info(tjdut, "lunar"),  # [9] Saros, [10] member
         0.0,  # [11] Reserved
         0.0,  # [12] Reserved
         0.0,  # [13] Reserved
@@ -5597,7 +5599,7 @@ def lun_occult_when_glob(
     tjdut: float,
     body: "int | str",
     flags: int = SEFLG_SWIEPH,
-    ifltype: int = 0,
+    ecltype: int = 0,
     backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
@@ -5615,7 +5617,7 @@ def lun_occult_when_glob(
             Use SE_MERCURY, SE_VENUS, etc. for planets.
             Use a star name string (e.g., "Regulus") for star occultations.
         flags: Calculation flags (SEFLG_SWIEPH, SEFLG_J2000, etc.)
-        ifltype: Bit flags for eclipse type filter (0 = any type):
+        ecltype: Bit flags for eclipse type filter (0 = any type):
             SE_ECL_CENTRAL, SE_ECL_NONCENTRAL, SE_ECL_TOTAL,
             SE_ECL_ANNULAR, SE_ECL_PARTIAL, SE_ECL_ANNULAR_TOTAL
         backwards: If True, search backward in time; if False, search forward.
@@ -7341,27 +7343,23 @@ _lun_occult_where_internal = lun_occult_where
 
 
 def swe_lun_occult_where(
-    tjd_ut: float,
-    ipl: int,
-    starname: str,
-    ifl: int = SEFLG_SWIEPH,
+    tjdut: float,
+    body: "int | str" = 0,
+    flags: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """Calculate where on Earth a lunar occultation is visible (pyswisseph-compatible).
 
-    Wrapper around lun_occult_where() matching pyswisseph's 4-parameter signature.
+    Wrapper around lun_occult_where() matching pyswisseph's signature.
 
     Args:
-        tjd_ut: Julian Day (UT) of the moment to calculate.
-        ipl: Planet ID (int). Use 0 when specifying a fixed star via starname.
-        starname: Star name (str). Use empty string "" when specifying a planet via ipl.
-        ifl: Calculation flags (default SEFLG_SWIEPH).
+        tjdut: Julian Day (UT) of the moment to calculate.
+        body: Planet identifier (int) or star name (str).
+        flags: Calculation flags (default SEFLG_SWIEPH).
 
     Returns:
         Tuple of (retflag, geopos, attr) matching pyswisseph.
     """
-    # Determine body: star name takes precedence if non-empty
-    body: "Union[int, str]" = starname if starname else ipl
-    return _lun_occult_where_internal(tjd_ut, body, ifl)
+    return _lun_occult_where_internal(tjdut, body, flags)
 
 
 # =============================================================================

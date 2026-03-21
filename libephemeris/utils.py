@@ -155,8 +155,8 @@ def cotrans_sp(
 
 
 def azalt(
-    jd: float,
-    calc_flag: int,
+    tjdut: float,
+    flag: int,
     geopos: Tuple[float, float, float],
     atpress: float,
     attemp: float,
@@ -172,8 +172,8 @@ def azalt(
     Compatible with the reference swe.azalt() API.
 
     Args:
-        jd: Julian Day in Universal Time (UT1)
-        calc_flag: Coordinate type flag:
+        tjdut: Julian Day in Universal Time (UT1)
+        flag: Coordinate type flag:
             - SE_ECL2HOR (0): Input is ecliptic (longitude, latitude, distance)
             - SE_EQU2HOR (1): Input is equatorial (RA, Dec, distance)
         geopos: Tuple of (longitude, latitude, altitude):
@@ -221,7 +221,7 @@ def azalt(
     # Get true obliquity (mean obliquity + nutation in obliquity)
     # This is needed for accurate ecliptic to equatorial conversion
     ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    t = ts.ut1_jd(tjdut)
     jd_tt = t.tt
 
     # Mean obliquity IAU 2006 (Hilton et al. 2006, via pyerfa)
@@ -235,7 +235,7 @@ def azalt(
     eps = eps0 + deps_deg  # True obliquity
 
     # Convert input coordinates to equatorial (RA, Dec) if ecliptic
-    if calc_flag == SE_ECL2HOR:
+    if flag == SE_ECL2HOR:
         # Input is ecliptic: convert to equatorial
         ecl_lon = coord[0]
         ecl_lat = coord[1]
@@ -253,7 +253,7 @@ def azalt(
 
     # Calculate Local Sidereal Time
     # Use apparent sidereal time (with nutation) for accuracy
-    lst_hours = _sidtime_internal(jd, lon, eps, dpsi_deg)
+    lst_hours = _sidtime_internal(tjdut, lon, eps, dpsi_deg)
     lst_deg = lst_hours * 15.0  # Convert hours to degrees
 
     # Calculate Hour Angle
@@ -312,7 +312,7 @@ def azalt(
             altitude,
             pressure,
             temperature,
-            calc_flag=SE_TRUE_TO_APP,
+            flag=SE_TRUE_TO_APP,
         )
     else:
         # No refraction correction
@@ -322,8 +322,8 @@ def azalt(
 
 
 def azalt_rev(
-    jd: float,
-    calc_flag: int,
+    tjdut: float,
+    flag: int,
     geopos: Tuple[float, float, float],
     azimuth: float,
     true_altitude: float,
@@ -342,8 +342,8 @@ def azalt_rev(
     using a refraction correction.
 
     Args:
-        jd: Julian Day in Universal Time (UT1)
-        calc_flag: Output coordinate type flag:
+        tjdut: Julian Day in Universal Time (UT1)
+        flag: Output coordinate type flag:
             - SE_HOR2EQU (1): Output is equatorial (RA, Dec)
             - SE_HOR2ECL (0): Output is ecliptic (longitude, latitude)
         geopos: Tuple of (longitude, latitude, altitude):
@@ -355,8 +355,8 @@ def azalt_rev(
 
     Returns:
         Tuple of (x1, x2) where:
-            - If calc_flag == SE_HOR2EQU: (Right Ascension, Declination) in degrees
-            - If calc_flag == SE_HOR2ECL: (Ecliptic longitude, Ecliptic latitude) in degrees
+            - If flag == SE_HOR2EQU: (Right Ascension, Declination) in degrees
+            - If flag == SE_HOR2ECL: (Ecliptic longitude, Ecliptic latitude) in degrees
 
     Example:
         >>> from libephemeris import azalt_rev, SE_HOR2EQU, julday
@@ -376,7 +376,7 @@ def azalt_rev(
     # Get true obliquity (mean obliquity + nutation in obliquity)
     # This is needed for accurate equatorial to ecliptic conversion
     ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    t = ts.ut1_jd(tjdut)
     jd_tt = t.tt
 
     # Mean obliquity IAU 2006 (Hilton et al. 2006, via pyerfa)
@@ -433,13 +433,13 @@ def azalt_rev(
 
     # Calculate Local Sidereal Time
     # Use apparent sidereal time (with nutation) for accuracy
-    lst_hours = _sidtime_internal(jd, lon, eps, dpsi_deg)
+    lst_hours = _sidtime_internal(tjdut, lon, eps, dpsi_deg)
     lst_deg = lst_hours * 15.0  # Convert hours to degrees
 
     # Calculate Right Ascension: RA = LST - H
     ra = (lst_deg - ha) % 360.0
 
-    if calc_flag == SE_HOR2EQU:
+    if flag == SE_HOR2EQU:
         # Return equatorial coordinates (RA, Dec)
         return (ra, dec)
     else:
@@ -450,10 +450,10 @@ def azalt_rev(
 
 
 def refrac(
-    altitude: float,
-    pressure: float = 1013.25,
-    temperature: float = 15.0,
-    calc_flag: int = SE_TRUE_TO_APP,
+    alt: float,
+    atpress: float = 1013.25,
+    attemp: float = 15.0,
+    flag: int = SE_TRUE_TO_APP,
 ) -> float:
     """
     Calculate true altitude from apparent altitude, or vice-versa.
@@ -468,13 +468,13 @@ def refrac(
     Compatible with the reference swe.refrac() API.
 
     Args:
-        altitude: Altitude in degrees. For SE_TRUE_TO_APP, this is the true
+        alt: Altitude in degrees. For SE_TRUE_TO_APP, this is the true
                   (geometric) altitude. For SE_APP_TO_TRUE, this is the apparent
                   (observed) altitude.
-        pressure: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
+        atpress: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
                   Use 0 to disable refraction correction (returns input altitude).
-        temperature: Atmospheric temperature in Celsius. Default is 15.0.
-        calc_flag: Direction of conversion:
+        attemp: Atmospheric temperature in Celsius. Default is 15.0.
+        flag: Direction of conversion:
             - SE_TRUE_TO_APP (0): Convert true altitude to apparent altitude
               (add refraction - object appears higher)
             - SE_APP_TO_TRUE (1): Convert apparent altitude to true altitude
@@ -508,16 +508,16 @@ def refrac(
     from .refraction import calc_refraction_true_to_app, calc_refraction_app_to_true
 
     # No refraction if pressure is zero or negative
-    if pressure <= 0:
-        return altitude
+    if atpress <= 0:
+        return alt
 
-    if calc_flag == SE_TRUE_TO_APP:
-        refr = calc_refraction_true_to_app(altitude, pressure, temperature)
-        apparent = altitude + refr
+    if flag == SE_TRUE_TO_APP:
+        refr = calc_refraction_true_to_app(alt, atpress, attemp)
+        apparent = alt + refr
         # Match reference API behaviour: if refraction can't bring
         # the object above 0°, return input unchanged.
         if apparent < 0:
-            return altitude
+            return alt
         return apparent
 
     else:
@@ -525,22 +525,22 @@ def refrac(
         # Compute the refraction at the geometric horizon to establish a
         # threshold: apparent altitudes below this value are returned
         # unchanged (the object is geometrically below the horizon).
-        horizon_refr = calc_refraction_true_to_app(0.0, pressure, temperature)
-        if altitude < horizon_refr:
-            return altitude
+        horizon_refr = calc_refraction_true_to_app(0.0, atpress, attemp)
+        if alt < horizon_refr:
+            return alt
 
-        refr = calc_refraction_app_to_true(altitude, pressure, temperature)
-        true_alt = altitude - refr
+        refr = calc_refraction_app_to_true(alt, atpress, attemp)
+        true_alt = alt - refr
         return true_alt
 
 
 def refrac_extended(
-    altitude: float,
-    altitude_geo: float,
-    pressure: float = 1013.25,
-    temperature: float = 15.0,
-    lapse_rate: Optional[float] = None,
-    calc_flag: int = SE_TRUE_TO_APP,
+    alt: float,
+    geoalt: float,
+    atpress: float = 1013.25,
+    attemp: float = 15.0,
+    lapserate: Optional[float] = None,
+    flag: int = SE_TRUE_TO_APP,
 ) -> Tuple[float, Tuple[float, float, float, float]]:
     """
     Calculate true altitude from apparent altitude, or vice-versa (extended).
@@ -553,19 +553,19 @@ def refrac_extended(
     Compatible with the reference swe.refrac_extended() API.
 
     Args:
-        altitude: Altitude of object above geometric horizon in degrees.
+        alt: Altitude of object above geometric horizon in degrees.
                   For SE_TRUE_TO_APP, this is the true (geometric) altitude.
                   For SE_APP_TO_TRUE, this is the apparent (observed) altitude.
-        altitude_geo: Altitude of observer above sea level in meters.
-        pressure: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
+        geoalt: Altitude of observer above sea level in meters.
+        atpress: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
                   Use 0 to disable refraction correction.
-        temperature: Atmospheric temperature at observer in degrees Celsius.
+        attemp: Atmospheric temperature at observer in degrees Celsius.
                      Default is 15.0.
-        lapse_rate: Temperature lapse rate dT/dh in degrees Kelvin per meter.
+        lapserate: Temperature lapse rate dT/dh in degrees Kelvin per meter.
                     Default is None (uses global value from set_lapse_rate(),
                     or 0.0065 K/m if not set).
                     Typical values range from 0.0034 to 0.010 K/m.
-        calc_flag: Direction of conversion:
+        flag: Direction of conversion:
             - SE_TRUE_TO_APP (0): Convert true altitude to apparent altitude
             - SE_APP_TO_TRUE (1): Convert apparent altitude to true altitude
 
@@ -609,35 +609,35 @@ def refrac_extended(
     )
 
     # Use global lapse rate if none provided
-    if lapse_rate is None:
-        lapse_rate = get_lapse_rate()
+    if lapserate is None:
+        lapserate = get_lapse_rate()
 
     # Compute refraction via ICAO ray-tracing (observer altitude aware)
-    if calc_flag == SE_TRUE_TO_APP:
-        true_alt = altitude
+    if flag == SE_TRUE_TO_APP:
+        true_alt = alt
         refraction = calc_refraction_true_to_app(
-            altitude, pressure, temperature, altitude_geo, lapse_rate
+            alt, atpress, attemp, geoalt, lapserate
         )
         apparent_alt = true_alt + refraction
     else:
-        apparent_alt = altitude
+        apparent_alt = alt
         refraction = calc_refraction_app_to_true(
-            altitude, pressure, temperature, altitude_geo, lapse_rate
+            alt, atpress, attemp, geoalt, lapserate
         )
         true_alt = apparent_alt - refraction
 
     # Dip of the horizon for elevated observers
-    dip = calc_dip(altitude_geo, lapse_rate)
+    dip = calc_dip(geoalt, lapserate)
 
     # Return the converted altitude and detail tuple
-    if calc_flag == SE_TRUE_TO_APP:
+    if flag == SE_TRUE_TO_APP:
         return (apparent_alt, (true_alt, apparent_alt, refraction, dip))
     else:
         return (true_alt, (true_alt, apparent_alt, refraction, dip))
 
 
 def cotrans(
-    coord: Tuple[float, float, float], obliquity: float
+    coord: Tuple[float, float, float], eps: float
 ) -> Tuple[float, float, float]:
     """
     Transform coordinates between ecliptic and equatorial systems.
@@ -650,7 +650,7 @@ def cotrans(
 
     Args:
         coord: Tuple of (longitude/RA, latitude/Dec, distance) in degrees
-        obliquity: Obliquity of the ecliptic in degrees.
+        eps: Obliquity of the ecliptic in degrees.
                    Negative for ecliptic→equatorial, positive for equatorial→ecliptic.
 
     Returns:
@@ -673,7 +673,7 @@ def cotrans(
     # Negate obliquity to match the pyswisseph API convention
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
-    eps_rad = math.radians(-obliquity)
+    eps_rad = math.radians(-eps)
 
     cos_eps = math.cos(eps_rad)
     sin_eps = math.sin(eps_rad)
@@ -707,7 +707,7 @@ def cotrans(
     return (new_lon, new_lat, dist)
 
 
-def degnorm(angle: float) -> float:
+def degnorm(x: float) -> float:
     """
     Normalize an angle to the range [0, 360).
 
@@ -715,7 +715,7 @@ def degnorm(angle: float) -> float:
     Equivalent to `angle % 360` but correctly handles negative numbers.
 
     Args:
-        angle: Angle in degrees (any value)
+        x: Angle in degrees (any value)
 
     Returns:
         Normalized angle in range [0, 360)
@@ -734,13 +734,13 @@ def degnorm(angle: float) -> float:
         >>> degnorm(720)
         0.0
     """
-    return angle % 360.0
+    return x % 360.0
 
 
 TWO_PI = 2.0 * math.pi
 
 
-def radnorm(angle: float) -> float:
+def radnorm(x: float) -> float:
     """
     Normalize an angle to the range [0, 2*pi).
 
@@ -748,7 +748,7 @@ def radnorm(angle: float) -> float:
     Equivalent to `angle % (2*pi)` but correctly handles negative numbers.
 
     Args:
-        angle: Angle in radians (any value)
+        x: Angle in radians (any value)
 
     Returns:
         Normalized angle in range [0, 2*pi)
@@ -768,7 +768,7 @@ def radnorm(angle: float) -> float:
         >>> radnorm(4 * math.pi)  # 720 degrees -> 0
         0.0
     """
-    return angle % TWO_PI
+    return x % TWO_PI
 
 
 def difdeg2n(p1: float, p2: float) -> float:
@@ -870,9 +870,9 @@ CS360 = 360 * 3600 * 100  # 129600000 centiseconds in a full circle
 CS180 = 180 * 3600 * 100  # 64800000 centiseconds in a half circle
 
 
-def difcs2n(a: int, b: int) -> int:
+def difcs2n(p1: int, p2: int) -> int:
     """
-    Calculate distance in centiseconds a - b normalized to [-180°, +180°].
+    Calculate distance in centiseconds p1 - p2 normalized to [-180°, +180°].
 
     This function computes the signed angular difference between two angles
     expressed in centiseconds (1/100 of an arcsecond), handling 360° wrapping.
@@ -881,8 +881,8 @@ def difcs2n(a: int, b: int) -> int:
     Compatible with the reference swe.difcs2n() API.
 
     Args:
-        a: First angle in centiseconds
-        b: Second angle in centiseconds
+        p1: First angle in centiseconds
+        p2: Second angle in centiseconds
 
     Returns:
         Normalized difference in range [-64800000, 64800000) centiseconds
@@ -904,15 +904,15 @@ def difcs2n(a: int, b: int) -> int:
         >>> difcs2n(64800000, 0)  # 180° - 0° = -180° (reference API convention)
         -64800000
     """
-    diff = (a - b) % CS360
+    diff = (p1 - p2) % CS360
     if diff >= CS180:
         diff -= CS360
     return diff
 
 
-def difcsn(a: int, b: int) -> int:
+def difcsn(p1: int, p2: int) -> int:
     """
-    Calculate distance in centiseconds a - b normalized to [0, 360°).
+    Calculate distance in centiseconds p1 - p2 normalized to [0, 360°).
 
     This function computes the angular difference between two angles
     expressed in centiseconds (1/100 of an arcsecond), handling 360° wrapping.
@@ -922,8 +922,8 @@ def difcsn(a: int, b: int) -> int:
     Compatible with the reference swe.difcsn() API.
 
     Args:
-        a: First angle in centiseconds
-        b: Second angle in centiseconds
+        p1: First angle in centiseconds
+        p2: Second angle in centiseconds
 
     Returns:
         Normalized difference in range [0, 129600000) centiseconds
@@ -945,7 +945,7 @@ def difcsn(a: int, b: int) -> int:
         >>> difcsn(0, 0)  # 0° - 0° = 0°
         0
     """
-    return (a - b) % CS360
+    return (p1 - p2) % CS360
 
 
 def csnorm(cs: int) -> int:
@@ -1114,7 +1114,7 @@ def cs2degstr(cs: int) -> str:
     return f"{degrees:3d}°{minutes:2d}'{seconds:2d}.{centisecs:02d}\""
 
 
-def cs2lonlatstr(cs: int, plus_char: "str | bytes", minus_char: "str | bytes") -> str:
+def cs2lonlatstr(cs: int, plus: "str | bytes", minus: "str | bytes") -> str:
     """
     Convert a value in centiseconds to a formatted longitude/latitude string.
 
@@ -1125,8 +1125,8 @@ def cs2lonlatstr(cs: int, plus_char: "str | bytes", minus_char: "str | bytes") -
 
     Args:
         cs: Angle in centiseconds (any integer value)
-        plus_char: Character to use for positive values (e.g., b"N" or b"E")
-        minus_char: Character to use for negative values (e.g., b"S" or b"W")
+        plus: Character to use for positive values (e.g., b"N" or b"E")
+        minus: Character to use for negative values (e.g., b"S" or b"W")
 
     Returns:
         Formatted string representing the angle with directional character.
@@ -1135,7 +1135,7 @@ def cs2lonlatstr(cs: int, plus_char: "str | bytes", minus_char: "str | bytes") -
 
     Notes:
         - 1 centisecond = 1/100 arcsecond = 1/360000 degree
-        - Positive values use plus_char, negative values use minus_char
+        - Positive values use plus, negative values use minus
         - Seconds are rounded to whole numbers (no centiseconds shown)
         - If seconds round to 0, the seconds portion is omitted
 
@@ -1148,16 +1148,16 @@ def cs2lonlatstr(cs: int, plus_char: "str | bytes", minus_char: "str | bytes") -
         "34E17'37"
     """
     # Decode bytes to str if needed
-    if isinstance(plus_char, bytes):
-        plus_char = plus_char.decode("ascii")
-    if isinstance(minus_char, bytes):
-        minus_char = minus_char.decode("ascii")
+    if isinstance(plus, bytes):
+        plus = plus.decode("ascii")
+    if isinstance(minus, bytes):
+        minus = minus.decode("ascii")
 
     # Determine direction character based on sign
     if cs >= 0:
-        direction = plus_char
+        direction = plus
     else:
-        direction = minus_char
+        direction = minus
         cs = -cs
 
     # Extract degrees, minutes, and seconds
@@ -1266,7 +1266,7 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
     return f"{hours:02d}{sep}{minutes:02d}{sep}{seconds:02d}"
 
 
-def deg_midp(a: float, b: float) -> float:
+def deg_midp(x1: float, x2: float) -> float:
     """
     Calculate the midpoint between two angles in degrees.
 
@@ -1275,8 +1275,8 @@ def deg_midp(a: float, b: float) -> float:
     350° and 10° is 0° (or equivalently 360°), not 180°.
 
     Args:
-        a: First angle in degrees (any value, will be normalized)
-        b: Second angle in degrees (any value, will be normalized)
+        x1: First angle in degrees (any value, will be normalized)
+        x2: Second angle in degrees (any value, will be normalized)
 
     Returns:
         Midpoint angle in range [0, 360)
@@ -1296,11 +1296,11 @@ def deg_midp(a: float, b: float) -> float:
         0.0
     """
     # Normalize both angles to [0, 360)
-    a = a % 360.0
-    b = b % 360.0
+    x1 = x1 % 360.0
+    x2 = x2 % 360.0
 
     # Calculate the difference
-    diff = b - a
+    diff = x2 - x1
 
     # When both arcs are equally long (diff exactly ±180) we follow the
     # pyswisseph convention: always take the positive (clockwise) half,
@@ -1313,13 +1313,13 @@ def deg_midp(a: float, b: float) -> float:
         diff = 180.0
 
     # Calculate midpoint along the chosen arc
-    midp = a + diff / 2.0
+    midp = x1 + diff / 2.0
 
     # Normalize result to [0, 360)
     return midp % 360.0
 
 
-def rad_midp(a: float, b: float) -> float:
+def rad_midp(x: float, y: float) -> float:
     """
     Calculate the midpoint between two angles in radians.
 
@@ -1328,8 +1328,8 @@ def rad_midp(a: float, b: float) -> float:
     5.5 radians and 0.5 radians is 0 (or equivalently 2*pi), not pi.
 
     Args:
-        a: First angle in radians (any value, will be normalized)
-        b: Second angle in radians (any value, will be normalized)
+        x: First angle in radians (any value, will be normalized)
+        y: Second angle in radians (any value, will be normalized)
 
     Returns:
         Midpoint angle in range [0, 2*pi)
@@ -1344,11 +1344,11 @@ def rad_midp(a: float, b: float) -> float:
         4.71238898038469
     """
     # Normalize both angles to [0, 2*pi)
-    a = a % TWO_PI
-    b = b % TWO_PI
+    x = x % TWO_PI
+    y = y % TWO_PI
 
     # Calculate the difference
-    diff = b - a
+    diff = y - x
 
     # When both arcs are equally long (diff exactly ±π) we follow the
     # pyswisseph convention: always take the positive (clockwise) half.
@@ -1360,13 +1360,13 @@ def rad_midp(a: float, b: float) -> float:
         diff = math.pi
 
     # Calculate midpoint along the chosen arc
-    midp = a + diff / 2.0
+    midp = x + diff / 2.0
 
     # Normalize result to [0, 2*pi)
     return midp % TWO_PI
 
 
-def d2l(value: float) -> int:
+def d2l(d: float) -> int:
     """
     Convert a double (float) to a long integer with rounding.
 
@@ -1377,10 +1377,10 @@ def d2l(value: float) -> int:
     Compatible with the pyswisseph swe.d2l() API.
 
     Args:
-        value: A floating-point number to convert.
+        d: A floating-point number to convert.
 
     Returns:
-        The nearest integer to value. For values exactly halfway between two
+        The nearest integer to d. For values exactly halfway between two
         integers, rounds away from zero (e.g., 0.5 -> 1, -0.5 -> -1).
 
     Notes:
@@ -1411,10 +1411,10 @@ def d2l(value: float) -> int:
         >>> d2l(-2.5)
         -3
     """
-    if value >= 0:
-        return int(value + 0.5)
+    if d >= 0:
+        return int(d + 0.5)
     else:
-        return int(value - 0.5)
+        return int(d - 0.5)
 
 
 # Split degree flags (imported from constants for convenience)
@@ -1504,7 +1504,7 @@ def _split_deg_nakshatra(
     return (ideg, imin, isec, secfr, nak_idx)
 
 
-def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float, int]:
+def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, int]:
     """
     Split a degree value into sign/nakshatra, degrees, minutes, seconds, and fraction.
 
@@ -1515,7 +1515,7 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
     Compatible with swe_split_deg().
 
     Args:
-        degrees: Position in decimal degrees (can be negative or > 360)
+        degree: Position in decimal degrees (can be negative or > 360)
         roundflag: Bit flags combination indicating how to round and format:
             - 0: Don't round, return all components with full precision
             - SPLIT_DEG_ROUND_SEC (1): Round to nearest second
@@ -1560,14 +1560,14 @@ def split_deg(degrees: float, roundflag: int = 0) -> Tuple[int, int, int, float,
     # Negative inputs never enter nakshatra mode; they are made positive
     # and flagged with sign_out = -1.  Non-negative inputs with the
     # NAKSHATRA flag take a dedicated path.
-    if degrees < 0:
+    if degree < 0:
         sign_out = -1
-        ddeg = -degrees
+        ddeg = -degree
     elif roundflag & SPLIT_DEG_NAKSHATRA:
-        return _split_deg_nakshatra(degrees, roundflag)
+        return _split_deg_nakshatra(degree, roundflag)
     else:
         sign_out = 1
-        ddeg = degrees
+        ddeg = degree
 
     # --- Rounding offset ---
     # The offset is applied to the *full* degree value before any

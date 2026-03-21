@@ -56,7 +56,7 @@ class TestLunarEclipsePenumbralContactsBasic:
     def test_p1_returns_float(self):
         """Test that P1 returns a float value."""
         jd_start = julday(2022, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -66,7 +66,7 @@ class TestLunarEclipsePenumbralContactsBasic:
     def test_p4_returns_float(self):
         """Test that P4 returns a float value."""
         jd_start = julday(2022, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_penumbral_fourth_contact_p4(jd_max)
@@ -76,7 +76,7 @@ class TestLunarEclipsePenumbralContactsBasic:
     def test_p1_accepts_flags_parameter(self):
         """Test that P1 accepts optional flags parameter."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_penumbral_first_contact_p1(
@@ -89,7 +89,7 @@ class TestLunarEclipsePenumbralContactsBasic:
     def test_p4_accepts_flags_parameter(self):
         """Test that P4 accepts optional flags parameter."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_penumbral_fourth_contact_p4(
@@ -106,7 +106,7 @@ class TestPenumbralContactTimingOrder:
     def test_p1_before_maximum(self):
         """Test that P1 occurs before eclipse maximum."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -117,7 +117,7 @@ class TestPenumbralContactTimingOrder:
     def test_p4_after_maximum(self):
         """Test that P4 occurs after eclipse maximum."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_p4 = calc_lunar_eclipse_penumbral_fourth_contact_p4(jd_max)
@@ -128,7 +128,7 @@ class TestPenumbralContactTimingOrder:
     def test_p1_before_p4(self):
         """Test that P1 occurs before P4."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -139,7 +139,7 @@ class TestPenumbralContactTimingOrder:
     def test_p1_p4_symmetric_around_maximum(self):
         """Test that P1 and P4 are roughly symmetric around maximum."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -167,7 +167,7 @@ class TestPenumbralContactKnownEclipses:
         - P4 (Penumbral ends): 2022 Nov 08 at 13:56:00 UT
         """
         jd_start = julday(2022, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Verify we found the right eclipse (November 8, 2022)
@@ -207,7 +207,7 @@ class TestPenumbralContactKnownEclipses:
         - P4 (Penumbral ends): 2022 May 16 at 06:50:54 UT
         """
         jd_start = julday(2022, 4, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Verify we found the right eclipse (May 16, 2022)
@@ -245,7 +245,7 @@ class TestPenumbralContactsWithLunEclipseWhen:
     def test_p1_matches_lun_eclipse_when_times6(self):
         """Test that P1 closely matches times[6] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # times[6] is penumbral eclipse beginning from lun_eclipse_when
@@ -265,7 +265,7 @@ class TestPenumbralContactsWithLunEclipseWhen:
     def test_p4_matches_lun_eclipse_when_times7(self):
         """Test that P4 closely matches times[7] from lun_eclipse_when."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # times[7] is penumbral eclipse ending from lun_eclipse_when
@@ -288,7 +288,7 @@ class TestPenumbralContactsPhysicalConstraints:
     def test_penumbral_duration_reasonable(self):
         """Test that P1 to P4 duration is physically reasonable."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -306,7 +306,7 @@ class TestPenumbralContactsPhysicalConstraints:
     def test_p1_to_max_reasonable(self):
         """Test that P1 to maximum duration is reasonable."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -322,7 +322,7 @@ class TestPenumbralContactsPhysicalConstraints:
     def test_max_to_p4_reasonable(self):
         """Test that maximum to P4 duration is reasonable."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_p4 = calc_lunar_eclipse_penumbral_fourth_contact_p4(jd_max)
@@ -342,7 +342,7 @@ class TestPenumbralContactsDifferentEclipseTypes:
     def test_partial_eclipse_has_penumbral_contacts(self):
         """Test that partial eclipses have valid P1 and P4."""
         jd_start = julday(2023, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -355,7 +355,7 @@ class TestPenumbralContactsDifferentEclipseTypes:
     def test_penumbral_only_eclipse_has_penumbral_contacts(self):
         """Test that penumbral-only eclipses have valid P1 and P4."""
         jd_start = julday(2020, 1, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         # Only test if we found a pure penumbral eclipse

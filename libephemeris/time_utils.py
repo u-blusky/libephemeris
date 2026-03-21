@@ -21,7 +21,7 @@ JD_GREGORIAN_REFORM = 2299161
 
 
 def swe_julday(
-    year: int, month: int, day: int, hour: float = 12.0, gregflag: int = SE_GREG_CAL
+    year: int, month: int, day: int, hour: float = 12.0, cal: int = SE_GREG_CAL
 ) -> float:
     """
     Convert calendar date to Julian Day number.
@@ -31,7 +31,7 @@ def swe_julday(
         month: Month (1-12)
         day: Day of month (1-31)
         hour: Decimal hour (0.0-23.999...)
-        gregflag: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        cal: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
 
     Returns:
         float: Julian Day number (days since JD 0.0 = noon Jan 1, 4713 BCE)
@@ -40,8 +40,8 @@ def swe_julday(
         Transition date: Oct 15, 1582 (Gregorian) = Oct 5, 1582 (Julian)
         JD 2451545.0 = Jan 1, 2000 12:00 TT (J2000.0 epoch)
     """
-    if gregflag not in (SE_GREG_CAL, SE_JUL_CAL):
-        raise ValueError(f"swisseph.julday: invalid calendar ({gregflag})")
+    if cal not in (SE_GREG_CAL, SE_JUL_CAL):
+        raise ValueError(f"swisseph.julday: invalid calendar ({cal})")
 
     if month <= 2:
         year -= 1
@@ -52,7 +52,7 @@ def swe_julday(
     # for negative years (e.g. int(-30/4)=-7 but floor(-30/4)=-8).
     a = _floor(year / 100)
 
-    if gregflag == SE_GREG_CAL:
+    if cal == SE_GREG_CAL:
         b = 2 - a + _floor(a / 4)
     else:
         b = 0
@@ -68,13 +68,13 @@ def swe_julday(
     return jd
 
 
-def swe_revjul(jd: float, gregflag: int = SE_GREG_CAL) -> tuple[int, int, int, float]:
+def swe_revjul(jd: float, cal: int = SE_GREG_CAL) -> tuple[int, int, int, float]:
     """
     Convert Julian Day number to calendar date.
 
     Args:
         jd: Julian Day number
-        gregflag: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        cal: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
 
     Returns:
         tuple: (year, month, day, hour) where:
@@ -87,16 +87,16 @@ def swe_revjul(jd: float, gregflag: int = SE_GREG_CAL) -> tuple[int, int, int, f
         Automatic Gregorian calendar used for JD >= 2299161 (Oct 15, 1582)
         unless Julian calendar explicitly requested.
     """
-    if gregflag not in (SE_GREG_CAL, SE_JUL_CAL):
-        raise ValueError(f"swisseph.revjul: invalid calendar ({gregflag})")
+    if cal not in (SE_GREG_CAL, SE_JUL_CAL):
+        raise ValueError(f"swisseph.revjul: invalid calendar ({cal})")
 
     jd = jd + 0.5
     z = _floor(jd)
     f = jd - z
 
-    # Always respect gregflag — SE uses proleptic Gregorian for ancient dates
+    # Always respect cal — SE uses proleptic Gregorian for ancient dates
     # when SE_GREG_CAL is requested, not auto-detection by JD threshold.
-    if gregflag == SE_GREG_CAL:
+    if cal == SE_GREG_CAL:
         alpha = _floor((z - 1867216.25) / 36524.25)
         a = z + 1 + alpha - _floor(alpha / 4)
     else:
@@ -126,12 +126,12 @@ def swe_revjul(jd: float, gregflag: int = SE_GREG_CAL) -> tuple[int, int, int, f
     return year, month, day, hour
 
 
-def swe_deltat(tjd: float) -> float:
+def swe_deltat(tjdut: float) -> float:
     """
     Calculate Delta T (TT - UT1) for a given Julian Day.
 
     Args:
-        tjd: Julian Day number in UT1
+        tjdut: Julian Day number in UT1
 
     Returns:
         float: Delta T in days (TT - UT1)
@@ -192,7 +192,7 @@ def swe_deltat(tjd: float) -> float:
         try:
             from . import iers_data
 
-            delta_t_seconds = iers_data.get_delta_t_iers(tjd)
+            delta_t_seconds = iers_data.get_delta_t_iers(tjdut)
             if delta_t_seconds is not None:
                 # IERS returns seconds, convert to days
                 return delta_t_seconds / 86400.0
@@ -201,13 +201,13 @@ def swe_deltat(tjd: float) -> float:
             pass
 
     ts = get_timescale()
-    t = ts.ut1_jd(tjd)
+    t = ts.ut1_jd(tjdut)
     # Skyfield returns delta_t in seconds, convert to days for reference API compatibility
     delta_t_seconds = float(t.delta_t)
     return delta_t_seconds / 86400.0
 
 
-def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> float:
+def swe_deltat_ex(tjdut: float, flag: int = SEFLG_SWIEPH) -> float:
     """
     Calculate Delta T (TT - UT1) with explicit ephemeris source specification.
 
@@ -215,8 +215,8 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> float:
     source for Delta T calculation.
 
     Args:
-        tjd: Julian Day number in UT1
-        ephe_flag: Ephemeris selection flag:
+        tjdut: Julian Day number in UT1
+        flag: Ephemeris selection flag:
             - SEFLG_SWIEPH (2): Use JPL/Skyfield ephemeris (default)
             - SEFLG_JPLEPH (1): Use JPL ephemeris
             - SEFLG_MOSEPH (4): Accepted for compatibility (same Delta T)
@@ -267,7 +267,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> float:
         return userdef_dt
 
     # Check for valid ephemeris flags
-    ephe_selection = ephe_flag & (SEFLG_JPLEPH | SEFLG_SWIEPH)
+    ephe_selection = flag & (SEFLG_JPLEPH | SEFLG_SWIEPH)
 
     # All ephemeris modes use the same Skyfield Delta T model
     # SEFLG_SWIEPH and SEFLG_JPLEPH both use Skyfield/JPL internally
@@ -279,7 +279,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> float:
         try:
             from . import iers_data
 
-            delta_t_seconds = iers_data.get_delta_t_iers(tjd)
+            delta_t_seconds = iers_data.get_delta_t_iers(tjdut)
             if delta_t_seconds is not None:
                 # IERS returns seconds, convert to days
                 return delta_t_seconds / 86400.0
@@ -288,7 +288,7 @@ def swe_deltat_ex(tjd: float, ephe_flag: int = SEFLG_SWIEPH) -> float:
             pass
 
     ts = get_timescale()
-    t = ts.ut1_jd(tjd)
+    t = ts.ut1_jd(tjdut)
     # Skyfield returns delta_t in seconds, convert to days for reference API compatibility
     delta_t_seconds = float(t.delta_t)
     delta_t = delta_t_seconds / 86400.0

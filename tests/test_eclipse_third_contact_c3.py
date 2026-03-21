@@ -47,7 +47,7 @@ class TestEclipseThirdContactC3BasicFunctionality:
         """Test that function returns a float value."""
         # Get a known total eclipse maximum (C3 exists for total eclipses)
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_eclipse_third_contact_c3(jd_max)
@@ -57,7 +57,7 @@ class TestEclipseThirdContactC3BasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_eclipse_third_contact_c3(jd_max, flags=SEFLG_SWIEPH)
@@ -82,7 +82,7 @@ class TestEclipseThirdContactC3TimingPrecision:
         We allow 300 seconds (5 minute) tolerance to account for these factors.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -114,7 +114,7 @@ class TestEclipseThirdContactC3TimingPrecision:
         C3 marks when annularity ends (antumbral shadow leaves Earth).
         """
         jd_start = julday(2023, 9, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
         jd_max = times[0]
 
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -168,7 +168,7 @@ class TestEclipseThirdContactC3ConsistencyWithSolEclipseWhenGlob:
         Our dedicated C3 function should produce the same result.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
         jd_third_glob = times[3]  # Third contact from sol_eclipse_when_glob
@@ -193,7 +193,7 @@ class TestEclipseThirdContactC3ConsistencyWithSolEclipseWhenGlob:
         ]
 
         for jd_start, ecl_type in eclipse_starts:
-            _, times = sol_eclipse_when_glob(jd_start, ifltype=ecl_type)
+            _, times = sol_eclipse_when_glob(jd_start, ecltype=ecl_type)
             jd_max = times[0]
             jd_third_glob = times[3]
 
@@ -213,7 +213,7 @@ class TestEclipseThirdContactC3PhysicalProperties:
     def test_c3_is_after_maximum(self):
         """Test that C3 is always after eclipse maximum."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -226,7 +226,7 @@ class TestEclipseThirdContactC3PhysicalProperties:
     def test_c3_is_after_c2(self):
         """Test that C3 is always after C2 (second contact)."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -241,7 +241,7 @@ class TestEclipseThirdContactC3PhysicalProperties:
         is typically 0.3-1.5 hours, depending on the eclipse geometry.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -257,7 +257,7 @@ class TestEclipseThirdContactC3PhysicalProperties:
     def test_c3_returns_nonzero_for_central_eclipse(self):
         """Test that C3 returns a non-zero value for central eclipses."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -272,7 +272,7 @@ class TestEclipseThirdContactC3PhysicalProperties:
         approximately equal to the duration from max to C3.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -306,7 +306,7 @@ class TestEclipseThirdContactC3PartialEclipses:
         """
         # Get a total eclipse and verify C3 exists (baseline)
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -320,7 +320,7 @@ class TestEclipseThirdContactC3PartialEclipses:
     def test_full_contact_order(self):
         """Test that contacts occur in correct order: C1 < C2 < max < C3."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -335,7 +335,7 @@ class TestEclipseThirdContactC3PartialEclipses:
     def test_c3_for_annular_eclipse(self):
         """Test C3 calculation for annular eclipse (antumbral shadow)."""
         jd_start = julday(2023, 9, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
         jd_max = times[0]
 
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -363,7 +363,7 @@ class TestEclipseThirdContactC3CentralPhaseDuration:
         1.5-3.5 hours for most eclipses.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -384,7 +384,7 @@ class TestEclipseThirdContactC3CentralPhaseDuration:
         ]
 
         for jd_start, ecl_type in eclipse_starts:
-            _, times = sol_eclipse_when_glob(jd_start, ifltype=ecl_type)
+            _, times = sol_eclipse_when_glob(jd_start, ecltype=ecl_type)
             jd_max = times[0]
 
             jd_c2 = calc_eclipse_second_contact_c2(jd_max)

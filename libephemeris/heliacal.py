@@ -1564,13 +1564,13 @@ def heliacal_ut(
 
 
 def swe_heliacal_ut(
-    jd_start: float,
+    tjdut: float,
     geopos: tuple,
-    datm: tuple,
-    dobs: tuple,
-    object_name: str,
-    event_type: int,
-    hel_flag: int = SEFLG_SWIEPH,
+    atmo: tuple,
+    observer: tuple,
+    objname: str,
+    eventtype: int,
+    flags: int = SEFLG_SWIEPH,
 ) -> Tuple[float, float, float]:
     """
     Calculate heliacal rising or setting time for a celestial body.
@@ -1580,32 +1580,32 @@ def swe_heliacal_ut(
     start date. It works between geographic latitudes 60S - 60N.
 
     Args:
-        jd_start: Julian Day (UT) to start search from for the heliacal event.
+        tjdut: Julian Day (UT) to start search from for the heliacal event.
         geopos: Geographic position as a sequence of at least 3 values:
             - [0]: Geographic longitude in degrees (east positive)
             - [1]: Geographic latitude in degrees (north positive)
             - [2]: Altitude above sea level in meters (eye height)
-        datm: Atmospheric conditions as a sequence of at least 4 values:
+        atmo: Atmospheric conditions as a sequence of at least 4 values:
             - [0]: Atmospheric pressure in mbar/hPa (default: 1013.25)
             - [1]: Atmospheric temperature in degrees Celsius (default: 15)
             - [2]: Relative humidity in percent (0-100) (default: 40)
             - [3]: If >= 1: Meteorological Range in km
                    If 0 < value < 1: Total atmospheric coefficient (ktot)
                    If 0: Calculate ktot from other parameters
-        dobs: Observer description as a sequence of at least 6 values:
+        observer: Observer description as a sequence of at least 6 values:
             - [0]: Age of observer in years (default: 36)
             - [1]: Snellen ratio of observer's eyes (default: 1.0 = normal)
             - [2]: 0 = monocular, 1 = binocular (used if SE_HELFLAG_OPTICAL_PARAMS)
             - [3]: Telescope magnification (0 = naked eye)
             - [4]: Optical aperture (telescope diameter) in mm
             - [5]: Optical transmission coefficient
-        object_name: Name of the celestial body. Can be:
+        objname: Name of the celestial body. Can be:
             - Planet name: "Sun", "Moon", "Mercury", "Venus", "Mars",
               "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"
             - Fixed star name: "Sirius", "Aldebaran", "Regulus", etc.
             Note: Sun and Moon are not valid for heliacal calculations
               and will raise a ValueError.
-        event_type: Type of heliacal event:
+        eventtype: Type of heliacal event:
             - SE_HELIACAL_RISING (1): Morning first visibility (heliacal rising)
               Exists for all visible planets and stars.
             - SE_HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
@@ -1614,10 +1614,10 @@ def swe_heliacal_ut(
               conjunction. Only valid for inner planets (Mercury, Venus).
             - SE_MORNING_LAST (4): Last morning visibility before superior
               conjunction. Only valid for inner planets (Mercury, Venus).
-        hel_flag: Calculation flags (bitmap). Contains ephemeris flags like
+        flags: Calculation flags (bitmap). Contains ephemeris flags like
             SEFLG_SWIEPH, plus heliacal-specific flags:
             - SE_HELFLAG_OPTICAL_PARAMS (512): Use optical instrument parameters
-              from dobs[2-5]. Without this flag, those values are ignored.
+              from observer[2-5]. Without this flag, those values are ignored.
             - SE_HELFLAG_NO_DETAILS (1024): Provide date only, skip visibility
               start/optimum/end details. Makes calculation faster.
             - SE_HELFLAG_VISLIM_DARK (4096): Function behaves as if Sun at nadir.
@@ -1694,14 +1694,14 @@ def swe_heliacal_ut(
     )
 
     # Validate event type
-    if event_type not in (
+    if eventtype not in (
         SE_HELIACAL_RISING,
         SE_HELIACAL_SETTING,
         SE_EVENING_FIRST,
         SE_MORNING_LAST,
     ):
         raise ValueError(
-            f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
+            f"Invalid event_type: {eventtype}. Use SE_HELIACAL_RISING, "
             "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
         )
 
@@ -1710,21 +1710,21 @@ def swe_heliacal_ut(
     lat = geopos[1] if len(geopos) > 1 else 0.0
     altitude = geopos[2] if len(geopos) > 2 else 0.0
 
-    # Parse datm with defaults per reference documentation
-    pressure = datm[0] if len(datm) > 0 and datm[0] > 0 else 1013.25
-    temperature = datm[1] if len(datm) > 1 else 15.0
-    humidity_pct = datm[2] if len(datm) > 2 else 40.0
-    # datm[3] is meteorological range / ktot, handled internally
+    # Parse atmo with defaults per reference documentation
+    pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
+    temperature = atmo[1] if len(atmo) > 1 else 15.0
+    humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
+    # atmo[3] is meteorological range / ktot, handled internally
 
     # Convert humidity from percent to 0-1 range for internal use
     humidity = humidity_pct / 100.0 if humidity_pct > 1.0 else humidity_pct
 
-    # Parse object_name to get body ID
-    body_id = _parse_object_name(object_name)
+    # Parse objname to get body ID
+    body_id = _parse_object_name(objname)
 
     # Call the internal heliacal_ut function
     jd_event, retflag = heliacal_ut(
-        jd_start=jd_start,
+        jd_start=tjdut,
         lat=lat,
         lon=lon,
         altitude=altitude,
@@ -1732,8 +1732,8 @@ def swe_heliacal_ut(
         temperature=temperature,
         humidity=humidity,
         body=body_id,
-        event_type=event_type,
-        flags=hel_flag,
+        event_type=eventtype,
+        flags=flags,
     )
 
     # Build the result as 3 floats matching pyswisseph API
@@ -1745,7 +1745,7 @@ def swe_heliacal_ut(
         jd1 = jd_event  # Start visibility
 
         # Calculate optimum and end visibility if details requested
-        if not (hel_flag & SE_HELFLAG_NO_DETAILS):
+        if not (flags & SE_HELFLAG_NO_DETAILS):
             # For detailed calculation, we estimate optimum and end times
             # based on typical visibility window durations
             # This is an approximation; full implementation would require
@@ -2290,13 +2290,13 @@ def heliacal_pheno_ut(
 
 
 def swe_heliacal_pheno_ut(
-    jd: float,
+    tjdut: float,
     geopos: tuple,
-    datm: tuple,
-    dobs: tuple,
-    object_name: str,
-    event_type: int,
-    hel_flag: int = SEFLG_SWIEPH,
+    atmo: tuple,
+    observer: tuple,
+    objname: str,
+    eventtype: int,
+    flags: int = SEFLG_SWIEPH,
 ) -> Tuple[float, ...]:
     """
     Provides data relevant for the calculation of heliacal risings and settings.
@@ -2306,13 +2306,13 @@ def swe_heliacal_pheno_ut(
     and returns a flat 50-element tuple.
 
     Args:
-        jd: Julian Day (UT) for the calculation
+        tjdut: Julian Day (UT) for the calculation
         geopos: Geographic position (lon, lat, alt_m)
-        datm: Atmospheric conditions (pressure, temperature, humidity%, met_range)
-        dobs: Observer description (age, snellen, binocular, mag, aperture, transmission)
-        object_name: Name of planet or fixed star (e.g., "Venus", "Sirius")
-        event_type: Type of heliacal event (1-4)
-        hel_flag: Calculation flags
+        atmo: Atmospheric conditions (pressure, temperature, humidity%, met_range)
+        observer: Observer description (age, snellen, binocular, mag, aperture, transmission)
+        objname: Name of planet or fixed star (e.g., "Venus", "Sirius")
+        eventtype: Type of heliacal event (1-4)
+        flags: Calculation flags
 
     Returns:
         Flat tuple of 50 floats with heliacal phenomena data.
@@ -2322,20 +2322,20 @@ def swe_heliacal_pheno_ut(
     lat = geopos[1] if len(geopos) > 1 else 0.0
     altitude = geopos[2] if len(geopos) > 2 else 0.0
 
-    # Parse datm with defaults
-    pressure = datm[0] if len(datm) > 0 and datm[0] > 0 else 1013.25
-    temperature = datm[1] if len(datm) > 1 else 15.0
-    humidity_pct = datm[2] if len(datm) > 2 else 40.0
+    # Parse atmo with defaults
+    pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
+    temperature = atmo[1] if len(atmo) > 1 else 15.0
+    humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
 
     # Convert humidity from percent to 0-1 range
     humidity = humidity_pct / 100.0 if humidity_pct > 1.0 else humidity_pct
 
-    # Parse object name to body ID
-    body_id = _parse_object_name(object_name)
+    # Parse objname to body ID
+    body_id = _parse_object_name(objname)
 
     # Call internal function
     dret, retflag = heliacal_pheno_ut(
-        jd=jd,
+        jd=tjdut,
         lat=lat,
         lon=lon,
         altitude=altitude,
@@ -2343,8 +2343,8 @@ def swe_heliacal_pheno_ut(
         temperature=temperature,
         humidity=humidity,
         body=body_id,
-        event_type=event_type,
-        flags=hel_flag,
+        event_type=eventtype,
+        flags=flags,
     )
 
     # Return flat 50-tuple (matching reference API)
@@ -2352,7 +2352,7 @@ def swe_heliacal_pheno_ut(
 
 
 def vis_limit_mag(
-    jd: float,
+    tjdut: float,
     geopos: tuple,
     atmo: tuple,
     observer: tuple,
@@ -2368,7 +2368,7 @@ def vis_limit_mag(
     status and detailed information about the observation conditions.
 
     Args:
-        jd: Julian Day (UT) for the observation time
+        tjdut: Julian Day (UT) for the observation time
         geopos: Geographic position as a sequence:
             - [0]: Geographic longitude in degrees (east positive)
             - [1]: Geographic latitude in degrees (north positive)
@@ -2495,7 +2495,7 @@ def vis_limit_mag(
     sun = eph["sun"]
     moon = eph["moon"]
 
-    t = ts.ut1_jd(jd)
+    t = ts.ut1_jd(tjdut)
     observer_at = earth + obs_location
 
     # Calculate Sun position
@@ -2547,7 +2547,7 @@ def vis_limit_mag(
         # Fixed star calculation
         try:
             star_result, star_name_out, retflag = swe_fixstar2_ut(
-                objname, jd, flags & 0xFF
+                objname, tjdut, flags & 0xFF
             )
 
             # star_result is (lon, lat, dist, lon_speed, lat_speed, dist_speed)
@@ -2567,7 +2567,7 @@ def vis_limit_mag(
             from .utils import azalt, SE_ECL2HOR
 
             hor_result = azalt(
-                jd,
+                tjdut,
                 SE_ECL2HOR,
                 (lon, lat, alt_m),
                 pressure,
@@ -2609,7 +2609,7 @@ def vis_limit_mag(
 
             # Get magnitude from pheno
             try:
-                pheno_result = swe_pheno_ut(jd, body_id, flags)
+                pheno_result = swe_pheno_ut(tjdut, body_id, flags)
                 obj_mag = pheno_result[4]  # Visual magnitude
             except Exception:
                 obj_mag = 0.0  # Default bright
@@ -2648,7 +2648,7 @@ def vis_limit_mag(
     moon_obj_angle = 180.0
     sun_obj_angle = 180.0
     try:
-        moon_pheno = swe_pheno_ut(jd, SE_MOON, flags & 0xFF)
+        moon_pheno = swe_pheno_ut(tjdut, SE_MOON, flags & 0xFF)
         phase_angle = moon_pheno[0]
         moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
 

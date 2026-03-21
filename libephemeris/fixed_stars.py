@@ -3955,7 +3955,7 @@ def _apply_fixstar_flags(
 
 
 def swe_fixstar_ut(
-    star_name: str, tjd_ut: float, iflag: int = SEFLG_SWIEPH
+    star: str, tjdut: float, flags: int = SEFLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Universal Time.
@@ -3963,9 +3963,9 @@ def swe_fixstar_ut(
     Reference API compatible function.
 
     Args:
-        star_name: Name of star (e.g. "Regulus", "Spica")
-        tjd_ut: Julian Day in Universal Time (UT1)
-        iflag: Calculation flags
+        star: Name of star (e.g. "Regulus", "Spica")
+        tjdut: Julian Day in Universal Time (UT1)
+        flags: Calculation flags
 
     Returns:
         Tuple containing:
@@ -3985,9 +3985,9 @@ def swe_fixstar_ut(
         >>> pos, name, retflag = swe_fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
-    iflag = _preprocess_flags(iflag)
+    flags = _preprocess_flags(flags)
 
-    star_id, error, canonical_name = _resolve_star_id(star_name)
+    star_id, error, canonical_name = _resolve_star_id(star)
     if error:
         raise Error(error)
 
@@ -3995,17 +3995,17 @@ def swe_fixstar_ut(
     from .state import get_timescale
 
     ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
+    t = ts.ut1_jd(tjdut)
 
     try:
-        noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
-        nogdefl = bool(iflag & SEFLG_NOGDEFL)
+        noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
+        nogdefl = bool(flags & SEFLG_NOGDEFL)
         # Compute natively in J2000 ecliptic frame when requested.
         # This avoids the ~5" error from precessing Skyfield's ecliptic-of-date
         # back to J2000 with a different precession model.
-        use_j2000 = bool(iflag & SEFLG_J2000)
+        use_j2000 = bool(flags & SEFLG_J2000)
 
-        if iflag & SEFLG_SPEED:
+        if flags & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
             )
@@ -4016,9 +4016,9 @@ def swe_fixstar_ut(
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        result = _apply_fixstar_flags(result, t.tt, iflag, j2000_native=use_j2000)
+        result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
 
-        return (result, canonical_name or "", iflag)
+        return (result, canonical_name or "", flags)
     except Error:
         raise
     except Exception as e:
@@ -4026,7 +4026,7 @@ def swe_fixstar_ut(
 
 
 def swe_fixstar(
-    star_name: str, jd: float, iflag: int = SEFLG_SWIEPH
+    star: str, tjdet: float, flags: int = SEFLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Terrestrial Time (TT).
@@ -4035,9 +4035,9 @@ def swe_fixstar(
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
 
     Args:
-        star_name: Name of star (e.g. "Regulus", "Spica")
-        jd: Julian Day in Terrestrial Time (TT/ET)
-        iflag: Calculation flags
+        star: Name of star (e.g. "Regulus", "Spica")
+        tjdet: Julian Day in Terrestrial Time (TT/ET)
+        flags: Calculation flags
 
     Returns:
         Tuple containing:
@@ -4057,31 +4057,31 @@ def swe_fixstar(
         >>> pos, name, retflag = swe_fixstar("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
-    iflag = _preprocess_flags(iflag)
+    flags = _preprocess_flags(flags)
 
-    star_id, error, canonical_name = _resolve_star_id(star_name)
+    star_id, error, canonical_name = _resolve_star_id(star)
     if error:
         raise Error(error)
 
     try:
-        noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
-        nogdefl = bool(iflag & SEFLG_NOGDEFL)
-        use_j2000 = bool(iflag & SEFLG_J2000)
+        noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
+        nogdefl = bool(flags & SEFLG_NOGDEFL)
+        use_j2000 = bool(flags & SEFLG_J2000)
 
-        if iflag & SEFLG_SPEED:
+        if flags & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, jd, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, jd, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        result = _apply_fixstar_flags(result, jd, iflag, j2000_native=use_j2000)
+        result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
 
-        return (result, canonical_name or "", iflag)
+        return (result, canonical_name or "", flags)
     except Error:
         raise
     except Exception as e:
@@ -4235,7 +4235,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
 
 
 def swe_fixstar2_ut(
-    star_name: str, tjd_ut: float, iflag: int = SEFLG_SWIEPH
+    star: str, tjdut: float, flags: int = SEFLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Universal Time with flexible lookup.
@@ -4250,9 +4250,9 @@ def swe_fixstar2_ut(
     of which star was matched when using partial searches.
 
     Args:
-        star_name: Star identifier (name, catalog number, or partial search)
-        tjd_ut: Julian Day in Universal Time (UT1)
-        iflag: Calculation flags
+        star: Star identifier (name, catalog number, or partial search)
+        tjdut: Julian Day in Universal Time (UT1)
+        flags: Calculation flags
 
     Returns:
         Tuple containing:
@@ -4276,23 +4276,23 @@ def swe_fixstar2_ut(
         >>> pos, name, retflag = swe_fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
-    iflag = _preprocess_flags(iflag)
+    flags = _preprocess_flags(flags)
 
-    entry, error = _resolve_star2(star_name)
+    entry, error = _resolve_star2(star)
     if error or entry is None:
         raise Error(error or "could not find star name")
 
     from .state import get_timescale
 
     ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
+    t = ts.ut1_jd(tjdut)
 
     try:
-        noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
-        nogdefl = bool(iflag & SEFLG_NOGDEFL)
-        use_j2000 = bool(iflag & SEFLG_J2000)
+        noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
+        nogdefl = bool(flags & SEFLG_NOGDEFL)
+        use_j2000 = bool(flags & SEFLG_J2000)
 
-        if iflag & SEFLG_SPEED:
+        if flags & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
             )
@@ -4304,9 +4304,9 @@ def swe_fixstar2_ut(
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         star_name_out = _format_star_name(entry)
-        result = _apply_fixstar_flags(result, t.tt, iflag, j2000_native=use_j2000)
+        result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
 
-        return (result, star_name_out, iflag)
+        return (result, star_name_out, flags)
     except Error:
         raise
     except Exception as e:
@@ -4314,7 +4314,7 @@ def swe_fixstar2_ut(
 
 
 def swe_fixstar2(
-    star_name: str, jd: float, iflag: int = SEFLG_SWIEPH
+    star: str, tjdet: float, flags: int = SEFLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Terrestrial Time with flexible lookup.
@@ -4328,9 +4328,9 @@ def swe_fixstar2(
     of which star was matched when using partial searches.
 
     Args:
-        star_name: Star identifier (name, catalog number, or partial search)
-        jd: Julian Day in Terrestrial Time (TT/ET)
-        iflag: Calculation flags
+        star: Star identifier (name, catalog number, or partial search)
+        tjdet: Julian Day in Terrestrial Time (TT/ET)
+        flags: Calculation flags
 
     Returns:
         Tuple containing:
@@ -4354,32 +4354,32 @@ def swe_fixstar2(
         >>> pos, name, retflag = swe_fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
-    iflag = _preprocess_flags(iflag)
+    flags = _preprocess_flags(flags)
 
-    entry, error = _resolve_star2(star_name)
+    entry, error = _resolve_star2(star)
     if error or entry is None:
         raise Error(error or "could not find star name")
 
     try:
-        noaberr = bool(iflag & SEFLG_NOABERR) or bool(iflag & SEFLG_TRUEPOS)
-        nogdefl = bool(iflag & SEFLG_NOGDEFL)
-        use_j2000 = bool(iflag & SEFLG_J2000)
+        noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
+        nogdefl = bool(flags & SEFLG_NOGDEFL)
+        use_j2000 = bool(flags & SEFLG_J2000)
 
-        if iflag & SEFLG_SPEED:
+        if flags & SEFLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, jd, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, jd, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         star_name_out = _format_star_name(entry)
-        result = _apply_fixstar_flags(result, jd, iflag, j2000_native=use_j2000)
+        result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
 
-        return (result, star_name_out, iflag)
+        return (result, star_name_out, flags)
     except Error:
         raise
     except Exception as e:
@@ -5517,7 +5517,7 @@ def get_hip_from_star_name(name: str) -> int | None:
     return None
 
 
-def swe_fixstar_mag(star_name: str) -> Tuple[float, str]:
+def swe_fixstar_mag(star: str) -> Tuple[float, str]:
     """
     Get the visual magnitude of a fixed star without calculating position.
 
@@ -5528,7 +5528,7 @@ def swe_fixstar_mag(star_name: str) -> Tuple[float, str]:
     raises Error if the star is not found.
 
     Args:
-        star_name: Name of star (e.g. "Regulus", "Spica")
+        star: Name of star (e.g. "Regulus", "Spica")
 
     Returns:
         Tuple containing:
@@ -5543,7 +5543,7 @@ def swe_fixstar_mag(star_name: str) -> Tuple[float, str]:
         >>> mag, name = swe_fixstar_mag("Regulus")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
     """
-    star_id, error, canonical_name = _resolve_star_id(star_name)
+    star_id, error, canonical_name = _resolve_star_id(star)
     if error:
         raise Error(error)
 
@@ -5557,11 +5557,11 @@ def swe_fixstar_mag(star_name: str) -> Tuple[float, str]:
             return (_STAR_MAGNITUDES[star_id], star_name_out)
 
     # Fallback: use canonical name if catalog entry not found
-    name_out = canonical_name or star_name
+    name_out = canonical_name or star
     return (_STAR_MAGNITUDES[star_id], name_out)
 
 
-def swe_fixstar2_mag(star_name: str) -> Tuple[float, str]:
+def swe_fixstar2_mag(star: str) -> Tuple[float, str]:
     """
     Get the visual magnitude of a fixed star with flexible lookup.
 
@@ -5577,7 +5577,7 @@ def swe_fixstar2_mag(star_name: str) -> Tuple[float, str]:
     raises Error if the star is not found.
 
     Args:
-        star_name: Star identifier (name, catalog number, or partial search)
+        star: Star identifier (name, catalog number, or partial search)
 
     Returns:
         Tuple containing:
@@ -5595,7 +5595,7 @@ def swe_fixstar2_mag(star_name: str) -> Tuple[float, str]:
         >>> mag, name = swe_fixstar2_mag("49669")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
     """
-    entry, error = _resolve_star2(star_name)
+    entry, error = _resolve_star2(star)
     if error or entry is None:
         raise Error(error or "could not find star name")
 

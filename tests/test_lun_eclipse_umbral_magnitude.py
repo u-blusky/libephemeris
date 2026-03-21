@@ -86,7 +86,7 @@ class TestUmbralMagnitudeValues:
         """Test that total lunar eclipse has umbral magnitude > 1.0 at maximum."""
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -100,7 +100,7 @@ class TestUmbralMagnitudeValues:
         """Test that partial lunar eclipse has 0 < umbral magnitude < 1.0."""
         # Find a partial lunar eclipse
         jd_start = julday(2023, 10, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -114,7 +114,7 @@ class TestUmbralMagnitudeValues:
         """Test that penumbral-only eclipse has umbral magnitude ~ 0."""
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -189,7 +189,7 @@ class TestUmbralMagnitudeConsistency:
         """Test that magnitude is highest at eclipse maximum."""
         # Find a lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # At maximum, magnitude should be the peak
@@ -290,7 +290,7 @@ class TestEdgeCases:
         """Test magnitude at eclipse maximum for total eclipse."""
         # Find a total lunar eclipse with all phases
         jd_start = julday(2022, 5, 1, 0)
-        _, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
 

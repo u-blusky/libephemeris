@@ -2,7 +2,7 @@
 Tests for the cs2lonlatstr centiseconds to longitude/latitude string conversion function.
 
 Tests verify that cs2lonlatstr correctly converts angles in centiseconds to
-formatted degree strings with directional characters (e.g., "45°30'00\" N").
+the compact pyswisseph format (e.g., "45N30", "122E15'30").
 """
 
 import libephemeris as ephem
@@ -23,11 +23,7 @@ class TestCs2lonlatstrBasic:
     def test_cs2lonlatstr_zero(self):
         """Test conversion of zero."""
         result = ephem.cs2lonlatstr(0, "N", "S")
-        assert "0" in result
-        assert "°" in result
-        assert "'" in result
-        assert '"' in result
-        assert "N" in result
+        assert result == "0N00"
 
     def test_cs2lonlatstr_returns_string(self):
         """Test that cs2lonlatstr returns a string."""
@@ -37,24 +33,7 @@ class TestCs2lonlatstrBasic:
     def test_cs2lonlatstr_one_degree(self):
         """Test conversion of exactly 1 degree."""
         result = ephem.cs2lonlatstr(CS1, "N", "S")
-        # Should contain 1 degree and N
-        assert "1°" in result
-        assert "N" in result
-
-    def test_cs2lonlatstr_contains_degree_symbol(self):
-        """Test that result contains the degree symbol."""
-        result = ephem.cs2lonlatstr(CS1 * 45, "N", "S")
-        assert "°" in result
-
-    def test_cs2lonlatstr_contains_minute_symbol(self):
-        """Test that result contains the minute symbol (')."""
-        result = ephem.cs2lonlatstr(CS1 * 45, "N", "S")
-        assert "'" in result
-
-    def test_cs2lonlatstr_contains_second_symbol(self):
-        """Test that result contains the second symbol (\")."""
-        result = ephem.cs2lonlatstr(CS1 * 45, "N", "S")
-        assert '"' in result
+        assert result == "1N00"
 
 
 class TestCs2lonlatstrDirectionalCharacters:
@@ -102,43 +81,31 @@ class TestCs2lonlatstrValues:
 
     def test_45_degrees_30_minutes(self):
         """Test conversion of 45°30'."""
-        # 45 degrees 30 minutes = 45*360000 + 30*6000 = 16380000 cs
         cs_value = 45 * CS1 + 30 * 6000
         result = ephem.cs2lonlatstr(cs_value, "N", "S")
-        assert "45°" in result
-        assert "30'" in result
-        assert "N" in result
+        assert result == "45N30"
 
     def test_122_degrees_15_minutes_30_seconds(self):
-        """Test conversion of 122°15'30\"."""
-        # 122 degrees 15 minutes 30 seconds
+        """Test conversion of 122°15'30"."""
         cs_value = 122 * CS1 + 15 * 6000 + 30 * 100
         result = ephem.cs2lonlatstr(cs_value, "E", "W")
-        assert "122°" in result
-        assert "15'" in result
-        assert '30"' in result
-        assert "E" in result
+        assert result == "122E15'30"
 
     def test_negative_longitude(self):
         """Test negative longitude (West)."""
         cs_value = -(122 * CS1 + 15 * 6000 + 30 * 100)
         result = ephem.cs2lonlatstr(cs_value, "E", "W")
-        assert "122°" in result
-        assert "15'" in result
-        assert '30"' in result
-        assert "W" in result
+        assert result == "122W15'30"
 
     def test_90_degrees_latitude(self):
         """Test 90° latitude (North Pole)."""
         result = ephem.cs2lonlatstr(90 * CS1, "N", "S")
-        assert "90°" in result
-        assert "N" in result
+        assert result == "90N00"
 
     def test_negative_90_degrees_latitude(self):
         """Test -90° latitude (South Pole)."""
         result = ephem.cs2lonlatstr(-90 * CS1, "N", "S")
-        assert "90°" in result
-        assert "S" in result
+        assert result == "90S00"
 
 
 class TestCs2lonlatstrRounding:
@@ -146,56 +113,47 @@ class TestCs2lonlatstrRounding:
 
     def test_round_up_centiseconds(self):
         """Test that centiseconds >= 50 round up to next second."""
-        # 1 degree 0 minutes 0.50 seconds should round to 1 second
         cs_value = CS1 + 50
         result = ephem.cs2lonlatstr(cs_value, "N", "S")
-        assert "1°" in result
-        assert ' 1"' in result or "'1\"" in result or "' 1\"" in result
+        assert result == "1N00'01"
 
     def test_round_down_centiseconds(self):
         """Test that centiseconds < 50 round down."""
-        # 1 degree 0 minutes 0.49 seconds should round to 0 seconds
         cs_value = CS1 + 49
         result = ephem.cs2lonlatstr(cs_value, "N", "S")
-        assert "1°" in result
-        assert ' 0"' in result
+        assert result == "1N00"
 
     def test_seconds_carry_to_minutes(self):
         """Test that 60 seconds rounds to next minute."""
-        # 1 degree 59 minutes 59.50 seconds should round to 2 degrees 0 minutes
         cs_value = CS1 + 59 * 6000 + 59 * 100 + 50
         result = ephem.cs2lonlatstr(cs_value, "N", "S")
-        assert "2°" in result
-        assert " 0'" in result
+        assert result == "2N00"
 
     def test_no_centiseconds_in_output(self):
         """Test that output does not contain centisecond decimals."""
-        # Unlike cs2degstr, cs2lonlatstr should show whole seconds only
         cs_value = CS1 + 45 * 100 + 78  # 1°0'45.78"
         result = ephem.cs2lonlatstr(cs_value, "N", "S")
         # Should show "46" (rounded from 45.78) not "45.78"
         assert ".78" not in result
+        assert result == "1N00'46"
 
 
 class TestCs2lonlatstrFormat:
     """Tests for output format consistency."""
 
-    def test_format_ends_with_direction(self):
-        """Test that the format ends with directional character."""
+    def test_format_direction_embedded(self):
+        """Test that direction char is embedded between degree and minutes."""
         result = ephem.cs2lonlatstr(CS1 * 45, "N", "S")
-        assert result.rstrip().endswith("N")
+        assert result == "45N00"
 
         result_neg = ephem.cs2lonlatstr(-CS1 * 45, "N", "S")
-        assert result_neg.rstrip().endswith("S")
+        assert result_neg == "45S00"
 
-    def test_format_contains_all_parts(self):
-        """Test that the format contains degrees, minutes, and seconds."""
-        result = ephem.cs2lonlatstr(45 * CS1 + 30 * 6000 + 15 * 100, "N", "S")
-        # Should have degree symbol, minute symbol, double quote, and direction
-        assert "°" in result
-        assert "'" in result
-        assert '"' in result
-        assert "N" in result
+    def test_format_with_seconds(self):
+        """Test format when seconds are present."""
+        cs_value = 45 * CS1 + 30 * 6000 + 15 * 100
+        result = ephem.cs2lonlatstr(cs_value, "N", "S")
+        assert result == "45N30'15"
 
 
 class TestCs2lonlatstrEdgeCases:
@@ -204,25 +162,27 @@ class TestCs2lonlatstrEdgeCases:
     def test_small_positive_value(self):
         """Test very small positive value."""
         result = ephem.cs2lonlatstr(1, "N", "S")
-        assert "0°" in result
-        assert "N" in result
+        assert result == "0N00"
 
     def test_small_negative_value(self):
         """Test very small negative value."""
         result = ephem.cs2lonlatstr(-1, "N", "S")
-        assert "0°" in result
-        assert "S" in result
+        assert result == "0S00"
 
     def test_180_degrees_longitude(self):
         """Test 180° longitude (dateline)."""
         result = ephem.cs2lonlatstr(180 * CS1, "E", "W")
-        assert "180°" in result
-        assert "E" in result
+        assert result == "180E00"
 
     def test_large_value(self):
         """Test large value beyond normal coordinate range."""
         result = ephem.cs2lonlatstr(360 * CS1, "E", "W")
-        assert "360°" in result
+        assert result == "360E00"
+
+    def test_30_minutes_only(self):
+        """Test 0 degrees 30 minutes."""
+        result = ephem.cs2lonlatstr(30 * 6000, "N", "S")
+        assert result == "0N30"
 
 
 class TestCs2lonlatstrTypicalUseCase:
@@ -230,49 +190,30 @@ class TestCs2lonlatstrTypicalUseCase:
 
     def test_rome_latitude(self):
         """Test latitude of Rome (~41°54' N)."""
-        # 41 degrees 54 minutes
         cs_value = 41 * CS1 + 54 * 6000
         result = ephem.cs2lonlatstr(cs_value, "N", "S")
-        assert "41°" in result
-        assert "54'" in result
-        assert "N" in result
+        assert result == "41N54"
 
     def test_rome_longitude(self):
         """Test longitude of Rome (~12°30' E)."""
-        # 12 degrees 30 minutes
         cs_value = 12 * CS1 + 30 * 6000
         result = ephem.cs2lonlatstr(cs_value, "E", "W")
-        assert "12°" in result
-        assert "30'" in result
-        assert "E" in result
-
-    def test_new_york_latitude(self):
-        """Test latitude of New York (~40°43' N)."""
-        cs_value = 40 * CS1 + 43 * 6000
-        result = ephem.cs2lonlatstr(cs_value, "N", "S")
-        assert "40°" in result
-        assert "43'" in result
-        assert "N" in result
+        assert result == "12E30"
 
     def test_new_york_longitude(self):
         """Test longitude of New York (~74°00' W)."""
         cs_value = -(74 * CS1)
         result = ephem.cs2lonlatstr(cs_value, "E", "W")
-        assert "74°" in result
-        assert "W" in result
+        assert result == "74W00"
 
     def test_sydney_latitude(self):
         """Test latitude of Sydney (~33°52' S)."""
         cs_value = -(33 * CS1 + 52 * 6000)
         result = ephem.cs2lonlatstr(cs_value, "N", "S")
-        assert "33°" in result
-        assert "52'" in result
-        assert "S" in result
+        assert result == "33S52"
 
     def test_sydney_longitude(self):
         """Test longitude of Sydney (~151°12' E)."""
         cs_value = 151 * CS1 + 12 * 6000
         result = ephem.cs2lonlatstr(cs_value, "E", "W")
-        assert "151°" in result
-        assert "12'" in result
-        assert "E" in result
+        assert result == "151E12"

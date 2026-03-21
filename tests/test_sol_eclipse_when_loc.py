@@ -346,13 +346,13 @@ class TestSweSwolEclipseWhenLocBackward:
     """Test backward search functionality."""
 
     def test_backward_finds_earlier_eclipse(self):
-        """Test that backward=True finds earlier eclipses."""
+        """Test that backwards=True finds earlier eclipses."""
         # Start from after April 2024 eclipse
         jd_start = julday(2024, 5, 1, 0)
         geopos = [-96.797, 32.7767, 0]  # Dallas
 
         retflag, tret, attr = swe_sol_eclipse_when_loc(
-            jd_start, geopos, SEFLG_SWIEPH, backward=True
+            jd_start, geopos, SEFLG_SWIEPH, backwards=True
         )
 
         # Should find eclipse before start date

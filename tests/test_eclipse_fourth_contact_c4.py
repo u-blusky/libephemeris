@@ -45,7 +45,7 @@ class TestEclipseFourthContactC4BasicFunctionality:
         """Test that function returns a float value."""
         # Get a known eclipse maximum
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_eclipse_fourth_contact_c4(jd_max)
@@ -55,7 +55,7 @@ class TestEclipseFourthContactC4BasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_eclipse_fourth_contact_c4(jd_max, flags=SEFLG_SWIEPH)
@@ -78,7 +78,7 @@ class TestEclipseFourthContactC4TimingPrecision:
         so we allow 120 seconds tolerance.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
@@ -105,7 +105,7 @@ class TestEclipseFourthContactC4TimingPrecision:
         This eclipse crossed North, Central, and South America.
         """
         jd_start = julday(2023, 9, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
         jd_max = times[0]
 
         jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
@@ -123,7 +123,7 @@ class TestEclipseFourthContactC4TimingPrecision:
     def test_december_2021_total_eclipse_c4(self):
         """Test December 4, 2021 total solar eclipse (Antarctica) fourth contact."""
         jd_start = julday(2021, 11, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
@@ -149,7 +149,7 @@ class TestEclipseFourthContactC4ConsistencyWithSolEclipseWhenGlob:
         Our dedicated C4 function should produce the same result.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
         jd_fourth_glob = times[4]  # Fourth contact from sol_eclipse_when_glob
@@ -174,7 +174,7 @@ class TestEclipseFourthContactC4ConsistencyWithSolEclipseWhenGlob:
         ]
 
         for jd_start, ecl_type in eclipse_starts:
-            _, times = sol_eclipse_when_glob(jd_start, ifltype=ecl_type)
+            _, times = sol_eclipse_when_glob(jd_start, ecltype=ecl_type)
             jd_max = times[0]
             jd_fourth_glob = times[4]
 
@@ -194,7 +194,7 @@ class TestEclipseFourthContactC4PhysicalProperties:
     def test_c4_is_after_maximum(self):
         """Test that C4 is always after eclipse maximum."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
@@ -210,7 +210,7 @@ class TestEclipseFourthContactC4PhysicalProperties:
         is typically 1.5-3 hours, depending on the eclipse geometry.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
@@ -226,7 +226,7 @@ class TestEclipseFourthContactC4PhysicalProperties:
     def test_c4_returns_nonzero_for_valid_eclipse(self):
         """Test that C4 returns a non-zero value for valid eclipses."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
@@ -263,7 +263,7 @@ class TestEclipseFourthContactC4EdgeCases:
         to the time from max to C4, unless the eclipse is asymmetric.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
 
@@ -285,7 +285,7 @@ class TestEclipseFourthContactC4EdgeCases:
     def test_total_eclipse_duration_c1_to_c4(self):
         """Test that total eclipse duration (C4 - C1) is physically reasonable."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)

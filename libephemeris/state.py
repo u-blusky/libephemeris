@@ -883,7 +883,7 @@ def set_jpl_file(filename: str) -> None:
     set_ephemeris_file(filename)
 
 
-def set_tid_acc(value: float) -> None:
+def set_tid_acc(acc: float) -> None:
     """
     Set the tidal acceleration used in Delta T calculations.
 
@@ -892,9 +892,9 @@ def set_tid_acc(value: float) -> None:
     calculations. Different JPL ephemeris files assume different values.
 
     Args:
-        value: Tidal acceleration in arcsec/century^2.
-               Use SE_TIDAL_* constants for standard ephemeris values,
-               or SE_TIDAL_AUTOMATIC (999999) to use the default.
+        acc: Tidal acceleration in arcsec/century^2.
+             Use SE_TIDAL_* constants for standard ephemeris values,
+             or SE_TIDAL_AUTOMATIC (999999) to use the default.
 
     Note:
         - The default value is based on DE440 (-25.936 arcsec/cy^2)
@@ -919,7 +919,7 @@ def set_tid_acc(value: float) -> None:
     global _TIDAL_ACCELERATION
     from .constants import SE_TIDAL_AUTOMATIC
 
-    _TIDAL_ACCELERATION = value if value != SE_TIDAL_AUTOMATIC else None
+    _TIDAL_ACCELERATION = acc if acc != SE_TIDAL_AUTOMATIC else None
 
 
 def get_tid_acc() -> float:
@@ -953,7 +953,7 @@ def get_tid_acc() -> float:
     return _TIDAL_ACCELERATION
 
 
-def set_delta_t_userdef(dt: Optional[float]) -> None:
+def set_delta_t_userdef(acc: Optional[float]) -> None:
     """
     Set a user-defined Delta T value to use instead of computed values.
 
@@ -965,9 +965,9 @@ def set_delta_t_userdef(dt: Optional[float]) -> None:
     - Experimentation with different Delta T assumptions
 
     Args:
-        dt: Delta T value in days (TT - UT1), or None to clear and resume
-            using computed values. The value should be in the same units
-            as returned by swe_deltat() (days, not seconds).
+        acc: Delta T value in days (TT - UT1), or None to clear and resume
+             using computed values. The value should be in the same units
+             as returned by swe_deltat() (days, not seconds).
 
     Note:
         - To convert from seconds to days, divide by 86400
@@ -989,7 +989,7 @@ def set_delta_t_userdef(dt: Optional[float]) -> None:
         True
     """
     global _DELTA_T_USERDEF
-    _DELTA_T_USERDEF = dt
+    _DELTA_T_USERDEF = acc
 
 
 def get_delta_t_userdef() -> Optional[float]:
@@ -1022,7 +1022,7 @@ def get_delta_t_userdef() -> Optional[float]:
 SE_LAPSE_RATE_DEFAULT: float = 0.0065
 
 
-def set_lapse_rate(lapse_rate: Optional[float]) -> None:
+def set_lapse_rate(lrate: Optional[float]) -> None:
     """
     Set the atmospheric temperature lapse rate for refraction calculations.
 
@@ -1031,9 +1031,9 @@ def set_lapse_rate(lapse_rate: Optional[float]) -> None:
     particularly the dip of the horizon for elevated observers.
 
     Args:
-        lapse_rate: Temperature lapse rate dT/dh in degrees Kelvin per meter.
-                    Use None to reset to the default value (0.0065 K/m).
-                    Typical values range from 0.0034 to 0.010 K/m.
+        lrate: Temperature lapse rate dT/dh in degrees Kelvin per meter.
+               Use None to reset to the default value (0.0065 K/m).
+               Typical values range from 0.0034 to 0.010 K/m.
 
     Note:
         - Standard atmospheric lapse rate is 0.0065 K/m (6.5°C per 1000m)
@@ -1054,7 +1054,7 @@ def set_lapse_rate(lapse_rate: Optional[float]) -> None:
         0.0065
     """
     global _LAPSE_RATE
-    _LAPSE_RATE = lapse_rate
+    _LAPSE_RATE = lrate
 
 
 def get_lapse_rate() -> float:
