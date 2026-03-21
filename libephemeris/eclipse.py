@@ -4682,6 +4682,11 @@ def lun_eclipse_when(
     MAX_SEARCH_YEARS = 20  # Maximum search range
     MAX_FULL_MOONS = int(MAX_SEARCH_YEARS * 12.4)  # ~12.4 lunations per year
 
+    # Mask out non-lunar eclipse type bits (CENTRAL=1, NONCENTRAL=2,
+    # ANNULAR=8, ANNULAR_TOTAL=32) — pyswisseph ignores these for lunar
+    # eclipses and treats them as "any type".
+    eclipse_type = eclipse_type & SE_ECL_ALLTYPES_LUNAR
+
     # If eclipse_type is 0, accept any type
     if eclipse_type == 0:
         eclipse_type = SE_ECL_ALLTYPES_LUNAR
