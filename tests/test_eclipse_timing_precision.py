@@ -36,7 +36,7 @@ class TestSolarEclipseTimingPrecision:
         - This is the most recent total solar eclipse visible from North America.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
 
         # Extract maximum eclipse time
         jd_max = times[0]
@@ -63,7 +63,7 @@ class TestSolarEclipseTimingPrecision:
         - Maximum eclipse: 2023 Oct 14 at 18:00:41 TDT (approximately 17:59:31 UT)
         """
         jd_start = julday(2023, 9, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_ANNULAR)
 
         jd_max = times[0]
 
@@ -107,7 +107,7 @@ class TestSolarEclipseTimingPrecision:
     def test_eclipse_contacts_ordering(self):
         """Test that eclipse contact times are in correct order."""
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
         jd_first = times[1]
@@ -130,7 +130,7 @@ class TestSolarEclipseTimingPrecision:
     def test_eclipse_duration_reasonable(self):
         """Test that eclipse phase durations are physically reasonable."""
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
         jd_first = times[1]
@@ -157,7 +157,7 @@ class TestLunarEclipseTimingPrecision:
         - Maximum eclipse (totality mid-point): 2022 Nov 08 at 10:59:08 UT
         """
         jd_start = julday(2022, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
 
@@ -181,7 +181,7 @@ class TestLunarEclipseTimingPrecision:
         - Maximum eclipse: 2022 May 16 at 04:11:28 UT
         """
         jd_start = julday(2022, 4, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
 
@@ -198,7 +198,7 @@ class TestLunarEclipseTimingPrecision:
     def test_lunar_eclipse_contacts_ordering(self):
         """Test that lunar eclipse phase times are in correct order."""
         jd_start = julday(2022, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
         jd_partial_begin = times[2]
@@ -289,7 +289,7 @@ class TestEclipseSearchFunctionality:
     def test_finds_correct_eclipse_date(self):
         """Test that eclipse search finds eclipses on correct dates."""
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
 

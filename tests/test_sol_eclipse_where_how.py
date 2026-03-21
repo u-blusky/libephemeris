@@ -220,8 +220,8 @@ class TestSweSolEclipseHowSignature:
         """Test that legacy sol_eclipse_how function works."""
         tjd_ut = 2460409.26
 
-        # Legacy signature: (jd, lat, lon, altitude, flags)
-        retflag, attr = sol_eclipse_how(tjd_ut, 32.7767, -96.797, 0, SEFLG_SWIEPH)
+        # Now aliases swe_ signature: (jd, geopos, ifl)
+        retflag, attr = sol_eclipse_how(tjd_ut, (-96.797, 32.7767, 0), SEFLG_SWIEPH)
         assert len(attr) == 20
 
 

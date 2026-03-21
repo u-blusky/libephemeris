@@ -321,11 +321,8 @@ lat, lon = 41.9028, 12.4964
 
 # Settore Gauquelin di Marte
 settore = ephem.gauquelin_sector(
-    jd, ephem.SE_MARS,
-    lat=lat, lon=lon,
-    altitude=0.0,
-    pressure=1013.25,
-    temperature=15.0
+    jd, ephem.SE_MARS, 0,
+    geopos=(lon, lat, 0.0)
 )
 
 num = int(settore)
@@ -515,4 +512,4 @@ In this chapter, we explored astrological houses, from theory to practice.
 - `house_name(hsys)` — returns the readable name of a house system (e.g., `house_name(ord('P'))` → `"Placidus"`)
 - `houses_with_fallback(jd, lat, lon, hsys, fallback_hsys)` — like `houses`, but with automatic fallback for polar latitudes
 - `get_extreme_latitude_info(lat)` — returns a dictionary with information on which systems work at a given latitude
-- `gauquelin_sector(jd, planet, lat, lon)` — calculates the Gauquelin sector (1–36) of a planet
+- `gauquelin_sector(jd, planet, method, geopos)` — calculates the Gauquelin sector (1–36) of a planet

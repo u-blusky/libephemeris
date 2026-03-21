@@ -597,9 +597,7 @@ def run_part7():
         label = f"Solar back #{i + 1}"
         try:
             se_res, se_tret = swe.sol_eclipse_when_glob(jd, backwards=True)
-            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(
-                jd, search_direction="backward"
-            )
+            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(jd, backward=True)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd -= 30
@@ -662,9 +660,7 @@ def run_part8():
         label = f"Total solar #{i + 1}"
         try:
             se_res, se_tret = swe.sol_eclipse_when_glob(jd, ecltype=SE_ECL_TOTAL)
-            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(
-                jd, eclipse_type=SE_ECL_TOTAL
-            )
+            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(jd, ifltype=SE_ECL_TOTAL)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd += 180
@@ -695,7 +691,7 @@ def run_part8():
         try:
             se_res, se_tret = swe.sol_eclipse_when_glob(jd, ecltype=SE_ECL_ANNULAR)
             le_res, le_tret = ephem.swe_sol_eclipse_when_glob(
-                jd, eclipse_type=SE_ECL_ANNULAR
+                jd, ifltype=SE_ECL_ANNULAR
             )
         except Exception as e:
             r.fail(f"{label}: {e}")
@@ -725,7 +721,7 @@ def run_part8():
         label = f"Total lunar #{i + 1}"
         try:
             se_res, se_tret = swe.lun_eclipse_when(jd, ecltype=SE_ECL_TOTAL)
-            le_res, le_tret = ephem.swe_lun_eclipse_when(jd, eclipse_type=SE_ECL_TOTAL)
+            le_res, le_tret = ephem.swe_lun_eclipse_when(jd, ifltype=SE_ECL_TOTAL)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd += 180
@@ -754,9 +750,7 @@ def run_part8():
         label = f"Penumbral lunar #{i + 1}"
         try:
             se_res, se_tret = swe.lun_eclipse_when(jd, ecltype=SE_ECL_PENUMBRAL)
-            le_res, le_tret = ephem.swe_lun_eclipse_when(
-                jd, eclipse_type=SE_ECL_PENUMBRAL
-            )
+            le_res, le_tret = ephem.swe_lun_eclipse_when(jd, ifltype=SE_ECL_PENUMBRAL)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd += 180

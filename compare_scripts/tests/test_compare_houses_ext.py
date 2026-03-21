@@ -271,7 +271,7 @@ class TestGauquelinSector:
         # LibEphemeris
         try:
             ret_py = pyephem.gauquelin_sector(
-                jd_standard, body_id, "", SEFLG_SWIEPH, 0, geopos, atpress, attemp
+                jd_standard, body_id, 0, geopos, atpress, attemp, SEFLG_SWIEPH
             )
             sector_py = ret_py[0] if isinstance(ret_py, tuple) else ret_py
         except Exception as e:

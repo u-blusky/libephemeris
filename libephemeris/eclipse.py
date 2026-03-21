@@ -2703,7 +2703,7 @@ def sol_eclipse_where(
 
 def swe_sol_eclipse_where(
     tjd_ut: float,
-    ifl: int,
+    ifl: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the geographic location where a solar eclipse is at maximum at a given time.
@@ -9040,7 +9040,7 @@ def vis_limit_mag(
     observer: tuple,
     objname: str,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[int, Tuple[float, ...]]:
+) -> Tuple[float, Tuple[float, ...]]:
     """
     Calculate the limiting visual magnitude for observing a celestial body.
 
@@ -9307,7 +9307,7 @@ def vis_limit_mag(
             moon_az,
             obj_mag,
         )
-        return SE_HELFLAG_BELOW_HORIZON, dret
+        return float(SE_HELFLAG_BELOW_HORIZON), dret
 
     # Apply HELFLAG options
     use_dark_sky = bool(flags & SE_HELFLAG_VISLIM_DARK)
@@ -9451,7 +9451,7 @@ def vis_limit_mag(
         apparent_obj_mag,  # 7: Apparent magnitude of object (with extinction)
     )
 
-    return vision_type, dret
+    return float(vision_type), dret
 
 
 # =============================================================================

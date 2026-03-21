@@ -37,7 +37,7 @@ class TestNodApsBasic:
     def test_nod_aps_ut_returns_4_tuples(self):
         """nod_aps_ut should return 4 position tuples."""
         jd = 2451545.0  # J2000
-        result = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
+        result = ephem.nod_aps_ut(jd, SE_MARS, SE_NODBIT_MEAN)
 
         assert isinstance(result, tuple)
         assert len(result) == 4
@@ -58,7 +58,7 @@ class TestNodApsBasic:
     def test_position_elements_are_floats(self):
         """All position elements should be floats."""
         jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
+        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, SE_NODBIT_MEAN)
 
         for name, pos in [
             ("nasc", nasc),
@@ -73,7 +73,7 @@ class TestNodApsBasic:
     def test_sun_returns_zeros(self):
         """Sun should return zero positions (no heliocentric orbit)."""
         jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_SUN, 0, SE_NODBIT_MEAN)
+        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_SUN, SE_NODBIT_MEAN)
 
         # All positions should be zero for Sun
         assert nasc[0] == 0.0
@@ -85,7 +85,7 @@ class TestNodApsBasic:
     def test_earth_returns_zeros(self):
         """Earth should return zero positions (no heliocentric orbit)."""
         jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_EARTH, 0, SE_NODBIT_MEAN)
+        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_EARTH, SE_NODBIT_MEAN)
 
         assert nasc[0] == 0.0
         assert peri[0] == 0.0
@@ -103,7 +103,7 @@ class TestNodApsOrbitalRelationships:
     def test_nodes_have_near_zero_latitude(self):
         """Nodes should have near-zero latitude (on ecliptic by definition)."""
         jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
+        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, SE_NODBIT_MEAN)
 
         assert abs(nasc[1]) < 0.01, f"Ascending node latitude {nasc[1]} should be ~0"
         assert abs(ndsc[1]) < 0.01, f"Descending node latitude {ndsc[1]} should be ~0"
@@ -113,7 +113,7 @@ class TestNodApsOrbitalRelationships:
         """Apsides should have non-zero latitude for inclined orbits."""
         jd = 2451545.0
         # Pluto has high inclination (~17°)
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_PLUTO, 0, SE_NODBIT_MEAN)
+        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_PLUTO, SE_NODBIT_MEAN)
 
         # Pluto's apsides should have measurable latitude
         # (depending on argument of perihelion)
@@ -125,7 +125,7 @@ class TestNodApsOrbitalRelationships:
     def test_geocentric_distances_are_positive(self):
         """All geocentric distances should be positive."""
         jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
+        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SE_MARS, SE_NODBIT_MEAN)
 
         assert nasc[2] > 0, "Ascending node geocentric distance should be positive"
         assert ndsc[2] > 0, "Descending node geocentric distance should be positive"
@@ -153,7 +153,7 @@ class TestNodApsAllPlanets:
     def test_all_planets_return_valid_positions(self, planet_id, planet_name):
         """All planets should return valid node/apse positions."""
         jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, planet_id, 0, SE_NODBIT_MEAN)
+        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, planet_id, SE_NODBIT_MEAN)
 
         # Longitudes should be in valid range
         assert 0 <= nasc[0] < 360, f"{planet_name} ascending node longitude invalid"
@@ -179,7 +179,7 @@ class TestNodApsAllPlanets:
     def test_longitudes_differ_between_planets(self, planet_id, planet_name):
         """Different planets should have different node/apse longitudes."""
         jd = 2451545.0
-        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, planet_id, 0, SE_NODBIT_MEAN)
+        nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, planet_id, SE_NODBIT_MEAN)
 
         # All four longitudes should be distinct (geocentric projection
         # of different orbital elements)
@@ -202,8 +202,8 @@ class TestNodApsMethods:
         """Both MEAN and OSCU methods should work."""
         jd = 2451545.0
 
-        result_mean = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
-        result_oscu = ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_OSCU)
+        result_mean = ephem.nod_aps_ut(jd, SE_MARS, SE_NODBIT_MEAN)
+        result_oscu = ephem.nod_aps_ut(jd, SE_MARS, SE_NODBIT_OSCU)
 
         # Both should return valid results
         assert len(result_mean) == 4
@@ -222,8 +222,8 @@ class TestNodApsTimeVariation:
         jd_2000 = 2451545.0
         jd_2100 = jd_2000 + 36525  # 100 years later
 
-        result_2000 = ephem.nod_aps_ut(jd_2000, SE_MARS, 0, SE_NODBIT_MEAN)
-        result_2100 = ephem.nod_aps_ut(jd_2100, SE_MARS, 0, SE_NODBIT_MEAN)
+        result_2000 = ephem.nod_aps_ut(jd_2000, SE_MARS, SE_NODBIT_MEAN)
+        result_2100 = ephem.nod_aps_ut(jd_2100, SE_MARS, SE_NODBIT_MEAN)
 
         # Nodes should have precessed
         diff = abs(result_2100[0][0] - result_2000[0][0])
@@ -238,8 +238,8 @@ class TestNodApsTimeVariation:
         jd_2000 = 2451545.0
         jd_2100 = jd_2000 + 36525
 
-        result_2000 = ephem.nod_aps_ut(jd_2000, SE_MARS, 0, SE_NODBIT_MEAN)
-        result_2100 = ephem.nod_aps_ut(jd_2100, SE_MARS, 0, SE_NODBIT_MEAN)
+        result_2000 = ephem.nod_aps_ut(jd_2000, SE_MARS, SE_NODBIT_MEAN)
+        result_2100 = ephem.nod_aps_ut(jd_2100, SE_MARS, SE_NODBIT_MEAN)
 
         # Perihelion should advance
         diff = result_2100[2][0] - result_2000[2][0]
@@ -259,7 +259,7 @@ class TestNodApsAliases:
     @pytest.mark.unit
     def test_swe_nod_aps_ut_alias(self):
         """swe_nod_aps_ut should be available."""
-        result = ephem.swe_nod_aps_ut(2451545.0, SE_MARS, 0, SE_NODBIT_MEAN)
+        result = ephem.swe_nod_aps_ut(2451545.0, SE_MARS, SE_NODBIT_MEAN)
         assert len(result) == 4
 
     @pytest.mark.unit
@@ -271,7 +271,7 @@ class TestNodApsAliases:
     @pytest.mark.unit
     def test_nod_aps_ut_alias(self):
         """nod_aps_ut should be available."""
-        result = ephem.nod_aps_ut(2451545.0, SE_MARS, 0, SE_NODBIT_MEAN)
+        result = ephem.nod_aps_ut(2451545.0, SE_MARS, SE_NODBIT_MEAN)
         assert len(result) == 4
 
     @pytest.mark.unit
@@ -297,7 +297,7 @@ class TestNodApsMethodologyWarning:
         jd = 2451545.0
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            ephem.nod_aps_ut(jd, SE_MERCURY, 0, SE_NODBIT_MEAN)
+            ephem.nod_aps_ut(jd, SE_MERCURY, SE_NODBIT_MEAN)
 
             helio_warnings = [
                 warning
@@ -314,7 +314,7 @@ class TestNodApsMethodologyWarning:
         jd = 2451545.0
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            ephem.nod_aps_ut(jd, SE_VENUS, 0, SE_NODBIT_MEAN)
+            ephem.nod_aps_ut(jd, SE_VENUS, SE_NODBIT_MEAN)
 
             helio_warnings = [
                 warning
@@ -331,7 +331,7 @@ class TestNodApsMethodologyWarning:
         jd = 2451545.0
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            ephem.nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_MEAN)
+            ephem.nod_aps_ut(jd, SE_MARS, SE_NODBIT_MEAN)
 
             helio_warnings = [
                 warning
@@ -348,7 +348,7 @@ class TestNodApsMethodologyWarning:
         jd = 2451545.0
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            ephem.nod_aps_ut(jd, SE_JUPITER, 0, SE_NODBIT_MEAN)
+            ephem.nod_aps_ut(jd, SE_JUPITER, SE_NODBIT_MEAN)
 
             helio_warnings = [
                 warning
@@ -365,7 +365,7 @@ class TestNodApsMethodologyWarning:
         jd = 2451545.0
         with warnings.catch_warnings(record=True) as w:
             warnings.filterwarnings("ignore", category=ephem.HeliocentricNodApsWarning)
-            ephem.nod_aps_ut(jd, SE_MERCURY, 0, SE_NODBIT_MEAN)
+            ephem.nod_aps_ut(jd, SE_MERCURY, SE_NODBIT_MEAN)
 
             # No HeliocentricNodApsWarning should be recorded when filtered
             helio_warnings = [

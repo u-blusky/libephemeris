@@ -45,7 +45,7 @@ class TestEclipseNorthernLimitBasicFunctionality:
     def test_returns_three_tuples(self):
         """Test that function returns a tuple of three tuples."""
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_c1 = times_ecl[1]  # First contact
         jd_c4 = times_ecl[4]  # Fourth contact
 
@@ -61,7 +61,7 @@ class TestEclipseNorthernLimitBasicFunctionality:
     def test_returns_same_length_tuples(self):
         """Test that all returned tuples have the same length."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_c1 = times_ecl[1]
         jd_c4 = times_ecl[4]
 
@@ -72,7 +72,7 @@ class TestEclipseNorthernLimitBasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_c1 = times_ecl[1]
         jd_c4 = times_ecl[4]
 
@@ -94,7 +94,7 @@ class TestEclipseNorthernLimitTotalEclipse:
         the central line throughout.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
 
         assert ecl_type & SE_ECL_TOTAL, "Should find a total eclipse"
 
@@ -118,7 +118,7 @@ class TestEclipseNorthernLimitTotalEclipse:
     def test_northern_limit_times_monotonic(self):
         """Test that times are monotonically increasing."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_c1 = times_ecl[1]
         jd_c4 = times_ecl[4]
 
@@ -133,7 +133,7 @@ class TestEclipseNorthernLimitTotalEclipse:
     def test_northern_limit_latitudes_valid(self):
         """Test that all latitudes are in valid range."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_c1 = times_ecl[1]
         jd_c4 = times_ecl[4]
 
@@ -145,7 +145,7 @@ class TestEclipseNorthernLimitTotalEclipse:
     def test_northern_limit_longitudes_normalized(self):
         """Test that all longitudes are normalized to [-180, 180]."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_c1 = times_ecl[1]
         jd_c4 = times_ecl[4]
 
@@ -161,9 +161,7 @@ class TestEclipseNorthernLimitAnnularEclipse:
     def test_annular_eclipse_northern_limit(self):
         """Test annular eclipse northern limit calculation."""
         jd_start = julday(2023, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(
-            jd_start, eclipse_type=SE_ECL_ANNULAR
-        )
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_ANNULAR)
 
         if ecl_type & SE_ECL_ANNULAR:
             jd_c1 = times_ecl[1]
@@ -196,7 +194,7 @@ class TestEclipseNorthernLimitVsCentralLine:
         but should hold for most mid-eclipse points.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
 
         if not (ecl_type & SE_ECL_TOTAL):
             pytest.skip("No total eclipse found")
@@ -251,7 +249,7 @@ class TestEclipseNorthernLimitVsCentralLine:
     def test_northern_limit_different_from_central_line(self):
         """Test that northern limit coordinates differ from central line."""
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
 
         if not (ecl_type & SE_ECL_TOTAL):
             pytest.skip("No total eclipse found")
@@ -280,7 +278,7 @@ class TestEclipseNorthernLimitStepSize:
     def test_smaller_step_gives_more_points(self):
         """Test that smaller step size produces more points."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_c1 = times_ecl[1]
         jd_c4 = times_ecl[4]
 
@@ -293,7 +291,7 @@ class TestEclipseNorthernLimitStepSize:
     def test_default_step_is_one_minute(self):
         """Test that default step size is 1 minute."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_c1 = times_ecl[1]
         jd_c4 = times_ecl[4]
 
@@ -325,7 +323,7 @@ class TestEclipseNorthernLimitEdgeCases:
     def test_single_point_for_very_short_range(self):
         """Test that very short time range gives at least one point if valid."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times_ecl[0]  # Maximum eclipse time
 
         # Calculate at just the maximum moment
@@ -347,9 +345,7 @@ class TestEclipseNorthernLimitMultipleEclipses:
 
         for _ in range(3):  # Test 3 total eclipses
             try:
-                ecl_type, times_ecl = sol_eclipse_when_glob(
-                    jd, eclipse_type=SE_ECL_TOTAL
-                )
+                ecl_type, times_ecl = sol_eclipse_when_glob(jd, ifltype=SE_ECL_TOTAL)
             except RuntimeError:
                 break
 
@@ -386,7 +382,7 @@ class TestEclipseNorthernLimitPhysicalReasonableness:
         which translates to roughly 0.0 to 2.0 degrees of latitude.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
 
         if not (ecl_type & SE_ECL_TOTAL):
             pytest.skip("No total eclipse found")

@@ -792,7 +792,7 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
 
 
 def swe_calc_ut(
-    tjd_ut: float, ipl: int, iflag: int
+    tjd_ut: float, ipl: int, iflag: int = SEFLG_SWIEPH | SEFLG_SPEED
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """
     Calculate planetary position for Universal Time.
@@ -903,7 +903,7 @@ def swe_calc_ut(
 
 
 def swe_calc(
-    tjd: float, ipl: int, iflag: int
+    tjd: float, ipl: int, iflag: int = SEFLG_SWIEPH | SEFLG_SPEED
 ) -> tuple[tuple[float, float, float, float, float, float], int]:
     """
     Calculate planetary position for Ephemeris Time (ET/TT).
@@ -984,7 +984,7 @@ def swe_calc(
 
 
 def swe_calc_pctr(
-    tjd_ut: float, ipl: int, iplctr: int, iflag: int
+    tjd_ut: float, ipl: int, iplctr: int, iflag: int = SEFLG_SWIEPH | SEFLG_SPEED
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """
     Calculate planetary position as seen from another planet (planet-centric).
@@ -3827,8 +3827,8 @@ PosTuple = Tuple[float, float, float, float, float, float]
 def swe_nod_aps_ut(
     tjd_ut: float,
     ipl: int,
-    iflag: int,
-    method: int,
+    method: int = SE_NODBIT_MEAN,
+    iflag: int = SEFLG_SWIEPH | SEFLG_SPEED,
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
     """
     Calculate planetary nodes and apsides for Universal Time.
@@ -3843,12 +3843,12 @@ def swe_nod_aps_ut(
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
         ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
-        iflag: Calculation flags (SEFLG_SPEED, etc.)
         method: Method for node/apse calculation:
             - SE_NODBIT_MEAN (1): Mean orbital elements (averaged)
             - SE_NODBIT_OSCU (2): Osculating elements (instantaneous)
             - SE_NODBIT_OSCU_BAR (4): Barycentric osculating elements
             - SE_NODBIT_FOPOINT (256): Include focal point
+        iflag: Calculation flags (SEFLG_SPEED, etc.)
 
     Returns:
         Tuple of 4 position tuples, each containing 6 floats:
@@ -3859,7 +3859,7 @@ def swe_nod_aps_ut(
 
     Example:
         >>> from libephemeris import swe_nod_aps_ut, SE_MARS, SE_NODBIT_MEAN
-        >>> nasc, ndsc, peri, aphe = swe_nod_aps_ut(2451545.0, SE_MARS, 0, SE_NODBIT_MEAN)
+        >>> nasc, ndsc, peri, aphe = swe_nod_aps_ut(2451545.0, SE_MARS, SE_NODBIT_MEAN)
         >>> print(f"Mars ascending node: {nasc[0]:.4f}°")
         >>> print(f"Mars perihelion: {peri[0]:.4f}°")
 
@@ -3876,8 +3876,8 @@ def swe_nod_aps_ut(
 def swe_nod_aps(
     tjd_et: float,
     ipl: int,
-    method: int,
-    iflag: int = SEFLG_SPEED,
+    method: int = SE_NODBIT_MEAN,
+    iflag: int = SEFLG_SWIEPH | SEFLG_SPEED,
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
     """
     Calculate planetary nodes and apsides for Ephemeris Time (ET/TT).
@@ -3885,14 +3885,11 @@ def swe_nod_aps(
     Reference API compatible function. Similar to swe_nod_aps_ut() but takes
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
 
-    Note: the reference API uses a different argument order than swe_nod_aps_ut.
-    nod_aps(tjdet, planet, method, flags) vs nod_aps_ut(tjdut, planet, flags, method)
-
     Args:
         tjd_et: Julian Day in Terrestrial Time (TT/ET)
         ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
         method: Method for node/apse calculation (SE_NODBIT_MEAN, etc.)
-        iflag: Calculation flags (default: SEFLG_SPEED)
+        iflag: Calculation flags (default: SEFLG_SWIEPH | SEFLG_SPEED)
 
     Returns:
         Same as swe_nod_aps_ut: (xnasc, xndsc, xperi, xaphe)
@@ -4999,7 +4996,9 @@ def _calc_moon_magnitude(
     return base + dist_correction
 
 
-def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
+def swe_pheno_ut(
+    tjd_ut: float, ipl: int, iflag: int = SEFLG_SWIEPH
+) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Universal Time.
 
@@ -5039,7 +5038,7 @@ def swe_pheno_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     return _calc_pheno(t, ipl, iflag)
 
 
-def swe_pheno(tjd_et: float, ipl: int, iflag: int) -> Tuple[float, ...]:
+def swe_pheno(tjd_et: float, ipl: int, iflag: int = SEFLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Ephemeris Time (TT/ET).
 

@@ -5516,37 +5516,48 @@ def get_hip_from_star_name(name: str) -> int | None:
     return None
 
 
-def swe_fixstar_mag(star_name: str) -> float:
+def swe_fixstar_mag(star_name: str) -> Tuple[float, str]:
     """
     Get the visual magnitude of a fixed star without calculating position.
 
     Lightweight function that returns only the magnitude, useful for
     visibility calculations where position is not needed.
 
-    Compatible with pyswisseph: returns a bare float on success,
+    Compatible with pyswisseph: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:
         star_name: Name of star (e.g. "Regulus", "Spica")
 
     Returns:
-        Visual magnitude as a float (e.g. 1.40 for Regulus).
+        Tuple containing:
+            - magnitude: Visual magnitude (float, e.g. 1.40 for Regulus)
+            - star_name_out: Full star name "Name,Nomenclature"
+              (e.g. "Regulus,alLeo")
 
     Raises:
         Error: If the star cannot be found or magnitude is unavailable.
 
     Example:
-        >>> mag = swe_fixstar_mag("Regulus")
-        >>> print(f"Regulus magnitude: {mag}")  # 1.40
+        >>> mag, name = swe_fixstar_mag("Regulus")
+        >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
     """
-    star_id, error, _canonical_name = _resolve_star_id(star_name)
+    star_id, error, canonical_name = _resolve_star_id(star_name)
     if error:
         raise Error(error)
 
-    if star_id in _STAR_MAGNITUDES:
-        return _STAR_MAGNITUDES[star_id]
-    else:
+    if star_id not in _STAR_MAGNITUDES:
         raise Error(f"Magnitude not available for star ID {star_id}")
+
+    # Build "Name,Nomenclature" format matching pyswisseph
+    for entry in STAR_CATALOG:
+        if entry.id == star_id:
+            star_name_out = _format_star_name(entry)
+            return (_STAR_MAGNITUDES[star_id], star_name_out)
+
+    # Fallback: use canonical name if catalog entry not found
+    name_out = canonical_name or star_name
+    return (_STAR_MAGNITUDES[star_id], name_out)
 
 
 def swe_fixstar2_mag(star_name: str) -> Tuple[float, str]:

@@ -2358,7 +2358,7 @@ def vis_limit_mag(
     observer: tuple,
     objname: str,
     flags: int = SEFLG_SWIEPH,
-) -> Tuple[int, Tuple[float, ...]]:
+) -> Tuple[float, Tuple[float, ...]]:
     """
     Calculate the limiting visual magnitude for observing a celestial body.
 
@@ -2620,7 +2620,7 @@ def vis_limit_mag(
     if obj_alt < 0:
         # Match reference API: return all zeros in data when below horizon
         dret = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        return SE_HELFLAG_BELOW_HORIZON, dret
+        return float(SE_HELFLAG_BELOW_HORIZON), dret
 
     # Apply HELFLAG options
     use_dark_sky = bool(flags & SE_HELFLAG_VISLIM_DARK)
@@ -2705,7 +2705,7 @@ def vis_limit_mag(
         0.0,  # 9: Reserved
     )
 
-    return vision_type, dret
+    return float(vision_type), dret
 
 
 # Alias for reference API compatibility

@@ -354,17 +354,16 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 1, 1, 0.0)
 lat, lon = 30.0, 31.2  # Cairo (where the Egyptians observed it)
 
-jd_event, ret = ephem.heliacal_ut(
-    jd, lat, lon,
-    altitude=0.0,
-    pressure=1013.25,
-    temperature=25.0,
-    humidity=0.3,
-    body=ephem.SE_SIRIUS,   # Sirius
-    event_type=ephem.SE_HELIACAL_RISING  # morning heliacal rising
+jd_event, *_ = ephem.heliacal_ut(
+    jd,
+    geopos=(31.2, 30.0, 0.0),      # Cairo (lon, lat, alt)
+    datm=(1013.25, 25.0, 30.0, 0.0),  # pressure, temp, humidity%, lapse
+    dobs=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    object_name="Sirius",
+    event_type=ephem.SE_HELIACAL_RISING
 )
 
-if ret > 0:
+if jd_event > 0:
     y, m, d, h = ephem.revjul(jd_event)
     print(f"Heliacal rising of Sirius in Cairo: {d:.0f}/{m:.0f}/{y:.0f}")
 ```
@@ -563,8 +562,8 @@ In this chapter, we learned how to calculate when celestial bodies are visible i
 - `rise_trans_true_hor(jd, planet, lat, lon, horizon_altitude=0.0, rsmi=...)` — like `rise_trans` but with a custom horizon altitude
 - `refrac(altitude, pressure, temperature, calc_flag)` — converts between true and apparent altitude (or vice versa), taking refraction into account
 - `refrac_extended(altitude, altitude_geo, ...)` — extended refraction with dip of the horizon for observers at high altitudes
-- `heliacal_ut(jd, lat, lon, body=..., event_type=...)` — finds the date of a heliacal event (first/last visibility)
-- `swe_heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — version with full control over the atmosphere and observer
+- `heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — finds the date of a heliacal event (first/last visibility)
+- `swe_heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — same function (bare name is now an alias)
 - `vis_limit_mag(jd, geopos, atmo, observer, objname)` — determines whether an object is visible by comparing limiting magnitude and apparent magnitude
 - `calc_airmass(altitude)` — calculates the air mass the light passes through
 - `calc_extinction_magnitude(altitude)` — calculates how many magnitudes of light are lost due to atmospheric extinction
