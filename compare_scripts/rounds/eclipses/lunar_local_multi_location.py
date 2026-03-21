@@ -56,8 +56,8 @@ def safe_lun_when_loc(jd_start, lat, lon, alt=0.0):
         return None, f"SE error: {e}"
 
     try:
-        # libephemeris: lun_eclipse_when_loc(jd, lat, lon, alt, flags)
-        le_ret = ephem.lun_eclipse_when_loc(jd_start, lat, lon, alt, SEFLG_SWIEPH)
+        # libephemeris: lun_eclipse_when_loc(jd, geopos, flags)
+        le_ret = ephem.lun_eclipse_when_loc(jd_start, (lon, lat, alt), SEFLG_SWIEPH)
         le_flag = le_ret[0]
         le_tret = le_ret[1]
         le_attr = le_ret[2]

@@ -280,9 +280,7 @@ class TestSolarEclipseEdgeCases:
         # Antarctica, unlikely to see most eclipses
         result = sol_eclipse_when_loc(
             times_glob[0] - 0.1,  # Start before max
-            lat=-80.0,
-            lon=0.0,
-            altitude=0.0,
+            geopos=(0.0, -80.0, 0.0),
         )
 
         # Either no eclipse visible or very shallow
@@ -305,7 +303,7 @@ class TestLunarEclipseEdgeCases:
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PENUMBRAL)
 
         # Should find a penumbral eclipse
         assert ecl_type & SE_ECL_PENUMBRAL
@@ -320,7 +318,7 @@ class TestLunarEclipseEdgeCases:
         # Find a partial lunar eclipse
         jd_start = julday(2021, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PARTIAL)
 
         # Should find a partial eclipse
         assert ecl_type & SE_ECL_PARTIAL

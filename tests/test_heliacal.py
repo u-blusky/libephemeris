@@ -40,75 +40,95 @@ class TestHeliacalBasic:
         # Start from January 1, 2024
         jd_start = julday(2024, 1, 1, 0)
         # Rome, Italy
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         # Venus synodic period is ~584 days, so the next heliacal rising
         # after inferior conjunction may be up to ~500 days away
-        assert jd_event > jd_start
-        assert jd_event < jd_start + 600
-        assert retflag == SE_HELIACAL_RISING
+        assert result[0] > jd_start
+        assert result[0] < jd_start + 600
 
     def test_mercury_heliacal_rising_returns_valid_result(self):
         """Test that Mercury heliacal rising returns a valid Julian Day."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964  # Rome
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_HELIACAL_RISING,
         )
 
         # Mercury has ~3 synodic periods per year, so should find one quickly
-        assert jd_event > jd_start
-        assert jd_event < jd_start + 120  # Within ~4 months
-        assert retflag == SE_HELIACAL_RISING
+        assert result[0] > jd_start
+        assert result[0] < jd_start + 120  # Within ~4 months
 
     def test_jupiter_heliacal_rising(self):
         """Test Jupiter heliacal rising."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 51.5074, -0.1278  # London
+        geopos = (-0.1278, 51.5074, 0.0)  # London
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Jupiter",
+            SE_HELIACAL_RISING,
         )
 
-        assert jd_event > jd_start
-        assert jd_event < jd_start + 400  # Within a bit more than a year
-        assert retflag == SE_HELIACAL_RISING
+        assert result[0] > jd_start
+        assert result[0] < jd_start + 400  # Within a bit more than a year
 
     def test_saturn_heliacal_rising(self):
         """Test Saturn heliacal rising."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 40.7128, -74.0060  # New York
+        geopos = (-74.0060, 40.7128, 0.0)  # New York
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_SATURN, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Saturn",
+            SE_HELIACAL_RISING,
         )
 
         # Saturn may not have heliacal rising within search window for all start dates
-        # Just verify it returns a valid response (either found or not found)
-        assert retflag in (SE_HELIACAL_RISING, -1)
-        if retflag == SE_HELIACAL_RISING:
-            assert jd_event > jd_start
-            assert jd_event < jd_start + 400
+        # Just verify it returns a valid response
+        if result[0] > 0:
+            assert result[0] > jd_start
+            assert result[0] < jd_start + 400
 
     def test_mars_heliacal_rising(self):
         """Test Mars heliacal rising."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 35.6762, 139.6503  # Tokyo
+        geopos = (139.6503, 35.6762, 0.0)  # Tokyo
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mars",
+            SE_HELIACAL_RISING,
         )
 
         # Mars has ~780 day synodic period, may not have event in window
-        assert retflag in (SE_HELIACAL_RISING, -1)
-        if retflag == SE_HELIACAL_RISING:
-            assert jd_event > jd_start
-            assert jd_event < jd_start + 780
+        if result[0] > 0:
+            assert result[0] > jd_start
+            assert result[0] < jd_start + 780
 
 
 class TestHeliacalEventTypes:
@@ -117,67 +137,104 @@ class TestHeliacalEventTypes:
     def test_heliacal_setting(self):
         """Test heliacal setting (evening last visibility)."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964  # Rome
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_SETTING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_SETTING,
         )
 
-        assert jd_event > jd_start
-        assert retflag == SE_HELIACAL_SETTING
+        assert result[0] > jd_start
 
     def test_evening_first(self):
         """Test evening first visibility (after superior conjunction)."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964  # Rome
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_EVENING_FIRST
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_EVENING_FIRST,
         )
 
         # May or may not find this event depending on current position
         # Just verify it returns something valid
-        assert retflag in (SE_EVENING_FIRST, -1)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_morning_last(self):
         """Test morning last visibility (before superior conjunction)."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964  # Rome
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_MORNING_LAST
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_MORNING_LAST,
         )
 
         # May or may not find this event
-        assert retflag in (SE_MORNING_LAST, -1)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
 
 class TestHeliacalValidation:
     """Test input validation for heliacal_ut."""
 
     def test_sun_raises_error(self):
-        """Test that SE_SUN raises ValueError."""
+        """Test that Sun raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(ValueError, match="SE_SUN"):
-            heliacal_ut(jd_start, lat, lon, body=SE_SUN, event_type=SE_HELIACAL_RISING)
+        with pytest.raises(ValueError, match="Sun"):
+            heliacal_ut(
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Sun",
+                SE_HELIACAL_RISING,
+            )
 
     def test_moon_raises_error(self):
-        """Test that SE_MOON raises ValueError."""
+        """Test that Moon raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(ValueError, match="SE_MOON"):
-            heliacal_ut(jd_start, lat, lon, body=SE_MOON, event_type=SE_HELIACAL_RISING)
+        with pytest.raises(ValueError, match="Moon"):
+            heliacal_ut(
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Moon",
+                SE_HELIACAL_RISING,
+            )
 
     def test_invalid_event_type_raises_error(self):
         """Test that invalid event type raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)
 
         with pytest.raises(ValueError, match="Invalid event_type"):
-            heliacal_ut(jd_start, lat, lon, body=SE_VENUS, event_type=99)
+            heliacal_ut(
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Venus",
+                99,
+            )
 
 
 class TestHeliacalLocations:
@@ -186,43 +243,57 @@ class TestHeliacalLocations:
     def test_northern_hemisphere(self):
         """Test at northern latitude."""
         jd_start = julday(2024, 6, 1, 0)  # Summer
-        lat, lon = 60.1699, 24.9384  # Helsinki
+        geopos = (24.9384, 60.1699, 0.0)  # Helsinki
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Jupiter",
+            SE_HELIACAL_RISING,
         )
 
         # High latitude summer nights are short, may affect visibility
-        assert retflag in (SE_HELIACAL_RISING, -1)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_southern_hemisphere(self):
         """Test at southern latitude."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = -33.8688, 151.2093  # Sydney
+        geopos = (151.2093, -33.8688, 0.0)  # Sydney
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         # In the southern hemisphere, twilight times differ
         # Allow for either success or not-found
-        assert retflag in (SE_HELIACAL_RISING, -1)
-        if retflag == SE_HELIACAL_RISING:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_equatorial_location(self):
         """Test at equatorial location."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 0.3476, 32.5825  # Kampala, Uganda
+        geopos = (32.5825, 0.3476, 0.0)  # Kampala, Uganda
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_SATURN, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Saturn",
+            SE_HELIACAL_RISING,
         )
 
         # Equatorial locations have consistent twilight times
-        assert retflag in (SE_HELIACAL_RISING, -1)
-        if retflag == SE_HELIACAL_RISING:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
 
 class TestHeliacalAtmosphericConditions:
@@ -231,54 +302,50 @@ class TestHeliacalAtmosphericConditions:
     def test_with_altitude(self):
         """Test calculation with observer at altitude."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964  # Rome
-        altitude = 2000.0  # 2000 meters (e.g., mountain observatory)
+        geopos = (12.4964, 41.9028, 2000.0)  # Rome, 2000 meters
 
-        jd_event, retflag = heliacal_ut(
+        result = heliacal_ut(
             jd_start,
-            lat,
-            lon,
-            altitude=altitude,
-            body=SE_VENUS,
-            event_type=SE_HELIACAL_RISING,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
-        assert jd_event > jd_start
-        assert retflag == SE_HELIACAL_RISING
+        assert result[0] > jd_start
 
     def test_with_pressure(self):
         """Test calculation with custom pressure."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
+        result = heliacal_ut(
             jd_start,
-            lat,
-            lon,
-            pressure=1000.0,  # Lower pressure
-            body=SE_VENUS,
-            event_type=SE_HELIACAL_RISING,
+            geopos,
+            (1000.0, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
-        assert jd_event > jd_start
-        assert retflag == SE_HELIACAL_RISING
+        assert result[0] > jd_start
 
     def test_with_humidity(self):
         """Test calculation with different humidity."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
+        result = heliacal_ut(
             jd_start,
-            lat,
-            lon,
-            humidity=0.8,  # High humidity
-            body=SE_VENUS,
-            event_type=SE_HELIACAL_RISING,
+            geopos,
+            (1013.25, 15.0, 80.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
-        assert jd_event > jd_start
-        assert retflag == SE_HELIACAL_RISING
+        assert result[0] > jd_start
 
 
 class TestSweHeliacalUt:
@@ -537,14 +604,19 @@ class TestHeliacalDateValidation:
     def test_event_date_is_reasonable(self):
         """Test that returned date is within expected range."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
-        if retflag > 0:
-            year, month, day, hour = revjul(jd_event)
+        if result[0] > 0:
+            year, month, day, hour = revjul(result[0])
             # Event should be in 2024 or 2025
             assert year in (2024, 2025)
             # Month and day should be valid
@@ -563,38 +635,51 @@ class TestHeliacalPhenoBasic:
     def test_venus_pheno_returns_valid_result(self):
         """Test that Venus heliacal phenomena returns a valid result tuple."""
         jd = julday(2024, 1, 1, 12)  # Noon
-        lat, lon = 41.9028, 12.4964  # Rome
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         # Should return a tuple of 50 floats
         assert isinstance(dret, tuple)
         assert len(dret) == 50
         assert all(isinstance(x, float) for x in dret)
-        assert retflag > 0
 
     def test_mercury_pheno_returns_valid_result(self):
         """Test that Mercury heliacal phenomena returns a valid result."""
         jd = julday(2024, 3, 15, 5)  # Morning
-        lat, lon = 51.5074, -0.1278  # London
+        geopos = (-0.1278, 51.5074, 0.0)  # London
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_MERCURY, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_HELIACAL_RISING,
         )
 
         assert isinstance(dret, tuple)
         assert len(dret) == 50
-        assert retflag > 0
 
     def test_jupiter_pheno_returns_valid_result(self):
         """Test that Jupiter heliacal phenomena returns a valid result."""
         jd = julday(2024, 6, 1, 4)  # Early morning
-        lat, lon = 40.7128, -74.0060  # New York
+        geopos = (-74.0060, 40.7128, 0.0)  # New York
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Jupiter",
+            SE_HELIACAL_RISING,
         )
 
         assert isinstance(dret, tuple)
@@ -603,10 +688,15 @@ class TestHeliacalPhenoBasic:
     def test_mars_pheno_evening(self):
         """Test Mars heliacal phenomena for evening setting."""
         jd = julday(2024, 7, 20, 20)  # Evening
-        lat, lon = 35.6762, 139.6503  # Tokyo
+        geopos = (139.6503, 35.6762, 0.0)  # Tokyo
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_SETTING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mars",
+            SE_HELIACAL_SETTING,
         )
 
         assert isinstance(dret, tuple)
@@ -619,10 +709,15 @@ class TestHeliacalPhenoValues:
     def test_altitude_values_are_reasonable(self):
         """Test that altitude values are within valid range."""
         jd = julday(2024, 1, 15, 6)  # Dawn
-        lat, lon = 41.9028, 12.4964  # Rome
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, _ = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         # Altitudes should be in -90 to +90 range
@@ -639,10 +734,15 @@ class TestHeliacalPhenoValues:
     def test_azimuth_values_are_reasonable(self):
         """Test that azimuth values are within valid range."""
         jd = julday(2024, 1, 15, 6)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, _ = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         azi_o = dret[3]  # Object azimuth
@@ -654,10 +754,15 @@ class TestHeliacalPhenoValues:
     def test_arcus_visionis_values(self):
         """Test that arcus visionis values are calculated."""
         jd = julday(2024, 1, 15, 6)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, _ = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         tav_act = dret[6]  # Topocentric arcus visionis
@@ -671,10 +776,15 @@ class TestHeliacalPhenoValues:
     def test_extinction_coefficient_is_positive(self):
         """Test that extinction coefficient is a sensible positive value."""
         jd = julday(2024, 1, 15, 6)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, _ = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         k_act = dret[10]  # Extinction coefficient
@@ -685,10 +795,15 @@ class TestHeliacalPhenoValues:
     def test_magnitude_for_venus(self):
         """Test that magnitude is calculated for Venus."""
         jd = julday(2024, 1, 15, 6)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, _ = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         magnitude = dret[20]
@@ -700,10 +815,15 @@ class TestHeliacalPhenoValues:
     def test_parallax_is_small(self):
         """Test that parallax is a small positive value."""
         jd = julday(2024, 1, 15, 6)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, _ = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         parallax = dret[19]
@@ -718,34 +838,47 @@ class TestHeliacalPhenoEventTypes:
     def test_morning_first_event(self):
         """Test SE_HELIACAL_RISING (morning first) event type."""
         jd = julday(2024, 3, 1, 5)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         assert len(dret) == 50
-        assert retflag > 0
 
     def test_evening_last_event(self):
         """Test SE_HELIACAL_SETTING (evening last) event type."""
         jd = julday(2024, 3, 1, 19)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_SETTING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_SETTING,
         )
 
         assert len(dret) == 50
-        assert retflag > 0
 
     def test_evening_first_event(self):
         """Test SE_EVENING_FIRST event type."""
         jd = julday(2024, 3, 1, 19)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_MERCURY, event_type=SE_EVENING_FIRST
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_EVENING_FIRST,
         )
 
         assert len(dret) == 50
@@ -753,10 +886,15 @@ class TestHeliacalPhenoEventTypes:
     def test_morning_last_event(self):
         """Test SE_MORNING_LAST event type."""
         jd = julday(2024, 3, 1, 5)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_MERCURY, event_type=SE_MORNING_LAST
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_MORNING_LAST,
         )
 
         assert len(dret) == 50
@@ -766,20 +904,34 @@ class TestHeliacalPhenoValidation:
     """Test input validation for heliacal_pheno_ut."""
 
     def test_invalid_body_raises_error(self):
-        """Test that invalid body ID raises ValueError."""
+        """Test that invalid body name raises ValueError."""
         jd = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(ValueError, match="illegal planet number"):
-            heliacal_pheno_ut(jd, lat, lon, body=999, event_type=SE_HELIACAL_RISING)
+        with pytest.raises(ValueError, match="not recognized"):
+            heliacal_pheno_ut(
+                jd,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "InvalidBody",
+                SE_HELIACAL_RISING,
+            )
 
     def test_invalid_event_type_raises_error(self):
         """Test that invalid event type raises ValueError."""
         jd = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)
 
         with pytest.raises(ValueError, match="Invalid event_type"):
-            heliacal_pheno_ut(jd, lat, lon, body=SE_VENUS, event_type=99)
+            heliacal_pheno_ut(
+                jd,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Venus",
+                99,
+            )
 
 
 class TestHeliacalPhenoLocations:
@@ -788,10 +940,15 @@ class TestHeliacalPhenoLocations:
     def test_northern_hemisphere(self):
         """Test at northern latitude."""
         jd = julday(2024, 6, 1, 3)  # Summer morning
-        lat, lon = 60.1699, 24.9384  # Helsinki
+        geopos = (24.9384, 60.1699, 0.0)  # Helsinki
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Jupiter",
+            SE_HELIACAL_RISING,
         )
 
         assert len(dret) == 50
@@ -799,10 +956,15 @@ class TestHeliacalPhenoLocations:
     def test_southern_hemisphere(self):
         """Test at southern latitude."""
         jd = julday(2024, 1, 15, 5)  # Summer morning (S. hemisphere)
-        lat, lon = -33.8688, 151.2093  # Sydney
+        geopos = (151.2093, -33.8688, 0.0)  # Sydney
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_SATURN, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Saturn",
+            SE_HELIACAL_RISING,
         )
 
         assert len(dret) == 50
@@ -810,10 +972,15 @@ class TestHeliacalPhenoLocations:
     def test_equatorial_location(self):
         """Test at equatorial location."""
         jd = julday(2024, 4, 1, 6)
-        lat, lon = 0.3476, 32.5825  # Kampala, Uganda
+        geopos = (32.5825, 0.3476, 0.0)  # Kampala, Uganda
 
-        dret, retflag = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_RISING
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mars",
+            SE_HELIACAL_RISING,
         )
 
         assert len(dret) == 50
@@ -825,24 +992,29 @@ class TestHeliacalPhenoAtmospheric:
     def test_with_altitude(self):
         """Test with observer at high altitude."""
         jd = julday(2024, 1, 15, 5)
-        lat, lon = 41.9028, 12.4964
-        altitude = 2000.0  # 2000 meters
+        geopos_high = (12.4964, 41.9028, 2000.0)  # Rome, 2000 meters
+        geopos_low = (12.4964, 41.9028, 0.0)  # Rome, sea level
 
-        dret, retflag = heliacal_pheno_ut(
+        dret = heliacal_pheno_ut(
             jd,
-            lat,
-            lon,
-            altitude=altitude,
-            body=SE_VENUS,
-            event_type=SE_HELIACAL_RISING,
+            geopos_high,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         assert len(dret) == 50
         # Extinction should be lower at high altitude
         k_high = dret[10]
 
-        dret_low, _ = heliacal_pheno_ut(
-            jd, lat, lon, altitude=0, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret_low = heliacal_pheno_ut(
+            jd,
+            geopos_low,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
         k_low = dret_low[10]
 
@@ -851,13 +1023,23 @@ class TestHeliacalPhenoAtmospheric:
     def test_with_high_humidity(self):
         """Test with high humidity."""
         jd = julday(2024, 1, 15, 5)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret_low, _ = heliacal_pheno_ut(
-            jd, lat, lon, humidity=0.2, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret_low = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 20.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
-        dret_high, _ = heliacal_pheno_ut(
-            jd, lat, lon, humidity=0.9, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret_high = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 90.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         # Higher humidity should increase extinction
@@ -869,13 +1051,23 @@ class TestHeliacalPhenoAtmospheric:
     def test_with_low_pressure(self):
         """Test with low atmospheric pressure."""
         jd = julday(2024, 1, 15, 5)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret_normal, _ = heliacal_pheno_ut(
-            jd, lat, lon, pressure=1013.25, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret_normal = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
-        dret_low, _ = heliacal_pheno_ut(
-            jd, lat, lon, pressure=800.0, body=SE_VENUS, event_type=SE_HELIACAL_RISING
+        dret_low = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (800.0, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_HELIACAL_RISING,
         )
 
         # Lower pressure should decrease extinction
@@ -889,19 +1081,14 @@ class TestHeliacalPhenoAlias:
     """Test swe_heliacal_pheno_ut alias."""
 
     def test_swe_alias_works(self):
-        """Test that swe_heliacal_pheno_ut wrapper returns consistent data."""
+        """Test that heliacal_pheno_ut and swe_heliacal_pheno_ut return same data."""
         jd = julday(2024, 1, 15, 6)
-        lat, lon = 41.9028, 12.4964
-
-        # Internal API returns (data_tuple, retflag)
-        result1, _ = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_VENUS, event_type=SE_HELIACAL_RISING
-        )
-
-        # Reference-compatible wrapper returns flat 50-tuple
-        geopos = (lon, lat, 0)
+        geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 50.0, 0.0)
-        dobs = (36.0, 1.0, 0, 0, 0, 0)
+        dobs = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+        result1 = heliacal_pheno_ut(jd, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING)
+
         result2 = swe_heliacal_pheno_ut(
             jd, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
         )
@@ -921,10 +1108,15 @@ class TestHeliacalPhenoMoon:
     def test_moon_crescent_values(self):
         """Test that Moon-specific crescent values are calculated."""
         jd = julday(2024, 1, 12, 18)  # Near new moon
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        dret, _ = heliacal_pheno_ut(
-            jd, lat, lon, body=SE_MOON, event_type=SE_EVENING_FIRST
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Moon",
+            SE_EVENING_FIRST,
         )
 
         w_moon = dret[16]  # Crescent width
@@ -986,52 +1178,92 @@ class TestHeliacalOuterPlanetValidation:
     def test_mars_evening_first_raises_error(self):
         """Test that Mars with SE_EVENING_FIRST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
         with pytest.raises(ValueError, match="inner planets"):
-            heliacal_ut(jd_start, lat, lon, body=SE_MARS, event_type=SE_EVENING_FIRST)
+            heliacal_ut(
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Mars",
+                SE_EVENING_FIRST,
+            )
 
     def test_mars_morning_last_raises_error(self):
         """Test that Mars with SE_MORNING_LAST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
         with pytest.raises(ValueError, match="inner planets"):
-            heliacal_ut(jd_start, lat, lon, body=SE_MARS, event_type=SE_MORNING_LAST)
+            heliacal_ut(
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Mars",
+                SE_MORNING_LAST,
+            )
 
     def test_jupiter_evening_first_raises_error(self):
         """Test that Jupiter with SE_EVENING_FIRST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
         with pytest.raises(ValueError, match="inner planets"):
             heliacal_ut(
-                jd_start, lat, lon, body=SE_JUPITER, event_type=SE_EVENING_FIRST
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Jupiter",
+                SE_EVENING_FIRST,
             )
 
     def test_jupiter_morning_last_raises_error(self):
         """Test that Jupiter with SE_MORNING_LAST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
         with pytest.raises(ValueError, match="inner planets"):
-            heliacal_ut(jd_start, lat, lon, body=SE_JUPITER, event_type=SE_MORNING_LAST)
+            heliacal_ut(
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Jupiter",
+                SE_MORNING_LAST,
+            )
 
     def test_saturn_evening_first_raises_error(self):
         """Test that Saturn with SE_EVENING_FIRST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
         with pytest.raises(ValueError, match="inner planets"):
-            heliacal_ut(jd_start, lat, lon, body=SE_SATURN, event_type=SE_EVENING_FIRST)
+            heliacal_ut(
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Saturn",
+                SE_EVENING_FIRST,
+            )
 
     def test_saturn_morning_last_raises_error(self):
         """Test that Saturn with SE_MORNING_LAST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
         with pytest.raises(ValueError, match="inner planets"):
-            heliacal_ut(jd_start, lat, lon, body=SE_SATURN, event_type=SE_MORNING_LAST)
+            heliacal_ut(
+                jd_start,
+                geopos,
+                (1013.25, 15.0, 50.0, 0.0),
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                "Saturn",
+                SE_MORNING_LAST,
+            )
 
 
 class TestHeliacalInnerPlanetEventTypes:
@@ -1040,76 +1272,108 @@ class TestHeliacalInnerPlanetEventTypes:
     def test_mercury_heliacal_rising(self):
         """Test Mercury heliacal rising works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_HELIACAL_RISING,
         )
 
-        assert retflag in (SE_HELIACAL_RISING, -1)
-        if retflag > 0:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_mercury_heliacal_setting(self):
         """Test Mercury heliacal setting works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_HELIACAL_SETTING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_HELIACAL_SETTING,
         )
 
-        assert retflag in (SE_HELIACAL_SETTING, -1)
-        if retflag > 0:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_mercury_evening_first(self):
         """Test Mercury evening first visibility works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_EVENING_FIRST
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_EVENING_FIRST,
         )
 
         # Should not raise an error - inner planets can use this event type
-        assert retflag in (SE_EVENING_FIRST, -1)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_mercury_morning_last(self):
         """Test Mercury morning last visibility works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MERCURY, event_type=SE_MORNING_LAST
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mercury",
+            SE_MORNING_LAST,
         )
 
         # Should not raise an error - inner planets can use this event type
-        assert retflag in (SE_MORNING_LAST, -1)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_venus_evening_first(self):
         """Test Venus evening first visibility works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_EVENING_FIRST
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_EVENING_FIRST,
         )
 
         # Should not raise an error - inner planets can use this event type
-        assert retflag in (SE_EVENING_FIRST, -1)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
     def test_venus_morning_last(self):
         """Test Venus morning last visibility works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_VENUS, event_type=SE_MORNING_LAST
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            SE_MORNING_LAST,
         )
 
         # Should not raise an error - inner planets can use this event type
-        assert retflag in (SE_MORNING_LAST, -1)
+        assert isinstance(result, tuple)
+        assert len(result) == 3
 
 
 class TestHeliacalOuterPlanetRisingSetting:
@@ -1118,80 +1382,104 @@ class TestHeliacalOuterPlanetRisingSetting:
     def test_mars_heliacal_rising(self):
         """Test Mars heliacal rising works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mars",
+            SE_HELIACAL_RISING,
         )
 
-        assert retflag in (SE_HELIACAL_RISING, -1)
-        if retflag > 0:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_mars_heliacal_setting(self):
         """Test Mars heliacal setting works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_MARS, event_type=SE_HELIACAL_SETTING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Mars",
+            SE_HELIACAL_SETTING,
         )
 
-        assert retflag in (SE_HELIACAL_SETTING, -1)
-        if retflag > 0:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_jupiter_heliacal_rising(self):
         """Test Jupiter heliacal rising works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Jupiter",
+            SE_HELIACAL_RISING,
         )
 
-        assert retflag in (SE_HELIACAL_RISING, -1)
-        if retflag > 0:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_jupiter_heliacal_setting(self):
         """Test Jupiter heliacal setting works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_JUPITER, event_type=SE_HELIACAL_SETTING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Jupiter",
+            SE_HELIACAL_SETTING,
         )
 
-        assert retflag in (SE_HELIACAL_SETTING, -1)
-        if retflag > 0:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_saturn_heliacal_rising(self):
         """Test Saturn heliacal rising works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_SATURN, event_type=SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Saturn",
+            SE_HELIACAL_RISING,
         )
 
-        assert retflag in (SE_HELIACAL_RISING, -1)
-        if retflag > 0:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
     def test_saturn_heliacal_setting(self):
         """Test Saturn heliacal setting works."""
         jd_start = julday(2024, 1, 1, 0)
-        lat, lon = 41.9028, 12.4964
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        jd_event, retflag = heliacal_ut(
-            jd_start, lat, lon, body=SE_SATURN, event_type=SE_HELIACAL_SETTING
+        result = heliacal_ut(
+            jd_start,
+            geopos,
+            (1013.25, 15.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Saturn",
+            SE_HELIACAL_SETTING,
         )
 
-        assert retflag in (SE_HELIACAL_SETTING, -1)
-        if retflag > 0:
-            assert jd_event > jd_start
+        if result[0] > 0:
+            assert result[0] > jd_start
 
 
 class TestSweHeliacalUtOuterPlanetValidation:

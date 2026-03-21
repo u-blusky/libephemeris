@@ -189,7 +189,7 @@ class TestGrazingOccultIntegration:
 
         try:
             retflag, times, attr = lun_occult_when_loc(
-                jd_start, 0, "Regulus", rome_lat, rome_lon
+                jd_start, "Regulus", (rome_lon, rome_lat, 0.0)
             )
 
             # The return flag should be an integer that can contain grazing flag

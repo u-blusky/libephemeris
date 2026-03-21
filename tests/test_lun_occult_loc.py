@@ -334,7 +334,9 @@ class TestLunOccultWhenLocLegacy:
         jd_start = julday(2017, 1, 1, 0)
         lat, lon = 45.0, 10.0
 
-        ocl_type, times, attr = lun_occult_when_loc(jd_start, 0, "Regulus", lat, lon)
+        ocl_type, times, attr = lun_occult_when_loc(
+            jd_start, "Regulus", (lon, lat, 0.0)
+        )
 
         # Should find an occultation
         assert ocl_type != 0
@@ -345,7 +347,9 @@ class TestLunOccultWhenLocLegacy:
         jd_start = julday(2017, 1, 1, 0)
         lat, lon = 45.0, 10.0
 
-        ocl_type, times, attr = lun_occult_when_loc(jd_start, 0, "Regulus", lat, lon)
+        ocl_type, times, attr = lun_occult_when_loc(
+            jd_start, "Regulus", (lon, lat, 0.0)
+        )
 
         # ocl_type is first (int)
         assert isinstance(ocl_type, int)
@@ -360,7 +364,7 @@ class TestLunOccultWhenLocLegacy:
         lat, lon, alt = 45.0, 10.0, 1000.0
 
         ocl_type, times, attr = lun_occult_when_loc(
-            jd_start, 0, "Regulus", lat, lon, alt
+            jd_start, "Regulus", (lon, lat, alt)
         )
 
         assert times[0] > jd_start

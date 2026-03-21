@@ -1183,7 +1183,7 @@ def cs2lonlatstr(cs: int, plus_char: str, minus_char: str) -> str:
     return f"{degrees:3d}°{minutes:2d}'{seconds:2d}\" {direction}"
 
 
-def cs2timestr(cs: int) -> str:
+def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) -> str:
     """
     Convert a value in centiseconds to a formatted time string.
 
@@ -1218,6 +1218,10 @@ def cs2timestr(cs: int) -> str:
         >>> cs2timestr(-360000)  # -1 hour
         '-1:00:00'
     """
+    # Accept bytes separator (pyswisseph uses b':')
+    if isinstance(sep, bytes):
+        sep = sep.decode("ascii")
+
     # Handle sign
     if cs < 0:
         sign = -1
@@ -1249,8 +1253,13 @@ def cs2timestr(cs: int) -> str:
         hours = -hours
 
     # Format the string matching reference API format
-    # Format: "%2d:%02d:%02d" with proper spacing
-    return f"{hours:2d}:{minutes:02d}:{seconds:02d}"
+    # Format: "%2d<sep>%02d<sep>%02d" with proper spacing
+    if suppresszero:
+        if seconds == 0:
+            if minutes == 0:
+                return f"{hours:2d}"
+            return f"{hours:2d}{sep}{minutes:02d}"
+    return f"{hours:2d}{sep}{minutes:02d}{sep}{seconds:02d}"
 
 
 def deg_midp(a: float, b: float) -> float:

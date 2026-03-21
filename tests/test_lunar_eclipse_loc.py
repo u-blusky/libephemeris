@@ -58,7 +58,9 @@ class TestLunEclipseWhenLoc:
         jd_start = julday(2024, 1, 1, 0)
         rome_lat, rome_lon = 41.9028, 12.4964
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, rome_lat, rome_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (rome_lon, rome_lat, 0.0)
+        )
 
         # Should find an eclipse
         assert ecl_type != 0
@@ -72,7 +74,9 @@ class TestLunEclipseWhenLoc:
         jd_start = julday(2024, 1, 1, 0)
         london_lat, london_lon = 51.5074, -0.1278
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, london_lat, london_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (london_lon, london_lat, 0.0)
+        )
 
         # Should return 10-element times tuple
         assert len(times) == 10
@@ -90,7 +94,9 @@ class TestLunEclipseWhenLoc:
         jd_start = julday(2024, 1, 1, 0)
         tokyo_lat, tokyo_lon = 35.6762, 139.6503
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, tokyo_lat, tokyo_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (tokyo_lon, tokyo_lat, 0.0)
+        )
 
         # Umbral magnitude should be between 0 and ~2 for visible eclipses
         assert 0 <= attr[0] <= 2.5
@@ -109,7 +115,9 @@ class TestLunEclipseWhenLoc:
         jd_start = julday(2024, 1, 1, 0)
         sydney_lat, sydney_lon = -33.8688, 151.2093
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, sydney_lat, sydney_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (sydney_lon, sydney_lat, 0.0)
+        )
 
         # Penumbral begin should be first (if present)
         if times[6] > 0:
@@ -134,10 +142,10 @@ class TestLunEclipseWhenLoc:
         beijing_lat, beijing_lon = 39.9042, 116.4074
 
         ecl_type_ny, times_ny, attr_ny = lun_eclipse_when_loc(
-            jd_start, new_york_lat, new_york_lon
+            jd_start, (new_york_lon, new_york_lat, 0.0)
         )
         ecl_type_bj, times_bj, attr_bj = lun_eclipse_when_loc(
-            jd_start, beijing_lat, beijing_lon
+            jd_start, (beijing_lon, beijing_lat, 0.0)
         )
 
         # Both should find eclipses (may be same or different)
@@ -149,7 +157,9 @@ class TestLunEclipseWhenLoc:
         jd_start = julday(2024, 1, 1, 0)
         berlin_lat, berlin_lon = 52.5200, 13.4050
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, berlin_lat, berlin_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (berlin_lon, berlin_lat, 0.0)
+        )
 
         # SE_ECL_VISIBLE should always be set for returned eclipses
         assert ecl_type & SE_ECL_VISIBLE
@@ -170,7 +180,9 @@ class TestLunEclipseWhenLoc:
         jd_start = julday(2024, 1, 1, 0)
         paris_lat, paris_lon = 48.8566, 2.3522
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, paris_lat, paris_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (paris_lon, paris_lat, 0.0)
+        )
 
         moon_alt = attr[5]  # True altitude (pyswisseph index)
 
@@ -185,7 +197,7 @@ class TestLunEclipseWhenLoc:
         cape_town_lat, cape_town_lon = -33.9249, 18.4241
 
         ecl_type1, times1, attr1 = lun_eclipse_when_loc(
-            jd_start, cape_town_lat, cape_town_lon
+            jd_start, (cape_town_lon, cape_town_lat, 0.0)
         )
         # swe_ version takes geopos tuple: [lon, lat, alt]
         geopos = [cape_town_lon, cape_town_lat, 0]
@@ -203,7 +215,9 @@ class TestLunEclipseWhenLoc:
 
         # Find 3 sequential visible eclipses
         for _ in range(3):
-            ecl_type, times, attr = lun_eclipse_when_loc(jd, mumbai_lat, mumbai_lon)
+            ecl_type, times, attr = lun_eclipse_when_loc(
+                jd, (mumbai_lon, mumbai_lat, 0.0)
+            )
             eclipses.append((times[0], ecl_type))
             jd = times[0] + 1  # Start after this eclipse
 
@@ -223,7 +237,7 @@ class TestLunEclipseWhenLoc:
         # Rio de Janeiro - should see this eclipse
         rio_lat, rio_lon = -22.9068, -43.1729
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, rio_lat, rio_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, (rio_lon, rio_lat, 0.0))
 
         # Should be a total eclipse
         assert ecl_type & SE_ECL_TOTAL
@@ -242,7 +256,7 @@ class TestLunEclipseWhenLoc:
         denver_altitude = 1609  # 1 mile high
 
         ecl_type, times, attr = lun_eclipse_when_loc(
-            jd_start, denver_lat, denver_lon, altitude=denver_altitude
+            jd_start, (denver_lon, denver_lat, denver_altitude)
         )
 
         # Should find an eclipse
@@ -256,7 +270,7 @@ class TestLunEclipseWhenLoc:
         melbourne_lat, melbourne_lon = -37.8136, 144.9631
 
         ecl_type, times, attr = lun_eclipse_when_loc(
-            jd_start, melbourne_lat, melbourne_lon
+            jd_start, (melbourne_lon, melbourne_lat, 0.0)
         )
 
         # Should find an eclipse
@@ -270,7 +284,7 @@ class TestLunEclipseWhenLoc:
         reykjavik_lat, reykjavik_lon = 64.1466, -21.9426
 
         ecl_type, times, attr = lun_eclipse_when_loc(
-            jd_start, reykjavik_lat, reykjavik_lon
+            jd_start, (reykjavik_lon, reykjavik_lat, 0.0)
         )
 
         # Should find an eclipse (might take longer due to polar location)
@@ -287,7 +301,9 @@ class TestLunEclipseWhenLocEdgeCases:
         # Quito, Ecuador (nearly on the equator)
         quito_lat, quito_lon = -0.1807, -78.4678
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, quito_lat, quito_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (quito_lon, quito_lat, 0.0)
+        )
 
         assert ecl_type & SE_ECL_VISIBLE
         assert times[0] > jd_start
@@ -299,7 +315,7 @@ class TestLunEclipseWhenLocEdgeCases:
         greenwich_lat, greenwich_lon = 51.4772, 0.0
 
         ecl_type, times, attr = lun_eclipse_when_loc(
-            jd_start, greenwich_lat, greenwich_lon
+            jd_start, (greenwich_lon, greenwich_lat, 0.0)
         )
 
         assert ecl_type & SE_ECL_VISIBLE
@@ -311,7 +327,9 @@ class TestLunEclipseWhenLocEdgeCases:
         # Fiji
         fiji_lat, fiji_lon = -18.1416, 178.4419
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, fiji_lat, fiji_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (fiji_lon, fiji_lat, 0.0)
+        )
 
         assert ecl_type & SE_ECL_VISIBLE
         assert times[0] > jd_start
@@ -322,7 +340,9 @@ class TestLunEclipseWhenLocEdgeCases:
         jd_start = julday(1920, 1, 1, 0)
         london_lat, london_lon = 51.5074, -0.1278
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, london_lat, london_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (london_lon, london_lat, 0.0)
+        )
 
         assert ecl_type & SE_ECL_VISIBLE
         assert times[0] > jd_start
@@ -334,7 +354,7 @@ class TestLunEclipseWhenLocEdgeCases:
         new_york_lat, new_york_lon = 40.7128, -74.0060
 
         ecl_type, times, attr = lun_eclipse_when_loc(
-            jd_start, new_york_lat, new_york_lon
+            jd_start, (new_york_lon, new_york_lat, 0.0)
         )
 
         assert ecl_type & SE_ECL_VISIBLE
@@ -348,7 +368,9 @@ class TestLunEclipseWhenLocEdgeCases:
         jd_start = julday(2024, 1, 1, 0)
         moscow_lat, moscow_lon = 55.7558, 37.6173
 
-        ecl_type, times, attr = lun_eclipse_when_loc(jd_start, moscow_lat, moscow_lon)
+        ecl_type, times, attr = lun_eclipse_when_loc(
+            jd_start, (moscow_lon, moscow_lat, 0.0)
+        )
 
         # times[8] is moonrise, times[9] is moonset (pyswisseph layout)
         # These may be 0 if Moon doesn't rise/set during eclipse

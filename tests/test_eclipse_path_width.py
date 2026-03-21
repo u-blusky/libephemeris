@@ -46,7 +46,7 @@ class TestEclipsePathWidthBasicFunctionality:
         """Test that function returns a float value."""
         # Get a known total eclipse maximum
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_eclipse_path_width(jd_max)
@@ -56,7 +56,7 @@ class TestEclipsePathWidthBasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_eclipse_path_width(jd_max, flags=SEFLG_SWIEPH)
@@ -77,7 +77,7 @@ class TestEclipsePathWidthTotalEclipses:
         We use a tolerance since the calculation method differs slightly.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         width = calc_eclipse_path_width(jd_max)
@@ -97,7 +97,7 @@ class TestEclipsePathWidthTotalEclipses:
         Path width at greatest eclipse: ~417 km (wider than average due to geometry)
         """
         jd_start = julday(2021, 11, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         width = calc_eclipse_path_width(jd_max)
@@ -113,7 +113,7 @@ class TestEclipsePathWidthTotalEclipses:
     def test_path_width_positive_at_central_line(self):
         """Test that path width is positive when calculated at the central line."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Get the central line coordinates
@@ -137,7 +137,7 @@ class TestEclipsePathWidthAnnularEclipses:
         Path width at greatest eclipse: ~187 km
         """
         jd_start = julday(2023, 9, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_ANNULAR)
         jd_max = times[0]
 
         width = calc_eclipse_path_width(jd_max)
@@ -156,7 +156,7 @@ class TestEclipsePathWidthAnnularEclipses:
         This was an annular eclipse visible from Canada and Russia.
         """
         jd_start = julday(2021, 5, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_ANNULAR)
         jd_max = times[0]
 
         width = calc_eclipse_path_width(jd_max)
@@ -175,7 +175,7 @@ class TestEclipsePathWidthWithLocation:
         We need to use a time when Dallas is near the central line.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         dallas_lat = 32.7767
@@ -207,7 +207,7 @@ class TestEclipsePathWidthWithLocation:
     def test_path_width_outside_central_path_returns_zero(self):
         """Test that path width is zero for locations outside the central path."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # London is well outside the April 2024 eclipse path
@@ -236,7 +236,7 @@ class TestEclipsePathWidthEdgeCases:
     def test_path_width_consistency_with_where_function(self):
         """Test that path width is consistent with swe_sol_eclipse_where results."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, eclipse_type=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ifltype=SE_ECL_TOTAL)
         jd_max = times[0]
 
         # Get path width from swe_sol_eclipse_where
@@ -271,7 +271,7 @@ class TestEclipsePathWidthPhysicalReasonableness:
         # Test several total eclipses
         jd = jd_start
         for _ in range(5):
-            ecl_type, times = sol_eclipse_when_glob(jd, eclipse_type=SE_ECL_TOTAL)
+            ecl_type, times = sol_eclipse_when_glob(jd, ifltype=SE_ECL_TOTAL)
             jd_max = times[0]
 
             width = calc_eclipse_path_width(jd_max)
@@ -292,7 +292,7 @@ class TestEclipsePathWidthPhysicalReasonableness:
 
         jd = jd_start
         for _ in range(10):
-            ecl_type, times = sol_eclipse_when_glob(jd, eclipse_type=SE_ECL_TOTAL)
+            ecl_type, times = sol_eclipse_when_glob(jd, ifltype=SE_ECL_TOTAL)
             jd_max = times[0]
 
             width = calc_eclipse_path_width(jd_max)

@@ -89,7 +89,7 @@ class TestLunEclipseWhen:
         """Test filtering for total lunar eclipses."""
         jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
 
         # Should find a total eclipse
         assert ecl_type & SE_ECL_TOTAL
@@ -101,7 +101,7 @@ class TestLunEclipseWhen:
         """Test filtering for partial lunar eclipses."""
         jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PARTIAL)
 
         # Should find a partial eclipse
         assert ecl_type & SE_ECL_PARTIAL
@@ -113,7 +113,7 @@ class TestLunEclipseWhen:
         """Test filtering for penumbral lunar eclipses."""
         jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PENUMBRAL)
 
         # Should find a penumbral eclipse
         assert ecl_type & SE_ECL_PENUMBRAL
@@ -130,7 +130,7 @@ class TestLunEclipseWhen:
         # Start searching from May 1, 2022
         jd_start = julday(2022, 5, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
 
         # Should be a total eclipse
         assert ecl_type & SE_ECL_TOTAL
@@ -152,7 +152,7 @@ class TestLunEclipseWhen:
         # Start searching from October 1, 2023
         jd_start = julday(2023, 10, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PARTIAL)
 
         # Should be a partial eclipse
         assert ecl_type & SE_ECL_PARTIAL
@@ -199,7 +199,7 @@ class TestLunEclipseWhen:
         """Test that penumbral-only eclipses have zero umbral phase times."""
         jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_PENUMBRAL)
 
         if ecl_type == SE_ECL_PENUMBRAL:  # Pure penumbral, not partial
             # Umbral phase times should be zero
@@ -240,7 +240,7 @@ class TestLunEclipseEdgeCases:
         jd_start = julday(2020, 1, 1, 0)
 
         # Total eclipse
-        ecl_type, times = lun_eclipse_when(jd_start, eclipse_type=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ifltype=SE_ECL_TOTAL)
         assert ecl_type & SE_ECL_TOTAL
         # Total eclipse should also have partial phase times
         assert times[2] > 0  # Partial begins

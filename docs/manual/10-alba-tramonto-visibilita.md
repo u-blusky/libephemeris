@@ -354,17 +354,16 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 1, 1, 0.0)
 lat, lon = 30.0, 31.2  # Il Cairo (dove gli Egizi la osservavano)
 
-jd_evento, ret = ephem.heliacal_ut(
-    jd, lat, lon,
-    altitude=0.0,
-    pressure=1013.25,
-    temperature=25.0,
-    humidity=0.3,
-    body=ephem.SE_SIRIUS,   # Sirio
+jd_evento, *_ = ephem.heliacal_ut(
+    jd,
+    geopos=(31.2, 30.0, 0.0),      # Il Cairo (lon, lat, alt)
+    datm=(1013.25, 25.0, 30.0, 0.0),  # pressione, temp, umidità%, lapse
+    dobs=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    object_name="Sirius",
     event_type=ephem.SE_HELIACAL_RISING  # levata eliacale mattutina
 )
 
-if ret > 0:
+if jd_evento > 0:
     y, m, d, h = ephem.revjul(jd_evento)
     print(f"Levata eliacale di Sirio al Cairo: {d:.0f}/{m:.0f}/{y:.0f}")
 ```
@@ -563,8 +562,8 @@ In questo capitolo abbiamo imparato a calcolare quando i corpi celesti sono visi
 - `rise_trans_true_hor(jd, planet, lat, lon, horizon_altitude=0.0, rsmi=...)` — come `rise_trans` ma con altezza personalizzata dell'orizzonte
 - `refrac(altitude, pressure, temperature, calc_flag)` — converte tra altezza vera e apparente (o viceversa), tenendo conto della rifrazione
 - `refrac_extended(altitude, altitude_geo, ...)` — rifrazione estesa con dip dell'orizzonte per osservatori in quota
-- `heliacal_ut(jd, lat, lon, body=..., event_type=...)` — trova la data di un evento eliacale (prima/ultima visibilità)
-- `swe_heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — versione con controllo completo su atmosfera e osservatore
+- `heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — trova la data di un evento eliacale (prima/ultima visibilità)
+- `swe_heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — stessa funzione (il nome semplice è ora un alias)
 - `vis_limit_mag(jd, geopos, atmo, observer, objname)` — determina se un oggetto è visibile, confrontando magnitudine limite e magnitudine apparente
 - `calc_airmass(altitude)` — calcola la massa d'aria attraversata dalla luce
 - `calc_extinction_magnitude(altitude)` — calcola quante magnitudini di luce si perdono per estinzione atmosferica

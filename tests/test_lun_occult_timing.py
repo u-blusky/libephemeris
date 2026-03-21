@@ -120,7 +120,7 @@ class TestLunOccultWhenLocTopocentric:
 
         try:
             ecl_type, times, attr = lun_occult_when_loc(
-                jd_start, SE_VENUS, "", rome_lat, rome_lon, 0, SEFLG_SWIEPH
+                jd_start, SE_VENUS, (rome_lon, rome_lat, 0), SEFLG_SWIEPH
             )
 
             # Should find an occultation
@@ -202,7 +202,7 @@ class TestLunOccultWhenLocTopocentric:
 
         try:
             ecl_type, times, attr = lun_occult_when_loc(
-                jd_max_global - 1, 0, "Regulus", rome_lat, rome_lon, 0, SEFLG_SWIEPH
+                jd_max_global - 1, "Regulus", (rome_lon, rome_lat, 0), SEFLG_SWIEPH
             )
 
             jd_max_local = times[0]

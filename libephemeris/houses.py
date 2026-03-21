@@ -508,7 +508,7 @@ def _calc_ascendant(
 
 
 def swe_houses(
-    tjdut: float, lat: float, lon: float, hsys: int, iflag: int = 0
+    tjdut: float, lat: float, lon: float, hsys: int = ord("P"), iflag: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
     Calculate astrological house cusps and angles for a given time and location.
@@ -1079,7 +1079,7 @@ def swe_houses_armc_with_fallback(
 
 
 def swe_houses_armc(
-    armc: float, lat: float, eps: float, hsys: int
+    armc: float, lat: float, eps: float, hsys: int = ord("P"), ascmc9: float = 0.0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
     Calculate house cusps and angles from ARMC (Right Ascension of Medium Coeli).
@@ -1370,7 +1370,13 @@ def swe_houses_armc(
 
 
 def swe_houses_armc_ex2(
-    armc: float, lat: float, eps: float, hsys: int, flags: int = 0
+    armc: float,
+    lat: float,
+    eps: float,
+    hsys: int = ord("P"),
+    ascmc9: float = 0.0,
+    *,
+    flags: int = 0,
 ) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
     """
     Extended house calculation from ARMC returning cusps, angles, and their velocities.
@@ -1512,7 +1518,7 @@ def swe_houses_armc_ex2(
 
 
 def swe_houses_ex(
-    tjdut: float, lat: float, lon: float, hsys: int, flags: int = 0
+    tjdut: float, lat: float, lon: float, hsys: int = ord("P"), flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
     Extended house calculation with sidereal zodiac support.
@@ -1625,7 +1631,7 @@ def swe_houses_ex(
 
 
 def swe_houses_ex2(
-    tjdut: float, lat: float, lon: float, hsys: int, flags: int = 0
+    tjdut: float, lat: float, lon: float, hsys: int = ord("P"), flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
     """
     Extended house calculation returning cusps, angles, and their velocities.

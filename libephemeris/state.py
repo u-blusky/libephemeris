@@ -665,7 +665,7 @@ def get_planet_center_segment(naif_id: int, jd: Optional[float] = None):
     return None
 
 
-def set_topo(lon: float, lat: float, alt: float) -> None:
+def set_topo(lon: float, lat: float, alt: float = 0.0) -> None:
     """
     Set observer's topocentric location for planet calculations.
 

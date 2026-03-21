@@ -366,7 +366,7 @@ for year in [2018, 2021, 2024, 2025]:
             continue
 
         try:
-            le_ret = ephem.lun_eclipse_when_loc(jd_start, lat, lon, alt, 0)
+            le_ret = ephem.lun_eclipse_when_loc(jd_start, (lon, lat, alt), 0)
             le_flags = le_ret[0]
             le_tret = le_ret[1]
             le_attr = le_ret[2]
@@ -563,7 +563,7 @@ for ecl_name, year, month, day, hour in detail_eclipses:
         # LE when_loc
         try:
             le_ret = ephem.lun_eclipse_when_loc(
-                swe.julday(year, month, day - 3, 0.0), lat, lon, alt, 0
+                swe.julday(year, month, day - 3, 0.0), (lon, lat, alt), 0
             )
             le_tret = le_ret[1]
             le_attr = le_ret[2]
@@ -680,7 +680,7 @@ for loc_name, lon, lat, alt in seq_locs:
 
         # LE search
         try:
-            le_ret = ephem.lun_eclipse_when_loc(jd_le, lat, lon, alt, 0)
+            le_ret = ephem.lun_eclipse_when_loc(jd_le, (lon, lat, alt), 0)
             le_tret = le_ret[1]
             le_attr = le_ret[2]
             le_flags = le_ret[0]

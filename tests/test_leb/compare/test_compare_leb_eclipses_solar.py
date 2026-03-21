@@ -37,9 +37,9 @@ class TestSolarEclipseGlobal:
         jd_start = year_to_jd(2024)
 
         ref_result = compare.skyfield(
-            ephem.sol_eclipse_when_glob, jd_start, 2, 0, "forward"
+            ephem.sol_eclipse_when_glob, jd_start, 2, 0, False
         )
-        leb_result = compare.leb(ephem.sol_eclipse_when_glob, jd_start, 2, 0, "forward")
+        leb_result = compare.leb(ephem.sol_eclipse_when_glob, jd_start, 2, 0, False)
 
         # Check first eclipse found
         if ref_result[0] != 0 and leb_result[0] != 0:

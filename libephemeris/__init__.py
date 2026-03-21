@@ -68,7 +68,7 @@ from .time_utils import (
     swe_revjul,
     swe_deltat,
     swe_deltat_ex,
-    date_conversion,
+    date_conversion as _date_conversion_calendars,
     day_of_week,
     utc_to_jd,
     jdet_to_utc,
@@ -127,7 +127,7 @@ from .houses import (
     swe_house_name,
     swe_house_pos,
     house_pos,
-    gauquelin_sector,
+    gauquelin_sector as _gauquelin_sector_pythonic,
     swe_gauquelin_sector,
     # Polar latitude handling
     swe_houses_with_fallback,
@@ -236,13 +236,13 @@ from .eclipse import (
     BesselianElements,
     sol_eclipse_max_time,
     swe_sol_eclipse_max_time,
-    sol_eclipse_when_glob,
+    sol_eclipse_when_glob as _sol_eclipse_when_glob_pythonic,
     swe_sol_eclipse_when_glob,
-    sol_eclipse_when_loc,
+    sol_eclipse_when_loc as _sol_eclipse_when_loc_pythonic,
     swe_sol_eclipse_when_loc,
-    sol_eclipse_where,
+    sol_eclipse_where as _sol_eclipse_where_pythonic,
     swe_sol_eclipse_where,
-    sol_eclipse_how,
+    sol_eclipse_how as _sol_eclipse_how_pythonic,
     swe_sol_eclipse_how,
     sol_eclipse_how_details,
     swe_sol_eclipse_how_details,
@@ -252,11 +252,11 @@ from .eclipse import (
     # Eclipse obscuration at location
     sol_eclipse_obscuration_at_loc,
     swe_sol_eclipse_obscuration_at_loc,
-    lun_eclipse_when,
+    lun_eclipse_when as _lun_eclipse_when_pythonic,
     swe_lun_eclipse_when,
-    lun_eclipse_when_loc,
+    lun_eclipse_when_loc as _lun_eclipse_when_loc_pythonic,
     swe_lun_eclipse_when_loc,
-    lun_eclipse_how,
+    lun_eclipse_how as _lun_eclipse_how_pythonic,
     swe_lun_eclipse_how,
     # Lunar eclipse umbral magnitude
     lun_eclipse_umbral_magnitude,
@@ -269,7 +269,7 @@ from .eclipse import (
     swe_lun_eclipse_gamma,
     lun_occult_when_glob,
     swe_lun_occult_when_glob,
-    lun_occult_when_loc,
+    lun_occult_when_loc as _lun_occult_when_loc_pythonic,
     swe_lun_occult_when_loc,
     lun_occult_where,
     swe_lun_occult_where,
@@ -329,9 +329,9 @@ from .eclipse import (
     INEX_CYCLE_DAYS,
 )
 from .heliacal import (
-    heliacal_ut,
+    heliacal_ut as _heliacal_ut_pythonic,
     swe_heliacal_ut,
-    heliacal_pheno_ut,
+    heliacal_pheno_ut as _heliacal_pheno_ut_pythonic,
     swe_heliacal_pheno_ut,
     vis_limit_mag,
     swe_vis_limit_mag,
@@ -593,8 +593,8 @@ def swe_date_conversion(
     year: int,
     month: int,
     day: int,
-    hour: float,
-    calendar: "str | bytes",
+    hour: float = 12.0,
+    calendar: "str | bytes" = b"g",
 ) -> "tuple[bool, float, tuple[int, int, int, float]]":
     """Convert and validate a calendar date, returning Julian Day number.
 
@@ -627,6 +627,10 @@ def swe_date_conversion(
     valid = y2 == year and m2 == month and d2 == day
     return (valid, jd, (y2, m2, d2, h2))
 
+
+# Make date_conversion an alias of swe_date_conversion for pyswisseph compat.
+# The old calendar-conversion helper is still available as _date_conversion_calendars.
+date_conversion = swe_date_conversion
 
 swe_day_of_week = day_of_week
 swe_utc_to_jd = utc_to_jd
@@ -756,8 +760,24 @@ from ._dotenv import load_dotenv
 from .constants import *
 
 __version__ = "0.25.0"
+version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "LGPL-3.0"
+
+# P3: Bare-name aliases — match pyswisseph where bare names ARE the swe_ functions.
+# The old "Pythonic" versions (separate lat/lon/alt params) are kept as _*_pythonic
+# for internal use but NOT exported as the public bare names.
+sol_eclipse_when_glob = swe_sol_eclipse_when_glob
+sol_eclipse_when_loc = swe_sol_eclipse_when_loc
+sol_eclipse_where = swe_sol_eclipse_where
+sol_eclipse_how = swe_sol_eclipse_how
+lun_eclipse_when = swe_lun_eclipse_when
+lun_eclipse_when_loc = swe_lun_eclipse_when_loc
+lun_eclipse_how = swe_lun_eclipse_how
+lun_occult_when_loc = swe_lun_occult_when_loc
+heliacal_ut = swe_heliacal_ut
+heliacal_pheno_ut = swe_heliacal_pheno_ut
+gauquelin_sector = swe_gauquelin_sector
 
 __all__ = [
     # .env file loader

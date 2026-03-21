@@ -1063,7 +1063,11 @@ def swe_cross_ut(
 
 
 def swe_helio_cross_ut(
-    planet_id: int, x2cross: float, jd_ut: float, flag: int = SEFLG_SWIEPH
+    planet_id: int,
+    x2cross: float,
+    jd_ut: float,
+    flag: int = SEFLG_SWIEPH,
+    backwards: bool = False,
 ) -> float:
     """
     Find when a planet crosses a specific heliocentric ecliptic longitude.
@@ -1072,7 +1076,7 @@ def swe_helio_cross_ut(
     coordinates), crosses a specific ecliptic longitude. Useful for heliocentric
     astrology calculations.
 
-    Searches FORWARD in time for the next crossing after jd_ut.
+    Searches forward (or backward if backwards=True) in time from jd_ut.
 
     Args:
         planet_id: Planet ID (SE_MERCURY, SE_VENUS, SE_EARTH, SE_MARS, etc.)
@@ -1081,6 +1085,7 @@ def swe_helio_cross_ut(
         x2cross: Target heliocentric ecliptic longitude in degrees (0-360)
         jd_ut: Julian Day (UT) to start search from
         flag: Calculation flags (SEFLG_SWIEPH, etc.). SEFLG_HELCTR is automatically added.
+        backwards: If True, search backward in time instead of forward.
 
     Returns:
         float: Julian Day of crossing (UT)
@@ -1138,14 +1143,22 @@ def swe_helio_cross_ut(
     diff = (x2cross - lon_start) % 360.0
 
     # Heliocentric planets don't go retrograde (except for very minor perturbations)
-    # so we always search forward
-    if diff < 1e-5:
-        diff += 360.0
-
-    if abs(speed) < 0.0001:
-        speed = speed_default
-
-    dt_guess = diff / speed
+    # so we search forward by default, or backward if requested
+    if backwards:
+        # For backward search, find the previous crossing
+        if diff > 1e-5:
+            diff -= 360.0
+        elif diff > -1e-5:
+            diff -= 360.0
+        if abs(speed) < 0.0001:
+            speed = speed_default
+        dt_guess = diff / speed  # diff is negative, speed positive -> negative dt
+    else:
+        if diff < 1e-5:
+            diff += 360.0
+        if abs(speed) < 0.0001:
+            speed = speed_default
+        dt_guess = diff / speed
     jd_guess = jd_ut + dt_guess
 
     # Adaptive iteration count based on planet speed
@@ -1166,8 +1179,12 @@ def swe_helio_cross_ut(
                 if speed_default > 0
                 else max(120.0, abs(dt_guess) * 2.0)
             )
-            jd_bracket_start = jd_ut
-            jd_bracket_end = jd_ut + search_window
+            if backwards:
+                jd_bracket_start = jd_ut - search_window
+                jd_bracket_end = jd_ut
+            else:
+                jd_bracket_start = jd_ut
+                jd_bracket_end = jd_ut + search_window
             bracket_samples = max(40, int(search_window / 30))
 
             jd_a, jd_b = _find_bracket_for_crossing(
@@ -1226,7 +1243,11 @@ def swe_helio_cross_ut(
 
 
 def swe_helio_cross(
-    planet_id: int, x2cross: float, jd_tt: float, flag: int = SEFLG_SWIEPH
+    planet_id: int,
+    x2cross: float,
+    jd_tt: float,
+    flag: int = SEFLG_SWIEPH,
+    backwards: bool = False,
 ) -> float:
     """
     Find when a planet crosses a specific heliocentric ecliptic longitude (TT version).
@@ -1237,13 +1258,14 @@ def swe_helio_cross(
     Calculates the time when a planet, as seen from the Sun (heliocentric
     coordinates), crosses a specific ecliptic longitude.
 
-    Searches FORWARD in time for the next crossing after jd_tt.
+    Searches forward (or backward if backwards=True) in time from jd_tt.
 
     Args:
         planet_id: Planet ID (SE_MERCURY, SE_VENUS, SE_EARTH, SE_MARS, etc.)
         x2cross: Target heliocentric ecliptic longitude in degrees (0-360)
         jd_tt: Julian Day in Terrestrial Time (TT/ET) to start search from
         flag: Calculation flags (SEFLG_SWIEPH, etc.). SEFLG_HELCTR is automatically added.
+        backwards: If True, search backward in time instead of forward.
 
     Returns:
         float: Julian Day of crossing (TT)
@@ -1295,13 +1317,22 @@ def swe_helio_cross(
     # Calculate initial guess
     diff = (x2cross - lon_start) % 360.0
 
-    if diff < 1e-5:
-        diff += 360.0
+    if backwards:
+        # For backward search, find the previous crossing
+        if diff > 1e-5:
+            diff -= 360.0
+        elif diff > -1e-5:
+            diff -= 360.0
+        if abs(speed) < 0.0001:
+            speed = speed_default
+        dt_guess = diff / speed  # diff is negative, speed positive -> negative dt
+    else:
+        if diff < 1e-5:
+            diff += 360.0
+        if abs(speed) < 0.0001:
+            speed = speed_default
+        dt_guess = diff / speed
 
-    if abs(speed) < 0.0001:
-        speed = speed_default
-
-    dt_guess = diff / speed
     jd_guess = jd_tt + dt_guess
 
     # Adaptive iteration count based on planet speed
@@ -1320,8 +1351,12 @@ def swe_helio_cross(
                 if speed_default > 0
                 else max(120.0, abs(dt_guess) * 2.0)
             )
-            jd_bracket_start = jd_tt
-            jd_bracket_end = jd_tt + search_window
+            if backwards:
+                jd_bracket_start = jd_tt - search_window
+                jd_bracket_end = jd_tt
+            else:
+                jd_bracket_start = jd_tt
+                jd_bracket_end = jd_tt + search_window
             bracket_samples = max(40, int(search_window / 30))
 
             jd_a, jd_b = _find_bracket_for_crossing(

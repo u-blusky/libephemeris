@@ -111,7 +111,7 @@ You can filter by eclipse type:
 # Search only for total eclipses
 ecl_type, tret = ephem.sol_eclipse_when_glob(
     jd_start,
-    eclipse_type=ephem.SE_ECL_TOTAL
+    ifltype=ephem.SE_ECL_TOTAL
 )
 ```
 
@@ -244,7 +244,7 @@ import libephemeris as ephem
 jd_max = ephem.julday(2024, 4, 8, 18.0 + 42/60)  # ~18:42 UT
 lat, lon = 32.78, -96.80  # Dallas
 
-ret, attr = ephem.sol_eclipse_how(jd_max, lat, lon)
+ret, attr = ephem.sol_eclipse_how(jd_max, (lon, lat, 0.0))
 
 if ret > 0:
     magnitudine = attr[0]
@@ -350,7 +350,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 1, 1, 0.0)
 lat, lon = 41.9028, 12.4964  # Rome
 
-ecl_type, tempi, attr = ephem.lun_eclipse_when_loc(jd, lat, lon)
+ecl_type, tempi, attr = ephem.lun_eclipse_when_loc(jd, (lon, lat, 0.0))
 
 jd_max = tempi[0]
 y, m, d, h = ephem.revjul(jd_max)
@@ -388,7 +388,7 @@ import libephemeris as ephem
 # Lunar eclipse: let's check a specific moment
 jd = ephem.julday(2025, 3, 14, 6.0)  # example
 
-ret, attr = ephem.lun_eclipse_how(jd, 41.9028, 12.4964)
+ret, attr = ephem.lun_eclipse_how(jd, (12.4964, 41.9028, 0.0))
 
 if ret > 0:
     mag_umbrale = attr[0]
@@ -528,10 +528,8 @@ jd = ephem.julday(2024, 1, 1, 0.0)
 # Next lunar occultation of Spica visible from Rome
 ret, tempi, attr = ephem.lun_occult_when_loc(
     jd,
-    ipl=0,
-    starname="Spica",
-    lat=41.9028,
-    lon=12.4964
+    "Spica",
+    geopos=(12.4964, 41.9028, 0.0)
 )
 
 if ret > 0:
@@ -597,16 +595,16 @@ In this chapter, we explored eclipses, from geometry to practice.
 
 **Functions introduced:**
 
-- `sol_eclipse_when_glob(jd, eclipse_type=0)` — finds the next solar eclipse in the world, returns type and contact times
-- `sol_eclipse_when_loc(jd, lat, lon)` — finds the next solar eclipse visible from a location, with magnitude and obscuration
+- `sol_eclipse_when_glob(jd, ifltype=0)` — finds the next solar eclipse in the world, returns type and contact times
+- `sol_eclipse_when_loc(jd, geopos)` — finds the next solar eclipse visible from a location, with magnitude and obscuration
 - `sol_eclipse_where(jd)` — given the time of maximum, returns the coordinates of the central line
-- `sol_eclipse_how(jd, lat, lon)` — calculates type, magnitude, and Sun position for an already known eclipse
+- `sol_eclipse_how(jd, geopos)` — calculates type, magnitude, and Sun position for an already known eclipse
 - `sol_eclipse_how_details(jd, lat, lon)` — extended version with all contacts, position angles, and durations
-- `lun_eclipse_when(jd, eclipse_type=0)` — finds the next lunar eclipse (global)
-- `lun_eclipse_when_loc(jd, lat, lon)` — finds the next lunar eclipse visible from a location
-- `lun_eclipse_how(jd, lat, lon)` — details of a lunar eclipse at a time and location
-- `lun_occult_when_glob(jd, ipl, starname)` — finds the next lunar occultation of a star or planet
-- `lun_occult_when_loc(jd, ipl, starname, lat, lon)` — occultation visible from a location
+- `lun_eclipse_when(jd, ifltype=0)` — finds the next lunar eclipse (global)
+- `lun_eclipse_when_loc(jd, geopos)` — finds the next lunar eclipse visible from a location
+- `lun_eclipse_how(jd, geopos)` — details of a lunar eclipse at a time and location
+- `lun_occult_when_glob(jd, body)` — finds the next lunar occultation of a star or planet
+- `lun_occult_when_loc(jd, body, geopos)` — occultation visible from a location
 - `planet_occult_when_glob(jd, occulting_planet, starname=...)` — occultation between planets
 - `get_saros_number(jd, "solar"|"lunar")` — returns the Saros series of an eclipse
 - `get_inex_number(jd, "solar"|"lunar")` — returns the Inex number
