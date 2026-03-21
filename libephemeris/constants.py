@@ -1055,8 +1055,8 @@ SE_TIDAL_DE430: float = -25.82  # DE430
 SE_TIDAL_DE431: float = -25.80  # DE431
 SE_TIDAL_DE440: float = -25.936  # DE440 (current default)
 SE_TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
-SE_TIDAL_DEFAULT: float = SE_TIDAL_DE440  # Default value based on DE440
-SE_TIDAL_AUTOMATIC: float = 0.0  # Let library choose based on ephemeris file
+SE_TIDAL_DEFAULT: float = -25.8  # Default value (matches pyswisseph)
+SE_TIDAL_AUTOMATIC: int = 999999  # Let library choose based on ephemeris file
 
 # reference API-compatible aliases (without SE_ prefix)
 TIDAL_DE200: float = SE_TIDAL_DE200
@@ -1071,7 +1071,7 @@ TIDAL_DE431: float = SE_TIDAL_DE431
 TIDAL_DE440: float = SE_TIDAL_DE440
 TIDAL_DE441: float = SE_TIDAL_DE441
 TIDAL_DEFAULT: float = SE_TIDAL_DEFAULT
-TIDAL_AUTOMATIC: float = SE_TIDAL_AUTOMATIC
+TIDAL_AUTOMATIC: int = SE_TIDAL_AUTOMATIC
 
 # =============================================================================
 # STANDARD ASTRONOMICAL EPOCHS (JULIAN DAY)

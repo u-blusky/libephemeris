@@ -3241,7 +3241,7 @@ def sol_eclipse_how(
 def swe_sol_eclipse_how(
     tjd_ut: float,
     geopos: Sequence[float],
-    ifl: int = 0,
+    ifl: int = SEFLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a solar eclipse at a specific location and time.
@@ -5595,8 +5595,7 @@ def swe_lun_eclipse_how(
 
 def lun_occult_when_glob(
     tjdut: float,
-    ipl: int,
-    starname: str,
+    body: "int | str",
     flags: int = SEFLG_SWIEPH,
     ifltype: int = 0,
     backwards: bool = False,
@@ -5612,10 +5611,9 @@ def lun_occult_when_glob(
 
     Args:
         tjdut: Julian Day (UT) to start search from
-        ipl: Planet identifier (int). Use SE_MERCURY, SE_VENUS, etc.
-            Use 0 if searching for a star occultation.
-        starname: Star name (str) for star occultations, or empty string
-            if searching for a planet occultation (e.g., "Regulus").
+        body: Planet identifier (int) or star name (str).
+            Use SE_MERCURY, SE_VENUS, etc. for planets.
+            Use a star name string (e.g., "Regulus") for star occultations.
         flags: Calculation flags (SEFLG_SWIEPH, SEFLG_J2000, etc.)
         ifltype: Bit flags for eclipse type filter (0 = any type):
             SE_ECL_CENTRAL, SE_ECL_NONCENTRAL, SE_ECL_TOTAL,
@@ -5659,11 +5657,11 @@ def lun_occult_when_glob(
         >>> # Find next occultation of Regulus by the Moon
         >>> from libephemeris import julday
         >>> jd = julday(2024, 1, 1, 0)
-        >>> retflags, tret = lun_occult_when_glob(jd, 0, "Regulus", SEFLG_SWIEPH, 0)
+        >>> retflags, tret = lun_occult_when_glob(jd, "Regulus", SEFLG_SWIEPH, 0)
         >>> print(f"Occultation at JD {tret[0]:.5f}")
 
         >>> # Find next occultation of Venus by the Moon
-        >>> retflags, tret = lun_occult_when_glob(jd, SE_VENUS, "", SEFLG_SWIEPH, 0)
+        >>> retflags, tret = lun_occult_when_glob(jd, SE_VENUS, SEFLG_SWIEPH, 0)
         >>> print(f"Venus occultation at JD {tret[0]:.5f}")
 
     References:
@@ -5684,8 +5682,13 @@ def lun_occult_when_glob(
     )
     from .planets import _PLANET_MAP, get_planet_target
 
-    planet = ipl
-    star_name = starname
+    # Interpret body parameter: int = planet ID, str = star name
+    if isinstance(body, str):
+        planet = 0
+        star_name = body
+    else:
+        planet = body
+        star_name = ""
 
     if planet == 0 and not star_name:
         raise ValueError(
@@ -6420,9 +6423,8 @@ def lun_occult_when_loc(
     for _ in range(MAX_OCCULTATIONS):
         # Find next global occultation
         try:
-            global_type, global_times = lun_occult_when_glob(
-                jd, planet, star_name, flags
-            )
+            _body = star_name if star_name else planet
+            global_type, global_times = lun_occult_when_glob(jd, _body, flags)
         except RuntimeError:
             raise RuntimeError(
                 f"No lunar occultation of {'star ' + star_name if planet == 0 else 'planet ' + str(planet)} "

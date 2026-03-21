@@ -1114,44 +1114,45 @@ def cs2degstr(cs: int) -> str:
     return f"{degrees:3d}°{minutes:2d}'{seconds:2d}.{centisecs:02d}\""
 
 
-def cs2lonlatstr(cs: int, plus_char: str, minus_char: str) -> str:
+def cs2lonlatstr(cs: int, plus_char: "str | bytes", minus_char: "str | bytes") -> str:
     """
     Convert a value in centiseconds to a formatted longitude/latitude string.
 
     This function converts an angular measurement in centiseconds (1/100 of an
-    arcsecond) to a human-readable string with a directional character suffix.
-    The format is "D°M'S\" X" where D is degrees, M is arcminutes, S is arcseconds,
-    and X is the directional character (e.g., N/S for latitude, E/W for longitude).
+    arcsecond) to a human-readable string with a directional character.
 
     Compatible with the reference swe.cs2lonlatstr() API.
 
     Args:
         cs: Angle in centiseconds (any integer value)
-        plus_char: Character to use for positive values (e.g., "N" or "E")
-        minus_char: Character to use for negative values (e.g., "S" or "W")
+        plus_char: Character to use for positive values (e.g., b"N" or b"E")
+        minus_char: Character to use for negative values (e.g., b"S" or b"W")
 
     Returns:
         Formatted string representing the angle with directional character.
-        Format: "DDD°MM'SS\" X" (e.g., "45°30'00\" N" or "122°15'30\" W")
+        Format: "{deg}{char}{min:02d}" when seconds == 0,
+        or "{deg}{char}{min:02d}'{sec:02d}" when seconds > 0.
 
     Notes:
         - 1 centisecond = 1/100 arcsecond = 1/360000 degree
         - Positive values use plus_char, negative values use minus_char
         - Seconds are rounded to whole numbers (no centiseconds shown)
-        - Commonly used for geographic coordinates:
-          - Latitude: plus_char="N", minus_char="S"
-          - Longitude: plus_char="E", minus_char="W"
+        - If seconds round to 0, the seconds portion is omitted
 
     Examples:
-        >>> cs2lonlatstr(163800000, "N", "S")  # 45°30'00" North
-        ' 45°30\\' 0" N'
-        >>> cs2lonlatstr(-163800000, "N", "S")  # 45°30'00" South
-        ' 45°30\\' 0" S'
-        >>> cs2lonlatstr(440154000, "E", "W")  # 122°15'30" East
-        '122°15\\'30" E'
-        >>> cs2lonlatstr(-440154000, "E", "W")  # 122°15'30" West
-        '122°15\\'30" W'
+        >>> cs2lonlatstr(360000, b"N", b"S")
+        '1N00'
+        >>> cs2lonlatstr(-360000, b"N", b"S")
+        '1S00'
+        >>> cs2lonlatstr(12345678, b"E", b"W")
+        "34E17'37"
     """
+    # Decode bytes to str if needed
+    if isinstance(plus_char, bytes):
+        plus_char = plus_char.decode("ascii")
+    if isinstance(minus_char, bytes):
+        minus_char = minus_char.decode("ascii")
+
     # Determine direction character based on sign
     if cs >= 0:
         direction = plus_char
@@ -1178,9 +1179,12 @@ def cs2lonlatstr(cs: int, plus_char: str, minus_char: str) -> str:
             minutes = 0
             degrees += 1
 
-    # Format the string matching reference API format
-    # Format: "%3d°%2d'%2d\" %c" with proper spacing
-    return f"{degrees:3d}°{minutes:2d}'{seconds:2d}\" {direction}"
+    # Format matching pyswisseph: "{deg}{char}{min:02d}" or
+    # "{deg}{char}{min:02d}'{sec:02d}"
+    if seconds == 0:
+        return f"{degrees}{direction}{minutes:02d}"
+    else:
+        return f"{degrees}{direction}{minutes:02d}'{seconds:02d}"
 
 
 def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) -> str:
@@ -1253,13 +1257,13 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
         hours = -hours
 
     # Format the string matching reference API format
-    # Format: "%2d<sep>%02d<sep>%02d" with proper spacing
+    # Format: "%02d<sep>%02d<sep>%02d"
+    # Hours are mod 24 to match pyswisseph behavior
+    hours = hours % 24
     if suppresszero:
         if seconds == 0:
-            if minutes == 0:
-                return f"{hours:2d}"
-            return f"{hours:2d}{sep}{minutes:02d}"
-    return f"{hours:2d}{sep}{minutes:02d}{sep}{seconds:02d}"
+            return f"{hours:02d}{sep}{minutes:02d}"
+    return f"{hours:02d}{sep}{minutes:02d}{sep}{seconds:02d}"
 
 
 def deg_midp(a: float, b: float) -> float:

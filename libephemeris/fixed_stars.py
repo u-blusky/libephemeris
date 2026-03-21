@@ -173,6 +173,7 @@ from .constants import (
     SE_MIRACH,
     SE_ALMACH,
     SE_MENKAR,
+    SEFLG_SWIEPH,
     SEFLG_SPEED,
     SEFLG_SPEED3,
     SEFLG_NOABERR,
@@ -3954,7 +3955,7 @@ def _apply_fixstar_flags(
 
 
 def swe_fixstar_ut(
-    star_name: str, tjd_ut: float, iflag: int
+    star_name: str, tjd_ut: float, iflag: int = SEFLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Universal Time.
@@ -4025,7 +4026,7 @@ def swe_fixstar_ut(
 
 
 def swe_fixstar(
-    star_name: str, jd: float, iflag: int
+    star_name: str, jd: float, iflag: int = SEFLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Terrestrial Time (TT).
@@ -4234,7 +4235,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
 
 
 def swe_fixstar2_ut(
-    star_name: str, tjd_ut: float, iflag: int
+    star_name: str, tjd_ut: float, iflag: int = SEFLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Universal Time with flexible lookup.
@@ -4313,7 +4314,7 @@ def swe_fixstar2_ut(
 
 
 def swe_fixstar2(
-    star_name: str, jd: float, iflag: int
+    star_name: str, jd: float, iflag: int = SEFLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Terrestrial Time with flexible lookup.

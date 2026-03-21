@@ -44,9 +44,9 @@ class TestLunOccultWhenGlob:
         # Start from Jan 1, 2017
         jd_start = julday(2017, 1, 1, 0)
 
-        # pyswisseph signature: lun_occult_when_glob(tjdut, planet, starname, flags, direction)
+        # pyswisseph signature: lun_occult_when_glob(tjdut, body, flags, ecltype, backwards)
         # Returns: (retflags, tret)
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Should find an occultation
         assert retflags != 0
@@ -62,7 +62,7 @@ class TestLunOccultWhenGlob:
         """Test that return values have correct structure per pyswisseph spec."""
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Should return 10-element tuple per pyswisseph specification
         assert len(tret) == 10
@@ -83,7 +83,7 @@ class TestLunOccultWhenGlob:
         """
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         jd_max = tret[0]
         jd_begin = tret[2]
@@ -108,7 +108,7 @@ class TestLunOccultWhenGlob:
         """Test that occultation type flags are set."""
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Should be either total or partial
         assert (retflags & SE_ECL_TOTAL) or (retflags & SE_ECL_PARTIAL)
@@ -118,22 +118,22 @@ class TestLunOccultWhenGlob:
         jd_start = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            lun_occult_when_glob(jd_start, 0, "", SEFLG_SWIEPH, 0)
+            lun_occult_when_glob(jd_start, "", SEFLG_SWIEPH, 0)
 
     def test_raises_error_for_unknown_star(self):
         """Test that function raises error for unknown star name."""
         jd_start = julday(2017, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            lun_occult_when_glob(jd_start, 0, "UnknownStar123", SEFLG_SWIEPH, 0)
+            lun_occult_when_glob(jd_start, "UnknownStar123", SEFLG_SWIEPH, 0)
 
     def test_swe_alias(self):
         """Test that swe_lun_occult_when_glob is an alias."""
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags1, tret1 = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags1, tret1 = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
         retflags2, tret2 = swe_lun_occult_when_glob(
-            jd_start, 0, "Regulus", SEFLG_SWIEPH, 0
+            jd_start, "Regulus", SEFLG_SWIEPH, 0
         )
 
         assert tret1 == tret2
@@ -147,7 +147,7 @@ class TestLunOccultWhenGlob:
         """
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         jd_begin = tret[2]
         jd_end = tret[3]
@@ -169,7 +169,7 @@ class TestLunOccultEdgeCases:
         # Search from June 1, 2017
         jd_start = julday(2017, 6, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Verify it's on June 28
         year, month, day, hour = revjul(tret[0])
@@ -185,9 +185,7 @@ class TestLunOccultEdgeCases:
         # The function should either find an occultation or raise RuntimeError
         # after exhausting the search limit
         try:
-            retflags, tret = lun_occult_when_glob(
-                jd_start, 0, "Regulus", SEFLG_SWIEPH, 0
-            )
+            retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
             # If found, verify it's after start date
             assert tret[0] > jd_start
         except RuntimeError as e:
@@ -199,9 +197,7 @@ class TestLunOccultEdgeCases:
         jd_start = julday(2020, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            lun_occult_when_glob(
-                jd_start, 999, "", SEFLG_SWIEPH, 0
-            )  # Invalid planet ID
+            lun_occult_when_glob(jd_start, 999, SEFLG_SWIEPH, 0)  # Invalid planet ID
 
 
 class TestLunOccultResolveStarId:
@@ -221,7 +217,7 @@ class TestLunOccultResolveStarId:
         jd_start = julday(2017, 1, 1, 0)
 
         # This should not raise "ValueError: too many values to unpack"
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
         assert tret[0] > jd_start
 
     def test_invalid_star_raises_value_error_with_message(self):
@@ -229,7 +225,7 @@ class TestLunOccultResolveStarId:
         jd_start = julday(2017, 1, 1, 0)
 
         with pytest.raises(ValueError) as exc_info:
-            lun_occult_when_glob(jd_start, 0, "InvalidStarXYZ123", SEFLG_SWIEPH, 0)
+            lun_occult_when_glob(jd_start, "InvalidStarXYZ123", SEFLG_SWIEPH, 0)
 
         # Error message should mention the star name
         assert "invalidstarxyz123" in str(exc_info.value).lower()
@@ -242,16 +238,15 @@ class TestLunOccultPyswissephCompatibility:
         """Test that the function signature matches pyswisseph.
 
         pyswisseph signature:
-        lun_occult_when_glob(tjdut, planet, starname, flags=SEFLG_SWIEPH, direction=0)
+        lun_occult_when_glob(tjdut, body, flags=FLG_SWIEPH, ecltype=0, backwards=False)
 
-        planet: int for planet ID (0 if using star)
-        starname: str for star name (empty string if using planet)
+        body: int for planet ID or str for star name
         Returns: (retflags, tret) where tret is 10-element tuple
         """
         jd_start = julday(2017, 1, 1, 0)
 
-        # Test with star name (planet=0)
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        # Test with star name
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
         assert isinstance(retflags, int)
         assert len(tret) == 10
 
@@ -272,7 +267,7 @@ class TestLunOccultPyswissephCompatibility:
         """
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Maximum occultation should be valid
         assert tret[0] > 0

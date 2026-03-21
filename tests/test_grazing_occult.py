@@ -86,7 +86,7 @@ class TestGrazingOccultDetection:
         # Search for a known occultation and check flag handling
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Should have a type flag (TOTAL, PARTIAL, or ANNULAR)
         has_type = (retflags & SE_ECL_TOTAL) or (retflags & SE_ECL_PARTIAL)
@@ -115,7 +115,7 @@ class TestGrazingOccultDetection:
         # Search for an occultation of Regulus (bright star close to ecliptic)
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # For a total occultation (star passes near center of Moon),
         # we wouldn't expect grazing flag unless it's specifically a grazing event
@@ -127,7 +127,7 @@ class TestGrazingOccultDetection:
         """Test that occultation returns correct structure even with grazing detection."""
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Should still return 10-element tuple
         assert len(tret) == 10
@@ -148,9 +148,7 @@ class TestGrazingOccultEdgeCases:
 
         for star in stars_to_test:
             try:
-                retflags, tret = lun_occult_when_glob(
-                    jd_start, 0, star, SEFLG_SWIEPH, 0
-                )
+                retflags, tret = lun_occult_when_glob(jd_start, star, SEFLG_SWIEPH, 0)
                 # Should return valid result
                 assert isinstance(retflags, int)
                 assert len(tret) == 10

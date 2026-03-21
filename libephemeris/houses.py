@@ -78,6 +78,7 @@ from .constants import (
     SE_SUN,
     SEFLG_JPLEPH,
     SEFLG_SWIEPH,
+    SEFLG_TOPOCTR,
 )
 from .state import get_timescale
 from .planets import swe_get_ayanamsa_ut, swe_calc_ut
@@ -4920,7 +4921,7 @@ def _gauquelin_sector_from_rise_set(
 
 def gauquelin_sector(
     jd: float,
-    planet: int,
+    planet: "int | str",
     lat: float,
     lon: float,
     altitude: float = 0.0,
@@ -4944,13 +4945,15 @@ def gauquelin_sector(
 
     Args:
         jd: Julian Day in Universal Time (UT)
-        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        planet: Planet/body ID (int, e.g. SE_SUN, SE_MOON) or star name (str)
         lat: Geographic latitude in degrees (positive North)
         lon: Geographic longitude in degrees (positive East)
         altitude: Geographic altitude in meters above sea level (default 0.0)
         pressure: Atmospheric pressure in mbar (default 1013.25)
         temperature: Atmospheric temperature in degrees Celsius (default 15.0)
         flags: Calculation flags (SEFLG_SWIEPH, SEFLG_TOPOCTR, etc.)
+            Note: The swe_gauquelin_sector() wrapper defaults to
+            SEFLG_SWIEPH | SEFLG_TOPOCTR (32770) per pyswisseph.
         method: Calculation method:
             - 0: with latitude
             - 1: without latitude
@@ -4977,6 +4980,10 @@ def gauquelin_sector(
     """
     # Methods 2-5: Use actual rise/set times
     if method in (2, 3, 4, 5):
+        if isinstance(planet, str):
+            raise NotImplementedError(
+                "Star names are not supported with methods 2-5 for gauquelin_sector"
+            )
         return _gauquelin_sector_from_rise_set(
             jd, planet, lat, lon, altitude, pressure, temperature, flags, method
         )
@@ -4984,6 +4991,7 @@ def gauquelin_sector(
     # Methods 0-1: Use house_pos with Gauquelin house system ('G')
     # This computes Gauquelin sectors from house position
     from .planets import swe_calc_ut
+    from .fixed_stars import swe_fixstar_ut
     from .cache import get_true_obliquity
 
     ts = get_timescale()
@@ -4996,10 +5004,15 @@ def gauquelin_sector(
     gast = float(t.gast)  # in hours
     armc_deg = (gast * 15.0 + lon) % 360.0
 
-    # Get planet position
-    pos, retflag = swe_calc_ut(jd, planet, flags | SEFLG_SPEED)
-    planet_lon = pos[0]
-    planet_lat = pos[1]
+    # Get body position - planet (int) or star (str)
+    if isinstance(planet, str):
+        pos, _star_name, retflag = swe_fixstar_ut(planet, jd, flags | SEFLG_SPEED)
+        planet_lon = float(pos[0])
+        planet_lat = float(pos[1])
+    else:
+        pos, retflag = swe_calc_ut(jd, planet, flags | SEFLG_SPEED)
+        planet_lon = pos[0]
+        planet_lat = pos[1]
 
     # For method 1 (without latitude), ignore ecliptic latitude
     if method == 1:
@@ -5014,21 +5027,37 @@ def gauquelin_sector(
 
 def swe_gauquelin_sector(
     tjdut: float,
-    body: int,
+    body: "int | str",
     method: int,
     geopos: tuple[float, float, float],
     atpress: float = 0.0,
     attemp: float = 0.0,
-    flags: int = 0,
+    flags: int = SEFLG_SWIEPH | SEFLG_TOPOCTR,
 ) -> float:
     """
     Calculate the Gauquelin sector (1-36) in which a planet is located.
 
-    Reference API compatible function signature.
+    Gauquelin sectors are a 36-fold division of the diurnal and nocturnal arcs
+    used in statistical astrology research by Michel Gauquelin. Sectors are
+    numbered clockwise from the Ascendant:
+    - Sector 1: Rising (Ascendant)
+    - Sector 10: Upper culmination (MC)
+    - Sector 19: Setting (Descendant)
+    - Sector 28: Lower culmination (IC)
+
+    Reference API compatible function (swe_gauquelin_sector equivalent).
 
     Args:
-        tjdut: Julian Day number in Universal Time (UT)
-        body: Planet number (SE_SUN, SE_MOON, etc.)
+        jd: Julian Day in Universal Time (UT)
+        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        lat: Geographic latitude in degrees (positive North)
+        lon: Geographic longitude in degrees (positive East)
+        altitude: Geographic altitude in meters above sea level (default 0.0)
+        pressure: Atmospheric pressure in mbar (default 1013.25)
+        temperature: Atmospheric temperature in degrees Celsius (default 15.0)
+        flags: Calculation flags (SEFLG_SWIEPH, SEFLG_TOPOCTR, etc.)
+            Note: The swe_gauquelin_sector() wrapper defaults to
+            SEFLG_SWIEPH | SEFLG_TOPOCTR (32770) per pyswisseph.
         method: Calculation method:
             - 0: with latitude
             - 1: without latitude

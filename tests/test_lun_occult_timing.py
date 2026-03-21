@@ -40,7 +40,7 @@ class TestLunOccultTimingPrecision:
         # Known Regulus occultation in 2017
         jd_start = julday(2017, 6, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Should find an occultation
         assert retflags != 0
@@ -64,7 +64,7 @@ class TestLunOccultTimingPrecision:
         """Test that contact times are roughly symmetric around maximum."""
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         if retflags == 0:
             pytest.skip("No occultation found")
@@ -87,7 +87,7 @@ class TestLunOccultTimingPrecision:
         """Test that totality times are properly nested within outer contacts."""
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         if retflags == 0:
             pytest.skip("No occultation found")
@@ -150,7 +150,7 @@ class TestLunOccultWhenLocTopocentric:
         # First find a global occultation
         try:
             retflags_glob, tret_glob = lun_occult_when_glob(
-                jd_start, 0, "Regulus", SEFLG_SWIEPH, 0
+                jd_start, "Regulus", SEFLG_SWIEPH, 0
             )
         except RuntimeError:
             pytest.skip("No global Regulus occultation found")
@@ -187,7 +187,7 @@ class TestLunOccultWhenLocTopocentric:
         # Get global occultation time
         try:
             retflags_glob, tret_glob = lun_occult_when_glob(
-                jd_start, 0, "Regulus", SEFLG_SWIEPH, 0
+                jd_start, "Regulus", SEFLG_SWIEPH, 0
             )
         except RuntimeError:
             pytest.skip("No global Regulus occultation found")
@@ -237,8 +237,8 @@ class TestLunOccultSearchPrecision:
         jd_start = julday(2017, 6, 1, 0)
 
         # Run search twice and verify consistent results
-        retflags1, tret1 = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
-        retflags2, tret2 = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags1, tret1 = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
+        retflags2, tret2 = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Results should be identical
         assert retflags1 == retflags2
@@ -252,7 +252,7 @@ class TestLunOccultSearchPrecision:
         # Search from early 2017 - multiple Regulus occultations throughout 2017
         jd_start = julday(2017, 1, 1, 0)
 
-        retflags, tret = lun_occult_when_glob(jd_start, 0, "Regulus", SEFLG_SWIEPH, 0)
+        retflags, tret = lun_occult_when_glob(jd_start, "Regulus", SEFLG_SWIEPH, 0)
 
         # Should find an occultation in 2017
         assert retflags != 0
@@ -277,7 +277,7 @@ class TestLunOccultPlanetOccultations:
         jd_start = julday(2024, 1, 1, 0)
 
         try:
-            retflags, tret = lun_occult_when_glob(jd_start, planet, "", SEFLG_SWIEPH, 0)
+            retflags, tret = lun_occult_when_glob(jd_start, planet, SEFLG_SWIEPH, 0)
 
             if retflags == 0:
                 pytest.skip(f"No {name} occultation found")

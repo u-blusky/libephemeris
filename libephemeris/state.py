@@ -894,7 +894,7 @@ def set_tid_acc(value: float) -> None:
     Args:
         value: Tidal acceleration in arcsec/century^2.
                Use SE_TIDAL_* constants for standard ephemeris values,
-               or SE_TIDAL_AUTOMATIC (0.0) to use the default.
+               or SE_TIDAL_AUTOMATIC (999999) to use the default.
 
     Note:
         - The default value is based on DE440 (-25.936 arcsec/cy^2)
@@ -917,7 +917,9 @@ def set_tid_acc(value: float) -> None:
         -25.936
     """
     global _TIDAL_ACCELERATION
-    _TIDAL_ACCELERATION = value if value != 0.0 else None
+    from .constants import SE_TIDAL_AUTOMATIC
+
+    _TIDAL_ACCELERATION = value if value != SE_TIDAL_AUTOMATIC else None
 
 
 def get_tid_acc() -> float:
@@ -926,15 +928,15 @@ def get_tid_acc() -> float:
 
     Returns:
         float: The tidal acceleration in arcsec/century^2.
-               Returns SE_TIDAL_DEFAULT (-25.936, based on DE440) if not explicitly set.
+               Returns SE_TIDAL_DEFAULT (-25.8) if not explicitly set.
 
     Note:
         The tidal acceleration affects how Delta T is extrapolated for dates
         outside the range of direct observations. This is particularly
         important for historical astronomical calculations.
 
-        If set_tid_acc() was called with SE_TIDAL_AUTOMATIC (0.0),
-        this returns the default value (DE440-based).
+        If set_tid_acc() was called with SE_TIDAL_AUTOMATIC (999999),
+        this returns the default value.
 
     Example:
         >>> from libephemeris import get_tid_acc, set_tid_acc, SE_TIDAL_DE441

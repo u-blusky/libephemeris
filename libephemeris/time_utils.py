@@ -21,7 +21,7 @@ JD_GREGORIAN_REFORM = 2299161
 
 
 def swe_julday(
-    year: int, month: int, day: int, hour: float, gregflag: int = SE_GREG_CAL
+    year: int, month: int, day: int, hour: float = 12.0, gregflag: int = SE_GREG_CAL
 ) -> float:
     """
     Convert calendar date to Julian Day number.

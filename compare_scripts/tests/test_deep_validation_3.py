@@ -271,7 +271,7 @@ class TestLunOccultWhenGlob:
     def test_planet_occultation_returns_result(self):
         """lun_occult_when_glob should find a Venus occultation."""
         jd = ephem.swe_julday(2024, 1, 1, 0.0)
-        lib_result = ephem.swe_lun_occult_when_glob(jd, SE_VENUS, "")
+        lib_result = ephem.swe_lun_occult_when_glob(jd, SE_VENUS)
         swe_result = swe.lun_occult_when_glob(jd, swe.VENUS, swe.FLG_SWIEPH)
 
         lib_type = lib_result[0]
@@ -295,7 +295,7 @@ class TestLunOccultWhenGlob:
     def test_return_structure(self):
         """lun_occult_when_glob should return (int, tuple_of_floats)."""
         jd = ephem.swe_julday(2024, 1, 1, 0.0)
-        result = ephem.swe_lun_occult_when_glob(jd, SE_VENUS, "")
+        result = ephem.swe_lun_occult_when_glob(jd, SE_VENUS)
 
         assert isinstance(result, tuple)
         assert len(result) == 2

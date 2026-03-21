@@ -3766,7 +3766,7 @@ def swe_get_ayanamsa_ex(tjd_et: float, flags: int = 0) -> Tuple[int, float]:
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
     ayanamsa = _calc_ayanamsa_ex_value(tjd_et, sid_mode)
-    return (flags, ayanamsa)
+    return (flags, float(ayanamsa))
 
 
 def swe_get_ayanamsa_ex_ut(tjd_ut: float, flags: int = 0) -> Tuple[int, float]:
@@ -3800,7 +3800,7 @@ def swe_get_ayanamsa_ex_ut(tjd_ut: float, flags: int = 0) -> Tuple[int, float]:
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
     ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode)
-    return (flags, ayanamsa)
+    return (flags, float(ayanamsa))
 
 
 def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int) -> float:
