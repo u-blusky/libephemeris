@@ -1453,14 +1453,14 @@ def _decompose_to_dms(ddeg: float, has_rounding: bool) -> Tuple[int, int, int, f
     fractional part.
     """
     ideg = int(ddeg)
-    ddeg -= ideg
+    ddeg = max(ddeg - ideg, 0.0)
     imin = int(ddeg * 60.0)
-    ddeg -= imin / 60.0
+    ddeg = max(ddeg - imin / 60.0, 0.0)
     isec = int(ddeg * 3600.0)
     if has_rounding:
         secfr = float(isec)
     else:
-        secfr = ddeg * 3600.0 - isec
+        secfr = max(ddeg * 3600.0 - isec, 0.0)
     return ideg, imin, isec, secfr
 
 
@@ -1474,8 +1474,12 @@ def _split_deg_nakshatra(
     """
     nakshatra_span = 360.0 / 27.0  # 13.33333...°
 
-    # Position within current nakshatra (needed for keep-flag checks)
-    pos_in_nak = math.fmod(ddeg, nakshatra_span)
+    # Reduce to within-nakshatra position for KEEP-flag boundary checks.
+    # Plain fmod(ddeg, span) fails at exact nakshatra multiples (40°, 120°,
+    # 360°) because span = 360/27 is irrational in IEEE 754.
+    # fmod(ddeg*27, 360)/27 operates on integer multiples at those
+    # boundaries, giving exact zeros.
+    pos_in_nak = math.fmod(ddeg * 27.0, 360.0) / 27.0
 
     # Determine and conditionally suppress rounding offset
     offset = _rounding_offset(roundflag)
@@ -1489,18 +1493,20 @@ def _split_deg_nakshatra(
             if pos_in_nak + offset >= nakshatra_span:
                 offset = 0.0
 
+    # Apply offset to the original degree and re-reduce using *27/27.
+    # This preserves FP precision better than adding offset to the
+    # already-reduced pos_in_nak (avoids 1-ULP loss at boundaries
+    # like 90° + ROUND_MIN offset).
     ddeg += offset
-
-    # Identify nakshatra index and reduce to within-nakshatra degrees
     nak_idx = int(ddeg / nakshatra_span)
-    if nak_idx == 27:  # 360° wraps back to first nakshatra
+    if nak_idx >= 27:
         nak_idx = 0
-    ddeg = math.fmod(ddeg, nakshatra_span)
+    pos_in_nak = math.fmod(ddeg * 27.0, 360.0) / 27.0
 
     has_rounding = bool(
         roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
     )
-    ideg, imin, isec, secfr = _decompose_to_dms(ddeg, has_rounding)
+    ideg, imin, isec, secfr = _decompose_to_dms(pos_in_nak, has_rounding)
     return (ideg, imin, isec, secfr, nak_idx)
 
 

@@ -51,14 +51,14 @@ class TestGetPlanetName:
         assert get_planet_name(SE_EARTH) == "Earth"
 
     def test_lunar_nodes(self):
-        """Test lunar node name lookups."""
-        assert get_planet_name(SE_MEAN_NODE) == "Mean Node"
-        assert get_planet_name(SE_TRUE_NODE) == "True Node"
+        """Test lunar node name lookups (pyswisseph uses lowercase)."""
+        assert get_planet_name(SE_MEAN_NODE) == "mean Node"
+        assert get_planet_name(SE_TRUE_NODE) == "true Node"
 
     def test_lunar_apogee(self):
-        """Test lunar apogee name lookups."""
-        assert get_planet_name(SE_MEAN_APOG) == "Mean Apogee"
-        assert get_planet_name(SE_OSCU_APOG) == "Osculating Apogee"
+        """Test lunar apogee name lookups (pyswisseph uses lowercase/abbreviated)."""
+        assert get_planet_name(SE_MEAN_APOG) == "mean Apogee"
+        assert get_planet_name(SE_OSCU_APOG) == "osc. Apogee"
 
     def test_unknown_planet_id(self):
         """Test unknown planet ID returns descriptive string."""

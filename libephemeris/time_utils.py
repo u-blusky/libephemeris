@@ -13,7 +13,15 @@ All algorithms follow Meeus "Astronomical Algorithms" (1998).
 from math import floor as _floor
 from typing import Any, Optional
 
-from .constants import SE_GREG_CAL, SE_JUL_CAL, SEFLG_JPLEPH, SEFLG_SWIEPH
+import math
+
+from .constants import (
+    SE_GREG_CAL,
+    SE_JUL_CAL,
+    SEFLG_EQUATORIAL,
+    SEFLG_JPLEPH,
+    SEFLG_SWIEPH,
+)
 from .state import get_timescale, get_delta_t_userdef, get_iers_delta_t_enabled
 
 # Julian Day of Gregorian calendar reform: Oct 15, 1582
@@ -688,61 +696,34 @@ def time_equ(jd: float) -> float:
         >>> print(f"Equation of Time: {eot_minutes:.2f} minutes")
         Equation of Time: -3.05 minutes
     """
-    from .state import get_planets, get_timescale
+    # The equation of time is derived from the relationship:
+    #   E = GAST - RA_sun + 12h - UT
+    # where GAST is Greenwich Apparent Sidereal Time (hours),
+    # RA_sun is the Sun's apparent right ascension (hours),
+    # and UT is the UT time of day (hours).
+    # The result is normalized to ±12 hours, then converted to days.
 
-    ts = get_timescale()
-    planets = get_planets()
+    # Get Sun's apparent right ascension via equatorial coordinates
+    # Import here to avoid circular import
+    from . import swe_calc_ut
 
-    # Create time object
-    t = ts.ut1_jd(jd)
+    sun_result = swe_calc_ut(jd, 0, SEFLG_EQUATORIAL)
+    ra_hours = sun_result[0][0] / 15.0  # RA in degrees -> hours
 
-    # Get Earth and Sun
-    earth = planets["earth"]
-    sun = planets["sun"]
+    # Greenwich Apparent Sidereal Time (in hours)
+    gast = sidtime(jd)
 
-    # Calculate apparent position of Sun from Earth
-    # Type ignore needed for Skyfield's lazy reify decorator
-    astrometric: Any = earth.at(t).observe(sun)
-    apparent = astrometric.apparent()
+    # UT time of day in hours
+    ut_hours = math.fmod((jd + 0.5), 1.0) * 24.0
 
-    # Get apparent right ascension in degrees
-    ra, _, _ = apparent.radec()
-    apparent_ra_deg = float(ra.hours) * 15.0  # Convert hours to degrees
+    # Equation of time in hours
+    e_hours = math.fmod(gast - ra_hours + 12.0 - ut_hours, 24.0)
+    if e_hours > 12.0:
+        e_hours -= 24.0
+    elif e_hours < -12.0:
+        e_hours += 24.0
 
-    # Calculate Sun's mean longitude using algorithm from
-    # Meeus "Astronomical Algorithms" Chapter 28
-    # T is Julian centuries from J2000.0
-    T = (jd - 2451545.0) / 36525.0
-
-    # Mean longitude of the Sun (in degrees), from Meeus Ch. 25
-    L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T**2
-
-    # Normalize to 0-360 degrees
-    L0 = L0 % 360.0
-    if L0 < 0:
-        L0 += 360.0
-
-    # Normalize apparent RA to 0-360 degrees
-    apparent_ra_deg = apparent_ra_deg % 360.0
-    if apparent_ra_deg < 0:
-        apparent_ra_deg += 360.0
-
-    # Equation of time: E = L0 - 0.0057183° - α (all in degrees)
-    # The constant 0.0057183° corrects for aberration and nutation
-    # already included in apparent position, so we skip it.
-    # E = Mean solar longitude - Apparent right ascension (in degrees)
-    eot_deg = L0 - apparent_ra_deg
-
-    # Normalize to ±180 degrees
-    while eot_deg > 180.0:
-        eot_deg -= 360.0
-    while eot_deg < -180.0:
-        eot_deg += 360.0
-
-    # Convert degrees to time (360° = 24h = 1 day)
-    eot_days = eot_deg / 360.0
-
-    return eot_days
+    return e_hours / 24.0
 
 
 def lat_to_lmt(jd_lat: float, longitude: float) -> float:
@@ -1323,10 +1304,14 @@ def utc_time_zone(
     timezone_offset: float,
 ) -> tuple[int, int, int, int, int, float]:
     """
-    Apply a timezone offset to a UTC date/time and return the local date/time.
+    Convert local time to UTC by subtracting the timezone offset.
 
-    Converts a UTC date/time to local time by adding the specified timezone
-    offset. Handles all date boundary crossings (day, month, year) correctly.
+    Given a date/time in a specific timezone, subtract the timezone offset
+    to obtain the equivalent UTC date/time. Handles all date boundary
+    crossings (day, month, year) correctly.
+
+    This matches the pyswisseph convention: the offset is **subtracted**
+    from the input time.
 
     Args:
         year: Calendar year (negative for BCE)
@@ -1340,7 +1325,7 @@ def utc_time_zone(
             Negative values for timezones west of UTC (e.g., -5 for EST, -8 for PST)
 
     Returns:
-        tuple: (year, month, day, hour, minute, second) in local time where:
+        tuple: (year, month, day, hour, minute, second) in UTC where:
             - year: Calendar year
             - month: Month (1-12)
             - day: Day of month (1-31)
@@ -1350,21 +1335,21 @@ def utc_time_zone(
 
     Example:
         >>> from libephemeris import utc_time_zone
-        >>> # Convert 2024-01-15 10:30:00 UTC to CET (UTC+1)
-        >>> utc_time_zone(2024, 1, 15, 10, 30, 0.0, 1)
-        (2024, 1, 15, 11, 30, 0.0)
-        >>> # Convert 2024-01-15 02:00:00 UTC to EST (UTC-5)
-        >>> utc_time_zone(2024, 1, 15, 2, 0, 0.0, -5)
-        (2024, 1, 14, 21, 0, 0.0)
+        >>> # Convert 2024-01-15 12:00:00 CET (UTC+1) to UTC
+        >>> utc_time_zone(2024, 1, 15, 12, 0, 0.0, 1)
+        (2024, 1, 15, 11, 0, 0.0)
+        >>> # Convert 2024-01-15 12:00:00 EST (UTC-5) to UTC
+        >>> utc_time_zone(2024, 1, 15, 12, 0, 0.0, -5)
+        (2024, 1, 15, 17, 0, 0.0)
     """
-    # Convert UTC time to decimal hours
+    # Convert local time to decimal hours
     decimal_hour = hour + minute / 60.0 + second / 3600.0
 
     # Convert to Julian Day
     jd = swe_julday(year, month, day, decimal_hour, SE_GREG_CAL)
 
-    # Add timezone offset (convert hours to days)
-    jd_local = jd + timezone_offset / 24.0
+    # Subtract timezone offset to get UTC (convert hours to days)
+    jd_local = jd - timezone_offset / 24.0
 
     # Convert back to calendar date
     local_year, local_month, local_day, local_decimal_hour = swe_revjul(
