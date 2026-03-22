@@ -210,6 +210,8 @@ class StarData:
         parallax_mas: Trigonometric parallax in milliarcseconds (mas).
             Used to compute stellar distance: dist_AU = 206265000 / parallax_mas.
             A value of 0.0 means unknown parallax (distance defaults to 100000 AU).
+        radial_km_per_s: Radial velocity in km/s (positive = receding).
+            Affects distance variation over time and speed_dist output.
 
     Note:
         Proper motions are applied using rigorous space motion approach
@@ -222,6 +224,7 @@ class StarData:
     pm_ra: float
     pm_dec: float
     parallax_mas: float = 0.0
+    radial_km_per_s: float = 0.0
 
 
 @dataclass
@@ -370,6 +373,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.24873,  # -248.73 mas/yr (westward)
             pm_dec=0.00559,  # +5.59 mas/yr (northward)
             parallax_mas=41.13,
+            radial_km_per_s=-18.06,
         ),
         magnitude=1.40,  # Visual magnitude
     ),
@@ -384,6 +388,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.04235,  # -42.35 mas/yr
             pm_dec=-0.03067,  # -30.67 mas/yr
             parallax_mas=13.06,
+            radial_km_per_s=-22.85,
         ),
         magnitude=1.04,  # Visual magnitude
     ),
@@ -398,6 +403,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00299,  # 2.99 mas/yr
             pm_dec=-0.00166,  # -1.66 mas/yr
             parallax_mas=36.27,
+            radial_km_per_s=21.84,
         ),
         magnitude=2.12,
     ),
@@ -412,6 +418,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.54601,  # -546.01 mas/yr
             pm_dec=-1.22307,  # -1223.07 mas/yr
             parallax_mas=379.21,
+            radial_km_per_s=-7.14,
         ),
         magnitude=-1.46,
     ),
@@ -426,6 +433,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.06345,  # 63.45 mas/yr
             pm_dec=-0.18894,  # -188.94 mas/yr
             parallax_mas=48.94,
+            radial_km_per_s=68.1,
         ),
         magnitude=0.85,
     ),
@@ -440,6 +448,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.01211,  # -12.11 mas/yr
             pm_dec=-0.02330,  # -23.30 mas/yr
             parallax_mas=5.89,
+            radial_km_per_s=-13.31,
         ),
         magnitude=1.06,
     ),
@@ -454,6 +463,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.20094,  # 200.94 mas/yr
             pm_dec=0.28623,  # 286.23 mas/yr
             parallax_mas=130.23,
+            radial_km_per_s=-19.21,
         ),
         magnitude=0.03,
     ),
@@ -468,6 +478,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.04448,  # 44.48 mas/yr
             pm_dec=-0.01185,  # -11.85 mas/yr
             parallax_mas=7.54,
+            radial_km_per_s=-14.06,
         ),
         magnitude=1.98,
     ),
@@ -482,6 +493,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.32895,  # 328.95 mas/yr
             pm_dec=-0.16467,  # -164.67 mas/yr
             parallax_mas=129.81,
+            radial_km_per_s=28.9,
         ),
         magnitude=1.16,
     ),
@@ -496,6 +508,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02754,  # 27.54 mas/yr
             pm_dec=0.01130,  # 11.30 mas/yr
             parallax_mas=6.55,
+            radial_km_per_s=26.74,
         ),
         magnitude=0.42,
     ),
@@ -510,6 +523,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00131,  # 1.31 mas/yr
             pm_dec=0.00050,  # 0.50 mas/yr
             parallax_mas=3.78,
+            radial_km_per_s=25.0,
         ),
         magnitude=0.12,
     ),
@@ -524,6 +538,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.71459,  # -714.59 mas/yr
             pm_dec=-1.03680,  # -1036.80 mas/yr
             parallax_mas=284.56,
+            radial_km_per_s=-11.18,
         ),
         magnitude=0.34,
     ),
@@ -538,6 +553,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.07525,  # 75.25 mas/yr
             pm_dec=-0.42689,  # -426.89 mas/yr
             parallax_mas=76.2,
+            radial_km_per_s=38.45,
         ),
         magnitude=0.08,
     ),
@@ -552,6 +568,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-1.09339,  # -1093.39 mas/yr
             pm_dec=-2.00006,  # -2000.06 mas/yr
             parallax_mas=88.83,
+            radial_km_per_s=-31.79,
         ),
         magnitude=-0.04,
     ),
@@ -566,6 +583,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00201,  # 2.01 mas/yr
             pm_dec=0.00185,  # 1.85 mas/yr
             parallax_mas=2.31,
+            radial_km_per_s=2.55,
         ),
         magnitude=1.25,
     ),
@@ -580,6 +598,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.62655,  # -626.55 mas/yr
             pm_dec=-0.04580,  # -45.80 mas/yr
             parallax_mas=96.54,
+            radial_km_per_s=-4.11,
         ),
         magnitude=1.14,
     ),
@@ -594,6 +613,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.19145,  # -191.45 mas/yr
             pm_dec=-0.14519,  # -145.19 mas/yr
             parallax_mas=64.12,
+            radial_km_per_s=0.6,
         ),
         magnitude=1.58,
     ),
@@ -608,6 +628,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.53623,  # 536.23 mas/yr
             pm_dec=0.38529,  # 385.29 mas/yr
             parallax_mas=194.95,
+            radial_km_per_s=-17.0,
         ),
         magnitude=0.77,
     ),
@@ -622,6 +643,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.08700,  # 87.00 mas/yr
             pm_dec=-0.03824,  # -38.24 mas/yr
             parallax_mas=23.39,
+            radial_km_per_s=28.46,
         ),
         magnitude=0.46,
     ),
@@ -636,6 +658,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01993,  # 19.93 mas/yr
             pm_dec=0.02324,  # 23.24 mas/yr
             parallax_mas=10.55,
+            radial_km_per_s=21.67,
         ),
         magnitude=-0.72,
     ),
@@ -650,6 +673,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.03583,  # -35.83 mas/yr
             pm_dec=-0.01486,  # -14.86 mas/yr
             parallax_mas=10.13,
+            radial_km_per_s=-0.64,
         ),
         magnitude=0.76,
     ),
@@ -664,6 +688,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.04297,  # -42.97 mas/yr
             pm_dec=-0.01618,  # -16.18 mas/yr
             parallax_mas=11.71,
+            radial_km_per_s=-7.57,
         ),
         magnitude=1.25,
     ),
@@ -678,6 +703,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02823,  # 28.23 mas/yr
             pm_dec=-0.26508,  # -265.08 mas/yr
             parallax_mas=36.83,
+            radial_km_per_s=4.97,
         ),
         magnitude=1.64,
     ),
@@ -692,6 +718,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.03327,  # -33.27 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=-0.02316,  # -23.16 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=8.32,
+            radial_km_per_s=-3.74,
         ),
         magnitude=0.61,
     ),
@@ -706,6 +733,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-3.67925,  # -3679.25 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=0.47367,  # 473.67 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=742.0,
+            radial_km_per_s=-37.06,
         ),
         magnitude=-0.27,
     ),
@@ -720,6 +748,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00853,  # -8.53 mas/yr
             pm_dec=-0.03080,  # -30.80 mas/yr
             parallax_mas=5.71,
+            radial_km_per_s=-3.34,
         ),
         magnitude=1.62,
     ),
@@ -734,6 +763,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00811,  # -8.11 mas/yr
             pm_dec=-0.01288,  # -12.88 mas/yr
             parallax_mas=12.92,
+            radial_km_per_s=26.8,
         ),
         magnitude=1.64,
     ),
@@ -748,6 +778,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02276,  # 22.76 mas/yr
             pm_dec=-0.17358,  # -173.58 mas/yr
             parallax_mas=24.36,
+            radial_km_per_s=21.7,
         ),
         magnitude=1.65,
     ),
@@ -762,6 +793,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00933,  # 9.33 mas/yr
             pm_dec=-0.23736,  # -237.36 mas/yr
             parallax_mas=10.91,
+            radial_km_per_s=88.96,
         ),
         magnitude=3.04,
     ),
@@ -776,6 +808,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00144,  # 1.44 mas/yr
             pm_dec=-0.00078,  # -0.78 mas/yr
             parallax_mas=1.65,
+            radial_km_per_s=32.26,
         ),
         magnitude=1.69,
     ),
@@ -790,6 +823,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00319,  # 3.19 mas/yr
             pm_dec=0.00203,  # 2.03 mas/yr
             parallax_mas=4.43,
+            radial_km_per_s=-0.8,
         ),
         magnitude=1.74,
     ),
@@ -804,6 +838,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00064,  # 0.64 mas/yr
             pm_dec=-0.00069,  # -0.69 mas/yr
             parallax_mas=4.71,
+            radial_km_per_s=24.07,
         ),
         magnitude=2.23,
     ),
@@ -818,6 +853,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00146,  # 1.46 mas/yr
             pm_dec=-0.00128,  # -1.28 mas/yr
             parallax_mas=5.04,
+            radial_km_per_s=27.05,
         ),
         magnitude=2.06,
     ),
@@ -832,6 +868,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00034,  # -0.34 mas/yr
             pm_dec=-0.00294,  # -2.94 mas/yr
             parallax_mas=2.97,
+            radial_km_per_s=38.31,
         ),
         magnitude=3.33,
     ),
@@ -846,6 +883,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.23255,  # 232.55 mas/yr
             pm_dec=0.03199,  # 31.99 mas/yr
             parallax_mas=33.86,
+            radial_km_per_s=41.98,
         ),
         magnitude=2.04,
     ),
@@ -860,6 +898,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.01523,  # -15.23 mas/yr
             pm_dec=0.03437,  # 34.37 mas/yr
             parallax_mas=18.09,
+            radial_km_per_s=-24.73,
         ),
         magnitude=1.98,
     ),
@@ -874,6 +913,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.10807,  # 108.07 mas/yr
             pm_dec=-0.22157,  # -221.57 mas/yr
             parallax_mas=67.13,
+            radial_km_per_s=4.76,
         ),
         magnitude=2.07,
     ),
@@ -888,6 +928,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00848,  # -8.48 mas/yr
             pm_dec=-0.02279,  # -22.79 mas/yr
             parallax_mas=21.14,
+            radial_km_per_s=-24.85,
         ),
         magnitude=2.23,
     ),
@@ -902,6 +943,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.03261,  # -32.61 mas/yr
             pm_dec=0.01142,  # 11.42 mas/yr
             parallax_mas=24.91,
+            radial_km_per_s=16.17,
         ),
         magnitude=2.08,
     ),
@@ -916,6 +958,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.12117,  # -121.17 mas/yr
             pm_dec=-0.01491,  # -14.91 mas/yr
             parallax_mas=31.38,
+            radial_km_per_s=-29.2,
         ),
         magnitude=1.86,
     ),
@@ -930,6 +973,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.13411,  # -134.11 mas/yr
             pm_dec=-0.03470,  # -34.70 mas/yr
             parallax_mas=26.54,
+            radial_km_per_s=-22.81,
         ),
         magnitude=1.79,
     ),
@@ -944,6 +988,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.08143,  # 81.43 mas/yr
             pm_dec=0.03349,  # 33.49 mas/yr
             parallax_mas=40.9,
+            radial_km_per_s=-25.75,
         ),
         magnitude=2.37,
     ),
@@ -958,6 +1003,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.11191,  # 111.91 mas/yr
             pm_dec=-0.00824,  # -8.24 mas/yr
             parallax_mas=39.51,
+            radial_km_per_s=-25.76,
         ),
         magnitude=1.77,
     ),
@@ -972,6 +1018,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.11901,  # 119.01 mas/yr
             pm_dec=-0.02597,  # -25.97 mas/yr
             parallax_mas=38.01,
+            radial_km_per_s=-23.08,
         ),
         magnitude=2.23,
     ),
@@ -986,6 +1033,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.12021,  # 120.21 mas/yr
             pm_dec=-0.01604,  # -16.04 mas/yr
             parallax_mas=39.91,
+            radial_km_per_s=-26.57,
         ),
         magnitude=3.99,
     ),
@@ -1000,6 +1048,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.10768,  # 107.68 mas/yr
             pm_dec=0.01101,  # 11.01 mas/yr
             parallax_mas=39.21,
+            radial_km_per_s=-28.76,
         ),
         magnitude=2.44,
     ),
@@ -1014,6 +1063,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.10411,  # 104.11 mas/yr
             pm_dec=0.00730,  # 7.30 mas/yr
             parallax_mas=40.51,
+            radial_km_per_s=-32.48,
         ),
         magnitude=3.31,
     ),
@@ -1028,6 +1078,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.27380,  # -273.80 mas/yr
             pm_dec=0.01996,  # 19.96 mas/yr
             parallax_mas=29.76,
+            radial_km_per_s=-43.32,
         ),
         magnitude=2.83,
     ),
@@ -1042,6 +1093,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.10568,  # -105.68 mas/yr
             pm_dec=-0.06840,  # -68.40 mas/yr
             parallax_mas=43.03,
+            radial_km_per_s=-36.82,
         ),
         magnitude=2.75,
     ),
@@ -1056,6 +1108,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.09810,  # -98.10 mas/yr
             pm_dec=-0.01965,  # -19.65 mas/yr
             parallax_mas=17.62,
+            radial_km_per_s=-60.47,
         ),
         magnitude=2.61,
     ),
@@ -1070,6 +1123,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.13384,  # 133.84 mas/yr
             pm_dec=0.04481,  # 44.81 mas/yr
             parallax_mas=44.1,
+            radial_km_per_s=-18.12,
         ),
         magnitude=2.65,
     ),
@@ -1084,6 +1138,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.30430,  # 304.30 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=-0.15428,  # -154.28 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=25.96,
+            radial_km_per_s=-57.44,
         ),
         magnitude=2.08,
     ),
@@ -1098,6 +1153,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.49768,  # -497.68 mas/yr
             pm_dec=-0.11467,  # -114.67 mas/yr
             parallax_mas=90.91,
+            radial_km_per_s=-28.35,
         ),
         magnitude=2.14,
     ),
@@ -1112,6 +1168,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.06040,  # 60.40 mas/yr
             pm_dec=-0.04130,  # -41.30 mas/yr
             parallax_mas=24.46,
+            radial_km_per_s=24.32,
         ),
         magnitude=2.49,
     ),
@@ -1126,6 +1183,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.18765,  # 187.65 mas/yr
             pm_dec=0.13693,  # 136.93 mas/yr
             parallax_mas=16.64,
+            radial_km_per_s=35.66,
         ),
         magnitude=2.42,
     ),
@@ -1141,6 +1199,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01934,  # 19.34 mas/yr
             pm_dec=-0.04367,  # -43.67 mas/yr
             parallax_mas=8.09,
+            radial_km_per_s=34.09,
         ),
         magnitude=2.87,
     ),
@@ -1155,6 +1214,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.21049,  # -210.49 mas/yr
             pm_dec=-0.13874,  # -138.74 mas/yr
             parallax_mas=37.55,
+            radial_km_per_s=-18.15,
         ),
         magnitude=2.95,
     ),
@@ -1169,6 +1229,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.12027,  # 120.27 mas/yr
             pm_dec=-0.08958,  # -89.58 mas/yr
             parallax_mas=43.46,
+            radial_km_per_s=-17.74,
         ),
         magnitude=2.23,
     ),
@@ -1183,6 +1244,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.26170,  # 261.70 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=-0.29670,  # -296.70 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=84.27,
+            radial_km_per_s=16.22,
         ),
         magnitude=2.81,
     ),
@@ -1200,6 +1262,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02018,  # 20.18 mas/yr
             pm_dec=-0.04487,  # -44.87 mas/yr
             parallax_mas=8.77,
+            radial_km_per_s=21.45,
         ),
         magnitude=5.76,
     ),
@@ -1214,6 +1277,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02038,  # 20.38 mas/yr
             pm_dec=-0.04481,  # -44.81 mas/yr
             parallax_mas=8.65,
+            radial_km_per_s=24.78,
         ),
         magnitude=5.45,
     ),
@@ -1228,6 +1292,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02084,  # 20.84 mas/yr
             pm_dec=-0.04606,  # -46.06 mas/yr
             parallax_mas=8.06,
+            radial_km_per_s=19.85,
         ),
         magnitude=3.70,
     ),
@@ -1242,6 +1307,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02095,  # 20.95 mas/yr
             pm_dec=-0.04598,  # -45.98 mas/yr
             parallax_mas=8.51,
+            radial_km_per_s=33.1,
         ),
         magnitude=3.87,
     ),
@@ -1256,6 +1322,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02113,  # 21.13 mas/yr
             pm_dec=-0.04365,  # -43.65 mas/yr
             parallax_mas=8.58,
+            radial_km_per_s=23.12,
         ),
         magnitude=4.14,
     ),
@@ -1270,6 +1337,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02124,  # 21.24 mas/yr
             pm_dec=-0.04056,  # -40.56 mas/yr
             parallax_mas=7.97,
+            radial_km_per_s=37.47,
         ),
         magnitude=4.30,
     ),
@@ -1284,6 +1352,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01770,  # 17.70 mas/yr
             pm_dec=-0.04418,  # -44.18 mas/yr
             parallax_mas=8.53,
+            radial_km_per_s=25.28,
         ),
         magnitude=3.62,
     ),
@@ -1298,6 +1367,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01807,  # 18.07 mas/yr
             pm_dec=-0.04720,  # -47.20 mas/yr
             parallax_mas=8.54,
+            radial_km_per_s=34.14,
         ),
         magnitude=5.09,
     ),
@@ -1315,6 +1385,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.11546,  # 115.46 mas/yr
             pm_dec=-0.02342,  # -23.42 mas/yr
             parallax_mas=20.19,
+            radial_km_per_s=54.6,
         ),
         magnitude=3.65,
     ),
@@ -1329,6 +1400,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.10656,  # 106.56 mas/yr
             pm_dec=-0.02918,  # -29.18 mas/yr
             parallax_mas=20.96,
+            radial_km_per_s=58.87,
         ),
         magnitude=3.77,
     ),
@@ -1356,6 +1428,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.10619,  # 106.19 mas/yr
             pm_dec=-0.03784,  # -37.84 mas/yr
             parallax_mas=22.24,
+            radial_km_per_s=53.5,
         ),
         magnitude=3.53,
     ),
@@ -1387,6 +1460,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.52053,  # -520.53 mas/yr
             pm_dec=-0.51806,  # -518.06 mas/yr
             parallax_mas=55.45,
+            radial_km_per_s=-24.68,
         ),
         magnitude=2.06,
     ),
@@ -1401,6 +1475,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.18572,  # -185.72 mas/yr
             pm_dec=0.00579,  # 5.79 mas/yr
             parallax_mas=25.06,
+            radial_km_per_s=-28.46,
         ),
         magnitude=2.17,
     ),
@@ -1455,6 +1530,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00554,  # 5.54 mas/yr
             pm_dec=-0.00312,  # -3.12 mas/yr
             parallax_mas=10.86,
+            radial_km_per_s=1.55,
         ),
         magnitude=1.87,
     ),
@@ -1469,6 +1545,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.01021,  # -10.21 mas/yr
             pm_dec=-0.03541,  # -35.41 mas/yr
             parallax_mas=6.64,
+            radial_km_per_s=-24.62,
         ),
         magnitude=2.32,
     ),
@@ -1483,6 +1560,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00520,  # -5.20 mas/yr
             pm_dec=-0.02404,  # -24.04 mas/yr
             parallax_mas=8.07,
+            radial_km_per_s=-22.73,
         ),
         magnitude=2.56,
     ),
@@ -1497,6 +1575,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00237,  # -2.37 mas/yr
             pm_dec=-0.03009,  # -30.09 mas/yr
             parallax_mas=5.66,
+            radial_km_per_s=-18.89,
         ),
         magnitude=2.70,
     ),
@@ -1512,6 +1591,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.14342,  # 143.42 mas/yr
             pm_dec=-0.12988,  # -129.88 mas/yr
             parallax_mas=55.82,
+            radial_km_per_s=-48.24,
         ),
         magnitude=2.56,
     ),
@@ -1530,6 +1610,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.18855,  # 188.55 mas/yr
             pm_dec=-0.14808,  # -148.08 mas/yr
             parallax_mas=49.56,
+            radial_km_per_s=11.2,
         ),
         magnitude=2.00,
     ),
@@ -1544,6 +1625,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.09874,  # 98.74 mas/yr
             pm_dec=-0.11041,  # -110.41 mas/yr
             parallax_mas=55.6,
+            radial_km_per_s=23.46,
         ),
         magnitude=2.64,
     ),
@@ -1558,6 +1640,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.07920,  # 79.20 mas/yr
             pm_dec=-0.09763,  # -97.63 mas/yr
             parallax_mas=19.88,
+            radial_km_per_s=23.69,
         ),
         magnitude=3.88,
     ),
@@ -1574,6 +1657,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.04323,  # 43.23 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=-0.02963,  # -29.63 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=17.32,
+            radial_km_per_s=-28.86,
         ),
         magnitude=4.25,
     ),
@@ -1601,6 +1685,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.10351,  # -103.51 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=-0.03948,  # -39.48 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=18.0,
+            radial_km_per_s=16.56,
         ),
         magnitude=4.66,
     ),
@@ -1615,6 +1700,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.01767,  # -17.67 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=-0.22926,  # -229.26 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=24.98,
+            radial_km_per_s=1.72,
         ),
         magnitude=3.94,
     ),
@@ -1631,6 +1717,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.03942,  # -39.42 mas/yr
             pm_dec=-0.12420,  # -124.20 mas/yr
             parallax_mas=22.76,
+            radial_km_per_s=-19.63,
         ),
         magnitude=1.85,
     ),
@@ -1645,6 +1732,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01514,  # 15.14 mas/yr
             pm_dec=-0.05343,  # -53.43 mas/yr
             parallax_mas=14.32,
+            radial_km_per_s=-10.42,
         ),
         magnitude=2.02,
     ),
@@ -1659,6 +1747,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.03254,  # 32.54 mas/yr
             pm_dec=-0.02557,  # -25.57 mas/yr
             parallax_mas=9.38,
+            radial_km_per_s=-34.58,
         ),
         magnitude=2.70,
     ),
@@ -1673,6 +1762,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.04476,  # -44.76 mas/yr
             pm_dec=-0.18566,  # -185.66 mas/yr
             parallax_mas=41.72,
+            radial_km_per_s=-46.4,
         ),
         magnitude=2.81,
     ),
@@ -1687,6 +1777,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01079,  # 10.79 mas/yr
             pm_dec=0.02111,  # 21.11 mas/yr
             parallax_mas=36.98,
+            radial_km_per_s=26.64,
         ),
         magnitude=2.59,
     ),
@@ -1703,6 +1794,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.06263,  # 62.63 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=0.00266,  # 2.66 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=5.73,
+            radial_km_per_s=-21.67,
         ),
         magnitude=3.57,
     ),
@@ -1717,6 +1809,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.04492,  # 44.92 mas/yr
             pm_dec=0.00738,  # 7.38 mas/yr
             parallax_mas=9.98,
+            radial_km_per_s=-5.74,
         ),
         magnitude=3.08,
     ),
@@ -1731,6 +1824,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.18756,  # 187.56 mas/yr
             pm_dec=-0.02245,  # -22.45 mas/yr
             parallax_mas=20.77,
+            radial_km_per_s=-10.0,
         ),
         magnitude=3.68,
     ),
@@ -1747,6 +1841,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01877,  # 18.77 mas/yr
             pm_dec=-0.00821,  # -8.21 mas/yr
             parallax_mas=6.07,
+            radial_km_per_s=29.66,
         ),
         magnitude=2.87,
     ),
@@ -1761,6 +1856,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01825,  # 18.25 mas/yr
             pm_dec=-0.00939,  # -9.39 mas/yr
             parallax_mas=6.23,
+            radial_km_per_s=37.65,
         ),
         magnitude=2.96,
     ),
@@ -1775,6 +1871,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.04260,  # -42.60 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=-0.02789,  # -27.89 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=20.31,
+            radial_km_per_s=44.84,
         ),
         magnitude=3.27,
     ),
@@ -1804,6 +1901,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.02714,  # 27.14 mas/yr (Hipparcos, van Leeuwen 2007)
             pm_dec=-0.00264,  # -2.64 mas/yr (Hipparcos, van Leeuwen 2007)
             parallax_mas=21.66,
+            radial_km_per_s=31.77,
         ),
         magnitude=3.82,
     ),
@@ -1820,6 +1918,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.13746,  # 137.46 mas/yr (mu_alpha*, includes cos(dec))
             pm_dec=-0.16344,  # -163.44 mas/yr
             parallax_mas=33.62,
+            radial_km_per_s=15.84,
         ),
         magnitude=2.06,
     ),
@@ -1835,6 +1934,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00198,  # 1.98 mas/yr
             pm_dec=-0.00928,  # -9.28 mas/yr
             parallax_mas=8.33,
+            radial_km_per_s=23.62,
         ),
         magnitude=2.84,
     ),
@@ -1851,6 +1951,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.06246,  # -62.46 mas/yr
             pm_dec=-0.01212,  # -12.12 mas/yr
             parallax_mas=8.48,
+            radial_km_per_s=26.52,
         ),
         magnitude=3.28,
     ),
@@ -1865,6 +1966,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.05639,  # 56.39 mas/yr
             pm_dec=-0.11003,  # -110.03 mas/yr
             parallax_mas=14.08,
+            radial_km_per_s=57.27,
         ),
         magnitude=2.87,
     ),
@@ -1879,6 +1981,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.01381,  # 13.81 mas/yr
             pm_dec=-0.05496,  # -54.96 mas/yr
             parallax_mas=29.84,
+            radial_km_per_s=-11.68,
         ),
         magnitude=1.92,
     ),
@@ -1893,6 +1996,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.01513,  # -15.13 mas/yr
             pm_dec=-0.00979,  # -9.79 mas/yr
             parallax_mas=53.94,
+            radial_km_per_s=-1.6,
         ),
         magnitude=3.53,
     ),
@@ -1908,6 +2012,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.00324,  # 3.24 mas/yr
             pm_dec=0.00133,  # 1.33 mas/yr
             parallax_mas=8.05,
+            radial_km_per_s=4.02,
         ),
         magnitude=1.50,
     ),
@@ -1922,6 +2027,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00312,  # -3.12 mas/yr
             pm_dec=0.00331,  # 3.31 mas/yr
             parallax_mas=2.03,
+            radial_km_per_s=53.82,
         ),
         magnitude=1.84,
     ),
@@ -1937,6 +2043,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.05634,  # -56.34 mas/yr
             pm_dec=0.01721,  # 17.21 mas/yr
             parallax_mas=10.76,
+            radial_km_per_s=-21.48,
         ),
         magnitude=3.68,
     ),
@@ -1952,6 +2059,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00732,  # -7.32 mas/yr
             pm_dec=0.03607,  # 36.07 mas/yr
             parallax_mas=9.07,
+            radial_km_per_s=-35.22,
         ),
         magnitude=3.06,  # Variable (SRC), mean V from Bright Star Catalogue
     ),
@@ -1967,6 +2075,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.00717,  # -7.17 mas/yr
             pm_dec=-0.00615,  # -6.15 mas/yr
             parallax_mas=7.51,
+            radial_km_per_s=1.29,
         ),
         magnitude=3.08,
     ),
@@ -1982,6 +2091,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.17590,  # 175.90 mas/yr
             pm_dec=-0.11220,  # -112.20 mas/yr
             parallax_mas=16.52,
+            radial_km_per_s=28.07,
         ),
         magnitude=2.05,
     ),
@@ -1996,6 +2106,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=0.04232,  # 42.32 mas/yr
             pm_dec=-0.04930,  # -49.30 mas/yr
             parallax_mas=9.19,
+            radial_km_per_s=-1.9,
         ),
         magnitude=2.10,
     ),
@@ -2011,6 +2122,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
             pm_ra=-0.01041,  # -10.41 mas/yr
             pm_dec=-0.07685,  # -76.85 mas/yr
             parallax_mas=5.66,
+            radial_km_per_s=35.32,
         ),
         magnitude=2.54,
     ),
@@ -3735,6 +3847,7 @@ def _calc_star_position_skyfield(
         ra_mas_per_year=star_data.pm_ra * 1000.0,  # arcsec/yr to mas/yr
         dec_mas_per_year=star_data.pm_dec * 1000.0,
         parallax_mas=star_data.parallax_mas,  # Trigonometric parallax for distance
+        radial_km_per_s=star_data.radial_km_per_s,  # Radial velocity for distance change
     )
 
     # Get timescale and ephemeris
@@ -3866,10 +3979,10 @@ def calc_fixed_star_velocity(
     )
 
     # Calculate positions at t-0.5 and t+0.5 for central difference
-    lon_prev, lat_prev, _ = calc_fixed_star_position(
+    lon_prev, lat_prev, dist_prev = calc_fixed_star_position(
         star_id, jd_tt - h, noaberr, nogdefl, j2000_frame
     )
-    lon_next, lat_next, _ = calc_fixed_star_position(
+    lon_next, lat_next, dist_next = calc_fixed_star_position(
         star_id, jd_tt + h, noaberr, nogdefl, j2000_frame
     )
 
@@ -3885,8 +3998,8 @@ def calc_fixed_star_velocity(
     # Latitude speed: pure finite difference (no wraparound needed for latitude)
     speed_lat = lat_next - lat_prev
 
-    # Distance velocity is 0 (stellar distances don't measurably change)
-    speed_dist = 0.0
+    # Distance speed from central difference (radial velocity effect)
+    speed_dist = dist_next - dist_prev
 
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
 

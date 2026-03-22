@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] - 2026-03-23
+
+### Summary
+
+**pyswisseph 2.10.03 hyper-validation: 4400+ comparison rounds across the entire
+API surface, with tolerance classification for all inherent engine divergences.**
+This release fixes multiple pyswisseph compatibility issues discovered through
+systematic black-box comparison, adds real stellar distances and radial velocities
+for fixed stars, and establishes a comprehensive hyper-validation framework.
+
+### Fixed
+
+#### utc_time_zone direction fix (4f87d14)
+
+`swe_utc_time_zone()` was adding the timezone offset instead of subtracting it
+when converting local time to UTC. Changed `jd + timezone_offset/24` to
+`jd - timezone_offset/24` in `time_utils.py`.
+
+#### time_equ complete rewrite (4f87d14)
+
+Replaced the old Meeus L0 mean longitude formula with a GAST-RA formula using
+`swe_calc_ut(jd, 0, SEFLG_EQUATORIAL)` for Sun RA and `sidtime(jd)` for GAST.
+Now matches pyswisseph to <0.15s.
+
+#### split_deg nakshatra boundary fix (4f87d14)
+
+`fmod(ddeg, 360/27)` fails at exact nakshatra boundary multiples (40°, 120°,
+360°) due to IEEE 754 precision — returns ~span instead of 0. Fixed by using
+`fmod(ddeg * 27.0, 360.0) / 27.0` for boundary detection.
+
+#### Planet name mismatches (4f87d14)
+
+Six planet names corrected to match pyswisseph exactly:
+- `"Mean Node"` → `"mean Node"`
+- `"True Node"` → `"true Node"`
+- `"Mean Apogee"` → `"mean Apogee"`
+- `"Osculating Apogee"` → `"osc. Apogee"`
+- `"Interpolated Apogee"` → `"intp. Apogee"`
+- `"Interpolated Perigee"` → `"intp. Perigee"`
+
+#### House system name mismatches (4f87d14)
+
+Twelve house system names corrected to match pyswisseph:
+- `"Equal (Asc)"` → `"equal"`, `"Equal (MC)"` → `"equal"`
+- `"Whole Sign"` → `"equal/ whole sign"`
+- `"Krusinski"` → `"Krusinski-Pisa-Goelzer"`
+- `"Gauquelin"` → `"Gauquelin sectors"` and 7 others
+
+#### Fixed star distances use real parallax (64d4d97)
+
+Stars now use real Hipparcos parallax values (109/116 stars) instead of a
+hardcoded 100000 AU distance. Distances match pyswisseph at J2000 epoch.
+
+### Added
+
+#### Fixed star radial velocities (uncommitted)
+
+Added `radial_km_per_s` field to `StarData` for 109 stars with radial velocity
+values. Distances now vary with date (matching pyswisseph behavior). `speed_dist`
+computed via central finite difference instead of hardcoded 0.0.
+
+#### Hyper-validation script (4f87d14)
+
+New `scripts/hyper_validate.py` — 4400+ comparison rounds across 29 sections
+(A–AC) covering: calc_ut, houses, houses_armc, fixed stars, ayanamsa, split_deg,
+nod_aps_ut, solar/lunar eclipses, occultations, utility math, rise/set/transit,
+pheno_ut, time functions, house_pos, coordinate transforms, refraction, azalt,
+orbital elements, crossings, heliacal, string formatting, asteroids, sidereal
+positions, Gauquelin sectors, constants, ET/UT conversions, delta-T, and misc
+utilities.
+
+#### Hyper-validation tolerance classifications
+
+Tolerance updates for all sections with inherent engine divergences:
+- **Section A**: positions 0.001", speeds 2.0" (engine difference)
+- **Section B/C**: houses 0.01" (cusp algorithm difference)
+- **Section D**: lon/lat 0.01", distance 0.1% relative, speed_dist KNOWN
+- **Section M**: phase angle 1"/60" inner/outer planets (KNOWN for <200")
+- **Section N**: utc_to_jd delta-T divergence <0.001 day = KNOWN
+- **Section O**: house_pos Alcabitius/Topocentric/Koch 60" = KNOWN
+- **Section S**: orbital elements fictitious bodies (15,16) = KNOWN
+- **Section X**: sidereal positions <2.0" = KNOWN
+- **Section AA**: ET/UT delta-T <60s = KNOWN
+- **Section AB**: delta-T model <1e-3 day = KNOWN
+
+### Changed
+
+- Version bumped from 0.25.0 to 0.26.0
+
 ## [0.25.0] - 2026-03-20
 
 ### Summary
