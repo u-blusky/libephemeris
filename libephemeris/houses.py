@@ -1376,8 +1376,6 @@ def swe_houses_armc_ex2(
     eps: float,
     hsys: int = ord("P"),
     ascmc9: float = 0.0,
-    *,
-    flags: int = 0,
 ) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
     """
     Extended house calculation from ARMC returning cusps, angles, and their velocities.
@@ -1386,13 +1384,12 @@ def swe_houses_armc_ex2(
     swe_houses_ex2(). It calculates house cusps directly from the ARMC value and
     also returns the velocities (derivatives) of house cusps and angles.
 
-    Velocities are only calculated when the SEFLG_SPEED flag is set in the flags
-    parameter. When SEFLG_SPEED is not set, zero velocities are returned for
-    efficiency. This is useful for progressed chart applications where the rate
-    of change of house cusps is needed.
+    Velocities are always calculated, matching pyswisseph behavior.
+    The ``ascmc9`` parameter is accepted for API compatibility (used by the
+    Sunshine house system) but is otherwise unused.
 
-    Velocities are calculated using centered finite differences at ±1 minute
-    intervals, with ARMC shifted by ±0.25° (corresponding to 1 minute of sidereal time).
+    Velocities are calculated using centered finite differences, with ARMC
+    shifted by ±1 second (Koch/Placidus) or ±1 minute (other systems).
 
     Note: The sidereal flag (SEFLG_SIDEREAL) has no effect since sidereal mode
     requires a Julian Day for ayanamsa calculation, which is not available when
@@ -1403,117 +1400,94 @@ def swe_houses_armc_ex2(
         lat: Geographic latitude in degrees (positive North, negative South)
         eps: True obliquity of the ecliptic in degrees
         hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
-        flags: Calculation flags bitmask. Use SEFLG_SPEED to compute velocities.
+        ascmc9: Optional parameter for Sunshine house system (default 0.0)
 
     Returns:
         Tuple containing:
             - cusps: Tuple of 12 house cusp longitudes in degrees
             - ascmc: Tuple of 8 angles (Asc, MC, ARMC, Vertex, EquAsc, CoAsc, CoAscKoch, PolarAsc)
-            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day (0.0 if SEFLG_SPEED not set)
-            - ascmc_speed: Tuple of 8 angle velocities in degrees/day (0.0 if SEFLG_SPEED not set)
+            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day
+            - ascmc_speed: Tuple of 8 angle velocities in degrees/day
 
     Example:
         >>> eps = 23.4393  # true obliquity
         >>> armc = 292.957  # ARMC in degrees
         >>> cusps, ascmc, cusps_speed, ascmc_speed = swe_houses_armc_ex2(
-        ...     armc, 41.9, eps, ord('P'), SEFLG_SPEED
+        ...     armc, 41.9, eps, ord('P')
         ... )
         >>> # cusps_speed[0] is the velocity of the 1st house cusp (same as ASC)
     """
     # Calculate positions at current ARMC
     cusps, ascmc = swe_houses_armc(armc, lat, eps, hsys)
 
-    # Only calculate velocities if SEFLG_SPEED flag is set
-    if flags & SEFLG_SPEED:
-        # Compute d(cusp)/d(ARMC) via centered finite differences, then
-        # scale by the sidereal rotation rate to obtain deg/day.
-        #
-        # The Earth completes 360.98564736629° of ARMC per mean solar day
-        # (one extra rotation relative to the Sun).  Previous code used
-        # 360°/day (solar rate), which under-estimated all speeds by the
-        # ratio 360/360.9856 ≈ 0.27 %.
-        _SIDEREAL_RATE = 360.98564736629  # ARMC degrees per mean solar day
+    # Always calculate velocities (matching pyswisseph behavior).
+    # Compute d(cusp)/d(ARMC) via centered finite differences, then
+    # scale by the sidereal rotation rate to obtain deg/day.
+    #
+    # The Earth completes 360.98564736629° of ARMC per mean solar day
+    # (one extra rotation relative to the Sun).  Previous code used
+    # 360°/day (solar rate), which under-estimated all speeds by the
+    # ratio 360/360.9856 ≈ 0.27 %.
+    _SIDEREAL_RATE = 360.98564736629  # ARMC degrees per mean solar day
 
-        # ARMC step for the finite difference.
-        # Koch and Placidus use a 1-second step (nested trig amplifies
-        # truncation error at the 1-minute step).
-        # All other systems use a 1-minute step.
-        if hsys in (ord("K"), ord("P")):
-            d_armc = _SIDEREAL_RATE / 86400.0  # sidereal degrees per 1 second
-        else:
-            d_armc = _SIDEREAL_RATE / 1440.0  # sidereal degrees per 1 minute
-
-        # Calculate positions at ARMC ± d_armc
-        cusps_before, ascmc_before = swe_houses_armc(armc - d_armc, lat, eps, hsys)
-        cusps_after, ascmc_after = swe_houses_armc(armc + d_armc, lat, eps, hsys)
-
-        def angular_diff_local(pos2: float, pos1: float) -> float:
-            """Calculate angular difference handling 360° wraparound."""
-            diff = pos2 - pos1
-            if diff > 180:
-                diff -= 360
-            elif diff < -180:
-                diff += 360
-            return diff
-
-        # Velocities in deg/day = d(cusp)/d(ARMC) * (ARMC deg/day)
-        # Since d_armc already equals _SIDEREAL_RATE * dt, dividing by
-        # (2*d_armc) and then multiplying by _SIDEREAL_RATE is equivalent to
-        # dividing by (2*dt).  Using d_armc directly avoids a separate dt
-        # variable: speed = Δcusp / (2*d_armc) * _SIDEREAL_RATE.
-        cusps_speed = tuple(
-            angular_diff_local(cusps_after[i], cusps_before[i])
-            / (2 * d_armc)
-            * _SIDEREAL_RATE
-            for i in range(len(cusps))
-        )
-
-        ascmc_speed = tuple(
-            angular_diff_local(ascmc_after[i], ascmc_before[i])
-            / (2 * d_armc)
-            * _SIDEREAL_RATE
-            for i in range(len(ascmc))
-        )
-
-        # ── System-specific cusp speed overrides ──────────────────────
-        if hsys == ord("W"):
-            # Whole Sign: cusps are at fixed sign boundaries (0°, 30°, …).
-            # Most cusps have zero speed (they jump discontinuously).
-            # Cusps 1,7 (ASC/DESC) get ASC speed; cusps 4,10 (IC/MC) get
-            # MC speed — matching pyswisseph behaviour.
-            v_asc = ascmc_speed[0]
-            v_mc = ascmc_speed[1]
-            cs = [0.0] * len(cusps)
-            cs[0] = v_asc  # cusp 1  = ASC
-            cs[3] = v_mc  # cusp 4  = IC
-            cs[6] = v_asc  # cusp 7  = DESC
-            cs[9] = v_mc  # cusp 10 = MC
-            cusps_speed = tuple(cs)
-
-        elif hsys == ord("O"):
-            # Porphyry: cusps are linear interpolations of ASC and MC/IC.
-            # Analytical speeds avoid the O(h²) truncation error.
-            v_asc = ascmc_speed[0]
-            v_mc = ascmc_speed[1]
-            cusps_speed = (
-                v_asc,  # cusp 1  = ASC
-                (2 * v_asc + v_mc) / 3,  # cusp 2
-                (v_asc + 2 * v_mc) / 3,  # cusp 3
-                v_mc,  # cusp 4  = IC
-                (2 * v_mc + v_asc) / 3,  # cusp 5  (opposite of 11)
-                (v_mc + 2 * v_asc) / 3,  # cusp 6  (opposite of 12)
-                v_asc,  # cusp 7  = DESC
-                (2 * v_asc + v_mc) / 3,  # cusp 8  (opposite of 2)
-                (v_asc + 2 * v_mc) / 3,  # cusp 9  (opposite of 3)
-                v_mc,  # cusp 10 = MC
-                (2 * v_mc + v_asc) / 3,  # cusp 11
-                (v_mc + 2 * v_asc) / 3,  # cusp 12
-            )
-        # Koch (K) and Placidus (P): handled above via reduced dt = 1 second.
+    # ARMC step for the finite difference.
+    # Koch and Placidus use a 1-second step (nested trig amplifies
+    # truncation error at the 1-minute step).
+    # All other systems use a 1-minute step.
+    if hsys in (ord("K"), ord("P")):
+        d_armc = _SIDEREAL_RATE / 86400.0  # sidereal degrees per 1 second
     else:
-        # Return zero velocities when SEFLG_SPEED is not set
-        cusps_speed = tuple(0.0 for _ in range(len(cusps)))
-        ascmc_speed = tuple(0.0 for _ in range(len(ascmc)))
+        d_armc = _SIDEREAL_RATE / 1440.0  # sidereal degrees per 1 minute
+
+    # Calculate positions at ARMC ± d_armc
+    cusps_before, ascmc_before = swe_houses_armc(armc - d_armc, lat, eps, hsys)
+    cusps_after, ascmc_after = swe_houses_armc(armc + d_armc, lat, eps, hsys)
+
+    def angular_diff_local(pos2: float, pos1: float) -> float:
+        """Calculate angular difference handling 360° wraparound."""
+        diff = pos2 - pos1
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        return diff
+
+    # Velocities in deg/day = d(cusp)/d(ARMC) * (ARMC deg/day)
+    # Since d_armc already equals _SIDEREAL_RATE * dt, dividing by
+    # (2*d_armc) and then multiplying by _SIDEREAL_RATE is equivalent to
+    # dividing by (2*dt).  Using d_armc directly avoids a separate dt
+    # variable: speed = Δcusp / (2*d_armc) * _SIDEREAL_RATE.
+    cusps_speed = tuple(
+        angular_diff_local(cusps_after[i], cusps_before[i])
+        / (2 * d_armc)
+        * _SIDEREAL_RATE
+        for i in range(len(cusps))
+    )
+
+    ascmc_speed = tuple(
+        angular_diff_local(ascmc_after[i], ascmc_before[i])
+        / (2 * d_armc)
+        * _SIDEREAL_RATE
+        for i in range(len(ascmc))
+    )
+
+    # ── System-specific cusp speed overrides ──────────────────────
+    if hsys == ord("W"):
+        # Whole Sign: cusps are at fixed sign boundaries (0°, 30°, …).
+        # Most cusps have zero speed (they jump discontinuously).
+        # Cusps 1,7 (ASC/DESC) get ASC speed; cusps 4,10 (IC/MC) get
+        # MC speed — matching pyswisseph behaviour.
+        v_asc = ascmc_speed[0]
+        v_mc = ascmc_speed[1]
+        cs = [0.0] * len(cusps)
+        cs[0] = v_asc  # cusp 1  = ASC
+        cs[3] = v_mc  # cusp 4  = IC
+        cs[6] = v_asc  # cusp 7  = DESC
+        cs[9] = v_mc  # cusp 10 = MC
+        cusps_speed = tuple(cs)
+    # Other systems (Placidus, Koch, Porphyry, etc.): use numerical
+    # differentiation directly. Note: Koch and Placidus use a smaller
+    # step size (1 second vs 1 minute) to reduce truncation error.
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 
@@ -1673,30 +1647,23 @@ def swe_houses_ex2(
     # Calculate positions at current time
     cusps, ascmc = swe_houses_ex(tjdut, lat, lon, hsys, flags)
 
-    # Only calculate velocities if SEFLG_SPEED flag is set
-    if flags & SEFLG_SPEED:
-        # Delegate speed computation to the ARMC-based path.
-        # This varies ARMC (with fixed obliquity) and scales by the
-        # sidereal rotation rate, matching the internal approach used by
-        # pyswisseph's houses_ex2.  Direct JD-based finite differences
-        # mix ARMC, obliquity, and nutation changes, producing systematic
-        # ~0.003 deg/day offsets on angular cusps.
-        #
-        # We extract ARMC and true obliquity from the ascmc tuple returned
-        # by swe_houses_ex (index 2 = ARMC) and compute obliquity via the
-        # same cached path used by swe_houses().
-        armc_val = ascmc[2]  # ARMC stored by swe_houses
-        ts = get_timescale()
-        t = ts.ut1_jd(tjdut)
-        eps = get_true_obliquity(t.tt)
+    # Always calculate velocities (matching pyswisseph behavior).
+    # Delegate speed computation to the ARMC-based path.
+    # This varies ARMC (with fixed obliquity) and scales by the
+    # sidereal rotation rate, matching the internal approach used by
+    # pyswisseph's houses_ex2.  Direct JD-based finite differences
+    # mix ARMC, obliquity, and nutation changes, producing systematic
+    # ~0.003 deg/day offsets on angular cusps.
+    #
+    # We extract ARMC and true obliquity from the ascmc tuple returned
+    # by swe_houses_ex (index 2 = ARMC) and compute obliquity via the
+    # same cached path used by swe_houses().
+    armc_val = ascmc[2]  # ARMC stored by swe_houses
+    ts = get_timescale()
+    t = ts.ut1_jd(tjdut)
+    eps = get_true_obliquity(t.tt)
 
-        _, _, cusps_speed, ascmc_speed = swe_houses_armc_ex2(
-            armc_val, lat, eps, hsys, SEFLG_SPEED
-        )
-    else:
-        # Return zero velocities when SEFLG_SPEED is not set
-        cusps_speed = tuple(0.0 for _ in range(len(cusps)))
-        ascmc_speed = tuple(0.0 for _ in range(len(ascmc)))
+    _, _, cusps_speed, ascmc_speed = swe_houses_armc_ex2(armc_val, lat, eps, hsys)
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 

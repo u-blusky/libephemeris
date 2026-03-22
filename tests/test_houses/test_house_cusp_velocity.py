@@ -1,10 +1,9 @@
 """
-Tests for house cusp velocity calculations with SEFLG_SPEED flag.
+Tests for house cusp velocity calculations in swe_houses_ex2 and swe_houses_armc_ex2.
 
-Tests that swe_houses_ex2 and swe_houses_armc_ex2 respect the SEFLG_SPEED flag:
-- When SEFLG_SPEED is not set, velocities should be zero
-- When SEFLG_SPEED is set, velocities should be calculated
-- Positions should be identical regardless of flag
+Velocities are always computed (matching pyswisseph behavior), regardless of
+whether SEFLG_SPEED is set. The SEFLG_SPEED flag is accepted but has no effect
+on speed computation for house cusps.
 """
 
 import pytest
@@ -13,11 +12,11 @@ from libephemeris.constants import SEFLG_SPEED, SEFLG_SIDEREAL, SE_SIDM_LAHIRI
 
 
 class TestHousesEx2SpeedFlag:
-    """Tests for SEFLG_SPEED flag in swe_houses_ex2."""
+    """Tests for velocities in swe_houses_ex2."""
 
     @pytest.mark.unit
-    def test_houses_ex2_without_speed_flag_returns_zero_velocities(self):
-        """When SEFLG_SPEED is not set, velocities should be zero."""
+    def test_houses_ex2_always_computes_velocities(self):
+        """Velocities are always computed, even without SEFLG_SPEED."""
         jd = 2451545.0  # J2000.0
         lat, lon = 41.9, 12.5
 
@@ -29,13 +28,13 @@ class TestHousesEx2SpeedFlag:
             0,  # No SEFLG_SPEED
         )
 
-        # All cusp velocities should be zero
+        # All cusp velocities should be non-zero (speeds always computed)
         for i, speed in enumerate(cusps_speed):
-            assert speed == 0.0, f"Cusp {i + 1} speed should be 0, got {speed}"
+            assert speed != 0.0, f"Cusp {i + 1} speed should be non-zero"
 
-        # All ascmc velocities should be zero
-        for i, speed in enumerate(ascmc_speed):
-            assert speed == 0.0, f"ASCMC {i} speed should be 0, got {speed}"
+        # ASC and MC velocities should be non-zero
+        assert ascmc_speed[0] != 0.0, "ASC speed should be non-zero"
+        assert ascmc_speed[1] != 0.0, "MC speed should be non-zero"
 
     @pytest.mark.unit
     def test_houses_ex2_with_speed_flag_returns_nonzero_velocities(self):
@@ -62,28 +61,28 @@ class TestHousesEx2SpeedFlag:
         )
 
     @pytest.mark.unit
-    def test_houses_ex2_positions_same_with_or_without_speed(self):
-        """Cusp positions should be identical regardless of SEFLG_SPEED flag."""
+    def test_houses_ex2_speeds_identical_with_or_without_flag(self):
+        """Speeds should be identical regardless of SEFLG_SPEED flag."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps_no_speed, ascmc_no_speed, _, _ = ephem.swe_houses_ex2(
+        cusps_a, ascmc_a, cusps_speed_a, ascmc_speed_a = ephem.swe_houses_ex2(
             jd, lat, lon, ord("P"), 0
         )
-        cusps_with_speed, ascmc_with_speed, _, _ = ephem.swe_houses_ex2(
+        cusps_b, ascmc_b, cusps_speed_b, ascmc_speed_b = ephem.swe_houses_ex2(
             jd, lat, lon, ord("P"), SEFLG_SPEED
         )
 
         # Positions should be identical
         for i in range(12):
-            assert cusps_no_speed[i] == cusps_with_speed[i], (
-                f"Cusp {i + 1} position differs"
-            )
+            assert cusps_a[i] == cusps_b[i], f"Cusp {i + 1} position differs"
 
         for i in range(8):
-            assert ascmc_no_speed[i] == ascmc_with_speed[i], (
-                f"ASCMC {i} position differs"
-            )
+            assert ascmc_a[i] == ascmc_b[i], f"ASCMC {i} position differs"
+
+        # Speeds should also be identical
+        assert cusps_speed_a == cusps_speed_b, "Cusp speeds differ with/without flag"
+        assert ascmc_speed_a == ascmc_speed_b, "ASCMC speeds differ with/without flag"
 
     @pytest.mark.unit
     def test_houses_ex2_with_sidereal_and_speed_flag(self):
@@ -99,18 +98,23 @@ class TestHousesEx2SpeedFlag:
             jd, lat, lon, ord("P"), SEFLG_SIDEREAL | SEFLG_SPEED
         )
 
-        # Velocities should still be calculated
+        # Velocities should be calculated
         for i, speed in enumerate(cusps_speed):
             assert speed != 0.0, f"Cusp {i + 1} speed should be non-zero"
 
-        # With SEFLG_SIDEREAL but not SEFLG_SPEED
+        # With SEFLG_SIDEREAL but not SEFLG_SPEED — speeds still computed
         cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.swe_houses_ex2(
             jd, lat, lon, ord("P"), SEFLG_SIDEREAL
         )
 
-        # Velocities should be zero
+        # Velocities should also be non-zero (always computed)
         for i, speed in enumerate(cusps_speed2):
-            assert speed == 0.0, f"Cusp {i + 1} speed should be 0 without SEFLG_SPEED"
+            assert speed != 0.0, (
+                f"Cusp {i + 1} speed should be non-zero even without SEFLG_SPEED"
+            )
+
+        # Speeds should be identical with or without SEFLG_SPEED
+        assert cusps_speed == cusps_speed2
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -127,7 +131,7 @@ class TestHousesEx2SpeedFlag:
         ],
     )
     def test_houses_ex2_speed_flag_various_systems(self, hsys, name):
-        """SEFLG_SPEED flag should work for all house systems."""
+        """Velocities should be computed for all house systems."""
         jd = 2451545.0
         lat, lon = 45.0, 12.0
 
@@ -145,21 +149,22 @@ class TestHousesEx2SpeedFlag:
         assert cusps1 == cusps2, f"{name}: positions differ"
         assert ascmc1 == ascmc2, f"{name}: ascmc differ"
 
-        # Without flag: zero velocities
-        assert all(s == 0.0 for s in cusps_speed1), (
-            f"{name}: speed should be 0 without flag"
+        # Both should have non-zero velocities (speeds always computed)
+        assert any(s != 0.0 for s in cusps_speed1), (
+            f"{name}: speed should be non-zero without flag"
         )
-
-        # With flag: non-zero velocities
         assert any(s != 0.0 for s in cusps_speed2), (
             f"{name}: speed should be non-zero with flag"
         )
+
+        # Speeds should be identical
+        assert cusps_speed1 == cusps_speed2, f"{name}: speeds differ with/without flag"
 
     @pytest.mark.unit
     def test_houses_ex2_speed_flag_whole_sign(self):
         """Whole Sign cusps are fixed at sign boundaries, so velocity is zero.
 
-        Whole Sign houses place cusps at exact sign boundaries (0°, 30°, 60°, etc.).
+        Whole Sign houses place cusps at exact sign boundaries (0, 30, 60, etc.).
         Within a short time interval, these don't change, so cusp velocities are zero.
         However, ASC and MC velocities should still be calculated.
         """
@@ -180,28 +185,28 @@ class TestHousesEx2SpeedFlag:
         assert cusps1 == cusps2, "Whole Sign: positions differ"
         assert ascmc1 == ascmc2, "Whole Sign: ascmc differ"
 
-        # Without flag: zero velocities
-        assert all(s == 0.0 for s in cusps_speed1)
-        assert all(s == 0.0 for s in ascmc_speed1)
+        # Speeds should be identical with or without flag
+        assert cusps_speed1 == cusps_speed2, "Whole Sign: speeds differ"
+        assert ascmc_speed1 == ascmc_speed2, "Whole Sign: ascmc speeds differ"
 
-        # With flag: most cusp velocities are zero (fixed at sign boundaries)
+        # Most cusp velocities are zero (fixed at sign boundaries)
         # but cusps 1,7 (ASC/DESC) and 4,10 (IC/MC) get ASC/MC speeds
         # to match pyswisseph behaviour.
         for i in [1, 2, 4, 5, 7, 8]:  # 0-indexed: cusps 2,3,5,6,8,9
-            assert cusps_speed2[i] == 0.0, (
-                f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed2[i]}"
+            assert cusps_speed1[i] == 0.0, (
+                f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed1[i]}"
             )
         # Cusps at ASC/DESC/MC/IC positions have non-zero speeds
-        assert cusps_speed2[0] != 0.0, "Cusp 1 (ASC) speed should be non-zero"
-        assert cusps_speed2[3] != 0.0, "Cusp 4 (IC) speed should be non-zero"
-        assert cusps_speed2[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
-        assert cusps_speed2[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
+        assert cusps_speed1[0] != 0.0, "Cusp 1 (ASC) speed should be non-zero"
+        assert cusps_speed1[3] != 0.0, "Cusp 4 (IC) speed should be non-zero"
+        assert cusps_speed1[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
+        assert cusps_speed1[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
 
-    """Tests for SEFLG_SPEED flag in swe_houses_armc_ex2."""
+    """Tests for velocities in swe_houses_armc_ex2."""
 
     @pytest.mark.unit
-    def test_houses_armc_ex2_without_speed_flag_returns_zero_velocities(self):
-        """When SEFLG_SPEED is not set, velocities should be zero."""
+    def test_houses_armc_ex2_always_computes_velocities(self):
+        """Velocities are always computed in swe_houses_armc_ex2."""
         armc = 292.957
         lat = 41.9
         eps = 23.4393
@@ -211,26 +216,25 @@ class TestHousesEx2SpeedFlag:
             lat,
             eps,
             ord("P"),
-            0,  # No SEFLG_SPEED
         )
 
-        # All cusp velocities should be zero
+        # All cusp velocities should be non-zero (speeds always computed)
         for i, speed in enumerate(cusps_speed):
-            assert speed == 0.0, f"Cusp {i + 1} speed should be 0, got {speed}"
+            assert speed != 0.0, f"Cusp {i + 1} speed should be non-zero"
 
-        # All ascmc velocities should be zero
-        for i, speed in enumerate(ascmc_speed):
-            assert speed == 0.0, f"ASCMC {i} speed should be 0, got {speed}"
+        # ASC and MC velocities should be non-zero
+        assert ascmc_speed[0] != 0.0, "ASC speed should be non-zero"
+        assert ascmc_speed[1] != 0.0, "MC speed should be non-zero"
 
     @pytest.mark.unit
-    def test_houses_armc_ex2_with_speed_flag_returns_nonzero_velocities(self):
-        """When SEFLG_SPEED is set, velocities should be calculated."""
+    def test_houses_armc_ex2_velocity_ranges(self):
+        """Cusp velocities should be in reasonable ranges."""
         armc = 292.957
         lat = 41.9
         eps = 23.4393
 
         cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P"), SEFLG_SPEED
+            armc, lat, eps, ord("P")
         )
 
         # All cusp velocities should be non-zero
@@ -248,29 +252,29 @@ class TestHousesEx2SpeedFlag:
         )
 
     @pytest.mark.unit
-    def test_houses_armc_ex2_positions_same_with_or_without_speed(self):
-        """Cusp positions should be identical regardless of SEFLG_SPEED flag."""
+    def test_houses_armc_ex2_positions_independent_of_ascmc9(self):
+        """Cusp positions should be identical regardless of ascmc9 value."""
         armc = 292.957
         lat = 41.9
         eps = 23.4393
 
-        cusps_no_speed, ascmc_no_speed, _, _ = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P"), 0
+        cusps_a, ascmc_a, speed_a, aspeed_a = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P")
         )
-        cusps_with_speed, ascmc_with_speed, _, _ = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P"), SEFLG_SPEED
+        cusps_b, ascmc_b, speed_b, aspeed_b = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("P"), 0.0
         )
 
         # Positions should be identical
         for i in range(12):
-            assert cusps_no_speed[i] == cusps_with_speed[i], (
-                f"Cusp {i + 1} position differs"
-            )
+            assert cusps_a[i] == cusps_b[i], f"Cusp {i + 1} position differs"
 
         for i in range(8):
-            assert ascmc_no_speed[i] == ascmc_with_speed[i], (
-                f"ASCMC {i} position differs"
-            )
+            assert ascmc_a[i] == ascmc_b[i], f"ASCMC {i} position differs"
+
+        # Speeds should be identical
+        assert speed_a == speed_b, "Cusp speeds differ"
+        assert aspeed_a == aspeed_b, "ASCMC speeds differ"
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -287,40 +291,23 @@ class TestHousesEx2SpeedFlag:
         ],
     )
     def test_houses_armc_ex2_speed_flag_various_systems(self, hsys, name):
-        """SEFLG_SPEED flag should work for all house systems."""
+        """Velocities should be computed for all house systems."""
         armc = 150.0
         lat = 45.0
         eps = 23.44
 
-        # Without SEFLG_SPEED
-        cusps1, ascmc1, cusps_speed1, ascmc_speed1 = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, hsys, 0
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, hsys
         )
 
-        # With SEFLG_SPEED
-        cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, hsys, SEFLG_SPEED
-        )
-
-        # Positions should match
-        assert cusps1 == cusps2, f"{name}: positions differ"
-        assert ascmc1 == ascmc2, f"{name}: ascmc differ"
-
-        # Without flag: zero velocities
-        assert all(s == 0.0 for s in cusps_speed1), (
-            f"{name}: speed should be 0 without flag"
-        )
-
-        # With flag: non-zero velocities
-        assert any(s != 0.0 for s in cusps_speed2), (
-            f"{name}: speed should be non-zero with flag"
-        )
+        # Should have non-zero velocities (speeds always computed)
+        assert any(s != 0.0 for s in cusps_speed), f"{name}: speed should be non-zero"
 
     @pytest.mark.unit
     def test_houses_armc_ex2_speed_flag_whole_sign(self):
         """Whole Sign cusps are fixed at sign boundaries, so velocity is zero.
 
-        Whole Sign houses place cusps at exact sign boundaries (0°, 30°, 60°, etc.).
+        Whole Sign houses place cusps at exact sign boundaries (0, 30, 60, etc.).
         Within a short time interval, these don't change, so cusp velocities are zero.
         However, ASC and MC velocities should still be calculated.
         """
@@ -328,36 +315,22 @@ class TestHousesEx2SpeedFlag:
         lat = 45.0
         eps = 23.44
 
-        # Without SEFLG_SPEED
-        cusps1, ascmc1, cusps_speed1, ascmc_speed1 = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("W"), 0
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+            armc, lat, eps, ord("W")
         )
 
-        # With SEFLG_SPEED
-        cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("W"), SEFLG_SPEED
-        )
-
-        # Positions should match
-        assert cusps1 == cusps2, "Whole Sign: positions differ"
-        assert ascmc1 == ascmc2, "Whole Sign: ascmc differ"
-
-        # Without flag: zero velocities
-        assert all(s == 0.0 for s in cusps_speed1)
-        assert all(s == 0.0 for s in ascmc_speed1)
-
-        # With flag: most cusp velocities are zero (fixed at sign boundaries)
+        # Most cusp velocities are zero (fixed at sign boundaries)
         # but cusps 1,7 (ASC/DESC) and 4,10 (IC/MC) get ASC/MC speeds
         # to match pyswisseph behaviour.
         for i in [1, 2, 4, 5, 7, 8]:  # 0-indexed: cusps 2,3,5,6,8,9
-            assert cusps_speed2[i] == 0.0, (
-                f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed2[i]}"
+            assert cusps_speed[i] == 0.0, (
+                f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed[i]}"
             )
         # Cusps at ASC/DESC/MC/IC positions have non-zero speeds
-        assert cusps_speed2[0] != 0.0, "Cusp 1 (ASC) speed should be non-zero"
-        assert cusps_speed2[3] != 0.0, "Cusp 4 (IC) speed should be non-zero"
-        assert cusps_speed2[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
-        assert cusps_speed2[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
+        assert cusps_speed[0] != 0.0, "Cusp 1 (ASC) speed should be non-zero"
+        assert cusps_speed[3] != 0.0, "Cusp 4 (IC) speed should be non-zero"
+        assert cusps_speed[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
+        assert cusps_speed[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
 
 
 class TestHouseCuspVelocityEdgeCases:
@@ -365,7 +338,7 @@ class TestHouseCuspVelocityEdgeCases:
 
     @pytest.mark.edge_case
     def test_houses_ex2_equator_with_speed(self):
-        """SEFLG_SPEED should work at the equator."""
+        """Velocities should be computed at the equator."""
         jd = 2451545.0
         lat, lon = 0.0, 0.0
 
@@ -379,7 +352,7 @@ class TestHouseCuspVelocityEdgeCases:
 
     @pytest.mark.edge_case
     def test_houses_ex2_high_latitude_with_speed(self):
-        """SEFLG_SPEED should work at high latitudes."""
+        """Velocities should be computed at high latitudes."""
         jd = 2451545.0
         lat, lon = 60.0, 0.0
 
@@ -392,7 +365,7 @@ class TestHouseCuspVelocityEdgeCases:
 
     @pytest.mark.edge_case
     def test_houses_ex2_southern_hemisphere_with_speed(self):
-        """SEFLG_SPEED should work in the southern hemisphere."""
+        """Velocities should be computed in the southern hemisphere."""
         jd = 2451545.0
         lat, lon = -33.9, 151.2  # Sydney
 
@@ -405,13 +378,13 @@ class TestHouseCuspVelocityEdgeCases:
 
     @pytest.mark.edge_case
     def test_houses_armc_ex2_equator_with_speed(self):
-        """SEFLG_SPEED should work at the equator for ARMC-based calculation."""
+        """Velocities should be computed at the equator for ARMC-based calculation."""
         armc = 180.0
         lat = 0.0
         eps = 23.44
 
         cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P"), SEFLG_SPEED
+            armc, lat, eps, ord("P")
         )
 
         # Velocities should be calculated

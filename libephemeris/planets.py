@@ -1570,6 +1570,22 @@ def _calc_body(
 
     planets = get_planets()
 
+    # Remap SE_AST_OFFSET + N to dedicated body IDs for special asteroids.
+    # pyswisseph treats calc_ut(jd, 10001, flags) identically to calc_ut(jd, 17, flags)
+    # (both compute Ceres). We mirror this behavior.
+    if ipl >= SE_AST_OFFSET:
+        _ast_num = ipl - SE_AST_OFFSET
+        _AST_REMAP = {
+            1: SE_CERES,  # 17
+            2: SE_PALLAS,  # 18
+            3: SE_JUNO,  # 19
+            4: SE_VESTA,  # 20
+            2060: SE_CHIRON,  # 15
+            5145: SE_PHOLUS,  # 16
+        }
+        if _ast_num in _AST_REMAP:
+            ipl = _AST_REMAP[_ast_num]
+
     # Handle planetary moons (Galilean moons, Titan, etc.)
     if planetary_moons.is_planetary_moon(ipl):
         result = planetary_moons.calc_moon_position(t, ipl, iflag)
