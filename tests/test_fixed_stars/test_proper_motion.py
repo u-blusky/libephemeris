@@ -289,8 +289,8 @@ class TestCalcFixedStarPositionIntegration:
         assert 149 < lon < 151, f"Regulus ecliptic longitude: {lon}"
         # Latitude should be small
         assert -1 < lat < 2, f"Regulus ecliptic latitude: {lat}"
-        # Distance is placeholder (100000 AU)
-        assert dist == 100000.0
+        # Distance from parallax (Regulus ~5 million AU)
+        assert dist > 1000000, f"Regulus distance should be large: {dist}"
 
     def test_spica_ecliptic_position_j2000(self):
         """Test Spica ecliptic position at J2000.0."""
@@ -342,7 +342,7 @@ class TestCalcFixedStarPositionIntegration:
             # All results should be valid
             assert 0 <= lon < 360, f"Star {star_id}: lon out of range"
             assert -90 <= lat <= 90, f"Star {star_id}: lat out of range"
-            assert dist == 100000.0
+            assert dist > 0, f"Star {star_id}: distance should be positive"
 
 
 @pytest.mark.unit
