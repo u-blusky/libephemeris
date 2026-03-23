@@ -85,8 +85,58 @@ These will be flagged as KNOWN, not FAIL:
 16. houses_ex2 cusp speeds Koch/Porphyry: algorithmic diff
 17-23. Eclipse/occultation retflag diffs, heliacal pheno diffs
 
+## Final Results (Run 5 — 2026-03-23)
+
+| Section | Rounds | PASS | KNOWN | FAIL | ERROR | SKIP | Status |
+|---------|--------|------|-------|------|-------|------|--------|
+| A — calc_ut | 1100 | 870 | 230 | 0 | 0 | 0 | OK |
+| B — houses | 960 | 960 | 0 | 0 | 0 | 0 | OK |
+| C — houses_armc | 288 | 238 | 50 | 0 | 0 | 0 | OK |
+| D — fixed stars | 140 | 76 | 64 | 0 | 0 | 0 | OK |
+| E — ayanamsa | 235 | 184 | 51 | 0 | 0 | 0 | OK |
+| F — split_deg | 320 | 320 | 0 | 0 | 0 | 0 | OK |
+| G — nod_aps_ut | 108 | 43 | 65 | 0 | 0 | 0 | OK |
+| H — solar eclipses | 20 | 12 | 8 | 0 | 0 | 0 | OK |
+| I — lunar eclipses | 15 | 10 | 5 | 0 | 0 | 0 | OK |
+| J — occultations | — | — | — | — | — | — | TIMEOUT |
+| K — utility math | 220 | 220 | 0 | 0 | 0 | 0 | OK |
+| L — rise/set/transit | 60 | 60 | 0 | 0 | 0 | 0 | OK |
+| M — pheno_ut | 30 | 21 | 9 | 0 | 0 | 0 | OK |
+| N — time functions | 60 | 50 | 10 | 0 | 0 | 0 | OK |
+| O — house_pos | 20 | 18 | 2 | 0 | 0 | 0 | OK |
+| P — coord transforms | 40 | 40 | 0 | 0 | 0 | 0 | OK |
+| Q — refraction | 30 | 11 | 19 | 0 | 0 | 0 | OK |
+| R — azalt/azalt_rev | 30 | 23 | 7 | 0 | 0 | 0 | OK |
+| S — orbital elements | 20 | 5 | 15 | 0 | 0 | 0 | OK |
+| T — crossings | 20 | 15 | 5 | 0 | 0 | 0 | OK |
+| U — heliacal | — | — | — | — | — | — | TIMEOUT |
+| V — string formatting | 94 | 94 | 0 | 0 | 0 | 0 | OK |
+| W — SE_AST_OFFSET | 36 | 0 | 24 | 0 | 0 | 12 | OK |
+| X — sidereal positions | 100 | 72 | 28 | 0 | 0 | 0 | OK |
+| Y — Gauquelin sectors | 15 | 13 | 2 | 0 | 0 | 0 | OK |
+| Z — names & constants | 319 | 317 | 2 | 0 | 0 | 0 | OK |
+| AA — ET/UT conversions | 20 | 10 | 10 | 0 | 0 | 0 | OK |
+| AB — delta-T extended | 20 | 14 | 6 | 0 | 0 | 0 | OK |
+| AC — misc utilities | 50 | 44 | 6 | 0 | 0 | 0 | OK |
+| **TOTAL** | **4370** | **3740** | **618** | **0** | **0** | **12** | **OK** |
+
+**0 FAIL. 0 ERROR.** All 618 KNOWN are documented inherent divergences between
+Skyfield/JPL DE440 and Swiss Ephemeris engines. The 12 SKIP are missing `.se1`
+asteroid files in the pyswisseph configuration.
+
+Sections J (occultations, ~6s/round) and U (heliacal, >90s/round) exceed the
+10-minute timeout. Both functions are already verified in Phase 1 and work
+correctly — the timeout is due to inherent computational cost, not bugs.
+
+See `docs/divergences.md` for the comprehensive catalog of all known divergences.
+
 ## Execution
 
 Run: `.venv/bin/python3 scripts/hyper_validate.py`
 
 Output: JSON report + console summary with PASS/FAIL/KNOWN counts.
+
+Exclude slow sections:
+```bash
+.venv/bin/python3 scripts/hyper_validate.py --section A,B,C,D,E,F,G,H,I,K,L,M,N,O,P,Q,R,S,T,V,W,X,Y,Z,AA,AB,AC
+```
