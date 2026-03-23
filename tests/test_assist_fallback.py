@@ -53,13 +53,17 @@ class MockPropagationResult:
 @pytest.fixture(autouse=True)
 def cleanup():
     """Reset state before and after each test."""
+    from libephemeris.rebound_integration import reset_assist_data_cache
+
     state._SPK_BODY_MAP.clear()
     eph.set_strict_precision(None)
     eph.set_auto_spk_download(None)
+    reset_assist_data_cache()
     yield
     state._SPK_BODY_MAP.clear()
     eph.set_strict_precision(None)
     eph.set_auto_spk_download(None)
+    reset_assist_data_cache()
 
 
 class TestAssistFallbackLogic:
@@ -75,7 +79,8 @@ class TestAssistFallbackLogic:
         )
 
         with patch(
-            "libephemeris.rebound_integration.check_assist_available", return_value=True
+            "libephemeris.rebound_integration.check_assist_data_available",
+            return_value=True,
         ):
             with patch(
                 "libephemeris.rebound_integration.propagate_orbit_assist",
@@ -93,7 +98,7 @@ class TestAssistFallbackLogic:
         eph.set_auto_spk_download(False)
 
         with patch(
-            "libephemeris.rebound_integration.check_assist_available",
+            "libephemeris.rebound_integration.check_assist_data_available",
             return_value=False,
         ):
             pos, _ = eph.calc_ut(2451545.0, SE_SEDNA, 0)
@@ -107,7 +112,8 @@ class TestAssistFallbackLogic:
         eph.set_auto_spk_download(False)
 
         with patch(
-            "libephemeris.rebound_integration.check_assist_available", return_value=True
+            "libephemeris.rebound_integration.check_assist_data_available",
+            return_value=True,
         ):
             with patch(
                 "libephemeris.rebound_integration.propagate_orbit_assist",
@@ -146,7 +152,8 @@ class TestAssistFallbackLogic:
             )
 
         with patch(
-            "libephemeris.rebound_integration.check_assist_available", return_value=True
+            "libephemeris.rebound_integration.check_assist_data_available",
+            return_value=True,
         ):
             with patch(
                 "libephemeris.rebound_integration.propagate_orbit_assist",
@@ -169,7 +176,8 @@ class TestAssistFallbackLogic:
         )
 
         with patch(
-            "libephemeris.rebound_integration.check_assist_available", return_value=True
+            "libephemeris.rebound_integration.check_assist_data_available",
+            return_value=True,
         ):
             with patch(
                 "libephemeris.rebound_integration.propagate_orbit_assist",
@@ -226,7 +234,8 @@ class TestAssistVsKeplerianPrecision:
         )
 
         with patch(
-            "libephemeris.rebound_integration.check_assist_available", return_value=True
+            "libephemeris.rebound_integration.check_assist_data_available",
+            return_value=True,
         ):
             with patch(
                 "libephemeris.rebound_integration.propagate_orbit_assist",

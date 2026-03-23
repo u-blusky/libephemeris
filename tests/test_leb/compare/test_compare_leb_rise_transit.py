@@ -52,12 +52,8 @@ class TestSunRiseSet:
         date_name: str,
     ):
         """Sun rise timing matches within tolerance."""
-        ref_result = compare.skyfield(
-            ephem.rise_trans, jd, SE_SUN, lat, lon, altitude=alt, rsmi=1
-        )
-        leb_result = compare.leb(
-            ephem.rise_trans, jd, SE_SUN, lat, lon, altitude=alt, rsmi=1
-        )
+        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_SUN, 1, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, SE_SUN, 1, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -79,12 +75,8 @@ class TestSunRiseSet:
         date_name: str,
     ):
         """Sun set timing matches within tolerance."""
-        ref_result = compare.skyfield(
-            ephem.rise_trans, jd, SE_SUN, lat, lon, altitude=alt, rsmi=2
-        )
-        leb_result = compare.leb(
-            ephem.rise_trans, jd, SE_SUN, lat, lon, altitude=alt, rsmi=2
-        )
+        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_SUN, 2, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, SE_SUN, 2, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -106,12 +98,8 @@ class TestSunRiseSet:
         date_name: str,
     ):
         """Sun transit timing matches within tolerance."""
-        ref_result = compare.skyfield(
-            ephem.rise_trans, jd, SE_SUN, lat, lon, altitude=alt, rsmi=4
-        )
-        leb_result = compare.leb(
-            ephem.rise_trans, jd, SE_SUN, lat, lon, altitude=alt, rsmi=4
-        )
+        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_SUN, 4, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, SE_SUN, 4, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -137,12 +125,8 @@ class TestMoonRiseSet:
         date_name: str,
     ):
         """Moon rise timing matches within tolerance."""
-        ref_result = compare.skyfield(
-            ephem.rise_trans, jd, SE_MOON, lat, lon, altitude=alt, rsmi=1
-        )
-        leb_result = compare.leb(
-            ephem.rise_trans, jd, SE_MOON, lat, lon, altitude=alt, rsmi=1
-        )
+        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_MOON, 1, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, SE_MOON, 1, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -165,12 +149,8 @@ class TestMoonRiseSet:
         date_name: str,
     ):
         """Moon set timing matches within tolerance."""
-        ref_result = compare.skyfield(
-            ephem.rise_trans, jd, SE_MOON, lat, lon, altitude=alt, rsmi=2
-        )
-        leb_result = compare.leb(
-            ephem.rise_trans, jd, SE_MOON, lat, lon, altitude=alt, rsmi=2
-        )
+        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_MOON, 2, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, SE_MOON, 2, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -197,11 +177,9 @@ class TestVenusRise:
     ):
         """Venus rise timing matches within tolerance."""
         ref_result = compare.skyfield(
-            ephem.rise_trans, jd, SE_VENUS, lat, lon, altitude=alt, rsmi=1
+            ephem.rise_trans, jd, SE_VENUS, 1, (lon, lat, alt)
         )
-        leb_result = compare.leb(
-            ephem.rise_trans, jd, SE_VENUS, lat, lon, altitude=alt, rsmi=1
-        )
+        leb_result = compare.leb(ephem.rise_trans, jd, SE_VENUS, 1, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0

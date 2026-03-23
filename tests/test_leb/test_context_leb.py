@@ -170,11 +170,17 @@ class TestContextLEBGracefulError:
 
     @pytest.mark.integration
     def test_global_invalid_leb_path_falls_back(self):
-        """Global set_leb_file with invalid path should fall back."""
+        """Global set_leb_file with invalid path should fall back in auto mode."""
+        import os
+
         from libephemeris import state
 
         old_leb = state._LEB_FILE
+        old_mode_env = os.environ.pop("LIBEPHEMERIS_MODE", None)
+        old_leb_env = os.environ.pop("LIBEPHEMERIS_LEB", None)
         try:
+            state.set_calc_mode("auto")
+            state._LEB_READER = None
             ephem.set_leb_file("/nonexistent/path/fake.leb")
             reader = state.get_leb_reader()
             assert reader is None
@@ -184,7 +190,12 @@ class TestContextLEBGracefulError:
             result, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
             assert 0.0 <= result[0] < 360.0
         finally:
+            state.set_calc_mode(None)
             ephem.set_leb_file(old_leb)
+            if old_mode_env is not None:
+                os.environ["LIBEPHEMERIS_MODE"] = old_mode_env
+            if old_leb_env is not None:
+                os.environ["LIBEPHEMERIS_LEB"] = old_leb_env
 
 
 class TestContextLEBGlobalFallthrough:
@@ -223,9 +234,13 @@ class TestCalcMode:
 
     def setup_method(self):
         """Reset calc mode before each test."""
+        import os
+
         from libephemeris.state import set_calc_mode
 
         set_calc_mode(None)
+        # Clear env var that may have been loaded from .env by _load_dotenv()
+        os.environ.pop("LIBEPHEMERIS_MODE", None)
 
     def teardown_method(self):
         """Clean up after each test."""
@@ -237,7 +252,7 @@ class TestCalcMode:
         os.environ.pop("LIBEPHEMERIS_MODE", None)
 
     def test_default_mode_is_auto(self):
-        """Default calc mode should be 'auto'."""
+        """Default calc mode should be 'auto' when env var is unset."""
         from libephemeris.state import get_calc_mode
 
         assert get_calc_mode() == "auto"
@@ -337,17 +352,26 @@ class TestCalcMode:
 
     def test_leb_mode_without_file_raises(self):
         """In leb mode, get_leb_reader() should raise if no file configured."""
+        import os
+        from unittest.mock import patch
+
         from libephemeris.state import get_leb_reader, set_calc_mode
 
         old_leb = ephem.state._LEB_FILE
+        old_leb_env = os.environ.pop("LIBEPHEMERIS_LEB", None)
         try:
             ephem.set_leb_file(None)
+            ephem.state._LEB_READER = None
             set_calc_mode("leb")
-            with pytest.raises(RuntimeError, match="LIBEPHEMERIS_MODE=leb"):
-                get_leb_reader()
+            # Prevent auto-discovery from ~/.libephemeris/leb/
+            with patch("libephemeris.state._discover_leb_file", return_value=None):
+                with pytest.raises(RuntimeError, match="LIBEPHEMERIS_MODE=leb"):
+                    get_leb_reader()
         finally:
             set_calc_mode(None)
             ephem.set_leb_file(old_leb)
+            if old_leb_env is not None:
+                os.environ["LIBEPHEMERIS_LEB"] = old_leb_env
 
     def test_leb_mode_with_invalid_file_raises(self):
         """In leb mode, invalid .leb file should raise RuntimeError."""

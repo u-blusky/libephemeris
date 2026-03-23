@@ -157,6 +157,22 @@ Fixed 8 pre-existing test failures that predated the v0.26.0 work:
   (auto-detection treats pre-1582 Gregorian output as Julian) with JD
   equivalence verification.
 
+#### Additional test fixes
+
+- **`test_assist_tried_before_keplerian`**: Fixed mock target from
+  `check_assist_available` to `check_assist_data_available` — the code path
+  in `_calc_body()` uses the data-availability check with caching, not the
+  bare import check. Also reset the assist data cache in fixture.
+- **`test_ayanamsha_doc_file_exists`**: Created missing `docs/AYANAMSHA.md`
+  documenting all 43 ayanamsha modes, usage, and compatibility.
+- **LEB rise_transit compare tests** (66 tests): Fixed `rise_trans()` call
+  signature — tests used `(lat, lon, altitude=alt, rsmi=N)` kwargs but the
+  API expects `(rsmi, geopos)` positional args.
+- **LEB context tests** (3 tests): Fixed `.env` file leaking
+  `LIBEPHEMERIS_MODE=leb` and `LIBEPHEMERIS_LEB` into tests that check
+  default mode and no-file-configured behavior. Tests now explicitly clear
+  env vars and mock auto-discovery where needed.
+
 #### Divergence documentation (6100de5)
 
 New `docs/divergences.md`: comprehensive catalog of all 15 categories of
