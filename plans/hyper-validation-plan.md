@@ -85,11 +85,11 @@ These will be flagged as KNOWN, not FAIL:
 16. houses_ex2 cusp speeds Koch/Porphyry: algorithmic diff
 17-23. Eclipse/occultation retflag diffs, heliacal pheno diffs
 
-## Final Results (Run 6 — 2026-03-23)
+## Final Results (Run 7 — 2026-03-23)
 
 | Section | Rounds | PASS | KNOWN | FAIL | ERROR | SKIP | Status |
 |---------|--------|------|-------|------|-------|------|--------|
-| A — calc_ut | 1100 | 920 | 180 | 0 | 0 | 0 | OK |
+| A — calc_ut | 1100 | 1005 | 95 | 0 | 0 | 0 | OK |
 | B — houses | 960 | 960 | 0 | 0 | 0 | 0 | OK |
 | C — houses_armc | 288 | 284 | 4 | 0 | 0 | 0 | OK |
 | D — fixed stars | 140 | 76 | 64 | 0 | 0 | 0 | OK |
@@ -113,26 +113,42 @@ These will be flagged as KNOWN, not FAIL:
 | V — string formatting | 94 | 94 | 0 | 0 | 0 | 0 | OK |
 | W — SE_AST_OFFSET | 36 | 0 | 24 | 0 | 0 | 12 | OK |
 | X — sidereal positions | 100 | 72 | 28 | 0 | 0 | 0 | OK |
-| Y — Gauquelin sectors | 15 | 13 | 2 | 0 | 0 | 0 | OK |
+| Y — Gauquelin sectors | 15 | 12 | 3 | 0 | 0 | 0 | OK |
 | Z — names & constants | 319 | 317 | 2 | 0 | 0 | 0 | OK |
 | AA — ET/UT conversions | 20 | 10 | 10 | 0 | 0 | 0 | OK |
 | AB — delta-T extended | 20 | 14 | 6 | 0 | 0 | 0 | OK |
 | AC — misc utilities | 50 | 44 | 6 | 0 | 0 | 0 | OK |
-| **TOTAL** | **4400** | **3863** | **525** | **0** | **0** | **12** | **OK** |
+| **TOTAL** | **4400** | **3947** | **441** | **0** | **0** | **12** | **OK** |
 
-**0 FAIL. 0 ERROR.** All 525 KNOWN are documented inherent divergences between
+**0 FAIL. 0 ERROR.** All 441 KNOWN are documented inherent divergences between
 Skyfield/JPL DE440 and Swiss Ephemeris engines. The 12 SKIP are missing `.se1`
 asteroid files in the pyswisseph configuration.
 
-### Run 6 vs Run 5 improvements:
+### Run 7 vs Run 6 improvements:
 
-- **Section A**: 230 → 180 KNOWN (−50) — Mean Node distance fix, Mean Apogee
-  distance fix (LEB path still uses pre-computed values; Skyfield path is fixed)
-- **Section C**: 50 → 4 KNOWN (−46) — Vertex at equator fix (remaining 4:
-  CoAsc Munkasey for Horizon system, C `tan(90°)` artifact)
-- **Section J**: TIMEOUT → 18 PASS, 2 KNOWN (now completes)
-- **Section U**: TIMEOUT → 9 PASS, 1 KNOWN (now completes)
-- **Total**: 618 → 525 KNOWN (−93), 3740 → 3863 PASS (+123)
+- **Section A**: 180 → 95 KNOWN (−85) — True Node distance override (analytical
+  mean orbit elements, ~0.7" mean error vs ~3.5" from LEB proxy), Mean Apogee
+  latitude override (3-harmonic model, ~0.5" mean error vs ~19" from LEB model)
+- **Section Y**: 2 → 3 KNOWN (+1) — non-deterministic (random test dates)
+- **Total**: 525 → 441 KNOWN (−84), 3863 → 3947 PASS (+84)
+
+### Section A KNOWN breakdown (95 remaining):
+
+| Body | Name | Count | Max Diff | Issue |
+|------|------|-------|----------|-------|
+| 11 | TrueNode | 15 | 1.20" | Analytical mean orbit approximation residual |
+| 16 | Pholus | 10 | 1.38" | SPK coverage error for historical dates |
+| 18 | Pallas | 15 | 2.87" | Inherent ephemeris engine difference |
+| 19 | Juno | 5 | 1.64" | Inherent ephemeris engine difference |
+| 21 | IntpApog | 50 | 5665" | Inherent ELP2000-82B implementation difference |
+
+### Run history:
+
+| Run | Date | PASS | KNOWN | FAIL | Key changes |
+|-----|------|------|-------|------|-------------|
+| 5 | 2026-03-22 | 3740 | 618 | 0 | Baseline |
+| 6 | 2026-03-23 | 3863 | 525 | 0 | Vertex fix, Mean Node/Apogee distances |
+| 7 | 2026-03-23 | 3947 | 441 | 0 | True Node dist + Mean Apogee lat overrides in fast_calc |
 
 See `docs/divergences.md` for the comprehensive catalog of all known divergences.
 

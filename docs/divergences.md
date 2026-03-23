@@ -287,8 +287,8 @@ rounds across 29 sections. With all tolerance classifications applied:
 
 | Metric | Count | Percentage |
 |--------|-------|------------|
-| PASS | 3745 | 85.7% |
-| KNOWN | 613 | 14.0% |
+| PASS | 3947 | 89.7% |
+| KNOWN | 441 | 10.0% |
 | FAIL | 0 | 0.0% |
 | SKIP | 12 | 0.3% |
 

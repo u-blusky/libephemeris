@@ -15,6 +15,8 @@ This release fixes multiple pyswisseph compatibility issues discovered through
 systematic black-box comparison, adds real stellar distances and radial velocities
 for fixed stars, and establishes a comprehensive hyper-validation framework.
 
+**Run 7 final results: 4400 rounds, 3947 PASS, 441 KNOWN, 0 FAIL, 0 ERROR.**
+
 ### Fixed
 
 #### utc_time_zone direction fix (4f87d14)
@@ -111,14 +113,28 @@ Ephemeris behavior. Eliminates 46 of 50 KNOWN divergences in Section C.
   distance (was 0.0), matching pyswisseph's mean apogee distance.
 - **True Node (body 11)**: Distance now computed from osculating orbit elements
   (semi-latus rectum formula) instead of angular momentum proxy. Matches
-  pyswisseph to <0.001" via Skyfield path (LEB needs regeneration).
+  pyswisseph to <0.001" via Skyfield path.
 
 #### Mean Apogee latitude 3-harmonic model
 
 Replaced the simple `i·sin(ω)` latitude formula (i=5.145°) with a 3-harmonic
 model fitted to pyswisseph output: `5.1490449°·sin(ω) + 0.0034412°·sin(3ω)`.
-Reduces latitude divergence from ~19" to ~0.4" via Skyfield path (LEB needs
-regeneration).
+Reduces latitude divergence from ~19" to ~0.4" via Skyfield path.
+
+#### LEB analytical overrides in fast_calc.py
+
+Added runtime analytical overrides in the LEB fast path (`_pipeline_ecliptic`)
+for two lunar bodies whose pre-computed Chebyshev coefficients used older models:
+
+- **True Node (body 11) distance**: LEB stored angular momentum magnitude proxy
+  (~0.0015 AU). Now computed analytically from mean orbital elements using the
+  vis-viva semi-latus rectum formula `r = p / (1 + e·cos(f))`. Mean error vs
+  pyswisseph: ~0.7" (down from ~3.5"). Eliminates 35 KNOWN in Section A.
+- **Mean Apogee (body 12) latitude**: LEB stored old `5.145°·sin(ω)` model
+  (max error ~20"). Now overridden with 3-harmonic model at runtime. Mean error
+  vs pyswisseph: ~0.5" (down from ~19"). Eliminates 50 KNOWN in Section A.
+
+**Run 7 results: 4400 rounds, 3947 PASS, 441 KNOWN, 0 FAIL (−84 KNOWN vs Run 6).**
 
 #### Divergence documentation (6100de5)
 

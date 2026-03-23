@@ -43,6 +43,7 @@ from .constants import (
     SEFLG_XYZ,
     _MOON_MEAN_DIST_AU,
     _MOON_MEAN_APOG_DIST_AU,
+    _MOON_MEAN_ECC,
 )
 from .leb_format import (
     COORD_ECLIPTIC,
@@ -968,11 +969,40 @@ def _pipeline_ecliptic(
     """
     (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
 
-    # Override distance for mean bodies: LEB stores 0 for dist, but
-    # pyswisseph returns a constant mean distance for these bodies.
+    # Override distance/latitude for lunar analytical bodies.
+    # LEB stores pre-computed Chebyshev coefficients that may use older
+    # models.  These overrides compute values analytically at runtime
+    # for better match with pyswisseph.
     if ipl == SE_MEAN_NODE:
+        # LEB stores 0 for dist; pyswisseph returns mean distance constant.
         dist = _MOON_MEAN_DIST_AU
+    elif ipl == SE_TRUE_NODE:
+        # LEB stores h_mag proxy for dist (~0.0015 AU); pyswisseph returns
+        # distance at the ascending node from osculating orbit elements
+        # (~0.0024 AU).  Analytical approximation using mean orbital elements:
+        # r = p / (1 + e·cos(f)) where f is true anomaly at ascending node.
+        # Mean error vs pyswisseph: ~0.7", max ~1.2" (vs ~3.5" from LEB proxy).
+        from .lunar import calc_mean_lilith, calc_mean_lunar_node
+
+        _p = _MOON_MEAN_DIST_AU * (1.0 - _MOON_MEAN_ECC * _MOON_MEAN_ECC)
+        apogee_lon = calc_mean_lilith(jd_tt)
+        node_lon = calc_mean_lunar_node(jd_tt)
+        omega_deg = (apogee_lon - node_lon) % 360.0
+        f_node_rad = math.radians((360.0 - omega_deg) % 360.0)
+        dist = _p / (1.0 + _MOON_MEAN_ECC * math.cos(f_node_rad))
     elif ipl == SE_MEAN_APOG:
+        # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
+        # Override with 3-harmonic model fitted to pyswisseph output:
+        #   lat = 5.1490449082·sin(ω) + 0.0034412113·sin(3ω)
+        # where ω = (apogee_lon - node_lon).
+        # Max residual vs pyswisseph: ~1.3", RMS: ~0.7".
+        from .lunar import calc_mean_lunar_node
+
+        node_lon = calc_mean_lunar_node(jd_tt)
+        omega_rad = math.radians((lon - node_lon) % 360.0)
+        lat = 5.1490449082 * math.sin(omega_rad) + 0.0034412113 * math.sin(
+            3.0 * omega_rad
+        )
         dist = _MOON_MEAN_APOG_DIST_AU
 
     # Nutation in longitude (dpsi) handling.
