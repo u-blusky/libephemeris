@@ -850,6 +850,14 @@ GREG_CAL: int = SE_GREG_CAL
 AUNIT: float = 149597870.7  # Astronomical Unit in km (IAU 2012 standard)
 SE_AUNIT: float = AUNIT
 
+# Moon mean distance constants (used for lunar node/apogee distance output)
+_MOON_MEAN_DIST_KM: float = 384400.0  # Mean Earth-Moon distance in km
+_MOON_MEAN_ECC: float = 0.054900489  # Mean lunar orbital eccentricity
+_MOON_MEAN_DIST_AU: float = _MOON_MEAN_DIST_KM / AUNIT  # ~0.002569555 AU
+_MOON_MEAN_APOG_DIST_AU: float = (
+    _MOON_MEAN_DIST_KM * (1.0 + _MOON_MEAN_ECC) / AUNIT
+)  # ~0.002710625 AU
+
 # =============================================================================
 # ECLIPSE TYPES AND FLAGS
 # =============================================================================

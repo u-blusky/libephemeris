@@ -377,9 +377,9 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
     through zenith perpendicular to meridian) intersects the ecliptic in the western sky.
     Often used in astrology for fateful encounters or significant relationships.
 
-    At the equator (lat=0), the Vertex is mathematically undefined because the Prime
-    Vertical coincides with the horizon plane. Following standard convention,
-    we return 180.0 as a fallback value in this case.
+    At the equator (lat=0), the formula has a 1/tan(lat) singularity. We clamp
+    latitude to a tiny positive value so the formula evaluates to the correct
+    limiting value, matching Swiss Ephemeris behavior.
 
     Args:
         armc_deg: Right Ascension of Midheaven (sidereal time) in degrees
@@ -388,20 +388,19 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
         mc: Midheaven longitude in degrees (for hemisphere verification)
 
     Returns:
-        Vertex longitude in degrees (western hemisphere), or 180.0 at equator
+        Vertex longitude in degrees (western hemisphere)
 
     Precision: ~0.001° for non-equatorial latitudes
     """
     eps_rad = math.radians(eps)
 
-    # At equator (lat=0), Vertex is mathematically undefined (Prime Vertical
-    # coincides with the horizon plane). Returns 180.0 as fallback,
-    # following the Swiss Ephemeris convention.
-    if abs(lat) < 1e-10:  # Effectively zero latitude (~0.00036 arcsec)
-        return 180.0
+    # At equator (lat=0), the Vertex formula has a 1/tan(lat) singularity.
+    # Clamp to a tiny positive latitude so the formula evaluates to the
+    # correct limiting value (matches Swiss Ephemeris behavior).
+    if abs(lat) < 1e-10:
+        lat = 1e-10
 
-    # Standard formula for non-zero latitudes
-    # Vertex is where Prime Vertical intersects ecliptic in West
+    # Standard formula: Vertex is where Prime Vertical intersects ecliptic in West
     armc_rad = math.radians(armc_deg)
     lat_rad = math.radians(lat)
 

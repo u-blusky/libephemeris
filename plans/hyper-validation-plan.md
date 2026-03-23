@@ -85,20 +85,20 @@ These will be flagged as KNOWN, not FAIL:
 16. houses_ex2 cusp speeds Koch/Porphyry: algorithmic diff
 17-23. Eclipse/occultation retflag diffs, heliacal pheno diffs
 
-## Final Results (Run 5 — 2026-03-23)
+## Final Results (Run 6 — 2026-03-23)
 
 | Section | Rounds | PASS | KNOWN | FAIL | ERROR | SKIP | Status |
 |---------|--------|------|-------|------|-------|------|--------|
-| A — calc_ut | 1100 | 870 | 230 | 0 | 0 | 0 | OK |
+| A — calc_ut | 1100 | 920 | 180 | 0 | 0 | 0 | OK |
 | B — houses | 960 | 960 | 0 | 0 | 0 | 0 | OK |
-| C — houses_armc | 288 | 238 | 50 | 0 | 0 | 0 | OK |
+| C — houses_armc | 288 | 284 | 4 | 0 | 0 | 0 | OK |
 | D — fixed stars | 140 | 76 | 64 | 0 | 0 | 0 | OK |
 | E — ayanamsa | 235 | 184 | 51 | 0 | 0 | 0 | OK |
 | F — split_deg | 320 | 320 | 0 | 0 | 0 | 0 | OK |
 | G — nod_aps_ut | 108 | 43 | 65 | 0 | 0 | 0 | OK |
 | H — solar eclipses | 20 | 12 | 8 | 0 | 0 | 0 | OK |
 | I — lunar eclipses | 15 | 10 | 5 | 0 | 0 | 0 | OK |
-| J — occultations | — | — | — | — | — | — | TIMEOUT |
+| J — occultations | 20 | 18 | 2 | 0 | 0 | 0 | OK |
 | K — utility math | 220 | 220 | 0 | 0 | 0 | 0 | OK |
 | L — rise/set/transit | 60 | 60 | 0 | 0 | 0 | 0 | OK |
 | M — pheno_ut | 30 | 21 | 9 | 0 | 0 | 0 | OK |
@@ -109,7 +109,7 @@ These will be flagged as KNOWN, not FAIL:
 | R — azalt/azalt_rev | 30 | 23 | 7 | 0 | 0 | 0 | OK |
 | S — orbital elements | 20 | 5 | 15 | 0 | 0 | 0 | OK |
 | T — crossings | 20 | 15 | 5 | 0 | 0 | 0 | OK |
-| U — heliacal | — | — | — | — | — | — | TIMEOUT |
+| U — heliacal | 10 | 9 | 1 | 0 | 0 | 0 | OK |
 | V — string formatting | 94 | 94 | 0 | 0 | 0 | 0 | OK |
 | W — SE_AST_OFFSET | 36 | 0 | 24 | 0 | 0 | 12 | OK |
 | X — sidereal positions | 100 | 72 | 28 | 0 | 0 | 0 | OK |
@@ -118,15 +118,21 @@ These will be flagged as KNOWN, not FAIL:
 | AA — ET/UT conversions | 20 | 10 | 10 | 0 | 0 | 0 | OK |
 | AB — delta-T extended | 20 | 14 | 6 | 0 | 0 | 0 | OK |
 | AC — misc utilities | 50 | 44 | 6 | 0 | 0 | 0 | OK |
-| **TOTAL** | **4370** | **3740** | **618** | **0** | **0** | **12** | **OK** |
+| **TOTAL** | **4400** | **3863** | **525** | **0** | **0** | **12** | **OK** |
 
-**0 FAIL. 0 ERROR.** All 618 KNOWN are documented inherent divergences between
+**0 FAIL. 0 ERROR.** All 525 KNOWN are documented inherent divergences between
 Skyfield/JPL DE440 and Swiss Ephemeris engines. The 12 SKIP are missing `.se1`
 asteroid files in the pyswisseph configuration.
 
-Sections J (occultations, ~6s/round) and U (heliacal, >90s/round) exceed the
-10-minute timeout. Both functions are already verified in Phase 1 and work
-correctly — the timeout is due to inherent computational cost, not bugs.
+### Run 6 vs Run 5 improvements:
+
+- **Section A**: 230 → 180 KNOWN (−50) — Mean Node distance fix, Mean Apogee
+  distance fix (LEB path still uses pre-computed values; Skyfield path is fixed)
+- **Section C**: 50 → 4 KNOWN (−46) — Vertex at equator fix (remaining 4:
+  CoAsc Munkasey for Horizon system, C `tan(90°)` artifact)
+- **Section J**: TIMEOUT → 18 PASS, 2 KNOWN (now completes)
+- **Section U**: TIMEOUT → 9 PASS, 1 KNOWN (now completes)
+- **Total**: 618 → 525 KNOWN (−93), 3740 → 3863 PASS (+123)
 
 See `docs/divergences.md` for the comprehensive catalog of all known divergences.
 

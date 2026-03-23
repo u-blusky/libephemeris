@@ -41,6 +41,8 @@ from .constants import (
     SEFLG_TOPOCTR,
     SEFLG_TRUEPOS,
     SEFLG_XYZ,
+    _MOON_MEAN_DIST_AU,
+    _MOON_MEAN_APOG_DIST_AU,
 )
 from .leb_format import (
     COORD_ECLIPTIC,
@@ -965,6 +967,13 @@ def _pipeline_ecliptic(
         (lon, lat, dist, dlon, dlat, ddist)
     """
     (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
+
+    # Override distance for mean bodies: LEB stores 0 for dist, but
+    # pyswisseph returns a constant mean distance for these bodies.
+    if ipl == SE_MEAN_NODE:
+        dist = _MOON_MEAN_DIST_AU
+    elif ipl == SE_MEAN_APOG:
+        dist = _MOON_MEAN_APOG_DIST_AU
 
     # Nutation in longitude (dpsi) handling.
     # When SIDEREAL+EQUATORIAL: pyswisseph outputs mean ecliptic (no nutation)

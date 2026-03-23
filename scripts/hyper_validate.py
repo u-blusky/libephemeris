@@ -487,9 +487,10 @@ def run_section_c():
                     det = det_c if md_c >= md_a else det_a
                     if ok:
                         status = "PASS"
-                    elif max_d < 648001:
-                        # Vertex at equator: 180° ambiguity (co-vertex vs vertex)
-                        # is a known divergence in house systems at lat=0
+                    elif lat == 0.0 and hsys == "H" and max_d < 648001:
+                        # CoAsc Munkasey (ascmc[6]) for Horizon system at equator:
+                        # pyswisseph returns 0° due to C tan(90°) artifact,
+                        # but the mathematical limit from any lat>0 is 180°.
                         status = "KNOWN"
                     else:
                         status = "FAIL"

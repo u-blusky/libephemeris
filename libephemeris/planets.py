@@ -107,6 +107,8 @@ from .constants import (
     SE_PARS_SPIRITUS,
     SE_PARS_AMORIS,
     SE_PARS_FIDEI,
+    _MOON_MEAN_DIST_AU,
+    _MOON_MEAN_APOG_DIST_AU,
 )
 
 # Import all sidereal mode constants (SE_SIDM_*)
@@ -1637,7 +1639,7 @@ def _calc_body(
                     ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                     da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                     dlon -= da
-            result = (lon, 0.0, 0.0, dlon, 0.0, 0.0)
+            result = (lon, 0.0, _MOON_MEAN_DIST_AU, dlon, 0.0, 0.0)
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
         else:  # SE_TRUE_NODE
@@ -1756,7 +1758,7 @@ def _calc_body(
                     ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
                     da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
                     dlon -= da
-            result = (lon, lat, 0.0, dlon, dlat, 0.0)
+            result = (lon, lat, _MOON_MEAN_APOG_DIST_AU, dlon, dlat, 0.0)
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
         else:  # SE_OSCU_APOG

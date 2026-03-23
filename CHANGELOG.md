@@ -96,6 +96,30 @@ Tolerance updates for all sections with inherent engine divergences:
 
 **Run 5 final results: 4370 rounds, 3740 PASS, 618 KNOWN, 0 FAIL, 0 ERROR.**
 
+#### Vertex at equator fix
+
+Fixed the Vertex calculation at latitude 0° (equator). Previously returned a
+hardcoded 180° fallback; now clamps latitude to a tiny epsilon value so the
+standard formula evaluates to the correct limiting value, matching Swiss
+Ephemeris behavior. Eliminates 46 of 50 KNOWN divergences in Section C.
+
+#### Lunar body distance constants
+
+- **Mean Node (body 10)**: Now returns `384400/AUNIT` AU as distance (was 0.0),
+  matching pyswisseph's constant mean lunar distance.
+- **Mean Apogee (body 12)**: Now returns `384400×1.054900489/AUNIT` AU as
+  distance (was 0.0), matching pyswisseph's mean apogee distance.
+- **True Node (body 11)**: Distance now computed from osculating orbit elements
+  (semi-latus rectum formula) instead of angular momentum proxy. Matches
+  pyswisseph to <0.001" via Skyfield path (LEB needs regeneration).
+
+#### Mean Apogee latitude 3-harmonic model
+
+Replaced the simple `i·sin(ω)` latitude formula (i=5.145°) with a 3-harmonic
+model fitted to pyswisseph output: `5.1490449°·sin(ω) + 0.0034412°·sin(3ω)`.
+Reduces latitude divergence from ~19" to ~0.4" via Skyfield path (LEB needs
+regeneration).
+
 #### Divergence documentation (6100de5)
 
 New `docs/divergences.md`: comprehensive catalog of all 15 categories of

@@ -68,10 +68,12 @@ intermediate calculations.
 
 ### 2.2 Vertex at the Equator
 
-At geographic latitude 0° (equator), the Vertex calculation has a 180° ambiguity
-(vertex vs co-vertex). pyswisseph returns 0° while libephemeris may return 180°
-for `ascmc[3]`. Both are mathematically valid — the Vertex is undefined at the
-equator where the prime vertical coincides with the horizon.
+At geographic latitude 0° (equator), the Vertex calculation has a 1/tan(lat)
+singularity. libephemeris clamps latitude to a tiny epsilon so the formula
+evaluates to the correct limiting value, matching pyswisseph. The only remaining
+divergence is `ascmc[6]` (CoAsc Munkasey) for the Horizon (H) house system at
+lat=0, where pyswisseph returns 0° due to a C `tan(90°)` floating-point
+artifact, while the mathematical limit from any positive latitude is 180°.
 
 ### 2.3 House Position (`swe_house_pos`)
 
