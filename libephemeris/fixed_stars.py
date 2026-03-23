@@ -4723,7 +4723,7 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "ARNEB": 25985,  # Alpha Leporis
     "ASCELLA": 93506,  # Zeta Sagittarii
     "ASELLUS AUSTRALIS": 42911,  # Delta Cancri (consistent with STAR_CATALOG)
-    "ASELLUS BOREALIS": 43103,  # Gamma Cancri (consistent with STAR_CATALOG)
+    "ASELLUS BOREALIS": 42806,  # Gamma Cancri (corrected from 43103=Iota Cnc)
     "ASHLESHA": 43109,  # Epsilon Hydrae
     "ASPIDISKE": 45556,  # Iota Carinae
     "ASTEROPE": 17579,  # 21 Tauri (Pleiades)

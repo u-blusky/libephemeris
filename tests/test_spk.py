@@ -482,7 +482,10 @@ class TestDownloadSpkLogging:
             "spk": base64.b64encode(mock_spk_data).decode("ascii"),
         }
 
-        with patch("urllib.request.urlopen") as mock_urlopen:
+        with (
+            patch("urllib.request.urlopen") as mock_urlopen,
+            patch("libephemeris.spk._is_valid_bsp", return_value=True),
+        ):
             mock_response = MagicMock()
             mock_response.read.return_value = json.dumps(mock_json_response).encode()
             mock_response.__enter__ = MagicMock(return_value=mock_response)
@@ -513,7 +516,10 @@ class TestDownloadSpkLogging:
             "spk": base64.b64encode(mock_spk_data).decode("ascii"),
         }
 
-        with patch("urllib.request.urlopen") as mock_urlopen:
+        with (
+            patch("urllib.request.urlopen") as mock_urlopen,
+            patch("libephemeris.spk._is_valid_bsp", return_value=True),
+        ):
             mock_response = MagicMock()
             mock_response.read.return_value = json.dumps(mock_json_response).encode()
             mock_response.__enter__ = MagicMock(return_value=mock_response)
@@ -545,7 +551,10 @@ class TestDownloadSpkLogging:
             "spk": base64.b64encode(mock_spk_data).decode("ascii"),
         }
 
-        with patch("urllib.request.urlopen") as mock_urlopen:
+        with (
+            patch("urllib.request.urlopen") as mock_urlopen,
+            patch("libephemeris.spk._is_valid_bsp", return_value=True),
+        ):
             mock_response = MagicMock()
             mock_response.read.return_value = json.dumps(mock_json_response).encode()
             mock_response.__enter__ = MagicMock(return_value=mock_response)
@@ -628,13 +637,14 @@ class TestDownloadSpkLogging:
         existing_file = tmp_path / "2060_202001_202501.bsp"
         existing_file.write_bytes(b"\x00" * 100)
 
-        path = eph.download_spk(
-            body="2060",
-            start="2020-01-01",
-            end="2025-01-01",
-            path=str(tmp_path),
-            overwrite=False,
-        )
+        with patch("libephemeris.spk._is_valid_bsp", return_value=True):
+            path = eph.download_spk(
+                body="2060",
+                start="2020-01-01",
+                end="2025-01-01",
+                path=str(tmp_path),
+                overwrite=False,
+            )
 
         # Should return immediately without logging
         assert path == str(existing_file)

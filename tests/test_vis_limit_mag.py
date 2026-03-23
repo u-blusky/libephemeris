@@ -43,7 +43,7 @@ class TestVisLimitMagBasic:
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
 
         # Should return a tuple of 8 values
-        assert len(dret) == 8
+        assert len(dret) == 10
         # Limiting magnitude should be a reasonable value
         assert -10.0 < dret[0] < 10.0
         # Object altitude
@@ -70,7 +70,7 @@ class TestVisLimitMagBasic:
 
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Jupiter")
 
-        assert len(dret) == 8
+        assert len(dret) == 10
         # Result should be a valid vision type or below horizon
         assert result in (
             SE_HELFLAG_BELOW_HORIZON,
@@ -88,7 +88,7 @@ class TestVisLimitMagBasic:
 
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Mars")
 
-        assert len(dret) == 8
+        assert len(dret) == 10
         assert result in (
             SE_HELFLAG_BELOW_HORIZON,
             SE_HELFLAG_PHOTOPIC,
@@ -105,7 +105,7 @@ class TestVisLimitMagBasic:
 
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Saturn")
 
-        assert len(dret) == 8
+        assert len(dret) == 10
 
 
 class TestVisLimitMagInputFormats:
@@ -121,7 +121,7 @@ class TestVisLimitMagInputFormats:
         # "3" is Venus
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "3")
 
-        assert len(dret) == 8
+        assert len(dret) == 10
 
     def test_planet_by_name_case_insensitive(self):
         """Test that planet names are case insensitive."""
@@ -147,7 +147,7 @@ class TestVisLimitMagInputFormats:
 
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Regulus")
 
-        assert len(dret) == 8
+        assert len(dret) == 10
         # Regulus is bright (mag ~ 1.4)
         if dret[1] > 0:  # If above horizon
             assert dret[7] < 5.0  # Should be reasonably bright
@@ -195,8 +195,8 @@ class TestVisLimitMagAtmosphericConditions:
         result_hazy, dret_hazy = vis_limit_mag(jd, geopos, atmo_hazy, observer, "Venus")
 
         # Both should succeed
-        assert len(dret_clear) == 8
-        assert len(dret_hazy) == 8
+        assert len(dret_clear) == 10
+        assert len(dret_hazy) == 10
 
 
 class TestVisLimitMagObserverParameters:
@@ -221,8 +221,8 @@ class TestVisLimitMagObserverParameters:
         # Limiting magnitude should be affected by age
         # Young observers generally see fainter objects
         # (Note: effect is small and may be overwhelmed by other factors)
-        assert len(dret_young) == 8
-        assert len(dret_old) == 8
+        assert len(dret_young) == 10
+        assert len(dret_old) == 10
 
     def test_snellen_ratio_effect(self):
         """Test that better vision (higher Snellen) improves limiting magnitude."""
@@ -240,8 +240,8 @@ class TestVisLimitMagObserverParameters:
         observer_good = (36, 1.5)
         result_good, dret_good = vis_limit_mag(jd, geopos, atmo, observer_good, "Venus")
 
-        assert len(dret_normal) == 8
-        assert len(dret_good) == 8
+        assert len(dret_normal) == 10
+        assert len(dret_good) == 10
 
 
 class TestVisLimitMagFlags:
@@ -373,7 +373,7 @@ class TestVisLimitMagEdgeCases:
 
         # Should still work with defaults for missing values
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
-        assert len(dret) == 8
+        assert len(dret) == 10
 
     def test_minimal_atmo(self):
         """Test with minimal atmospheric parameters."""
@@ -383,7 +383,7 @@ class TestVisLimitMagEdgeCases:
         observer = (36, 1.0)
 
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
-        assert len(dret) == 8
+        assert len(dret) == 10
 
     def test_minimal_observer(self):
         """Test with minimal observer parameters."""
@@ -393,7 +393,7 @@ class TestVisLimitMagEdgeCases:
         observer = (36,)  # Only age
 
         result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
-        assert len(dret) == 8
+        assert len(dret) == 10
 
 
 class TestVisLimitMagAliases:

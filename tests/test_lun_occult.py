@@ -154,8 +154,11 @@ class TestLunOccultWhenGlob:
 
         if jd_begin > 0 and jd_end > 0:
             duration_hours = (jd_end - jd_begin) * 24
-            # Duration should be between 0.01 hours (~30 seconds) and 2 hours
-            assert 0.001 < duration_hours < 2.0
+            # Duration should be between 0.01 hours (~30 seconds) and 4 hours
+            # Global occultation durations (C1 to C4 across entire Earth)
+            # can be longer than local durations, especially for bright stars
+            # near the ecliptic with favorable geometry.
+            assert 0.001 < duration_hours < 4.0
 
 
 class TestLunOccultEdgeCases:

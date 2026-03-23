@@ -5,6 +5,7 @@ This tests the function that returns information about the currently loaded
 ephemeris file: file path, date range, and ephemeris type.
 """
 
+import os
 import pytest
 from libephemeris import (
     get_current_file_data,
@@ -19,8 +20,20 @@ from libephemeris import (
 
 
 @pytest.fixture(autouse=True)
-def reset_state():
-    """Reset ephemeris state before and after each test."""
+def reset_state(monkeypatch):
+    """Reset ephemeris state before and after each test.
+
+    Disables LEB so swe_calc_ut goes through Skyfield and populates _PLANETS.
+    """
+    # Disable LEB env vars
+    monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
+    monkeypatch.delenv("LIBEPHEMERIS_MODE", raising=False)
+    # Disable LEB auto-discovery and reader
+    from libephemeris import state
+
+    monkeypatch.setattr(state, "_LEB_FILE", None)
+    monkeypatch.setattr(state, "_LEB_READER", None)
+    monkeypatch.setattr(state, "_discover_leb_file", lambda: None)
     close()
     set_ephemeris_file("de440.bsp")
     set_ephe_path(None)

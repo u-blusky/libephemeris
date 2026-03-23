@@ -55,10 +55,13 @@ class TestLunOccultTimingPrecision:
         if jd_end > 0:
             assert jd_end > jd_max
 
-        # Duration should be reasonable (occultations typically last seconds to ~1 hour)
+        # Duration should be reasonable for a GLOBAL occultation
+        # Global occultations (C1 to C4 across entire Earth surface)
+        # can last much longer than local ones — up to ~5 hours for
+        # bright stars near the ecliptic with favorable geometry.
         if jd_begin > 0 and jd_end > 0:
             duration_seconds = (jd_end - jd_begin) * 86400
-            assert 1 < duration_seconds < 7200  # 1 second to 2 hours
+            assert 1 < duration_seconds < 20000  # 1 second to ~5.5 hours
 
     def test_contact_times_symmetry(self):
         """Test that contact times are roughly symmetric around maximum."""
@@ -292,10 +295,12 @@ class TestLunOccultPlanetOccultations:
             if jd_end > 0:
                 assert jd_end > jd_max
 
-            # Duration should be reasonable
+            # Duration should be reasonable for a GLOBAL occultation
+            # Global planet occultations can span several hours as the
+            # Moon's shadow sweeps across the entire Earth surface.
             if jd_begin > 0 and jd_end > 0:
                 duration_minutes = (jd_end - jd_begin) * 24 * 60
-                assert 0.1 < duration_minutes < 120  # 6 seconds to 2 hours
+                assert 0.1 < duration_minutes < 360  # 6 seconds to 6 hours
 
         except (RuntimeError, KeyError):
             pytest.skip(

@@ -152,7 +152,7 @@ class TestEclipseFourthContactC4ConsistencyWithSolEclipseWhenGlob:
         ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
-        jd_fourth_glob = times[4]  # Fourth contact from sol_eclipse_when_glob
+        jd_fourth_glob = times[3]  # Eclipse end from sol_eclipse_when_glob
 
         jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
 
@@ -176,7 +176,7 @@ class TestEclipseFourthContactC4ConsistencyWithSolEclipseWhenGlob:
         for jd_start, ecl_type in eclipse_starts:
             _, times = sol_eclipse_when_glob(jd_start, ecltype=ecl_type)
             jd_max = times[0]
-            jd_fourth_glob = times[4]
+            jd_fourth_glob = times[3]
 
             jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
 

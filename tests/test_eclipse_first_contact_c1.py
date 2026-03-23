@@ -153,7 +153,7 @@ class TestEclipseFirstContactC1ConsistencyWithSolEclipseWhenGlob:
         ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
-        jd_first_glob = times[1]  # First contact from sol_eclipse_when_glob
+        jd_first_glob = times[2]  # Eclipse begin from sol_eclipse_when_glob
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
 
@@ -177,7 +177,7 @@ class TestEclipseFirstContactC1ConsistencyWithSolEclipseWhenGlob:
         for jd_start, ecl_type in eclipse_starts:
             _, times = sol_eclipse_when_glob(jd_start, ecltype=ecl_type)
             jd_max = times[0]
-            jd_first_glob = times[1]
+            jd_first_glob = times[2]
 
             jd_c1 = calc_eclipse_first_contact_c1(jd_max)
 
@@ -267,8 +267,8 @@ class TestEclipseFirstContactC1EdgeCases:
         _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
-        jd_first = times[1]  # C1
-        jd_fourth = times[4]  # C4
+        jd_first = times[2]  # Eclipse begin (C1)
+        jd_fourth = times[3]  # Eclipse end (C4)
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
 

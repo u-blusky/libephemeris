@@ -515,23 +515,33 @@ class TestUtcTimezoneWithLeapSeconds:
     """Test UTC timezone conversions with leap second awareness."""
 
     def test_timezone_conversion_basic(self):
-        """Verify basic timezone conversion works correctly."""
-        # 2020-01-15 10:30:00 UTC to CET (UTC+1)
+        """Verify basic timezone conversion works correctly.
+
+        utc_time_zone converts FROM local time TO UTC by subtracting
+        the timezone offset. So local 10:30 in UTC+1 => UTC 09:30.
+        """
+        # 2020-01-15 10:30:00 local (UTC+1) => 2020-01-15 09:30:00 UTC
         result = ephem.utc_time_zone(2020, 1, 15, 10, 30, 0.0, 1.0)
 
-        assert result[:5] == (2020, 1, 15, 11, 30)
+        assert result[:5] == (2020, 1, 15, 9, 30)
         assert abs(result[5] - 0.0) < 0.01
 
     def test_timezone_conversion_day_boundary(self):
-        """Test timezone conversion crossing day boundary."""
-        # 2020-01-15 23:00:00 UTC to UTC+5 = 2020-01-16 04:00:00
+        """Test timezone conversion crossing day boundary.
+
+        utc_time_zone converts FROM local time TO UTC (subtracts offset).
+        Local 23:00 in UTC+5 => UTC 18:00 (same day).
+        """
         result = ephem.utc_time_zone(2020, 1, 15, 23, 0, 0.0, 5.0)
 
-        assert result[:5] == (2020, 1, 16, 4, 0)
+        assert result[:5] == (2020, 1, 15, 18, 0)
 
     def test_timezone_conversion_negative_offset(self):
-        """Test timezone conversion with negative offset."""
-        # 2020-01-15 02:00:00 UTC to UTC-5 = 2020-01-14 21:00:00
+        """Test timezone conversion with negative offset.
+
+        utc_time_zone converts FROM local time TO UTC (subtracts offset).
+        Local 02:00 in UTC-5 => UTC 07:00 (same day).
+        """
         result = ephem.utc_time_zone(2020, 1, 15, 2, 0, 0.0, -5.0)
 
-        assert result[:5] == (2020, 1, 14, 21, 0)
+        assert result[:5] == (2020, 1, 15, 7, 0)

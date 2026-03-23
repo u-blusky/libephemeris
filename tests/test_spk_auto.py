@@ -211,7 +211,7 @@ class TestCacheInfo:
     def test_get_cache_info_empty(self, tmp_path):
         """Get cache info when cache is empty/non-existent."""
         custom_dir = str(tmp_path / "spk")
-        with patch("libephemeris.state.get_spk_cache_dir", return_value=custom_dir):
+        with patch.object(spk_auto, "DEFAULT_AUTO_SPK_DIR", custom_dir):
             info = spk_auto.get_cache_info()
 
             assert info["num_files"] == 0

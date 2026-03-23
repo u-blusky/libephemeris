@@ -171,7 +171,9 @@ class TestEclipseSecondContactC2ConsistencyWithSolEclipseWhenGlob:
         ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
-        jd_second_glob = times[2]  # Second contact from sol_eclipse_when_glob
+        jd_second_glob = times[
+            4
+        ]  # Second contact (C2 = totality begin) from sol_eclipse_when_glob
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
 
@@ -195,7 +197,7 @@ class TestEclipseSecondContactC2ConsistencyWithSolEclipseWhenGlob:
         for jd_start, ecl_type in eclipse_starts:
             _, times = sol_eclipse_when_glob(jd_start, ecltype=ecl_type)
             jd_max = times[0]
-            jd_second_glob = times[2]
+            jd_second_glob = times[4]
 
             jd_c2 = calc_eclipse_second_contact_c2(jd_max)
 
@@ -324,7 +326,7 @@ class TestEclipseSecondContactC2PartialEclipses:
         assert jd_c2 < jd_max, "C2 should be before maximum"
 
         # Check that it's close to sol_eclipse_when_glob's C2
-        jd_second_glob = times[2]
+        jd_second_glob = times[4]
         time_diff_seconds = abs(jd_c2 - jd_second_glob) * 86400
 
         assert time_diff_seconds < 10, (

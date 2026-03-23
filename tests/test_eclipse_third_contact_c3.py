@@ -171,7 +171,9 @@ class TestEclipseThirdContactC3ConsistencyWithSolEclipseWhenGlob:
         ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
-        jd_third_glob = times[3]  # Third contact from sol_eclipse_when_glob
+        jd_third_glob = times[
+            5
+        ]  # Third contact (C3 = totality end) from sol_eclipse_when_glob
 
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
 
@@ -195,7 +197,7 @@ class TestEclipseThirdContactC3ConsistencyWithSolEclipseWhenGlob:
         for jd_start, ecl_type in eclipse_starts:
             _, times = sol_eclipse_when_glob(jd_start, ecltype=ecl_type)
             jd_max = times[0]
-            jd_third_glob = times[3]
+            jd_third_glob = times[5]
 
             jd_c3 = calc_eclipse_third_contact_c3(jd_max)
 
@@ -345,7 +347,7 @@ class TestEclipseThirdContactC3PartialEclipses:
         assert jd_c3 > jd_max, "C3 should be after maximum"
 
         # Check that it's close to sol_eclipse_when_glob's C3
-        jd_third_glob = times[3]
+        jd_third_glob = times[5]
         time_diff_seconds = abs(jd_c3 - jd_third_glob) * 86400
 
         assert time_diff_seconds < 10, (

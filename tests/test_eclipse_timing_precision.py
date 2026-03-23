@@ -110,10 +110,10 @@ class TestSolarEclipseTimingPrecision:
         ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
-        jd_first = times[1]
-        jd_second = times[2]
-        jd_third = times[3]
-        jd_fourth = times[4]
+        jd_first = times[2]  # C1: eclipse begin (first contact)
+        jd_second = times[4]  # C2: totality/annularity begin
+        jd_third = times[5]  # C3: totality/annularity end
+        jd_fourth = times[3]  # C4: eclipse end (fourth contact)
 
         # First contact < second contact < maximum < third contact < fourth contact
         assert jd_first < jd_max, "First contact should be before maximum"
@@ -133,8 +133,8 @@ class TestSolarEclipseTimingPrecision:
         ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
 
         jd_max = times[0]
-        jd_first = times[1]
-        jd_fourth = times[4]
+        jd_first = times[2]  # C1: eclipse begin
+        jd_fourth = times[3]  # C4: eclipse end
 
         # Total eclipse duration (first to fourth contact) typically 2-5.5 hours
         # The April 2024 eclipse is a long one (~5.2 hours) as the shadow path

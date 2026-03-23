@@ -94,44 +94,44 @@ class TestCs2timestrValues:
 
 
 class TestCs2timestrNegativeValues:
-    """Tests for negative value handling."""
+    """Tests for negative value handling (hours wrap mod 24)."""
 
     def test_cs2timestr_negative_1_hour(self):
-        """Test conversion of -1 hour."""
+        """Test conversion of -1 hour (wraps to 23:00:00 mod 24)."""
         result = ephem.cs2timestr(-CS_HOUR)
-        assert "-1:" in result
-        assert ":00:00" in result
+        assert "23:00:00" in result
 
     def test_cs2timestr_negative_12_hours(self):
-        """Test conversion of -12 hours."""
+        """Test conversion of -12 hours (wraps to 12:00:00 mod 24)."""
         result = ephem.cs2timestr(-CS_HOUR * 12)
-        assert "-12:" in result
+        assert "12:" in result
 
     def test_cs2timestr_negative_with_minutes(self):
-        """Test conversion of negative value with minutes."""
+        """Test conversion of negative value with minutes (-1h30m wraps to 23:30)."""
         cs_value = -(CS_HOUR + 30 * CS_MINUTE)  # -1 hour 30 minutes
         result = ephem.cs2timestr(cs_value)
-        assert "-1:" in result
+        # -1 hour mod 24 = 23, minutes stay at 30
+        assert "23:" in result
         assert ":30:" in result
 
 
 class TestCs2timestrLargeValues:
-    """Tests for large value handling."""
+    """Tests for large value handling (hours wrap mod 24)."""
 
     def test_cs2timestr_24_hours(self):
-        """Test conversion of 24 hours (full day)."""
+        """Test conversion of 24 hours (wraps to 00:00:00 mod 24)."""
         result = ephem.cs2timestr(CS_HOUR * 24)
-        assert "24:" in result
+        assert "00:00:00" in result
 
     def test_cs2timestr_greater_than_24(self):
-        """Test conversion of value greater than 24 hours."""
+        """Test conversion of value greater than 24 hours (30h wraps to 06:00:00)."""
         result = ephem.cs2timestr(CS_HOUR * 30)  # 30 hours
-        assert "30:" in result
+        assert "06:" in result
 
     def test_cs2timestr_100_hours(self):
-        """Test conversion of 100 hours."""
+        """Test conversion of 100 hours (wraps to 04:00:00 mod 24)."""
         result = ephem.cs2timestr(CS_HOUR * 100)
-        assert "100:" in result
+        assert "04:" in result
 
 
 class TestCs2timestrEdgeCases:

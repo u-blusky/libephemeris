@@ -32,18 +32,26 @@ class TestDE440Default:
         assert _EPHEMERIS_FILE == "de440.bsp"
 
     def test_tidal_default_is_de440(self):
-        """Verify that SE_TIDAL_DEFAULT matches DE440."""
-        assert SE_TIDAL_DEFAULT == SE_TIDAL_DE440
+        """Verify tidal acceleration constants.
+
+        SE_TIDAL_DEFAULT matches pyswisseph TIDAL_DEFAULT (-25.8).
+        SE_TIDAL_DE440 and SE_TIDAL_DE441 use the JPL DE441 value (-25.936).
+        """
+        assert SE_TIDAL_DEFAULT == -25.8  # Matches pyswisseph TIDAL_DEFAULT
         assert SE_TIDAL_DE440 == -25.936
         assert SE_TIDAL_DE441 == -25.936  # DE441 uses same value
 
     def test_get_tid_acc_returns_de440_default(self):
-        """Verify that get_tid_acc() returns DE440 value by default."""
+        """Verify that get_tid_acc() returns the default tidal acceleration value.
+
+        The default tidal acceleration matches pyswisseph TIDAL_DEFAULT (-25.8),
+        not the DE440-specific value (-25.936).
+        """
         # Reset to ensure default state
         ephem.close()
 
         tid_acc = ephem.get_tid_acc()
-        assert tid_acc == SE_TIDAL_DE440
+        assert tid_acc == SE_TIDAL_DEFAULT
 
 
 class TestDE440DateRange:

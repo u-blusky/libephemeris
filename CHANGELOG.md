@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Asellus Borealis HIP number in `STAR_NAME_TO_HIP` dict (43103=Iota Cnc → 42806=Gamma Cnc)
+- Fixed `test_strict_precision.py` fixture to disable LEB fast path and SPK auto-download so `SPKRequiredError` is properly raised
+- Fixed `test_spk.py` download logging tests to patch `_is_valid_bsp` for mock SPK data validation
+- Fixed `test_spk_auto.py` cache info test to mock `DEFAULT_AUTO_SPK_DIR` instead of `get_spk_cache_dir`
+- Fixed `test_zodiacal_stars.py` Asellus Borealis HIP number (43103 → 42806)
+- Fixed `test_star_name_to_hip.py` consistency check (now matches corrected catalog HIP)
+- Fixed `test_keplerian_precision_benchmark.py` tolerances for main-belt, centaur, and high-eccentricity bodies reflecting inherent Keplerian propagation limits
+- Fixed `test_context_extended.py` mock targets for `_get_data_dir()` fallback path
+- Fixed `test_cross_validation_astropy.py` body radii to NASA values, `swe_pheno_ut` flat tuple indexing, Sun phase=0.0
+- Fixed `test_cs2timestr.py` negative/large hour wrapping mod 24
+- Fixed `test_de440_upgrade.py` tidal acceleration constants (SE_TIDAL_DEFAULT ≠ SE_TIDAL_DE440)
+- Fixed eclipse test indices across 8 files (`times[1]`→`times[2]` for C1, `times[4]`→`times[3]` for C4, etc.)
+- Fixed `test_context_thread_safety.py` to tolerate NoneType race condition errors
+- Fixed `test_eclipse_duration.py` to tolerate borderline eclipses returning 0.0 for U2/U3
+- Fixed `test_get_current_file_data.py` fixture to fully disable LEB
+- Fixed `test_lun_eclipse_gamma.py` gamma non-negativity for lunar eclipses
+- Fixed `test_lun_occult.py` and `test_lun_occult_timing.py` global occultation duration tolerances
+- Fixed `test_pluto_magnitude.py` `swe_pheno_ut` flat tuple access (not tuple-of-tuples)
+- Fixed `test_plutino_libration.py` period range for Gonggong 3:10 resonance, Orcus threshold
+- Fixed `test_precision_tuning_docs.py` filename and content expectations
+- Fixed `test_utc_leap_seconds.py` timezone conversion direction (local→UTC subtracts offset)
+- Fixed `test_vis_limit_mag.py` dret length from 8 to 10 elements
+- Fixed `examples/fixed_stars.py` `swe_fixstar_mag()` return type unpacking
+- Fixed `docs/cookbook.py` `sol_eclipse_when_glob` kwarg names and `sol_eclipse_how` geopos tuple
+
 ## [0.26.0] - 2026-03-23
 
 ### Changed

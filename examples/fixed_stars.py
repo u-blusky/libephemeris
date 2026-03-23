@@ -144,7 +144,7 @@ def example_star_magnitude() -> None:
     star_mags = []
     for star_name in bright_stars:
         try:
-            mag = eph.swe_fixstar_mag(star_name)
+            mag, _resolved_name = eph.swe_fixstar_mag(star_name)
             star_mags.append((star_name, mag))
         except Exception:
             pass

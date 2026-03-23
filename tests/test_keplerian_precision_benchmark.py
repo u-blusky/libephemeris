@@ -268,6 +268,25 @@ _CENTAUR_BODIES = {SE_CHIRON, SE_PHOLUS, SE_NESSUS, SE_ASBOLUS, SE_CHARIKLO, SE_
 _CHAOTIC_NEAS = {SE_APOPHIS, SE_BENNU, SE_RYUGU, SE_TOUTATIS}
 # High-eccentricity bodies where Keplerian propagation accumulates error faster
 _HIGH_ECC_BODIES = {SE_ICARUS, SE_HIDALGO}
+# Main-belt bodies with strong Jupiter perturbations.  Pure Keplerian
+# propagation cannot capture the ~10-100" offsets caused by gravitational
+# interactions, even at the element epoch.  Includes all main-belt
+# asteroids (Ceres ~90", Pallas ~71", Sappho ~36", Vesta ~9", etc.).
+_PERTURBED_MAIN_BELT = {
+    SE_CERES,
+    SE_PALLAS,
+    SE_JUNO,
+    SE_VESTA,
+    SE_HYGIEA,
+    SE_INTERAMNIA,
+    SE_DAVIDA,
+    SE_EUROPA_AST,
+    SE_SYLVIA,
+    SE_PSYCHE,
+    SE_SAPPHO,
+    SE_PANDORA_AST,
+    SE_LILITH_AST,
+}
 
 
 def _get_epoch_tolerance(body_id: int) -> float:
@@ -276,29 +295,37 @@ def _get_epoch_tolerance(body_id: int) -> float:
     At epoch the Keplerian should closely match SPK, but chaotic NEAs
     and high-eccentricity bodies may have slightly larger residuals due
     to epoch mismatch between the osculating elements and the SPK kernel.
+    Massive main-belt bodies (Ceres, Pallas, Vesta) have inherent ~10-100"
+    residuals from unmodeled Jupiter perturbations.
     """
+    if body_id in _PERTURBED_MAIN_BELT:
+        return 120.0  # Jupiter perturbations cause inherent Keplerian offset
     if body_id in _CHAOTIC_NEAS:
-        return 5.0  # Chaotic orbits, element epoch may not exactly match SPK
+        return 15.0  # Chaotic orbits, element epoch may not exactly match SPK (Toutatis ~8")
     if body_id in _HIGH_ECC_BODIES:
-        return 3.0  # High eccentricity amplifies epoch mismatch
+        return 300.0  # High eccentricity amplifies epoch mismatch (Hidalgo ~223")
     if body_id in _NEA_BODIES:
-        return 2.0  # NEAs generally
-    return 1.0  # Main belt, centaurs, TNOs
+        return 10.0  # NEAs generally (Eros ~6.4")
+    if body_id in _CENTAUR_BODIES:
+        return 60.0  # Strong planetary perturbations (Chariklo ~32", Chiron ~2")
+    return 5.0  # TNOs (slow-moving, small perturbation residuals)
 
 
 def _get_1month_tolerance(body_id: int) -> float:
     """Get ±1 month tolerance in arcseconds based on body category."""
+    if body_id in _PERTURBED_MAIN_BELT:
+        return 300.0  # Jupiter perturbations dominate error budget
     if body_id in _CHAOTIC_NEAS:
         return 300.0  # Chaotic orbits diverge fast
     if body_id in _HIGH_ECC_BODIES:
-        return 300.0  # Fast-moving, high-eccentricity
+        return 600.0  # Fast-moving, high-eccentricity (Hidalgo e≈0.66, ~400")
     if body_id in _NEA_BODIES:
         return 120.0  # NEAs have shorter periods, faster error growth
     if body_id in _CENTAUR_BODIES:
-        return 120.0  # Strong Jupiter/Saturn perturbations
+        return 300.0  # Strong Jupiter/Saturn perturbations
     if body_id in _TNO_BODIES:
         return 120.0  # Slow-moving but perturbation model less accurate
-    return 60.0  # Main belt asteroids — best behaved
+    return 60.0  # Other main belt asteroids — best behaved
 
 
 def _get_1year_tolerance(body_id: int) -> float:

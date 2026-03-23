@@ -23,15 +23,27 @@ from unittest.mock import patch
 
 
 @pytest.fixture(autouse=True)
-def cleanup():
+def cleanup(monkeypatch):
     """Reset state before and after each test."""
     # Clear any SPK registrations
     state._SPK_BODY_MAP.clear()
+    # Disable auto-SPK download so cached SPK files in ~/.libephemeris/spk/
+    # don't get re-registered during calc_ut()
+    old_auto_spk = state._AUTO_SPK_DOWNLOAD
+    state._AUTO_SPK_DOWNLOAD = False
+    # Disable LEB so the fast path doesn't intercept calc_ut() before
+    # the SPK/strict-precision code path is reached
+    monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
+    monkeypatch.delenv("LIBEPHEMERIS_MODE", raising=False)
+    monkeypatch.setattr(state, "_LEB_FILE", None)
+    monkeypatch.setattr(state, "_LEB_READER", None)
+    monkeypatch.setattr(state, "_discover_leb_file", lambda: None)
     # Reset strict precision setting
     eph.set_strict_precision(None)
     yield
     # Cleanup after test
     state._SPK_BODY_MAP.clear()
+    state._AUTO_SPK_DOWNLOAD = old_auto_spk
     eph.set_strict_precision(None)
 
 

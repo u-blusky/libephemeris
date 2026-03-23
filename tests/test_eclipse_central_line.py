@@ -46,10 +46,10 @@ class TestEclipseCentralLineBasicFunctionality:
         """Test that function returns a tuple of three tuples."""
         jd_start = julday(2024, 1, 1, 0.0)
         ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
-        jd_c1 = times_ecl[1]  # First contact
-        jd_c4 = times_ecl[4]  # Fourth contact
+        jd_begin = times_ecl[2]  # Eclipse begin
+        jd_end = times_ecl[3]  # Eclipse end
 
-        result = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=30.0)
+        result = calc_eclipse_central_line(jd_begin, jd_end, step_minutes=30.0)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -62,8 +62,8 @@ class TestEclipseCentralLineBasicFunctionality:
         """Test that all returned tuples have the same length."""
         jd_start = julday(2024, 1, 1, 0.0)
         _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
-        jd_c1 = times_ecl[1]
-        jd_c4 = times_ecl[4]
+        jd_c1 = times_ecl[2]
+        jd_c4 = times_ecl[3]
 
         times, lats, lons = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=30.0)
 
@@ -73,8 +73,8 @@ class TestEclipseCentralLineBasicFunctionality:
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
         _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
-        jd_c1 = times_ecl[1]
-        jd_c4 = times_ecl[4]
+        jd_c1 = times_ecl[2]
+        jd_c4 = times_ecl[3]
 
         result = calc_eclipse_central_line(
             jd_c1, jd_c4, step_minutes=30.0, flags=SEFLG_SWIEPH
@@ -99,8 +99,8 @@ class TestEclipseCentralLineTotalEclipse:
 
         assert ecl_type & SE_ECL_TOTAL, "Should find a total eclipse"
 
-        jd_c1 = times_ecl[1]  # First contact
-        jd_c4 = times_ecl[4]  # Fourth contact
+        jd_c1 = times_ecl[2]  # First contact
+        jd_c4 = times_ecl[3]  # Fourth contact
 
         # Calculate central line with 10-minute steps
         times, lats, lons = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=10.0)
@@ -121,8 +121,8 @@ class TestEclipseCentralLineTotalEclipse:
         """Test that times are monotonically increasing."""
         jd_start = julday(2024, 1, 1, 0.0)
         _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
-        jd_c1 = times_ecl[1]
-        jd_c4 = times_ecl[4]
+        jd_c1 = times_ecl[2]
+        jd_c4 = times_ecl[3]
 
         times, lats, lons = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=10.0)
 
@@ -136,8 +136,8 @@ class TestEclipseCentralLineTotalEclipse:
         """Test that all latitudes are in valid range."""
         jd_start = julday(2024, 1, 1, 0.0)
         _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
-        jd_c1 = times_ecl[1]
-        jd_c4 = times_ecl[4]
+        jd_c1 = times_ecl[2]
+        jd_c4 = times_ecl[3]
 
         times, lats, lons = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=5.0)
 
@@ -148,8 +148,8 @@ class TestEclipseCentralLineTotalEclipse:
         """Test that all longitudes are normalized to [-180, 180]."""
         jd_start = julday(2024, 1, 1, 0.0)
         _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
-        jd_c1 = times_ecl[1]
-        jd_c4 = times_ecl[4]
+        jd_c1 = times_ecl[2]
+        jd_c4 = times_ecl[3]
 
         times, lats, lons = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=5.0)
 
@@ -166,8 +166,8 @@ class TestEclipseCentralLineAnnularEclipse:
         ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
 
         if ecl_type & SE_ECL_ANNULAR:
-            jd_c1 = times_ecl[1]
-            jd_c4 = times_ecl[4]
+            jd_c1 = times_ecl[2]
+            jd_c4 = times_ecl[3]
 
             times, lats, lons = calc_eclipse_central_line(
                 jd_c1, jd_c4, step_minutes=10.0
@@ -190,8 +190,8 @@ class TestEclipseCentralLineStepSize:
         """Test that smaller step size produces more points."""
         jd_start = julday(2024, 1, 1, 0.0)
         _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
-        jd_c1 = times_ecl[1]
-        jd_c4 = times_ecl[4]
+        jd_c1 = times_ecl[2]
+        jd_c4 = times_ecl[3]
 
         times_1min, _, _ = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=1.0)
         times_10min, _, _ = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=10.0)
@@ -203,8 +203,8 @@ class TestEclipseCentralLineStepSize:
         """Test that default step size is 1 minute."""
         jd_start = julday(2024, 1, 1, 0.0)
         _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
-        jd_c1 = times_ecl[1]
-        jd_c4 = times_ecl[4]
+        jd_c1 = times_ecl[2]
+        jd_c4 = times_ecl[3]
 
         # Use default step
         times_default, _, _ = calc_eclipse_central_line(jd_c1, jd_c4)
@@ -312,8 +312,8 @@ class TestEclipseCentralLineMultipleEclipses:
             if not (ecl_type & SE_ECL_TOTAL):
                 break
 
-            jd_c1 = times_ecl[1]
-            jd_c4 = times_ecl[4]
+            jd_c1 = times_ecl[2]
+            jd_c4 = times_ecl[3]
 
             times, lats, lons = calc_eclipse_central_line(
                 jd_c1, jd_c4, step_minutes=15.0

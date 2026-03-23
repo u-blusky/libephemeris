@@ -743,7 +743,7 @@ def find_next_solar_eclipse(
     #   [7] = unused
     if eclipse_type:
         ecl_flags, times = ephem.sol_eclipse_when_glob(
-            start_jd, flags=SEFLG_SWIEPH, eclipse_type=eclipse_type
+            start_jd, flags=SEFLG_SWIEPH, ecltype=eclipse_type
         )
     else:
         ecl_flags, times = ephem.sol_eclipse_when_glob(start_jd, flags=SEFLG_SWIEPH)
@@ -863,9 +863,7 @@ def find_eclipse_visibility(
         >>> print(f"Magnitude: {visibility['magnitude']:.3f}")
     """
     # Use sol_eclipse_how to get eclipse circumstances at location
-    ecl_flags, attr = ephem.sol_eclipse_how(
-        eclipse_jd, latitude, longitude, altitude=altitude
-    )
+    ecl_flags, attr = ephem.sol_eclipse_how(eclipse_jd, (longitude, latitude, altitude))
 
     # attr indices:
     #   [0] = eclipse magnitude
