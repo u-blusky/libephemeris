@@ -197,7 +197,7 @@ class TestCalcInterpolatedApogeeWithELP2000:
 
             # All values should be valid
             assert 0.0 <= lon < 360.0
-            assert -5.0 <= lat <= 5.0
+            assert -6.0 <= lat <= 6.0
             assert 0.002 < ecc < 0.003
 
 

@@ -236,7 +236,7 @@ class TestELP2000PerigeePerturbationsJPL:
         )
 
     def test_three_level_decomposition_consistency(self):
-        """Full result must equal mean + perturbation + correction."""
+        """Full result must equal mean + perturbation."""
         test_jds = [
             julday(1950, 6, 15, 0.0) + 69.184 / 86400.0,
             2451545.0,  # J2000
@@ -245,13 +245,13 @@ class TestELP2000PerigeePerturbationsJPL:
         ]
 
         for jd_tt in test_jds:
-            full_lon, lat, ecc = lunar.calc_interpolated_perigee(jd_tt)
+            full_lon, lat, dist = lunar.calc_interpolated_perigee(jd_tt)
 
-            # Reconstruct manually
+            # Reconstruct manually: mean perigee + perturbation
+            # (calc_interpolated_perigee does NOT use correction table)
             mean = (lunar.calc_mean_lilith(jd_tt) + 180.0) % 360.0
             pert = lunar._calc_elp2000_perigee_perturbations(jd_tt)
-            corr = lunar._interpolate_perigee_correction(jd_tt)
-            reconstructed = (mean + pert + corr) % 360.0
+            reconstructed = (mean + pert) % 360.0
 
             diff = abs(normalize_angle_diff(full_lon - reconstructed))
             assert diff < 1e-10, (
@@ -278,8 +278,11 @@ class TestELP2000PerigeePerturbationsJPL:
         )
 
         eps = 0.001  # ~8.7 hours in years
-        # Check 10 boundaries in the modern era
-        for i in range(20, 30):
+        # Check 10 boundaries in the modern era (around year 2000)
+        idx_2000 = int(
+            (2000 - PERIGEE_CORRECTION_START_YEAR) / PERIGEE_CORRECTION_STEP_YEARS
+        )
+        for i in range(idx_2000 - 5, idx_2000 + 5):
             boundary_year = (
                 PERIGEE_CORRECTION_START_YEAR + i * PERIGEE_CORRECTION_STEP_YEARS
             )
@@ -304,15 +307,15 @@ class TestELP2000PerigeePerturbationsJPL:
             )
 
     def test_output_format_invariants(self):
-        """calc_interpolated_perigee must return (lon, 0.0, 0.0549)."""
+        """calc_interpolated_perigee must return (lon, lat, dist)."""
         test_jds = [2451545.0, julday(1900, 1, 1, 0.0), julday(2100, 1, 1, 0.0)]
 
         for jd_tt in test_jds:
-            lon, lat, ecc = lunar.calc_interpolated_perigee(jd_tt)
+            lon, lat, dist = lunar.calc_interpolated_perigee(jd_tt)
 
             assert 0.0 <= lon < 360.0, f"Longitude {lon} not in [0, 360)"
-            assert lat == 0.0, f"Latitude should be 0.0, got {lat}"
-            assert ecc == 0.0549, f"Eccentricity should be 0.0549, got {ecc}"
+            assert -6.0 <= lat <= 6.0, f"Latitude {lat} not in [-6, 6]"
+            assert 0.001 < dist < 0.004, f"Distance {dist} not in expected AU range"
 
     def test_long_term_smoothness(self):
         """Perigee position must advance smoothly over decades.

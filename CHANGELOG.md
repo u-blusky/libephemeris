@@ -136,6 +136,27 @@ for two lunar bodies whose pre-computed Chebyshev coefficients used older models
 
 **Run 7 results: 4400 rounds, 3947 PASS, 441 KNOWN, 0 FAIL (−84 KNOWN vs Run 6).**
 
+#### Pre-existing test fixes (8 tests)
+
+Fixed 8 pre-existing test failures that predated the v0.26.0 work:
+
+- **`test_interpolated_apogee_documentation`** (3 tests): Created missing
+  `docs/INTERPOLATED_APOGEE.md` documenting the interpolated apogee/perigee
+  algorithm, the three apogee variants, SE_INTP_APOG/SE_INTP_PERG API, and
+  comparison with pyswisseph.
+- **`test_interpolated_apogee_multi_date_consistency`**: Widened latitude bound
+  from ±5° to ±6° — osculating apogee latitude can exceed 5° at certain dates.
+- **`test_output_format_invariants`**: Updated assertions from placeholder
+  `lat==0.0, ecc==0.0549` to actual return value ranges (lat ±6°, dist in AU).
+- **`test_three_level_decomposition_consistency`**: Removed phantom correction
+  table term from reconstruction — `calc_interpolated_perigee` uses only
+  `mean + perturbation`, not `mean + perturbation + correction`.
+- **`test_correction_table_continuity`**: Fixed table indices from `range(20,30)`
+  (which pointed to years -13159) to modern era indices around year 2000.
+- **`test_roundtrip_pre_reform_date`**: Replaced impossible direct roundtrip
+  (auto-detection treats pre-1582 Gregorian output as Julian) with JD
+  equivalence verification.
+
 #### Divergence documentation (6100de5)
 
 New `docs/divergences.md`: comprehensive catalog of all 15 categories of
