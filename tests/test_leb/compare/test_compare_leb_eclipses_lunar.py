@@ -84,8 +84,8 @@ class TestLunarEclipseHow:
         jd = year_to_jd(2025) + 90  # March 2025 lunar eclipse
         geopos = (lat, lon, alt)
 
-        ref_result = compare.skyfield(ephem.swe_lun_eclipse_how, jd, 2, geopos)
-        leb_result = compare.leb(ephem.swe_lun_eclipse_how, jd, 2, geopos)
+        ref_result = compare.skyfield(ephem.swe_lun_eclipse_how, jd, geopos)
+        leb_result = compare.leb(ephem.swe_lun_eclipse_how, jd, geopos)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_mag = ref_result[1][0]

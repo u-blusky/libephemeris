@@ -119,8 +119,8 @@ class TestSolarEclipseHow:
         jd = year_to_jd(2024) + 60  # Around April 2024 eclipse
         geopos = _geopos(lat, lon, alt)
 
-        ref_result = compare.skyfield(ephem.swe_sol_eclipse_how, jd, 0, geopos)
-        leb_result = compare.leb(ephem.swe_sol_eclipse_how, jd, 0, geopos)
+        ref_result = compare.skyfield(ephem.swe_sol_eclipse_how, jd, geopos)
+        leb_result = compare.leb(ephem.swe_sol_eclipse_how, jd, geopos)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_mag = ref_result[1][0]

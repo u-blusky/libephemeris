@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [0.26.0] - 2026-03-23
 
-### Summary
+### Changed
 
 **pyswisseph 2.10.03 hyper-validation: 4400+ comparison rounds across the entire
 API surface, with tolerance classification for all inherent engine divergences.**
@@ -185,7 +187,7 @@ and maximum magnitudes, and affected API functions.
 
 ## [0.25.0] - 2026-03-20
 
-### Summary
+### Changed
 
 **LEB Sidereal Precision: 4 critical sidereal coordinate transform bugs fixed,
 537 new regression tests, and 134,000+ deep validation test cases across all
@@ -285,7 +287,7 @@ Exhaustive precision validation across 14 blocks:
 
 ## [0.24.0] - 2026-03-16
 
-### Summary
+### Changed
 
 **Precision V3: sub-arcsecond accuracy across the full API surface, comprehensive
 pyswisseph compatibility audit, and 30+ critical bug fixes.** This release
@@ -490,7 +492,7 @@ parameter for proleptic Gregorian output.
 
 ## [0.23.0] - 2026-03-09
 
-### Summary
+### Changed
 
 **LEB Precision V3: sub-milliarcsecond accuracy for all 31 celestial bodies across
 all three precision tiers.** This release completely rewrites the LEB runtime
@@ -750,7 +752,7 @@ The precision measurement script had three bugs causing false error reports:
   ecliptic storage approach was abandoned early in V3 development due to
   retrograde cusp fitting failures)
 
-### Precision Results
+### Tests
 
 All 31 bodies pass <0.001 arcsecond on all three tiers (1569 comparison tests):
 
@@ -2055,6 +2057,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Swiss Ephemeris compatible function names, flags, and result structure
 
 [Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/g-battaglia/libephemeris/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/g-battaglia/libephemeris/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/g-battaglia/libephemeris/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/g-battaglia/libephemeris/compare/v0.22.0...v0.23.0
