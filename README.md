@@ -347,6 +347,7 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 - `docs/methodology/overview.md` (computational methodology, comparison with Swiss Ephemeris)
 - `docs/reference/precision.md` (scientific models, measured precision, references)
 - `docs/reference/swisseph-comparison.md` (exhaustive comparison vs pyswisseph, 1,619 tests)
+- `docs/divergences.md` (all known divergences from pyswisseph, with causes and magnitudes)
 - `docs/guides/migration-guide.md` (pyswisseph -> libephemeris)
 - `docs/reference/house-systems.md`
 - `docs/reference/ayanamsha.md`
