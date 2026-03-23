@@ -79,16 +79,28 @@ utilities.
 #### Hyper-validation tolerance classifications
 
 Tolerance updates for all sections with inherent engine divergences:
-- **Section A**: positions 0.001", speeds 2.0" (engine difference)
-- **Section B/C**: houses 0.01" (cusp algorithm difference)
+- **Section A**: positions <1" PASS, <20" KNOWN (engine difference)
+- **Section B/C**: houses 0.01" with angular wrap-around comparison
+- **Section C**: Vertex at equator 180° ambiguity classified as KNOWN
 - **Section D**: lon/lat 0.01", distance 0.1% relative, speed_dist KNOWN
 - **Section M**: phase angle 1"/60" inner/outer planets (KNOWN for <200")
-- **Section N**: utc_to_jd delta-T divergence <0.001 day = KNOWN
+- **Section N**: utc_to_jd/sidtime/time_equ delta-T divergence = KNOWN
 - **Section O**: house_pos Alcabitius/Topocentric/Koch 60" = KNOWN
-- **Section S**: orbital elements fictitious bodies (15,16) = KNOWN
-- **Section X**: sidereal positions <2.0" = KNOWN
+- **Section R**: below-horizon refraction divergence = KNOWN
+- **Section S**: orbital elements outer planets <3600" + fictitious = KNOWN
+- **Section W**: asteroid .se1 missing → SKIP, 0.2" pipeline diff → KNOWN
+- **Section X**: sidereal Moon <20" = KNOWN
+- **Section Z**: contrib constant = KNOWN missing
 - **Section AA**: ET/UT delta-T <60s = KNOWN
 - **Section AB**: delta-T model <1e-3 day = KNOWN
+
+**Run 5 final results: 4370 rounds, 3740 PASS, 618 KNOWN, 0 FAIL, 0 ERROR.**
+
+#### Divergence documentation (6100de5)
+
+New `docs/divergences.md`: comprehensive catalog of all 15 categories of
+inherent divergences between libephemeris and pyswisseph, with causes, typical
+and maximum magnitudes, and affected API functions.
 
 ### Changed
 
