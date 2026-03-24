@@ -21,8 +21,8 @@ class TestCloseFunction:
 
     def test_close_resets_planets(self):
         """close() should reset the _PLANETS global to None."""
-        # Ensure planets are loaded by doing a calculation
-        swe_calc_ut(2451545.0, SE_SUN, 0)
+        # Explicitly load planets (swe_calc_ut may use LEB fast path)
+        state.get_planets()
         assert state._PLANETS is not None
 
         # Call close
@@ -45,8 +45,8 @@ class TestCloseFunction:
 
     def test_close_resets_loader(self):
         """close() should reset the _LOADER global to None."""
-        # Ensure loader is created
-        swe_calc_ut(2451545.0, SE_SUN, 0)
+        # Explicitly load planets to ensure loader is created
+        state.get_planets()
         assert state._LOADER is not None
 
         # Call close
