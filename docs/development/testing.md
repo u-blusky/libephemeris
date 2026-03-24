@@ -249,26 +249,9 @@ LibEphemeris respects these environment variables for testing:
 | `LIBEPHEMERIS_AUTO_SPK` | `1`, `true`, `yes` | Enable auto SPK download globally |
 | `LIBEPHEMERIS_LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR` | Control logging verbosity |
 
-**CI/CD Example** (GitHub Actions):
-
-```yaml
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    env:
-      LIBEPHEMERIS_AUTO_SPK: "1"
-      LIBEPHEMERIS_LOG_LEVEL: "INFO"  # Show download progress
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
-      - name: Run tests
-        run: pytest
-```
-
 ### Custom SPK Cache Directory
 
-For CI caching or custom storage locations:
+For custom storage locations:
 
 ```python
 import pytest

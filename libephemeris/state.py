@@ -360,6 +360,68 @@ def get_loader() -> Loader:
     return _LOADER
 
 
+def _build_enhanced_timescale() -> Timescale:
+    """Build a Timescale with extended historical Delta T coverage.
+
+    Skyfield's built-in ``iers.npz`` provides daily observed Delta T from
+    ~1973 to ~2027.  For earlier dates it falls back to the Stephenson,
+    Morrison & Hohenkerk (2016) cubic spline which is designed for
+    millennial-scale modelling and can deviate from 20th-century
+    observations by up to ~0.7 s (worst case around 1955).
+
+    Skyfield also ships ``historic_deltat.npy`` — semi-annual observed
+    values from 1657 to 1984 compiled from the *Astronomical Almanac*
+    (McCarthy & Babcock 1986) — but the current ``build_delta_t()``
+    function does not incorporate them.
+
+    This function merges the two datasets into a single table that is
+    then passed to ``build_delta_t()``, giving continuous observed
+    coverage from **1657 to ~2027** with a smooth hand-off at the
+    junction (~1973).
+    """
+    import numpy as np
+    from pathlib import Path
+    from skyfield.timelib import build_delta_t
+
+    # Locate Skyfield's bundled data directory
+    import skyfield.data
+
+    data_dir = Path(skyfield.data.__file__).parent
+
+    # --- Load IERS daily table (1973-~2027) ----------------------------------
+    iers_path = data_dir / "iers.npz"
+    iers = dict(np.load(str(iers_path)))
+
+    tt_offset = iers["tt_jd_minus_arange"]
+    n = len(tt_offset)
+    iers_tt = tt_offset + np.arange(n, dtype=np.float64)
+    iers_dt = iers["delta_t_1e7"] / 1e7
+
+    leap_dates = iers["leap_dates"]
+    leap_offsets = iers["leap_offsets"]
+
+    # --- Load historical observed table (1657-1984) --------------------------
+    hist_path = data_dir / "historic_deltat.npy"
+    if not hist_path.exists():
+        # Graceful fallback: if the file is missing (unlikely but
+        # possible with a stripped Skyfield install), just use the
+        # standard IERS-only timescale.
+        load = get_loader()
+        return load.timescale()
+
+    hist = np.load(str(hist_path))  # shape (2, 656)
+
+    # --- Merge: keep historic entries strictly before IERS start --------------
+    cutoff_jd = iers_tt[0]
+    mask = hist[0] < cutoff_jd
+    merged_tt = np.concatenate([hist[0][mask], iers_tt])
+    merged_dt = np.concatenate([hist[1][mask], iers_dt])
+
+    # --- Build the composite Delta T function and Timescale ------------------
+    delta_t_func = build_delta_t((merged_tt, merged_dt))
+    return Timescale(delta_t_func, leap_dates, leap_offsets)
+
+
 def get_timescale() -> Timescale:
     """
     Get or create the Skyfield timescale object.
@@ -368,12 +430,28 @@ def get_timescale() -> Timescale:
         Timescale: Skyfield timescale for time conversions (UTC, TT, etc.)
 
     Note:
-        Automatically downloads IERS data for Delta T calculations if needed.
+        Uses an enhanced timescale that merges Skyfield's bundled
+        historical Delta T observations (1657-1984, from the
+        *Astronomical Almanac*) with the modern IERS daily table
+        (1973-~2027), providing continuous observed Delta T coverage
+        from 1657 onwards.  For dates outside this range, Skyfield's
+        standard Stephenson, Morrison & Hohenkerk (2016) long-term
+        model is used automatically.
     """
     global _TS
     if _TS is None:
-        load = get_loader()
-        _TS = load.timescale()
+        try:
+            _TS = _build_enhanced_timescale()
+        except Exception:
+            # If anything goes wrong with the merge, fall back to the
+            # standard Skyfield timescale so the library never fails to
+            # initialise.
+            get_logger().warning(
+                "Failed to build enhanced timescale with historical "
+                "Delta T data; falling back to standard Skyfield timescale."
+            )
+            load = get_loader()
+            _TS = load.timescale()
     return _TS
 
 

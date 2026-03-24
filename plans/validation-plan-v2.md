@@ -220,7 +220,7 @@ structured tests miss.
 
 - [x] Generate reference outputs for 133 representative calculations
 - [x] Store as JSON golden files in `tests/golden/golden_reference.json`
-- [x] CI runs golden file comparison on every commit (`.github/workflows/ci.yml`)
+- [x] Golden file comparison runs as part of the test suite
 - [x] Any difference triggers explicit test failure (tolerance 1e-8 degrees)
 
 ### 7.2 Performance Benchmarks
@@ -231,9 +231,9 @@ structured tests miss.
 - [x] `houses`: ~95 µs (Placidus), ~69 µs (Equal/Whole Sign)
 - [x] LEB speedup ratios: Sun 10.5x, Moon 19.9x, Mars 12.2x, Jupiter 10.0x
 
-### 7.3 Hyper-Validation CI Integration
+### 7.3 Hyper-Validation
 
-- [x] CI workflow configured for hyper-validation (manual dispatch)
+- [x] Hyper-validation configured
 - [x] Sections A–AC excluding J (occultations) and U (heliacal)
 - [x] Configured with 30-minute timeout
 - [x] 0 FAIL gate via JSON report artifact upload
@@ -259,4 +259,4 @@ structured tests miss.
 - No crashes from any fuzz input
 - Eclipse timing within 60 seconds of NASA catalog
 - Thread safety verified under 50-thread stress
-- Golden file infrastructure in CI
+- Golden file infrastructure operational

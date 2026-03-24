@@ -1,17 +1,24 @@
 """
-Tests to verify Delta T implementation matches Stephenson/Morrison/Hohenkerk 2016 model.
+Tests to verify Delta T implementation.
 
-The SMH 2016 model is published in:
+For dates before ~1973, libephemeris uses historical observed Delta T
+values from the *Astronomical Almanac* (McCarthy & Babcock 1986),
+bundled in Skyfield's ``historic_deltat.npy`` (semi-annual, 1657-1984).
+
+For ~1973 onward, daily IERS observed values are used (from Skyfield's
+``iers.npz``).
+
+For dates outside both tables, Skyfield's implementation of the
+Stephenson, Morrison & Hohenkerk (2016) long-term model is used:
+    - Cubic spline interpolation from Table S15 for 720 BC to ~AD 2015
+    - Long-term parabolic extrapolation: DeltaT = -320 + 32.5 * u^2
+      where u = (year - 1825) / 100
+
+References:
     Stephenson F.R., Morrison L.V., Hohenkerk C.Y. (2016).
     "Measurement of the Earth's rotation: 720 BC to AD 2015."
     Proceedings of the Royal Society A, 472: 20160404.
     https://doi.org/10.1098/rspa.2016.0404
-
-The model uses:
-    - Cubic spline interpolation from Table S15 for 720 BC to ~AD 2015
-    - Long-term parabolic extrapolation: DeltaT = -320 + 32.5 * u^2
-      where u = (year - 1825) / 100
-    - IERS observations for recent/modern dates
 """
 
 import pytest
@@ -50,10 +57,12 @@ class TestDeltaTSMH2016LongTermParabola:
 
 class TestDeltaTKnownHistoricalValues:
     """
-    Test Delta T against known historical values from SMH 2016 Table S15.
+    Test Delta T against known historical values.
 
-    These values are approximate as the actual implementation uses splines
-    that smoothly interpolate between data points.
+    For ancient dates (pre-1657), values come from the Stephenson,
+    Morrison & Hohenkerk (2016) long-term model.  For 1657-1972,
+    values come from the *Astronomical Almanac* observed data.
+    For modern dates, values come from IERS observations.
     """
 
     @pytest.mark.unit
@@ -66,12 +75,12 @@ class TestDeltaTKnownHistoricalValues:
             (0, 10580, 300),  # Year 0: ~2.9 hours
             (500, 5710, 200),  # Year 500: ~1.6 hours
             (1000, 1570, 100),  # Year 1000: ~26 minutes
-            (1500, 291, 50),  # Year 1500: ~4.9 minutes (actual Skyfield value)
-            # Modern era - smaller Delta T with better measurements
-            (1800, 18.2, 2),  # Year 1800: ~18 seconds (actual Skyfield value)
-            (1900, -2.8, 2),  # Year 1900: ~-3 seconds
-            (1950, 29.1, 2),  # Year 1950: ~29 seconds
-            (2000, 63.8, 2),  # Year 2000: ~64 seconds
+            (1500, 291, 50),  # Year 1500: ~4.9 minutes
+            # Modern era - observed values from Astronomical Almanac
+            (1800, 12.5, 2),  # Year 1800: ~12.5 seconds (AA observed)
+            (1900, -2.7, 2),  # Year 1900: ~-2.7 seconds (AA observed)
+            (1950, 29.15, 2),  # Year 1950: ~29 seconds (AA observed)
+            (2000, 63.8, 2),  # Year 2000: ~64 seconds (IERS)
         ],
     )
     def test_historical_delta_t(self, year, expected_dt_seconds, tolerance):
@@ -171,7 +180,7 @@ class TestDeltaTModelProperties:
 
 
 class TestDeltaTUsesSkyfieldModel:
-    """Verify libephemeris uses Skyfield's SMH 2016 implementation."""
+    """Verify libephemeris uses Skyfield's timescale for Delta T."""
 
     @pytest.mark.unit
     def test_delta_t_uses_skyfield(self):
@@ -196,13 +205,16 @@ class TestDeltaTUsesSkyfieldModel:
         )
 
     @pytest.mark.unit
-    def test_delta_t_matches_skyfield_various_dates(self):
-        """Delta T should match Skyfield across various dates."""
+    def test_delta_t_matches_skyfield_modern_dates(self):
+        """Delta T should match Skyfield for dates within IERS daily table (1973+)."""
         from skyfield.api import load
 
         ts = load.timescale()
 
-        test_years = [1800, 1900, 1950, 1980, 2000, 2010, 2020]
+        # Only test dates within the IERS daily table (~1973-2027) where
+        # both our enhanced timescale and the standard Skyfield timescale
+        # use the same underlying IERS data.
+        test_years = [1980, 2000, 2010, 2020]
 
         for year in test_years:
             jd = ephem.swe_julday(year, 6, 15, 12.0)
@@ -214,6 +226,26 @@ class TestDeltaTUsesSkyfieldModel:
             assert dt_lib == pytest.approx(dt_skyfield, abs=0.01), (
                 f"Year {year}: libephemeris ({dt_lib:.2f}s) != Skyfield ({dt_skyfield:.2f}s)"
             )
+
+    @pytest.mark.unit
+    def test_delta_t_historical_uses_observed_data(self):
+        """For 1657-1972, Delta T should use observed Astronomical Almanac data,
+        which is more accurate than Skyfield's default S15 spline for this period."""
+        from skyfield.api import load
+
+        ts_default = load.timescale()
+
+        # At 1955, the S15 spline gives ~30.4s but the AA observed value is 31.07s
+        jd_1955 = ephem.swe_julday(1955, 1, 1, 12.0)
+        dt_lib = ephem.swe_deltat(jd_1955) * 86400
+        t = ts_default.ut1_jd(jd_1955)
+        dt_skyfield_default = t.delta_t
+
+        # Our value should be closer to the AA observed value (31.07s)
+        assert abs(dt_lib - 31.07) < abs(dt_skyfield_default - 31.07), (
+            f"libephemeris ({dt_lib:.3f}s) should be closer to AA observed "
+            f"(31.07s) than default Skyfield ({dt_skyfield_default:.3f}s)"
+        )
 
 
 class TestDeltaTDocumentation:

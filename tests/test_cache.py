@@ -79,7 +79,6 @@ class TestNutationCache:
         assert result1 == result2
 
         # Cache hit should be significantly faster (at least 10x)
-        # Allow some tolerance for CI variability
         if time1 > 0.0001:  # Only check if first call took measurable time
             assert time2 < time1, "Cache hit should be faster than cache miss"
 
