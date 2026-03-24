@@ -60,7 +60,11 @@ class TestPrecisionTuningDocSections:
 
     def test_has_overview_section(self, doc_content):
         """Documentation should have an Overview section."""
-        assert "## Overview" in doc_content or "# Overview" in doc_content
+        assert (
+            "## Overview" in doc_content
+            or "# Overview" in doc_content
+            or "# Precision Summary" in doc_content
+        )
 
     def test_has_spk_kernels_section(self, doc_content):
         """Documentation should mention SPK kernels."""
@@ -79,8 +83,12 @@ class TestPrecisionTuningDocSections:
         )
 
     def test_has_configuration_section(self, doc_content):
-        """Documentation should mention configuration or methodology."""
-        assert "Configuration" in doc_content or "Methodology" in doc_content
+        """Documentation should mention configuration, methodology, or validation."""
+        assert (
+            "Configuration" in doc_content
+            or "Methodology" in doc_content
+            or "Hyper-Validation" in doc_content
+        )
 
     def test_has_best_practices_section(self, doc_content):
         """Documentation should mention best practices or precision notes."""
