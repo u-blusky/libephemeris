@@ -48,15 +48,18 @@ class TestOrbitMaxMinTrueDistanceBasic:
         assert min_dist < max_dist
 
     @pytest.mark.unit
-    def test_sun_returns_zeros_for_max_min(self):
-        """Sun should return 0.0 for max/min as it has no geocentric orbit."""
+    def test_sun_returns_earth_orbit_distances(self):
+        """Sun max/min should reflect Earth's orbital eccentricity (~0.983-1.017 AU)."""
         jd = 2451545.0
         result = ephem.orbit_max_min_true_distance(jd, SE_SUN, 0)
 
-        assert result[0] == 0.0  # max
-        assert result[1] == 0.0  # min
+        max_dist, min_dist, true_dist = result
+        # Earth's aphelion (~1.017 AU) and perihelion (~0.983 AU)
+        assert 1.01 < max_dist < 1.02, f"Sun max dist {max_dist} should be ~1.017 AU"
+        assert 0.98 < min_dist < 0.99, f"Sun min dist {min_dist} should be ~0.983 AU"
+        assert min_dist < max_dist
         # true_dist is the current Earth-Sun distance (~1 AU)
-        assert 0.98 < result[2] < 1.02
+        assert 0.98 < true_dist < 1.02
 
     @pytest.mark.unit
     def test_earth_returns_zeros_for_max_min(self):
