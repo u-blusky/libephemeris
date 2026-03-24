@@ -12,6 +12,9 @@ de421.bsp
 swisseph
 stuff
 
+# Hypothesis test database
+.hypothesis/
+
 # Coverage reports
 .coverage
 .coverage.*
