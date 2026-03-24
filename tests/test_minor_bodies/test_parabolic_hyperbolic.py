@@ -49,13 +49,15 @@ class TestEllipticKeplerEquation:
         )
 
     def test_elliptic_circular_orbit(self):
-        """For circular orbit (e=0), E should equal M."""
+        """For circular orbit (e=0), E should equal M (modulo 2π)."""
         for M_deg in [0, 45, 90, 135, 180, 225, 270, 315]:
             M = math.radians(M_deg)
             E = solve_kepler_equation_elliptic(M, 0.0)
-            assert abs(E - M) < 1e-10, (
-                f"E should equal M for circular orbit at M={M_deg}°"
-            )
+            # The solver normalizes M to [-π, π], so E may differ by 2π
+            diff = abs(E - M) % (2 * math.pi)
+            if diff > math.pi:
+                diff = 2 * math.pi - diff
+            assert diff < 1e-10, f"E should equal M for circular orbit at M={M_deg}°"
 
 
 class TestHyperbolicKeplerEquation:

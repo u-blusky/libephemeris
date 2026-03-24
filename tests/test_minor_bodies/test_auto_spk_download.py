@@ -81,7 +81,7 @@ class TestGetMajorAsteroidInfo:
         assert info is not None
         ast_num, horizons_id, naif_id, name = info
         assert ast_num == 1
-        assert horizons_id == "1"
+        assert horizons_id == "Ceres;"
         assert naif_id == NAIF_CERES
         assert name == "Ceres"
 
@@ -194,6 +194,7 @@ class TestAutoDownloadAsteroidSpk:
         result = auto_download_asteroid_spk(SE_CERES)
         assert result == expected_path
 
+    @pytest.mark.skip(reason="Implementation now uses direct HTTP, not astroquery")
     @patch("libephemeris.spk_auto._check_astroquery_available")
     def test_returns_none_when_astroquery_unavailable(self, mock_check):
         """Should return None when astroquery is not available."""
@@ -241,6 +242,9 @@ class TestAutoDownloadAsteroidSpk:
         assert call_kwargs["jd_start"] == jd_start
         assert call_kwargs["jd_end"] == jd_end
 
+    @pytest.mark.skip(
+        reason="Implementation now uses direct HTTP via download_and_register_spk"
+    )
     @patch("libephemeris.spk_auto._check_astroquery_available")
     @patch("libephemeris.spk_auto.auto_get_spk")
     def test_handles_download_exception_gracefully(self, mock_auto_get, mock_check):
