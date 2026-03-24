@@ -31,7 +31,7 @@ DE440/DE441 via Skyfield.
 - **[Technical Guide](leb/guide.md)** — Complete LEB reference: format specification, reader, pipelines, commands
 - **[Algorithms & Theory](leb/algorithms.md)** — Chebyshev polynomials, Clenshaw algorithm, gravitational deflection, COB corrections, error analysis
 - **[Comparison Testing](leb/testing.md)** — Running and interpreting LEB vs Skyfield comparison tests
-- **[Design](leb/design.md)** — Original implementation plan (historical — superseded by Technical Guide)
+
 
 ## Development
 

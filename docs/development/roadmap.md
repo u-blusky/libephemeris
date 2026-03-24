@@ -2,7 +2,7 @@
 
 Current project status and remaining tasks for LibEphemeris.
 
-> Last updated: February 2026
+> Last updated: March 2026
 
 ## Table of Contents
 

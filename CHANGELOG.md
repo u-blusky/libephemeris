@@ -34,6 +34,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `examples/fixed_stars.py` `swe_fixstar_mag()` return type unpacking
 - Fixed `docs/cookbook.py` `sol_eclipse_when_glob` kwarg names and `sol_eclipse_how` geopos tuple
 
+### Changed
+
+- Rewrote `docs/PRECISION.md` with accurate numbers matching measured precision from hyper-validation (previous values were significantly outdated)
+- Updated `AGENTS.md` to remove reference to deleted `docs/leb/design.md`
+- Updated `docs/README.md` to remove link to deleted `docs/leb/design.md`
+- Updated `docs/development/architecture-overview.md` to redirect LEB design references to `docs/leb/guide.md`
+- Updated `docs/development/roadmap.md` last-updated date to March 2026
+
+### Removed
+
+- Removed `docs/leb/design.md` (61K historical document, superseded by `docs/leb/guide.md`)
+- Removed `docs/leb/leb_precision_v3.md` (abandoned, superseded by `docs/leb/algorithms.md`)
+- Removed `releases/v0.23.0.md` (duplicate of `release-notes/v0.23.0.md`)
+- Removed `plans/hyper-validation-plan.md` (completed)
+- Removed `plans/pyswisseph-compat-verification.md` (completed, all items verified)
+- Removed `plans/hyper-validation-report.json`, `plans/hyper-validation-run5.json`, `plans/hyper-validation-run6.json` (old run data)
+
+### Added
+
+- Created `plans/validation-plan-v2.md` — next-phase validation plan covering JPL Horizons cross-validation, LEB accuracy sweep, property-based testing, fuzz testing, eclipse catalog validation, concurrency stress testing, and regression infrastructure
+
 ## [0.26.0] - 2026-03-23
 
 ### Changed

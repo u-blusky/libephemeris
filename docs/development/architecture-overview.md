@@ -2,7 +2,7 @@
 
 Codebase metrics, performance bottleneck analysis, and future development vision
 for LibEphemeris. For the implemented LEB binary ephemeris system, see the
-[LEB Technical Guide](../leb/guide.md) and [LEB Design](../leb/design.md).
+[LEB Technical Guide](../leb/guide.md).
 
 ---
 
@@ -193,7 +193,7 @@ in the critical path.
 ## 3. Future Rust Port via PyO3
 
 > **Note:** The LEB-reader-only Rust port strategy is also documented in
-> [LEB Design](../leb/design.md).
+> the [LEB Technical Guide](../leb/guide.md).
 
 This section describes a vision for porting the full library (~7,800 lines)
 to Rust, beyond just the LEB reader.

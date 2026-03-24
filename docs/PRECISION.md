@@ -1,78 +1,94 @@
-# Precision Report
+# Precision Summary
 
-## Overview
+Compact precision summary for LibEphemeris vs pyswisseph 2.10.03.
+For full details, models, and methodology see [reference/precision.md](reference/precision.md)
+and [reference/swisseph-comparison.md](reference/swisseph-comparison.md).
 
-LibEphemeris achieves high precision for all calculation types by using NASA JPL DE440/DE441 ephemeris data via Skyfield. This document summarizes measured precision across all supported calculation categories.
+## Planetary Positions (geocentric ecliptic, 1550–2650 CE)
 
-## Methodology
+| Body | Mean Diff | Max Diff | Notes |
+|------|-----------|----------|-------|
+| Sun | 0.04" | 0.20" | DE440 vs DE431 |
+| Moon | 0.70" | 3.32" | Numerical vs analytical lunar theory |
+| Mercury | 0.05" | 0.32" | |
+| Venus | 0.08" | 0.33" | |
+| Mars | 0.06" | 0.58" | |
+| Jupiter | 0.12" | 0.44" | Includes COB correction |
+| Saturn | 0.13" | 0.51" | Includes COB correction |
+| Uranus | 0.23" | 0.50" | |
+| Neptune | 0.24" | 1.17" | |
+| Pluto | 0.26" | 0.75" | Includes COB correction |
 
-Precision is measured by comparing libephemeris output against pyswisseph across randomized dates spanning 1900-2050. All measurements use 500 date samples with reproducible random seeds.
+All planets sub-arcsecond. Moon ~3" max reflects different lunar models (JPL DE440 numerical integration vs ELP/MPP02 + DE431).
 
-## Planetary Positions
+## Velocities
 
-### Geocentric Ecliptic Longitude and Latitude
-
-| Body | Mean Diff (arcsec) | Max Diff (arcsec) | Notes |
-|------|-------------------|-------------------|-------|
-| Sun | < 0.001 | < 0.01 | DE440 vs DE431 |
-| Moon | < 0.01 | < 0.1 | Numerical vs analytical theory |
-| Mercury | < 0.001 | < 0.01 | |
-| Venus | < 0.001 | < 0.01 | |
-| Mars | < 0.001 | < 0.01 | |
-| Jupiter | < 0.001 | < 0.01 | |
-| Saturn | < 0.001 | < 0.01 | |
-| Uranus | < 0.001 | < 0.01 | |
-| Neptune | < 0.001 | < 0.01 | |
-| Pluto | < 0.01 | < 0.1 | |
-
-### Planetary Velocities
-
-Velocity precision is typically < 0.001 deg/day for all major planets.
+| Component | Max Diff |
+|-----------|----------|
+| Longitude speed | < 0.003°/day |
+| Latitude speed | < 0.004°/day |
+| Distance speed | < 0.0001 AU/day |
 
 ## Lunar Points
 
-| Point | Mean Diff (arcsec) | Max Diff (arcsec) |
-|-------|-------------------|-------------------|
-| Mean Node | < 0.01 | < 0.1 |
-| True Node | < 0.1 | < 1.0 |
-| Mean Lilith | 12 arcsec | ~30 arcsec |
-| True Lilith | 52 arcsec | 235 arcsec |
-
-### True Lilith Precision
-
-True Lilith (osculating lunar apogee) shows larger differences due to different calculation methods:
-- Mean difference: ~52 arcsec (~0.015 degrees)
-- Maximum difference: ~235 arcsec (~0.065 degrees)
-
-This is sub-arcminute precision for mean difference. See [TRUE_LILITH_METHODS.md](TRUE_LILITH_METHODS.md) for details on the eccentricity vector method used.
+| Point | Max Diff | Independent Verification |
+|-------|----------|--------------------------|
+| Mean Node | < 0.001° | — |
+| True Node | < 0.01" | Verified vs JPL Horizons to machine precision |
+| Mean Lilith | < 0.015" (lon) | Latitude ~20" systematic (different node formulas) |
+| True Lilith | < 0.5" | Both libraries ~240" from Horizons (inherent two-body limit) |
+| Interpolated Apogee | ~0.36° | Genuine algorithm difference (JPL DE440 vs ELP2000) |
+| Interpolated Perigee | ~2.6° | JPL DE440 physical passages vs truncated ELP2000 |
 
 ## House Cusps
 
-House cusp positions agree to < 0.0001 arcsec for all supported house systems (Placidus, Koch, Equal, Whole Sign, Regiomontanus, Campanus, Porphyry, Morinus, and others).
-
-## Ayanamsha
-
-All supported ayanamshas (Lahiri, Fagan-Bradley, Raman, True Citra, and 40+ others) agree to < 0.0001 degrees.
-
-## Heliocentric Positions
-
-Heliocentric longitude precision is < 0.01 arcsec for all major planets.
-
-## Time Functions
-
-- Delta T: agrees within measurement precision for dates 1900-2040
-- Julian Day conversions: exact agreement
-
-## Minor Bodies
-
-With SPK kernel auto-download enabled, minor bodies (Chiron, Ceres, Pholus, Vesta, Juno, Pallas, Eris, Sedna, etc.) achieve < 0.01 arcsec precision.
-
-Without SPK kernels, Keplerian propagation provides ~10-30 arcsec precision for main belt asteroids.
-
-## Hypothetical Planets
-
-Uranian hypothetical planets (Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon) achieve < 1 arcsec precision using Keplerian propagation from published orbital elements.
+< 0.02" for all 24 supported house systems, tested at 11 global locations.
+Iterative systems (Placidus, Koch) use 10⁻⁷° convergence threshold.
 
 ## Fixed Stars
 
-All 113 fixed stars in the catalog use Hipparcos/van Leeuwen 2007 proper motion values, achieving < 1 arcsec agreement for the epoch range 1900-2100.
+116 stars from Hipparcos catalog with van Leeuwen 2007 proper motions.
+Max difference: 0.51" (Rigil Kentaurus — nearest star, parallax not modeled).
+98% of 101 comparable stars within 0.5". Two catalog bugs found and fixed
+(Algedi wrong component, Asellus Borealis wrong HIP number).
+
+## Ayanamsha
+
+- Standard modes (Lahiri, Fagan-Bradley, Raman): < 0.0002°
+- Star-based modes (True Citra, True Revati): < 0.006°
+
+## Eclipses
+
+- Solar eclipse timing: < 6 seconds
+- Lunar eclipse timing: < 8 seconds
+- Rise/set/transit: < 30 seconds
+
+## Delta T
+
+- Modern (1900–2025): < 1 second
+- Historical (< 1700): up to ~187 seconds (different models: SMH 2016 vs E&M 2006)
+- Future (> 2050): grows with extrapolation divergence
+
+## Minor Bodies
+
+- With SPK kernels: sub-arcsecond (matching JPL Horizons)
+- Keplerian fallback: ~10–30" for main belt asteroids near epoch, degrees over decades
+
+## Hypothetical Planets
+
+Uranian hypothetical planets: < 1" (Keplerian from published elements).
+
+## Heliocentric / Barycentric / Equatorial / XYZ
+
+| Mode | Max Diff |
+|------|----------|
+| Heliocentric | < 0.0004° (1.1") |
+| Barycentric (non-Sun) | < 0.001° |
+| Equatorial RA/Dec | < 0.0005° (1.7") |
+| XYZ Cartesian | < 0.00005 AU |
+
+## Hyper-Validation
+
+4400+ comparison rounds across 29 API sections:
+**3947 PASS, 441 KNOWN, 0 FAIL, 12 SKIP**.
+All divergences documented in [divergences.md](divergences.md).
