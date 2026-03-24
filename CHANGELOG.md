@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `examples/fixed_stars.py` `swe_fixstar_mag()` return type unpacking
 - Fixed `docs/cookbook.py` `sol_eclipse_when_glob` kwarg names and `sol_eclipse_how` geopos tuple
 
+### Added
+
+- Eclipse catalog validation against NASA Five Millennium Canon (§5): 20 solar eclipses (2001–2020), 20 lunar eclipses (2001–2022), 10 future solar + 10 future lunar eclipses — all 63 tests pass within 60s timing tolerance using proper TD→UT conversion
+
 ### Changed
 
 - Rewrote `docs/PRECISION.md` with accurate numbers matching measured precision from hyper-validation (previous values were significantly outdated)
