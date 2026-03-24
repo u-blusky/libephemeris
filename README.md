@@ -15,8 +15,8 @@ A pure Python astronomical ephemeris library based on NASA JPL data. Designed as
 - Uses NASA JPL ephemerides (DE440/DE441) via Skyfield
 - Uses modern IAU standards (ERFA/pyerfa)
 
-> [!WARNING]
-> **Pre-Alpha** -- The public API may change without notice.
+> [!NOTE]
+> **Alpha 1.0.0** -- API is stabilizing. Breaking changes will be documented in the changelog.
 
 ---
 
@@ -505,4 +505,4 @@ Generated files are saved in the workspace root:
 
 ## License
 
-LGPL-3.0. See `LICENSE`.
+AGPL-3.0. See `LICENSE`.

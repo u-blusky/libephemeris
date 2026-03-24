@@ -56,8 +56,8 @@ The git history of this repository reflects this progression transparently.
 
 ## License
 
-LibEphemeris is distributed under the **GNU Lesser General Public License v3**
-(LGPL-3.0-only). See the [LICENSE](LICENSE) file for the full text.
+LibEphemeris is distributed under the **GNU Affero General Public License v3**
+(AGPL-3.0-only). See the [LICENSE](LICENSE) file for the full text.
 
 This project has no license dependency on, and no license obligation toward,
 the Swiss Ephemeris or Astrodienst AG.
