@@ -39,7 +39,22 @@ at the cost of speed and strict numerical agreement with Swiss Ephemeris.
 - **Slower than Swiss Ephemeris.** Swiss is C; LibEphemeris is Python (see Performance).
 
 Methodology and rationale: `docs/methodology/overview.md`.
-Precision measurements: `docs/reference/precision.md`.
+
+### Precision at a glance
+
+Measured against pyswisseph 2.10 across 4,400+ comparison rounds. Full report: [`docs/PRECISION.md`](docs/PRECISION.md).
+
+| Category | Typical | Max | Notes |
+|----------|---------|-----|-------|
+| Planets (Sun-Pluto) | 0.04-0.26" | 0.75" | Sub-arcsecond, all planets |
+| Moon | 0.70" | 3.32" | Different lunar models (DE440 vs ELP) |
+| House cusps | < 0.01" | 0.02" | All 24 systems tested |
+| Fixed stars | < 0.1" | 0.51" | 116 Hipparcos stars |
+| Solar eclipses | — | < 6s | Timing precision |
+| Lunar eclipses | — | < 8s | Timing precision |
+| Ayanamsha | < 0.001° | 0.006° | 43 sidereal modes |
+
+**Hyper-validation: 3,947 PASS, 441 KNOWN, 0 FAIL.** All divergences [documented](docs/divergences.md).
 
 ---
 
@@ -307,24 +322,6 @@ SPK kernel > auto-download SPK > REBOUND/ASSIST > Keplerian.
 
 See `docs/methodology/rebound-integration.md` for details.
 
-### Optional Dependencies
-
-LibEphemeris has several optional dependencies for enhanced functionality:
-
-| Extra     | Description           | Dependencies        |
-| --------- | --------------------- | ------------------- |
-| `[stars]` | Star catalog building | `astropy`           |
-| `[nbody]` | N-body integration    | `rebound`, `assist` |
-| `[all]`   | All optional features | All above           |
-
-```bash
-pip install libephemeris[stars]  # For star catalog building via astropy
-pip install libephemeris[nbody]  # For REBOUND/ASSIST n-body fallback
-pip install libephemeris[all]    # Install all optional dependencies
-```
-
-**Note:** `pyerfa` and `astroquery` are required dependencies. `pyerfa` provides IAU 2006/2000A precession-nutation models; `astroquery` enables automatic SPK downloads from JPL Horizons.
-
 ---
 
 ## Thread safety
@@ -344,23 +341,28 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 
 ## Docs
 
-- `docs/methodology/overview.md` (computational methodology, comparison with Swiss Ephemeris)
-- `docs/reference/precision.md` (scientific models, measured precision, references)
-- `docs/reference/swisseph-comparison.md` (exhaustive comparison vs pyswisseph, 1,619 tests)
-- `docs/divergences.md` (all known divergences from pyswisseph, with causes and magnitudes)
-- `docs/guides/migration-guide.md` (pyswisseph -> libephemeris)
-- `docs/reference/house-systems.md`
-- `docs/reference/ayanamsha.md`
-- `docs/development/testing.md`
-- `docs/methodology/lunar-apsides.md` (lunar apsides methodology)
-- `docs/methodology/interpolated-perigee.md` (perigee calibration method and precision)
-- `docs/methodology/interpolated-apogee.md` (apogee methodology)
-- `docs/methodology/true-lilith.md` (True Lilith correction methods)
-- `docs/methodology/planet-centers-spk.md` (planet centers SPK system)
-- `docs/guides/precision-tuning.md` (precision tuning guide)
-- `docs/methodology/pyerfa-integration.md` (pyerfa integration benefits)
-- `docs/methodology/rebound-integration.md` (REBOUND n-body integration benefits)
-- `docs/leb/guide.md` (binary ephemeris format and performance guide)
+**Getting started:**
+[Migration guide](docs/guides/migration-guide.md) ·
+[Precision tuning](docs/guides/precision-tuning.md)
+
+**Reference:**
+[Precision report](docs/reference/precision.md) ·
+[Swiss Ephemeris comparison](docs/reference/swisseph-comparison.md) (1,619 tests) ·
+[Known divergences](docs/divergences.md) ·
+[House systems](docs/reference/house-systems.md) ·
+[Ayanamsha modes](docs/reference/ayanamsha.md)
+
+**Methodology:**
+[Overview](docs/methodology/overview.md) ·
+[Planet centers](docs/methodology/planet-centers-spk.md) ·
+[Lunar apsides](docs/methodology/lunar-apsides.md) ·
+[True Lilith](docs/methodology/true-lilith.md) ·
+[pyerfa integration](docs/methodology/pyerfa-integration.md) ·
+[REBOUND integration](docs/methodology/rebound-integration.md) ·
+[LEB format](docs/leb/guide.md)
+
+**Development:**
+[Testing](docs/development/testing.md)
 
 ---
 
@@ -452,9 +454,10 @@ All development tasks use [poethepoet](https://poethepoet.naberhaus.dev/) (`poe`
 | `poe coverage`            | Fast tests with coverage report                           |
 | `poe coverage:full`       | All tests with coverage report                            |
 
-### Tier diagnostics
+<details>
+<summary><strong>Advanced: diagnostics, data generation, calibration</strong></summary>
 
-Run diagnostic tables showing all celestial bodies with coordinates, velocities, and data source for each precision tier:
+#### Tier diagnostics
 
 | Command             | Description                                     |
 | ------------------- | ----------------------------------------------- |
@@ -462,44 +465,27 @@ Run diagnostic tables showing all celestial bodies with coordinates, velocities,
 | `poe diag:medium`   | Diagnostic for medium tier (1550-2650)          |
 | `poe diag:extended` | Diagnostic for extended tier (-13200 to +17191) |
 
-### SPK downloads (dev)
+#### Data generation
 
-Download SPK kernels for minor bodies directly (without the full CLI tier setup):
+Generate `planet_centers_*.bsp` files (requires `spiceypy >= 6.0.0`):
 
-| Command                     | Description                                           |
-| --------------------------- | ----------------------------------------------------- |
-| `poe spk:download:base`     | SPK for base tier range (1850-2150)                   |
-| `poe spk:download:medium`   | SPK for medium tier range (1900-2100)                 |
-| `poe spk:download:extended` | Max-range SPK files (1600-2500, single file per body) |
+| Command                                | Description                            | Download |
+| -------------------------------------- | -------------------------------------- | -------- |
+| `poe generate-planet-centers:base`     | Base tier (1850-2150)                  | ~500 MB  |
+| `poe generate-planet-centers:medium`   | Medium tier (1550-2650)                | ~4 GB    |
+| `poe generate-planet-centers:extended` | Extended tier (partial)                | ~6.5 GB  |
+| `poe generate-lunar-corrections`       | Lunar correction tables (needs de441)  | —        |
 
-### Data generation
+#### Calibration
 
-Generate `planet_centers_*.bsp` files for each precision tier. Requires `spiceypy >= 6.0.0`.
+| Command                       | Description                                         |
+| ----------------------------- | --------------------------------------------------- |
+| `poe calibrate-perigee`       | Full calibration, 1500-2500 CE (~30 min, needs de441) |
+| `poe calibrate-perigee:quick` | Quick validation, 100-year range (~2 min)           |
 
-| Command                                | Description                                               | Download |
-| -------------------------------------- | --------------------------------------------------------- | -------- |
-| `poe generate-planet-centers:base`     | Generate for base tier (1850-2150)                        | ~500 MB  |
-| `poe generate-planet-centers:medium`   | Generate for medium tier (1550-2650)                      | ~4 GB    |
-| `poe generate-planet-centers:extended` | Generate for extended tier (partial)                      | ~6.5 GB  |
-| `poe generate-planet-centers:all`      | Generate all 3 tiers                                      | ~11 GB   |
-| `poe generate-lunar-corrections`       | Regenerate lunar correction tables (requires `de441.bsp`) | —        |
+See `docs/methodology/interpolated-perigee.md` for details.
 
-### Calibration
-
-Calibrate perturbation series coefficients against JPL DE441 ephemeris. See `docs/methodology/interpolated-perigee.md` for full details.
-
-| Command                       | Description                                                            |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `poe calibrate-perigee`       | Full perigee calibration, 1500-2500 CE (~30 min, requires `de441.bsp`) |
-| `poe calibrate-perigee:quick` | Quick validation run, 100-year range (~2 min)                          |
-
-After calibration, update coefficients in `lunar.py`, sync `generate_lunar_corrections.py`, and run `poe generate-lunar-corrections` followed by `poe test:lunar:perigee`.
-
-Generated files are saved in the workspace root:
-
-- `planet_centers_base.bsp` (~15-20 MB)
-- `planet_centers_medium.bsp` (~40-50 MB)
-- `planet_centers_extended.bsp` (~80-100 MB)
+</details>
 
 ---
 
