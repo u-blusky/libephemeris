@@ -146,6 +146,7 @@ import math
 import warnings
 from typing import Tuple
 from .state import get_timescale, get_planets
+from .exceptions import EphemerisRangeError
 
 try:
     from .lunar_corrections import (
@@ -1710,7 +1711,7 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
         angular momentum vector directly in the true ecliptic frame of date:
 
         **Step 1: Obtain Moon State Vectors in Ecliptic Frame**
-            - Query JPL DE ephemeris (DE421/DE440) via Skyfield
+            - Query JPL DE ephemeris (DE440/DE441) via Skyfield
             - Get geocentric position r and velocity v in the true ecliptic
               frame of date (Skyfield's ``ecliptic_frame``)
             - This frame automatically includes IAU 2006 precession and
@@ -2268,14 +2269,14 @@ def _get_ephemeris_range() -> Tuple[float, float]:
                 start_time, end_time = segment.time_range(ts)
                 min_jd = min(min_jd, float(start_time.tt))
                 max_jd = max(max_jd, float(end_time.tt))
-            except Exception:
+            except (AttributeError, TypeError, ValueError):
                 continue
 
         if min_jd == float("inf"):
             return (2415020.0, 2471184.0)
 
         return (min_jd, max_jd)
-    except Exception:
+    except (AttributeError, TypeError, ValueError, KeyError):
         return (2415020.0, 2471184.0)
 
 
@@ -2378,7 +2379,7 @@ def _sample_osculating_apogee_with_fallback(
             sample_lats.append(lat)
             sample_eccs.append(ecc)
             valid_times.append(sample_jd)
-        except Exception:
+        except (EphemerisRangeError, ValueError, ZeroDivisionError):
             # Skip samples that fail (outside ephemeris range)
             continue
 
@@ -2398,7 +2399,7 @@ def _sample_osculating_apogee_with_fallback(
             try:
                 lon, lat, ecc = calc_true_lilith(jd_tt)
                 return [jd_tt], [lon], [lat], [ecc], 0
-            except Exception:
+            except (EphemerisRangeError, ValueError, ZeroDivisionError):
                 # Even target date fails - re-raise the original error
                 raise
 
@@ -2754,7 +2755,7 @@ def _sample_osculating_perigee_with_fallback(
             sample_lats.append(perigee_lat)
             sample_eccs.append(ecc)
             valid_times.append(sample_jd)
-        except Exception:
+        except (EphemerisRangeError, ValueError, ZeroDivisionError):
             # Skip samples that fail (outside ephemeris range)
             continue
 
@@ -2774,7 +2775,7 @@ def _sample_osculating_perigee_with_fallback(
             try:
                 perigee_lon, perigee_lat, ecc = calc_osculating_perigee(jd_tt)
                 return [jd_tt], [perigee_lon], [perigee_lat], [ecc], 0
-            except Exception:
+            except (EphemerisRangeError, ValueError, ZeroDivisionError):
                 # Even target date fails - re-raise the original error
                 raise
 

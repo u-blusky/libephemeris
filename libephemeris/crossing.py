@@ -35,6 +35,7 @@ References:
 from typing import Callable, Tuple
 
 from .constants import SEFLG_SWIEPH, SEFLG_SPEED, SEFLG_HELCTR, SE_SUN, SE_MOON
+from .exceptions import EphemerisRangeError, CalculationError
 from .planets import swe_calc_ut, swe_calc
 
 # Station detection threshold: speed below this indicates proximity to retrograde station
@@ -327,8 +328,8 @@ def swe_solcross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) -> 
         pos, _ = swe_calc_ut(tjdut, SE_SUN, flags | SEFLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate Sun position: {e}")
+    except (EphemerisRangeError, CalculationError, ValueError) as e:
+        raise RuntimeError(f"Failed to calculate Sun position: {e}") from e
 
     # Calculate angular distance to target (always forward)
     diff = (x2cross - lon_start) % 360.0
@@ -358,10 +359,10 @@ def swe_solcross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) -> 
             pos, _ = swe_calc_ut(jd, SE_SUN, flags | SEFLG_SPEED)
             lon = pos[0]
             speed = pos[3]
-        except Exception as e:
+        except (EphemerisRangeError, CalculationError, ValueError) as e:
             raise RuntimeError(
                 f"Failed to calculate Sun position during iteration: {e}"
-            )
+            ) from e
 
         # Angular difference to target
         diff = (x2cross - lon) % 360.0
@@ -431,8 +432,8 @@ def swe_solcross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> flo
         pos, _ = swe_calc(tjdet, SE_SUN, flags | SEFLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate Sun position: {e}")
+    except (EphemerisRangeError, CalculationError, ValueError) as e:
+        raise RuntimeError(f"Failed to calculate Sun position: {e}") from e
 
     # Calculate angular distance to target (always forward)
     diff = (x2cross - lon_start) % 360.0
@@ -461,10 +462,10 @@ def swe_solcross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> flo
             pos, _ = swe_calc(jd, SE_SUN, flags | SEFLG_SPEED)
             lon = pos[0]
             speed = pos[3]
-        except Exception as e:
+        except (EphemerisRangeError, CalculationError, ValueError) as e:
             raise RuntimeError(
                 f"Failed to calculate Sun position during iteration: {e}"
-            )
+            ) from e
 
         # Angular difference to target
         diff = (x2cross - lon) % 360.0
@@ -523,8 +524,8 @@ def swe_mooncross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) ->
         pos, _ = swe_calc_ut(tjdut, SE_MOON, flags | SEFLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate Moon position: {e}")
+    except (EphemerisRangeError, CalculationError, ValueError) as e:
+        raise RuntimeError(f"Failed to calculate Moon position: {e}") from e
 
     # Calculate initial guess for NEXT crossing
     diff = (x2cross - lon_start) % 360.0
@@ -552,10 +553,10 @@ def swe_mooncross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) ->
             pos, _ = swe_calc_ut(jd, SE_MOON, flags | SEFLG_SPEED)
             lon = pos[0]
             speed = pos[3]
-        except Exception as e:
+        except (EphemerisRangeError, CalculationError, ValueError) as e:
             raise RuntimeError(
                 f"Failed to calculate Moon position during iteration: {e}"
-            )
+            ) from e
 
         # Difference to target
         diff = (x2cross - lon) % 360.0
@@ -627,8 +628,8 @@ def swe_mooncross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> fl
         pos, _ = swe_calc(tjdet, SE_MOON, flags | SEFLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate Moon position: {e}")
+    except (EphemerisRangeError, CalculationError, ValueError) as e:
+        raise RuntimeError(f"Failed to calculate Moon position: {e}") from e
 
     # Calculate initial guess for NEXT crossing
     diff = (x2cross - lon_start) % 360.0
@@ -655,10 +656,10 @@ def swe_mooncross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> fl
             pos, _ = swe_calc(jd, SE_MOON, flags | SEFLG_SPEED)
             lon = pos[0]
             speed = pos[3]
-        except Exception as e:
+        except (EphemerisRangeError, CalculationError, ValueError) as e:
             raise RuntimeError(
                 f"Failed to calculate Moon position during iteration: {e}"
-            )
+            ) from e
 
         # Difference to target
         diff = (x2cross - lon) % 360.0
@@ -784,8 +785,8 @@ def swe_mooncross_node(
         pos, _ = swe_calc(tjdet, SE_MOON, flags | SEFLG_SPEED)
         lat = pos[1]  # ecliptic latitude
         lat_speed = pos[4]  # latitude velocity in degrees/day
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate Moon position: {e}")
+    except (EphemerisRangeError, CalculationError, ValueError) as e:
+        raise RuntimeError(f"Failed to calculate Moon position: {e}") from e
 
     # If latitude velocity is zero or very small, use average value
     if abs(lat_speed) < 0.1:
@@ -822,10 +823,10 @@ def swe_mooncross_node(
             pos, _ = swe_calc(jd, SE_MOON, flags | SEFLG_SPEED)
             lat = pos[1]
             lat_speed = pos[4]
-        except Exception as e:
+        except (EphemerisRangeError, CalculationError, ValueError) as e:
             raise RuntimeError(
                 f"Failed to calculate Moon position during iteration: {e}"
-            )
+            ) from e
 
         # Check convergence (< 0.001 arcsecond for Moon)
         if abs(lat) < NR_TOLERANCE_MOON:
@@ -887,8 +888,8 @@ def swe_cross_ut(
         pos, _ = swe_calc_ut(tjdut, planet, flags | SEFLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate planet position: {e}")
+    except (EphemerisRangeError, CalculationError, ValueError) as e:
+        raise RuntimeError(f"Failed to calculate planet position: {e}") from e
 
     # Estimate typical speed if near zero
     # Geocentric average speeds (°/day) - slower planets need more iterations
@@ -981,10 +982,10 @@ def swe_cross_ut(
             pos, _ = swe_calc_ut(jd, planet, flags | SEFLG_SPEED)
             lon = pos[0]
             speed = pos[3]
-        except Exception as e:
+        except (EphemerisRangeError, CalculationError, ValueError) as e:
             raise RuntimeError(
                 f"Failed to calculate planet position during iteration: {e}"
-            )
+            ) from e
 
         diff = (x2cross - lon) % 360.0
         if diff > 180:
@@ -1121,8 +1122,8 @@ def swe_helio_cross_ut(
         pos, _ = swe_calc_ut(tjdut, planet, helio_flag)
         lon_start = pos[0]
         speed = pos[3]
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate heliocentric planet position: {e}")
+    except (EphemerisRangeError, CalculationError, ValueError) as e:
+        raise RuntimeError(f"Failed to calculate heliocentric planet position: {e}") from e
 
     # Estimate typical heliocentric speed if near zero
     # Heliocentric speeds are different from geocentric due to no retrograde
@@ -1207,10 +1208,10 @@ def swe_helio_cross_ut(
             pos, _ = swe_calc_ut(jd, planet, helio_flag)
             lon = pos[0]
             speed = pos[3]
-        except Exception as e:
+        except (EphemerisRangeError, CalculationError, ValueError) as e:
             raise RuntimeError(
                 f"Failed to calculate heliocentric position during iteration: {e}"
-            )
+            ) from e
 
         diff = (x2cross - lon) % 360.0
         if diff > 180:
@@ -1297,8 +1298,8 @@ def swe_helio_cross(
         pos, _ = swe_calc(tjdet, planet, helio_flag)
         lon_start = pos[0]
         speed = pos[3]
-    except Exception as e:
-        raise RuntimeError(f"Failed to calculate heliocentric planet position: {e}")
+    except (EphemerisRangeError, CalculationError, ValueError) as e:
+        raise RuntimeError(f"Failed to calculate heliocentric planet position: {e}") from e
 
     # Estimate typical heliocentric speed if near zero
     typical_speeds = {
@@ -1379,10 +1380,10 @@ def swe_helio_cross(
             pos, _ = swe_calc(jd, planet, helio_flag)
             lon = pos[0]
             speed = pos[3]
-        except Exception as e:
+        except (EphemerisRangeError, CalculationError, ValueError) as e:
             raise RuntimeError(
                 f"Failed to calculate heliocentric position during iteration: {e}"
-            )
+            ) from e
 
         diff = (x2cross - lon) % 360.0
         if diff > 180:
@@ -1461,7 +1462,7 @@ def is_retrograde(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> boo
     try:
         pos, _ = swe_calc_ut(jd_ut, planet_id, flag | SEFLG_SPEED)
         return pos[3] < 0
-    except Exception:
+    except (EphemerisRangeError, CalculationError, ValueError):
         return False
 
 
@@ -1512,7 +1513,7 @@ def get_station_type(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
         else:
             return "direct"
 
-    except Exception:
+    except (EphemerisRangeError, CalculationError, ValueError):
         return "direct"
 
 

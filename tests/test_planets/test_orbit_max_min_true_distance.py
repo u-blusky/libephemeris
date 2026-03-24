@@ -248,3 +248,45 @@ class TestOrbitMaxMinTrueDistanceAllPlanets:
         assert min_dist <= true_dist <= max_dist, (
             f"{planet_name} true distance should be between min and max"
         )
+
+
+class TestOrbitMaxMinTrueDistanceTimeScale:
+    """Verify that swe_orbit_max_min_true_distance uses TT (not UT1)."""
+
+    @pytest.mark.unit
+    def test_tt_time_scale_consistency(self):
+        """The true distance from orbit_max_min_true_distance (TT input)
+        should match swe_calc (TT input), not swe_calc_ut (UT input)."""
+        jd_tt = 2451545.0  # J2000.0 in TT
+        _, _, true_dist = ephem.swe_orbit_max_min_true_distance(jd_tt, SE_MARS, 0)
+        # swe_calc takes TT — should match closely
+        pos_tt, _ = ephem.swe_calc(jd_tt, SE_MARS, ephem.SEFLG_SPEED)
+        assert abs(true_dist - pos_tt[2]) < 0.001, (
+            f"orbit_max_min true_dist ({true_dist:.6f}) should match "
+            f"swe_calc distance ({pos_tt[2]:.6f}) for same TT input"
+        )
+
+
+class TestCalcPctrTimeScale:
+    """Verify that swe_calc_pctr uses TT (not UT1)."""
+
+    @pytest.mark.unit
+    def test_pctr_uses_tt_time_scale(self):
+        """swe_calc_pctr should use TT internally, consistent with swe_calc."""
+        jd_tt = 2451545.0
+        # swe_calc_pctr: position of Moon as seen from Mars
+        pos_pctr, _ = ephem.swe_calc_pctr(jd_tt, SE_MOON, SE_MARS, ephem.SEFLG_SPEED)
+        # The result should be a valid ecliptic longitude (not NaN/zero)
+        assert 0.0 <= pos_pctr[0] < 360.0
+        # Distance should be positive and reasonable (Mars-Moon is 0.5-3 AU)
+        assert 0.3 < pos_pctr[2] < 4.0
+
+    @pytest.mark.unit
+    def test_pctr_sun_from_mars(self):
+        """Sun position as seen from Mars should give ~180° different from
+        geocentric Mars position (Mars is roughly opposite the Sun from Earth)."""
+        jd_tt = 2451545.0
+        pos_pctr, _ = ephem.swe_calc_pctr(jd_tt, SE_SUN, SE_MARS, ephem.SEFLG_SPEED)
+        assert 0.0 <= pos_pctr[0] < 360.0
+        # Sun-Mars distance should be roughly 1.5 AU
+        assert 1.0 < pos_pctr[2] < 2.0

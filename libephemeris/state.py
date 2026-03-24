@@ -108,6 +108,11 @@ _PRECISION_TIER_ENV_VAR: str = "LIBEPHEMERIS_PRECISION"
 # calculation function internally calls other state-swapping functions.
 _CONTEXT_SWAP_LOCK = threading.RLock()
 
+# Lock to protect lazy initialization of global singletons (_LOADER, _TS, _PLANETS).
+# Prevents race conditions when multiple threads call get_loader/get_timescale/get_planets
+# concurrently before initialization has completed.
+_INIT_LOCK = threading.RLock()
+
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
 _EPHEMERIS_FILE_EXPLICIT: bool = False  # True if set_ephemeris_file() was called
@@ -356,7 +361,9 @@ def get_loader() -> Loader:
     """
     global _LOADER
     if _LOADER is None:
-        _LOADER = Loader(_get_data_dir())
+        with _INIT_LOCK:
+            if _LOADER is None:
+                _LOADER = Loader(_get_data_dir())
     return _LOADER
 
 
@@ -440,18 +447,20 @@ def get_timescale() -> Timescale:
     """
     global _TS
     if _TS is None:
-        try:
-            _TS = _build_enhanced_timescale()
-        except Exception:
-            # If anything goes wrong with the merge, fall back to the
-            # standard Skyfield timescale so the library never fails to
-            # initialise.
-            get_logger().warning(
-                "Failed to build enhanced timescale with historical "
-                "Delta T data; falling back to standard Skyfield timescale."
-            )
-            load = get_loader()
-            _TS = load.timescale()
+        with _INIT_LOCK:
+            if _TS is None:
+                try:
+                    _TS = _build_enhanced_timescale()
+                except Exception:
+                    # If anything goes wrong with the merge, fall back to the
+                    # standard Skyfield timescale so the library never fails to
+                    # initialise.
+                    get_logger().warning(
+                        "Failed to build enhanced timescale with historical "
+                        "Delta T data; falling back to standard Skyfield timescale."
+                    )
+                    load = get_loader()
+                    _TS = load.timescale()
     return _TS
 
 
@@ -620,30 +629,32 @@ def get_planets() -> SpiceKernel:
     global _PLANETS, _EPHEMERIS_FILE
     logger = get_logger()
     if _PLANETS is None:
-        load = get_loader()
-        effective_file = _get_effective_ephemeris_file()
-        _EPHEMERIS_FILE = effective_file
+        with _INIT_LOCK:
+            if _PLANETS is None:
+                load = get_loader()
+                effective_file = _get_effective_ephemeris_file()
+                _EPHEMERIS_FILE = effective_file
 
-        # Try custom ephemeris path first if set
-        if _EPHEMERIS_PATH:
-            bsp_path = os.path.join(_EPHEMERIS_PATH, _EPHEMERIS_FILE)
-            if os.path.exists(bsp_path):
-                logger.debug("Using cached ephemeris: %s", bsp_path)
-                _PLANETS = load(bsp_path)
-                logger.info("Ephemeris loaded: %s", bsp_path)
-                return _PLANETS
+                # Try custom ephemeris path first if set
+                if _EPHEMERIS_PATH:
+                    bsp_path = os.path.join(_EPHEMERIS_PATH, _EPHEMERIS_FILE)
+                    if os.path.exists(bsp_path):
+                        logger.debug("Using cached ephemeris: %s", bsp_path)
+                        _PLANETS = load(bsp_path)
+                        logger.info("Ephemeris loaded: %s", bsp_path)
+                        return _PLANETS
 
-        # Load from data dir (downloads automatically if missing)
-        data_dir = _get_data_dir()
-        bsp_path = os.path.join(data_dir, _EPHEMERIS_FILE)
-        if os.path.exists(bsp_path):
-            logger.debug("Using cached ephemeris: %s", bsp_path)
-            _PLANETS = load(bsp_path)
-            logger.info("Ephemeris loaded: %s", bsp_path)
-        else:
-            logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
-            _PLANETS = load(_EPHEMERIS_FILE)
-            logger.info("Ephemeris downloaded to: %s", data_dir)
+                # Load from data dir (downloads automatically if missing)
+                data_dir = _get_data_dir()
+                bsp_path = os.path.join(data_dir, _EPHEMERIS_FILE)
+                if os.path.exists(bsp_path):
+                    logger.debug("Using cached ephemeris: %s", bsp_path)
+                    _PLANETS = load(bsp_path)
+                    logger.info("Ephemeris loaded: %s", bsp_path)
+                else:
+                    logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
+                    _PLANETS = load(_EPHEMERIS_FILE)
+                    logger.info("Ephemeris downloaded to: %s", data_dir)
     return _PLANETS
 
 

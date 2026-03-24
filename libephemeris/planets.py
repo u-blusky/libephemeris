@@ -36,7 +36,7 @@ Precision Notes:
 - Ecliptic frame uses true ecliptic of date (Skyfield ecliptic_frame with IAU 2006 precession + IAU 2000A nutation)
 
 References:
-- JPL DE421 ephemeris (accurate to ~0.001 arcsecond for modern dates)
+- JPL DE440 ephemeris (accurate to ~0.001 arcsecond for modern dates)
 - IAU 2000B nutation model via Skyfield
 - Reference API compatibility layer
 """
@@ -174,6 +174,29 @@ _PLANET_NAMES = {
 }
 
 
+def _cob_velocity_correction(barycenter_name: str, t):
+    """Compute COB velocity correction via central difference.
+
+    Args:
+        barycenter_name: Name for lookup in moon_theories (e.g. 'jupiter barycenter')
+        t: Skyfield Time object at which to evaluate
+
+    Returns:
+        numpy array of velocity offset in AU/day (3-element)
+    """
+    import numpy as np
+    from .moon_theories import get_cob_offset
+    from .state import get_timescale
+
+    dt = 1.0 / 86400.0  # 1 second in days
+    ts = get_timescale()
+    t_prev = ts.tt_jd(t.tt - dt)
+    t_next = ts.tt_jd(t.tt + dt)
+    offset_prev = get_cob_offset(barycenter_name, t_prev)
+    offset_next = get_cob_offset(barycenter_name, t_next)
+    return (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
+
+
 class _CobCorrectedTarget:
     """Wrapper that applies COB (Center of Body) correction to barycenter positions.
 
@@ -210,36 +233,17 @@ class _CobCorrectedTarget:
         """
         import numpy as np
         from skyfield.positionlib import ICRF
-
         from .moon_theories import get_cob_offset
-        from .state import get_timescale
 
-        # Get barycenter position
         bary_pos = self._barycenter.at(t)
         pos_au = bary_pos.position.au
         vel_au_per_d = bary_pos.velocity.au_per_d
 
-        # Apply COB correction
         offset = get_cob_offset(self._barycenter_name, t)
         corrected_pos = pos_au + np.array(offset)
+        corrected_vel = vel_au_per_d + _cob_velocity_correction(self._barycenter_name, t)
 
-        # Compute velocity correction using central difference
-        dt = 1.0 / 86400.0  # 1 second in days
-        ts = get_timescale()
-        t_prev = ts.tt_jd(t.tt - dt)
-        t_next = ts.tt_jd(t.tt + dt)
-        offset_prev = get_cob_offset(self._barycenter_name, t_prev)
-        offset_next = get_cob_offset(self._barycenter_name, t_next)
-        offset_vel = (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
-        corrected_vel = vel_au_per_d + offset_vel
-
-        # Return new ICRF position with corrected coordinates
-        return ICRF(
-            corrected_pos,
-            corrected_vel,
-            t=t,
-            center=self.center,
-        )
+        return ICRF(corrected_pos, corrected_vel, t=t, center=self.center)
 
     def __repr__(self):
         return f"<CobCorrectedTarget {self._barycenter_name}>"
@@ -258,28 +262,13 @@ class _CobCorrectedTarget:
             Tuple of (position_au, velocity_au_per_d, time, light_time_days)
         """
         import numpy as np
-
         from .moon_theories import get_cob_offset
-        from .state import get_timescale
 
-        # Get the raw observation from the barycenter
         pos, vel, t, light_time = self._barycenter._observe_from_bcrs(observer)
 
-        # Apply COB correction at the retarded time
-        # (when light left the planet, not when it arrives)
-        # The returned 't' should be the retarded time
         offset = get_cob_offset(self._barycenter_name, t)
         corrected_pos = pos + np.array(offset)
-
-        # Compute velocity correction using central difference
-        dt = 1.0 / 86400.0  # 1 second in days
-        ts = get_timescale()
-        t_prev = ts.tt_jd(t.tt - dt)
-        t_next = ts.tt_jd(t.tt + dt)
-        offset_prev = get_cob_offset(self._barycenter_name, t_prev)
-        offset_next = get_cob_offset(self._barycenter_name, t_next)
-        offset_vel = (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
-        corrected_vel = vel + offset_vel
+        corrected_vel = vel + _cob_velocity_correction(self._barycenter_name, t)
 
         return corrected_pos, corrected_vel, t, light_time
 
@@ -342,28 +331,12 @@ class _SpkCenterTarget:
             # If SPK segment is out of range, fall back to COB correction
             import numpy as np
             from .moon_theories import get_cob_offset
-            from .state import get_timescale
 
             offset = get_cob_offset(self._barycenter_name, t)
             corrected_pos = pos_au + np.array(offset)
+            corrected_vel = vel_au_per_d + _cob_velocity_correction(self._barycenter_name, t)
 
-            # Compute velocity correction using central difference
-            dt = 1.0 / 86400.0  # 1 second in days
-            ts = get_timescale()
-            t_prev = ts.tt_jd(t.tt - dt)
-            t_next = ts.tt_jd(t.tt + dt)
-            offset_prev = get_cob_offset(self._barycenter_name, t_prev)
-            offset_next = get_cob_offset(self._barycenter_name, t_next)
-            offset_vel = (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
-            corrected_vel = vel_au_per_d + offset_vel
-
-        # Return new ICRF position with corrected coordinates
-        return ICRF(
-            corrected_pos,
-            corrected_vel,
-            t=t,
-            center=self.center,
-        )
+        return ICRF(corrected_pos, corrected_vel, t=t, center=self.center)
 
     def __repr__(self):
         return f"<SpkCenterTarget {self._planet_name}>"
@@ -381,11 +354,9 @@ class _SpkCenterTarget:
         Returns:
             Tuple of (position_au, velocity_au_per_d, time, light_time_days)
         """
-        # Get the raw observation from the barycenter
         pos, vel, t, light_time = self._barycenter._observe_from_bcrs(observer)
 
         try:
-            # Apply center offset at the retarded time
             center_offset = self._center_segment.at(t)
             offset_au = center_offset.position.au
             offset_vel = center_offset.velocity.au_per_d
@@ -393,23 +364,12 @@ class _SpkCenterTarget:
             corrected_pos = pos + offset_au
             corrected_vel = vel + offset_vel
         except _RANGE_ERRORS:
-            # If SPK segment is out of range, fall back to COB correction
             import numpy as np
             from .moon_theories import get_cob_offset
-            from .state import get_timescale
 
             offset = get_cob_offset(self._barycenter_name, t)
             corrected_pos = pos + np.array(offset)
-
-            # Compute velocity correction using central difference
-            dt = 1.0 / 86400.0  # 1 second in days
-            ts = get_timescale()
-            t_prev = ts.tt_jd(t.tt - dt)
-            t_next = ts.tt_jd(t.tt + dt)
-            offset_prev = get_cob_offset(self._barycenter_name, t_prev)
-            offset_next = get_cob_offset(self._barycenter_name, t_next)
-            offset_vel = (np.array(offset_next) - np.array(offset_prev)) / (2.0 * dt)
-            corrected_vel = vel + offset_vel
+            corrected_vel = vel + _cob_velocity_correction(self._barycenter_name, t)
 
         return corrected_pos, corrected_vel, t, light_time
 
@@ -874,8 +834,11 @@ def swe_calc_ut(
             result = fast_calc.fast_calc_ut(reader, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdut)
             return result
-        except (KeyError, ValueError):
-            get_logger().debug("body=%d jd=%.1f source=LEB->fallback", planet, tjdut)
+        except (KeyError, ValueError) as _leb_err:
+            get_logger().debug(
+                "body=%d jd=%.1f source=LEB->fallback reason=%s",
+                planet, tjdut, _leb_err,
+            )
     # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
@@ -958,8 +921,11 @@ def swe_calc(
             result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
             return result
-        except (KeyError, ValueError):
-            get_logger().debug("body=%d jd=%.1f source=LEB->fallback", planet, tjdet)
+        except (KeyError, ValueError) as _leb_err:
+            get_logger().debug(
+                "body=%d jd=%.1f source=LEB->fallback reason=%s",
+                planet, tjdet, _leb_err,
+            )
     # --- END LEB fast path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
@@ -999,7 +965,7 @@ def swe_calc_pctr(
     seen from Mars, or Venus as seen from Jupiter.
 
     Args:
-        tjdet: Julian Day in Universal Time (UT1)
+        tjdet: Julian Day in Terrestrial Time (TT/ET)
         planet: Target planet/body ID (SE_SUN, SE_MOON, etc.)
         center: Observer/center planet ID (the body from which to observe)
         flags: Calculation flags (SEFLG_SPEED, etc.)
@@ -1030,7 +996,7 @@ def swe_calc_pctr(
         validate_jd_range(tjdet, planet, "swe_calc_pctr")
 
     ts = get_timescale()
-    t = ts.ut1_jd(tjdet)
+    t = ts.tt_jd(tjdet)
     try:
         return _calc_body_pctr(t, planet, center, flags)
     except SkyfieldRangeError as e:
@@ -1531,7 +1497,7 @@ def _calc_body(
     sub-modules based on body type. Supports all reference API body types.
 
     Supported body types:
-        - Classical planets (Sun, Moon, Mercury-Pluto) via JPL DE421 ephemeris
+        - Classical planets (Sun, Moon, Mercury-Pluto) via JPL DE440 ephemeris
         - Lunar nodes (Mean/True North/South) via lunar.py
         - Lilith/Lunar apogee (Mean/Osculating) via lunar.py
         - Minor bodies (asteroids, TNOs) via minor_bodies.py with rigorous geocentric conversion
@@ -4608,7 +4574,7 @@ def swe_orbit_max_min_true_distance(
     conjunction and the maximum near superior conjunction.
 
     Args:
-        tjdet: Julian Day in Universal Time (UT1) - used to determine current
+        tjdet: Julian Day in Terrestrial Time (TT/ET) - used to determine current
                 orbital elements and current true distance.
         planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
@@ -4632,7 +4598,7 @@ def swe_orbit_max_min_true_distance(
           distance range.
     """
     ts = get_timescale()
-    t = ts.ut1_jd(tjdet)
+    t = ts.tt_jd(tjdet)
     return _calc_orbit_max_min_true_distance(t, planet, flags, tjdet)
 
 

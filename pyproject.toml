@@ -1,10 +1,10 @@
 [project]
 name = "libephemeris"
-version = "0.25.0"
+version = "1.0.0a1"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.9"
-license = "LGPL-3.0-only"
+license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [
     { name = "Giacomo Battaglia", email = "giacomo@libephemeris.dev" }
