@@ -31,18 +31,18 @@ at the cost of speed and strict numerical agreement with Swiss Ephemeris.
 - **Physical planet positions.** Outer planet positions are automatically corrected from system barycenters to true planet body centers, using JPL satellite ephemerides and analytical moon theories. No extra flags or files required.
 - **Peer-reviewed photometric models.** Visual magnitudes use Mallama & Hilton (2018) formulas, published in *The Astronomical Journal* and adopted by the Astronomical Almanac. Body radii use IAU 2015 official equatorial values.
 - **IAU standard coordinate transforms.** Nutation (IAU 2006/2000A, 1365 terms), precession (IAU 2006), and obliquity use the official IAU ERFA library -- the same routines used by professional observatories.
-- **Independently verified precision.** Triangulated comparisons against JPL Horizons (NASA) and astropy/ERFA confirm sub-arcsecond accuracy. Lunar node positions match JPL Horizons to < 0.01 arcsecond. True Lilith matches within 0.5 arcsecond. All planets within 2 arcseconds (outer planets sub-arcsecond). See `docs/reference/swisseph-comparison.md` for the full verification report.
-- **Fixes known Swiss Ephemeris bugs.** LibEphemeris corrects a behavioral bug where pyswisseph silently ignores `SEFLG_J2000` for TrueNode, OscuApog, IntpApog, and IntpPerg when combined with `SEFLG_SIDEREAL`. This causes up to ~0.34° error at modern dates and ~28° at historical dates. See [`docs/reference/se-bug-sidereal-j2000-nodes.md`](docs/reference/se-bug-sidereal-j2000-nodes.md) for the full analysis.
+- **Independently verified precision.** Triangulated comparisons against JPL Horizons (NASA) and astropy/ERFA confirm sub-arcsecond accuracy. Lunar node positions match JPL Horizons to < 0.01 arcsecond. True Lilith matches within 0.5 arcsecond. All planets within 2 arcseconds (outer planets sub-arcsecond). See the [Swiss Ephemeris comparison report](https://kerykeion.net/libephemeris/docs/reference/swisseph-comparison).
+- **Fixes known Swiss Ephemeris bugs.** LibEphemeris corrects a behavioral bug where pyswisseph silently ignores `SEFLG_J2000` for TrueNode, OscuApog, IntpApog, and IntpPerg when combined with `SEFLG_SIDEREAL`. This causes up to ~0.34° error at modern dates and ~28° at historical dates. See the [full analysis](https://kerykeion.net/libephemeris/docs/reference/se-bug-sidereal-j2000-nodes).
 - **JPL-grounded lunar apsides.** The interpolated perigee and apogee are derived from actual physical distance-extrema passages in JPL data, rather than from truncated analytical series.
 - **Current Delta T model.** Uses Stephenson, Morrison & Hohenkerk (2016) with optional IERS observational data -- the current astronomical standard for historical timescale conversion.
 - **Transparent.** Pure Python, fully testable, readable, and documented with explicit astronomical references.
 - **Slower than Swiss Ephemeris.** Swiss is C; LibEphemeris is Python (see Performance).
 
-Methodology and rationale: `docs/methodology/overview.md`.
+Methodology and rationale: [overview](https://kerykeion.net/libephemeris/docs/methodology/overview).
 
 ### Precision at a glance
 
-Measured against pyswisseph 2.10 across 4,400+ comparison rounds. Full report: [`docs/PRECISION.md`](docs/PRECISION.md).
+Measured against pyswisseph 2.10 across 4,400+ comparison rounds. Full report: [Precision](https://kerykeion.net/libephemeris/docs/PRECISION).
 
 | Category | Typical | Max | Notes |
 |----------|---------|-----|-------|
@@ -54,7 +54,7 @@ Measured against pyswisseph 2.10 across 4,400+ comparison rounds. Full report: [
 | Lunar eclipses | — | < 8s | Timing precision |
 | Ayanamsha | < 0.001° | 0.006° | 43 sidereal modes |
 
-**Hyper-validation: 3,947 PASS, 441 KNOWN, 0 FAIL.** All divergences [documented](docs/divergences.md).
+**Hyper-validation: 3,947 PASS, 441 KNOWN, 0 FAIL.** All divergences [documented](https://kerykeion.net/libephemeris/docs/divergences).
 
 ---
 
@@ -282,7 +282,7 @@ SPK coverage varies by tier:
 | Neptune | SPK              | SPK                | SPK full (-12000 to +17000)         |
 | Pluto   | SPK              | SPK 1800-2200      | SPK 1800-2200, fallback outside     |
 
-Full technical details are in `docs/reference/precision.md`.
+Full technical details in the [precision report](https://kerykeion.net/libephemeris/docs/reference/precision).
 
 ---
 
@@ -320,7 +320,7 @@ download_assist_data()  # Downloads to ~/.libephemeris/assist/ (~714 MB)
 Once installed, ASSIST is used automatically in the fallback chain:
 SPK kernel > auto-download SPK > REBOUND/ASSIST > Keplerian.
 
-See `docs/methodology/rebound-integration.md` for details.
+See [REBOUND integration](https://kerykeion.net/libephemeris/docs/methodology/rebound-integration) for details.
 
 ---
 
@@ -341,28 +341,32 @@ pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
 
 ## Docs
 
+Full documentation: **[kerykeion.net/libephemeris/docs](https://kerykeion.net/libephemeris/docs/)**
+
 **Getting started:**
-[Migration guide](docs/guides/migration-guide.md) ·
-[Precision tuning](docs/guides/precision-tuning.md)
+[Migration guide](https://kerykeion.net/libephemeris/docs/guides/migration-guide) ·
+[Precision tuning](https://kerykeion.net/libephemeris/docs/guides/precision-tuning)
 
 **Reference:**
-[Precision report](docs/reference/precision.md) ·
-[Swiss Ephemeris comparison](docs/reference/swisseph-comparison.md) (1,619 tests) ·
-[Known divergences](docs/divergences.md) ·
-[House systems](docs/reference/house-systems.md) ·
-[Ayanamsha modes](docs/reference/ayanamsha.md)
+[Precision report](https://kerykeion.net/libephemeris/docs/reference/precision) ·
+[Swiss Ephemeris comparison](https://kerykeion.net/libephemeris/docs/reference/swisseph-comparison) (1,619 tests) ·
+[Known divergences](https://kerykeion.net/libephemeris/docs/divergences) ·
+[House systems](https://kerykeion.net/libephemeris/docs/reference/house-systems) ·
+[Ayanamsha modes](https://kerykeion.net/libephemeris/docs/reference/ayanamsha)
 
 **Methodology:**
-[Overview](docs/methodology/overview.md) ·
-[Planet centers](docs/methodology/planet-centers-spk.md) ·
-[Lunar apsides](docs/methodology/lunar-apsides.md) ·
-[True Lilith](docs/methodology/true-lilith.md) ·
-[pyerfa integration](docs/methodology/pyerfa-integration.md) ·
-[REBOUND integration](docs/methodology/rebound-integration.md) ·
-[LEB format](docs/leb/guide.md)
+[Overview](https://kerykeion.net/libephemeris/docs/methodology/overview) ·
+[Planet centers](https://kerykeion.net/libephemeris/docs/methodology/planet-centers-spk) ·
+[Lunar apsides](https://kerykeion.net/libephemeris/docs/methodology/lunar-apsides) ·
+[True Lilith](https://kerykeion.net/libephemeris/docs/methodology/true-lilith) ·
+[pyerfa integration](https://kerykeion.net/libephemeris/docs/methodology/pyerfa-integration) ·
+[REBOUND integration](https://kerykeion.net/libephemeris/docs/methodology/rebound-integration) ·
+[LEB format](https://kerykeion.net/libephemeris/docs/leb/guide)
 
 **Development:**
-[Testing](docs/development/testing.md)
+[Testing](https://kerykeion.net/libephemeris/docs/development/testing) ·
+[Architecture](https://kerykeion.net/libephemeris/docs/development/architecture-overview) ·
+[Roadmap](https://kerykeion.net/libephemeris/docs/development/roadmap)
 
 ---
 
@@ -391,7 +395,7 @@ Once downloaded, the file is auto-discovered from `~/.libephemeris/leb/` -- no c
 
 LEB transparently falls back to Skyfield for unsupported flags or bodies not in the `.leb` file. See [Calculation backend](#calculation-backend) for mode control.
 
-Full technical guide: `docs/leb/guide.md`.
+Full technical guide: [LEB format](https://kerykeion.net/libephemeris/docs/leb/guide).
 
 ---
 
@@ -483,7 +487,7 @@ Generate `planet_centers_*.bsp` files (requires `spiceypy >= 6.0.0`):
 | `poe calibrate-perigee`       | Full calibration, 1500-2500 CE (~30 min, needs de441) |
 | `poe calibrate-perigee:quick` | Quick validation, 100-year range (~2 min)           |
 
-See `docs/methodology/interpolated-perigee.md` for details.
+See [interpolated perigee](https://kerykeion.net/libephemeris/docs/methodology/interpolated-perigee) for details.
 
 </details>
 
