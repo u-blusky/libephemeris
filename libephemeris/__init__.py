@@ -759,10 +759,10 @@ from ._dotenv import load_dotenv
 # Constants (planet IDs, flags, sidereal modes)
 from .constants import *
 
-__version__ = "0.25.0"
+__version__ = "1.0.0a1"
 version = __version__
 __author__ = "Giacomo Battaglia"
-__license__ = "LGPL-3.0"
+__license__ = "AGPL-3.0"
 
 # P3: Bare-name aliases — match pyswisseph where bare names ARE the swe_ functions.
 # The old "Pythonic" versions (separate lat/lon/alt params) are kept as _*_pythonic
