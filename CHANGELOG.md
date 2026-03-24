@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Eclipse catalog validation against NASA Five Millennium Canon (§5): 20 solar eclipses (2001–2020), 20 lunar eclipses (2001–2022), 10 future solar + 10 future lunar eclipses — all 63 tests pass within 60s timing tolerance using proper TD→UT conversion
 - Fuzz testing for robustness (§4): 74 tests covering extreme JDs (NaN/Inf/-1e6/1e8), invalid body IDs, extreme geographic coordinates, 500+ sampled flag combinations from 2^14 space — zero crashes
 - Thread safety and concurrency stress tests (§6): 12 tests — 50-thread stress test matching single-threaded baseline, sidereal mode isolation (LAHIRI vs FAGAN_BRADLEY), topocentric isolation (Rome vs Tokyo), LEB+Skyfield mixed mode, concurrent house calculations
+- Regression test infrastructure (§7): golden file tests (133 reference calculations), performance benchmarks (LEB 10-21x speedup verified), CI workflow (`.github/workflows/ci.yml`) with lint, golden regression, validation, essential suite, concurrency, and manual hyper-validation
 
 ### Changed
 

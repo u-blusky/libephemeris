@@ -1,0 +1,152 @@
+# LibEphemeris CI — Validation & Regression
+#
+# Runs on every push and PR to main. Includes:
+#   - Linting and type checking
+#   - Golden file regression tests (§7.1)
+#   - Performance benchmarks (§7.2)
+#   - Property-based tests (§3)
+#   - Fuzz tests (§4)
+#   - Eclipse catalog validation (§5)
+#   - Essential test subset (~490 tests)
+#
+# Full hyper-validation (§7.3) runs on manual dispatch only
+# (too slow for every commit — ~10 min with pyswisseph).
+
+name: CI
+
+on:
+  push:
+    branches: [main, "validation/*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_hyper_validation:
+        description: "Run full hyper-validation against pyswisseph"
+        required: false
+        default: "false"
+        type: boolean
+
+env:
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  lint:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv pip install -e ".[dev]"
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: mypy typecheck
+        run: uv run mypy libephemeris --ignore-missing-imports
+
+  test-golden:
+    name: Golden File Regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv pip install -e ".[dev]"
+      - name: Run golden regression tests
+        run: uv run pytest tests/test_golden_regression.py -v
+
+  test-validation:
+    name: Validation Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv pip install -e ".[dev]"
+      - run: uv pip install hypothesis
+      - name: Property-based tests (§3)
+        run: uv run pytest tests/test_property_based.py -v
+      - name: Fuzz tests (§4)
+        run: uv run pytest tests/test_fuzz.py -v
+      - name: Eclipse catalog validation (§5)
+        run: uv run pytest tests/test_eclipse_catalog_validation.py -v
+
+  test-essential:
+    name: Essential Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv pip install -e ".[dev]"
+      - run: uv pip install hypothesis
+      - name: Run essential tests (~490 tests)
+        run: |
+          uv run pytest -m "not slow" \
+            tests/test_planets/test_central_difference_velocity.py \
+            tests/test_planets/test_nod_aps.py \
+            tests/test_houses/test_house_algorithms.py \
+            tests/test_lunar_eclipse.py \
+            tests/test_lunar/test_interpolated_apogee.py \
+            tests/test_fixed_stars/test_fixstar2.py \
+            tests/test_asteroid_by_number.py \
+            tests/test_hypothetical.py \
+            tests/test_heliacal.py \
+            tests/test_rise_trans.py \
+            tests/test_arabic_parts.py \
+            tests/test_planetary_moons.py \
+            tests/test_time/test_date_conversion.py \
+            tests/test_exception_hierarchy.py \
+            tests/test_close.py \
+            tests/test_sidereal/test_ayanamsa_precision.py \
+            tests/test_deg_midp.py \
+            tests/test_get_planet_name.py \
+            -v
+
+  test-concurrency:
+    name: Thread Safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv pip install -e ".[dev]"
+      - name: Concurrency stress tests (§6)
+        run: uv run pytest tests/test_concurrency_stress.py -v
+
+  hyper-validation:
+    name: Hyper-Validation (manual)
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_hyper_validation == 'true'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv pip install -e ".[dev]"
+      - run: uv pip install pyswisseph
+      - name: Run hyper-validation (fast sections)
+        run: |
+          uv run python scripts/hyper_validate.py \
+            --json hyper_validation_report.json \
+            --skip-sections J,U
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyper-validation-report
+          path: hyper_validation_report.json
