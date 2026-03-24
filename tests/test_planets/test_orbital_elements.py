@@ -154,7 +154,7 @@ class TestOrbitalElementsRelationships:
 
         a = elements[0]
         e = elements[1]
-        q = elements[11]  # Perihelion distance
+        q = elements[15]  # Perihelion distance
 
         expected_q = a * (1 - e)
         assert abs(q - expected_q) < 0.001, (
@@ -169,7 +169,7 @@ class TestOrbitalElementsRelationships:
 
         a = elements[0]
         e = elements[1]
-        Q = elements[12]  # Aphelion distance
+        Q = elements[16]  # Aphelion distance
 
         expected_Q = a * (1 + e)
         assert abs(Q - expected_Q) < 0.001, (
@@ -183,8 +183,8 @@ class TestOrbitalElementsRelationships:
 
         for planet_id in [SE_MERCURY, SE_MARS, SE_JUPITER, SE_SATURN]:
             elements = ephem.get_orbital_elements(jd, planet_id, 0)
-            q = elements[11]
-            Q = elements[12]
+            q = elements[15]
+            Q = elements[16]
             assert q < Q, f"Perihelion {q} should be less than aphelion {Q}"
 
     @pytest.mark.unit
@@ -195,7 +195,7 @@ class TestOrbitalElementsRelationships:
 
         Omega = elements[3]  # Longitude of ascending node
         omega = elements[4]  # Argument of perihelion
-        varpi = elements[9]  # Longitude of perihelion
+        varpi = elements[5]  # Longitude of perihelion
 
         expected_varpi = (Omega + omega) % 360.0
         diff = abs(varpi - expected_varpi)
@@ -214,8 +214,8 @@ class TestOrbitalElementsRelationships:
 
         Omega = elements[3]
         omega = elements[4]
-        M = elements[5]
-        L = elements[8]
+        M = elements[6]  # Mean anomaly
+        L = elements[9]  # Mean longitude
 
         expected_L = (Omega + omega + M) % 360.0
         diff = abs(L - expected_L)
@@ -268,7 +268,7 @@ class TestOrbitalElementsOrbitalPeriod:
         jd = 2451545.0
         elements = ephem.get_orbital_elements(jd, planet_id, 0)
 
-        P = elements[13]  # Orbital period in tropical years
+        P = elements[10]  # Sidereal orbital period in tropical years
         assert abs(P - expected_period_years) < tolerance, (
             f"{planet_name} period {P:.3f} years differs from "
             f"expected {expected_period_years}"
@@ -280,8 +280,8 @@ class TestOrbitalElementsOrbitalPeriod:
         jd = 2451545.0
         elements = ephem.get_orbital_elements(jd, SE_MARS, 0)
 
-        n = elements[10]  # Mean daily motion (degrees/day)
-        P = elements[13]  # Orbital period (years)
+        n = elements[11]  # Mean daily motion (degrees/day)
+        P = elements[10]  # Sidereal orbital period (years)
 
         # n should equal 360 / (P * 365.24219)
         expected_n = 360.0 / (P * 365.24219)
@@ -318,7 +318,7 @@ class TestOrbitalElementsMoon:
         jd = 2451545.0
         elements = ephem.get_orbital_elements(jd, SE_MOON, 0)
 
-        P_years = elements[13]
+        P_years = elements[10]  # Sidereal orbital period
         P_days = P_years * 365.24219
 
         # Sidereal month is about 27.32 days
