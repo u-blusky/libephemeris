@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Eclipse catalog validation against NASA Five Millennium Canon (§5): 20 solar eclipses (2001–2020), 20 lunar eclipses (2001–2022), 10 future solar + 10 future lunar eclipses — all 63 tests pass within 60s timing tolerance using proper TD→UT conversion
+- Fuzz testing for robustness (§4): 74 tests covering extreme JDs (NaN/Inf/-1e6/1e8), invalid body IDs, extreme geographic coordinates, 500+ sampled flag combinations from 2^14 space — zero crashes
 
 ### Changed
 
