@@ -90,33 +90,33 @@ structured tests miss.
 
 ### 3.1 Coordinate Transform Round-Trips
 
-- [ ] ecliptic → equatorial → ecliptic: verify identity within 0.001"
-- [ ] ecliptic → XYZ → ecliptic: verify identity
-- [ ] degrees → radians → degrees: verify identity
-- [ ] Random JD, random body, random flag combinations
+- [x] ecliptic → equatorial → ecliptic: verify identity within 0.001" (via swe_cotrans roundtrip)
+- [x] ecliptic → XYZ → ecliptic: verify identity
+- [x] degrees → radians → degrees: verify identity
+- [x] Random JD, random body, random flag combinations
 
 ### 3.2 API Contract Testing
 
-- [ ] `calc_ut(jd, body, flags)` always returns (6-tuple, int)
-- [ ] `houses(jd, lat, lon, system)` always returns (tuple, tuple)
-- [ ] `fixstar(name, jd, flags)` always returns (6-tuple, str)
-- [ ] No function raises unhandled exceptions for valid inputs
-- [ ] All functions accept SEFLG_MOSEPH without error
+- [x] `calc_ut(jd, body, flags)` always returns (6-tuple, int)
+- [x] `houses(jd, lat, lon, system)` always returns (tuple, tuple)
+- [x] `fixstar(name, jd, flags)` always returns (6-tuple, str, int)
+- [x] No function raises unhandled exceptions for valid inputs
+- [x] All functions accept SEFLG_MOSEPH without error
 
 ### 3.3 Monotonicity Properties
 
-- [ ] Sun longitude is monotonically increasing (mod 360) over 1 day
-- [ ] Mean Node longitude is monotonically decreasing over 1 day
-- [ ] Julian day conversion is monotonic: julday(y,m,d) < julday(y,m,d+1)
-- [ ] Delta T is monotonically increasing for dates > 1972
+- [x] Sun longitude is monotonically increasing (mod 360) over 1 day
+- [x] Mean Node longitude is monotonically decreasing over 1 day
+- [x] Julian day conversion is monotonic: julday(y,m,d) < julday(y,m,d+1)
+- [x] Delta T in reasonable range (40–120s) for 1972–2040 (note: NOT monotonic — Earth rotation sped up ~2020–2029)
 
 ### 3.4 Symmetry Properties
 
-- [ ] `calc_ut(jd, body, SEFLG_HELCTR)` for Sun returns (0, 0, 0, ...)
-- [ ] `pheno_ut(jd, SE_SUN)` returns phase_angle = 0
-- [ ] `houses(jd, lat, lon)` cusps are in ascending order (mod 360)
+- [x] `calc_ut(jd, body, SEFLG_HELCTR)` for Sun returns (0, 0, 0, ...)
+- [x] `pheno_ut(jd, SE_SUN)` returns phase_angle = 0
+- [x] `houses(jd, lat, lon)` cusps are in ascending order (mod 360)
 
-**Deliverable:** `tests/test_property_based.py` using hypothesis library
+**Deliverable:** `tests/test_property_based.py` using hypothesis library ✅
 
 ---
 

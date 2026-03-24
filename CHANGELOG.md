@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `data/horizons_cross_validation.json` — reproducible JSON report from Horizons cross-validation
 - Added `scripts/leb_accuracy_sweep.py` — LEB accuracy sweep (§2): 31/31 bodies pass position accuracy (max 0.000352"), 9/9 native flag combos pass, 4/4 fallback flags verified, all boundary conditions pass, 8–23x speedup for JPL-backed planets
 - Added `data/leb_accuracy_sweep_medium.json` — reproducible JSON report from LEB accuracy sweep (medium tier)
+- Added `tests/test_property_based.py` — property-based testing with Hypothesis (§3): 19 tests covering coordinate transform roundtrips (cotrans identity within 0.001"), API contracts (calc_ut/houses/fixstar return shapes), monotonicity (Sun longitude, Mean Node regression, julday ordering), symmetry (heliocentric Sun at origin, Sun phase angle 0, house cusp ordering); discovered Delta T is NOT monotonic post-2020 due to Earth rotation speed-up
 
 ## [0.26.0] - 2026-03-23
 
