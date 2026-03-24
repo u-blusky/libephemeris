@@ -54,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Created `plans/validation-plan-v2.md` — next-phase validation plan covering JPL Horizons cross-validation, LEB accuracy sweep, property-based testing, fuzz testing, eclipse catalog validation, concurrency stress testing, and regression infrastructure
+- Added `scripts/horizons_cross_validate.py` — JPL Horizons cross-validation (§1): 680/680 comparisons pass across 10 planets (50 dates), 5 minor bodies (20 dates), 4 outer planet COB tests (20 dates); core-era accuracy < 0.1" for all bodies; era-adaptive tolerances account for Delta T model divergence at extreme dates
+- Added `data/horizons_cross_validation.json` — reproducible JSON report from Horizons cross-validation
 
 ## [0.26.0] - 2026-03-23
 
