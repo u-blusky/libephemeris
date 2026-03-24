@@ -22,10 +22,17 @@ from libephemeris.constants import (
 
 
 @pytest.fixture(autouse=True)
-def cleanup():
+def cleanup(monkeypatch):
     """Reset state before and after each test."""
     # Clear any SPK registrations
     state._SPK_BODY_MAP.clear()
+    # Disable LEB so the fast path doesn't intercept calc_ut() before
+    # the SPK/strict-precision code path is reached
+    monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
+    monkeypatch.delenv("LIBEPHEMERIS_MODE", raising=False)
+    monkeypatch.setattr(state, "_LEB_FILE", None)
+    monkeypatch.setattr(state, "_LEB_READER", None)
+    monkeypatch.setattr(state, "_discover_leb_file", lambda: None)
     # Reset settings
     eph.set_strict_precision(None)
     eph.set_auto_spk_download(None)

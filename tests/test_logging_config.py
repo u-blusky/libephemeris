@@ -379,7 +379,7 @@ class TestGetPlanetsLogging:
                 r.message for r in caplog.records if r.levelno == logging.INFO
             ]
             assert any("Downloading JPL ephemeris" in msg for msg in info_messages)
-            assert any("Ephemeris loaded:" in msg for msg in info_messages)
+            assert any("Ephemeris downloaded to:" in msg for msg in info_messages)
         finally:
             # Restore state
             logger.propagate = original_propagate
