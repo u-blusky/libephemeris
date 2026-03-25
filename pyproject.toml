@@ -147,6 +147,56 @@ test = "pytest -m \"not slow\""
     tests/test_deg_midp.py \
     tests/test_get_planet_name.py"""
 
+# Smoke subset - 1+ test file per library module, parallel (~1460 tests)
+# Covers every libephemeris/*.py module: all of "essential" plus angles, cache,
+# spk, spk_auto, state, extinction, logging, packaging, dotenv, erfa_nutation,
+# iers_data, delta-T, UTC, true_node_terms, mean_lilith, edge_cases,
+# retrograde, leb_format, leb_reader, fast_calc, profiling, type_safety,
+# golden regression, coordinate_validation
+"test:smoke" = """pytest -n auto -m "not slow" \
+    tests/test_planets/test_central_difference_velocity.py \
+    tests/test_planets/test_nod_aps.py \
+    tests/test_houses/test_house_algorithms.py \
+    tests/test_lunar_eclipse.py \
+    tests/test_lunar/test_interpolated_apogee.py \
+    tests/test_lunar/test_mean_lilith_enhanced.py \
+    tests/test_lunar/test_true_node_terms.py \
+    tests/test_fixed_stars/test_fixstar2.py \
+    tests/test_asteroid_by_number.py \
+    tests/test_hypothetical.py \
+    tests/test_heliacal.py \
+    tests/test_rise_trans.py \
+    tests/test_arabic_parts.py \
+    tests/test_planetary_moons.py \
+    tests/test_time/test_date_conversion.py \
+    tests/test_time/test_utc_to_jd.py \
+    tests/test_time/test_iers_delta_t.py \
+    tests/test_time/test_deltat_smh2016.py \
+    tests/test_exception_hierarchy.py \
+    tests/test_close.py \
+    tests/test_sidereal/test_ayanamsa_precision.py \
+    tests/test_deg_midp.py \
+    tests/test_get_planet_name.py \
+    tests/test_cs2degstr.py \
+    tests/test_cache.py \
+    tests/test_spk.py \
+    tests/test_spk_auto.py \
+    tests/test_ephemeris_config.py \
+    tests/test_extinction.py \
+    tests/test_logging_config.py \
+    tests/test_packaging.py \
+    tests/test_dotenv.py \
+    tests/test_type_safety.py \
+    tests/test_golden_regression.py \
+    tests/test_coordinate_validation.py \
+    tests/test_profiling.py \
+    tests/test_retrograde_stations.py \
+    tests/test_edge_cases/test_boundaries.py \
+    tests/test_precision/test_erfa_nutation.py \
+    tests/test_leb/test_leb_format.py \
+    tests/test_leb/test_leb_reader.py \
+    tests/test_leb/test_fast_calc.py"""
+
 # Unit tests (tests/ directory)
 "test:unit" = "pytest tests/ -v -m \"not slow\""
 "test:unit:full" = "pytest tests/ -v"

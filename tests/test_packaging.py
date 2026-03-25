@@ -40,7 +40,7 @@ class TestPackageMetadata:
     def test_license_is_set(self):
         """License should be defined."""
         assert hasattr(libephemeris, "__license__")
-        assert libephemeris.__license__ == "LGPL-3.0"
+        assert libephemeris.__license__ == "AGPL-3.0"
 
 
 class TestPackageDistribution:
@@ -109,7 +109,7 @@ class TestPackageFiles:
         license_file = project_root / "LICENSE"
         assert license_file.exists(), "LICENSE not found"
         content = license_file.read_text()
-        assert "GNU LESSER GENERAL PUBLIC LICENSE" in content
+        assert "GNU AFFERO GENERAL PUBLIC LICENSE" in content
 
     def test_pyproject_toml_exists(self, project_root):
         """pyproject.toml should exist in project root."""

@@ -1756,12 +1756,14 @@ def swe_heliacal_ut(
     return (jd1, jd2, jd3)
 
 
-def _parse_object_name(object_name: str) -> int:
+def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
     """
     Parse an object name string to get the corresponding body ID.
 
     Args:
         object_name: Name of planet or fixed star (e.g., "Venus", "Sirius")
+        allow_moon: If True, allow Moon as a valid body (for heliacal_pheno_ut
+            which supports Moon crescent calculations)
 
     Returns:
         Body ID (SE_* constant) for planets
@@ -1804,10 +1806,10 @@ def _parse_object_name(object_name: str) -> int:
     if name_upper in planet_map:
         body_id = planet_map[name_upper]
 
-        # Sun and Moon are not valid for heliacal calculations
+        # Sun is not valid for heliacal calculations
         if body_id == SE_SUN:
             raise ValueError("Sun is not valid for heliacal calculations")
-        if body_id == SE_MOON:
+        if body_id == SE_MOON and not allow_moon:
             raise ValueError("Moon is not valid for heliacal calculations")
 
         return body_id
@@ -1817,7 +1819,7 @@ def _parse_object_name(object_name: str) -> int:
         body_id = int(object_name)
         if body_id == SE_SUN:
             raise ValueError("Sun is not valid for heliacal calculations")
-        if body_id == SE_MOON:
+        if body_id == SE_MOON and not allow_moon:
             raise ValueError("Moon is not valid for heliacal calculations")
         return body_id
     except ValueError:
@@ -2330,8 +2332,8 @@ def swe_heliacal_pheno_ut(
     # Convert humidity from percent to 0-1 range
     humidity = humidity_pct / 100.0 if humidity_pct > 1.0 else humidity_pct
 
-    # Parse objname to body ID
-    body_id = _parse_object_name(objname)
+    # Parse objname to body ID (Moon is allowed for pheno calculations)
+    body_id = _parse_object_name(objname, allow_moon=True)
 
     # Call internal function
     dret, retflag = heliacal_pheno_ut(
