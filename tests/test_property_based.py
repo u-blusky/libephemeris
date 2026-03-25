@@ -276,7 +276,7 @@ class TestAPIContracts:
         jd = 2460311.0
         for star in ["Regulus", "Sirius", "Aldebaran", "Spica"]:
             result = swe.fixstar_ut(star, jd)
-            assert len(result) == 3, f"Expected 3 values from fixstar_ut"
+            assert len(result) == 3, "Expected 3 values from fixstar_ut"
             pos, name, ret_flags = result
             assert isinstance(pos, tuple) and len(pos) == 6
             assert isinstance(name, str)

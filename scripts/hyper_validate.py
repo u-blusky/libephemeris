@@ -2002,10 +2002,10 @@ def run_section_z():
                 KNOWN_MISSING = {"contrib"}
                 if name in KNOWN_MISSING:
                     report.add(
-                        TestResult("Z", test_id, "KNOWN", f"not exposed in ephem")
+                        TestResult("Z", test_id, "KNOWN", "not exposed in ephem")
                     )
                 else:
-                    report.add(TestResult("Z", test_id, "FAIL", f"missing in ephem"))
+                    report.add(TestResult("Z", test_id, "FAIL", "missing in ephem"))
                 count += 1
                 continue
             if name == "version":

@@ -241,7 +241,7 @@ def sweep_flag_combinations(reader) -> dict:
     """Test LEB with various flag combinations and verify fallback."""
     from libephemeris.fast_calc import fast_calc_tt
 
-    print(f"\n§2.2  Flag Combinations")
+    print("\n§2.2  Flag Combinations")
     print("-" * 90)
 
     # A representative date and body for each flag test
@@ -364,7 +364,7 @@ def sweep_flag_combinations(reader) -> dict:
             except Exception:
                 pass
 
-    print(f"    Skyfield handles all fallback flags:  PASS")
+    print("    Skyfield handles all fallback flags:  PASS")
     results["fallback_identity"] = {"pass": True}
 
     return results
@@ -379,7 +379,7 @@ def sweep_boundary_conditions(reader) -> dict:
     """Test dates at segment boundaries, body range edges, and outside range."""
     from libephemeris.fast_calc import fast_calc_tt
 
-    print(f"\n§2.3  Boundary Conditions")
+    print("\n§2.3  Boundary Conditions")
     print("-" * 90)
 
     results: dict = {}
@@ -517,7 +517,7 @@ def sweep_performance(reader) -> dict:
     """Benchmark LEB vs Skyfield performance."""
     from libephemeris.fast_calc import fast_calc_tt
 
-    print(f"\n§2.4  Performance Regression")
+    print("\n§2.4  Performance Regression")
     print("-" * 90)
 
     results: dict = {}
