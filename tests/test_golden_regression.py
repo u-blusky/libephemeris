@@ -58,6 +58,20 @@ class TestGoldenCalcUt:
 
     def test_calc_ut_positions_match(self, golden_entries: list[dict]) -> None:
         """All calc_ut positions must match golden values within tolerance."""
+        # Ensure LEB mode is active — golden values were generated with the
+        # LEB engine.  A preceding test on this xdist worker may have called
+        # close() or popped env vars, causing fallback to Skyfield which
+        # produces slightly different speeds (~3e-5 diff, exceeding 1e-8 tol).
+        #
+        # Note: os.environ["LIBEPHEMERIS_MODE"] is poisoned to "skyfield" by
+        # test_cross_validation_astropy.py at module-level import time (before
+        # xdist forks workers), so we must use the programmatic API which
+        # takes priority over the env var in get_calc_mode().
+        from libephemeris import state
+
+        state.set_calc_mode("auto")  # programmatic override; ignores env var
+        state._LEB_READER = None  # force reader re-creation from env/discovery
+
         calc_entries = entries_by_type(golden_entries, "calc_ut")
         mismatches = []
 
@@ -131,6 +145,13 @@ class TestGoldenSidereal:
 
     def test_sidereal_match(self, golden_entries: list[dict]) -> None:
         """Sidereal positions must match golden values."""
+        # Ensure LEB mode is active — golden values were generated with the
+        # LEB engine.  See test_calc_ut_positions_match for full rationale.
+        from libephemeris import state
+
+        state.set_calc_mode("auto")  # programmatic override; ignores env var
+        state._LEB_READER = None  # force reader re-creation from env/discovery
+
         sid_entries = entries_by_type(golden_entries, "sidereal")
         mismatches = []
 

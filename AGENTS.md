@@ -25,12 +25,22 @@ pytest tests/test_file.py -v                          # Single file
 pytest tests/test_file.py::TestClass::test_method -v  # Single test
 pytest -k "pattern" -v                                # By keyword
 
+# Unit test suites
+poe test:unit               # All unit tests (no slow), sequential
+poe test:unit:fast           # All unit tests (no slow), parallel (-n auto)
+poe test:unit:full           # All unit tests including slow
+
+# Unit tests in LEB mode (precomputed Chebyshev ephemeris, ~14x faster)
+poe test:unit:leb            # LEB mode, no slow, sequential
+poe test:unit:leb:fast       # LEB mode, no slow, parallel (-n auto)
+poe test:unit:leb:full       # LEB mode, including slow
+
 # Feature-specific suites
 poe test:lunar              # All lunar tests (no slow)
 poe test:lunar:perigee      # Perigee tests only
 poe test:lunar:apogee       # Apogee tests only
 poe test:lunar:lilith       # Lilith tests only
-poe test:leb                # LEB unit tests (no slow)
+poe test:leb                # LEB-specific unit tests (no slow)
 ```
 
 ## Code Style

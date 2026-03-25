@@ -60,10 +60,18 @@ class TestContextLEBFastPath:
         """Context calc_ut() with LEB should match global swe_calc_ut() with LEB."""
         # Set up global LEB too
         old_leb = None
+        old_calc_mode = None
         try:
             from libephemeris import state
 
             old_leb = state._LEB_FILE
+            old_calc_mode = state._CALC_MODE
+
+            # Ensure calc mode allows LEB usage.  A preceding test on this
+            # xdist worker may have set _CALC_MODE to "skyfield" or popped
+            # the LIBEPHEMERIS_MODE env var, causing get_leb_reader() to
+            # return None even though set_leb_file() was called.
+            state.set_calc_mode("auto")
             ephem.set_leb_file(test_leb_file)
 
             ctx_result, _ = ctx_with_leb.calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
@@ -75,6 +83,7 @@ class TestContextLEBFastPath:
                     f"Component {i}: ctx={ctx_result[i]}, global={global_result[i]}"
                 )
         finally:
+            state.set_calc_mode(old_calc_mode)
             ephem.set_leb_file(old_leb)
 
     @pytest.mark.integration

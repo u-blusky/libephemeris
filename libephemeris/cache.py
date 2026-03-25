@@ -34,8 +34,12 @@ import erfa
 # - NUTATION_CACHE_SIZE: Caches nutation angles (dpsi, deps) for Julian Days
 #   Most chart calculations use 1-2 JDs, but time ranges may use more
 # - OBLIQUITY_CACHE_SIZE: Caches obliquity values, same usage pattern
+# - TIME_CACHE_SIZE: Caches Skyfield Time objects per JD to avoid recreating
+#   nutation/precession matrices for repeated calls at the same JD
 _NUTATION_CACHE_SIZE = 128
 _OBLIQUITY_CACHE_SIZE = 128
+_TIME_CACHE_SIZE = 64
+_OBSERVER_CACHE_MAX = 256
 
 # J2000.0 epoch in Julian Days
 _J2000_JD = 2451545.0
@@ -131,6 +135,73 @@ def get_true_obliquity(jd_tt: float) -> float:
     return eps
 
 
+@lru_cache(maxsize=_TIME_CACHE_SIZE)
+def get_cached_time_ut1(jd: float):
+    """
+    Get a cached Skyfield Time object for a UT1 Julian Day.
+
+    Avoids recreating Time objects (and their lazy nutation/precession
+    matrices) when the same JD is used repeatedly, e.g. when computing
+    positions for multiple planets in a single chart.
+
+    Args:
+        jd: Julian Day in UT1
+
+    Returns:
+        Skyfield Time object
+    """
+    from .state import get_timescale
+
+    return get_timescale().ut1_jd(jd)
+
+
+@lru_cache(maxsize=_TIME_CACHE_SIZE)
+def get_cached_time_tt(jd: float):
+    """
+    Get a cached Skyfield Time object for a TT Julian Day.
+
+    Args:
+        jd: Julian Day in Terrestrial Time (TT)
+
+    Returns:
+        Skyfield Time object
+    """
+    from .state import get_timescale
+
+    return get_timescale().tt_jd(jd)
+
+
+# Observer position cache: stores observer.at(t) results keyed on
+# (id(observer), jd_tt). This avoids recomputing Earth's position
+# for every planet in a multi-planet chart at the same JD.
+_observer_at_cache: dict = {}
+
+
+def get_cached_observer_at(observer, t):
+    """
+    Get a cached result of observer.at(t).
+
+    For geocentric calculations, Earth's position at a given JD is
+    identical for all planets. This cache prevents ~10x redundant
+    evaluations per chart.
+
+    Args:
+        observer: Skyfield VectorSum (e.g. earth, sun)
+        t: Skyfield Time object
+
+    Returns:
+        Skyfield position object (Geocentric, Barycentric, etc.)
+    """
+    key = (id(observer), float(t.tt))
+    result = _observer_at_cache.get(key)
+    if result is None:
+        if len(_observer_at_cache) > _OBSERVER_CACHE_MAX:
+            _observer_at_cache.clear()
+        result = observer.at(t)
+        _observer_at_cache[key] = result
+    return result
+
+
 def clear_caches() -> None:
     """
     Clear all computation caches.
@@ -142,6 +213,9 @@ def clear_caches() -> None:
     """
     get_cached_nutation.cache_clear()
     get_cached_obliquity.cache_clear()
+    get_cached_time_ut1.cache_clear()
+    get_cached_time_tt.cache_clear()
+    _observer_at_cache.clear()
 
 
 def get_cache_info() -> dict:
@@ -154,4 +228,10 @@ def get_cache_info() -> dict:
     return {
         "nutation": get_cached_nutation.cache_info()._asdict(),
         "obliquity": get_cached_obliquity.cache_info()._asdict(),
+        "time_ut1": get_cached_time_ut1.cache_info()._asdict(),
+        "time_tt": get_cached_time_tt.cache_info()._asdict(),
+        "observer_at": {
+            "size": len(_observer_at_cache),
+            "maxsize": _OBSERVER_CACHE_MAX,
+        },
     }

@@ -113,22 +113,22 @@ packages = ["libephemeris"]
 libephemeris = ["py.typed", "data/*.csv"]
 
 [tool.poe.tasks]
-format = "ruff format ."
-format-black = "black libephemeris tests"
-lint = "ruff check . --fix"
+format = {cmd = "ruff format .", help = "Auto-format all Python files (ruff, line-length 88)"}
+format-black = {cmd = "black libephemeris tests", help = "Auto-format with black (legacy, prefer 'format')"}
+lint = {cmd = "ruff check . --fix", help = "Lint and auto-fix all Python files (ruff)"}
 
 # Test commands - fast variants exclude @pytest.mark.slow tests
-test = "pytest -m \"not slow\""
-"test:full" = "pytest"
-"test:progress" = "pytest --no-header -q -m \"not slow\""
-"test:fast" = "pytest -n auto -m \"not slow\""
-"test:full:fast" = "pytest -n auto"
+test = {cmd = "pytest -m \"not slow\"", help = "All tests excluding @slow — sequential, includes unit + compare if pyswisseph installed"}
+"test:full" = {cmd = "pytest", help = "ALL tests including @slow (iterative searches, hypothesis) — very slow, sequential"}
+"test:progress" = {cmd = "pytest --no-header -q -m \"not slow\"", help = "Same as 'test' but compact dots-only output, good for CI"}
+"test:fast" = {cmd = "pytest -n auto -m \"not slow\"", help = "All tests excluding @slow — parallel across CPU cores (-n auto)"}
+"test:full:fast" = {cmd = "pytest -n auto", help = "ALL tests including @slow — parallel, still slow due to iterative tests"}
 
-# Essential subset - 1 test file per library module, parallel (~490 tests vs ~5000 total)
+# Essential subset - 1 test file per library module, parallel (~490 tests vs ~5890 total)
 # Covers: planets, houses, eclipse, lunar, fixed_stars, minor_bodies, hypothetical,
 #         heliacal, rise/transit, arabic_parts, planetary_moons, time_utils,
 #         exceptions, context/state, sidereal, utils, constants/API
-"test:fast:essential" = """pytest -n auto -m "not slow" \
+"test:fast:essential" = {help = "Essential subset: 1 test per module, parallel (~490 tests, ~20s). Quick sanity check", cmd = """pytest -n auto -m "not slow" \
     tests/test_planets/test_central_difference_velocity.py \
     tests/test_planets/test_nod_aps.py \
     tests/test_houses/test_house_algorithms.py \
@@ -146,7 +146,7 @@ test = "pytest -m \"not slow\""
     tests/test_close.py \
     tests/test_sidereal/test_ayanamsa_precision.py \
     tests/test_deg_midp.py \
-    tests/test_get_planet_name.py"""
+    tests/test_get_planet_name.py"""}
 
 # Smoke subset - 1+ test file per library module, parallel (~1460 tests)
 # Covers every libephemeris/*.py module: all of "essential" plus angles, cache,
@@ -154,7 +154,7 @@ test = "pytest -m \"not slow\""
 # iers_data, delta-T, UTC, true_node_terms, mean_lilith, edge_cases,
 # retrograde, leb_format, leb_reader, fast_calc, profiling, type_safety,
 # golden regression, coordinate_validation
-"test:smoke" = """pytest -n auto -m "not slow" \
+"test:smoke" = {help = "Smoke test: 1+ test per module, parallel (~1460 tests, ~30s). Covers all libephemeris modules", cmd = """pytest -n auto -m "not slow" \
     tests/test_planets/test_central_difference_velocity.py \
     tests/test_planets/test_nod_aps.py \
     tests/test_houses/test_house_algorithms.py \
@@ -196,109 +196,91 @@ test = "pytest -m \"not slow\""
     tests/test_precision/test_erfa_nutation.py \
     tests/test_leb/test_leb_format.py \
     tests/test_leb/test_leb_reader.py \
-    tests/test_leb/test_fast_calc.py"""
+    tests/test_leb/test_fast_calc.py"""}
 
-# Unit tests (tests/ directory)
-"test:unit" = "pytest tests/ -v -m \"not slow\""
-"test:unit:full" = "pytest tests/ -v"
-"test:unit:fast" = "pytest tests/ -n auto -m \"not slow\""
+# Unit tests (tests/ directory only, no pyswisseph comparison)
+"test:unit" = {cmd = "pytest tests/ -v -m \"not slow\"", help = "Unit tests excluding @slow — sequential, verbose output (~5890 tests, ~2 min)"}
+"test:unit:full" = {cmd = "pytest tests/ -v", help = "ALL unit tests including @slow — sequential, very slow (~10+ min)"}
+"test:unit:fast" = {cmd = "pytest tests/ -n auto -m \"not slow\"", help = "Unit tests excluding @slow — parallel across CPU cores (~1 min)"}
 
-# Unit tests in LEB mode (uses precomputed Chebyshev ephemeris, ~14x faster)
-"test:unit:leb" = {cmd = "pytest tests/ -v -m \"not slow\" --calc-mode leb", env = {LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}}
-"test:unit:leb:full" = {cmd = "pytest tests/ -v --calc-mode leb", env = {LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}}
-"test:unit:leb:fast" = {cmd = "pytest tests/ -n auto -m \"not slow\" --calc-mode leb", env = {LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}}
+# Unit tests in LEB mode (uses precomputed Chebyshev ephemeris for ~14x faster Skyfield fallback)
+"test:unit:leb" = {cmd = "pytest tests/ -v -m \"not slow\" --calc-mode leb", env = {LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}, help = "Unit tests in LEB mode — sequential, verbose. Requires data/leb/ephemeris_medium.leb"}
+"test:unit:leb:full" = {cmd = "pytest tests/ -v --calc-mode leb", env = {LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}, help = "ALL unit tests in LEB mode including @slow — sequential, very slow"}
+"test:unit:leb:fast" = {cmd = "pytest tests/ -n auto -m \"not slow\" --calc-mode leb", env = {LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}, help = "RECOMMENDED: unit tests in LEB mode, parallel (~5890 tests, ~1 min). Best for dev"}
 
-# Comparison tests (compare_scripts/tests/ directory)
-# Default: Skyfield (JPL) mode — live DE440 calculations vs pyswisseph
-"test:compare" = "pytest compare_scripts/tests/ -v -m \"not slow\""
-"test:compare:full" = "pytest compare_scripts/tests/ -v"
-"test:compare:fast" = "pytest compare_scripts/tests/ -n auto -m \"not slow\""
+# Comparison tests (compare_scripts/tests/) — REQUIRE pyswisseph installed
+# Verify libephemeris output matches pyswisseph (the C reference implementation)
+"test:compare" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", help = "Compare libephemeris vs pyswisseph using live Skyfield/DE440 calculations (no @slow)"}
+"test:compare:full" = {cmd = "pytest compare_scripts/tests/ -v", help = "Compare libephemeris vs pyswisseph — all tests including @slow"}
+"test:compare:fast" = {cmd = "pytest compare_scripts/tests/ -n auto -m \"not slow\"", help = "Compare libephemeris vs pyswisseph — parallel across CPU cores"}
 
-# Comparison tests: explicit JPL/Skyfield mode (same as default, explicit)
-"test:compare:jpl" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", env = {LIBEPHEMERIS_COMPARE_MODE = "skyfield"}}
-"test:compare:jpl:full" = {cmd = "pytest compare_scripts/tests/ -v", env = {LIBEPHEMERIS_COMPARE_MODE = "skyfield"}}
+# Comparison tests: explicit JPL/Skyfield mode (same as default but forces LIBEPHEMERIS_COMPARE_MODE)
+"test:compare:jpl" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", env = {LIBEPHEMERIS_COMPARE_MODE = "skyfield"}, help = "Compare vs pyswisseph with explicit Skyfield mode env var (no @slow)"}
+"test:compare:jpl:full" = {cmd = "pytest compare_scripts/tests/ -v", env = {LIBEPHEMERIS_COMPARE_MODE = "skyfield"}, help = "Compare vs pyswisseph with explicit Skyfield mode — all tests"}
 
-# Comparison tests: LEB mode — precomputed Chebyshev ephemeris vs pyswisseph
-"test:compare:leb" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", env = {LIBEPHEMERIS_COMPARE_MODE = "leb", LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}}
-"test:compare:leb:full" = {cmd = "pytest compare_scripts/tests/ -v", env = {LIBEPHEMERIS_COMPARE_MODE = "leb", LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}}
+# Comparison tests: LEB mode — validates that precomputed LEB matches pyswisseph
+"test:compare:leb" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", env = {LIBEPHEMERIS_COMPARE_MODE = "leb", LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}, help = "Compare LEB binary ephemeris vs pyswisseph — validates LEB accuracy (no @slow)"}
+"test:compare:leb:full" = {cmd = "pytest compare_scripts/tests/ -v", env = {LIBEPHEMERIS_COMPARE_MODE = "leb", LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}, help = "Compare LEB binary ephemeris vs pyswisseph — all tests including @slow"}
 
-# Tier diagnostics - show all bodies with coordinates, velocities, and data source
-"diag:base" = "python scripts/tier_diagnostic_base.py"
-"diag:medium" = "python scripts/tier_diagnostic_medium.py"
-"diag:extended" = "python scripts/tier_diagnostic_extended.py"
-"diag:download" = "python -c \"import libephemeris as eph; eph.ensure_all_ephemerides(show_progress=True)\""
+# Tier diagnostics — print coordinates, velocities, and data source for all supported bodies
+"diag:base" = {cmd = "python scripts/tier_diagnostic_base.py", help = "Print all body positions for base tier (de440s, 1850-2150) to verify data integrity"}
+"diag:medium" = {cmd = "python scripts/tier_diagnostic_medium.py", help = "Print all body positions for medium tier (de440, 1550-2650) to verify data integrity"}
+"diag:extended" = {cmd = "python scripts/tier_diagnostic_extended.py", help = "Print all body positions for extended tier (de441, -13200 to +17191) to verify data integrity"}
+"diag:download" = {cmd = "python -c \"import libephemeris as eph; eph.ensure_all_ephemerides(show_progress=True)\"", help = "Download all required data files (BSP kernels, delta-T, leap seconds) with progress bar"}
 
-# Tier-specific SPK downloads for minor bodies
-"spk:download:base" = "python -c \"import libephemeris as eph; eph.set_precision_tier('base'); eph.ensure_all_ephemerides(show_progress=True)\""
-"spk:download:medium" = "python -c \"import libephemeris as eph; eph.set_precision_tier('medium'); eph.ensure_all_ephemerides(show_progress=True)\""
-"spk:download:extended" = "python scripts/download_max_range_spk.py"
+# Tier-specific SPK downloads for minor bodies (Chiron, Ceres, Pallas, Juno, Vesta)
+"spk:download:base" = {cmd = "python -c \"import libephemeris as eph; eph.set_precision_tier('base'); eph.ensure_all_ephemerides(show_progress=True)\"", help = "Download asteroid SPK21 files for base tier (1850-2150 date range)"}
+"spk:download:medium" = {cmd = "python -c \"import libephemeris as eph; eph.set_precision_tier('medium'); eph.ensure_all_ephemerides(show_progress=True)\"", help = "Download asteroid SPK21 files for medium tier (1550-2650 date range)"}
+"spk:download:extended" = {cmd = "python scripts/download_max_range_spk.py", help = "Download max-range asteroid SPK files for extended tier from JPL Horizons"}
 
-# ASSIST data download (REBOUND/ASSIST n-body integration)
-"download:assist" = "python -m libephemeris.cli download:assist"
+# ASSIST data download (REBOUND/ASSIST n-body integration for high-precision TNO orbits)
+"download:assist" = {cmd = "python -m libephemeris.cli download:assist", help = "Download REBOUND/ASSIST integration data (~120 MB) for high-precision TNO/asteroid orbits"}
 
-# LEB binary ephemeris download (precomputed Chebyshev polynomials, ~14x speedup)
-"download:leb:base" = "python -m libephemeris.cli download:leb:base"
-"download:leb:medium" = "python -m libephemeris.cli download:leb:medium"
-"download:leb:extended" = "python -m libephemeris.cli download:leb:extended"
+# LEB binary ephemeris download (precomputed Chebyshev polynomials, ~14x speedup over Skyfield)
+"download:leb:base" = {cmd = "python -m libephemeris.cli download:leb:base", help = "Download pre-built LEB file for base tier (de440s, 1850-2150, ~5 MB)"}
+"download:leb:medium" = {cmd = "python -m libephemeris.cli download:leb:medium", help = "Download pre-built LEB file for medium tier (de440, 1550-2650, ~20 MB)"}
+"download:leb:extended" = {cmd = "python -m libephemeris.cli download:leb:extended", help = "Download pre-built LEB file for extended tier (de441, -5000 to 5000, ~180 MB)"}
 
-# Planet centers SPK generation (requires spiceypy, downloads source satellite SPKs)
-"generate-planet-centers:base" = "python scripts/generate_planet_centers_spk.py --tier base"
-"generate-planet-centers:medium" = "python scripts/generate_planet_centers_spk.py --tier medium"
-"generate-planet-centers:extended" = "python scripts/generate_planet_centers_spk.py --tier extended"
-"generate-planet-centers:all" = "python scripts/generate_planet_centers_spk.py --all"
+# Planet centers SPK generation — builds COB-corrected SPK for gas giant planet centers
+# (requires spiceypy; downloads satellite ephemeris SPKs from JPL)
+"generate-planet-centers:base" = {cmd = "python scripts/generate_planet_centers_spk.py --tier base", help = "Build planet-center SPK for base tier (sub-arcsec Jupiter/Saturn/Uranus/Neptune)"}
+"generate-planet-centers:medium" = {cmd = "python scripts/generate_planet_centers_spk.py --tier medium", help = "Build planet-center SPK for medium tier (sub-arcsec gas giants)"}
+"generate-planet-centers:extended" = {cmd = "python scripts/generate_planet_centers_spk.py --tier extended", help = "Build planet-center SPK for extended tier (sub-arcsec gas giants)"}
+"generate-planet-centers:all" = {cmd = "python scripts/generate_planet_centers_spk.py --all", help = "Build planet-center SPK for all three tiers at once"}
 
 # Legacy alias
-"generate-planet-centers-spk" = "python scripts/generate_planet_centers_spk.py --tier medium"
+"generate-planet-centers-spk" = {cmd = "python scripts/generate_planet_centers_spk.py --tier medium", help = "(Legacy alias) Same as generate-planet-centers:medium"}
 
-coverage = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html -m \"not slow\""
-"coverage:full" = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html"
-typecheck = "mypy libephemeris"
+coverage = {cmd = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html -m \"not slow\"", help = "Run tests with code coverage (term + XML + HTML reports, no @slow)"}
+"coverage:full" = {cmd = "pytest --cov=libephemeris --cov-report=term-missing --cov-report=xml --cov-report=html", help = "Run ALL tests with code coverage including @slow"}
+typecheck = {cmd = "mypy libephemeris", help = "Static type checking with mypy on libephemeris package"}
 
-# Lunar test suites
-"test:lunar" = "pytest tests/test_lunar/ -v -m \"not slow\""
-"test:lunar:perigee" = """pytest -v \
-    tests/test_lunar/test_elp2000_perigee_perturbations.py \
-    tests/test_lunar/test_interpolated_perigee.py \
-    tests/test_lunar/test_osculating_perigee.py"""
-"test:lunar:apogee" = """pytest -v \
-    tests/test_lunar/test_elp2000_apogee_perturbations.py \
-    tests/test_lunar/test_interpolated_apogee.py"""
-"test:lunar:lilith" = """pytest -v \
-    tests/test_lunar/test_mean_lilith_enhanced.py \
-    tests/test_lunar/test_true_lilith_precision.py \
-    tests/test_lunar/test_true_lilith_annual_equation.py \
-    tests/test_lunar/test_true_lilith_evection_secondary.py \
-    tests/test_lunar/test_true_lilith_parallactic_inequality.py \
-    tests/test_lunar/test_true_lilith_reduction_to_ecliptic.py \
-    tests/test_lunar/test_true_lilith_solar_perturbation.py \
-    tests/test_lunar/test_true_lilith_variation.py"""
+# Lunar test suites — tests for nodes, apsides, Lilith, and ELP2000 perturbations
+"test:lunar" = {cmd = "pytest tests/test_lunar/ -v -m \"not slow\"", help = "All lunar module tests (nodes, Lilith, perigee, apogee) excluding @slow"}
+"test:lunar:perigee" = {cmd = "pytest -v tests/test_lunar/test_elp2000_perigee_perturbations.py tests/test_lunar/test_interpolated_perigee.py tests/test_lunar/test_osculating_perigee.py", help = "Lunar perigee tests: ELP2000 perturbation coefficients, interpolated and osculating perigee"}
+"test:lunar:apogee" = {cmd = "pytest -v tests/test_lunar/test_elp2000_apogee_perturbations.py tests/test_lunar/test_interpolated_apogee.py", help = "Lunar apogee tests: ELP2000 perturbation coefficients and interpolated apogee"}
+"test:lunar:lilith" = {cmd = "pytest -v tests/test_lunar/test_mean_lilith_enhanced.py tests/test_lunar/test_true_lilith_precision.py tests/test_lunar/test_true_lilith_annual_equation.py tests/test_lunar/test_true_lilith_evection_secondary.py tests/test_lunar/test_true_lilith_parallactic_inequality.py tests/test_lunar/test_true_lilith_reduction_to_ecliptic.py tests/test_lunar/test_true_lilith_solar_perturbation.py tests/test_lunar/test_true_lilith_variation.py", help = "Lilith tests: mean Lilith, true Lilith precision, all perturbation terms (8 test files)"}
 
-# LEB test suites
-"test:leb" = "pytest tests/test_leb/ -v -m \"not slow\""
-"test:leb:precision" = "pytest tests/test_leb/test_leb_precision.py -v"
-"test:leb:precision:quick" = "pytest tests/test_leb/test_leb_precision.py -v -k \"medium\""
+# LEB test suites — tests for the binary ephemeris format, reader, and fast-path calculator
+"test:leb" = {cmd = "pytest tests/test_leb/ -v -m \"not slow\"", help = "LEB module tests: binary format read/write, Chebyshev reader, fast_calc pipeline (no @slow)"}
+"test:leb:precision" = {cmd = "pytest tests/test_leb/test_leb_precision.py -v", help = "LEB precision sweep: verify Chebyshev approximation error for all bodies across all tiers"}
+"test:leb:precision:quick" = {cmd = "pytest tests/test_leb/test_leb_precision.py -v -k \"medium\"", help = "LEB precision sweep for medium tier only (faster subset of test:leb:precision)"}
 
-# LEB vs Skyfield comparison tests (medium tier — old-style at parent level)
-"test:leb:compare" = "pytest tests/test_leb/compare/ -v -m leb_compare --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/medium --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
-"test:leb:compare:quick" = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/medium --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier"
+# LEB vs Skyfield comparison — verify LEB Chebyshev output matches live Skyfield calculations
+"test:leb:compare" = {cmd = "pytest tests/test_leb/compare/ -v -m leb_compare --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/medium --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier", help = "LEB vs Skyfield comparison for medium tier (legacy flat tests in compare/ root)"}
+"test:leb:compare:quick" = {cmd = "pytest tests/test_leb/compare/ -v -m \"leb_compare and not slow\" --ignore=tests/test_leb/compare/base --ignore=tests/test_leb/compare/medium --ignore=tests/test_leb/compare/extended --ignore=tests/test_leb/compare/crosstier", help = "LEB vs Skyfield quick comparison, medium tier legacy (no @slow)"}
 
-# LEB vs Skyfield comparison tests (medium tier — new structured tests)
-"test:leb:compare:medium" = "pytest tests/test_leb/compare/medium/ -v -m leb_compare_medium"
-"test:leb:compare:medium:quick" = "pytest tests/test_leb/compare/medium/ -v -m \"leb_compare_medium and not slow\""
+# LEB vs Skyfield — structured per-tier comparison suites
+"test:leb:compare:medium" = {cmd = "pytest tests/test_leb/compare/medium/ -v -m leb_compare_medium", help = "LEB vs Skyfield: medium tier (de440, 1550-2650). Positions, speeds, sidereal, equatorial"}
+"test:leb:compare:medium:quick" = {cmd = "pytest tests/test_leb/compare/medium/ -v -m \"leb_compare_medium and not slow\"", help = "LEB vs Skyfield: medium tier quick (no @slow, ~2 min)"}
+"test:leb:compare:base" = {cmd = "pytest tests/test_leb/compare/base/ -v -m leb_compare_base", help = "LEB vs Skyfield: base tier (de440s, 1850-2150). Positions, speeds, sidereal, equatorial"}
+"test:leb:compare:base:quick" = {cmd = "pytest tests/test_leb/compare/base/ -v -m \"leb_compare_base and not slow\"", help = "LEB vs Skyfield: base tier quick (no @slow)"}
+"test:leb:compare:extended" = {cmd = "pytest tests/test_leb/compare/extended/ -v -m leb_compare_extended", help = "LEB vs Skyfield: extended tier (de441, -5000 to 5000). Positions, speeds, sidereal"}
+"test:leb:compare:extended:quick" = {cmd = "pytest tests/test_leb/compare/extended/ -v -m \"leb_compare_extended and not slow\"", help = "LEB vs Skyfield: extended tier quick (no @slow)"}
 
-# LEB vs Skyfield comparison tests (base tier)
-"test:leb:compare:base" = "pytest tests/test_leb/compare/base/ -v -m leb_compare_base"
-"test:leb:compare:base:quick" = "pytest tests/test_leb/compare/base/ -v -m \"leb_compare_base and not slow\""
-
-# LEB vs Skyfield comparison tests (extended tier)
-"test:leb:compare:extended" = "pytest tests/test_leb/compare/extended/ -v -m leb_compare_extended"
-"test:leb:compare:extended:quick" = "pytest tests/test_leb/compare/extended/ -v -m \"leb_compare_extended and not slow\""
-
-# LEB cross-tier consistency tests
-"test:leb:compare:crosstier" = "pytest tests/test_leb/compare/crosstier/ -v -m leb_compare_crosstier"
-
-# LEB comparison: all tiers combined
-"test:leb:compare:all" = "pytest tests/test_leb/compare/ -v -m \"leb_compare or leb_compare_base or leb_compare_extended or leb_compare_crosstier\""
+# LEB cross-tier and combined
+"test:leb:compare:crosstier" = {cmd = "pytest tests/test_leb/compare/crosstier/ -v -m leb_compare_crosstier", help = "Cross-tier consistency: verify base/medium/extended LEB files agree on overlapping date ranges"}
+"test:leb:compare:all" = {cmd = "pytest tests/test_leb/compare/ -v -m \"leb_compare or leb_compare_base or leb_compare_extended or leb_compare_crosstier\"", help = "LEB vs Skyfield: ALL tiers + cross-tier combined (comprehensive, slow)"}
 
 # Lunar corrections and calibration
 [tool.poe.tasks.generate-lunar-corrections]

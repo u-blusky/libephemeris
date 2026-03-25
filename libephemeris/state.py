@@ -540,8 +540,16 @@ def set_precision_tier(tier: str) -> None:
             f"Invalid tier: {tier!r}. Must be one of: {list(TIERS.keys())}"
         )
     _PRECISION_TIER = tier
-    # Clear cached planets to force reload with the new ephemeris file
+    # Close old kernel and clear caches before reloading
+    if _PLANETS is not None:
+        try:
+            _PLANETS.close()
+        except (AttributeError, Exception):
+            pass
     _PLANETS = None
+    from .cache import clear_caches
+
+    clear_caches()
 
 
 def list_tiers() -> List[PrecisionTier]:
@@ -902,8 +910,16 @@ def set_ephe_path(path: Optional[str]) -> None:
     """
     global _EPHEMERIS_PATH, _PLANETS
     _EPHEMERIS_PATH = path
-    # Clear cached planets to force reload from new path
+    # Close old kernel and clear caches before reloading
+    if _PLANETS is not None:
+        try:
+            _PLANETS.close()
+        except (AttributeError, Exception):
+            pass
     _PLANETS = None
+    from .cache import clear_caches
+
+    clear_caches()
 
     # Auto-discover local SPK files (no network, just file scanning)
     if path and os.path.isdir(path):
@@ -942,8 +958,16 @@ def set_ephemeris_file(filename: str) -> None:
     global _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT, _PLANETS
     _EPHEMERIS_FILE = filename
     _EPHEMERIS_FILE_EXPLICIT = True
-    # Clear cached planets to force reload with new file
+    # Close old kernel and clear caches before reloading
+    if _PLANETS is not None:
+        try:
+            _PLANETS.close()
+        except (AttributeError, Exception):
+            pass
     _PLANETS = None
+    from .cache import clear_caches
+
+    clear_caches()
 
 
 def set_jpl_file(filename: str) -> None:

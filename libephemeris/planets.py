@@ -856,8 +856,9 @@ def swe_calc_ut(
     # We apply them after the calculation is complete.
     calc_iflag = flags & ~SEFLG_XYZ & ~SEFLG_RADIANS
 
-    ts = get_timescale()
-    t = ts.ut1_jd(tjdut)
+    from .cache import get_cached_time_ut1
+
+    t = get_cached_time_ut1(tjdut)
     try:
         pos, retflag = _calc_body(t, planet, calc_iflag)
         # _calc_body logs the specific source (SPK, ASSIST, Keplerian)
@@ -944,8 +945,9 @@ def swe_calc(
     # since they are output format flags, not calculation flags.
     calc_iflag = flags & ~SEFLG_XYZ & ~SEFLG_RADIANS
 
-    ts = get_timescale()
-    t = ts.tt_jd(tjdet)
+    from .cache import get_cached_time_tt
+
+    t = get_cached_time_tt(tjdet)
     try:
         pos, retflag = _calc_body(t, planet, calc_iflag)
         if planet in _PLANET_MAP:
@@ -1003,8 +1005,9 @@ def swe_calc_pctr(
     if _body_uses_jpl_ephemeris(planet) or _body_uses_jpl_ephemeris(center):
         validate_jd_range(tjdet, planet, "swe_calc_pctr")
 
-    ts = get_timescale()
-    t = ts.tt_jd(tjdet)
+    from .cache import get_cached_time_tt
+
+    t = get_cached_time_tt(tjdet)
     try:
         return _calc_body_pctr(t, planet, center, flags)
     except SkyfieldRangeError as e:
@@ -1070,13 +1073,17 @@ def _calc_body_pctr(
     target = get_planet_target(planets, target_name)
     observer = get_planet_target(planets, observer_name)
 
+    from .cache import get_cached_observer_at
+
     # Helper function to get position vector at time t_
     def get_vector(t_):
         # Both positions relative to SSB (Solar System Barycenter)
-        tgt_pos = target.at(t_).position.au
-        tgt_vel = target.at(t_).velocity.au_per_d
-        obs_pos = observer.at(t_).position.au
-        obs_vel = observer.at(t_).velocity.au_per_d
+        tgt = target.at(t_)
+        tgt_pos = tgt.position.au
+        tgt_vel = tgt.velocity.au_per_d
+        obs = get_cached_observer_at(observer, t_)
+        obs_pos = obs.position.au
+        obs_vel = obs.velocity.au_per_d
 
         # Target position relative to observer
         p_ = tgt_pos - obs_pos
@@ -1095,17 +1102,18 @@ def _calc_body_pctr(
     else:
         # Light-time corrected position
         p, v = get_vector(t)
+        # Hoist observer.at(t) out of the loop - observer stays at current time
+        obs_at_t = get_cached_observer_at(observer, t)
+        obs_pos = obs_at_t.position.au
+        obs_vel = obs_at_t.velocity.au_per_d
         for _ in range(3):
             dist_au = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
             light_time = dist_au / C_AU_PER_DAY
             ts_lt = get_timescale()
             # Retard only the target, keep observer at current time
-            tgt_pos_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time)).position.au
-            tgt_vel_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time)).velocity.au_per_d
-            obs_pos = observer.at(t).position.au
-            obs_vel = observer.at(t).velocity.au_per_d
-            p = tgt_pos_ret - obs_pos
-            v = tgt_vel_ret - obs_vel
+            tgt_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time))
+            p = tgt_ret.position.au - obs_pos
+            v = tgt_ret.velocity.au_per_d - obs_vel
 
     # Create position object for coordinate conversion
     # Center doesn't matter for coordinate conversion, just for documentation
@@ -2175,19 +2183,23 @@ def _calc_body(
         icrf_center = 399  # Earth
 
     # 3. Compute Position
+    from .cache import get_cached_observer_at
+
     # Helper to get vector at time t
     def get_vector(t_):
         # Target position relative to SSB
-        tgt_pos = target.at(t_).position.au
-        tgt_vel = target.at(t_).velocity.au_per_d
+        tgt = target.at(t_)
+        tgt_pos = tgt.position.au
+        tgt_vel = tgt.velocity.au_per_d
 
         if observer is None:
             # Barycentric: target position is already relative to SSB
             return tgt_pos, tgt_vel
 
-        # Observer relative to SSB
-        obs_pos = observer.at(t_).position.au
-        obs_vel = observer.at(t_).velocity.au_per_d
+        # Observer relative to SSB (cached per observer+JD)
+        obs = get_cached_observer_at(observer, t_)
+        obs_pos = obs.position.au
+        obs_vel = obs.velocity.au_per_d
 
         p_ = tgt_pos - obs_pos
         v_ = tgt_vel - obs_vel
@@ -2225,15 +2237,18 @@ def _calc_body(
 
             pos = ICRF(p, v, t=t, center=icrf_center)
         else:
+            # Cache observer.at(t) to avoid recomputing Earth's position
+            # for every planet at the same JD
+            obs_at_t = get_cached_observer_at(observer, t)
             if iflag & SEFLG_NOABERR:
-                pos = observer.at(t).observe(target)  # Astrometric
+                pos = obs_at_t.observe(target)  # Astrometric
             elif iflag & SEFLG_NOGDEFL:
                 # Aberration without gravitational deflection:
                 # Pass empty deflectors tuple to skip Sun/Jupiter/Saturn
                 # deflection while still applying stellar aberration.
-                pos = observer.at(t).observe(target).apparent(deflectors=())
+                pos = obs_at_t.observe(target).apparent(deflectors=())
             else:
-                pos = observer.at(t).observe(target).apparent()  # Apparent
+                pos = obs_at_t.observe(target).apparent()  # Apparent
 
     # 4. Coordinate System & Speeds
     is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
@@ -2289,14 +2304,15 @@ def _calc_body(
                             center=icrf_center,
                         )
                     else:
+                        obs_at_t_ = get_cached_observer_at(observer, t_)
                         if iflag & SEFLG_NOABERR:
-                            pos_ = observer.at(t_).observe(target)
+                            pos_ = obs_at_t_.observe(target)
                         elif iflag & SEFLG_NOGDEFL:
                             pos_ = (
-                                observer.at(t_).observe(target).apparent(deflectors=())
+                                obs_at_t_.observe(target).apparent(deflectors=())
                             )
                         else:
-                            pos_ = observer.at(t_).observe(target).apparent()
+                            pos_ = obs_at_t_.observe(target).apparent()
                     ra_, dec_, dist_ = pos_.radec()
                     return ra_.hours * 15.0, dec_.degrees, dist_.au
 
@@ -2371,14 +2387,15 @@ def _calc_body(
                             center=icrf_center,
                         )
                     else:
+                        obs_at_t_ = get_cached_observer_at(observer, t_)
                         if iflag & SEFLG_NOABERR:
-                            pos_ = observer.at(t_).observe(target)
+                            pos_ = obs_at_t_.observe(target)
                         elif iflag & SEFLG_NOGDEFL:
                             pos_ = (
-                                observer.at(t_).observe(target).apparent(deflectors=())
+                                obs_at_t_.observe(target).apparent(deflectors=())
                             )
                         else:
-                            pos_ = observer.at(t_).observe(target).apparent()
+                            pos_ = obs_at_t_.observe(target).apparent()
 
                     if _use_mean_equator:
                         from skyfield.framelib import mean_equator_and_equinox_of_date
@@ -5010,6 +5027,8 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         Tuple of 20 floats (bare tuple, matching pyswisseph).
     """
 
+    from .cache import get_cached_observer_at
+
     planets = get_planets()
 
     # Initialize return values
@@ -5025,7 +5044,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         # Get Sun distance
         earth = planets["earth"]
         sun = planets["sun"]
-        sun_pos = earth.at(t).observe(sun).apparent()
+        sun_pos = get_cached_observer_at(earth, t).observe(sun).apparent()
         _, _, sun_dist = sun_pos.radec()
 
         phase_angle = 0.0
@@ -5074,21 +5093,22 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         observer = earth
 
     # Get apparent positions
+    obs_at_t = get_cached_observer_at(observer, t)
     if iflag & SEFLG_TRUEPOS:
         # Geometric position (no light time)
-        target_pos_geo = observer.at(t).observe(target)
-        sun_pos_geo = observer.at(t).observe(sun) if ipl != SE_MOON else None
+        target_pos_geo = obs_at_t.observe(target)
+        sun_pos_geo = obs_at_t.observe(sun) if ipl != SE_MOON else None
     else:
         # Apparent position
-        target_pos_geo = observer.at(t).observe(target).apparent()
+        target_pos_geo = obs_at_t.observe(target).apparent()
         sun_pos_geo = (
-            observer.at(t).observe(sun).apparent()
+            obs_at_t.observe(sun).apparent()
             if not (iflag & SEFLG_HELCTR)
             else None
         )
 
     # Get heliocentric position of target for phase calculations
-    target_helio = sun.at(t).observe(target)
+    target_helio = get_cached_observer_at(sun, t).observe(target)
     target_helio_dist = math.sqrt(sum(x**2 for x in target_helio.position.au))
 
     # Get geocentric distance
@@ -5097,7 +5117,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # Special handling for Moon
     if ipl == SE_MOON:
         # For Moon, we need Sun position from Earth
-        sun_from_earth = earth.at(t).observe(sun).apparent()
+        sun_from_earth = get_cached_observer_at(earth, t).observe(sun).apparent()
 
         # Get RA/Dec of Moon and Sun
         moon_ra, moon_dec, moon_dist = target_pos_geo.radec()
@@ -5199,12 +5219,13 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         # Heliocentric case: phase angle and elongation are geometric
         # properties of the Sun-Planet-Earth triangle, computed from
         # Earth's perspective regardless of observer flag.
+        earth_at_t = get_cached_observer_at(earth, t)
         if iflag & SEFLG_TRUEPOS:
-            _earth_target = earth.at(t).observe(target)
-            _earth_sun = earth.at(t).observe(sun)
+            _earth_target = earth_at_t.observe(target)
+            _earth_sun = earth_at_t.observe(sun)
         else:
-            _earth_target = earth.at(t).observe(target).apparent()
-            _earth_sun = earth.at(t).observe(sun).apparent()
+            _earth_target = earth_at_t.observe(target).apparent()
+            _earth_sun = earth_at_t.observe(sun).apparent()
 
         planet_ra, planet_dec, _ = _earth_target.radec()
         sun_ra, sun_dec, _ = _earth_sun.radec()

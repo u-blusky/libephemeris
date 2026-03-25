@@ -7,10 +7,27 @@ This module provides test infrastructure for libephemeris standalone tests
 For comparison tests against pyswisseph, see compare_scripts/tests/conftest.py
 """
 
+import logging
+
 import pytest
 import random
 import libephemeris as ephem
 from libephemeris.constants import *
+
+
+# ============================================================================
+# GLOBAL SETUP - Suppress debug log noise during tests
+# ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def _suppress_debug_logs():
+    """Set libephemeris log level to WARNING to reduce noise in test output."""
+    logger = logging.getLogger("libephemeris")
+    original_level = logger.level
+    logger.setLevel(logging.WARNING)
+    yield
+    logger.setLevel(original_level)
 
 
 # ============================================================================
@@ -529,14 +546,65 @@ def known_solstices():
 
 @pytest.fixture(autouse=True)
 def reset_ephemeris_state():
-    """Reset ephemeris state before each test."""
+    """Reset ephemeris state and clear caches before each test.
+
+    Saves and restores ALL mutable global state that could cause cross-test
+    contamination in parallel runs (pytest-xdist). Without this, tests that
+    call close(), set_calc_mode(), or pop env vars will corrupt state for
+    subsequent tests in the same worker process.
+    """
+    import os
+
+    from libephemeris import state
+    from libephemeris.cache import clear_caches
+
+    # Save critical global state before the test
+    saved_calc_mode = state._CALC_MODE
+    saved_leb_file = state._LEB_FILE
+    saved_leb_reader = state._LEB_READER
+    saved_precision_tier = state._PRECISION_TIER
+    saved_ephemeris_file = state._EPHEMERIS_FILE
+    saved_ephemeris_file_explicit = state._EPHEMERIS_FILE_EXPLICIT
+    saved_topo = state._TOPO
+
+    # Save env vars that some tests pop/modify
+    saved_env_mode = os.environ.get("LIBEPHEMERIS_MODE")
+    saved_env_leb = os.environ.get("LIBEPHEMERIS_LEB")
+
     # Reset to default sidereal mode
     ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    # Clear hot-path caches to prevent cross-test contamination in parallel runs
+    clear_caches()
 
     yield
 
-    # Cleanup after test
+    # Restore all global state after the test
+    state._CALC_MODE = saved_calc_mode
+    state._PRECISION_TIER = saved_precision_tier
+    state._EPHEMERIS_FILE = saved_ephemeris_file
+    state._EPHEMERIS_FILE_EXPLICIT = saved_ephemeris_file_explicit
+    state._TOPO = saved_topo
+
+    # Restore LEB file path but force reader re-creation.
+    # close() may have closed the reader's file handle, making it unusable.
+    # Setting _LEB_READER = None lets get_leb_reader() recreate it lazily.
+    state._LEB_FILE = saved_leb_file
+    state._LEB_READER = None
+
+    # Restore env vars to their pre-test state
+    if saved_env_mode is not None:
+        os.environ["LIBEPHEMERIS_MODE"] = saved_env_mode
+    else:
+        os.environ.pop("LIBEPHEMERIS_MODE", None)
+
+    if saved_env_leb is not None:
+        os.environ["LIBEPHEMERIS_LEB"] = saved_env_leb
+    else:
+        os.environ.pop("LIBEPHEMERIS_LEB", None)
+
+    # Cleanup sidereal mode and caches
     ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    clear_caches()
 
 
 # ============================================================================
