@@ -13,6 +13,9 @@ Known occultation series:
 """
 
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

@@ -25,6 +25,8 @@ from libephemeris.exceptions import (
 
 warnings.filterwarnings("ignore")
 
+pytestmark = pytest.mark.slow
+
 # Acceptable exceptions for fuzz inputs — must be clean, not crashes
 ACCEPTABLE_EXCEPTIONS = (
     Error,

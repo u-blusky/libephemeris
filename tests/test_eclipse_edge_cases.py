@@ -37,6 +37,8 @@ from libephemeris.eclipse import (
     NEAR_MISS_GAMMA_MARGIN,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestShallowEclipseDetection:
     """Test detection of shallow eclipses."""

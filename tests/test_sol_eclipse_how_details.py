@@ -12,6 +12,9 @@ Reference eclipse: April 8, 2024 total solar eclipse
 
 import math
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

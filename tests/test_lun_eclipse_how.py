@@ -8,6 +8,8 @@ Reference data from NASA Eclipse website:
 https://eclipse.gsfc.nasa.gov/lunar.html
 """
 
+import pytest
+
 from libephemeris import (
     julday,
     lun_eclipse_when,
@@ -20,6 +22,8 @@ from libephemeris import (
     SE_ECL_VISIBLE,
     SEFLG_SWIEPH,
 )
+
+pytestmark = pytest.mark.slow
 
 
 class TestLunEclipseHow:

@@ -29,6 +29,8 @@ from libephemeris.constants import (
     SEFLG_SPEED,
 )
 
+pytestmark = pytest.mark.slow
+
 
 @pytest.mark.unit
 class TestIsNearStation:

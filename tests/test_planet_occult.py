@@ -19,6 +19,9 @@ rather than finding actual occultations (which are very rare).
 """
 
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     planet_occult_when_glob,

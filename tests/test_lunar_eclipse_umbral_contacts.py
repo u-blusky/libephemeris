@@ -15,6 +15,10 @@ Reference data from NASA Eclipse website:
 https://eclipse.gsfc.nasa.gov/lunar.html
 """
 
+import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

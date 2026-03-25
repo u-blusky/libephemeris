@@ -10,6 +10,8 @@ Reference: Historical astronomical records and Meeus, Astronomical Algorithms.
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

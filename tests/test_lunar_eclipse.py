@@ -20,6 +20,10 @@ Times tuple layout (10 elements, pyswisseph-compatible):
     [9]: Reserved
 """
 
+import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

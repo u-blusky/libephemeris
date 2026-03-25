@@ -33,6 +33,8 @@ from libephemeris import (
     SE_ECL_PARTIAL,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestSolarEclipseDurationBasicFunctionality:
     """Test basic functionality of calc_solar_eclipse_duration."""

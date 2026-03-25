@@ -8,6 +8,8 @@ Reference data from USNO and timeanddate.com for verification.
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

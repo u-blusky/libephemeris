@@ -27,6 +27,8 @@ from libephemeris import (
     SE_ECL_PARTIAL,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestEclipseSecondContactC2BasicFunctionality:
     """Test basic functionality of calc_eclipse_second_contact_c2."""

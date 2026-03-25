@@ -11,6 +11,8 @@ Reference data based on astronomical calculations and historical records.
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

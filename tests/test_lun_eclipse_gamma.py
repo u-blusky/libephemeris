@@ -21,6 +21,8 @@ from libephemeris import (
     SEFLG_SWIEPH,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestLunEclipseGammaFunctionSignature:
     """Test that lun_eclipse_gamma function signature is correct."""

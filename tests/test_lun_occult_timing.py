@@ -13,6 +13,9 @@ The improvements include:
 """
 
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

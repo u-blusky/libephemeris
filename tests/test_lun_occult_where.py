@@ -10,6 +10,9 @@ is visible at a specific moment.
 """
 
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     lun_occult_where,

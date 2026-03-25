@@ -29,6 +29,8 @@ import libephemeris as swe
 
 warnings.filterwarnings("ignore")
 
+pytestmark = pytest.mark.slow
+
 J2000 = 2451545.0
 
 # Number of iterations for timing

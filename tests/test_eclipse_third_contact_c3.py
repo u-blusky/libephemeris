@@ -27,6 +27,8 @@ from libephemeris import (
     SE_ECL_ANNULAR,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestEclipseThirdContactC3BasicFunctionality:
     """Test basic functionality of calc_eclipse_third_contact_c3."""

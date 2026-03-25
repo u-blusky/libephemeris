@@ -11,6 +11,9 @@ Reference data sources:
 """
 
 import pytest  # noqa: F401
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     calc_eclipse_southern_limit,

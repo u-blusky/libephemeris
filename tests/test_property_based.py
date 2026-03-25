@@ -19,6 +19,8 @@ import libephemeris as swe
 
 warnings.filterwarnings("ignore")
 
+pytestmark = pytest.mark.slow
+
 # ============================================================================
 # Strategies
 # ============================================================================

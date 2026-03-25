@@ -24,6 +24,8 @@ from libephemeris import (
     SE_ECL_PENUMBRAL,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestSolarEclipseTimingPrecision:
     """Test solar eclipse timing precision against known reference data."""

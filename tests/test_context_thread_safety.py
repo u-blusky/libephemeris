@@ -49,6 +49,8 @@ from libephemeris.constants import (
     SE_SIDM_GALCENT_0SAG,
 )
 
+pytestmark = pytest.mark.slow
+
 
 # =============================================================================
 # FIXTURES

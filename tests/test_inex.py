@@ -16,6 +16,8 @@ from libephemeris import (
     SE_ECL_TOTAL,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestInexCycleConstant:
     """Tests for the Inex cycle constant."""

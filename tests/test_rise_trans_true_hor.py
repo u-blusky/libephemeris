@@ -7,6 +7,8 @@ This is useful for locations with mountains or buildings that occlude the horizo
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

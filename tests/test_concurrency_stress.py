@@ -21,6 +21,8 @@ from libephemeris.context import EphemerisContext
 
 warnings.filterwarnings("ignore")
 
+pytestmark = pytest.mark.slow
+
 # Base JD for tests
 J2000 = 2451545.0
 

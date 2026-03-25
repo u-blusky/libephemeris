@@ -14,6 +14,9 @@ The function matches the pyswisseph swe_lun_occult_when_loc() API:
 """
 
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     lun_occult_when_loc,

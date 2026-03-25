@@ -34,6 +34,8 @@ import libephemeris as swe
 
 warnings.filterwarnings("ignore")
 
+pytestmark = pytest.mark.slow
+
 
 def jd_to_datetime_str(jd: float) -> str:
     """Convert JD to human-readable string."""

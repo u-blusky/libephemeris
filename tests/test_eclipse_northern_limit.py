@@ -22,6 +22,8 @@ from libephemeris import (
     SE_ECL_ANNULAR,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestEclipseNorthernLimitBasicFunctionality:
     """Test basic functionality of calc_eclipse_northern_limit."""

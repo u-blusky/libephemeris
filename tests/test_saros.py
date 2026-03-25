@@ -7,6 +7,9 @@ geometry.
 """
 
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     get_saros_number,
     SAROS_CYCLE_DAYS,

@@ -11,6 +11,9 @@ the outer 10% of the Moon's disc (min_sep > 0.9 * moon_radius).
 """
 
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

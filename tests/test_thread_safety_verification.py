@@ -43,6 +43,8 @@ from libephemeris.constants import (
     SE_SIDM_YUKTESHWAR,
 )
 
+pytestmark = pytest.mark.slow
+
 
 # =============================================================================
 # TEST: Lock Correctness Verification

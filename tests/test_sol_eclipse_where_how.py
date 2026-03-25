@@ -10,6 +10,9 @@ Reference data from NASA Eclipse website and pyswisseph comparison.
 
 import math
 import pytest
+
+pytestmark = pytest.mark.slow
+
 from libephemeris import (
     julday,
     revjul,

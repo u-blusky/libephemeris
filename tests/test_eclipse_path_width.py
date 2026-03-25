@@ -22,6 +22,8 @@ from libephemeris import (
     SE_ECL_ANNULAR,
 )
 
+pytestmark = pytest.mark.slow
+
 
 class TestEclipsePathWidthBasicFunctionality:
     """Test basic functionality of calc_eclipse_path_width."""
