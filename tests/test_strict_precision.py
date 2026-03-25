@@ -38,6 +38,8 @@ def cleanup(monkeypatch):
     monkeypatch.setattr(state, "_LEB_FILE", None)
     monkeypatch.setattr(state, "_LEB_READER", None)
     monkeypatch.setattr(state, "_discover_leb_file", lambda: None)
+    # Override any --calc-mode leb from root conftest
+    eph.set_calc_mode("auto")
     # Reset strict precision setting
     eph.set_strict_precision(None)
     yield

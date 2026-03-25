@@ -142,7 +142,7 @@ class TestChangelogVersionSync:
         with open(pyproject_path, "r", encoding="utf-8") as f:
             pyproject_content = f.read()
 
-        version_match = re.search(r'version = "(\d+\.\d+\.\d+)"', pyproject_content)
+        version_match = re.search(r'version = "([^"]+)"', pyproject_content)
         assert version_match, "Could not find version in pyproject.toml"
         current_version = version_match.group(1)
 
@@ -151,9 +151,18 @@ class TestChangelogVersionSync:
         with open(changelog_path, "r", encoding="utf-8") as f:
             changelog_content = f.read()
 
-        assert f"[{current_version}]" in changelog_content, (
-            f"Current version {current_version} not found in CHANGELOG.md"
-        )
+        # Pre-release versions (e.g. 1.0.0a1, 1.0.0rc1) are expected under
+        # [Unreleased]; stable versions must have their own entry.
+        is_prerelease = any(tag in current_version for tag in ("a", "b", "rc", "dev"))
+        if is_prerelease:
+            assert "[Unreleased]" in changelog_content, (
+                f"Pre-release version {current_version} requires an "
+                f"[Unreleased] section in CHANGELOG.md"
+            )
+        else:
+            assert f"[{current_version}]" in changelog_content, (
+                f"Current version {current_version} not found in CHANGELOG.md"
+            )
 
 
 class TestChangelogLinks:

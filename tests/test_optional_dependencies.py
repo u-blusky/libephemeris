@@ -39,8 +39,11 @@ class TestOptionalDependenciesDocumentation:
         )
 
     def test_optional_dependencies_section_exists(self, readme_content: str):
-        """README should have an Optional Dependencies section."""
-        assert "Optional Dependencies" in readme_content
+        """README should have an Optional Dependencies/extras section."""
+        assert (
+            "Optional Dependencies" in readme_content
+            or "Optional extras" in readme_content
+        )
 
     def test_installation_commands_documented(self, readme_content: str):
         """README should include installation commands for optional dependencies."""
