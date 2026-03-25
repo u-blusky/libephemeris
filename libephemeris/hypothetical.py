@@ -39,6 +39,8 @@ References:
     - Landscheidt: "Cosmic Cybernetics" (1973)
 """
 
+from __future__ import annotations
+
 import erfa
 import math
 import re

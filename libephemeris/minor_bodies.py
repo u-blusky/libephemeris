@@ -38,6 +38,8 @@ Orbital elements source: JPL Small-Body Database (epoch JD 2461000.5 TDB = 2025-
 Algorithm: Keplerian mechanics with Laplace-Lagrange secular perturbations + resonant libration
 """
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from typing import Tuple, Optional, NamedTuple
@@ -2722,8 +2724,11 @@ def fetch_orbital_elements_from_sbdb(
         - JPL SBDB contains 1+ million numbered asteroids
     """
     import json
+    import ssl
     import urllib.error
     import urllib.request
+
+    import certifi
 
     # Check cache first
     if asteroid_number in _ASTEROID_ELEMENTS_CACHE:
@@ -2738,7 +2743,10 @@ def fetch_orbital_elements_from_sbdb(
             url,
             headers={"User-Agent": "libephemeris/1.0 (Python)"},
         )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        with urllib.request.urlopen(
+            request, timeout=timeout, context=_ssl_ctx
+        ) as response:
             data = json.loads(response.read().decode("utf-8"))
 
         # Check for API errors
@@ -2908,9 +2916,12 @@ def get_asteroid_number(name: str, timeout: float = 30.0) -> Optional[int]:
         fetch_orbital_elements_from_sbdb: Get orbital elements by number
     """
     import json
+    import ssl
     import urllib.error
     import urllib.parse
     import urllib.request
+
+    import certifi
 
     # Normalize name for lookup
     name_lower = name.strip().lower()
@@ -2935,7 +2946,10 @@ def get_asteroid_number(name: str, timeout: float = 30.0) -> Optional[int]:
             url,
             headers={"User-Agent": "libephemeris/1.0 (Python)"},
         )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        with urllib.request.urlopen(
+            request, timeout=timeout, context=_ssl_ctx
+        ) as response:
             data = json.loads(response.read().decode("utf-8"))
 
         # Check for API errors

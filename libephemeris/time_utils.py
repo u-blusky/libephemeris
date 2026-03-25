@@ -10,6 +10,8 @@ Functions provide pyswisseph-compatible API signatures.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 
+from __future__ import annotations
+
 from math import floor as _floor
 from typing import Any, Optional
 

@@ -21,6 +21,8 @@ Constants:
     Most constants are from Schaefer (1990).
 """
 
+from __future__ import annotations
+
 import math
 from typing import Tuple, Optional
 

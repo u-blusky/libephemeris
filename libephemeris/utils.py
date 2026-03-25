@@ -5,6 +5,8 @@ Provides helper functions compatible with the reference API including
 angular calculations and other mathematical utilities.
 """
 
+from __future__ import annotations
+
 import math
 import erfa
 from typing import Optional, Sequence, Tuple

@@ -25,6 +25,8 @@ References:
     - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
 """
 
+from __future__ import annotations
+
 import math
 from typing import Tuple, NamedTuple, Optional
 

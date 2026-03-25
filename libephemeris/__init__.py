@@ -756,9 +756,6 @@ from .arabic_parts import calc_all_arabic_parts
 # .env file loader (public API for manual reloading)
 from ._dotenv import load_dotenv
 
-# Constants (planet IDs, flags, sidereal modes)
-from .constants import *
-
 __version__ = "1.0.0a1"
 version = __version__
 __author__ = "Giacomo Battaglia"

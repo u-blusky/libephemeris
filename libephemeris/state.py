@@ -14,6 +14,8 @@ All state is stored in module-level globals to provide a stateful module-level A
 compatible with pyswisseph's threading model (thread-unsafe by design).
 """
 
+from __future__ import annotations
+
 import os
 import threading
 from dataclasses import dataclass
@@ -259,7 +261,7 @@ def set_leb_file(filepath: Optional[str]) -> None:
         try:
             _LEB_READER.close()
         except Exception:
-            pass
+            get_logger().debug("Failed to close LEB reader: %s", _LEB_FILE)
     _LEB_FILE = filepath
     _LEB_READER = None  # force re-creation on next access
 
@@ -749,7 +751,10 @@ def get_planet_center_segment(naif_id: int, jd: Optional[float] = None):
                         if not (start_jd <= jd <= end_jd):
                             return None  # Outside coverage, trigger fallback
                 except Exception:
-                    pass  # If we can't check coverage, return segment anyway
+                    # If we can't check coverage, return segment anyway
+                    get_logger().debug(
+                        "Could not check SPK segment coverage for jd=%.1f", jd
+                    )
             return seg
     return None
 
@@ -908,7 +913,7 @@ def set_ephe_path(path: Optional[str]) -> None:
             discover_local_spks(path)
         except Exception:
             # Discovery is best-effort; don't fail set_ephe_path()
-            pass
+            get_logger().debug("Local SPK discovery failed for path: %s", path)
 
 
 def set_ephemeris_file(filename: str) -> None:
@@ -1229,7 +1234,7 @@ def close() -> None:
     global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
-    global _SPK_KERNELS, _SPK_BODY_MAP, _AUTO_SPK_DOWNLOAD
+    global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
     global _PRECISION_TIER
     global _LEB_FILE, _LEB_READER, _CALC_MODE
@@ -1303,6 +1308,14 @@ def close() -> None:
             pass
     _SPK_KERNELS = {}
     _SPK_BODY_MAP = {}
+
+    # Close and clear SPK type 21 kernels
+    for kernel in _SPK_TYPE21_KERNELS.values():
+        try:
+            kernel.close()
+        except (AttributeError, Exception):
+            pass
+    _SPK_TYPE21_KERNELS = {}
 
     # Close planetary moon kernels
     from . import planetary_moons

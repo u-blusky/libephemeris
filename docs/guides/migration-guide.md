@@ -174,8 +174,6 @@ The following features are present in pyswisseph but **not yet fully implemented
 
 Eclipse functions are implemented but some return values are not yet calculated:
 
-- **Saros series number**: Returns 0 (not implemented)
-- **Inex number**: Returns 0 (not implemented)
 - **Sunrise/sunset on central line**: Returns 0 for solar eclipses (not implemented)
 
 Affected functions:
@@ -425,7 +423,6 @@ See the [LEB Technical Guide](../leb/guide.md) for details.
 - [ ] Verify date range is within ephemeris coverage (1550-2650 for DE440)
 - [ ] For multi-threaded apps: migrate to `EphemerisContext` API
 - [ ] Update tests for relaxed tolerances on star-based ayanamshas (< 0.06 degrees)
-- [ ] Handle eclipse functions that return 0 for Saros/Inex numbers
 - [ ] Review True Node usage (up to 0.14 degrees difference from pyswisseph)
 - [ ] Review True Lilith usage (~0.065° max difference - sub-arcminute precision)
 

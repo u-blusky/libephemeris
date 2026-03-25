@@ -241,7 +241,9 @@ class _CobCorrectedTarget:
 
         offset = get_cob_offset(self._barycenter_name, t)
         corrected_pos = pos_au + np.array(offset)
-        corrected_vel = vel_au_per_d + _cob_velocity_correction(self._barycenter_name, t)
+        corrected_vel = vel_au_per_d + _cob_velocity_correction(
+            self._barycenter_name, t
+        )
 
         return ICRF(corrected_pos, corrected_vel, t=t, center=self.center)
 
@@ -334,7 +336,9 @@ class _SpkCenterTarget:
 
             offset = get_cob_offset(self._barycenter_name, t)
             corrected_pos = pos_au + np.array(offset)
-            corrected_vel = vel_au_per_d + _cob_velocity_correction(self._barycenter_name, t)
+            corrected_vel = vel_au_per_d + _cob_velocity_correction(
+                self._barycenter_name, t
+            )
 
         return ICRF(corrected_pos, corrected_vel, t=t, center=self.center)
 
@@ -837,7 +841,9 @@ def swe_calc_ut(
         except (KeyError, ValueError) as _leb_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=LEB->fallback reason=%s",
-                planet, tjdut, _leb_err,
+                planet,
+                tjdut,
+                _leb_err,
             )
     # --- END LEB fast path ---
 
@@ -924,7 +930,9 @@ def swe_calc(
         except (KeyError, ValueError) as _leb_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=LEB->fallback reason=%s",
-                planet, tjdet, _leb_err,
+                planet,
+                tjdet,
+                _leb_err,
             )
     # --- END LEB fast path ---
 
@@ -1487,6 +1495,34 @@ def _assist_position_at(
     return lon, lat, r_geo
 
 
+def _apply_sidereal_correction(
+    lon: float, dlon: float, ut1: float, iflag: int
+) -> Tuple[float, float]:
+    """Apply sidereal ayanamsa correction to ecliptic longitude and its velocity.
+
+    Subtracts the ayanamsa from the longitude and corrects the velocity for
+    the ayanamsa precession rate using a central-difference derivative.
+
+    Args:
+        lon: Ecliptic longitude in degrees (tropical).
+        dlon: Longitude velocity in degrees/day.
+        ut1: Julian Day in UT1.
+        iflag: Calculation flags (checked for SEFLG_SPEED).
+
+    Returns:
+        Tuple of (corrected_lon, corrected_dlon).
+    """
+    ayanamsa = _get_ayanamsa_for_flags(ut1, iflag)
+    lon = (lon - ayanamsa) % 360.0
+    if iflag & SEFLG_SPEED:
+        dt_aya = 1.0 / 86400.0
+        ayanamsa_prev = _get_ayanamsa_for_flags(ut1 - dt_aya, iflag)
+        ayanamsa_next = _get_ayanamsa_for_flags(ut1 + dt_aya, iflag)
+        da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
+        dlon -= da
+    return lon, dlon
+
+
 def _calc_body(
     t, ipl: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -1596,15 +1632,7 @@ def _calc_body(
                 dlon = lon_diff / (2.0 * dt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-                lon = (lon - ayanamsa) % 360.0
-                # Correct velocity for ayanamsha rate
-                if iflag & SEFLG_SPEED:
-                    dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                    da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                    dlon -= da
+                lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, 0.0, _MOON_MEAN_DIST_AU, dlon, 0.0, 0.0)
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
@@ -1646,22 +1674,18 @@ def _calc_body(
                 except Exception:
                     # At ephemeris boundaries, speed calculation may fail
                     # Return 0 for speed components
-                    pass
+                    from .logging_config import get_logger
+
+                    get_logger().debug(
+                        "True Node velocity fallback to 0 at jd=%.1f", jd_tt
+                    )
             # Apply sidereal correction if requested (not for equatorial output).
             # SEFLG_J2000 is honored for TrueNode, same as MeanNode.
             # pyswisseph silently ignores J2000 for TrueNode when sidereal is
             # set — LibEphemeris intentionally fixes this behavioral bug.
             # See docs/reference/se-bug-sidereal-j2000-nodes.md
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-                lon = (lon - ayanamsa) % 360.0
-                # Correct velocity for ayanamsha rate
-                if iflag & SEFLG_SPEED:
-                    dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                    da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                    dlon -= da
+                lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
@@ -1716,14 +1740,7 @@ def _calc_body(
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-                lon = (lon - ayanamsa) % 360.0
-                if iflag & SEFLG_SPEED:
-                    dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                    da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                    dlon -= da
+                lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, _MOON_MEAN_APOG_DIST_AU, dlon, dlat, 0.0)
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
@@ -1761,21 +1778,18 @@ def _calc_body(
                 except Exception:
                     # At ephemeris boundaries, speed calculation may fail
                     # Return 0 for speed components
-                    pass
+                    from .logging_config import get_logger
+
+                    get_logger().debug(
+                        "True Lilith velocity fallback to 0 at jd=%.1f", jd_tt
+                    )
             # Apply sidereal correction if requested (not for equatorial output).
             # SEFLG_J2000 is honored for OscuApog, same as MeanApog.
             # pyswisseph silently ignores J2000 for OscuApog when sidereal is
             # set — LibEphemeris intentionally fixes this behavioral bug.
             # See docs/reference/se-bug-sidereal-j2000-nodes.md
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-                lon = (lon - ayanamsa) % 360.0
-                if iflag & SEFLG_SPEED:
-                    dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                    da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                    dlon -= da
+                lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
@@ -1824,14 +1838,7 @@ def _calc_body(
         # set — LibEphemeris intentionally fixes this behavioral bug.
         # See docs/reference/se-bug-sidereal-j2000-nodes.md
         if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-            ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-            lon = (lon - ayanamsa) % 360.0
-            if iflag & SEFLG_SPEED:
-                dt_aya = 1.0 / 86400.0
-                ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                dlon -= da
+            lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
         result = (lon, lat, dist, dlon, dlat, ddist)
         result = _maybe_equatorial_convert(result, jd_tt, iflag)
         return _to_native_floats(result), iflag
@@ -1857,81 +1864,13 @@ def _calc_body(
                 lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-                lon = (lon - ayanamsa) % 360.0
-                if iflag & SEFLG_SPEED:
-                    dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                    da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                    dlon -= da
+                lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
             # Strip J2000 flag since we already handled precession
             result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
             return _to_native_floats(result), iflag
 
-        # Geocentric: convert heliocentric J2000 ecliptic to geocentric
-        def _get_uranian_geo_j2000(jd):
-            """Geocentric J2000 ecliptic position for a Uranian body."""
-            h = hypothetical.calc_uranian_planet(ipl, jd)
-            lon_r = math.radians(h[0])
-            lat_r = math.radians(h[1])
-            cl = math.cos(lat_r)
-            xh = h[2] * cl * math.cos(lon_r)
-            yh = h[2] * cl * math.sin(lon_r)
-            zh = h[2] * math.sin(lat_r)
-
-            ts_i = get_timescale()
-            t_i = ts_i.tt_jd(jd)
-            earth_h = planets["sun"].at(t_i).observe(planets["earth"])
-            exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
-
-            xg = xh - float(exyz[0])
-            yg = yh - float(exyz[1])
-            zg = zh - float(exyz[2])
-            rg = math.sqrt(xg * xg + yg * yg + zg * zg)
-            lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
-            sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
-            lat_g = math.degrees(math.asin(sin_lat))
-            return lon_g, lat_g, rg
-
-        lon, lat, dist = _get_uranian_geo_j2000(jd_tt)
-
-        # Velocity via central difference (geocentric J2000)
-        dt_v = 1.0  # 1 day
-        prev = _get_uranian_geo_j2000(jd_tt - dt_v)
-        nxt = _get_uranian_geo_j2000(jd_tt + dt_v)
-        dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
-        if dlon > 180.0:
-            dlon -= 360.0
-        elif dlon < -180.0:
-            dlon += 360.0
-        dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
-        ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
-
-        # Precess J2000 -> ecliptic of date (unless J2000 output requested)
-        if not is_j2000:
-            from .astrometry import _precess_ecliptic
-
-            lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
-
-        # Apply sidereal correction if requested (not for equatorial output)
-        if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-            ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-            lon = (lon - ayanamsa) % 360.0
-            if iflag & SEFLG_SPEED:
-                dt_aya = 1.0 / 86400.0
-                ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                dlon -= da
-
-        result = (lon, lat, dist, dlon, dlat, ddist)
-        # Strip J2000 flag since we already handled precession
-        result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
-        return _to_native_floats(result), iflag
-
-    # Handle Transpluto (Isis) - hypothetical trans-Plutonian planet (ID 48)
+    # Handle Transpluto (Isis) — SE_ISIS = 48
     if ipl == SE_ISIS:
         from . import hypothetical
         from skyfield.framelib import ecliptic_J2000_frame
@@ -1951,14 +1890,7 @@ def _calc_body(
                 lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-                ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-                lon = (lon - ayanamsa) % 360.0
-                if iflag & SEFLG_SPEED:
-                    dt_aya = 1.0 / 86400.0
-                    ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                    ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                    da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                    dlon -= da
+                lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
             result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
             return _to_native_floats(result), iflag
@@ -2008,14 +1940,7 @@ def _calc_body(
 
         # Apply sidereal correction if requested (not for equatorial output)
         if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
-            ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
-            lon = (lon - ayanamsa) % 360.0
-            if iflag & SEFLG_SPEED:
-                dt_aya = 1.0 / 86400.0
-                ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt_aya, iflag)
-                ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt_aya, iflag)
-                da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-                dlon -= da
+            lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
 
         result = (lon, lat, dist, dlon, dlat, ddist)
         result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)

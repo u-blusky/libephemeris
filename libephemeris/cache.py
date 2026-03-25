@@ -21,6 +21,8 @@ Thread Safety:
     acceptable since we're caching pure functions with deterministic outputs.
 """
 
+from __future__ import annotations
+
 import math
 from functools import lru_cache
 from typing import Tuple

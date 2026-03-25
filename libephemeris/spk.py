@@ -36,6 +36,8 @@ References:
     - spktype21: https://pypi.org/project/spktype21/
 """
 
+from __future__ import annotations
+
 import json
 import math
 import os
@@ -166,8 +168,10 @@ def _get_spk_targets(filepath: str) -> list[int]:
         from jplephem.spk import SPK
 
         spk = SPK.open(filepath)
-        targets = [int(seg.target) for seg in spk.segments]
-        spk.close()
+        try:
+            targets = [int(seg.target) for seg in spk.segments]
+        finally:
+            spk.close()
         return targets
     except Exception:
         return []
@@ -713,17 +717,19 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
             from jplephem.spk import SPK
 
             spk = SPK.open(spk_file)
-            start_jd = None
-            end_jd = None
-            for segment in spk.segments:
-                if hasattr(segment, "start_jd") and hasattr(segment, "end_jd"):
-                    seg_start = float(segment.start_jd)
-                    seg_end = float(segment.end_jd)
-                    if start_jd is None or seg_start < start_jd:
-                        start_jd = seg_start
-                    if end_jd is None or seg_end > end_jd:
-                        end_jd = seg_end
-            spk.close()
+            try:
+                start_jd = None
+                end_jd = None
+                for segment in spk.segments:
+                    if hasattr(segment, "start_jd") and hasattr(segment, "end_jd"):
+                        seg_start = float(segment.start_jd)
+                        seg_end = float(segment.end_jd)
+                        if start_jd is None or seg_start < start_jd:
+                            start_jd = seg_start
+                        if end_jd is None or seg_end > end_jd:
+                            end_jd = seg_end
+            finally:
+                spk.close()
             if start_jd is not None and end_jd is not None:
                 return (start_jd, end_jd)
         except Exception:
@@ -779,14 +785,13 @@ def _detect_spk_type(filepath: str) -> Optional[int]:
         from jplephem.spk import SPK
 
         spk = SPK.open(filepath)
-
-        for segment in spk.segments:
-            if hasattr(segment, "data_type") and segment.data_type == 21:
-                spk.close()
-                return 21
-
-        spk.close()
-        return 2  # Assume type 2/3 for Skyfield compatibility
+        try:
+            for segment in spk.segments:
+                if hasattr(segment, "data_type") and segment.data_type == 21:
+                    return 21
+            return 2  # Assume type 2/3 for Skyfield compatibility
+        finally:
+            spk.close()
     except Exception:
         return None
 

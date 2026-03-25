@@ -23,11 +23,14 @@ from __future__ import annotations
 
 import hashlib
 import os
+import ssl
 import sys
 import tempfile
 import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
+
+import certifi
 
 from .logging_config import get_logger
 
@@ -280,7 +283,8 @@ def download_file(
 
         logger.info("Downloading %s...", description)
 
-        with urllib.request.urlopen(req, timeout=30) as response:
+        _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        with urllib.request.urlopen(req, timeout=30, context=_ssl_ctx) as response:
             total_size = int(response.headers.get("Content-Length", 0))
 
             if total_size > 0:
@@ -1105,10 +1109,11 @@ def _download_planet_centers_for_tier(
     temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".download")
 
     try:
+        _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
         total_size = 0
         try:
             req = urllib.request.Request(url, method="HEAD")
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with urllib.request.urlopen(req, timeout=30, context=_ssl_ctx) as response:
                 total_size = int(response.headers.get("Content-Length", 0))
         except Exception:
             pass
@@ -1116,7 +1121,7 @@ def _download_planet_centers_for_tier(
         downloaded = 0
         chunk_size = 1024 * 1024
 
-        with urllib.request.urlopen(url, timeout=300) as response:
+        with urllib.request.urlopen(url, timeout=300, context=_ssl_ctx) as response:
             with os.fdopen(temp_fd, "wb") as f:
                 if show_progress and total_size > 0 and not quiet:
                     progress = SimpleProgressBar(total_size, f"  {filename}")

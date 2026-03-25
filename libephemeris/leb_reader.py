@@ -426,7 +426,10 @@ class LEBReader:
         idx = max(0, min(idx, n - 2))
 
         # Linear interpolation (fast, sufficient for 30-day spacing)
-        t = (jd - jds[idx]) / (jds[idx + 1] - jds[idx])
+        span = jds[idx + 1] - jds[idx]
+        if span == 0.0:
+            return vals[idx]
+        t = (jd - jds[idx]) / span
         return vals[idx] + t * (vals[idx + 1] - vals[idx])
 
     def get_star(self, star_id: int) -> StarEntry:

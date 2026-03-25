@@ -23,6 +23,8 @@ Usage:
     >>> p.print_stats(top_n=20)
 """
 
+from __future__ import annotations
+
 import cProfile
 import io
 import pstats

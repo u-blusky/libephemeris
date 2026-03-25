@@ -142,6 +142,8 @@ Orbital mechanics:
 - Park, R.S. et al. (2021) "The JPL Planetary and Lunar Ephemerides DE440 and DE441"
 """
 
+from __future__ import annotations
+
 import math
 import warnings
 from typing import Tuple

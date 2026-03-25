@@ -21,6 +21,8 @@ Supported Parts:
 - Part of Faith (Pars Fidei): Belief, religion, trust
 """
 
+from __future__ import annotations
+
 from typing import Dict, Optional
 
 # Latitude threshold above which 3D horizontal calculation is used

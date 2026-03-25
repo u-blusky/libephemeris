@@ -17,6 +17,8 @@ Note:
     They represent fundamental horizon/meridian intersections with the ecliptic.
 """
 
+from __future__ import annotations
+
 from typing import Dict
 from .constants import (
     SE_ASCENDANT,

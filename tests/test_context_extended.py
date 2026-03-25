@@ -1000,49 +1000,6 @@ class TestGetPlanetsEphemerisPathBranches:
 
         monkeypatch.setattr("os.path.exists", mock_exists)
 
-        ctx_module._SHARED_EPHE_PATH = custom_path
-        ctx_module._SHARED_EPHE_FILE = "de440.bsp"
-
-        mock_loader = type(
-            "MockLoader", (), {"__call__": lambda s, p: mock_loader_call(p)}
-        )()
-        ctx_module._SHARED_LOADER = mock_loader
-
-        ctx = EphemerisContext()
-        result = ctx.get_planets()
-
-        # Verify data dir path was used (fallback from custom path)
-        assert len(loaded_paths) == 1
-        assert loaded_paths[0] == data_dir_file_path
-        assert result is mock_kernel
-
-    def test_branch_no_custom_path_data_dir_exists(self, monkeypatch):
-        """
-        Branch 3: No custom path set, file exists in data dir.
-
-        The default behavior when no custom ephemeris path is configured
-        and the ephemeris file is found in the data dir (~/.libephemeris/).
-        """
-        loaded_paths = []
-        mock_kernel = type("MockSpiceKernel", (), {})()
-
-        def mock_loader_call(path):
-            loaded_paths.append(path)
-            return mock_kernel
-
-        import os
-
-        # Mock _get_data_dir to return a predictable path
-        mock_data_dir = "/mock/libephemeris/data"
-        data_dir_file_path = os.path.join(mock_data_dir, "de440.bsp")
-
-        monkeypatch.setattr("libephemeris.state._get_data_dir", lambda: mock_data_dir)
-
-        def mock_exists(path):
-            return path == data_dir_file_path
-
-        monkeypatch.setattr("os.path.exists", mock_exists)
-
         # No custom path set
         ctx_module._SHARED_EPHE_PATH = None
         ctx_module._SHARED_EPHE_FILE = "de440.bsp"

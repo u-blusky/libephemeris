@@ -25,13 +25,18 @@ References:
     - IERS Bulletin A: https://www.iers.org/IERS/EN/Publications/Bulletins/Bulletins.html
 """
 
+from __future__ import annotations
+
 import os
+import ssl
 import threading
 import time
 import urllib.request
 import urllib.error
 from typing import Optional, Union
 from dataclasses import dataclass
+
+import certifi
 
 from .logging_config import get_logger
 
@@ -279,7 +284,8 @@ def _download_file(url: str, output_path: str, timeout: int = 30) -> bool:
             url,
             headers={"User-Agent": "libephemeris/1.0 (astronomical ephemeris library)"},
         )
-        with urllib.request.urlopen(req, timeout=timeout) as response:
+        _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx) as response:
             content = response.read()
 
         # Ensure directory exists
@@ -291,7 +297,7 @@ def _download_file(url: str, output_path: str, timeout: int = 30) -> bool:
         temp_path = output_path + ".tmp"
         with open(temp_path, "wb") as f:
             f.write(content)
-        os.rename(temp_path, output_path)
+        os.replace(temp_path, output_path)
         return True
     except (urllib.error.URLError, OSError, TimeoutError):
         return False

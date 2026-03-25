@@ -26,6 +26,8 @@ References:
     - Kasten, F. & Young, A.T. (1989) "Revised optical air mass tables"
 """
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from typing import Optional

@@ -32,6 +32,8 @@ References:
     - Brent, R.P. (1973) "Algorithms for Minimization without Derivatives"
 """
 
+from __future__ import annotations
+
 from typing import Callable, Tuple
 
 from .constants import SEFLG_SWIEPH, SEFLG_SPEED, SEFLG_HELCTR, SE_SUN, SE_MOON
@@ -1123,7 +1125,9 @@ def swe_helio_cross_ut(
         lon_start = pos[0]
         speed = pos[3]
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(f"Failed to calculate heliocentric planet position: {e}") from e
+        raise RuntimeError(
+            f"Failed to calculate heliocentric planet position: {e}"
+        ) from e
 
     # Estimate typical heliocentric speed if near zero
     # Heliocentric speeds are different from geocentric due to no retrograde
@@ -1299,7 +1303,9 @@ def swe_helio_cross(
         lon_start = pos[0]
         speed = pos[3]
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(f"Failed to calculate heliocentric planet position: {e}") from e
+        raise RuntimeError(
+            f"Failed to calculate heliocentric planet position: {e}"
+        ) from e
 
     # Estimate typical heliocentric speed if near zero
     typical_speeds = {
