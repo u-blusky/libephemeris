@@ -26,14 +26,6 @@ True Node distance differs from reference by ~2.3e-4 AU. Longitude is correct (~
 Different osculating orbit computation from Moon state vectors.
 Documented in `docs/reference/known-bugs.md`.
 
-### XYZ/RADIANS numpy bug (preexisting)
-
-**Priority: low | Effort: medium**
-
-`SEFLG_XYZ` combined with certain frame flags causes `TypeError: 'numpy.ndarray'
-object is not callable` in the Skyfield coordinate transform path.
-Documented in `docs/reference/known-bugs.md`.
-
 ---
 
 ## Technical Debt

@@ -155,10 +155,8 @@ def run_section2_flags(rng, n_dates=50):
                         r.check(v[2] >= 0 or (fl & swe.SEFLG_XYZ), f"mode={mode} body={bid}: dist < 0")
                     except (KeyError, ValueError):
                         pass  # expected for unsupported combos
-                    except TypeError:
-                        pass  # known: numpy ndarray not callable in XYZ/RADIANS path
                     except Exception as e:
-                        r.check(False, f"mode={mode} body={bid} flag={fl}: {e}")
+                        r.check(False, f"mode={mode} body={bid} flag={fl}: {type(e).__name__}: {e}")
         swe.swe_close()
     return r.summary("Flag combinations")
 
