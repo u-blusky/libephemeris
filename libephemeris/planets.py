@@ -1921,6 +1921,54 @@ def _calc_body(
             result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
             return _to_native_floats(result), iflag
 
+        # Geocentric: convert heliocentric Keplerian orbit to geocentric
+        def _get_uranian_geo_j2000(jd, body_id):
+            h = hypothetical.calc_uranian_planet(body_id, jd)
+            lon_r = math.radians(h[0])
+            lat_r = math.radians(h[1])
+            cl = math.cos(lat_r)
+            xh = h[2] * cl * math.cos(lon_r)
+            yh = h[2] * cl * math.sin(lon_r)
+            zh = h[2] * math.sin(lat_r)
+
+            ts_i = get_timescale()
+            t_i = ts_i.tt_jd(jd)
+            earth_h = planets["sun"].at(t_i).observe(planets["earth"])
+            exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
+            xg = xh - float(exyz[0])
+            yg = yh - float(exyz[1])
+            zg = zh - float(exyz[2])
+            rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+            lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
+            sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
+            lat_g = math.degrees(math.asin(sin_lat))
+            return lon_g, lat_g, rg
+
+        lon, lat, dist = _get_uranian_geo_j2000(jd_tt, ipl)
+
+        dt_v = 1.0
+        prev = _get_uranian_geo_j2000(jd_tt - dt_v, ipl)
+        nxt = _get_uranian_geo_j2000(jd_tt + dt_v, ipl)
+        dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
+        if dlon > 180.0:
+            dlon -= 360.0
+        elif dlon < -180.0:
+            dlon += 360.0
+        dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
+        ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+
+        if not is_j2000:
+            from .astrometry import _precess_ecliptic
+
+            lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
+        if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
+            lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
+
+        result = (lon, lat, dist, dlon, dlat, ddist)
+        result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
+        return _to_native_floats(result), iflag
+
     # Handle Transpluto (Isis) — SE_ISIS = 48
     if ipl == SE_ISIS:
         from . import hypothetical
