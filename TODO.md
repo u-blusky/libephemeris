@@ -11,28 +11,19 @@ Items identified during development (March 2026). Grouped by category.
 Completed: `libephemeris/data/leb2/base_core.leb` included in package-data,
 `_discover_leb_file()` falls back to bundled file.
 
-### 7. Update download command for LEB2 modular files
+### ~~7. Update download command for LEB2 modular files~~ DONE
 
-**Priority: high | Effort: medium**
-
-The `libephemeris download:leb:*` commands still download monolithic LEB1 files. Update to download LEB2 modular files (core, asteroids, apogee, uranians) from GitHub Releases.
-
-- Update `libephemeris/download.py` DATA_FILES with LEB2 file URLs
-- Support `libephemeris download:leb2:base:core`, `download:leb2:base:asteroids`, etc.
-- Keep backward compat: old `download:leb:base` still works (downloads LEB1)
+Completed: `download_leb2_for_tier()` added to download.py, DATA_FILES
+updated with all 12 LEB2 files from GitHub Release data-v2.
 
 ### ~~8. Regenerate LEB1 base with optimized BODY_PARAMS~~ DONE
 
 Already regenerated — LEB1 has Pluto 64d/deg11, Uranians 256d/deg7.
 
-### 9. Publish LEB2 non-core files to GitHub Releases
+### ~~9. Publish LEB2 non-core files to GitHub Releases~~ DONE
 
-**Priority: medium | Effort: small**
-
-LEB2 files for asteroids, apogee, uranians (all 3 tiers) need to be published as GitHub Release assets so users can download them.
-
-- Use `gh release create` or update existing release
-- Update download URLs in download.py
+Published: 12 files in GitHub Release data-v2.
+https://github.com/g-battaglia/libephemeris/releases/tag/data-v2
 
 ### 10. Run validation suite (415K checks)
 
