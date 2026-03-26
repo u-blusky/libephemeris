@@ -115,6 +115,11 @@ _CONTEXT_SWAP_LOCK = threading.RLock()
 # concurrently before initialization has completed.
 _INIT_LOCK = threading.RLock()
 
+# Lock to protect mutable global state (setter/getter pairs).
+# Prevents race conditions when one thread calls set_topo() while another reads it.
+# Uses RLock to allow re-entrancy (e.g., set_ephe_path -> get_precision_tier).
+_STATE_LOCK = threading.RLock()
+
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
 _EPHEMERIS_FILE_EXPLICIT: bool = False  # True if set_ephemeris_file() was called
@@ -217,7 +222,8 @@ def set_calc_mode(mode: Optional[str]) -> None:
             raise ValueError(
                 f"Invalid mode: {mode!r}. Must be one of: {list(_VALID_CALC_MODES)}"
             )
-    _CALC_MODE = mode
+    with _STATE_LOCK:
+        _CALC_MODE = mode
 
 
 def get_calc_mode() -> str:
@@ -237,8 +243,9 @@ def get_calc_mode() -> str:
         >>> get_calc_mode()  # Default
         'auto'
     """
-    if _CALC_MODE is not None:
-        return _CALC_MODE
+    with _STATE_LOCK:
+        if _CALC_MODE is not None:
+            return _CALC_MODE
     env_value = os.environ.get(_CALC_MODE_ENV_VAR, "").lower().strip()
     if env_value in _VALID_CALC_MODES:
         return env_value
@@ -262,12 +269,13 @@ def set_leb_file(filepath: Optional[str]) -> None:
         >>> set_leb_file(None)  # disable binary mode
     """
     global _LEB_FILE, _LEB_READER
-    if _LEB_READER is not None:
-        try:
-            _LEB_READER.close()
-        except (AttributeError, OSError):
-            get_logger().debug("Failed to close LEB reader: %s", _LEB_FILE)
-    _LEB_FILE = filepath
+    with _STATE_LOCK:
+        if _LEB_READER is not None:
+            try:
+                _LEB_READER.close()
+            except (AttributeError, OSError):
+                get_logger().debug("Failed to close LEB reader: %s", _LEB_FILE)
+        _LEB_FILE = filepath
     _LEB_READER = None  # force re-creation on next access
 
 
@@ -880,7 +888,8 @@ def set_topo(lon: float, lat: float, alt: float = 0.0) -> None:
 
     validate_coordinates(lat, lon, "set_topo")
     global _TOPO
-    _TOPO = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
+    with _STATE_LOCK:
+        _TOPO = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
 
 
 def get_topo() -> Optional[Topos]:
@@ -890,7 +899,8 @@ def get_topo() -> Optional[Topos]:
     Returns:
         Optional[Topos]: Current observer location or None if not set
     """
-    return _TOPO
+    with _STATE_LOCK:
+        return _TOPO
 
 
 def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
@@ -907,9 +917,10 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
         Default is Lahiri (SE_SIDM_LAHIRI) if never set.
     """
     global _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
-    _SIDEREAL_MODE = mode
-    _SIDEREAL_T0 = t0 if t0 != 0.0 else 2451545.0
-    _SIDEREAL_AYAN_T0 = ayan_t0
+    with _STATE_LOCK:
+        _SIDEREAL_MODE = mode
+        _SIDEREAL_T0 = t0 if t0 != 0.0 else 2451545.0
+        _SIDEREAL_AYAN_T0 = ayan_t0
 
 
 @overload
@@ -933,10 +944,11 @@ def get_sid_mode(full: bool = False) -> Union[int, tuple[int, float, float]]:
     Note:
         Returns SE_SIDM_LAHIRI (1) by default if never set.
     """
-    mode = _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 1
-    if full:
-        return mode, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
-    return mode
+    with _STATE_LOCK:
+        mode = _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 1
+        if full:
+            return mode, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
+        return mode
 
 
 def get_angles_cache() -> dict[str, float]:
@@ -1341,6 +1353,22 @@ def close() -> None:
         >>> close()  # Close files and reset state
         >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # Reloads ephemeris
     """
+    global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
+    global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
+    global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
+    global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
+    global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
+    global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
+    global _PRECISION_TIER
+    global _LEB_FILE, _LEB_READER, _CALC_MODE
+    global _HORIZONS_CLIENT, _HORIZONS_WARNED
+
+    with _STATE_LOCK:
+        _close_inner()
+
+
+def _close_inner() -> None:
+    """Inner close implementation (must be called with _STATE_LOCK held)."""
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
     global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
