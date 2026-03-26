@@ -10,34 +10,29 @@ Items identified during development (March 2026). Grouped by category.
 - ~~#7~~ Download command — `download_leb2_for_tier()` in download.py, 12 files in DATA_FILES
 - ~~#8~~ LEB1 regenerated — Pluto 64d/deg11, Uranians 256d/deg7
 - ~~#9~~ GitHub Release data-v2 — 12 LEB2 files published
+- ~~#10~~ Validation suite — `scripts/run_validation_suite.py` created and run (7/8 PASS, 1 preexisting XYZ numpy bug)
 - ~~#11a~~ Uranian geocentric — added geocentric path in `planets.py`
+- ~~#11b~~ Sun heliocentric — returns (0,0,0) correctly now
 
 ---
 
 ## Open
 
-### 10. Run validation suite (415K checks)
-
-**Priority: medium | Effort: CPU time**
-
-Execute `plans/validation-suite-100k.md`. Create a script, run, document results.
-
-### 11b. Sun heliocentric bug
-
-**Priority: medium | Effort: small**
-
-`swe_calc(jd, SE_SUN, SEFLG_HELCTR)` via Skyfield path returns ~180 deg error.
-The Sun heliocentric should be (0,0,0) or Earth's heliocentric position reversed.
-Documented in `proposals/leb-optimization-findings.md`.
-
-**Files:** `libephemeris/planets.py` (_calc_body Sun + SEFLG_HELCTR path)
-
 ### 11c. True Node distance tolerance
 
-**Priority: low | Effort: small**
+**Priority: low | Effort: unclear**
 
-True Node distance exceeds DISTANCE_AU tolerance in LEB comparison tests.
-Likely a rounding/precision issue in the eccentricity vector computation.
+True Node distance differs from reference by ~2.3e-4 AU. Longitude is correct (~4").
+Different osculating orbit computation from Moon state vectors.
+Documented in `docs/reference/known-bugs.md`.
+
+### XYZ/RADIANS numpy bug (preexisting)
+
+**Priority: low | Effort: medium**
+
+`SEFLG_XYZ` combined with certain frame flags causes `TypeError: 'numpy.ndarray'
+object is not callable` in the Skyfield coordinate transform path.
+Documented in `docs/reference/known-bugs.md`.
 
 ---
 
