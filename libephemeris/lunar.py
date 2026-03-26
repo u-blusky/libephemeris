@@ -1613,16 +1613,10 @@ class MeeusPolynomialWarning(UserWarning):
 
 
 class MeeusRangeError(ValueError):
-    """Exception raised when date is beyond the valid range for Meeus polynomials.
+    """Deprecated: this exception is defined but never raised.
 
-    The Meeus polynomial approximations are valid for approximately ±2000 years
-    from J2000.0 (years 0-4000 CE). Beyond this range, errors grow rapidly and
-    results should not be trusted.
-
-    For dates beyond ±2000 years, consider:
-        - Using numerical integration of the full lunar theory
-        - Consulting specialized historical astronomy software
-        - Accepting that precision requirements cannot be met
+    Kept for backward compatibility with code that may import it.
+    Use ``EphemerisRangeError`` for date-range errors instead.
     """
 
     pass
