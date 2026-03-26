@@ -265,7 +265,7 @@ def set_leb_file(filepath: Optional[str]) -> None:
     if _LEB_READER is not None:
         try:
             _LEB_READER.close()
-        except Exception:
+        except (AttributeError, OSError):
             get_logger().debug("Failed to close LEB reader: %s", _LEB_FILE)
     _LEB_FILE = filepath
     _LEB_READER = None  # force re-creation on next access
@@ -540,7 +540,7 @@ def get_timescale() -> Timescale:
             if _TS is None:
                 try:
                     _TS = _build_enhanced_timescale()
-                except Exception:
+                except (ImportError, FileNotFoundError, RuntimeError, ValueError):
                     # If anything goes wrong with the merge, fall back to the
                     # standard Skyfield timescale so the library never fails to
                     # initialise.
@@ -802,7 +802,7 @@ def get_planet_centers() -> Optional[SpiceKernel]:
                     _PLANET_CENTERS = load(path)
                     _PLANET_CENTERS_TIER = current_tier
                     break
-                except Exception as e:
+                except (FileNotFoundError, ValueError, KeyError, OSError) as e:
                     get_logger().warning(
                         "Failed to load planet_centers file %s: %s", path, e
                     )
@@ -845,7 +845,7 @@ def get_planet_center_segment(naif_id: int, jd: Optional[float] = None):
                     if start_jd is not None and end_jd is not None:
                         if not (start_jd <= jd <= end_jd):
                             return None  # Outside coverage, trigger fallback
-                except Exception:
+                except (AttributeError, TypeError):
                     # If we can't check coverage, return segment anyway
                     get_logger().debug(
                         "Could not check SPK segment coverage for jd=%.1f", jd
@@ -1014,7 +1014,7 @@ def set_ephe_path(path: Optional[str]) -> None:
             from .spk_auto import discover_local_spks
 
             discover_local_spks(path)
-        except Exception:
+        except (ImportError, OSError, ValueError):
             # Discovery is best-effort; don't fail set_ephe_path()
             get_logger().debug("Local SPK discovery failed for path: %s", path)
 
@@ -1355,7 +1355,7 @@ def close() -> None:
     if _HORIZONS_CLIENT is not None:
         try:
             _HORIZONS_CLIENT.shutdown()
-        except Exception:
+        except (AttributeError, OSError):
             pass
     _HORIZONS_CLIENT = None
     _HORIZONS_WARNED = False
@@ -1364,7 +1364,7 @@ def close() -> None:
     if _LEB_READER is not None:
         try:
             _LEB_READER.close()
-        except Exception:
+        except (AttributeError, OSError):
             pass
     _LEB_FILE = None
     _LEB_READER = None
@@ -1546,7 +1546,7 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
 
         return (path, start_jd, end_jd, denum)
 
-    except Exception:
+    except (ValueError, IndexError, KeyError, OSError):
         # Return empty data on any error
         return ("", 0.0, 0.0, 0)
 
@@ -1949,7 +1949,7 @@ def _load_spk_kernel(filepath: str) -> SpiceKernel:
         kernel = load(filepath)
         _SPK_KERNELS[filepath] = kernel
         return kernel
-    except Exception as e:
+    except (FileNotFoundError, ValueError, OSError) as e:
         raise ValueError(f"Failed to load SPK file {filepath}: {e}") from e
 
 
