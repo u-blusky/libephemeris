@@ -752,7 +752,7 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         # Now try to calculate using the newly registered SPK
         return spk.calc_spk_body_position(t, ipl, iflag)
 
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         logger.warning("Auto SPK download failed for body %d: %s", ipl, e)
         return None
 
@@ -1728,7 +1728,7 @@ def _calc_body(
                     dlon = lon_diff / (2.0 * dt)
                     dlat = (lat_next - lat_prev) / (2.0 * dt)
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
-                except Exception:
+                except (IndexError, ValueError, ArithmeticError):
                     # At ephemeris boundaries, speed calculation may fail
                     # Return 0 for speed components
                     from .logging_config import get_logger
@@ -1832,7 +1832,7 @@ def _calc_body(
                     dlon = lon_diff / (2.0 * dt)
                     dlat = (lat_next - lat_prev) / (2.0 * dt)
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
-                except Exception:
+                except (IndexError, ValueError, ArithmeticError):
                     # At ephemeris boundaries, speed calculation may fail
                     # Return 0 for speed components
                     from .logging_config import get_logger
@@ -2073,7 +2073,7 @@ def _calc_body(
                 try:
                     # _try_auto_spk_download registers the SPK as a side effect
                     _try_auto_spk_download(t, ipl, iflag)
-                except Exception:
+                except (OSError, ValueError, KeyError):
                     pass
                 # Re-check after download
                 _spk_type21_target = spk.get_spk_type21_target(ipl)
@@ -2134,7 +2134,7 @@ def _calc_body(
                             iflag,
                         )
                     ), iflag
-            except Exception:
+            except (ImportError, RuntimeError, ValueError):
                 pass
 
             # Keplerian as last resort — reduced precision, warn the user
@@ -4711,7 +4711,7 @@ def _calc_orbit_max_min_true_distance(
         try:
             pos, _ = swe_calc_ut(tjd_ut, ipl, iflag)
             true_dist = float(pos[2])
-        except Exception:
+        except (IndexError, TypeError, ValueError):
             pass
 
     # Sun: geocentric distance = Earth-Sun distance, varies with Earth's orbit
@@ -5418,7 +5418,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
             geo_ecl_lat, geo_ecl_lon, _ = target_pos_geo.frame_latlon(ecliptic_frame)
             geo_lon = geo_ecl_lon.degrees
             geo_lat = geo_ecl_lat.degrees
-        except Exception:
+        except (AttributeError, ValueError, TypeError):
             geo_lon = 0.0
             geo_lat = 0.0
 
@@ -5427,7 +5427,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
             helio_ecl_lat, helio_ecl_lon, _ = target_helio.frame_latlon(ecliptic_frame)
             helio_lon = helio_ecl_lon.degrees
             helio_lat = helio_ecl_lat.degrees
-        except Exception:
+        except (AttributeError, ValueError, TypeError):
             helio_lon = 0.0
             helio_lat = 0.0
 
