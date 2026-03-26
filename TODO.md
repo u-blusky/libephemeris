@@ -10,18 +10,12 @@ Items identified during development (March 2026). Grouped by category.
 - ~~#7~~ Download command — `download_leb2_for_tier()` in download.py, 12 files in DATA_FILES
 - ~~#8~~ LEB1 regenerated — Pluto 64d/deg11, Uranians 256d/deg7
 - ~~#9~~ GitHub Release data-v2 — 12 LEB2 files published
-- ~~#10~~ Validation suite — `scripts/run_validation_suite.py` created and run (7/8 PASS, 1 preexisting XYZ numpy bug)
+- ~~#10~~ Validation suite — 8/8 PASS, 61,547 checks, ALL PASS
 - ~~#11a~~ Uranian geocentric — added geocentric path in `planets.py`
 - ~~#11b~~ Sun heliocentric — returns (0,0,0) correctly now
-
----
-
-## Open
-
-### ~~11c. True Node distance tolerance~~ FIXED
-
-LEB fast path was using mean orbital elements approximation. Now uses full
-osculating orbit calc. Error: 3.25e-4 -> 1.5e-7 AU (2000x improvement).
+- ~~#11c~~ True Node distance — full osculating orbit calc (2000x improvement)
+- ~~#12~~ Skyfield TypeError — retry + radec removal, cache clear
+- ~~#3~~ MeeusRangeError — marked deprecated
 
 ---
 
