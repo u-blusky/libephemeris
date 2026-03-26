@@ -86,6 +86,24 @@ from .cache import get_true_obliquity, get_cached_nutation
 from .exceptions import Error, PolarCircleError, validate_coordinates
 
 
+def _init_cardinal_cusps(asc: float, mc: float) -> list:
+    """Create 13-element cusp list with cardinal points and their opposites."""
+    cusps = [0.0] * 13
+    cusps[1] = asc
+    cusps[10] = mc
+    cusps[7] = (asc + 180) % 360.0
+    cusps[4] = (mc + 180) % 360.0
+    return cusps
+
+
+def _set_opposite_cusps(cusps: list) -> None:
+    """Set cusps 5,6,8,9 as 180-degree opposites of 11,12,2,3."""
+    cusps[5] = (cusps[11] + 180) % 360.0
+    cusps[6] = (cusps[12] + 180) % 360.0
+    cusps[8] = (cusps[2] + 180) % 360.0
+    cusps[9] = (cusps[3] + 180) % 360.0
+
+
 def _is_polar_circle(lat: float, eps: float) -> bool:
     """
     Check if latitude is within the polar circle for house calculations.
@@ -1809,11 +1827,7 @@ def _houses_placidus(
     # 11, 12 are in SE quadrant (MC to Asc).
     # 2, 3 are in NE quadrant (Asc to IC).
 
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     rad_lat = math.radians(lat)
     rad_eps = math.radians(eps)
@@ -2172,11 +2186,7 @@ def _houses_koch(
     Returns:
         List of 13 house cusp longitudes
     """
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     # Check for polar circle - Koch undefined at |lat| >= 90 - eps
     if abs(lat) >= 90 - eps:
@@ -2212,10 +2222,7 @@ def _houses_koch(
     cusps[3] = _calc_ascendant(armc + 150 + 2 * asc_diff_third, eps, lat, lat)
 
     # Opposite houses
-    cusps[5] = (cusps[11] + 180) % 360.0
-    cusps[6] = (cusps[12] + 180) % 360.0
-    cusps[8] = (cusps[2] + 180) % 360.0
-    cusps[9] = (cusps[3] + 180) % 360.0
+    _set_opposite_cusps(cusps)
 
     return cusps
 
@@ -2260,11 +2267,7 @@ def _houses_regiomontanus(
         List of 13 house cusp longitudes
     """
 
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     rad_lat = math.radians(lat)
     rad_eps = math.radians(eps)
@@ -2289,10 +2292,7 @@ def _houses_regiomontanus(
     cusps[2] = calc_cusp(120)
     cusps[3] = calc_cusp(150)
 
-    cusps[5] = (cusps[11] + 180) % 360.0
-    cusps[6] = (cusps[12] + 180) % 360.0
-    cusps[8] = (cusps[2] + 180) % 360.0
-    cusps[9] = (cusps[3] + 180) % 360.0
+    _set_opposite_cusps(cusps)
 
     return cusps
 
@@ -2344,11 +2344,7 @@ def _houses_campanus(
     # We map the Prime Vertical division h to an Equatorial division H_eff.
     # tan(H_eff) = tan(h) * cos(lat)
 
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     rad_lat = math.radians(lat)
     rad_eps = math.radians(eps)
@@ -2390,10 +2386,7 @@ def _houses_campanus(
     cusps[2] = calc_cusp(120)
     cusps[3] = calc_cusp(150)
 
-    cusps[5] = (cusps[11] + 180) % 360.0
-    cusps[6] = (cusps[12] + 180) % 360.0
-    cusps[8] = (cusps[2] + 180) % 360.0
-    cusps[9] = (cusps[3] + 180) % 360.0
+    _set_opposite_cusps(cusps)
 
     return cusps
 
@@ -2508,11 +2501,7 @@ def _houses_porphyry(asc: float, mc: float) -> List[float]:
     Returns:
         List of 13 house cusp longitudes
     """
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     # Trisect the ecliptic arc between angles
     # Arc 10-1
@@ -2529,10 +2518,7 @@ def _houses_porphyry(asc: float, mc: float) -> List[float]:
     cusps[3] = (asc + 2 * step) % 360.0
 
     # Opposites
-    cusps[5] = (cusps[11] + 180) % 360.0
-    cusps[6] = (cusps[12] + 180) % 360.0
-    cusps[8] = (cusps[2] + 180) % 360.0
-    cusps[9] = (cusps[3] + 180) % 360.0
+    _set_opposite_cusps(cusps)
 
     return cusps
 
@@ -2613,11 +2599,7 @@ def _houses_pullen_sd(asc: float, mc: float) -> List[float]:
     Returns:
         List of 13 house cusp longitudes (index 0 unused, 1-12 are house cusps)
     """
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     # Calculate quadrant sizes
     # Quadrant 1: MC to Asc (houses 11, 12)
@@ -2700,11 +2682,7 @@ def _houses_pullen_sr(asc: float, mc: float) -> List[float]:
     Returns:
         List of 13 house cusp longitudes (index 0 unused, 1-12 are house cusps)
     """
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     # Calculate quadrant sizes
     q1 = (asc - mc) % 360.0  # MC to Asc
@@ -2830,11 +2808,7 @@ def _houses_alcabitius(
     # RA_11 = RAMC + SA/3.
     # SA = 90 + AD_asc.
 
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     rad_lat = math.radians(lat)
     rad_eps = math.radians(eps)
@@ -2865,10 +2839,7 @@ def _houses_alcabitius(
     cusps[2] = get_lon_from_ra(ra_asc + step2)
     cusps[3] = get_lon_from_ra(ra_asc + 2 * step2)
 
-    cusps[5] = (cusps[11] + 180) % 360.0
-    cusps[6] = (cusps[12] + 180) % 360.0
-    cusps[8] = (cusps[2] + 180) % 360.0
-    cusps[9] = (cusps[3] + 180) % 360.0
+    _set_opposite_cusps(cusps)
 
     return cusps
 
@@ -2917,11 +2888,7 @@ def _houses_polich_page(
     # Uses Pole method with tan(Pole) = tan(lat) * factor.
     # factor = 1/3 for 11/3, 2/3 for 12/2.
 
-    cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[7] = (asc + 180) % 360.0
-    cusps[4] = (mc + 180) % 360.0
+    cusps = _init_cardinal_cusps(asc, mc)
 
     rad_lat = math.radians(lat)
     rad_eps = math.radians(eps)
@@ -2944,10 +2911,7 @@ def _houses_polich_page(
     cusps[2] = calc_cusp(120, 2.0 / 3.0)
     cusps[3] = calc_cusp(150, 1.0 / 3.0)
 
-    cusps[5] = (cusps[11] + 180) % 360.0
-    cusps[6] = (cusps[12] + 180) % 360.0
-    cusps[8] = (cusps[2] + 180) % 360.0
-    cusps[9] = (cusps[3] + 180) % 360.0
+    _set_opposite_cusps(cusps)
 
     return cusps
 
