@@ -272,11 +272,12 @@ def set_leb_file(filepath: Optional[str]) -> None:
 
 
 def _discover_leb_file() -> Optional[str]:
-    """Auto-discover a downloaded LEB file for the active precision tier.
+    """Auto-discover a LEB file for the active precision tier.
 
     Checks in order:
-    1. LEB2 modular files: ``~/.libephemeris/leb/{tier}_core.leb`` (with companions)
-    2. LEB1 merged file: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
+    1. LEB2 modular files in user data dir: ``~/.libephemeris/leb/{tier}_core.leb``
+    2. LEB1 merged file in user data dir: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
+    3. Bundled LEB2 core file shipped with the package (base tier only)
 
     Returns:
         Path to the discovered LEB file, or None if not found.
@@ -293,6 +294,12 @@ def _discover_leb_file() -> Optional[str]:
     candidate = os.path.join(leb_dir, f"ephemeris_{tier}.leb")
     if os.path.isfile(candidate):
         return candidate
+
+    # Fall back to bundled LEB2 core (ships with the PyPI wheel, base tier only)
+    bundled = os.path.join(os.path.dirname(__file__), "data", "leb2", "base_core.leb")
+    if os.path.isfile(bundled):
+        return bundled
+
     return None
 
 

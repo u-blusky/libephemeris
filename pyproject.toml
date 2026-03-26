@@ -111,7 +111,7 @@ build-backend = "setuptools.build_meta"
 packages = ["libephemeris"]
 
 [tool.setuptools.package-data]
-libephemeris = ["py.typed", "data/*.csv"]
+libephemeris = ["py.typed", "data/*.csv", "data/leb2/base_core.leb"]
 
 [tool.poe.tasks]
 format = {cmd = "ruff format .", help = "Auto-format all Python files (ruff, line-length 88)"}
