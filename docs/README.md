@@ -19,6 +19,7 @@
 - **[Known Divergences](reference/divergences.md)** -- Documented differences vs reference implementations
 - **[House Systems](reference/house-systems.md)** -- Mathematical documentation for all 24 house systems
 - **[Ayanamsha Modes](reference/ayanamsha.md)** -- Complete reference for all 43 sidereal zodiac modes
+- **[Known Bugs](reference/known-bugs.md)** -- Active issues and Horizons limitations
 - **[Comparison Report](reference/swisseph-comparison.md)** -- 1,619 cross-validation tests
 
 ## Methodology

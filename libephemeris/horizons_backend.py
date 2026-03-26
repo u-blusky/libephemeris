@@ -385,7 +385,7 @@ def horizons_calc_ut(
         raise KeyError(f"Body {body_id} not in Horizons command map")
 
     # Convert UT to TT (approximate, good enough for Horizons queries)
-    from .delta_t import swe_deltat
+    from .time_utils import swe_deltat
     delta_t = swe_deltat(jd_ut)
     jd_tt = jd_ut + delta_t
 
@@ -645,7 +645,7 @@ def _calc_analytical(
     jd_ut: float, body_id: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate analytical body (Mean Node, Mean Apogee)."""
-    from .delta_t import swe_deltat
+    from .time_utils import swe_deltat
     from .constants import SEFLG_SPEED, SEFLG_SIDEREAL
 
     jd_tt = jd_ut + swe_deltat(jd_ut)
@@ -690,7 +690,7 @@ def _calc_uranian(
     jd_ut: float, body_id: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate Uranian hypothetical body (heliocentric only)."""
-    from .delta_t import swe_deltat
+    from .time_utils import swe_deltat
     from .constants import SEFLG_SIDEREAL
 
     jd_tt = jd_ut + swe_deltat(jd_ut)
