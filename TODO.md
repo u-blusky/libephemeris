@@ -1,11 +1,16 @@
 # TODO - Improvements and Technical Debt
 
-Items identified during development (March 2026). Grouped by category.
+All items completed as of March 2026.
 
 ---
 
 ## Completed
 
+- ~~#1~~ Thread safety — `_STATE_LOCK` RLock on critical setters/getters in state.py
+- ~~#2~~ Bare `except Exception` — 101 -> 0 across entire codebase (all narrowed to specific types)
+- ~~#3~~ MeeusRangeError — marked deprecated
+- ~~#4~~ houses.py dedup — `_init_cardinal_cusps` (9x) + `_set_opposite_cusps` (6x) extracted
+- ~~#5~~ constants.py `__all__` — 785 public names, `annotations` excluded
 - ~~#6~~ PyPI Packaging — `base_core.leb` bundled in wheel, auto-discovered
 - ~~#7~~ Download command — `download_leb2_for_tier()` in download.py, 12 files in DATA_FILES
 - ~~#8~~ LEB1 regenerated — Pluto 64d/deg11, Uranians 256d/deg7
@@ -15,41 +20,3 @@ Items identified during development (March 2026). Grouped by category.
 - ~~#11b~~ Sun heliocentric — returns (0,0,0) correctly now
 - ~~#11c~~ True Node distance — full osculating orbit calc (2000x improvement)
 - ~~#12~~ Skyfield TypeError — retry + radec removal, cache clear
-- ~~#3~~ MeeusRangeError — marked deprecated
-
----
-
-## Technical Debt
-
-### 1. Thread Safety
-
-**Priority: high | Risk: high | Effort: large**
-
-~30 mutable global variables in `state.py` without locks. Requires architectural
-decision: lock-per-variable vs context-only.
-
-**Files:** `state.py`, `context.py`
-
-### 2. Broad `except Exception` (~92 sites remaining)
-
-**Priority: medium | Risk: low | Effort: medium**
-
-`state.py` done (9 -> 0). Remaining: 24 in `eclipse.py`, ~8 in `planets.py`,
-~3 in `houses.py`, ~8 in `heliacal.py`. Most are intentional graceful
-degradation in numerical iteration loops.
-
-### ~~3. `MeeusRangeError` — dead code~~ DONE
-
-Marked as deprecated in docstring, kept for backward compat.
-
-### 4. `houses.py` deduplication
-
-**Priority: low | Risk: medium | Effort: medium**
-
-Repeated calculation blocks across house systems.
-
-### 5. `constants.py` missing `__all__`
-
-**Priority: low | Risk: high | Effort: small**
-
-51 files do `from .constants import *`. Adding `__all__` requires full audit.
