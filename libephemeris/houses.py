@@ -751,7 +751,7 @@ def swe_houses(
             eph_flags = iflag & (SEFLG_JPLEPH | SEFLG_SWIEPH)
             sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
-        except Exception:
+        except (IndexError, TypeError, ValueError):
             # Fallback to 0 declination (same as equinox behavior)
             sun_dec = 0.0
 
@@ -1577,7 +1577,7 @@ def swe_houses_ex(
                 eph_flags = flags & (SEFLG_JPLEPH | SEFLG_SWIEPH)
                 sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
                 sun_dec = sun_pos[1]
-            except Exception:
+            except (IndexError, TypeError, ValueError):
                 sun_dec = 0.0
             # Get obliquity for Sunshine calculation
             ts = get_timescale()
@@ -4841,7 +4841,7 @@ def _gauquelin_sector_from_rise_set(
             if retflag == -2 or jd_prev_set >= jd:
                 return fallback()
 
-    except Exception:
+    except (IndexError, TypeError, ValueError, ArithmeticError):
         return fallback()
 
     # Determine if planet is above or below horizon:

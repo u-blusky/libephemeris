@@ -1052,7 +1052,7 @@ def heliacal_ut(
             try:
                 pheno = swe_pheno_ut(jd, body, flags)
                 return pheno[2]  # Elongation
-            except Exception:
+            except (ValueError, TypeError, ArithmeticError):
                 pass
 
         # For stars or fallback: calculate elongation manually
@@ -1072,7 +1072,7 @@ def heliacal_ut(
         try:
             pheno = swe_pheno_ut(jd, body, flags)
             return pheno[4]  # Visual magnitude
-        except Exception:
+        except (ValueError, TypeError, ArithmeticError):
             return 0.0  # Default to bright magnitude
 
     # Create Schaefer model for visibility calculations
@@ -2096,7 +2096,7 @@ def heliacal_pheno_ut(
             elongation = pheno[2]  # Elongation
             magnitude = pheno[4]  # Visual magnitude
             phase_angle = pheno[0]  # Phase angle (index 0, not 1)
-        except Exception:
+        except (ValueError, TypeError, ArithmeticError):
             # Calculate elongation manually
             sun_geo = earth.at(t).observe(sun).apparent()
             elongation = body_geo.separation_from(sun_geo).degrees
@@ -2221,7 +2221,7 @@ def heliacal_pheno_ut(
                 moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
             )
             l_moon = math.pi * moon_diameter / 2
-        except Exception:
+        except (ValueError, TypeError, ArithmeticError):
             pass
 
     # Yallop q-test (for lunar crescent visibility)
@@ -2563,7 +2563,7 @@ def vis_limit_mag(
             try:
                 star_mag_val, _star_name_mag = swe_fixstar2_mag(objname)
                 obj_mag = star_mag_val
-            except Exception:
+            except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 2.0  # Default magnitude if not found
 
             # Convert ecliptic to equatorial then to horizontal
@@ -2583,7 +2583,7 @@ def vis_limit_mag(
 
         except ValueError:
             raise
-        except Exception as e:
+        except (KeyError, IndexError, OSError) as e:
             # Star not found or other error
             raise ValueError(f"could not find star name {objname.lower()}: {e}")
     else:
@@ -2615,7 +2615,7 @@ def vis_limit_mag(
             try:
                 pheno_result = swe_pheno_ut(tjdut, body_id, flags)
                 obj_mag = pheno_result[4]  # Visual magnitude
-            except Exception:
+            except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0  # Default bright
         else:
             raise ValueError(f"illegal planet number {body_id}.")
@@ -2671,7 +2671,7 @@ def vis_limit_mag(
             sun_obj_angle = 90.0  # Default
         else:
             sun_obj_angle = body_app_geo.separation_from(sun_app).degrees
-    except Exception:
+    except (ValueError, TypeError, AttributeError):
         pass
 
     # Calculate limiting magnitude using Schaefer model
