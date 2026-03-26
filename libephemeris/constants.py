@@ -14,6 +14,9 @@ Values match reference API v2.x for API compatibility.
 
 from __future__ import annotations
 
+# __all__ is generated dynamically at the bottom of this module to export
+# all public constants and functions while excluding private names and imports.
+
 # =============================================================================
 # PLANET AND BODY IDENTIFIERS
 # =============================================================================
@@ -1420,3 +1423,12 @@ PHOTOPIC_FLAG: int = 0
 SCOTOPIC_FLAG: int = 1
 SIMULATE_VICTORVB: int = 1
 TJD_INVALID: float = 99999999.0
+
+# =============================================================================
+# __all__ — explicit public API (excludes 'annotations' and private names)
+# =============================================================================
+__all__ = [
+    _name
+    for _name in sorted(dir())
+    if not _name.startswith("_") and _name != "annotations"
+]
