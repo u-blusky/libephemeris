@@ -5,22 +5,15 @@ in future releases where possible.
 
 ## Active Bugs
 
-### 1. True Node distance tolerance
-
-**Severity:** Low (distance value only, longitude is correct)
-**Affected:** `swe_calc_ut(jd, SE_TRUE_NODE, ...)` — the distance component.
-
-**Symptom:** Distance value differs from reference by ~2.3e-4 AU. Longitude
-is correct within ~4" (expected difference due to different lunar models).
-
-**Root cause:** Different osculating orbit computation from Moon state vectors.
-The distance represents the osculating distance at the node, which is sensitive
-to the exact eccentricity vector computation.
-
-**Impact:** Negligible for astrological use. Longitude is the primary output
-for True Node calculations.
+No active bugs at this time.
 
 ## Fixed Bugs (v1.0.0a3)
+
+### True Node distance (FIXED)
+
+The LEB fast path used mean orbital elements for True Node distance, causing
+~3e-4 AU errors. Now uses full osculating orbit calculation from JPL DE data.
+Error reduced from 3.25e-4 AU to ~1.5e-7 AU (2000x improvement).
 
 ### Sun heliocentric (FIXED)
 

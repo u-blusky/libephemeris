@@ -18,13 +18,10 @@ Items identified during development (March 2026). Grouped by category.
 
 ## Open
 
-### 11c. True Node distance tolerance
+### ~~11c. True Node distance tolerance~~ FIXED
 
-**Priority: low | Effort: unclear**
-
-True Node distance differs from reference by ~2.3e-4 AU. Longitude is correct (~4").
-Different osculating orbit computation from Moon state vectors.
-Documented in `docs/reference/known-bugs.md`.
+LEB fast path was using mean orbital elements approximation. Now uses full
+osculating orbit calc. Error: 3.25e-4 -> 1.5e-7 AU (2000x improvement).
 
 ---
 
