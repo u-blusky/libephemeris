@@ -131,25 +131,26 @@ Flags control what is calculated and how results are returned. Combine with `|`.
 | `SEFLG_TRUEPOS` | Geometric position (no light-time/aberration) |
 | `SEFLG_NOABERR` | Astrometric position (no aberration) |
 
-Full flag reference with examples: [docs/flags.md](docs/flags.md)
+Full flag reference with examples: [docs/reference/flags.md](docs/reference/flags.md)
 
 ---
 
 ## Documentation
 
 ### Guides
-- [Getting Started](docs/getting-started.md) -- installation, ephemeris tiers, first calculations
+- [Getting Started](docs/guides/getting-started.md) -- installation, ephemeris tiers, first calculations
 - [Migration from PySwissEph](docs/guides/migration-guide.md)
 - [Precision Tuning](docs/guides/precision-tuning.md)
 
 ### Architecture
 - [LEB Binary Ephemeris](docs/leb/guide.md) -- format, reader, generation, fast-path pipeline
-- [Horizons API Backend](docs/horizons-backend.md) -- HTTP client, pipeline, modes, precision
+- [Horizons API Backend](docs/architecture/horizons-backend.md) -- HTTP client, pipeline, modes, precision
 - [Architecture Overview](docs/development/architecture-overview.md)
 
 ### Reference
-- [Precision Report](docs/PRECISION.md) -- full measurement data
-- [Flag Reference](docs/flags.md)
+- [Precision Report](docs/PRECISION.md)
+- [Flag Reference](docs/reference/flags.md)
+- [Known Divergences](docs/reference/divergences.md)
 - [House Systems](docs/reference/house-systems.md)
 - [Ayanamsha Modes](docs/reference/ayanamsha.md)
 
@@ -159,6 +160,10 @@ Full flag reference with examples: [docs/flags.md](docs/flags.md)
 - [Lunar Apsides](docs/methodology/lunar-apsides.md)
 - [True Lilith](docs/methodology/true-lilith.md)
 - [pyerfa Integration](docs/methodology/pyerfa-integration.md)
+
+### Manuals
+- [Manuale (IT)](docs/manual/it/) -- introduzione ai calcoli astrologici per principianti, 15 capitoli
+- [Manual (EN)](docs/manual/en/) -- beginner's guide to astrological calculations, 15 chapters
 
 ### Development
 - [Testing](docs/development/testing.md) -- test suites, commands, coverage
