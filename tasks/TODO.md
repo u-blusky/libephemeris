@@ -1,895 +1,1042 @@
-# Exhaustive Verification Plan — LibEphemeris v1.0.0a3+
+# LibEphemeris — Piano di Verifica Esaustiva
 
-Ogni check e' una verifica standalone eseguibile come script Python.
-Nessun riferimento a unit test, poe, o pytest. Ogni sezione e' autonoma.
+## Contesto Generale del Progetto
 
-**Contesto:** LibEphemeris e' una libreria di effemeridi astronomiche con 3 backend
-(Skyfield/DE440, LEB Chebyshev precomputed, Horizons API), 40+ corpi celesti,
-24 sistemi di case, 43 ayanamsha, eclissi, visibilita' eliacale, stelle fisse,
-coordinate, e altro. Questo piano verifica la correttezza di OGNI funzione pubblica.
+LibEphemeris e' una reimplementazione clean-room in puro Python della Swiss Ephemeris,
+la libreria standard de facto per calcoli astronomici ed astrologici. Usa esclusivamente
+dati NASA JPL (DE440/DE441) tramite Skyfield, anziche' i file di effemeridi proprietari
+della Swiss Ephemeris. L'obiettivo e' la compatibilita' 1:1 con l'API PySwissEph
+mantenendo una precisione sub-arcsecond rispetto ai dati JPL.
 
-**Riferimento:** pyswisseph 2.10 (Swiss Ephemeris) come implementazione di riferimento.
+### Architettura a 3 Backend
+
+La libreria supporta 3 backend di calcolo con fallback automatico:
+
+1. **LEB** (LibEphemeris Binary) — Polinomi Chebyshev precomputed dai dati JPL.
+   ~5 microsecondi per valutazione. File `.leb` (LEB1) o `.leb` compresso (LEB2).
+   Il file `base_core.leb` (8.7 MB, 14 corpi) e' incluso nel wheel PyPI.
+
+2. **Horizons** — REST API di NASA JPL Horizons. Zero file locali necessari.
+   ~300ms per il primo calcolo, poi cached. Richiede internet.
+
+3. **Skyfield** — Calcolo diretto dai file DE440/DE441 via Skyfield.
+   ~120 microsecondi per valutazione. Il gold standard per precisione.
+
+Modalita' di calcolo (`set_calc_mode()` o `LIBEPHEMERIS_MODE`):
+- `"auto"` (default): LEB -> Horizons (se no DE440) -> Skyfield
+- `"leb"`: solo LEB, errore se non configurato
+- `"horizons"`: solo Horizons API
+- `"skyfield"`: solo Skyfield/DE440
+
+### Corpi Celesti Supportati
+
+| ID | Corpo | Note |
+|----|-------|------|
+| 0 | Sole | Geocentrico (apparente), eliocentrico = (0,0,0) |
+| 1 | Luna | Piu' alta precisione richiesta (moto rapido ~13 deg/day) |
+| 2-9 | Mercurio-Plutone | Include correzione baricentro->centro fisico per 5-9 |
+| 10 | Nodo Medio | Moto retrogrado liscio ~-0.053 deg/day |
+| 11 | Nodo Vero | Oscillazione ±1.5 deg attorno al medio, orbita osculante |
+| 12 | Apogeo Medio | Black Moon Lilith, ~40 deg/anno diretto |
+| 13 | Apogeo Osculante | True Lilith, oscillazione rapida |
+| 14 | Terra | Geocentrico = (0,0,0), utile per eliocentrico |
+| 15 | Chirone | Centauro, orbita caotica, richiede SPK per alta precisione |
+| 17-20 | Cerere-Vesta | Asteroidi cintura principale |
+| 21-22 | Apogeo/Perigeo Interpolati | Apsidi lunari da passaggi fisici distanza |
+| 40-47 | Uraniani | Cupido-Poseidon, Keplerian helio -> geocentrico |
+| 48 | Transpluto/Isis | Ipotetico, Keplerian |
+| 10000+ | Asteroidi via offset | SE_AST_OFFSET + numero |
+
+### Tier di Effemeridi
+
+| Tier | File JPL | Range date | Dimensione |
+|------|----------|-----------|------------|
+| base | de440s.bsp | 1849-2150 | ~31 MB |
+| medium | de440.bsp | 1550-2650 | ~128 MB (default) |
+| extended | de441.bsp | -13200 a +17191 | ~3.1 GB |
+
+### Flag di Calcolo
+
+I flag controllano il tipo di calcolo e il frame di riferimento. Sono bitmask
+combinabili con `|`.
+
+| Flag | Valore | Effetto |
+|------|--------|---------|
+| SEFLG_SPEED | 256 | Calcola velocita' (quasi sempre necessario) |
+| SEFLG_HELCTR | 8 | Osservatore al Sole (eliocentrico) |
+| SEFLG_BARYCTR | 16384 | Osservatore al baricentro SSB |
+| SEFLG_TOPOCTR | 32768 | Osservatore sulla superficie terrestre |
+| SEFLG_EQUATORIAL | 2048 | Output in RA/Dec anziche' lon/lat eclittica |
+| SEFLG_J2000 | 32 | Frame J2000 (no precessione a data) |
+| SEFLG_NONUT | 64 | Eclittica/equatore medio (no nutazione) |
+| SEFLG_SIDEREAL | 65536 | Zodiaco siderale (richiede set_sid_mode) |
+| SEFLG_TRUEPOS | 16 | Posizione geometrica (no light-time/aberrazione) |
+| SEFLG_NOABERR | 1024 | No aberrazione (astrometrica) |
+| SEFLG_NOGDEFL | 512 | No deflessione gravitazionale |
+| SEFLG_XYZ | 4096 | Output cartesiano (x,y,z in AU) |
+| SEFLG_RADIANS | 8192 | Angoli in radianti |
+| SEFLG_ICRS | 131072 | Frame ICRS |
+
+### Sistemi di Case (24)
+
+P=Placidus, K=Koch, O=Porphyrius, R=Regiomontanus, C=Campanus,
+E/A=Uguale, W=Segno Intero, X=Meridiano, M=Morinus, H=Orizzontale,
+T=Topocentric, B=Alcabitus, G=Gauquelin, I/i=Sunshine, L=Pullen SD,
+N=Pullen SR, Q=Carter, Y=APC, F=Carter Poli-Equatorial, U=Krusinski,
+D=Sripati, J=vedic
+
+### Ayanamsha (43 + custom)
+
+Modi 0-42 predefiniti (Fagan-Bradley, Lahiri, Raman, etc.)
+Modo 255 = custom con t0 e ayan_t0 utente.
+Modi stellari (27-29) usano posizioni reali di stelle.
+
+### Precisione Attesa
+
+| Categoria | Tipica | Max | Note |
+|-----------|--------|-----|------|
+| Pianeti (Sole-Plutone) | 0.04-0.26" | 0.75" | Sub-arcsecond |
+| Luna | 0.70" | 3.32" | Modelli lunari diversi |
+| Cuspidi case | < 0.01" | 0.02" | 24 sistemi testati |
+| Stelle fisse | < 0.1" | 0.51" | 116 stelle Hipparcos |
+| Eclissi solari | — | < 6s | Timing |
+| Eclissi lunari | — | < 8s | Timing |
+| LEB vs Skyfield | < 0.005" | < 0.01" | Compressione Chebyshev |
+| Horizons vs Skyfield | < 0.001" | 0.03" | Eliocentrico offset |
+
+### File Chiave dell'Implementazione
+
+| File | Righe | Scopo |
+|------|-------|-------|
+| `planets.py` | ~5500 | Core: `_calc_body()`, flag dispatch, velocity, planet centers |
+| `houses.py` | ~5000 | 24 sistemi di case, cusps, angles (ASC, MC, Vertex) |
+| `eclipse.py` | ~14000 | Eclissi solari/lunari, occultazioni, Besselian elements |
+| `lunar.py` | ~1900 | Nodi, apsidi, True Node osculante, perturbazioni ELP2000 |
+| `heliacal.py` | ~2700 | Visibilita' eliacale, magnitudine limite |
+| `fast_calc.py` | ~1100 | LEB fast path pipeline (Clenshaw, correzioni, frame) |
+| `horizons_backend.py` | ~720 | HTTP client, pipeline geocentrica, cache |
+| `state.py` | ~2000 | Stato globale, setter/getter, lock, init lazy |
+| `context.py` | ~600 | EphemerisContext thread-safe |
+| `time_utils.py` | ~800 | Julian day, Delta T, sidereal time, UTC |
+| `fixed_stars.py` | ~4800 | Catalogo Hipparcos, moto proprio |
+| `crossing.py` | ~1200 | Equinozi, solstizi, crossings, stazioni |
+| `constants.py` | ~1430 | 785 costanti + 3 funzioni |
 
 ---
 
-## 1. Posizioni Planetarie — Cross-Backend
+## Piano di Verifica
 
-### 1.1 Skyfield vs pyswisseph — tutti i corpi principali
+Ogni sezione descrive verifiche standalone. Ogni check e' un'asserzione Python
+individuale che puo' essere eseguita senza dipendenze da test suite esistenti.
+Il riferimento e' pyswisseph 2.10.
 
-Per ogni corpo in [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,18,19,20,21,22]:
-Per ogni data in 500 JD casuali [2415020, 2488069] (1900-2100):
-- [ ] `swe_calc_ut(jd, body, SEFLG_SPEED)` lon diff < 1" vs pyswisseph
-- [ ] `swe_calc_ut(jd, body, SEFLG_SPEED)` lat diff < 1" vs pyswisseph
-- [ ] `swe_calc_ut(jd, body, SEFLG_SPEED)` dist diff < 1e-5 AU vs pyswisseph
-- [ ] `swe_calc_ut(jd, body, SEFLG_SPEED)` speed_lon diff < 0.01 deg/day vs pyswisseph
+### Notazione
 
-### 1.2 LEB vs Skyfield — corpi core (14 body)
-
-Per ogni corpo in [0,1,2,3,4,5,6,7,8,9,10,11,12,14]:
-Per ogni data in 500 JD in [2396760, 2506330] (base tier):
-- [ ] `set_calc_mode("leb")` vs `set_calc_mode("skyfield")`: lon diff < 0.005"
-- [ ] lat diff < 0.005"
-- [ ] dist diff < 1e-7 AU
-- [ ] speed_lon diff < 0.001 deg/day
-
-### 1.3 Horizons vs Skyfield — 13 corpi geocentrici
-
-Per ogni corpo in [0,1,2,3,4,5,6,7,8,9,14,15,17]:
-Per ogni data in 200 JD in [2430000, 2470000]:
-- [ ] `set_calc_mode("horizons")` vs `set_calc_mode("skyfield")`: lon diff < 0.001"
-- [ ] lat diff < 0.001"
-- [ ] dist diff < 1e-7 AU
-
-### 1.4 LEB2 vs LEB1 — compressione intatta
-
-Per ogni corpo in LEB2 core (14 body):
-Per ogni data in 500 JD:
-- [ ] Posizione da LEB2Reader.eval_body() matches LEBReader.eval_body() < 0.001"
-
-### 1.5 Triple cross-validation (Skyfield x LEB x Horizons)
-
-Per 11 corpi x 100 date:
-- [ ] |Skyfield - LEB| < 0.005" (lon e lat)
-- [ ] |Skyfield - Horizons| < 0.005" (lon e lat)
-- [ ] |LEB - Horizons| < 0.005" (lon e lat)
+- `jd` = Julian Day (es. 2451545.0 = J2000.0 = 1 Gennaio 2000 12:00 TT)
+- `body` = ID corpo celeste (SE_SUN=0, SE_MOON=1, etc.)
+- `flags` = bitmask flag di calcolo
+- `"<"` = strettamente minore (tolleranza)
+- Quando si dice "per N date casuali" si intende con seed fisso per riproducibilita'
 
 ---
 
-## 2. Flag Combinazioni — OGNI flag con OGNI backend
+## 1. Posizioni Planetarie — Accuratezza Cross-Backend
 
-### 2.1 Singoli flag (13 flag x 22 corpi x 3 backend x 50 date)
+Questa e' la sezione piu' critica. Verifica che tutti e 3 i backend producano
+posizioni consistenti tra loro e con la reference implementation.
 
-Flag: SEFLG_SPEED, SEFLG_SPEED|SEFLG_SIDEREAL, SEFLG_SPEED|SEFLG_EQUATORIAL,
-SEFLG_SPEED|SEFLG_J2000, SEFLG_SPEED|SEFLG_NOABERR, SEFLG_SPEED|SEFLG_HELCTR,
-SEFLG_SPEED|SEFLG_BARYCTR, SEFLG_SPEED|SEFLG_TRUEPOS, SEFLG_SPEED|SEFLG_NONUT,
-SEFLG_SPEED|SEFLG_NOGDEFL, SEFLG_SPEED|SEFLG_XYZ, SEFLG_SPEED|SEFLG_RADIANS,
-SEFLG_SPEED|SEFLG_TOPOCTR
+### 1.1 Skyfield vs pyswisseph — tutti i 22 corpi
+
+Corpi: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,18,19,20,21,22
+Date: 500 JD casuali (seed=42) in [2415020.5, 2488069.5] (1900-2100)
+Flag: SEFLG_SPEED
+
+Per ogni (corpo, data):
+- [ ] Longitudine: |lib - ref| < 1.0 arcsec (pianeti), < 4.0 arcsec (Luna)
+- [ ] Latitudine: |lib - ref| < 1.0 arcsec
+- [ ] Distanza: |lib - ref| < 1e-5 AU
+- [ ] Velocita' lon: |lib - ref| < 0.01 deg/day
+- [ ] Nessun crash o eccezione inattesa
+
+Stima: 22 corpi x 500 date x 5 check = **55.000 check**
+
+### 1.2 Skyfield vs pyswisseph — flag varianti
+
+Per ogni flag in [SEFLG_SPEED, SPEED|SIDEREAL, SPEED|EQUATORIAL, SPEED|J2000,
+SPEED|NOABERR, SPEED|HELCTR, SPEED|BARYCTR, SPEED|TRUEPOS, SPEED|NONUT,
+SPEED|NOGDEFL]:
+Per 10 corpi (0,1,2,4,5,6,8,9,14,15):
+Per 100 date casuali:
+- [ ] Longitudine: |lib - ref| < 2.0 arcsec
+- [ ] Latitudine: |lib - ref| < 2.0 arcsec
+
+Stima: 10 flag x 10 corpi x 100 date x 2 check = **20.000 check**
+
+### 1.3 LEB vs Skyfield — 14 corpi core
+
+Corpi: 0,1,2,3,4,5,6,7,8,9,10,11,12,14 (quelli nel base_core.leb)
+Date: 500 JD in [2396760, 2506330] (range base tier)
+Metodo: `set_calc_mode("leb")` vs `set_calc_mode("skyfield")`
+
+Per ogni (corpo, data):
+- [ ] |lon_leb - lon_sky| < 0.005 arcsec
+- [ ] |lat_leb - lat_sky| < 0.005 arcsec
+- [ ] |dist_leb - dist_sky| < 1e-7 AU
+- [ ] |speed_leb - speed_sky| < 0.001 deg/day
+
+Stima: 14 x 500 x 4 = **28.000 check**
+
+### 1.4 LEB vs Skyfield — con flag siderale/equatoriale/J2000
+
+Per 14 corpi x 200 date x 4 flag (sidereal, equatorial, J2000, noaberr):
+- [ ] |lon_diff| < 0.005 arcsec
+
+Stima: 14 x 200 x 4 = **11.200 check**
+
+### 1.5 Horizons vs Skyfield — 13 corpi geocentrici
+
+Corpi: 0,1,2,3,4,5,6,7,8,9,14,15,17
+Date: 200 JD in [2430000, 2470000]
+6 flag: default, sidereal, equatorial, J2000, noaberr, truepos
+
+Per ogni (corpo, data, flag):
+- [ ] |lon_hz - lon_sky| < 0.001 arcsec (geocentrico)
+- [ ] |lat_hz - lat_sky| < 0.001 arcsec
+
+Stima: 13 x 200 x 6 x 2 = **31.200 check**
+
+### 1.6 Horizons vs Skyfield — eliocentrici
+
+Per 10 corpi x 100 date:
+- [ ] |lon_hz - lon_sky| < 0.03 arcsec (offset sistematico noto)
+
+Stima: 10 x 100 = **1.000 check**
+
+### 1.7 LEB2 vs LEB1 — integrita' compressione
+
+Per 14 corpi x 500 date:
+- [ ] |pos_leb2 - pos_leb1| < 0.001 arcsec
+
+Stima: 14 x 500 = **7.000 check**
+
+### 1.8 Triple cross-validation
+
+Per 11 corpi (comuni a tutti i backend) x 100 date:
+- [ ] |Skyfield - LEB| < 0.01 arcsec
+- [ ] |Skyfield - Horizons| < 0.01 arcsec
+- [ ] |LEB - Horizons| < 0.01 arcsec
+(per lon e lat = 6 check per combinazione)
+
+Stima: 11 x 100 x 6 = **6.600 check**
+
+---
+
+## 2. Flag Combinazioni — Robustezza
+
+Verifica che OGNI combinazione di flag con OGNI corpo non crashi e produca
+output valido.
+
+### 2.1 Singoli flag — no crash, output valido
+
+13 flag x 22 corpi x 3 backend (skyfield, leb, horizons) x 50 date
 
 Per ogni (flag, corpo, backend, data):
 - [ ] Nessun crash
-- [ ] Ritorna tupla a 6 elementi
-- [ ] Tutti i valori finiti (math.isfinite)
-- [ ] lon/RA in range valido
-- [ ] dist >= 0 (tranne XYZ)
+- [ ] Tupla a 6 elementi
+- [ ] Tutti i valori math.isfinite()
+- [ ] lon/RA nel range atteso
+- [ ] dist >= 0 (escluso XYZ)
+- [ ] speed finita
 
-### 2.2 Flag combinati (coppie compatibili)
+Stima: 13 x 22 x 3 x 50 x 6 = **257.400 check**
 
-78 coppie di flag x 5 corpi x 20 date:
-- [ ] SEFLG_SPEED|SEFLG_SIDEREAL|SEFLG_EQUATORIAL — nessun crash
-- [ ] SEFLG_SPEED|SEFLG_J2000|SEFLG_NOABERR — nessun crash
-- [ ] SEFLG_SPEED|SEFLG_HELCTR|SEFLG_J2000 — nessun crash
-- [ ] SEFLG_SPEED|SEFLG_SIDEREAL|SEFLG_J2000 — nessun crash
-- [ ] ... tutte le 78 coppie
+### 2.2 Coppie di flag compatibili
 
-### 2.3 SEFLG_TOPOCTR con set_topo
+78 coppie x 5 corpi x 20 date:
+- [ ] No crash
+- [ ] Output valido (6 valori finiti)
 
-Per 5 localita' (Roma, Tokyo, NYC, Polo Nord, Equatore):
-Per 10 date:
-- [ ] set_topo(lon, lat, alt) + calc_ut(jd, SE_MOON, SEFLG_SPEED|SEFLG_TOPOCTR)
-- [ ] Risultato diverso dal geocentrico (Moon parallax ~1 deg)
-- [ ] Risultato consistente se ripetuto
+Stima: 78 x 5 x 20 x 2 = **15.600 check**
 
-### 2.4 SEFLG_SIDEREAL con tutte le 43 ayanamsha
+### 2.3 SEFLG_TOPOCTR con diverse localita'
 
-Per ogni mode 0-42:
-Per 10 date:
-Per 3 corpi (Sun, Moon, Mars):
-- [ ] set_sid_mode(mode); calc_ut(jd, body, SEFLG_SPEED|SEFLG_SIDEREAL)
-- [ ] Risultato != tropicale
-- [ ] lon siderale in [0, 360)
-- [ ] Ayanamsha = get_ayanamsa_ut(jd) e' finito e ragionevole (0-30 deg per mode moderni)
+5 localita' x 10 corpi x 20 date:
+- [ ] set_topo() + calc_ut() con SEFLG_TOPOCTR: no crash
+- [ ] Risultato differisce dal geocentrico (almeno per la Luna)
 
-### 2.5 Sun heliocentric = (0,0,0)
+Stima: 5 x 10 x 20 x 2 = **2.000 check**
 
-- [ ] calc_ut(jd, SE_SUN, SEFLG_SPEED|SEFLG_HELCTR) == (0,0,0,0,0,0) per qualsiasi jd
+### 2.4 SEFLG_XYZ coerenza con sferico
 
-### 2.6 SEFLG_XYZ vs conversione manuale
+10 corpi x 50 date:
+- [ ] Conversione manuale lon/lat/dist -> xyz matches SEFLG_XYZ output (< 1e-8)
 
-Per 10 corpi x 20 date:
-- [ ] pos_ecl = calc_ut(jd, body, SEFLG_SPEED)
-- [ ] pos_xyz = calc_ut(jd, body, SEFLG_SPEED|SEFLG_XYZ)
-- [ ] x = dist*cos(lat)*cos(lon), y = dist*cos(lat)*sin(lon), z = dist*sin(lat)
-- [ ] |x - pos_xyz[0]| < 1e-8
+Stima: 10 x 50 x 3 = **1.500 check**
 
-### 2.7 SEFLG_RADIANS vs gradi
+### 2.5 SEFLG_RADIANS coerenza con gradi
 
-Per 10 corpi x 20 date:
-- [ ] pos_deg = calc_ut(jd, body, SEFLG_SPEED)
-- [ ] pos_rad = calc_ut(jd, body, SEFLG_SPEED|SEFLG_RADIANS)
-- [ ] |pos_rad[0] - math.radians(pos_deg[0])| < 1e-10
+10 corpi x 50 date:
+- [ ] math.radians(lon_deg) == lon_rad (< 1e-10)
+
+Stima: 10 x 50 x 2 = **1.000 check**
+
+### 2.6 Sun heliocentric invariante
+
+50 date:
+- [ ] calc_ut(jd, SE_SUN, SEFLG_SPEED|SEFLG_HELCTR) == (0,0,0,0,0,0)
+
+Stima: 50 x 6 = **300 check**
 
 ---
 
 ## 3. Sistemi di Case (24 sistemi)
 
-### 3.1 Per ogni sistema: P K O R C E W X M H T B G I i A L N Q Y F U D J
+Verifica tutti i 24 sistemi di case per correttezza geometrica e
+compatibilita' con la reference implementation.
 
-Per ogni sistema:
-Per 20 date x 6 localita' (equatore, Roma, Tokyo, NYC, 60N, 60S):
-- [ ] houses(jd, lat, lon, system) ritorna (cusps, ascmc)
+### 3.1 Validita' output per ogni sistema
+
+24 sistemi x 6 localita' x 20 date:
+Localita': (0,0), (12.5,41.9), (139.7,35.7), (-73.9,40.7), (0,60), (0,-60)
+
+Per ogni (sistema, localita', data):
 - [ ] len(cusps) >= 12
 - [ ] Tutti i cusps in [0, 360)
 - [ ] ASC (ascmc[0]) in [0, 360)
 - [ ] MC (ascmc[1]) in [0, 360)
-- [ ] ASC != MC (tranne equatore)
-- [ ] Cusps ordinati crescenti (con wrap-around a 360)
+- [ ] ASC != MC
 
-### 3.2 Confronto houses vs pyswisseph
+Stima: 24 x 6 x 20 x 5 = **14.400 check**
 
-Per ogni sistema x 10 date x 3 localita':
-- [ ] cusps diff < 0.1 deg vs pyswisseph per tutti i cusps
-- [ ] ASC diff < 0.01 deg vs pyswisseph
-- [ ] MC diff < 0.01 deg vs pyswisseph
+### 3.2 Confronto vs pyswisseph
+
+24 sistemi x 3 localita' x 20 date:
+- [ ] |cusp_i_lib - cusp_i_ref| < 0.1 deg per tutti i cusps (i=1..12)
+- [ ] |ASC_lib - ASC_ref| < 0.01 deg
+- [ ] |MC_lib - MC_ref| < 0.01 deg
+
+Stima: 24 x 3 x 20 x 14 = **20.160 check**
 
 ### 3.3 houses_ex con flag siderale
 
-Per 5 sistemi (P, K, W, E, B):
-Per 3 ayanamsha (Lahiri, Fagan-Bradley, Raman):
-Per 10 date:
-- [ ] houses_ex(jd, lat, lon, system, SEFLG_SIDEREAL) != houses(jd, lat, lon, system)
-- [ ] Differenza = ayanamsha (entro 0.01 deg)
+5 sistemi x 3 ayanamsha x 20 date:
+- [ ] Cuspidi siderali != tropicali
+- [ ] Differenza ~ ayanamsha
+
+Stima: 5 x 3 x 20 x 2 = **600 check**
 
 ### 3.4 Latitudini polari
 
-- [ ] Placidus a 70N: fallback a Porphyry (no crash)
-- [ ] Koch a 70N: fallback a Porphyry (no crash)
-- [ ] Equal a 90N: funziona normalmente
-- [ ] Whole Sign a 90N: funziona normalmente
+Per Placidus e Koch a lat 70, 80, 85, 89:
+- [ ] No crash (fallback a Porphyry)
+Per Equal e Whole Sign a lat 90:
+- [ ] Funziona normalmente
+
+Stima: 2 x 4 x 10 + 2 x 10 = **100 check**
 
 ### 3.5 houses_armc
 
-Per 5 sistemi x 10 ARMC values x 3 eps values:
-- [ ] houses_armc(armc, lat, eps, system) ritorna risultato valido
-- [ ] Consistente con houses() per lo stesso momento
+5 sistemi x 10 ARMC x 3 eps:
+- [ ] Output valido
+- [ ] Coerente con houses() per stesso momento
+
+Stima: 5 x 10 x 3 x 5 = **750 check**
 
 ### 3.6 house_pos
 
-Per 10 longitudini planetarie x 5 sistemi:
-- [ ] house_pos(armc, lat, eps, system, planet_lon) in [1.0, 13.0)
-- [ ] Pianeta al cusp 1 -> house_pos ~ 1.0
+10 lon planetarie x 5 sistemi x 5 date:
+- [ ] Risultato in [1.0, 13.0)
+
+Stima: 10 x 5 x 5 = **250 check**
 
 ### 3.7 Gauquelin sectors
 
-Per 5 corpi x 5 date:
-- [ ] gauquelin_sector(jd, body, lon, lat, SEFLG_SPEED) in [1, 36]
+5 corpi x 10 date:
+- [ ] Settore in [1, 36]
+
+Stima: 5 x 10 = **50 check**
 
 ---
 
 ## 4. Ayanamsha (43 modi + custom)
 
-### 4.1 Tutti i modi producono valori diversi
+### 4.1 Tutti i modi producono valori distinti
 
-Per JD = 2451545.0 (J2000):
-- [ ] get_ayanamsa_ut(jd) per mode 0-42: tutti diversi tra loro
-- [ ] Tutti in range [-5, 30] gradi (ragionevole per epoca moderna)
+A J2000:
+- [ ] get_ayanamsa_ut(jd) per mode 0-42: 43 valori tutti diversi
+- [ ] Tutti in range [-5, 30] deg
 
-### 4.2 get_ayanamsa_ut vs get_ayanamsa
+Stima: **43 + 43 = 86 check**
 
-Per 10 date:
-- [ ] |get_ayanamsa_ut(jd_ut) - get_ayanamsa(jd_tt)| < delta_t * derivata (coerenza UT/TT)
+### 4.2 Coerenza UT/TT
 
-### 4.3 get_ayanamsa_ex e get_ayanamsa_ex_ut
+10 date x 5 modi:
+- [ ] |get_ayanamsa_ut(jd_ut) - get_ayanamsa(jd_tt)| ragionevole
 
-Per 5 modi:
-- [ ] Ritorna (ayanamsa, retflag) tuple
-- [ ] ayanamsa matches get_ayanamsa_ut()
+Stima: **50 check**
+
+### 4.3 get_ayanamsa_ex/get_ayanamsa_ex_ut
+
+5 modi x 5 date:
+- [ ] Ritorna (ayanamsa, retflag)
+- [ ] ayanamsa matches get_ayanamsa_ut
+
+Stima: **50 check**
 
 ### 4.4 get_ayanamsa_name
 
-Per ogni mode 0-42:
-- [ ] get_ayanamsa_name(mode) ritorna stringa non vuota
+- [ ] 43 nomi non vuoti
+
+Stima: **43 check**
 
 ### 4.5 Custom ayanamsha (mode 255)
 
-- [ ] set_sid_mode(255, t0=2451545.0, ayan_t0=23.5)
-- [ ] get_ayanamsa_ut(2451545.0) == 23.5
-- [ ] Varia linearmente nel tempo
+- [ ] set_sid_mode(255, t0=J2000, ayan_t0=23.5): get_ayanamsa_ut(J2000) == 23.5
 
-### 4.6 Star-based ayanamsha (modes 27, 28, 29)
+Stima: **5 check**
 
-Per ognuno:
-- [ ] Calcolo non crasha (richiede star positions)
-- [ ] Risultato finito e ragionevole
+### 4.6 Star-based (modes 27, 28, 29)
+
+3 modi x 5 date:
+- [ ] No crash, risultato finito
+
+Stima: **15 check**
+
+### 4.7 Posizioni siderali per tutti i 43 modi
+
+43 modi x 3 corpi x 10 date:
+- [ ] lon_siderale in [0, 360)
+- [ ] lon_siderale != lon_tropicale
+
+Stima: 43 x 3 x 10 x 2 = **2.580 check**
 
 ---
 
-## 5. Eclissi
+## 5. Eclissi Solari
 
-### 5.1 Eclissi solari — ricerca globale
+### 5.1 Ricerca globale
 
-Per ogni anno 2000-2025 (26 anni):
-- [ ] sol_eclipse_when_glob(jd_start) trova almeno 1 eclissi nell'anno
-- [ ] JD eclissi e' nell'anno
-- [ ] Tipo eclissi e' valido (SE_ECL_TOTAL|ANNULAR|PARTIAL)
-- [ ] Coordinate centrali nell'emisfero corretto
+26 anni (2000-2025):
+- [ ] sol_eclipse_when_glob() trova almeno 1 eclissi per anno
+- [ ] JD eclissi nell'anno
+- [ ] Tipo valido (TOTAL|ANNULAR|PARTIAL|HYBRID)
 
-### 5.2 Eclissi solari — ricerca locale
+Stima: 26 x 3 = **78 check**
 
-Per 3 eclissi note (es. 2024-04-08 USA, 2023-10-14 Americas, 2020-06-21 Africa):
-- [ ] sol_eclipse_when_loc(jd, lon, lat) trova l'eclissi
-- [ ] Timing entro 1 minuto dal dato noto
+### 5.2 Ricerca locale
 
-### 5.3 Eclissi solari — geometria
+5 eclissi note x 5 localita':
+- [ ] sol_eclipse_when_loc() trova eclissi
+- [ ] Timing entro 60 secondi dal dato noto
 
-Per 5 eclissi note:
-- [ ] sol_eclipse_where(jd) ritorna coordinate centrali valide
-- [ ] sol_eclipse_how(jd, lon, lat) ritorna magnitudine > 0
-- [ ] sol_eclipse_how_details(jd, lon, lat) ritorna dettagli
-- [ ] Magnitude, obscuration finiti
+Stima: 25 x 2 = **50 check**
 
-### 5.4 Eclissi lunari — ricerca globale
+### 5.3 Geometria
 
-Per ogni anno 2000-2025:
-- [ ] lun_eclipse_when(jd_start) trova almeno 1 eclissi
-- [ ] Tipo valido (TOTAL|PARTIAL|PENUMBRAL)
+5 eclissi:
+- [ ] sol_eclipse_where(): coordinate centrali valide
+- [ ] sol_eclipse_how(): magnitudine > 0
+- [ ] sol_eclipse_how_details(): dettagli finiti
+- [ ] Obscuration in [0, 1]
 
-### 5.5 Eclissi lunari — dettagli
+Stima: 5 x 4 = **20 check**
 
-Per 5 eclissi note:
-- [ ] lun_eclipse_how(jd) ritorna gamma, magnitudine
+### 5.4 Besselian elements
+
+3 eclissi:
+- [ ] x, y, d, l1, l2, mu tutti finiti
+- [ ] Derivate temporali finite
+
+Stima: 3 x 12 = **36 check**
+
+### 5.5 Saros/Inex
+
+5 eclissi:
+- [ ] get_saros_number() > 0
+- [ ] get_inex_number() finito
+
+Stima: 5 x 2 = **10 check**
+
+---
+
+## 6. Eclissi Lunari
+
+### 6.1 Ricerca globale
+
+26 anni:
+- [ ] lun_eclipse_when() trova almeno 1 per anno
+- [ ] Tipo valido
+
+Stima: 26 x 2 = **52 check**
+
+### 6.2 Dettagli
+
+5 eclissi note:
+- [ ] lun_eclipse_how(): gamma, magnitudine
 - [ ] Umbral/penumbral magnitude finiti
 
-### 5.6 Occultazioni
+Stima: 5 x 4 = **20 check**
 
-Per 3 occultazioni note:
-- [ ] lun_occult_when_glob(jd, body) trova occultazione
-- [ ] planet_occult_when_glob(jd, body1, body2) funziona
+### 6.3 Occultazioni
 
-### 5.7 Elementi Besseliani
+3 occultazioni:
+- [ ] lun_occult_when_glob() trova evento
+- [ ] planet_occult_when_glob() funziona
 
-Per 3 eclissi solari:
-- [ ] BesselianElements calcolati (x, y, d, l1, l2, mu)
-- [ ] Tutti i valori finiti
-- [ ] Derivate temporali (dx_dt, dy_dt) calcolate
-
-### 5.8 Saros e Inex
-
-Per 5 eclissi:
-- [ ] get_saros_number(jd) ritorna intero > 0
-- [ ] get_inex_number(jd) ritorna intero
+Stima: 3 x 2 = **6 check**
 
 ---
 
-## 6. Alba/Tramonto/Transito
+## 7. Alba/Tramonto/Transito
 
-### 6.1 rise_trans per Sole
+### 7.1 Sole
 
-Per 5 localita' x 10 date:
-- [ ] rise_trans(jd, SE_SUN, lon, lat, SE_CALC_RISE) ritorna JD alba
-- [ ] rise_trans(jd, SE_SUN, lon, lat, SE_CALC_SET) ritorna JD tramonto
-- [ ] Alba < Tramonto (stesso giorno)
-- [ ] Differenza alba-tramonto ragionevole (6-18 ore)
-- [ ] rise_trans(jd, SE_SUN, lon, lat, SE_CALC_MTRANSIT) ritorna mezzogiorno ~12h locale
+5 localita' x 20 date:
+- [ ] rise_trans(CALC_RISE): JD alba valido
+- [ ] rise_trans(CALC_SET): JD tramonto valido
+- [ ] Alba < Tramonto
+- [ ] Durata giorno ragionevole (6-18 ore)
+- [ ] rise_trans(CALC_MTRANSIT): mezzogiorno ~12h locale
 
-### 6.2 rise_trans per Luna
+Stima: 5 x 20 x 5 = **500 check**
 
-Per 3 localita' x 10 date:
-- [ ] rise_trans(jd, SE_MOON, ..., SE_CALC_RISE) ritorna JD
-- [ ] Luna sorge ~50 min dopo ogni giorno
+### 7.2 Luna
 
-### 6.3 rise_trans per pianeti
+3 localita' x 20 date:
+- [ ] Rise e set calcolati
+- [ ] Progressione ~ +50 min/giorno
 
-Per Mercury, Venus, Mars, Jupiter, Saturn:
-Per 5 date:
-- [ ] Rise, set, transit calcolati senza crash
-- [ ] Transit altitude ragionevole
+Stima: 3 x 20 x 3 = **180 check**
 
-### 6.4 Crepuscolo
+### 7.3 Pianeti
 
-- [ ] BIT_CIVIL_TWILIGHT: sole a -6 deg
-- [ ] BIT_NAUTIC_TWILIGHT: sole a -12 deg
-- [ ] BIT_ASTRO_TWILIGHT: sole a -18 deg
+5 pianeti x 5 date:
+- [ ] Rise, set, transit: no crash
 
-### 6.5 Latitudini polari
+Stima: 5 x 5 x 3 = **75 check**
 
-- [ ] Sole a 70N in estate: notte bianca (no set)
-- [ ] Sole a 70N in inverno: notte polare (no rise)
+### 7.4 Crepuscoli
+
+3 tipi (civil, nautic, astro) x 5 date:
+- [ ] Angoli corretti (-6, -12, -18 deg)
+
+Stima: 3 x 5 x 2 = **30 check**
+
+### 7.5 Latitudini polari
+
+5 date estive/invernali a 70N:
+- [ ] Notte bianca estate (no set)
+- [ ] Notte polare inverno (no rise)
+
+Stima: **10 check**
 
 ---
 
-## 7. Visibilita' Eliacale
+## 8. Visibilita' Eliacale
 
-### 7.1 heliacal_ut per pianeti
+### 8.1 heliacal_ut
 
-Per Mercury, Venus, Mars, Jupiter, Saturn:
-- [ ] heliacal_ut(jd, lon, lat, atmo, observer, body, SE_HELIACAL_RISING) ritorna JD
-- [ ] JD e' nel futuro rispetto a jd_start
-- [ ] Differenza < 365 giorni
+5 pianeti x 4 tipi di evento x 3 date:
+- [ ] JD evento valido
 
-### 7.2 vis_limit_mag
+Stima: 5 x 4 x 3 = **60 check**
 
-Per 5 corpi x 3 condizioni atmosferiche:
-- [ ] vis_limit_mag(jd, geopos, atmo, observer, body) ritorna risultato
+### 8.2 vis_limit_mag
+
+5 corpi x 3 condizioni atmosferiche:
 - [ ] Magnitudine limite finita
 
-### 7.3 Tipi di evento eliacale
-
-Per Venus:
-- [ ] SE_HELIACAL_RISING (levata eliacale mattutina)
-- [ ] SE_HELIACAL_SETTING (tramonto eliacale serale)
-- [ ] SE_EVENING_FIRST
-- [ ] SE_MORNING_LAST
+Stima: 5 x 3 = **15 check**
 
 ---
 
-## 8. Stelle Fisse
+## 9. Stelle Fisse
 
-### 8.1 fixstar_ut per stelle note
+### 9.1 Posizioni
 
-Per Regulus, Spica, Aldebaran, Sirius, Vega, Antares, Fomalhaut, Pollux:
-- [ ] fixstar_ut(jd, name, SEFLG_SPEED) ritorna posizione valida
-- [ ] lon in [0, 360), lat in [-90, 90]
+20 stelle note (Sirius, Vega, Regulus, Spica, Aldebaran, Antares, Fomalhaut,
+Pollux, Arcturus, Capella, Rigel, Procyon, Betelgeuse, Altair, Deneb,
+Canopus, Achernar, Hadar, Acrux, Mimosa):
+Per 5 date:
+- [ ] fixstar_ut(): lon in [0, 360), lat in [-90, 90]
 - [ ] dist > 0
 
-### 8.2 fixstar_mag
+Stima: 20 x 5 x 3 = **300 check**
 
-Per 20 stelle:
-- [ ] fixstar_mag(name) ritorna magnitudine finita
-- [ ] Sirius ~ -1.46, Vega ~ 0.03 (entro 0.1)
+### 9.2 Magnitudini
 
-### 8.3 Moto proprio
+20 stelle:
+- [ ] fixstar_mag(): magnitudine finita
+- [ ] Sirius ~ -1.46 (entro 0.2)
 
-Per Sirius e Barnard's Star (alto moto proprio):
-- [ ] Posizione a J2000 vs J2100: differenza misurabile
-- [ ] Barnard's Star: moto > 1" per anno
+Stima: 20 x 2 = **40 check**
 
-### 8.4 fixstar2 (ricerca per numero)
+### 9.3 Moto proprio
 
-Per 10 stelle Hipparcos:
-- [ ] fixstar2(jd, hip_number, flags) ritorna posizione
-- [ ] Matches fixstar_ut con stesso nome
+Per Barnard's Star e Sirius (alto moto proprio):
+- [ ] Posizione J2000 vs J2100 differisce in modo misurabile
+
+Stima: 2 x 2 = **4 check**
 
 ---
 
-## 9. Trasformazioni di Coordinate
+## 10. Trasformazioni di Coordinate
 
-### 9.1 cotrans round-trip
+### 10.1 cotrans round-trip
 
-Per 3 obliquita' x 100 punti casuali (lon, lat):
-- [ ] ecl -> eq -> ecl: |lon_finale - lon_iniziale| < 1e-10 deg
-- [ ] ecl -> eq -> ecl: |lat_finale - lat_iniziale| < 1e-10 deg
+3 obliquita' x 200 punti:
+- [ ] ecl -> eq -> ecl: |diff| < 1e-10 deg
 
-### 9.2 cotrans_sp con velocita'
+Stima: 3 x 200 x 2 = **1.200 check**
 
-Per 10 punti + velocita':
+### 10.2 cotrans_sp
+
+20 punti con velocita':
 - [ ] Round-trip preserva posizione e velocita'
 
-### 9.3 azalt
+Stima: 20 x 4 = **80 check**
 
-Per 5 localita' x 10 date x 5 corpi:
-- [ ] azalt(jd, SE_ECL2HOR, lon, lat, alt, ecl_lon, ecl_lat) ritorna (az, alt_true, alt_app)
-- [ ] Azimut in [0, 360)
-- [ ] Altitudine in [-90, 90]
+### 10.3 azalt
 
-### 9.4 azalt_rev
+5 localita' x 10 date x 5 corpi:
+- [ ] az in [0, 360), alt in [-90, 90]
 
-Per 10 punti (az, alt):
-- [ ] azalt_rev(jd, SE_HOR2ECL, lon, lat, alt, az, true_alt) ritorna (ecl_lon, ecl_lat)
-- [ ] Round-trip: azalt -> azalt_rev -> azalt: consistente
+Stima: 5 x 10 x 5 x 2 = **500 check**
 
-### 9.5 refrac
+### 10.4 azalt_rev round-trip
 
-- [ ] refrac(alt, SE_TRUE_TO_APP) > alt per alt > 0
-- [ ] refrac(alt, SE_APP_TO_TRUE) < alt per alt > 0
-- [ ] All'orizzonte (alt=0): refrazione ~ 34'
+20 punti:
+- [ ] azalt -> azalt_rev -> azalt: consistente
 
----
+Stima: 20 x 2 = **40 check**
 
-## 10. Funzioni Tempo
+### 10.5 refrac
 
-### 10.1 julday/revjul round-trip
+- [ ] All'orizzonte: refrazione ~ 34 arcmin
+- [ ] round-trip: refrac(refrac(alt, TRUE_TO_APP), APP_TO_TRUE) ~ alt
 
-Per 2000 date casuali (anno -5000 a +5000):
-- [ ] revjul(julday(y, m, d, h)) == (y, m, d, h) entro 1e-6
-
-### 10.2 deltat
-
-Per 500 JD in [1900, 2100]:
-- [ ] deltat(jd) > 0
-- [ ] deltat(jd) < 0.01 giorni (~14 min)
-- [ ] Variazione smooth (no discontinuita')
-
-### 10.3 deltat_ex
-
-Per 10 JD:
-- [ ] deltat_ex(jd, SEFLG_JPLEPH) ritorna (delta_t, retflag)
-- [ ] delta_t matches deltat(jd)
-
-### 10.4 sidtime
-
-Per 50 JD:
-- [ ] sidtime(jd) in [0, 24) ore
-- [ ] Incremento ~3m56s per giorno solare
-
-### 10.5 utc_to_jd e inversi
-
-Per 10 date UTC:
-- [ ] utc_to_jd(y, m, d, h, min, sec) ritorna (jd_et, jd_ut)
-- [ ] jdet_to_utc(jd_et) ritorna data originale
-- [ ] jdut1_to_utc(jd_ut) ritorna data originale
-
-### 10.6 day_of_week
-
-- [ ] day_of_week(julday(2024, 1, 1, 0)) == 1 (Monday)
-- [ ] day_of_week(julday(2024, 3, 26, 0)) == 2 (Tuesday)
-
-### 10.7 time_equ
-
-Per 10 date:
-- [ ] time_equ(jd) in [-0.02, 0.02] giorni (equazione del tempo < 17 min)
-
-### 10.8 TAI functions
-
-- [ ] utc_to_tai_jd(jd) > jd (TAI ahead of UTC)
-- [ ] tai_jd_to_utc(utc_to_tai_jd(jd)) == jd (round-trip)
-- [ ] tt_to_tai_jd(jd) < jd (TT = TAI + 32.184s)
-- [ ] tai_to_tt_jd(tt_to_tai_jd(jd)) == jd (round-trip)
+Stima: **20 check**
 
 ---
 
-## 11. Nodi e Apsidi Lunari
+## 11. Funzioni Tempo
 
-### 11.1 Nodo Medio
+### 11.1 julday/revjul
 
-Per 200 date:
-- [ ] calc_mean_lunar_node(jd) in [0, 360)
-- [ ] Moto retrogrado: nodo(jd+1) < nodo(jd) (in media)
-- [ ] Velocita' ~ -0.053 deg/day
+2000 date casuali (-5000 a +5000):
+- [ ] Round-trip esatto
 
-### 11.2 Nodo Vero
+Stima: **2.000 check**
 
-Per 200 date:
-- [ ] calc_true_lunar_node(jd) in [0, 360)
-- [ ] Oscilla attorno al nodo medio (entro ~1.5 deg)
-- [ ] Distanza (3o elemento) ragionevole (~0.0025 AU)
+### 11.2 deltat
 
-### 11.3 Lilith Media (Black Moon)
+500 JD in [1900, 2100]:
+- [ ] > 0, < 0.01 giorni, smooth
 
-Per 200 date:
-- [ ] calc_mean_lilith(jd) in [0, 360)
-- [ ] Moto diretto: ~40 deg/anno
+Stima: 500 x 3 = **1.500 check**
 
-### 11.4 Lilith Vera (Osculating Apogee)
+### 11.3 sidtime
 
-Per 100 date:
-- [ ] calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED): lon in [0, 360)
+100 JD:
+- [ ] in [0, 24) ore
+- [ ] Incremento ~3m56s/giorno
 
-### 11.5 Apogee/Perigee interpolati
+Stima: 100 x 2 = **200 check**
 
-Per 50 date:
-- [ ] calc_ut(jd, SE_INTP_APOG, SEFLG_SPEED): lon in [0, 360)
-- [ ] calc_ut(jd, SE_INTP_PERG, SEFLG_SPEED): lon in [0, 360)
-- [ ] INTP_APOG e INTP_PERG differiscono di ~180 deg (opposti)
+### 11.4 utc_to_jd / inversi
 
-### 11.6 nod_aps_ut
+20 date:
+- [ ] Round-trip esatto
 
-Per Sun, Moon, Mars, Jupiter:
-- [ ] nod_aps_ut(jd, body, SEFLG_SPEED, SE_NODBIT_MEAN) ritorna 4 tuple
-- [ ] Ascending node, descending node, perihelion, aphelion
-- [ ] Tutti i valori finiti
+Stima: 20 x 2 = **40 check**
 
----
+### 11.5 day_of_week
 
-## 12. Corpi Uraniani / Ipotetici
+10 date note:
+- [ ] Giorno corretto
 
-### 12.1 Uraniani geocentrici (40-47)
+Stima: **10 check**
 
-Per Cupido(40), Hades(41), Zeus(42), Kronos(43), Apollon(44), Admetos(45), Vulkanus(46), Poseidon(47):
-Per 20 date:
-- [ ] calc_ut(jd, body, SEFLG_SPEED): lon in [0, 360)
-- [ ] dist > 10 AU (sono lontani)
+### 11.6 TAI functions
 
-### 12.2 Uraniani eliocentrici
+10 date:
+- [ ] Round-trip utc->tai->utc, tt->tai->tt
 
-Per tutti i body 40-47:
-Per 10 date:
-- [ ] calc_ut(jd, body, SEFLG_SPEED|SEFLG_HELCTR): lon in [0, 360)
-- [ ] Matches geocentric entro ~1 deg (parallasse trascurabile a 40+ AU)
-
-### 12.3 Transpluto (48)
-
-Per 20 date:
-- [ ] calc_ut(jd, 48, SEFLG_SPEED): geocentrico funziona
-- [ ] calc_ut(jd, 48, SEFLG_SPEED|SEFLG_HELCTR): eliocentrico funziona
-
-### 12.4 Uraniani siderali
-
-Per body 40-47:
-Per 3 ayanamsha:
-- [ ] calc_ut(jd, body, SEFLG_SPEED|SEFLG_SIDEREAL): lon diverso da tropicale
+Stima: 10 x 4 = **40 check**
 
 ---
 
-## 13. Asteroidi e Corpi Minori
+## 12. Nodi e Apsidi Lunari
 
-### 13.1 Asteroidi principali
+### 12.1 Nodo Medio
 
-Per Chiron(15), Ceres(17), Pallas(18), Juno(19), Vesta(20):
-Per 50 date:
-- [ ] calc_ut(jd, body, SEFLG_SPEED): posizione valida
-- [ ] Confronto vs pyswisseph: lon diff < 2"
+200 date:
+- [ ] in [0, 360), retrogrado, ~-0.053 deg/day
 
-### 13.2 Via SE_AST_OFFSET
+Stima: 200 x 3 = **600 check**
 
-- [ ] calc_ut(jd, 10001, flags) == calc_ut(jd, 17, flags) (Ceres)
-- [ ] calc_ut(jd, 10002, flags) == calc_ut(jd, 18, flags) (Pallas)
-- [ ] calc_ut(jd, 10003, flags) == calc_ut(jd, 19, flags) (Juno)
-- [ ] calc_ut(jd, 10004, flags) == calc_ut(jd, 20, flags) (Vesta)
-- [ ] calc_ut(jd, 12060, flags) == calc_ut(jd, 15, flags) (Chiron)
+### 12.2 Nodo Vero
 
-### 13.3 TNO noti
+200 date:
+- [ ] in [0, 360), oscillazione ±1.5 deg, distanza ~0.0025 AU
 
-Per SE_ERIS, SE_SEDNA, SE_MAKEMAKE, SE_HAUMEA (se SPK disponibili):
-- [ ] calc_ut(jd, body, SEFLG_SPEED): posizione valida o errore esplicito
+Stima: 200 x 3 = **600 check**
 
----
+### 12.3 Lilith Media
 
-## 14. Lune Planetarie
+200 date:
+- [ ] in [0, 360), diretto, ~40 deg/anno
 
-Per SE_MOON_IO, SE_MOON_EUROPA, SE_MOON_GANYMEDE, SE_MOON_CALLISTO:
-Per SE_MOON_TITAN:
-Per SE_MOON_TRITON:
-- [ ] calc_ut(jd, body, SEFLG_SPEED): posizione valida (se SPK registrato) o errore
-- [ ] is_planetary_moon(body) == True
+Stima: 200 x 3 = **600 check**
 
----
+### 12.4 Apogeo osculante, interpolati
 
-## 15. Elementi Orbitali
+100 date ciascuno per OSCU_APOG, INTP_APOG, INTP_PERG:
+- [ ] Posizione valida
+- [ ] INTP_APOG e INTP_PERG opposti (~180 deg)
 
-### 15.1 get_orbital_elements_ut
+Stima: 300 x 3 = **900 check**
 
-Per Sun, Mercury, Venus, Mars, Jupiter, Saturn:
-Per 5 date:
-- [ ] Ritorna tupla con semi-asse maggiore, eccentricita', inclinazione, etc.
-- [ ] Semi-asse maggiore ragionevole (Marte ~1.52 AU, Giove ~5.2 AU)
-- [ ] Eccentricita' in [0, 1)
+### 12.5 nod_aps_ut
 
-### 15.2 orbit_max_min_true_distance
+5 corpi x 5 date x 3 flag:
+- [ ] 4 tuple (ascending, descending, perihelion, aphelion) valide
 
-Per 5 corpi:
-- [ ] max_dist > min_dist
-- [ ] Rapporto max/min ragionevole (Terra: ~1.034)
-
-### 15.3 nod_aps_ut
-
-Per 5 corpi x 3 flag (NODBIT_MEAN, NODBIT_OSCU, NODBIT_FOPOINT):
-- [ ] Ritorna (ascending_node, descending_node, perihelion, aphelion)
-- [ ] Tutti valori finiti
+Stima: 5 x 5 x 3 x 4 = **300 check**
 
 ---
 
-## 16. Fenomeni e Elongazione
+## 13. Corpi Uraniani e Ipotetici
 
-### 16.1 pheno_ut
+### 13.1 Uraniani geocentrici (40-47)
 
-Per 10 corpi x 5 date:
-- [ ] pheno_ut(jd, body, flags) ritorna tupla con phase angle, elongation, magnitude, etc.
-- [ ] Phase angle in [0, 180]
-- [ ] Elongation in [0, 180]
+8 corpi x 20 date:
+- [ ] Posizione valida, dist > 10 AU
 
-### 16.2 Elongazione dal Sole
+Stima: 8 x 20 x 2 = **320 check**
 
-Per Mercury e Venus:
-Per 50 date:
-- [ ] get_elongation_from_sun(jd, body) in [0, 180]
-- [ ] Mercury: max ~28 deg
-- [ ] Venus: max ~47 deg
+### 13.2 Uraniani eliocentrici
 
-### 16.3 Stella del mattino/sera
+8 corpi x 10 date:
+- [ ] Matches geocentrico entro ~1 deg
 
-Per Venus:
-Per 10 date:
-- [ ] is_morning_star(jd, SE_VENUS) o is_evening_star(jd, SE_VENUS) == True
-- [ ] Non entrambi True
+Stima: 8 x 10 = **80 check**
+
+### 13.3 Transpluto
+
+20 date:
+- [ ] Geocentrico e eliocentrico funzionano
+
+Stima: 20 x 2 = **40 check**
+
+### 13.4 Siderali
+
+8 corpi x 3 ayanamsha x 5 date:
+- [ ] lon siderale != tropicale
+
+Stima: 8 x 3 x 5 = **120 check**
 
 ---
 
-## 17. Crossings e Stazioni
+## 14. Asteroidi
 
-### 17.1 Equinozi e solstizi
+### 14.1 Principali (5)
 
-Per anno 2020-2025:
-- [ ] solcross_ut(0, jd_start) trova equinozio di primavera (lon=0)
-- [ ] solcross_ut(90, jd_start) trova solstizio d'estate (lon=90)
-- [ ] solcross_ut(180, jd_start) trova equinozio d'autunno
-- [ ] solcross_ut(270, jd_start) trova solstizio d'inverno
-- [ ] Date entro 1 giorno dai valori noti
+5 corpi x 50 date:
+- [ ] Posizione valida, confronto ref < 2 arcsec
 
-### 17.2 Moon crossings
+Stima: 5 x 50 x 2 = **500 check**
 
-Per 5 date:
-- [ ] mooncross_ut(lon_target, jd) trova il crossing
-- [ ] La Luna e' effettivamente a lon_target al JD ritornato
+### 14.2 Via SE_AST_OFFSET
 
-### 17.3 Stazioni e retrogradazioni
+5 mapping (10001=17, 10002=18, 10003=19, 10004=20, 12060=15):
+- [ ] Risultato identico
 
-Per Marte e Mercurio:
-- [ ] find_station_ut(jd, body) trova la prossima stazione
-- [ ] next_retrograde_ut(jd, body) trova inizio retrogradazione
+Stima: 5 x 5 = **25 check**
+
+---
+
+## 15. Lune Planetarie
+
+Per 6 lune (Io, Europa, Ganymede, Callisto, Titan, Triton):
+- [ ] is_planetary_moon() == True
+- [ ] calc_ut() con SPK registrato: posizione valida
+
+Stima: 6 x 5 = **30 check**
+
+---
+
+## 16. Elementi Orbitali
+
+5 corpi x 5 date:
+- [ ] get_orbital_elements_ut(): semi-asse, eccentricita', inclinazione validi
+- [ ] orbit_max_min_true_distance(): max > min
+
+Stima: 5 x 5 x 4 + 5 = **105 check**
+
+---
+
+## 17. Fenomeni e Elongazione
+
+10 corpi x 10 date:
+- [ ] pheno_ut(): fase, elongazione, magnitudine valide
+
+Stima: 10 x 10 x 3 = **300 check**
+
+Mercury e Venus x 50 date:
+- [ ] get_elongation_from_sun() in [0, 180]
+- [ ] Mercury max ~28 deg, Venus max ~47 deg
+
+Stima: 2 x 50 x 2 = **200 check**
+
+---
+
+## 18. Crossings e Stazioni
+
+### 18.1 Equinozi/solstizi
+
+6 anni x 4 punti (0, 90, 180, 270 deg):
+- [ ] solcross_ut() trova crossing corretto
+
+Stima: 6 x 4 x 2 = **48 check**
+
+### 18.2 Moon crossings
+
+10 crossing targets:
+- [ ] mooncross_ut() trova crossing
+
+Stima: **10 check**
+
+### 18.3 Stazioni planetarie
+
+Mars e Mercury x 5 date:
+- [ ] find_station_ut(): stazione trovata
 - [ ] Velocita' ~ 0 alla stazione
 
----
-
-## 18. LEB-Specifico
-
-### 18.1 open_leb() factory
-
-- [ ] open_leb("data/leb/ephemeris_base.leb") ritorna LEBReader
-- [ ] open_leb("data/leb2/base_core.leb") ritorna LEB2Reader o CompositeLEBReader
-- [ ] open_leb("nonexistent.leb") solleva FileNotFoundError
-- [ ] open_leb("README.md") solleva ValueError (magic bytes)
-
-### 18.2 LEBReader
-
-- [ ] .path ritorna il path corretto
-- [ ] .jd_range ritorna (start, end) valido
-- [ ] .has_body(0) == True (Sun)
-- [ ] .has_body(999) == False
-- [ ] .eval_body(0, 2451545.0) ritorna (pos, vel) tuple
-- [ ] .eval_nutation(2451545.0) ritorna (dpsi, deps) finiti
-- [ ] .delta_t(2451545.0) > 0
-- [ ] .close() non solleva eccezione
-- [ ] Context manager funziona
-
-### 18.3 LEB2Reader
-
-Stessi test del LEBReader +
-- [ ] Lazy decompression: prima chiamata eval_body piu' lenta
-- [ ] Seconda chiamata stessa body: dalla cache
-
-### 18.4 CompositeLEBReader
-
-- [ ] from_file_with_companions("base_core.leb") carica companion files se presenti
-- [ ] has_body dispatch al file corretto
-- [ ] eval_body cross-file: core body vs asteroid body
-
-### 18.5 LEB fast_calc pipeline
-
-Per 14 corpi core x 50 date:
-- [ ] fast_calc_ut(reader, jd, body, flags) matches calc_ut skyfield < 0.005"
-- [ ] Nutation correction applicata (lon nuda + dpsi)
-- [ ] Sidereal correction applicata quando richiesto
-
-### 18.6 Bundled LEB2
-
-- [ ] `libephemeris/data/leb2/base_core.leb` esiste nel pacchetto
-- [ ] `_discover_leb_file()` lo trova come fallback
-- [ ] Dopo `pip install`, LEB fast path funziona senza download
+Stima: 2 x 5 x 2 = **20 check**
 
 ---
 
-## 19. Horizons-Specifico
+## 19. LEB-Specifico
 
-### 19.1 HorizonsClient
+### 19.1 open_leb factory
 
-- [ ] fetch_state_vector("399", jd, "@0", "TDB") ritorna 6 componenti
-- [ ] Cache hit: seconda chiamata stessi parametri ritorna stesso risultato
-- [ ] clear_cache() svuota la cache
-- [ ] shutdown() e' idempotente
+- [ ] LEB1 -> LEBReader
+- [ ] LEB2 -> LEB2Reader/CompositeLEBReader
+- [ ] File inesistente -> FileNotFoundError
+- [ ] File non-LEB -> ValueError
 
-### 19.2 Pipeline geocentrica
+Stima: **4 check**
 
-Per 5 corpi x 10 date:
-- [ ] horizons_calc_ut(jd, body, SEFLG_SPEED): risultato valido
-- [ ] Light-time correction applicata
-- [ ] Aberration correction applicata
-- [ ] Frame rotation corretta (ICRS -> ecliptic of date)
+### 19.2 LEBReader API
 
-### 19.3 Corpi analitici (no HTTP)
+- [ ] .path, .jd_range, .has_body(), .eval_body(), .eval_nutation(), .delta_t(), .close()
+- [ ] Context manager
 
-- [ ] horizons_calc_ut(jd, 10, flags): Mean Node via formula analitica
-- [ ] horizons_calc_ut(jd, 12, flags): Mean Apogee via formula analitica
-- [ ] Nessuna HTTP call per questi corpi
+Stima: **20 check**
 
-### 19.4 Fallback a Skyfield
+### 19.3 LEB2 compression
 
-- [ ] horizons_calc_ut(jd, 11, flags): True Node -> KeyError -> Skyfield
-- [ ] horizons_calc_ut(jd, 13, flags): Oscu Apogee -> KeyError -> Skyfield
-- [ ] SEFLG_TOPOCTR -> KeyError -> Skyfield
+- [ ] shuffle/unshuffle round-trip
+- [ ] compress/decompress round-trip
+- [ ] Compressione effettiva (compressed < raw)
 
-### 19.5 Auto mode
+Stima: **10 check**
 
-- [ ] set_calc_mode("auto"): con LEB -> usa LEB
-- [ ] set_calc_mode("auto"): senza LEB, senza DE440 -> usa Horizons
-- [ ] set_calc_mode("auto"): senza LEB, con DE440 -> usa Skyfield
+### 19.4 CompositeLEBReader
 
----
+- [ ] from_file_with_companions
+- [ ] has_body dispatch corretto
 
-## 20. State Management
+Stima: **10 check**
 
-### 20.1 Setter/getter round-trip
+### 19.5 fast_calc pipeline
 
-- [ ] set_calc_mode("skyfield"); get_calc_mode() == "skyfield"
-- [ ] set_calc_mode("leb"); get_calc_mode() == "leb"
-- [ ] set_calc_mode("horizons"); get_calc_mode() == "horizons"
-- [ ] set_calc_mode("auto"); get_calc_mode() == "auto"
-- [ ] set_calc_mode(None); get_calc_mode() == "auto" (default)
-- [ ] set_calc_mode("invalid") solleva ValueError
-- [ ] set_topo(12.5, 41.9, 0); get_topo() != None
-- [ ] set_sid_mode(1); get_sid_mode() == 1
-- [ ] set_sid_mode(0, 2451545.0, 23.5); get_sid_mode(full=True) == (0, 2451545.0, 23.5)
+14 corpi x 50 date:
+- [ ] fast_calc_ut matches calc_ut skyfield < 0.005 arcsec
 
-### 20.2 close() reset
+Stima: 14 x 50 = **700 check**
 
-- [ ] close() resetta topo, sidereal mode, LEB reader, Horizons client
-- [ ] Dopo close(), calc_ut funziona ancora (re-init automatico)
+### 19.6 Bundled LEB2
 
-### 20.3 Environment variables
+- [ ] File esiste nel pacchetto
+- [ ] _discover_leb_file() lo trova
 
-- [ ] LIBEPHEMERIS_MODE=skyfield: get_calc_mode() == "skyfield"
-- [ ] LIBEPHEMERIS_PRECISION=base: get_precision_tier() == "base"
-- [ ] LIBEPHEMERIS_LEB=/path: LEB reader usa quel file
-
-### 20.4 Precision tier
-
-- [ ] set_precision_tier("base"); get_precision_tier() == "base"
-- [ ] set_precision_tier("medium"); get_precision_tier() == "medium"
-- [ ] set_precision_tier("extended"); get_precision_tier() == "extended"
-- [ ] Tier base: range ~1850-2150
-- [ ] Tier medium: range ~1550-2650
+Stima: **2 check**
 
 ---
 
-## 21. EphemerisContext (Thread-Safe)
+## 20. Horizons-Specifico
 
-### 21.1 Funzionalita' base
+### 20.1 Client HTTP
 
-- [ ] ctx = EphemerisContext()
-- [ ] ctx.calc_ut(jd, SE_SUN, SEFLG_SPEED) matches swe_calc_ut()
-- [ ] ctx.houses(jd, lat, lon, b"P") matches swe_houses()
+- [ ] fetch_state_vector: 6 componenti
+- [ ] Cache hit
+- [ ] clear_cache, shutdown idempotente
 
-### 21.2 Isolamento stato
+Stima: **10 check**
 
-- [ ] ctx1.set_topo(Roma); ctx2.set_topo(Tokyo)
-- [ ] ctx1.calc_ut(jd, SE_MOON, SEFLG_TOPOCTR) != ctx2.calc_ut()
-- [ ] Stato globale non influenzato
+### 20.2 Pipeline geocentrica
 
-### 21.3 Sidereal isolation
+5 corpi x 10 date:
+- [ ] Risultato valido con correzioni (light-time, aberrazione, deflessione)
 
-- [ ] ctx1.set_sid_mode(1); ctx2.set_sid_mode(0)
-- [ ] ctx1 risultati diversi da ctx2
+Stima: 5 x 10 = **50 check**
 
-### 21.4 LEB per-context
+### 20.3 Corpi analitici
 
-- [ ] ctx1.set_leb_file("path1.leb"); ctx2 usa LEB diverso
+2 corpi (Mean Node, Mean Apogee) x 20 date:
+- [ ] Nessuna HTTP, risultato matches Skyfield
 
----
+Stima: 2 x 20 x 2 = **80 check**
 
-## 22. Edge Cases
+### 20.4 Fallback
 
-### 22.1 Date limite
+4 corpi non supportati (11, 13, 21, 22):
+- [ ] KeyError -> Skyfield fallback
 
-- [ ] calc_ut(2396758.5, SE_SUN, 0): inizio base tier -> no crash
-- [ ] calc_ut(2506331.5, SE_SUN, 0): fine base tier -> no crash
-- [ ] calc_ut(2451545.0, SE_SUN, 0): J2000 -> risultato noto (~280.37 deg)
-- [ ] calc_ut(1000000.0, SE_SUN, 0): fuori range -> EphemerisRangeError o fallback
-
-### 22.2 Input invalidi
-
-- [ ] calc_ut(jd, 999, 0): corpo sconosciuto -> errore
-- [ ] calc_ut(float('nan'), SE_SUN, 0): NaN -> errore o gestione
-- [ ] calc_ut(float('inf'), SE_SUN, 0): Inf -> errore o gestione
-- [ ] houses(jd, 91, 0, b"P"): lat fuori range -> CoordinateError
-- [ ] set_sid_mode(-1): modo invalido -> gestione
-
-### 22.3 Corpi speciali
-
-- [ ] calc_ut(jd, SE_ECL_NUT, 0): ritorna nutation/obliquity
-- [ ] calc_ut(jd, SE_EARTH, SEFLG_SPEED): geocentrico Earth = (0,0,0)
-- [ ] calc_ut(jd, SE_SUN, SEFLG_HELCTR): helio Sun = (0,0,0)
-
-### 22.4 Velocita' vs differenze finite
-
-Per 11 corpi x 50 date:
-- [ ] speed = calc_ut(jd, body, SEFLG_SPEED)[0][3]
-- [ ] numerical_speed = (calc_ut(jd+0.001)[0][0] - calc_ut(jd-0.001)[0][0]) / 0.002
-- [ ] |speed - numerical_speed| < 0.05 deg/day
-
-### 22.5 Wrap-around 360 deg
-
-Per 10 date dove il Sole e' vicino a 360/0:
-- [ ] lon in [0, 360) (mai negativo, mai >= 360)
+Stima: 4 x 2 = **8 check**
 
 ---
 
-## 23. Utility Functions
+## 21. State Management
 
-### 23.1 degnorm / radnorm
+### 21.1 Setter/getter round-trip
 
-- [ ] degnorm(361) == 1
-- [ ] degnorm(-1) == 359
-- [ ] radnorm(7) ~ 7 - 2*pi
+- [ ] calc_mode: 4 valori + None + invalid
+- [ ] topo: set/get
+- [ ] sid_mode: set/get, full=True
+- [ ] precision_tier: 3 tiers
 
-### 23.2 difdeg2n
+Stima: **30 check**
 
-- [ ] difdeg2n(350, 10) == -20 (shortest arc)
-- [ ] difdeg2n(10, 350) == 20
+### 21.2 close() reset
 
-### 23.3 split_deg
+- [ ] Tutto resettato
+- [ ] Re-init automatico dopo close
 
-- [ ] split_deg(123.456, SPLIT_DEG_ZODIACAL): ritorna (deg, sign, min, sec, ...)
-- [ ] split_deg(90.5, 0): ritorna componenti
+Stima: **10 check**
 
-### 23.4 get_planet_name
+### 21.3 Environment variables
 
-Per ogni corpo 0-22:
-- [ ] get_planet_name(body) ritorna stringa non vuota
+- [ ] LIBEPHEMERIS_MODE, LIBEPHEMERIS_PRECISION, LIBEPHEMERIS_LEB
 
-### 23.5 swe_version
-
-- [ ] swe_version() ritorna stringa versione
+Stima: **6 check**
 
 ---
 
-## 24. Parti Arabe
+## 22. EphemerisContext
 
-### 24.1 calc_all_arabic_parts
+### 22.1 Funzionalita' base
 
-Per 5 date x 3 localita':
-- [ ] calc_all_arabic_parts(jd, lon, lat) ritorna dizionario
-- [ ] Pars Fortunae presente
-- [ ] Pars Spiritus presente
-- [ ] Tutti i valori in [0, 360)
+- [ ] calc_ut, houses matches globale
+- [ ] set_topo isolato
+- [ ] set_sid_mode isolato
 
----
+Stima: **20 check**
 
-## 25. Golden Regression
+### 22.2 Concorrenza
 
-### 25.1 Stabilita' posizioni
+2 context x 50 iterazioni:
+- [ ] Risultati consistenti per context
 
-Per 100 combinazioni (corpo, data, flag) fissate:
-- [ ] Risultato identico bit-per-bit a referenza salvata
-- [ ] Nessuna regressione rispetto all'ultima release
+Stima: **100 check**
 
 ---
 
-## Riepilogo Stime
+## 23. Edge Cases
+
+### 23.1 Date limite
+
+5 corpi x 5 date boundary:
+- [ ] No crash, gestione corretta
+
+Stima: **25 check**
+
+### 23.2 Input invalidi
+
+- [ ] corpo 999, NaN, Inf, lat 91, mode -1: errore corretto
+
+Stima: **10 check**
+
+### 23.3 Corpi speciali
+
+- [ ] ECL_NUT, Earth geocentrico, Sun helio
+
+Stima: **10 check**
+
+### 23.4 Velocita' vs differenze finite
+
+11 corpi x 50 date:
+- [ ] |speed - numerical| < 0.05 deg/day
+
+Stima: 11 x 50 = **550 check**
+
+### 23.5 Wrap-around 360
+
+20 date vicino a 360/0:
+- [ ] lon in [0, 360)
+
+Stima: **20 check**
+
+---
+
+## 24. Utility Functions
+
+- [ ] degnorm, radnorm, difdeg2n, split_deg, get_planet_name, swe_version
+- [ ] Valori noti per verifica
+
+Stima: **50 check**
+
+---
+
+## 25. Parti Arabe
+
+5 date x 3 localita':
+- [ ] calc_all_arabic_parts: Pars Fortunae, Pars Spiritus presenti
+- [ ] Valori in [0, 360)
+
+Stima: 5 x 3 x 3 = **45 check**
+
+---
+
+## 26. Golden Regression
+
+100 combinazioni fissate (corpo, data, flag):
+- [ ] Risultato identico a referenza salvata
+
+Stima: **100 check**
+
+---
+
+## Riepilogo
 
 | Sezione | Check stimati |
 |---------|--------------|
-| 1. Posizioni cross-backend | ~50,000 |
-| 2. Flag combinazioni | ~100,000 |
-| 3. Case (24 sistemi) | ~30,000 |
-| 4. Ayanamsha (43 modi) | ~5,000 |
-| 5. Eclissi | ~500 |
-| 6. Alba/tramonto | ~1,000 |
-| 7. Visibilita' eliacale | ~200 |
-| 8. Stelle fisse | ~500 |
-| 9. Coordinate | ~3,000 |
-| 10. Tempo | ~5,000 |
-| 11. Nodi/apsidi lunari | ~2,000 |
-| 12. Uraniani | ~1,000 |
-| 13. Asteroidi | ~1,000 |
-| 14. Lune planetarie | ~100 |
-| 15. Elementi orbitali | ~500 |
-| 16. Fenomeni | ~500 |
-| 17. Crossings | ~200 |
-| 18. LEB specifico | ~2,000 |
-| 19. Horizons specifico | ~500 |
-| 20. State management | ~200 |
-| 21. EphemerisContext | ~200 |
-| 22. Edge cases | ~500 |
-| 23. Utility | ~100 |
-| 24. Parti arabe | ~100 |
-| 25. Golden regression | ~100 |
-| **TOTALE** | **~204,200** |
+| 1. Posizioni cross-backend | 160.000 |
+| 2. Flag combinazioni | 277.800 |
+| 3. Case (24 sistemi) | 36.310 |
+| 4. Ayanamsha (43 modi) | 2.869 |
+| 5. Eclissi solari | 194 |
+| 6. Eclissi lunari | 78 |
+| 7. Alba/tramonto | 795 |
+| 8. Visibilita' eliacale | 75 |
+| 9. Stelle fisse | 344 |
+| 10. Coordinate | 1.840 |
+| 11. Tempo | 3.790 |
+| 12. Nodi/apsidi lunari | 3.000 |
+| 13. Uraniani/ipotetici | 560 |
+| 14. Asteroidi | 525 |
+| 15. Lune planetarie | 30 |
+| 16. Elementi orbitali | 105 |
+| 17. Fenomeni/elongazione | 500 |
+| 18. Crossings/stazioni | 78 |
+| 19. LEB specifico | 746 |
+| 20. Horizons specifico | 148 |
+| 21. State management | 46 |
+| 22. EphemerisContext | 120 |
+| 23. Edge cases | 615 |
+| 24. Utility | 50 |
+| 25. Parti arabe | 45 |
+| 26. Golden regression | 100 |
+| **TOTALE** | **~490.763** |
