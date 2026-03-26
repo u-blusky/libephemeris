@@ -1,8 +1,72 @@
 # TODO - Improvements and Technical Debt
 
-Items identified during the code quality audit (March 2026) that were
-deliberately skipped because they require deeper architectural work or carry
-backward-compatibility risk.
+Items identified during development (March 2026). Grouped by category.
+
+---
+
+## Next Up (v1.0.0a4+)
+
+### 6. PyPI Packaging — ship `base_core.leb` in the wheel
+
+**Priority: high | Effort: small**
+
+Include `data/leb2/base_core.leb` (~8.7 MB) in the PyPI wheel so `pip install libephemeris` works out-of-the-box with the LEB fast path. No downloads needed for core bodies.
+
+- Update `pyproject.toml` `[tool.setuptools.package-data]` to include `data/leb2/base_core.leb`
+- Auto-load the bundled file when no other LEB file is configured (modify `_discover_leb_file()` in `state.py`)
+- Test: `pip install` from wheel -> `calc_ut()` works without any download
+
+### 7. Update download command for LEB2 modular files
+
+**Priority: high | Effort: medium**
+
+The `libephemeris download:leb:*` commands still download monolithic LEB1 files. Update to download LEB2 modular files (core, asteroids, apogee, uranians) from GitHub Releases.
+
+- Update `libephemeris/download.py` DATA_FILES with LEB2 file URLs
+- Support `libephemeris download:leb2:base:core`, `download:leb2:base:asteroids`, etc.
+- Keep backward compat: old `download:leb:base` still works (downloads LEB1)
+
+### 8. Regenerate LEB1 base with optimized BODY_PARAMS
+
+**Priority: medium | Effort: medium (CPU time)**
+
+The LEB1 `ephemeris_base.leb` on disk was generated before the Chebyshev param optimization (Uranians 256d/deg7, Pluto 64d/deg11). Needs regeneration.
+
+- Run `poe leb:generate:base:groups` with the new params
+- Then `poe leb2:convert:base` to regenerate LEB2 files
+- Verify with `poe test:leb2:precision:base`
+
+### 9. Publish LEB2 non-core files to GitHub Releases
+
+**Priority: medium | Effort: small**
+
+LEB2 files for asteroids, apogee, uranians (all 3 tiers) need to be published as GitHub Release assets so users can download them.
+
+- Use `gh release create` or update existing release
+- Update download URLs in download.py
+
+### 10. Run validation suite (415K checks)
+
+**Priority: medium | Effort: small (CPU time)**
+
+Execute `plans/validation-suite-100k.md` — the 415K-check validation plan covering positions, flags, velocity, houses, sidereal modes, edge cases, compression, Horizons, transforms, stars, eclipses, performance, and cross-backend consistency.
+
+- Create a script that implements the checklist
+- Run and document results
+
+### 11. Known bugs from LEB optimization findings
+
+**Priority: medium | Effort: varies**
+
+Documented in `proposals/leb-optimization-findings.md`:
+
+- Uranian geocentric bodies (40-47) — `swe_calc(jd, 40, SEFLG_SPEED)` without `SEFLG_HELCTR` raises `UnknownBodyError`. Missing geocentric conversion path in `planets.py:1854-1879`.
+- Sun heliocentric — `swe_calc(jd, SE_SUN, SEFLG_SPEED | SEFLG_HELCTR)` returns ~180 deg error. Known Skyfield path bug.
+- True Node distance — exceeds DISTANCE_AU tolerance in comparison tests.
+
+---
+
+## Technical Debt (from code quality audit)
 
 ---
 
