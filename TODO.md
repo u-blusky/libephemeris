@@ -39,12 +39,13 @@ decision: lock-per-variable vs context-only.
 
 **Files:** `state.py`, `context.py`
 
-### 2. Broad `except Exception` (101 sites)
+### 2. Broad `except Exception` (~92 sites remaining)
 
 **Priority: medium | Risk: low | Effort: medium**
 
-101 bare `except Exception:` blocks. 24 in `eclipse.py`, ~10 in `houses.py`,
-~8 in `heliacal.py`. Most are intentional graceful degradation.
+`state.py` done (9 -> 0). Remaining: 24 in `eclipse.py`, ~8 in `planets.py`,
+~3 in `houses.py`, ~8 in `heliacal.py`. Most are intentional graceful
+degradation in numerical iteration loops.
 
 ### ~~3. `MeeusRangeError` — dead code~~ DONE
 
