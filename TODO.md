@@ -6,15 +6,10 @@ Items identified during development (March 2026). Grouped by category.
 
 ## Next Up (v1.0.0a4+)
 
-### 6. PyPI Packaging — ship `base_core.leb` in the wheel
+### ~~6. PyPI Packaging — ship `base_core.leb` in the wheel~~ DONE
 
-**Priority: high | Effort: small**
-
-Include `data/leb2/base_core.leb` (~8.7 MB) in the PyPI wheel so `pip install libephemeris` works out-of-the-box with the LEB fast path. No downloads needed for core bodies.
-
-- Update `pyproject.toml` `[tool.setuptools.package-data]` to include `data/leb2/base_core.leb`
-- Auto-load the bundled file when no other LEB file is configured (modify `_discover_leb_file()` in `state.py`)
-- Test: `pip install` from wheel -> `calc_ut()` works without any download
+Completed: `libephemeris/data/leb2/base_core.leb` included in package-data,
+`_discover_leb_file()` falls back to bundled file.
 
 ### 7. Update download command for LEB2 modular files
 
@@ -26,15 +21,9 @@ The `libephemeris download:leb:*` commands still download monolithic LEB1 files.
 - Support `libephemeris download:leb2:base:core`, `download:leb2:base:asteroids`, etc.
 - Keep backward compat: old `download:leb:base` still works (downloads LEB1)
 
-### 8. Regenerate LEB1 base with optimized BODY_PARAMS
+### ~~8. Regenerate LEB1 base with optimized BODY_PARAMS~~ DONE
 
-**Priority: medium | Effort: medium (CPU time)**
-
-The LEB1 `ephemeris_base.leb` on disk was generated before the Chebyshev param optimization (Uranians 256d/deg7, Pluto 64d/deg11). Needs regeneration.
-
-- Run `poe leb:generate:base:groups` with the new params
-- Then `poe leb2:convert:base` to regenerate LEB2 files
-- Verify with `poe test:leb2:precision:base`
+Already regenerated — LEB1 has Pluto 64d/deg11, Uranians 256d/deg7.
 
 ### 9. Publish LEB2 non-core files to GitHub Releases
 
@@ -60,7 +49,7 @@ Execute `plans/validation-suite-100k.md` — the 415K-check validation plan cove
 
 Documented in `proposals/leb-optimization-findings.md`:
 
-- Uranian geocentric bodies (40-47) — `swe_calc(jd, 40, SEFLG_SPEED)` without `SEFLG_HELCTR` raises `UnknownBodyError`. Missing geocentric conversion path in `planets.py:1854-1879`.
+- ~~Uranian geocentric bodies (40-47)~~ FIXED — added geocentric path in `planets.py`.
 - Sun heliocentric — `swe_calc(jd, SE_SUN, SEFLG_SPEED | SEFLG_HELCTR)` returns ~180 deg error. Known Skyfield path bug.
 - True Node distance — exceeds DISTANCE_AU tolerance in comparison tests.
 
