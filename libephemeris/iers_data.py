@@ -906,7 +906,7 @@ def load_iers_data(force_download: bool = False) -> bool:
             try:
                 _IERS_DATA = _parse_finals_data(finals_path)
                 _IERS_DATA_TIMESTAMP = time.time()
-            except Exception:
+            except (OSError, ValueError, ImportError):
                 _IERS_DATA = {}
 
         # Load leap seconds data
@@ -914,7 +914,7 @@ def load_iers_data(force_download: bool = False) -> bool:
             try:
                 _LEAP_SECONDS = _parse_leap_seconds(leap_path)
                 _LEAP_SECONDS_TIMESTAMP = time.time()
-            except Exception:
+            except (OSError, ValueError, ImportError):
                 _LEAP_SECONDS = _get_hardcoded_leap_seconds()
         else:
             # Use hardcoded fallback
@@ -926,7 +926,7 @@ def load_iers_data(force_download: bool = False) -> bool:
             try:
                 _DELTA_T_DATA = _parse_delta_t_data(delta_t_path)
                 _DELTA_T_DATA_TIMESTAMP = time.time()
-            except Exception:
+            except (OSError, ValueError, ImportError):
                 _DELTA_T_DATA = []
         else:
             _DELTA_T_DATA = []

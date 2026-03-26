@@ -177,7 +177,7 @@ class CompositeLEBReader:
         for reader in self._readers:
             try:
                 reader.close()
-            except Exception:
+            except (OSError, ValueError, KeyError):
                 pass
         self._readers.clear()
         self._body_map.clear()

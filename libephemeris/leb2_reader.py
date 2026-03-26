@@ -70,7 +70,7 @@ class LEB2Reader:
 
         try:
             self._parse()
-        except Exception:
+        except (OSError, ValueError, KeyError):
             self.close()
             raise
 
@@ -290,12 +290,12 @@ class LEB2Reader:
         if self._mm is not None:
             try:
                 self._mm.close()
-            except Exception:
+            except (OSError, ValueError, KeyError):
                 pass
             self._mm = None  # type: ignore[assignment]
         if self._file is not None:
             try:
                 self._file.close()
-            except Exception:
+            except (OSError, ValueError, KeyError):
                 pass
             self._file = None  # type: ignore[assignment]

@@ -213,7 +213,7 @@ class HorizonsClient:
                 key = futures[fut]
                 try:
                     results[key] = fut.result()
-                except Exception:
+                except (OSError, ValueError, KeyError):
                     pass  # skip failed fetches
 
         return results
@@ -243,7 +243,7 @@ class HorizonsClient:
 
             except KeyError:
                 raise  # don't retry API errors (body not found etc.)
-            except Exception as e:
+            except (OSError, ValueError, KeyError) as e:
                 last_err = e
                 if attempt < max_retries:
                     time.sleep(0.5 * (2 ** attempt))

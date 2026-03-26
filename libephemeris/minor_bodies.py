@@ -3282,7 +3282,7 @@ def auto_download_asteroid_spk(
 
         return spk_path
 
-    except Exception as e:
+    except (ValueError, KeyError) as e:
         logger.warning("Auto SPK download failed for %s: %s", body_name, e)
         return None
 

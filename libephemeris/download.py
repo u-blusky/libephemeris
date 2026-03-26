@@ -60,7 +60,7 @@ def _is_valid_bsp(filepath: str) -> bool:
             for segment in kernel.segments:
                 _ = segment.center, segment.target
         return True
-    except Exception:
+    except (OSError, ValueError, KeyError, RuntimeError):
         return False
 
 
@@ -416,7 +416,7 @@ def download_file(
         logger.info("Download complete: %s", dest_path.name)
         return True
 
-    except Exception:
+    except (OSError, ValueError, KeyError, RuntimeError):
         # Clean up temp file on error
         if os.path.exists(temp_path):
             os.unlink(temp_path)
@@ -503,7 +503,7 @@ def download_planet_centers(
                 file=sys.stderr,
             )
         raise
-    except Exception as e:
+    except (OSError, ValueError, KeyError, RuntimeError) as e:
         print(f"\nError downloading file: {e}", file=sys.stderr)
         raise
 
@@ -704,7 +704,7 @@ def init_all(
         result["de440"] = True
         if not quiet:
             print("  [OK] DE440.bsp ready")
-    except Exception as e:
+    except (OSError, ValueError, KeyError, RuntimeError) as e:
         logger.error("Failed to initialize DE440: %s", e)
         if not quiet:
             print(f"  [FAIL] DE440.bsp: {e}", file=sys.stderr)
@@ -724,7 +724,7 @@ def init_all(
         result["planet_centers"] = True
         if not quiet:
             print("  [OK] planet_centers.bsp ready")
-    except Exception as e:
+    except (OSError, ValueError, KeyError, RuntimeError) as e:
         logger.error("Failed to download planet_centers.bsp: %s", e)
         if not quiet:
             print(f"  [FAIL] planet_centers.bsp: {e}", file=sys.stderr)
@@ -820,7 +820,7 @@ def init_all(
                 if not quiet:
                     sys.stdout.write("\n")
                 raise
-            except Exception as e:
+            except (OSError, ValueError, KeyError, RuntimeError) as e:
                 error_msg = str(e)
 
                 # Detect Horizons SPK limit errors to skip gracefully
@@ -942,7 +942,7 @@ def download_for_tier(
         if not quiet:
             print("  [OK] planet_centers ready")
             print()
-    except Exception as e:
+    except (OSError, ValueError, KeyError, RuntimeError) as e:
         if not quiet:
             print(f"  [WARN] planet_centers: {e}", file=sys.stderr)
             print("  (non-critical, continuing...)")
@@ -994,7 +994,7 @@ def _is_valid_leb(filepath: str) -> bool:
         reader = open_leb(filepath)
         reader.close()
         return True
-    except Exception:
+    except (OSError, ValueError, KeyError, RuntimeError):
         return False
 
 
@@ -1106,7 +1106,7 @@ def download_leb_for_tier(
             expected_sha256=str(file_info["sha256"]),
             show_progress=show_progress,
         )
-    except Exception:
+    except (OSError, ValueError, KeyError, RuntimeError):
         # Clean up partial file
         if dest_path.exists():
             try:
@@ -1208,7 +1208,7 @@ def download_leb2_for_tier(
             downloaded.append(dest_path)
             if not quiet:
                 print(f"  [OK] {filename}")
-        except Exception as e:
+        except (OSError, ValueError, KeyError, RuntimeError) as e:
             if not quiet:
                 print(f"  [FAIL] {filename}: {e}")
 
@@ -1285,7 +1285,7 @@ def _download_planet_centers_for_tier(
             req = urllib.request.Request(url, method="HEAD")
             with urllib.request.urlopen(req, timeout=30, context=_ssl_ctx) as response:
                 total_size = int(response.headers.get("Content-Length", 0))
-        except Exception:
+        except (OSError, ValueError, KeyError, RuntimeError):
             pass
 
         downloaded = 0
@@ -1329,7 +1329,7 @@ def _download_planet_centers_for_tier(
 
         return dest_path
 
-    except Exception:
+    except (OSError, ValueError, KeyError, RuntimeError):
         if os.path.exists(temp_path):
             os.unlink(temp_path)
         raise

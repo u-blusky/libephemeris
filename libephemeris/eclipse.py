@@ -2803,7 +2803,7 @@ def swe_sol_eclipse_where(
             sun_app = observer_at.at(t).observe(sun).apparent()
             moon_app = observer_at.at(t).observe(moon).apparent()
             return sun_app.separation_from(moon_app).degrees
-        except Exception:
+        except (ValueError, ArithmeticError, IndexError):
             return 999.0  # Return large value on error
 
     # Gradient descent to find minimum separation (eclipse center)
@@ -2959,7 +2959,7 @@ def swe_sol_eclipse_where(
         if is_total_shadow:
             path_width_km = -path_width_km
 
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         # If calculation fails, return zeros (10-element geopos, 20-element attr)
         return (
             0,
@@ -3341,7 +3341,7 @@ def swe_sol_eclipse_how(
     try:
         sun_app = observer_at.at(t).observe(sun).apparent()
         moon_app = observer_at.at(t).observe(moon).apparent()
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         # If calculation fails, return zeros (20 elements per reference API spec)
         return 0, (
             0.0,
@@ -3992,7 +3992,7 @@ def swe_sol_eclipse_how_details(
 
         # Position angle at C1
         result["position_angle_c1"] = _calc_position_angle(jd_c1)
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         pass
 
     # Fourth contact (separation increasing from sum of radii)
@@ -4012,7 +4012,7 @@ def swe_sol_eclipse_how_details(
 
         # Position angle at C4
         result["position_angle_c4"] = _calc_position_angle(jd_c4)
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         pass
 
     # Second and third contacts (for central eclipses only)
@@ -4035,7 +4035,7 @@ def swe_sol_eclipse_how_details(
 
             # Position angle at C2
             result["position_angle_c2"] = _calc_position_angle(jd_c2)
-        except Exception:
+        except (ValueError, ArithmeticError, IndexError):
             pass
 
         # Third contact
@@ -4055,7 +4055,7 @@ def swe_sol_eclipse_how_details(
 
             # Position angle at C3
             result["position_angle_c3"] = _calc_position_angle(jd_c3)
-        except Exception:
+        except (ValueError, ArithmeticError, IndexError):
             pass
 
     # Calculate durations
@@ -5271,7 +5271,7 @@ def lun_eclipse_how(
     # Get Moon apparent position from observer
     try:
         moon_app = observer_at.at(t).observe(moon).apparent()
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         # If calculation fails, return zeros (20 elements)
         return 0, tuple([0.0] * 20)
 
@@ -5470,7 +5470,7 @@ def swe_lun_eclipse_how(
     # Get Moon apparent position from observer (topocentric)
     try:
         moon_app = observer_at.at(t).observe(moon).apparent()
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         # If calculation fails, return zeros (20 elements)
         return 0, tuple([0.0] * 20)
 
@@ -7140,7 +7140,7 @@ def lun_occult_where(
             moon_app = observer_at.at(t).observe(moon_body).apparent()
             target_app = _get_target_for_observer(observer_at, t)
             return moon_app.separation_from(target_app).degrees
-        except Exception:
+        except (ValueError, ArithmeticError, IndexError):
             return 999.0  # Return large value on error
 
     # Gradient descent to find minimum separation (occultation center)
@@ -7279,7 +7279,7 @@ def lun_occult_where(
         else:
             diameter_ratio = 999.0  # Moon much larger than star
 
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         # If calculation fails, use defaults
         moon_azimuth = 0.0
         moon_altitude = 0.0
@@ -8311,7 +8311,7 @@ def heliacal_ut(
         try:
             pheno = swe_pheno_ut(jd, body, flags)
             return pheno[2]  # Elongation
-        except Exception:
+        except (ValueError, ArithmeticError, IndexError):
             # Fallback: calculate elongation manually
             t = ts.ut1_jd(jd)
             sun_app = earth.at(t).observe(sun).apparent()
@@ -8323,7 +8323,7 @@ def heliacal_ut(
         try:
             pheno = swe_pheno_ut(jd, body, flags)
             return pheno[4]  # Visual magnitude
-        except Exception:
+        except (ValueError, ArithmeticError, IndexError):
             return 0.0  # Default to bright magnitude
 
     def _calculate_limiting_magnitude(sun_alt: float, body_alt: float) -> float:
@@ -8845,7 +8845,7 @@ def heliacal_pheno_ut(
         elongation = pheno[2]  # Elongation
         magnitude = pheno[4]  # Visual magnitude
         phase_angle = pheno[1]  # Phase angle
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         # Calculate elongation manually
         sun_geo = earth.at(t).observe(sun).apparent()
         elongation = body_geo.separation_from(sun_geo).degrees
@@ -8961,7 +8961,7 @@ def heliacal_pheno_ut(
             # L ≈ pi * D / 2 where D is diameter
             moon_diameter = 0.5  # Approximately 0.5 degrees
             l_moon = math.pi * moon_diameter / 2
-        except Exception:
+        except (ValueError, ArithmeticError, IndexError):
             pass
 
     # Yallop q-test (for lunar crescent visibility)
@@ -9247,7 +9247,7 @@ def vis_limit_mag(
             try:
                 star_mag_val, _star_name_mag = swe_fixstar2_mag(objname)
                 obj_mag = star_mag_val
-            except Exception:
+            except (ValueError, ArithmeticError, IndexError):
                 obj_mag = 2.0  # Default magnitude if not found
 
             # Convert ecliptic to equatorial then to horizontal
@@ -9267,7 +9267,7 @@ def vis_limit_mag(
 
         except ValueError:
             raise
-        except Exception as e:
+        except (ValueError, ArithmeticError, IndexError) as e:
             # Star not found or other error
             raise ValueError(f"could not find star name {objname.lower()}: {e}")
     else:
@@ -9290,7 +9290,7 @@ def vis_limit_mag(
             try:
                 pheno_result = swe_pheno_ut(jd, body_id, flags)
                 obj_mag = pheno_result[4]  # Visual magnitude
-            except Exception:
+            except (ValueError, ArithmeticError, IndexError):
                 obj_mag = 0.0  # Default bright
         else:
             raise ValueError(f"illegal planet number {body_id}.")
@@ -9392,7 +9392,7 @@ def vis_limit_mag(
             moon_pheno = swe_pheno_ut(jd_ut, SE_MOON, flags & 0xFF)
             phase_angle = moon_pheno[0]  # Phase angle in degrees
             illumination = (1 + math.cos(math.radians(phase_angle))) / 2.0
-        except Exception:
+        except (ValueError, ArithmeticError, IndexError):
             illumination = 0.5  # Assume half moon
 
         # Moon brightness increases with altitude and illumination
@@ -12592,14 +12592,14 @@ def calc_eclipse_path_width(
     try:
         observer = wgs84.latlon(calc_lat, calc_lon, 0.0)
         observer_at = earth + observer
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         return 0.0
 
     # Get Sun and Moon apparent positions from the observer
     try:
         sun_app = observer_at.at(t).observe(sun).apparent()
         moon_app = observer_at.at(t).observe(moon).apparent()
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         return 0.0
 
     # Get Sun altitude
@@ -13589,7 +13589,7 @@ def sol_eclipse_magnitude_at_loc(
     try:
         sun_app = observer_at.at(t).observe(sun).apparent()
         moon_app = observer_at.at(t).observe(moon).apparent()
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         # If calculation fails, return 0 magnitude
         return 0.0
 
@@ -13787,7 +13787,7 @@ def sol_eclipse_obscuration_at_loc(
     try:
         sun_app = observer_at.at(t).observe(sun).apparent()
         moon_app = observer_at.at(t).observe(moon).apparent()
-    except Exception:
+    except (ValueError, ArithmeticError, IndexError):
         # If calculation fails, return 0 obscuration
         return 0.0
 
@@ -14569,7 +14569,7 @@ def planet_occult_when_glob(
     for iteration in range(MAX_ITERATIONS):
         try:
             is_occ, sep, occ_r, target_r = _check_occultation(jd)
-        except Exception as e:
+        except (ValueError, ArithmeticError, IndexError) as e:
             # Handle ephemeris range errors or other calculation errors
             if "ephemeris" in str(e).lower() or "range" in str(e).lower():
                 # Exceeded ephemeris range - stop searching

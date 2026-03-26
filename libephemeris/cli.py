@@ -73,7 +73,7 @@ def _cmd_download(tier_name: str, args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         print("\nDownload cancelled.")
         return 130
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         if not args.quiet:
             print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -114,7 +114,7 @@ def _cmd_download_leb(tier_name: str, args: argparse.Namespace) -> int:
         if not args.quiet:
             print(f"Error: {e}", file=sys.stderr)
         return 1
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         if not args.quiet:
             print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -159,7 +159,7 @@ def cmd_download_assist(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
         return 1
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         if not args.quiet:
             print(f"Error: {e}", file=sys.stderr)
         return 1

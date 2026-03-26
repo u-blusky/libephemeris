@@ -256,7 +256,7 @@ def _verify_assist_file(path: Path) -> bool:
             with SPK.open(str(path)) as kernel:
                 for segment in kernel.segments:
                     _ = segment.center, segment.target
-        except Exception:
+        except (ImportError, RuntimeError, ValueError):
             return False
 
     return True
@@ -346,7 +346,7 @@ def _download_single_file(
             actual_mb = dest.stat().st_size / (1024 * 1024)
             print(f"  Done ({actual_mb:.1f} MB, sha256: {sha256.hexdigest()[:16]}...)")
 
-    except Exception:
+    except (ImportError, RuntimeError, ValueError):
         # Clean up temp file on error
         try:
             if os.path.exists(temp_path):

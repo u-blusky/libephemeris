@@ -173,7 +173,7 @@ def _get_spk_targets(filepath: str) -> list[int]:
         finally:
             spk.close()
         return targets
-    except Exception:
+    except (OSError, ValueError, KeyError, IndexError):
         return []
 
 
@@ -450,7 +450,7 @@ def download_spk(
 
             try:
                 spk_data = base64.b64decode(spk_data_b64)
-            except Exception as e:
+            except (OSError, ValueError, KeyError, IndexError) as e:
                 raise ValueError(
                     f"Failed to decode SPK data from Horizons response: {e}"
                 ) from e
@@ -467,7 +467,7 @@ def download_spk(
                     )
 
                 os.replace(temp_path, filepath)
-            except Exception:
+            except (OSError, ValueError, KeyError, IndexError):
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
                 raise
@@ -483,7 +483,7 @@ def download_spk(
                 try:
                     error_data = json.loads(e.read().decode("utf-8"))
                     msg = error_data.get("message", str(e))
-                except Exception:
+                except (OSError, ValueError, KeyError, IndexError):
                     msg = str(e)
                 logger.warning("SPK download failed for %s: %s", body, msg)
                 raise ValueError(f"Invalid body '{body}': {msg}") from e
@@ -732,7 +732,7 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
                 spk.close()
             if start_jd is not None and end_jd is not None:
                 return (start_jd, end_jd)
-        except Exception:
+        except (OSError, ValueError, KeyError, IndexError):
             pass
         return None
 
@@ -756,7 +756,7 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
                 )
                 end_jd = max(float(s.end_jd) for s in segments if hasattr(s, "end_jd"))
                 return (start_jd, end_jd)
-    except Exception:
+    except (OSError, ValueError, KeyError, IndexError):
         pass
 
     return None
@@ -792,7 +792,7 @@ def _detect_spk_type(filepath: str) -> Optional[int]:
             return 2  # Assume type 2/3 for Skyfield compatibility
         finally:
             spk.close()
-    except Exception:
+    except (OSError, ValueError, KeyError, IndexError):
         return None
 
 
@@ -823,7 +823,7 @@ def _load_type21_kernel(filepath: str):
         kernel = SPKType21.open(filepath)
         state._SPK_TYPE21_KERNELS[filepath] = kernel
         return kernel
-    except Exception as e:
+    except (OSError, ValueError, KeyError, IndexError) as e:
         get_logger().warning("Failed to load type 21 SPK %s: %s", filepath, e)
         return None
 
@@ -1090,7 +1090,7 @@ def _calc_type21_position(
         for _ in range(3):
             try:
                 pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-            except Exception as e:
+            except (OSError, ValueError, KeyError, IndexError) as e:
                 get_logger().debug("SPK type 21 computation failed: %s", e)
                 return None
 
@@ -1109,14 +1109,14 @@ def _calc_type21_position(
         # No light-time correction
         try:
             pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-        except Exception as e:
+        except (OSError, ValueError, KeyError, IndexError) as e:
             get_logger().debug("SPK type 21 computation failed: %s", e)
             return None
 
     # Final position computation at light-time corrected epoch
     try:
         pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-    except Exception as e:
+    except (OSError, ValueError, KeyError, IndexError) as e:
         get_logger().debug("SPK type 21 computation failed: %s", e)
         return None
 

@@ -192,7 +192,7 @@ class EphemerisContext:
         if self._leb_reader is not None:
             try:
                 self._leb_reader.close()
-            except Exception:
+            except (AttributeError, OSError):
                 pass
         self._leb_file = filepath
         self._leb_reader = None

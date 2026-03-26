@@ -184,7 +184,7 @@ class LEBReader:
 
         try:
             self._parse()
-        except Exception:
+        except (OSError, ValueError, KeyError):
             # Clean up mmap and file handle on parse failure
             self.close()
             raise
@@ -456,13 +456,13 @@ class LEBReader:
         if self._mm is not None:
             try:
                 self._mm.close()
-            except Exception:
+            except (OSError, ValueError, KeyError):
                 pass
             self._mm = None  # type: ignore[assignment]
         if self._file is not None:
             try:
                 self._file.close()
-            except Exception:
+            except (OSError, ValueError, KeyError):
                 pass
             self._file = None  # type: ignore[assignment]
 

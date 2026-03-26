@@ -327,7 +327,7 @@ def _download_spk_astroquery(
 
         logger.info("SPK download complete: %s", os.path.basename(result_path))
         return result_path
-    except Exception as e:
+    except (OSError, ValueError, KeyError, ImportError) as e:
         raise ValueError(
             f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"
         ) from e
@@ -573,7 +573,7 @@ def try_auto_download(ipl: int) -> Optional[str]:
 
     try:
         return _ensure_spk_downloaded(config)
-    except Exception:
+    except (OSError, ValueError, KeyError, ImportError):
         # Log error but don't raise - fall back to Keplerian
         return None
 
@@ -731,7 +731,7 @@ def list_cached_spk(
                     file_info["jd_end"] = jd_end
                     file_info["date_start"] = _jd_to_iso_date(jd_start)
                     file_info["date_end"] = _jd_to_iso_date(jd_end)
-            except Exception:
+            except (OSError, ValueError, KeyError, ImportError):
                 # If we can't read coverage, try to extract from filename
                 parts = filename[:-4].split("_")  # Remove .bsp
                 if len(parts) >= 3:
@@ -1289,7 +1289,7 @@ def is_spk_cached(
                 # Check if this file covers our requested range
                 if file_jd_start <= jd_start and file_jd_end >= jd_end:
                     return True
-        except Exception:
+        except (OSError, ValueError, KeyError, ImportError):
             # If we can't read the file, skip it and try others
             continue
 
@@ -1587,7 +1587,7 @@ def download_spk_from_horizons(
         raise ConnectionError(
             f"Network error downloading SPK for '{body_id}': {e}"
         ) from e
-    except Exception as e:
+    except (OSError, ValueError, KeyError, ImportError) as e:
         raise ValueError(
             f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"
         ) from e
@@ -1671,7 +1671,7 @@ def discover_local_spks(path: str) -> Dict[str, str]:
         # Read NAIF target IDs from the SPK file
         try:
             targets = spk._get_spk_targets(filepath)
-        except Exception:
+        except (OSError, ValueError, KeyError, ImportError):
             continue
 
         if not targets:
@@ -1705,7 +1705,7 @@ def discover_local_spks(path: str) -> Dict[str, str]:
                                 existing_span,
                             )
                             continue
-                except Exception:
+                except (OSError, ValueError, KeyError, ImportError):
                     pass
                 if body_name not in results:
                     results[body_name] = "already_registered"
@@ -1720,7 +1720,7 @@ def discover_local_spks(path: str) -> Dict[str, str]:
                     target_naif,
                     bsp_file,
                 )
-            except Exception as e:
+            except (OSError, ValueError, KeyError, ImportError) as e:
                 results[body_name] = f"error: {e}"
                 logger.debug(
                     "Failed to register %s from %s: %s",
@@ -1836,7 +1836,7 @@ def ensure_all_ephemerides(
             load(eph_file)
             results["ephemeris"] = {"file": eph_file, "status": "downloaded"}
             summary["downloaded"] += 1
-        except Exception as e:
+        except (OSError, ValueError, KeyError, ImportError) as e:
             results["ephemeris"] = {"file": eph_file, "status": f"error: {e}"}
             summary["errors"] += 1
 
@@ -1882,7 +1882,7 @@ def ensure_all_ephemerides(
             )
             spk_results[body_name] = "downloaded"
             summary["downloaded"] += 1
-        except Exception as e:
+        except (OSError, ValueError, KeyError, ImportError) as e:
             # Download failed - body will use Keplerian fallback
             spk_results[body_name] = f"fallback ({e})"
             summary["fallback"] += 1

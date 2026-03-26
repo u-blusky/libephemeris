@@ -606,7 +606,7 @@ def get_moon_coverage(moon_id: int) -> Optional[Tuple[float, float]]:
                 )
                 end_jd = max(float(s.end_jd) for s in segments if hasattr(s, "end_jd"))
                 return (start_jd, end_jd)
-    except Exception:
+    except (ValueError, KeyError, AttributeError):
         pass
 
     return None

@@ -4249,7 +4249,7 @@ def swe_fixstar_ut(
         return (result, canonical_name or "", flags)
     except Error:
         raise
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
 
@@ -4312,7 +4312,7 @@ def swe_fixstar(
         return (result, canonical_name or "", flags)
     except Error:
         raise
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
 
@@ -4537,7 +4537,7 @@ def swe_fixstar2_ut(
         return (result, star_name_out, flags)
     except Error:
         raise
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
 
@@ -4610,7 +4610,7 @@ def swe_fixstar2(
         return (result, star_name_out, flags)
     except Error:
         raise
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
 

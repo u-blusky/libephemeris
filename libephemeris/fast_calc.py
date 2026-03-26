@@ -347,7 +347,7 @@ def _apply_cob_correction(
                     pos[1] + float(offset_pos[1]),
                     pos[2] + float(offset_pos[2]),
                 )
-            except Exception:
+            except (ValueError, ArithmeticError):
                 pass  # Fall through to analytical COB
 
     # Fallback: analytical COB from moon theories
