@@ -901,9 +901,9 @@ def _is_valid_leb(filepath: str) -> bool:
         True if file can be opened and parsed, False otherwise
     """
     try:
-        from .leb_reader import LEBReader
+        from .leb_reader import open_leb
 
-        reader = LEBReader(filepath)
+        reader = open_leb(filepath)
         reader.close()
         return True
     except Exception:

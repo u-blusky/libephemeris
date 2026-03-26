@@ -5,6 +5,85 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a2] — 2026-03-26
+
+### Added
+
+#### LEB2 Compressed Ephemeris Format
+
+A new binary ephemeris format (LEB2) that uses error-bounded lossy compression to achieve
+5-15x compression per body while maintaining <0.001" precision. This enables shipping
+precomputed ephemeris data directly inside the PyPI wheel (~6.5 MB for core bodies).
+
+**Compression pipeline** (mantissa truncation + coefficient-major reorder + byte shuffle + zstd):
+- Analyzes each Chebyshev coefficient order and keeps only the mantissa bits needed for
+  the target precision (0.001" = 5e-9 AU). High-order coefficients (c6-c13) that contribute
+  below the noise floor are zeroed entirely.
+- Reorders coefficients from segment-major to coefficient-major layout, grouping same-order
+  coefficients across all time segments for better compression.
+- Applies byte-lane transposition (HDF5/Blosc-style shuffle) so exponent bytes and zeroed
+  mantissa bytes cluster together.
+- Compresses with zstd level 19 for maximum ratio.
+
+**New modules:**
+- `libephemeris/leb_compression.py` — Compression/decompression primitives: `compress_body()`,
+  `decompress_body()`, `compute_mantissa_bits()`, `truncate_mantissa()`, `shuffle_bytes()`,
+  `reorder_coeff_major()`.
+- `libephemeris/leb2_reader.py` — `LEB2Reader` class with lazy per-body decompression.
+  Same interface as `LEBReader`. First access to a body decompresses its coefficients
+  (~0.5-1ms), subsequent calls use cached data with identical Clenshaw evaluation.
+- `libephemeris/leb_composite.py` — `CompositeLEBReader` that wraps multiple LEB files
+  (LEB1 and/or LEB2) and dispatches `eval_body()` to the reader containing each body.
+  Supports `from_directory()` and `from_file_with_companions()` auto-discovery.
+
+**New script:** `scripts/generate_leb2.py` — Complete CLI for LEB2 operations:
+- `convert` — Convert a single LEB1 file to LEB2 (with optional `--group` filter)
+- `convert-all` — Convert LEB1 to LEB2 for all 4 body groups
+- `generate` — Generate LEB2 from scratch via Skyfield
+- `verify` — Precision verification against LEB1 reference
+
+**Modular body groups:**
+- `core` (14 bodies): Sun-Pluto, Earth, Mean/True Node, Mean Apogee — **7.7 MB** (7.3x compression)
+- `asteroids` (5 bodies): Chiron, Ceres, Pallas, Juno, Vesta — 7.66 MB (4.0x)
+- `apogee` (3 bodies): Osculating Apogee, Interpolated Apogee/Perigee — 10.31 MB (3.8x)
+- `uranians` (9 bodies): Cupido-Transpluto — 2.02 MB (8.6x)
+- Total for all 31 bodies: 28.0 MB (3.6x vs 101.8 MB LEB1)
+
+**Integration:**
+- `open_leb()` factory in `leb_reader.py` auto-detects LEB1 vs LEB2 via magic bytes
+- `state.py` auto-discovers LEB2 modular files (`{tier}_core.leb`) with companion detection
+- `context.py`, `download.py` updated to use `open_leb()`
+- `fast_calc.py` TYPE_CHECKING updated for LEB2Reader compatibility
+
+**Poe tasks:**
+- `poe leb2:convert:base` — Convert base tier (all groups)
+- `poe leb2:convert:base:core` — Convert core group only
+- `poe leb2:convert:base:asteroids` / `apogee` / `uranians` — Convert individual groups
+- `poe leb2:convert:medium` / `extended` — Convert other tiers
+- `poe leb2:verify:base` — Verify against LEB1 reference
+- `poe test:leb2` — Run LEB2 test suite (27 tests)
+
+#### LEB Parameter Optimization
+
+- Optimized Chebyshev parameters for Uranians (40-48): interval 32d/degree 13 → 256d/degree 7.
+  Pure analytical functions with ~0" fitting error. Saves 9.5 MB on base tier.
+- Optimized Pluto: interval 32d/degree 13 → 64d/degree 11. 0.0005" fitting error. Saves 0.6 MB.
+- Total base tier reduction: 107 MB → ~97 MB (before LEB2 compression).
+- Added `scripts/sweep_leb_params.py` for automated parameter validation.
+- Documented all tested-and-failed parameter combinations in `proposals/leb-optimization-findings.md`.
+
+### Changed
+
+- `zstandard>=0.22.0` added to dependencies (required for LEB2 decompression)
+- `leb_format.py` extended with LEB2 constants (`LEB2_MAGIC`, `SECTION_COMPRESSED_CHEBYSHEV`,
+  `CompressedBodyEntry` dataclass, serialization helpers)
+- `state.py` discovery order: LEB2 modular files checked before LEB1 merged files
+- Version bumped to 1.0.0a2
+
+### Fixed
+
+- Updated `test_degree_range` test to accept degree 7 (Uranian optimized params)
+
 ## [Unreleased]
 
 ### Fixed

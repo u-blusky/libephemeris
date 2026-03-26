@@ -17,6 +17,8 @@ import struct
 from bisect import bisect_right
 from typing import Dict, List, Optional, Tuple
 
+from typing import Union
+
 from .leb_format import (
     BODY_ENTRY_SIZE,
     COORD_ECLIPTIC,
@@ -27,6 +29,7 @@ from .leb_format import (
     DELTA_T_HEADER_FMT,
     DELTA_T_HEADER_SIZE,
     HEADER_SIZE,
+    LEB2_MAGIC,
     MAGIC,
     NUTATION_HEADER_SIZE,
     SECTION_BODY_INDEX,
@@ -462,3 +465,28 @@ class LEBReader:
             except Exception:
                 pass
             self._file = None  # type: ignore[assignment]
+
+
+def open_leb(path: str) -> Union["LEBReader", "LEB2Reader"]:
+    """Open a .leb file, auto-detecting LEB1 vs LEB2 format.
+
+    Args:
+        path: Path to the .leb file.
+
+    Returns:
+        LEBReader for LEB1 files, LEB2Reader for LEB2 files.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If the file has an unknown magic.
+    """
+    with open(path, "rb") as f:
+        magic = f.read(4)
+    if magic == MAGIC:
+        return LEBReader(path)
+    elif magic == LEB2_MAGIC:
+        from .leb2_reader import LEB2Reader
+
+        return LEB2Reader(path)
+    else:
+        raise ValueError(f"Unknown LEB format magic: {magic!r}")

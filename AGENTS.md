@@ -77,7 +77,51 @@ poe leb:generate:medium:groups    # All 3 groups + merge for medium tier
 poe leb:generate:extended:groups  # All 3 groups + merge for extended tier
 ```
 
-Runtime always uses a **single merged file**. See `docs/leb/guide.md` for details.
+Runtime always uses a **single merged file** for LEB1. See `docs/leb/guide.md` for details.
+
+## LEB2 Compressed Format (v1.0.0a2+)
+
+LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reorder + byte shuffle + zstd) to achieve 4-10x compression while maintaining <0.001" precision vs LEB1.
+
+### Architecture
+
+| Module | Purpose |
+|--------|---------|
+| `libephemeris/leb_compression.py` | Compression primitives: `compress_body()`, `decompress_body()`, `compute_mantissa_bits()` |
+| `libephemeris/leb2_reader.py` | `LEB2Reader` — lazy per-body decompression, same interface as `LEBReader` |
+| `libephemeris/leb_composite.py` | `CompositeLEBReader` — wraps multiple LEB files, dispatches by body_id |
+| `libephemeris/leb_reader.py` | `open_leb()` factory auto-detects LEB1/LEB2 via magic bytes |
+| `scripts/generate_leb2.py` | CLI: `convert`, `convert-all`, `generate`, `verify` |
+| `scripts/test_leb2_precision.py` | Fast precision test: all bodies x 6 flags x N dates per tier |
+
+### Body Groups
+
+| Group | Bodies | Base size |
+|-------|--------|-----------|
+| `core` | Sun-Pluto, Earth, Mean/True Node, Mean Apogee (14) | ~8.7 MB |
+| `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~7.3 MB |
+| `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~9.8 MB |
+| `uranians` | Cupido-Transpluto (9) | ~1.9 MB |
+
+### Per-body Precision Targets (`BODY_TARGET_AU` in `leb_compression.py`)
+
+Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amplifies errors through the pipeline (light-time, deflection, aberration). Inner planets use 1e-10 AU.
+
+### Key Commands
+
+```bash
+poe leb2:convert:base              # Convert LEB1 -> LEB2 (all groups)
+poe leb2:convert:base:core         # Core group only
+poe leb2:verify:base               # Verify against LEB1
+poe test:leb2                      # Unit tests (27)
+poe test:leb2:precision:base       # Fast precision test (~15s)
+poe test:leb2:precision:all        # All tiers (~45s)
+```
+
+### Full documentation
+- `docs/leb/guide.md` — Complete LEB technical guide (section 13 for LEB2)
+- `proposals/leb2-implementation-plan.md` — Implementation plan with benchmarks
+- `release-notes/v1.0.0a2.md` — Detailed release notes with measured results
 
 ## Lunar Calibration Workflow
 

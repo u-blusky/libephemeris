@@ -209,9 +209,9 @@ class EphemerisContext:
         """
         if self._leb_reader is None and self._leb_file is not None:
             try:
-                from .leb_reader import LEBReader
+                from .leb_reader import open_leb
 
-                self._leb_reader = LEBReader(self._leb_file)
+                self._leb_reader = open_leb(self._leb_file)
             except (FileNotFoundError, ValueError, OSError) as e:
                 from .logging_config import get_logger
 

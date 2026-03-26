@@ -45,6 +45,13 @@ SECTION_NUTATION = 2
 SECTION_DELTA_T = 3
 SECTION_STARS = 4
 SECTION_ORBITAL_ELEMENTS = 5
+SECTION_COMPRESSED_CHEBYSHEV = 6  # LEB2: per-body compressed blobs
+
+# LEB2 format constants
+LEB2_MAGIC = b"LEB2"
+LEB2_VERSION = 1
+COMPRESSION_NONE = 0
+COMPRESSION_ZSTD_TRUNC_SHUFFLE = 1  # mantissa truncation + coeff-major reorder + byte shuffle + zstd
 
 # Struct formats (little-endian, no padding with '<' prefix)
 HEADER_FMT = "<4sIIIdddI20s"
@@ -55,6 +62,10 @@ SECTION_DIR_SIZE = struct.calcsize(SECTION_DIR_FMT)  # 24
 
 BODY_ENTRY_FMT = "<iIIdddIIQ"
 BODY_ENTRY_SIZE = struct.calcsize(BODY_ENTRY_FMT)  # 52
+
+# LEB2 compressed body entry: LEB1 fields + compressed_size + uncompressed_size
+COMPRESSED_BODY_ENTRY_FMT = "<iIIdddIIQQQ"
+COMPRESSED_BODY_ENTRY_SIZE = struct.calcsize(COMPRESSED_BODY_ENTRY_FMT)  # 68
 
 STAR_ENTRY_FMT = "<iddddddd4s"
 STAR_ENTRY_SIZE = struct.calcsize(STAR_ENTRY_FMT)  # 64
@@ -130,6 +141,26 @@ class StarEntry:
 
 
 @dataclass
+class CompressedBodyEntry:
+    """LEB2 compressed body index entry (68 bytes).
+
+    Same fields as BodyEntry plus compressed/uncompressed sizes.
+    """
+
+    body_id: int
+    coord_type: int
+    segment_count: int
+    jd_start: float
+    jd_end: float
+    interval_days: float
+    degree: int
+    components: int
+    data_offset: int  # Offset to compressed blob
+    compressed_size: int
+    uncompressed_size: int
+
+
+@dataclass
 class NutationHeader:
     """Nutation section header (40 bytes)."""
 
@@ -155,47 +186,42 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     # Runtime pipeline applies gravitational deflection + SR aberration
     # for <0.001" total error vs Skyfield apparent().
     0: (32, 13, COORD_ICRS_BARY, 3),  # SE_SUN       — <0.001"
-    1: (4, 13, COORD_ICRS_BARY, 3),  # SE_MOON      — <0.001"
+    1: (4, 13, COORD_ICRS_BARY, 3),  # SE_MOON      — <0.001" (margin 2.8x, DO NOT CHANGE)
     2: (16, 15, COORD_ICRS_BARY, 3),  # SE_MERCURY   — <0.001"
     3: (16, 13, COORD_ICRS_BARY, 3),  # SE_VENUS     — <0.001"
     4: (16, 13, COORD_ICRS_BARY, 3),  # SE_MARS      — <0.001"
     # Outer planets: ICRS system barycenter — COB correction applied at runtime.
-    # System barycenters are ultra-smooth (no moon oscillations), so Chebyshev
-    # fitting error is negligible. Runtime COB via SPK/analytical matches Skyfield.
     5: (32, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_JUPITER — <0.001"
     6: (32, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_SATURN  — <0.001"
     7: (64, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_URANUS  — <0.001"
     8: (64, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_NEPTUNE — <0.001"
-    9: (32, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_PLUTO   — <0.001"
-    14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH     — <0.001"
+    9: (64, 11, COORD_ICRS_BARY_SYSTEM, 3),  # SE_PLUTO   — 0.0005" fit error
+    14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH     — <0.001" (mirror of Moon)
     # Lunar nodes/Lilith: ecliptic direct
-    10: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_NODE  (lon, 0, 0)
-    11: (8, 13, COORD_ECLIPTIC, 3),  # SE_TRUE_NODE  (lon, lat, dist)
-    12: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_APOG  (lon, lat, 0)
-    13: (
-        4,
-        15,
-        COORD_ECLIPTIC,
-        3,
-    ),  # SE_OSCU_APOG  (lon, lat, dist) — fast oscillation ~2.6°/d
-    21: (4, 15, COORD_ECLIPTIC, 3),  # SE_INTP_APOG  (lon, lat, dist)
-    22: (4, 15, COORD_ECLIPTIC, 3),  # SE_INTP_PERG  (lon, lat, dist)
-    # Main asteroids: ICRS barycentric
-    15: (8, 13, COORD_ICRS_BARY, 3),  # SE_CHIRON    — <0.001"
-    17: (8, 13, COORD_ICRS_BARY, 3),  # SE_CERES     — <0.001"
-    18: (8, 13, COORD_ICRS_BARY, 3),  # SE_PALLAS    — <0.001"
-    19: (8, 13, COORD_ICRS_BARY, 3),  # SE_JUNO      — <0.001"
-    20: (8, 13, COORD_ICRS_BARY, 3),  # SE_VESTA     — <0.001"
-    # Uranian hypotheticals: heliocentric ecliptic (unchanged)
-    40: (32, 13, COORD_HELIO_ECL, 3),  # SE_CUPIDO
-    41: (32, 13, COORD_HELIO_ECL, 3),  # SE_HADES
-    42: (32, 13, COORD_HELIO_ECL, 3),  # SE_ZEUS
-    43: (32, 13, COORD_HELIO_ECL, 3),  # SE_KRONOS
-    44: (32, 13, COORD_HELIO_ECL, 3),  # SE_APOLLON
-    45: (32, 13, COORD_HELIO_ECL, 3),  # SE_ADMETOS
-    46: (32, 13, COORD_HELIO_ECL, 3),  # SE_VULKANUS
-    47: (32, 13, COORD_HELIO_ECL, 3),  # SE_POSEIDON
-    48: (32, 13, COORD_HELIO_ECL, 3),  # SE_ISIS
+    # These have complex oscillations from lunar perturbations/precession —
+    # keep conservative params. Will optimize after dedicated sweep.
+    10: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_NODE  — keep current
+    11: (8, 13, COORD_ECLIPTIC, 3),  # SE_TRUE_NODE  — keep current
+    12: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_APOG  — keep current
+    13: (4, 15, COORD_ECLIPTIC, 3),  # SE_OSCU_APOG  — keep current
+    21: (4, 15, COORD_ECLIPTIC, 3),  # SE_INTP_APOG  — keep current
+    22: (4, 15, COORD_ECLIPTIC, 3),  # SE_INTP_PERG  — keep current
+    # Main asteroids: ICRS barycentric — keep current (16d fails: 15-321")
+    15: (8, 13, COORD_ICRS_BARY, 3),  # SE_CHIRON
+    17: (8, 13, COORD_ICRS_BARY, 3),  # SE_CERES
+    18: (8, 13, COORD_ICRS_BARY, 3),  # SE_PALLAS
+    19: (8, 13, COORD_ICRS_BARY, 3),  # SE_JUNO
+    20: (8, 13, COORD_ICRS_BARY, 3),  # SE_VESTA
+    # Uranian hypotheticals: heliocentric ecliptic — pure analytical, ~0" error
+    40: (256, 7, COORD_HELIO_ECL, 3),  # SE_CUPIDO
+    41: (256, 7, COORD_HELIO_ECL, 3),  # SE_HADES
+    42: (256, 7, COORD_HELIO_ECL, 3),  # SE_ZEUS
+    43: (256, 7, COORD_HELIO_ECL, 3),  # SE_KRONOS
+    44: (256, 7, COORD_HELIO_ECL, 3),  # SE_APOLLON
+    45: (256, 7, COORD_HELIO_ECL, 3),  # SE_ADMETOS
+    46: (256, 7, COORD_HELIO_ECL, 3),  # SE_VULKANUS
+    47: (256, 7, COORD_HELIO_ECL, 3),  # SE_POSEIDON
+    48: (256, 7, COORD_HELIO_ECL, 3),  # SE_ISIS
 }
 
 
@@ -356,6 +382,46 @@ def read_nutation_header(data: Any, offset: int) -> NutationHeader:
         components=fields[4],
         segment_count=fields[5],
         reserved=fields[6],
+    )
+
+
+def write_compressed_body_entry(
+    buf: bytearray, offset: int, entry: CompressedBodyEntry
+) -> None:
+    """Pack a CompressedBodyEntry into a bytearray at the given offset."""
+    struct.pack_into(
+        COMPRESSED_BODY_ENTRY_FMT,
+        buf,
+        offset,
+        entry.body_id,
+        entry.coord_type,
+        entry.segment_count,
+        entry.jd_start,
+        entry.jd_end,
+        entry.interval_days,
+        entry.degree,
+        entry.components,
+        entry.data_offset,
+        entry.compressed_size,
+        entry.uncompressed_size,
+    )
+
+
+def read_compressed_body_entry(data: Any, offset: int) -> CompressedBodyEntry:
+    """Unpack a CompressedBodyEntry from bytes at the given offset."""
+    fields = struct.unpack_from(COMPRESSED_BODY_ENTRY_FMT, data, offset)
+    return CompressedBodyEntry(
+        body_id=fields[0],
+        coord_type=fields[1],
+        segment_count=fields[2],
+        jd_start=fields[3],
+        jd_end=fields[4],
+        interval_days=fields[5],
+        degree=fields[6],
+        components=fields[7],
+        data_offset=fields[8],
+        compressed_size=fields[9],
+        uncompressed_size=fields[10],
     )
 
 

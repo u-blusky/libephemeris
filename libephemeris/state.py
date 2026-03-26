@@ -269,14 +269,22 @@ def set_leb_file(filepath: Optional[str]) -> None:
 def _discover_leb_file() -> Optional[str]:
     """Auto-discover a downloaded LEB file for the active precision tier.
 
-    Checks ``~/.libephemeris/leb/ephemeris_{tier}.leb`` where ``{tier}``
-    is the currently active precision tier (base, medium, or extended).
+    Checks in order:
+    1. LEB2 modular files: ``~/.libephemeris/leb/{tier}_core.leb`` (with companions)
+    2. LEB1 merged file: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
 
     Returns:
         Path to the discovered LEB file, or None if not found.
     """
     tier = get_precision_tier()
     leb_dir = os.path.join(_get_data_dir(), "leb")
+
+    # Check for LEB2 modular files first (core is the primary)
+    leb2_core = os.path.join(leb_dir, f"{tier}_core.leb")
+    if os.path.isfile(leb2_core):
+        return leb2_core
+
+    # Fall back to LEB1 merged file
     candidate = os.path.join(leb_dir, f"ephemeris_{tier}.leb")
     if os.path.isfile(candidate):
         return candidate
@@ -331,9 +339,19 @@ def get_leb_reader() -> Optional["LEBReader"]:
 
         if path is not None:
             try:
-                from .leb_reader import LEBReader
+                from .leb_reader import open_leb
 
-                _LEB_READER = LEBReader(path)
+                reader = open_leb(path)
+                # If the file has companion group files, wrap in composite
+                directory = os.path.dirname(os.path.abspath(path))
+                basename = os.path.splitext(os.path.basename(path))[0]
+                if "_" in basename:
+                    # Looks like a modular file (e.g. base_core.leb)
+                    from .leb_composite import CompositeLEBReader
+
+                    _LEB_READER = CompositeLEBReader.from_file_with_companions(path)
+                else:
+                    _LEB_READER = reader
             except (FileNotFoundError, ValueError, OSError) as e:
                 if mode == "leb":
                     raise RuntimeError(

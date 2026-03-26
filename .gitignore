@@ -38,6 +38,11 @@ compare_scripts_tests.log
 # LEB binary ephemeris files (generated, large)
 data/leb/*.leb
 
+# LEB2 compressed files — only base_core.leb is tracked (ships in PyPI wheel)
+# All others are published via GitHub Releases
+data/leb2/*.leb
+!data/leb2/base_core.leb
+
 # Environment files (may contain local paths/config)
 .env
 .env.*

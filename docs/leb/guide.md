@@ -1,9 +1,9 @@
 # LEB (LibEphemeris Binary) — Complete Technical Guide
 
-> **Version:** 2.0 — March 2026
-> **Status:** Production-ready (format version 1), **all 31 bodies <0.001" precision**
-> **Source of truth:** This document. See also [LEB Design](design.md) for the original
-> implementation plan and [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
+> **Version:** 2.1 — March 2026
+> **Status:** Production-ready (LEB1 and LEB2 formats), **all 31 bodies <0.001" precision**
+> **Source of truth:** This document. See also [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
+> LEB2 compressed format details: see `proposals/leb2-implementation-plan.md` and `release-notes/v1.0.0a2.md`.
 
 ---
 
@@ -22,8 +22,9 @@
 10. [Precision and Validation](#10-precision-and-validation)
 11. [Performance](#11-performance)
 12. [Commands Reference](#12-commands-reference)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Internals Deep-Dive](#14-internals-deep-dive)
+13. [LEB2 Compressed Format](#13-leb2-compressed-format)
+14. [Troubleshooting](#14-troubleshooting)
+15. [Internals Deep-Dive](#15-internals-deep-dive)
 
 ---
 
@@ -1747,7 +1748,84 @@ download_leb_for_tier("medium")  # downloads + activates
 
 ---
 
-## 13. Troubleshooting
+## 13. LEB2 Compressed Format
+
+### 13.1 Overview
+
+LEB2 is a compressed variant of the LEB format that uses error-bounded lossy
+compression to reduce file sizes by 4-10x while maintaining <0.001" precision.
+The compression is transparent: `open_leb()` auto-detects the format via magic
+bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
+
+### 13.2 Compression Pipeline
+
+```
+Raw float64 coefficients
+    ↓
+[1] Mantissa truncation  — zero unneeded mantissa bits per coefficient order
+    ↓                      (high-order coefficients need very few bits)
+[2] Coefficient-major     — reorder (segments, coeffs) → (coeffs, segments)
+    reorder                 so same-order coefficients are contiguous
+    ↓
+[3] Byte shuffle          — transpose byte lanes (HDF5/Blosc-style)
+    ↓
+[4] zstd level 19         — the regularized data compresses well
+    ↓
+Compressed blob
+```
+
+The truncation is lossy but error-bounded: each coefficient keeps only the
+mantissa bits needed for the target angular precision. Bodies with small
+geocentric distances (Moon, Earth) use tighter precision targets to avoid
+error amplification through the light-time/deflection/aberration pipeline.
+
+### 13.3 Modular File Architecture
+
+LEB2 files are organized into **body groups** instead of one monolithic file:
+
+| Group | Bodies | Base tier size | Description |
+|-------|--------|----------------|-------------|
+| `core` | 14 | 7.7 MB | Sun-Pluto, Earth, Mean/True Node, Mean Apogee |
+| `asteroids` | 5 | 7.3 MB | Chiron, Ceres, Pallas, Juno, Vesta |
+| `apogee` | 3 | 9.8 MB | Oscu Apogee, Interp Apogee/Perigee |
+| `uranians` | 9 | 1.9 MB | Cupido-Transpluto |
+
+The `CompositeLEBReader` auto-discovers companion files in the same directory:
+
+```python
+swe.set_leb_file("data/leb2/base_core.leb")  # companions auto-discovered
+swe.set_calc_mode("leb")
+# All 31 bodies accessible if companion files are present
+```
+
+### 13.4 Key Modules
+
+| Module | Purpose |
+|--------|---------|
+| `leb_compression.py` | Compression/decompression primitives |
+| `leb2_reader.py` | `LEB2Reader` — lazy per-body decompression |
+| `leb_composite.py` | `CompositeLEBReader` — multi-file dispatch |
+| `scripts/generate_leb2.py` | Conversion and generation CLI |
+
+### 13.5 Generation Commands
+
+```bash
+# Convert existing LEB1 → LEB2 (all groups)
+poe leb2:convert:base
+
+# Convert single group
+poe leb2:convert:base:core
+
+# Verify against LEB1 reference
+poe leb2:verify:base
+
+# Run LEB2 tests
+poe test:leb2
+```
+
+---
+
+## 14. Troubleshooting
 
 ### 13.1 "Body X not in LEB file"
 
@@ -1787,7 +1865,7 @@ poe leb:generate:base
 
 ---
 
-## 14. Internals Deep-Dive
+## 15. Internals Deep-Dive
 
 ### 14.1 Outer Planet Position Computation
 

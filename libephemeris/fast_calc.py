@@ -53,7 +53,12 @@ from .leb_format import (
 )
 
 if TYPE_CHECKING:
+    from typing import Union
+
+    from .leb2_reader import LEB2Reader
     from .leb_reader import LEBReader
+
+    LEBReaderLike = Union[LEBReader, LEB2Reader]
 
 # =============================================================================
 # CONSTANTS
