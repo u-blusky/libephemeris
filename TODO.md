@@ -46,12 +46,9 @@ decision: lock-per-variable vs context-only.
 101 bare `except Exception:` blocks. 24 in `eclipse.py`, ~10 in `houses.py`,
 ~8 in `heliacal.py`. Most are intentional graceful degradation.
 
-### 3. `MeeusRangeError` — dead code
+### ~~3. `MeeusRangeError` — dead code~~ DONE
 
-**Priority: low | Risk: medium | Effort: small**
-
-Defined and exported but never raised. Either remove or fix hierarchy
-(`ValueError` -> should be `EphemerisRangeError`).
+Marked as deprecated in docstring, kept for backward compat.
 
 ### 4. `houses.py` deduplication
 
