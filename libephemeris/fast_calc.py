@@ -982,19 +982,11 @@ def _pipeline_ecliptic(
         # LEB stores 0 for dist; pyswisseph returns mean distance constant.
         dist = _MOON_MEAN_DIST_AU
     elif ipl == SE_TRUE_NODE:
-        # LEB stores h_mag proxy for dist (~0.0015 AU); pyswisseph returns
-        # distance at the ascending node from osculating orbit elements
-        # (~0.0024 AU).  Analytical approximation using mean orbital elements:
-        # r = p / (1 + e·cos(f)) where f is true anomaly at ascending node.
-        # Mean error vs pyswisseph: ~0.7", max ~1.2" (vs ~3.5" from LEB proxy).
-        from .lunar import calc_mean_lilith, calc_mean_lunar_node
+        # LEB stores h_mag proxy for dist; use the full osculating orbit
+        # calculation from calc_true_lunar_node() for accurate distance.
+        from .lunar import calc_true_lunar_node
 
-        _p = _MOON_MEAN_DIST_AU * (1.0 - _MOON_MEAN_ECC * _MOON_MEAN_ECC)
-        apogee_lon = calc_mean_lilith(jd_tt)
-        node_lon = calc_mean_lunar_node(jd_tt)
-        omega_deg = (apogee_lon - node_lon) % 360.0
-        f_node_rad = math.radians((360.0 - omega_deg) % 360.0)
-        dist = _p / (1.0 + _MOON_MEAN_ECC * math.cos(f_node_rad))
+        _, _, dist = calc_true_lunar_node(jd_tt)
     elif ipl == SE_MEAN_APOG:
         # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
         # Override with 3-harmonic model fitted to pyswisseph output:
