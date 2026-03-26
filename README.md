@@ -9,52 +9,21 @@
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
 
-A pure Python astronomical ephemeris library based on NASA JPL data. Designed as a 1:1 API-compatible drop-in replacement for PySwisseph, strictly focused on scientific precision.
-
-- Drop-in replacement for `pyswisseph`
-- Uses NASA JPL ephemerides (DE440/DE441) via Skyfield
-- Uses modern IAU standards (ERFA/pyerfa)
+A high-precision astronomical ephemeris library for Python, powered by NASA JPL data and modern IAU standards. API-compatible drop-in replacement for PySwissEph.
 
 > [!NOTE]
-> **Alpha 1.0.0** -- API is stabilizing. Breaking changes will be documented in the changelog.
+> **Alpha 1.0.0** -- API is stabilizing. Breaking changes will be documented in the [changelog](CHANGELOG.md).
 
 ---
 
-## Why
+## Features
 
-Swiss Ephemeris is fast and widely used, but its architecture reflects design
-decisions from the 1990s. LibEphemeris makes a different trade-off:
-**absolute consistency with current NASA JPL ephemerides and IAU standards**,
-at the cost of speed and strict numerical agreement with Swiss Ephemeris.
-
-- **Modern ephemeris, no fallback.** All calculations use JPL DE440/DE441 (2021) exclusively. The `SEFLG_MOSEPH` flag is accepted for compatibility but silently ignored -- there is no degradation to 1980s analytical theories.
-- **Physical planet positions.** Outer planet positions are automatically corrected from system barycenters to true planet body centers, using JPL satellite ephemerides and analytical moon theories. No extra flags or files required.
-- **Peer-reviewed photometric models.** Visual magnitudes use Mallama & Hilton (2018) formulas, published in *The Astronomical Journal* and adopted by the Astronomical Almanac. Body radii use IAU 2015 official equatorial values.
-- **IAU standard coordinate transforms.** Nutation (IAU 2006/2000A, 1365 terms), precession (IAU 2006), and obliquity use the official IAU ERFA library -- the same routines used by professional observatories.
-- **Independently verified precision.** Triangulated comparisons against JPL Horizons (NASA) and astropy/ERFA confirm sub-arcsecond accuracy. Lunar node positions match JPL Horizons to < 0.01 arcsecond. True Lilith matches within 0.5 arcsecond. All planets within 2 arcseconds (outer planets sub-arcsecond). See the [Swiss Ephemeris comparison report](https://kerykeion.net/libephemeris/docs/reference/swisseph-comparison).
-- **Fixes known Swiss Ephemeris bugs.** LibEphemeris corrects a behavioral bug where pyswisseph silently ignores `SEFLG_J2000` for TrueNode, OscuApog, IntpApog, and IntpPerg when combined with `SEFLG_SIDEREAL`. This causes up to ~0.34° error at modern dates and ~28° at historical dates. See the [full analysis](https://kerykeion.net/libephemeris/docs/reference/se-bug-sidereal-j2000-nodes).
-- **JPL-grounded lunar apsides.** The interpolated perigee and apogee are derived from actual physical distance-extrema passages in JPL data, rather than from truncated analytical series.
-- **Current Delta T model.** Uses Stephenson, Morrison & Hohenkerk (2016) with optional IERS observational data -- the current astronomical standard for historical timescale conversion.
-- **Transparent.** Pure Python, fully testable, readable, and documented with explicit astronomical references.
-- **Slower than Swiss Ephemeris.** Swiss is C; LibEphemeris is Python (see Performance).
-
-Methodology and rationale: [overview](https://kerykeion.net/libephemeris/docs/methodology/overview).
-
-### Precision at a glance
-
-Measured against pyswisseph 2.10 across 4,400+ comparison rounds. Full report: [Precision](https://kerykeion.net/libephemeris/docs/PRECISION).
-
-| Category | Typical | Max | Notes |
-|----------|---------|-----|-------|
-| Planets (Sun-Pluto) | 0.04-0.26" | 0.75" | Sub-arcsecond, all planets |
-| Moon | 0.70" | 3.32" | Different lunar models (DE440 vs ELP) |
-| House cusps | < 0.01" | 0.02" | All 24 systems tested |
-| Fixed stars | < 0.1" | 0.51" | 116 Hipparcos stars |
-| Solar eclipses | — | < 6s | Timing precision |
-| Lunar eclipses | — | < 8s | Timing precision |
-| Ayanamsha | < 0.001° | 0.006° | 43 sidereal modes |
-
-**Hyper-validation: 3,947 PASS, 441 KNOWN, 0 FAIL.** All divergences [documented](https://kerykeion.net/libephemeris/docs/divergences).
+- **NASA JPL ephemerides** -- all calculations use DE440/DE441 (2021) exclusively via Skyfield. No analytical fallbacks.
+- **Three calculation backends** -- Skyfield (pure JPL), LEB (precomputed Chebyshev, ~14x speedup), and Horizons API (zero-install, no local files needed).
+- **IAU standard transforms** -- nutation (IAU 2006/2000A), precession (IAU 2006), obliquity via the official ERFA library.
+- **Physical planet centers** -- outer planets corrected from system barycenters to true body centers using JPL satellite ephemerides.
+- **Sub-arcsecond precision** -- all planets < 1", house cusps < 0.02", independently verified against JPL Horizons and astropy/ERFA. [Full report](docs/PRECISION.md).
+- **Pure Python** -- fully testable, readable, documented. No C extensions.
 
 ---
 
@@ -64,31 +33,17 @@ Measured against pyswisseph 2.10 across 4,400+ comparison rounds. Full report: [
 pip install libephemeris
 ```
 
-DE440 (~128 MB) downloads automatically on first use.
-
-Download all data files for your use case (ephemeris + SPK kernels):
+Works immediately -- the library fetches data from NASA JPL Horizons API when no local files are present. For offline use or faster calculations, download ephemeris files:
 
 ```bash
-libephemeris download:medium      # recommended for most users
+libephemeris download:medium      # JPL DE440 (~128 MB), recommended
 ```
 
-See [CLI commands](#cli-commands) for all download tiers.
-
-### Optional extras
-
-```bash
-pip install libephemeris[nbody]  # REBOUND/ASSIST n-body integration
-pip install libephemeris[stars]  # Star catalog building (astropy)
-pip install libephemeris[all]    # Everything
-```
-
-**Requirements:** Python 3.9+ &bull; skyfield >= 1.54 &bull; pyerfa >= 2.0
+**Requirements:** Python 3.9+ | [Optional extras](docs/getting-started.md#optional-extras): `[nbody]`, `[stars]`, `[all]`
 
 ---
 
-## Quick start
-
-By default, all calculations use **JPL DE440 via Skyfield** -- no extra files or configuration needed. For faster batch workloads, see [Calculation backend](#calculation-backend).
+## Quick Start
 
 ```python
 import libephemeris as swe
@@ -99,325 +54,131 @@ jd = swe.julday(2000, 1, 1, 12.0)  # J2000.0
 sun, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED)
 moon, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)
 
-print("Sun lon:", sun[0], "deg")
-print("Moon lon:", moon[0], "deg")
+print(f"Sun:  {sun[0]:.4f} deg, speed {sun[3]:.4f} deg/day")
+print(f"Moon: {moon[0]:.4f} deg, speed {moon[3]:.4f} deg/day")
 ```
-
-Houses:
 
 ```python
-jd = swe.julday(2024, 11, 5, 18.0)
-cusps, ascmc = swe.houses(jd, 41.9028, 12.4964, b"P")  # Placidus
-print("ASC:", ascmc[0], "deg")
-print("MC:", ascmc[1], "deg")
+# House cusps (Placidus, Rome)
+cusps, ascmc = swe.houses(swe.julday(2024, 11, 5, 18.0), 41.9028, 12.4964, b"P")
+print(f"ASC: {ascmc[0]:.4f}, MC: {ascmc[1]:.4f}")
 ```
+
+More examples: [Getting Started](docs/getting-started.md)
 
 ---
 
-## Calculation flags
+## Calculation Backends
 
-Flags are bitmasks that control what is calculated and how the result is returned. `calc_ut()` returns a 6-element tuple `(longitude, latitude, distance, speed_lon, speed_lat, speed_dist)` and a return flag. Combine multiple flags with bitwise OR (`|`).
+LibEphemeris supports three backends with automatic fallback:
 
-### Velocity
-
-- `SEFLG_SPEED` — Populates the speed fields (`pos[3]`–`pos[5]`) with daily motion in longitude, latitude, and distance. Without this flag those values are zero. Almost every call should include it.
-
-### Observer
-
-By default the observer is at Earth's center (geocentric).
-
-- `SEFLG_HELCTR` — Heliocentric: moves the observer to the Sun. Distances become heliocentric AU.
-- `SEFLG_TOPOCTR` — Topocentric: places the observer on Earth's surface at the position set with `swe_set_topo()`. This matters most for the Moon (up to ~1° parallax).
-
-### Coordinates
-
-By default the output is ecliptic longitude/latitude of date.
-
-- `SEFLG_EQUATORIAL` — Switches to equatorial coordinates: `pos[0]` becomes Right Ascension (0–360°) and `pos[1]` becomes Declination (±90°). Speeds change accordingly.
-
-### Reference frame
-
-By default positions are precessed to the equinox of date.
-
-- `SEFLG_J2000` — Keeps coordinates in the J2000.0 reference frame instead of precessing to the equinox of date.
-- `SEFLG_NONUT` — Excludes nutation, giving positions on the mean ecliptic/equator.
-
-### Position corrections
-
-By default positions are apparent (light-time and aberration corrected).
-
-- `SEFLG_TRUEPOS` — Geometric position: no light-time correction. Returns where the body actually is at the instant of calculation.
-- `SEFLG_NOABERR` — Astrometric position: light-time corrected but no aberration. Comparable to star catalog positions.
-- `SEFLG_ASTROMETRIC` — Convenience shorthand for `SEFLG_NOABERR | SEFLG_NOGDEFL`.
-
-### Sidereal zodiac
-
-- `SEFLG_SIDEREAL` — Subtracts the ayanamsha from ecliptic longitude, returning sidereal rather than tropical positions. Requires a prior `swe_set_sid_mode()` call to select the ayanamsha (Lahiri, Fagan-Bradley, etc.).
-
-### Combining flags
-
-```python
-# Heliocentric position with velocity
-pos, _ = swe.calc_ut(jd, SE_MARS, SEFLG_SPEED | SEFLG_HELCTR)
-
-# Sidereal equatorial coordinates
-pos, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_SIDEREAL)
+```
+LEB (~5 us/eval)  -->  Horizons API (~300ms)  -->  Skyfield/DE440 (~120 us/eval)
 ```
 
-> [!NOTE]
-> `SEFLG_MOSEPH` and `SEFLG_SWIEPH` are accepted for API compatibility but
-> silently ignored — all calculations always use JPL DE440/DE441 via Skyfield.
-> `SEFLG_BARYCTR` returns barycentric coordinates. `SEFLG_XYZ` returns
-> Cartesian coordinates (x, y, z in AU). `SEFLG_RADIANS` returns angles in
-> radians instead of degrees. `SEFLG_SPEED3` is converted to `SEFLG_SPEED`.
-
----
-
-## Choose the ephemeris
-
-LibEphemeris supports three precision tiers, each mapping to a different JPL ephemeris:
-
-| Tier | File | Date Range | Size | Use Case |
-|------|------|------------|------|----------|
-| `base` | de440s.bsp | 1849--2150 | ~31 MB | Lightweight, modern-era usage |
-| `medium` | de440.bsp | 1550--2650 | ~128 MB | General purpose **(DEFAULT)** |
-| `extended` | de441.bsp | -13200 to +17191 | ~3.1 GB | Historical/far-future research |
-
-DE440 and DE441 have identical precision — DE441 is simply the extended-range version.
-DE440s is a reduced-size subset of DE440 with no loss of precision within its range.
-
-### Select by precision tier
-
-```python
-import libephemeris as swe
-swe.set_precision_tier("extended")   # uses de441.bsp
-```
-
-```bash
-export LIBEPHEMERIS_PRECISION=extended
-```
-
-### Select by ephemeris file directly
-
-```python
-import libephemeris as swe
-swe.set_ephemeris_file("de441.bsp")
-```
-
-```bash
-export LIBEPHEMERIS_EPHEMERIS=de441.bsp
-```
-
-### Resolution priority
-
-1. `LIBEPHEMERIS_EPHEMERIS` environment variable
-2. `set_ephemeris_file()` / `set_jpl_file()` programmatic call
-3. Precision tier (`LIBEPHEMERIS_PRECISION` env var or `set_precision_tier()`)
-4. Default: `de440.bsp` (medium tier)
-
-Dates outside the loaded kernel raise `EphemerisRangeError`.
-
----
-
-## Calculation backend
-
-LibEphemeris supports two calculation backends. **By default it uses Skyfield (pure JPL) -- no configuration needed.** LEB is an opt-in accelerated mode that serves the same JPL positions from a compact precomputed cache.
-
-| Backend | Speed | Configuration |
-|---------|-------|---------------|
-| **Skyfield** (default) | ~120 us/eval | None -- works out of the box |
-| **LEB** (binary ephemeris) | ~8 us/eval | Requires a `.leb` file ([see Performance](#binary-ephemeris-mode-leb)) |
-
-Both backends produce the same positions: LEB files are generated from JPL DE440/DE441 via Skyfield and store the results as Chebyshev polynomial fits (sub-arcsecond approximation error). If you never configure a `.leb` file, the library always uses Skyfield regardless of any other setting.
-
-### Calculation mode
-
-The `LIBEPHEMERIS_MODE` setting (or `set_calc_mode()`) controls backend selection:
-
-| Mode | Behavior |
-|------|----------|
-| `"auto"` **(default)** | Use LEB if a `.leb` file is configured, otherwise Skyfield |
-| `"skyfield"` | Always Skyfield, even if a `.leb` file is configured |
-| `"leb"` | Require LEB; raises `RuntimeError` if no `.leb` file is available |
+| Mode | Behavior | Use case |
+|------|----------|----------|
+| `"auto"` **(default)** | LEB if configured, then Horizons if no DE440, then Skyfield | Works everywhere |
+| `"leb"` | LEB precomputed only | Maximum performance |
+| `"horizons"` | NASA JPL Horizons API only | Zero-install, serverless, CI |
+| `"skyfield"` | Skyfield/DE440 only | Offline, maximum precision |
 
 ```python
 from libephemeris import set_calc_mode
 
-set_calc_mode("skyfield")  # Force pure JPL/Skyfield
-set_calc_mode("leb")       # Require LEB (error if unavailable)
-set_calc_mode("auto")      # Default: LEB if available, else Skyfield
-set_calc_mode(None)        # Reset to env var / default
+set_calc_mode("horizons")  # Or via env: LIBEPHEMERIS_MODE=horizons
 ```
+
+All backends produce the same positions (sub-arcsecond agreement). The default `"auto"` mode always works -- with or without local data files.
+
+| Backend | Details |
+|---------|---------|
+| **Skyfield** | Pure JPL DE440/DE441 via Skyfield. Gold standard. [Ephemeris tiers](docs/getting-started.md#ephemeris-tiers) |
+| **LEB** | Precomputed Chebyshev polynomials, ~14x speedup. [LEB Guide](docs/leb/guide.md) |
+| **LEB2** | Compressed LEB format (4-10x smaller). Core bodies (~8.7 MB) ship in the PyPI wheel. [LEB2 details](docs/leb/guide.md#13-leb2-compressed-format) |
+| **Horizons** | NASA JPL Horizons REST API. No local files needed. [Horizons Guide](docs/horizons-backend.md) |
+
+---
+
+## Precision
+
+Measured across 4,400+ comparison rounds. [Full precision report](docs/PRECISION.md).
+
+| Category | Typical | Max | Notes |
+|----------|---------|-----|-------|
+| Planets (Sun-Pluto) | 0.04-0.26" | 0.75" | Sub-arcsecond, all planets |
+| Moon | 0.70" | 3.32" | Different lunar models |
+| House cusps | < 0.01" | 0.02" | All 24 systems tested |
+| Fixed stars | < 0.1" | 0.51" | 116 Hipparcos stars |
+| Solar eclipses | -- | < 6s | Timing precision |
+| Lunar eclipses | -- | < 8s | Timing precision |
+| Ayanamsha | < 0.001 deg | 0.006 deg | 43 sidereal modes |
+
+---
+
+## Flags Reference
+
+Flags control what is calculated and how results are returned. Combine with `|`.
+
+| Flag | Effect |
+|------|--------|
+| `SEFLG_SPEED` | Populate speed fields (almost always needed) |
+| `SEFLG_HELCTR` | Heliocentric observer |
+| `SEFLG_TOPOCTR` | Topocentric observer (set position with `set_topo()`) |
+| `SEFLG_EQUATORIAL` | Output RA/Dec instead of ecliptic lon/lat |
+| `SEFLG_J2000` | J2000.0 frame instead of equinox of date |
+| `SEFLG_SIDEREAL` | Sidereal zodiac (requires `set_sid_mode()`) |
+| `SEFLG_TRUEPOS` | Geometric position (no light-time/aberration) |
+| `SEFLG_NOABERR` | Astrometric position (no aberration) |
+
+Full flag reference with examples: [docs/flags.md](docs/flags.md)
+
+---
+
+## Documentation
+
+### Guides
+- [Getting Started](docs/getting-started.md) -- installation, ephemeris tiers, first calculations
+- [Migration from PySwissEph](docs/guides/migration-guide.md)
+- [Precision Tuning](docs/guides/precision-tuning.md)
+
+### Architecture
+- [LEB Binary Ephemeris](docs/leb/guide.md) -- format, reader, generation, fast-path pipeline
+- [Horizons API Backend](docs/horizons-backend.md) -- HTTP client, pipeline, modes, precision
+- [Architecture Overview](docs/development/architecture-overview.md)
+
+### Reference
+- [Precision Report](docs/PRECISION.md) -- full measurement data
+- [Flag Reference](docs/flags.md)
+- [House Systems](docs/reference/house-systems.md)
+- [Ayanamsha Modes](docs/reference/ayanamsha.md)
+
+### Methodology
+- [Overview](docs/methodology/overview.md)
+- [Planet Centers](docs/methodology/planet-centers-spk.md)
+- [Lunar Apsides](docs/methodology/lunar-apsides.md)
+- [True Lilith](docs/methodology/true-lilith.md)
+- [pyerfa Integration](docs/methodology/pyerfa-integration.md)
+
+### Development
+- [Testing](docs/development/testing.md) -- test suites, commands, coverage
+- [Roadmap](docs/development/roadmap.md)
+- [Changelog](CHANGELOG.md)
+
+---
+
+## CLI Commands
 
 ```bash
-export LIBEPHEMERIS_MODE=skyfield  # Or: leb, auto
+# Download ephemeris data
+libephemeris download:base         # DE440s (~35 MB), 1850-2150
+libephemeris download:medium       # DE440 (~130 MB), 1550-2650 (recommended)
+libephemeris download:extended     # DE441 (~3.3 GB), -13200 to +17191
+
+# Status and version
+libephemeris status                # Show installed data files
+libephemeris --version
 ```
-
-> [!NOTE]
-> In practice, `"auto"` with no `.leb` file configured is identical to `"skyfield"`.
-> The default out-of-the-box experience is always pure JPL/Skyfield.
-
----
-
-## Outer-planet centers (barycenter vs center)
-
-JPL DE ephemerides provide system barycenters for Jupiter/Saturn/Uranus/Neptune/Pluto.
-LibEphemeris corrects these to planet body centers automatically:
-
-1. Uses tier-specific SPK files (`planet_centers_{tier}.bsp`) downloaded by `libephemeris download:<tier>`
-2. Falls back to analytical satellite models when SPK coverage is not available:
-    - Jupiter: Galilean moon theory (E5/Meeus) — ~0.05 arcsec
-    - Saturn: TASS 1.7 (Titan-dominated) — ~0.02 arcsec
-    - Uranus: 5 major moons Keplerian — ~0.01 arcsec
-    - Neptune: Triton Keplerian — ~0.003 arcsec
-    - Pluto: Charon two-body — ~0.15 arcsec
-
-SPK coverage varies by tier:
-
-| Planet  | base (1850-2150) | medium (1550-2650) | extended                            |
-| ------- | ---------------- | ------------------ | ----------------------------------- |
-| Jupiter | SPK              | SPK                | SPK 1600-2200, fallback outside     |
-| Saturn  | SPK              | SPK                | SPK -502 to +4500, fallback outside |
-| Uranus  | SPK              | SPK                | SPK full (-12000 to +17000)         |
-| Neptune | SPK              | SPK                | SPK full (-12000 to +17000)         |
-| Pluto   | SPK              | SPK 1800-2200      | SPK 1800-2200, fallback outside     |
-
-Full technical details in the [precision report](https://kerykeion.net/libephemeris/docs/reference/precision).
-
----
-
-## Minor bodies (SPK)
-
-For many asteroids and TNOs, high precision requires JPL SPK kernels.
-SPK kernels are downloaded automatically via `astroquery` (a core dependency).
-
-```python
-import libephemeris as swe
-from libephemeris.constants import SE_CHIRON
-
-swe.set_auto_spk_download(True)
-swe.set_spk_cache_dir("./spk_cache")
-
-pos, _ = swe.calc_ut(2460000.0, SE_CHIRON, 0)
-print(pos[0])
-```
-
-### N-body fallback (REBOUND/ASSIST)
-
-When SPK kernels are not available for a minor body, LibEphemeris can fall back
-to REBOUND/ASSIST n-body integration for ephemeris-quality precision (sub-arcsecond).
-This requires the optional `[nbody]` extra and ~714 MB of JPL data files:
-
-```bash
-pip install libephemeris[nbody]
-```
-
-```python
-from libephemeris.rebound_integration import download_assist_data
-download_assist_data()  # Downloads to ~/.libephemeris/assist/ (~714 MB)
-```
-
-Once installed, ASSIST is used automatically in the fallback chain:
-SPK kernel > auto-download SPK > REBOUND/ASSIST > Keplerian.
-
-See [REBOUND integration](https://kerykeion.net/libephemeris/docs/methodology/rebound-integration) for details.
-
----
-
-## Thread safety
-
-The global API is pyswisseph-compatible and uses global mutable state.
-For concurrency, use `EphemerisContext`:
-
-```python
-from libephemeris import EphemerisContext, SE_SUN
-
-ctx = EphemerisContext()
-ctx.set_topo(12.5, 41.9, 0)
-pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
-```
-
----
-
-## Docs
-
-Full documentation: **[kerykeion.net/libephemeris/docs](https://kerykeion.net/libephemeris/docs/)**
-
-**Getting started:**
-[Migration guide](https://kerykeion.net/libephemeris/docs/guides/migration-guide) ·
-[Precision tuning](https://kerykeion.net/libephemeris/docs/guides/precision-tuning)
-
-**Reference:**
-[Precision report](https://kerykeion.net/libephemeris/docs/reference/precision) ·
-[Swiss Ephemeris comparison](https://kerykeion.net/libephemeris/docs/reference/swisseph-comparison) (1,619 tests) ·
-[Known divergences](https://kerykeion.net/libephemeris/docs/divergences) ·
-[House systems](https://kerykeion.net/libephemeris/docs/reference/house-systems) ·
-[Ayanamsha modes](https://kerykeion.net/libephemeris/docs/reference/ayanamsha)
-
-**Methodology:**
-[Overview](https://kerykeion.net/libephemeris/docs/methodology/overview) ·
-[Planet centers](https://kerykeion.net/libephemeris/docs/methodology/planet-centers-spk) ·
-[Lunar apsides](https://kerykeion.net/libephemeris/docs/methodology/lunar-apsides) ·
-[True Lilith](https://kerykeion.net/libephemeris/docs/methodology/true-lilith) ·
-[pyerfa integration](https://kerykeion.net/libephemeris/docs/methodology/pyerfa-integration) ·
-[REBOUND integration](https://kerykeion.net/libephemeris/docs/methodology/rebound-integration) ·
-[LEB format](https://kerykeion.net/libephemeris/docs/leb/guide)
-
-**Development:**
-[Testing](https://kerykeion.net/libephemeris/docs/development/testing) ·
-[Architecture](https://kerykeion.net/libephemeris/docs/development/architecture-overview) ·
-[Roadmap](https://kerykeion.net/libephemeris/docs/development/roadmap)
-
----
-
-## Performance
-
-LibEphemeris is pure Python; Swiss Ephemeris is C. Expect LibEphemeris to be slower.
-For batch workloads, use `EphemerisContext`, parallelism, and caching.
-
-### Binary Ephemeris Mode (LEB)
-
-For performance-critical applications, LibEphemeris supports precomputed binary
-ephemeris files (`.leb`). These files are generated from the same JPL DE440/DE441
-data used by Skyfield, compressed into Chebyshev polynomial fits for fast
-evaluation. The underlying positions are identical -- LEB is a cache, not a
-different data source. Approximation error is sub-arcsecond. This provides
-approximately **14x speedup** (~8 us vs ~120 us per evaluation).
-
-To enable LEB, download a pre-generated `.leb` file:
-
-```bash
-libephemeris download:leb:base      # ~53 MB, 1849-2150
-libephemeris download:leb:medium    # ~175 MB, 1550-2650
-```
-
-Once downloaded, the file is auto-discovered from `~/.libephemeris/leb/` -- no code changes needed. You can also generate locally: `poe leb:generate:base:groups` (~5 min).
-
-LEB transparently falls back to Skyfield for unsupported flags or bodies not in the `.leb` file. See [Calculation backend](#calculation-backend) for mode control.
-
-Full technical guide: [LEB format](https://kerykeion.net/libephemeris/docs/leb/guide).
-
----
-
-## CLI commands
-
-Download all required data for your precision tier:
-
-| Command                          | Ephemeris  | SPK range | Download |
-| -------------------------------- | ---------- | --------- | -------- |
-| `libephemeris download:base`     | de440s.bsp | 1850-2150 | ~35 MB   |
-| `libephemeris download:medium`   | de440.bsp  | 1900-2100 | ~130 MB  |
-| `libephemeris download:extended` | de441.bsp  | 1600-2500 | ~3.3 GB  |
-
-Other commands:
-
-| Command                            | Description                              |
-| ---------------------------------- | ---------------------------------------- |
-| `libephemeris download:leb:base`   | Download LEB binary ephemeris (~53 MB)   |
-| `libephemeris download:leb:medium` | Download LEB binary ephemeris (~175 MB)  |
-| `libephemeris download:assist`     | Download ASSIST n-body data (~714 MB)    |
-| `libephemeris status`              | Show installed data file status          |
-| `libephemeris --version`           | Show version information                 |
 
 ---
 
@@ -425,74 +186,22 @@ Other commands:
 
 ```bash
 git clone https://github.com/g-battaglia/libephemeris.git
-cd libephemeris
-uv pip install -e ".[dev]"
+cd libephemeris && uv pip install -e ".[dev]"
 ```
 
-All development tasks use [poethepoet](https://poethepoet.naberhaus.dev/) (`poe`).
+Key commands ([full list](docs/development/testing.md)):
 
-### Code quality
-
-| Command         | Description                 |
-| --------------- | --------------------------- |
-| `poe format`    | Format code with Ruff       |
-| `poe lint`      | Lint and auto-fix with Ruff |
-| `poe typecheck` | Type-check with mypy        |
-
-### Tests
-
-| Command                   | Description                                               |
-| ------------------------- | --------------------------------------------------------- |
-| `poe test`                | Fast tests (excludes `@pytest.mark.slow`)                 |
-| `poe test:full`           | All tests including slow ones                             |
-| `poe test:fast`           | Fast tests, parallel (`-n auto`)                          |
-| `poe test:fast:essential` | Parallel essential subset (~670 tests, 1 file per module) |
-| `poe test:unit`           | Unit tests only (`tests/`)                                |
-| `poe test:unit:fast`      | Unit tests, parallel                                      |
-| `poe test:compare`        | Comparison tests vs pyswisseph (`compare_scripts/tests/`) |
-| `poe test:compare:fast`   | Comparison tests, parallel                                |
-| `poe test:lunar`          | All lunar tests (nodes, Lilith, perigee, apogee)          |
-| `poe test:lunar:perigee`  | Perigee tests (perturbations + interpolated + osculating) |
-| `poe test:lunar:apogee`   | Apogee tests (perturbations + interpolated)               |
-| `poe test:lunar:lilith`   | Lilith tests (mean + true, all correction modules)        |
-| `poe coverage`            | Fast tests with coverage report                           |
-| `poe coverage:full`       | All tests with coverage report                            |
-
-<details>
-<summary><strong>Advanced: diagnostics, data generation, calibration</strong></summary>
-
-#### Tier diagnostics
-
-| Command             | Description                                     |
-| ------------------- | ----------------------------------------------- |
-| `poe diag:base`     | Diagnostic for base tier (1850-2150)            |
-| `poe diag:medium`   | Diagnostic for medium tier (1550-2650)          |
-| `poe diag:extended` | Diagnostic for extended tier (-13200 to +17191) |
-
-#### Data generation
-
-Generate `planet_centers_*.bsp` files (requires `spiceypy >= 6.0.0`):
-
-| Command                                | Description                            | Download |
-| -------------------------------------- | -------------------------------------- | -------- |
-| `poe generate-planet-centers:base`     | Base tier (1850-2150)                  | ~500 MB  |
-| `poe generate-planet-centers:medium`   | Medium tier (1550-2650)                | ~4 GB    |
-| `poe generate-planet-centers:extended` | Extended tier (partial)                | ~6.5 GB  |
-| `poe generate-lunar-corrections`       | Lunar correction tables (needs de441)  | —        |
-
-#### Calibration
-
-| Command                       | Description                                         |
-| ----------------------------- | --------------------------------------------------- |
-| `poe calibrate-perigee`       | Full calibration, 1500-2500 CE (~30 min, needs de441) |
-| `poe calibrate-perigee:quick` | Quick validation, 100-year range (~2 min)           |
-
-See [interpolated perigee](https://kerykeion.net/libephemeris/docs/methodology/interpolated-perigee) for details.
-
-</details>
+| Command | Description |
+|---------|-------------|
+| `poe test:unit:fast` | Unit tests, parallel (~1 min) |
+| `poe test:leb2:precision:all` | LEB2 compression precision (all tiers) |
+| `poe test:horizons:quick` | Horizons API precision (~15s) |
+| `poe test:compare` | Cross-validate vs reference |
+| `poe lint` | Ruff linter |
+| `poe format` | Ruff formatter |
 
 ---
 
 ## License
 
-AGPL-3.0. See `LICENSE`.
+AGPL-3.0. See [LICENSE](LICENSE).
