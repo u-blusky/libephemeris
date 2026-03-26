@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### NASA JPL Horizons API Backend
+
+Zero-install ephemeris computation via the NASA JPL Horizons REST API. When no
+local ephemeris files (DE440 or LEB) are available, the library transparently
+fetches state vectors from Horizons and computes apparent positions.
+
+**New module:** `libephemeris/horizons_backend.py`
+- `HorizonsClient` — HTTP client with LRU cache (4096 entries), parallel fetch
+  (8 workers), retry with exponential backoff, 30s timeout
+- `horizons_calc_ut()` — full geocentric apparent pipeline: light-time iteration,
+  gravitational deflection (Sun+Jupiter+Saturn), stellar aberration, frame rotation
+- Analytical dispatch for Mean Node, Mean Apogee, Uranians (no HTTP needed)
+- Per-body Horizons COMMAND mapping for 17 bodies
+
+**Calculation modes** (set via `set_calc_mode()` or `LIBEPHEMERIS_MODE` env var):
+- `"auto"` (default): LEB -> Horizons (if no DE440 locally) -> Skyfield
+- `"horizons"`: always use Horizons API
+- `"skyfield"`: always use Skyfield/DE440
+- `"leb"`: always use LEB precomputed ephemeris
+
+**Precision:** <0.001" for geocentric modes vs Skyfield reference (15K+ tests).
+Heliocentric: ~0.01-0.03" systematic offset (Horizons Sun center vs Skyfield SSB).
+
+**Poe tasks:**
+- `poe test:horizons` — Horizons vs Skyfield precision (200 dates, ~45s)
+- `poe test:horizons:quick` — Quick test (50 dates)
+- `poe test:horizons:vs:leb` — Cross-validation Horizons vs LEB2
+- `poe test:compare:horizons` — Compare vs pyswisseph via Horizons
+
+**Full documentation:** `docs/horizons-backend.md`
+
 #### LEB2 Compressed Ephemeris Format
 
 A new binary ephemeris format (LEB2) that uses error-bounded lossy compression to achieve

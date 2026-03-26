@@ -123,6 +123,39 @@ poe test:leb2:precision:all        # All tiers (~45s)
 - `proposals/leb2-implementation-plan.md` — Implementation plan with benchmarks
 - `release-notes/v1.0.0a2.md` — Detailed release notes with measured results
 
+## Horizons API Backend
+
+Zero-install ephemeris via NASA JPL Horizons REST API. Used automatically in `"auto"` mode when no local DE440/LEB files are available, or explicitly via `set_calc_mode("horizons")`.
+
+### Calculation Modes
+
+| Mode | Flow | Fails when |
+|------|------|-----------|
+| `"auto"` (default) | LEB -> Horizons (if no DE440) -> Skyfield | never (always has fallback) |
+| `"leb"` | LEB only | no .leb file configured |
+| `"horizons"` | Horizons only | no internet / body not supported |
+| `"skyfield"` | Skyfield/DE440 only | DE440 not downloaded |
+
+Set via `set_calc_mode()` or env var `LIBEPHEMERIS_MODE`.
+
+### Architecture
+
+| Module | Purpose |
+|--------|---------|
+| `libephemeris/horizons_backend.py` | `HorizonsClient` (LRU cache, parallel fetch, retry) + `horizons_calc_ut()` pipeline |
+| `libephemeris/state.py` | `get_horizons_client()` — singleton with auto-detection |
+| `libephemeris/planets.py` | Horizons dispatch between LEB and Skyfield paths |
+
+### Supported Bodies
+- Planets (Sun-Pluto, Earth): via Horizons VECTORS API
+- Asteroids (Chiron, Ceres, Pallas, Juno, Vesta): via Horizons small-body syntax
+- Mean Node, Mean Apogee: analytical (no HTTP)
+- Uranians: analytical heliocentric (no HTTP)
+- NOT supported: fixed stars, planetary moons, SEFLG_TOPOCTR -> fallback to Skyfield
+
+### Full documentation
+- `proposals/horizons-live-backend.md` — Original proposal with detailed design
+
 ## Lunar Calibration Workflow
 
 1. `poe calibrate-perigee` (or `poe calibrate-perigee:quick`)

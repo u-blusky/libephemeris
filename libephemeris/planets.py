@@ -847,6 +847,26 @@ def swe_calc_ut(
             )
     # --- END LEB fast path ---
 
+    # --- Horizons path: use NASA JPL Horizons API when no local ephemeris ---
+    from .state import get_horizons_client
+
+    h_client = get_horizons_client()
+    if h_client is not None:
+        try:
+            from . import horizons_backend
+
+            result = horizons_backend.horizons_calc_ut(
+                h_client, tjdut, planet, flags
+            )
+            get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdut)
+            return result
+        except KeyError as _hz_err:
+            get_logger().debug(
+                "body=%d jd=%.1f source=Horizons->fallback reason=%s",
+                planet, tjdut, _hz_err,
+            )
+    # --- END Horizons path ---
+
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(planet):
         validate_jd_range(tjdut, planet, "swe_calc_ut")
@@ -936,6 +956,29 @@ def swe_calc(
                 _leb_err,
             )
     # --- END LEB fast path ---
+
+    # --- Horizons path ---
+    from .state import get_horizons_client
+
+    h_client = get_horizons_client()
+    if h_client is not None:
+        try:
+            from . import horizons_backend
+            from .delta_t import swe_deltat
+
+            # swe_calc uses TT, convert to UT for horizons_calc_ut
+            jd_ut_approx = tjdet - swe_deltat(tjdet)
+            result = horizons_backend.horizons_calc_ut(
+                h_client, jd_ut_approx, planet, flags
+            )
+            get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdet)
+            return result
+        except KeyError as _hz_err:
+            get_logger().debug(
+                "body=%d jd=%.1f source=Horizons->fallback reason=%s",
+                planet, tjdet, _hz_err,
+            )
+    # --- END Horizons path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(planet):

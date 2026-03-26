@@ -27,6 +27,9 @@ if _COMPARE_MODE == "leb":
     # LEB mode: let auto-discovery find the LEB file, or use an explicit path.
     # Do NOT force skyfield — we want LEB to intercept swe_calc_ut calls.
     os.environ.pop("LIBEPHEMERIS_MODE", None)
+elif _COMPARE_MODE == "horizons":
+    # Horizons mode: use NASA JPL Horizons API (requires internet).
+    os.environ["LIBEPHEMERIS_MODE"] = "horizons"
 else:
     # Skyfield mode (default): force skyfield to prevent LEB interception.
     os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -41,6 +44,8 @@ if _COMPARE_MODE == "leb":
     if _leb_path:
         ephem.set_leb_file(_leb_path)
     ephem.set_calc_mode("auto")
+elif _COMPARE_MODE == "horizons":
+    ephem.set_calc_mode("horizons")
 
 # Set ephemeris data path for star-based ayanamsha calculations.
 # Without this, pyswisseph falls back to Moshier analytical ephemeris which

@@ -223,6 +223,9 @@ test = {cmd = "pytest -m \"not slow\"", help = "All tests excluding @slow — se
 "test:compare:leb" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", env = {LIBEPHEMERIS_COMPARE_MODE = "leb", LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}, help = "Compare LEB binary ephemeris vs pyswisseph — validates LEB accuracy (no @slow)"}
 "test:compare:leb:full" = {cmd = "pytest compare_scripts/tests/ -v", env = {LIBEPHEMERIS_COMPARE_MODE = "leb", LIBEPHEMERIS_LEB = "data/leb/ephemeris_medium.leb"}, help = "Compare LEB binary ephemeris vs pyswisseph — all tests including @slow"}
 
+# Comparison tests: Horizons mode — validates that Horizons API matches pyswisseph (requires internet)
+"test:compare:horizons" = {cmd = "pytest compare_scripts/tests/ -v -m \"not slow\"", env = {LIBEPHEMERIS_COMPARE_MODE = "horizons"}, help = "Compare Horizons API vs pyswisseph — validates Horizons accuracy (no @slow, needs internet)"}
+
 # Tier diagnostics — print coordinates, velocities, and data source for all supported bodies
 "diag:base" = {cmd = "python scripts/tier_diagnostic_base.py", help = "Print all body positions for base tier (de440s, 1850-2150) to verify data integrity"}
 "diag:medium" = {cmd = "python scripts/tier_diagnostic_medium.py", help = "Print all body positions for medium tier (de440, 1550-2650) to verify data integrity"}
@@ -482,11 +485,38 @@ cmd = "python scripts/generate_leb2.py verify data/leb2/base_core.leb --referenc
 help = "Verify base tier LEB2 core against LEB1 reference (<0.003\" precision)"
 
 # LEB2 tests
-"test:leb2" = {cmd = "pytest tests/test_leb/test_leb_compression.py tests/test_leb/test_leb2_reader.py -v", help = "LEB2 compression and reader tests (27 tests)"}
-"test:leb2:precision:base" = {cmd = "python scripts/test_leb2_precision.py base", help = "LEB2 vs LEB1 precision: base tier, 31 bodies x 6 flags x 200 dates (~15s)"}
-"test:leb2:precision:medium" = {cmd = "python scripts/test_leb2_precision.py medium", help = "LEB2 vs LEB1 precision: medium tier (~15s)"}
-"test:leb2:precision:extended" = {cmd = "python scripts/test_leb2_precision.py extended", help = "LEB2 vs LEB1 precision: extended tier (~15s)"}
-"test:leb2:precision:all" = {cmd = "python scripts/test_leb2_precision.py all", help = "LEB2 vs LEB1 precision: all tiers (~45s)"}
+[tool.poe.tasks."test:leb2"]
+cmd = "pytest tests/test_leb/test_leb_compression.py tests/test_leb/test_leb2_reader.py -v"
+help = "LEB2 compression and reader tests (27 tests)"
+
+[tool.poe.tasks."test:leb2:precision:base"]
+cmd = "python scripts/test_leb2_precision.py base"
+help = "LEB2 vs LEB1 precision: base tier, 31 bodies x 6 flags x 200 dates (~15s)"
+
+[tool.poe.tasks."test:leb2:precision:medium"]
+cmd = "python scripts/test_leb2_precision.py medium"
+help = "LEB2 vs LEB1 precision: medium tier (~15s)"
+
+[tool.poe.tasks."test:leb2:precision:extended"]
+cmd = "python scripts/test_leb2_precision.py extended"
+help = "LEB2 vs LEB1 precision: extended tier (~15s)"
+
+[tool.poe.tasks."test:leb2:precision:all"]
+cmd = "python scripts/test_leb2_precision.py all"
+help = "LEB2 vs LEB1 precision: all tiers (~45s)"
+
+# Horizons API tests (require internet)
+[tool.poe.tasks."test:horizons"]
+cmd = "python scripts/test_horizons_precision.py"
+help = "Horizons vs Skyfield precision test (13 bodies, 200 dates, 6 flags, ~45s, needs internet)"
+
+[tool.poe.tasks."test:horizons:quick"]
+cmd = "python scripts/test_horizons_precision.py --dates 50"
+help = "Quick Horizons precision test (~15s, needs internet)"
+
+[tool.poe.tasks."test:horizons:vs:leb"]
+cmd = "python scripts/test_horizons_vs_leb.py"
+help = "Horizons vs LEB2 cross-validation (15 bodies, 100 dates, needs internet)"
 
 # LEB release — upload generated .leb files to GitHub Releases (data-v1)
 # Requires: gh CLI authenticated (gh auth login)

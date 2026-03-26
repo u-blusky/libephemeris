@@ -186,13 +186,26 @@ class TestLEB2Reader:
         reader2.close()
 
 
+requires_leb2_companions = pytest.mark.skipif(
+    not os.path.isfile(os.path.join(LEB2_DIR, "base_asteroids.leb")),
+    reason="LEB2 companion files not available (only core is tracked in git)"
+)
+
+
 @requires_leb2
 class TestCompositeLEBReader:
     def test_from_directory(self):
         from libephemeris.leb_composite import CompositeLEBReader
 
         reader = CompositeLEBReader.from_directory(LEB2_DIR)
-        assert reader.has_body(0)   # Sun (core)
+        assert reader.has_body(0)   # Sun (core always present)
+        reader.close()
+
+    @requires_leb2_companions
+    def test_from_directory_all_groups(self):
+        from libephemeris.leb_composite import CompositeLEBReader
+
+        reader = CompositeLEBReader.from_directory(LEB2_DIR)
         assert reader.has_body(15)  # Chiron (asteroids)
         assert reader.has_body(13)  # OscuApog (apogee)
         assert reader.has_body(40)  # Cupido (uranians)
@@ -204,9 +217,18 @@ class TestCompositeLEBReader:
         path = os.path.join(LEB2_DIR, "base_core.leb")
         reader = CompositeLEBReader.from_file_with_companions(path)
         assert reader.has_body(0)   # from primary
+        reader.close()
+
+    @requires_leb2_companions
+    def test_from_file_with_companions_all(self):
+        from libephemeris.leb_composite import CompositeLEBReader
+
+        path = os.path.join(LEB2_DIR, "base_core.leb")
+        reader = CompositeLEBReader.from_file_with_companions(path)
         assert reader.has_body(15)  # from companion
         reader.close()
 
+    @requires_leb2_companions
     def test_eval_body_cross_files(self):
         from libephemeris.leb_composite import CompositeLEBReader
 

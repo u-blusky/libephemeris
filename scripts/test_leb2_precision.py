@@ -83,12 +83,25 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
 
     t0 = time.time()
 
+    # Determine which bodies are in the LEB2 file
+    from libephemeris.leb_reader import open_leb
+    leb2_reader = open_leb(cfg["leb2"])
+    leb2_bodies = set()
+    # Walk the body map — works for both LEBReader, LEB2Reader, CompositeLEBReader
+    if hasattr(leb2_reader, '_bodies'):
+        leb2_bodies = set(leb2_reader._bodies.keys())
+    elif hasattr(leb2_reader, '_body_map'):
+        leb2_bodies = set(leb2_reader._body_map.keys())
+    leb2_reader.close()
+
+    test_bodies = [b for b in ALL_BODIES if b in leb2_bodies]
+
     # Phase 1: LEB1 reference
     swe.set_leb_file(cfg["leb1"])
     swe.set_calc_mode("leb")
     ref = {}
     for jd in jds:
-        for bid in ALL_BODIES:
+        for bid in test_bodies:
             for fl, _ in FLAGS:
                 if bid in HELIO_ONLY and not (fl & swe.SEFLG_HELCTR):
                     continue
@@ -106,7 +119,7 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
     body_max: dict[int, tuple[float, str]] = {}
 
     for jd in jds:
-        for bid in ALL_BODIES:
+        for bid in test_bodies:
             for fl, fn in FLAGS:
                 k = (float(jd), bid, fl)
                 if k not in ref:

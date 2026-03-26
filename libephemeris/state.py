@@ -165,10 +165,14 @@ _IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
 _LEB_FILE: Optional[str] = None  # Path to .leb file
 _LEB_READER: Optional["LEBReader"] = None  # Cached LEBReader instance
 
-# Calculation mode: "auto" (default), "skyfield", or "leb"
+# Horizons API client
+_HORIZONS_CLIENT: Optional[object] = None
+_HORIZONS_WARNED: bool = False
+
+# Calculation mode: "auto" (default), "skyfield", "leb", or "horizons"
 _CALC_MODE: Optional[str] = None  # None = check env var
 _CALC_MODE_ENV_VAR = "LIBEPHEMERIS_MODE"
-_VALID_CALC_MODES = ("auto", "skyfield", "leb")
+_VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons")
 
 if TYPE_CHECKING:
     from .leb_reader import LEBReader
@@ -179,17 +183,18 @@ def set_calc_mode(mode: Optional[str]) -> None:
 
     Controls how swe_calc_ut() and swe_calc() resolve positions:
 
-    - ``"auto"`` (default): Use LEB if a .leb file is configured,
-      otherwise fall back to Skyfield. This is the standard behavior.
-    - ``"skyfield"``: Always use Skyfield, even if a .leb file is
-      configured. Useful for benchmarking or validation.
+    - ``"auto"`` (default): Try LEB first, then Horizons API (if no
+      local DE440), then Skyfield. This is the standard behavior.
+    - ``"skyfield"``: Always use Skyfield/DE440. Fails if DE440 is not
+      available locally.
     - ``"leb"``: Require LEB. Raises RuntimeError if no .leb file is
-      configured or if the file cannot be opened. Bodies not in the
-      .leb file still fall through to Skyfield.
+      configured. Bodies not in the .leb file fall through to Skyfield.
+    - ``"horizons"``: Always use NASA JPL Horizons API (requires internet).
+      Bodies not supported by Horizons fall through to Skyfield.
 
     Args:
-        mode: One of ``"auto"``, ``"skyfield"``, ``"leb"``, or None
-              to reset to environment variable / default.
+        mode: One of ``"auto"``, ``"skyfield"``, ``"leb"``, ``"horizons"``,
+              or None to reset to environment variable / default.
 
     Raises:
         ValueError: If mode is not a valid mode string.
@@ -366,6 +371,63 @@ def get_leb_reader() -> Optional["LEBReader"]:
                 "Use set_leb_file() or set LIBEPHEMERIS_LEB env var."
             )
     return _LEB_READER
+
+
+def get_horizons_client():
+    """Get the Horizons API client, if the current mode allows it.
+
+    Returns a HorizonsClient when:
+    - mode="horizons" — always
+    - mode="auto" — only when no DE440 is available locally
+
+    Returns None when:
+    - mode="skyfield" or mode="leb"
+    """
+    global _HORIZONS_CLIENT, _HORIZONS_WARNED
+    mode = get_calc_mode()
+
+    if mode in ("skyfield", "leb"):
+        return None
+
+    if mode == "horizons":
+        return _get_or_create_horizons_client()
+
+    # mode == "auto": use Horizons only when no local ephemeris
+    if mode == "auto":
+        # Check if DE440/441 is locally available
+        data_dir = _get_data_dir()
+        eph_file = _get_effective_ephemeris_file()
+        local_paths = [
+            os.path.join(data_dir, eph_file),
+        ]
+        if _EPHEMERIS_PATH:
+            local_paths.append(os.path.join(_EPHEMERIS_PATH, eph_file))
+
+        for p in local_paths:
+            if os.path.isfile(p):
+                return None  # local ephemeris exists, skip Horizons
+
+        return _get_or_create_horizons_client()
+
+    return None
+
+
+def _get_or_create_horizons_client():
+    """Create or return the singleton HorizonsClient."""
+    global _HORIZONS_CLIENT, _HORIZONS_WARNED
+    if _HORIZONS_CLIENT is None:
+        from .horizons_backend import HorizonsClient
+
+        _HORIZONS_CLIENT = HorizonsClient()
+        if not _HORIZONS_WARNED:
+            logger = get_logger()
+            logger.info(
+                "No local ephemeris file found. Using NASA JPL Horizons API "
+                "(requires internet, slower). For offline/faster calculations:\n"
+                "  python -m libephemeris download"
+            )
+            _HORIZONS_WARNED = True
+    return _HORIZONS_CLIENT
 
 
 def get_loader() -> Loader:
@@ -1280,6 +1342,16 @@ def close() -> None:
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
     global _PRECISION_TIER
     global _LEB_FILE, _LEB_READER, _CALC_MODE
+    global _HORIZONS_CLIENT, _HORIZONS_WARNED
+
+    # Close the Horizons client if loaded
+    if _HORIZONS_CLIENT is not None:
+        try:
+            _HORIZONS_CLIENT.shutdown()
+        except Exception:
+            pass
+    _HORIZONS_CLIENT = None
+    _HORIZONS_WARNED = False
 
     # Close the LEB reader if loaded
     if _LEB_READER is not None:
