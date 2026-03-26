@@ -1625,6 +1625,10 @@ def _calc_body(
 
     planets = get_planets()
 
+    # Sun heliocentric = Sun from Sun = trivially (0,0,0)
+    if ipl == SE_SUN and (iflag & SEFLG_HELCTR):
+        return _to_native_floats((0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
+
     # Remap SE_AST_OFFSET + N to dedicated body IDs for special asteroids.
     # pyswisseph treats calc_ut(jd, 10001, flags) identically to calc_ut(jd, 17, flags)
     # (both compute Ceres). We mirror this behavior.
