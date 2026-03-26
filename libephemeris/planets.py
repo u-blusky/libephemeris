@@ -1190,9 +1190,11 @@ def _calc_body_pctr(
             p2 = math.degrees(math.asin(ze / dist_val))
             p3 = dist_val
         else:
-            ra, dec, dist = pos.radec(epoch="date")
+            from skyfield.framelib import true_equator_and_equinox_of_date
+
+            dec, ra, dist = pos.frame_latlon(true_equator_and_equinox_of_date)
         if not is_icrs or (iflag & SEFLG_J2000):
-            p1 = ra.hours * 15.0  # Convert hours to degrees
+            p1 = ra.degrees
             p2 = dec.degrees
             p3 = dist.au
     else:
@@ -2457,15 +2459,19 @@ def _calc_body(
                 dec_, ra_, dist_ = pos.frame_latlon(mean_equator_and_equinox_of_date)
                 p1, p2, p3 = ra_.degrees, dec_.degrees, dist_.au
             else:
-                ra_, dec_, dist_ = pos.radec(epoch="date")
-                p1, p2, p3 = ra_.hours * 15.0, dec_.degrees, dist_.au
+                from skyfield.framelib import true_equator_and_equinox_of_date
+
+                dec_, ra_, dist_ = pos.frame_latlon(true_equator_and_equinox_of_date)
+                p1, p2, p3 = ra_.degrees, dec_.degrees, dist_.au
 
             if iflag & SEFLG_SPEED:
                 # Central difference numerical differentiation for speeds
                 # 1 second timestep provides good balance
                 dt = 1.0 / 86400.0  # 1 second in days
 
-                # Helper to get coord at time t_ (for speed neighbors only)
+                # Helper to get coord at time t_ (for speed neighbors only).
+                # Uses fresh observer.at() without cache to avoid Skyfield
+                # Time reify descriptor state corruption between calls.
                 def get_coord(t_):
                     from skyfield.positionlib import ICRF
 
@@ -2482,7 +2488,7 @@ def _calc_body(
                             center=icrf_center,
                         )
                     else:
-                        obs_at_t_ = get_cached_observer_at(observer, t_)
+                        obs_at_t_ = observer.at(t_)
                         if iflag & SEFLG_NOABERR:
                             pos_ = obs_at_t_.observe(target)
                         elif iflag & SEFLG_NOGDEFL:
@@ -2500,13 +2506,20 @@ def _calc_body(
                         )
                         return ra_.degrees, dec_.degrees, dist_.au
                     else:
-                        ra_, dec_, dist_ = pos_.radec(epoch="date")
-                    return ra_.hours * 15.0, dec_.degrees, dist_.au
+                        from skyfield.framelib import true_equator_and_equinox_of_date
+
+                        dec_, ra_, dist_ = pos_.frame_latlon(
+                            true_equator_and_equinox_of_date
+                        )
+                    return ra_.degrees, dec_.degrees, dist_.au
 
                 ts = get_timescale()
-                # Central difference: get t-dt and t+dt
-                p1_prev, p2_prev, p3_prev = get_coord(ts.tt_jd(t.tt - dt))
-                p1_next, p2_next, p3_next = get_coord(ts.tt_jd(t.tt + dt))
+                # Central difference: create fresh Time objects to avoid
+                # Skyfield reify descriptor state leakage between calls
+                t_prev = ts.tt_jd(float(t.tt - dt))
+                t_next = ts.tt_jd(float(t.tt + dt))
+                p1_prev, p2_prev, p3_prev = get_coord(t_prev)
+                p1_next, p2_next, p3_next = get_coord(t_next)
                 dp1 = (p1_next - p1_prev) / (2.0 * dt)
                 dp2 = (p2_next - p2_prev) / (2.0 * dt)
                 dp3 = (p3_next - p3_prev) / (2.0 * dt)
@@ -2588,7 +2601,21 @@ def _calc_body(
                 p2 = math.degrees(math.asin(ze / dist))
                 p3 = dist
             else:
-                lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
+                try:
+                    lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
+                except TypeError:
+                    # Skyfield Time reify corruption: recompute with fresh Time
+                    from .cache import clear_observer_cache
+                    clear_observer_cache()
+                    t_fresh = get_timescale().tt_jd(float(t.tt))
+                    obs_fresh = observer.at(t_fresh)
+                    if iflag & SEFLG_NOABERR:
+                        pos = obs_fresh.observe(target)
+                    elif iflag & SEFLG_NOGDEFL:
+                        pos = obs_fresh.observe(target).apparent(deflectors=())
+                    else:
+                        pos = obs_fresh.observe(target).apparent()
+                    lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
                 p1 = lon_.degrees
                 p2 = lat_.degrees
                 p3 = dist_.au
@@ -2618,8 +2645,18 @@ def _calc_body(
         # are in the same frame (tropical) before calculating velocity.
         # We'll apply sidereal conversion to the velocity afterwards.
         flags_no_speed_no_sidereal = (iflag & ~SEFLG_SPEED) & ~SEFLG_SIDEREAL
-        result_prev, _ = _calc_body(t_prev, ipl, flags_no_speed_no_sidereal)
-        result_next, _ = _calc_body(t_next, ipl, flags_no_speed_no_sidereal)
+        try:
+            result_prev, _ = _calc_body(t_prev, ipl, flags_no_speed_no_sidereal)
+            result_next, _ = _calc_body(t_next, ipl, flags_no_speed_no_sidereal)
+        except TypeError:
+            # Skyfield Time reify descriptor corruption: clear cache and retry
+            # with fresh Time objects (see Skyfield #xxx)
+            from .cache import clear_observer_cache
+            clear_observer_cache()
+            t_prev = ts_inner.tt_jd(float(t.tt - dt))
+            t_next = ts_inner.tt_jd(float(t.tt + dt))
+            result_prev, _ = _calc_body(t_prev, ipl, flags_no_speed_no_sidereal)
+            result_next, _ = _calc_body(t_next, ipl, flags_no_speed_no_sidereal)
         p1_prev, p2_prev, p3_prev = result_prev[0], result_prev[1], result_prev[2]
         p1_next, p2_next, p3_next = result_next[0], result_next[1], result_next[2]
 

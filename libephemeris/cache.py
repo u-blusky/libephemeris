@@ -202,6 +202,15 @@ def get_cached_observer_at(observer, t):
     return result
 
 
+def clear_observer_cache():
+    """Clear the observer-at-time cache.
+
+    Called when a Skyfield Time reify descriptor corruption is detected,
+    forcing fresh position computations on the next call.
+    """
+    _observer_at_cache.clear()
+
+
 def clear_caches() -> None:
     """
     Clear all computation caches.
