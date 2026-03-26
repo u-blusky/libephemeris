@@ -752,7 +752,7 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         # Now try to calculate using the newly registered SPK
         return spk.calc_spk_body_position(t, ipl, iflag)
 
-    except (OSError, ValueError, KeyError) as e:
+    except (OSError, ValueError, KeyError, RuntimeError) as e:
         logger.warning("Auto SPK download failed for body %d: %s", ipl, e)
         return None
 
@@ -2073,7 +2073,7 @@ def _calc_body(
                 try:
                     # _try_auto_spk_download registers the SPK as a side effect
                     _try_auto_spk_download(t, ipl, iflag)
-                except (OSError, ValueError, KeyError):
+                except (OSError, ValueError, KeyError, RuntimeError):
                     pass
                 # Re-check after download
                 _spk_type21_target = spk.get_spk_type21_target(ipl)
@@ -2134,7 +2134,7 @@ def _calc_body(
                             iflag,
                         )
                     ), iflag
-            except (ImportError, RuntimeError, ValueError):
+            except (ImportError, RuntimeError, ValueError, FileNotFoundError):
                 pass
 
             # Keplerian as last resort — reduced precision, warn the user

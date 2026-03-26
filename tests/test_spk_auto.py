@@ -952,7 +952,7 @@ class TestIsSpkCachedWithMockedCoverage:
 
         # Mock get_spk_coverage to raise exception
         with patch("libephemeris.spk.get_spk_coverage") as mock_coverage:
-            mock_coverage.side_effect = Exception("Failed to parse SPK")
+            mock_coverage.side_effect = ValueError("Failed to parse SPK")
 
             # Should not raise, just return False
             result = spk_auto.is_spk_cached("2060", 2458849.5, 2462502.5, str(tmp_path))
@@ -1523,7 +1523,7 @@ class TestListCachedSpk:
         spk_file = tmp_path / "2060_2458849_2462502.bsp"
         spk_file.write_bytes(b"dummy")
 
-        with patch("libephemeris.spk.get_spk_coverage", side_effect=Exception("err")):
+        with patch("libephemeris.spk.get_spk_coverage", side_effect=ValueError("err")):
             result = spk_auto.list_cached_spk(cache_dir=str(tmp_path))
 
         assert len(result) == 1

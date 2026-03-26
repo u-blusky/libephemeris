@@ -116,9 +116,9 @@ _CONTEXT_SWAP_LOCK = threading.RLock()
 _INIT_LOCK = threading.RLock()
 
 # Lock to protect mutable global state (setter/getter pairs).
-# Prevents race conditions when one thread calls set_topo() while another reads it.
-# Uses RLock to allow re-entrancy (e.g., set_ephe_path -> get_precision_tier).
-_STATE_LOCK = threading.RLock()
+# This is the SAME lock as _CONTEXT_SWAP_LOCK to prevent deadlocks between
+# context-based calculations (which swap global state) and direct setters.
+_STATE_LOCK = _CONTEXT_SWAP_LOCK
 
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
