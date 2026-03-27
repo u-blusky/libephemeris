@@ -78,6 +78,12 @@ from .constants import (
     SE_INTP_APOG,
     SE_INTP_PERG,
     SE_CUPIDO,
+    SE_HADES,
+    SE_ZEUS,
+    SE_KRONOS,
+    SE_APOLLON,
+    SE_ADMETOS,
+    SE_VULKANUS,
     SE_POSEIDON,
     SE_ISIS,
     SE_CHIRON,
@@ -165,6 +171,14 @@ _PLANET_NAMES = {
     SE_INTP_PERG: "intp. Perigee",
     SE_EARTH: "Earth",
     SE_ISIS: "Transpluto",
+    SE_CUPIDO: "Cupido",
+    SE_HADES: "Hades",
+    SE_ZEUS: "Zeus",
+    SE_KRONOS: "Kronos",
+    SE_APOLLON: "Apollon",
+    SE_ADMETOS: "Admetos",
+    SE_VULKANUS: "Vulkanus",
+    SE_POSEIDON: "Poseidon",
     SE_CHIRON: "Chiron",
     SE_PHOLUS: "Pholus",
     SE_CERES: "Ceres",
@@ -855,15 +869,15 @@ def swe_calc_ut(
         try:
             from . import horizons_backend
 
-            result = horizons_backend.horizons_calc_ut(
-                h_client, tjdut, planet, flags
-            )
+            result = horizons_backend.horizons_calc_ut(h_client, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdut)
             return result
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
-                planet, tjdut, _hz_err,
+                planet,
+                tjdut,
+                _hz_err,
             )
     # --- END Horizons path ---
 
@@ -976,7 +990,9 @@ def swe_calc(
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
-                planet, tjdet, _hz_err,
+                planet,
+                tjdet,
+                _hz_err,
             )
     # --- END Horizons path ---
 
@@ -2261,6 +2277,12 @@ def _calc_body(
 
     is_barycentric = bool(iflag & SEFLG_BARYCTR)
 
+    # Earth geocentric is trivially (0,0,0,0,0,0) regardless of frame flags.
+    # Return early to avoid division-by-zero in J2000/ICRS coordinate transforms
+    # where dist=0 would cause NaN from asin(ze/dist).
+    if ipl == SE_EARTH and not (iflag & SEFLG_HELCTR) and not is_barycentric:
+        return _to_native_floats((0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
+
     if iflag & SEFLG_HELCTR:
         # Heliocentric
         observer = planets["sun"]
@@ -2405,9 +2427,7 @@ def _calc_body(
                         if iflag & SEFLG_NOABERR:
                             pos_ = obs_at_t_.observe(target)
                         elif iflag & SEFLG_NOGDEFL:
-                            pos_ = (
-                                obs_at_t_.observe(target).apparent(deflectors=())
-                            )
+                            pos_ = obs_at_t_.observe(target).apparent(deflectors=())
                         else:
                             pos_ = obs_at_t_.observe(target).apparent()
                     ra_, dec_, dist_ = pos_.radec()
@@ -2443,7 +2463,7 @@ def _calc_body(
                 xyz_icrs = np.array(pos.position.au)
                 if _use_mean_equator:
                     # Mean equator: P only (no B, no N)
-                    xyz_eq = t.P @ xyz_icrs
+                    xyz_eq = t.precession_matrix() @ xyz_icrs
                 else:
                     # True equator: N × P (no B)
                     M_no_bias = t.M @ ICRS_to_J2000.T
@@ -2454,10 +2474,22 @@ def _calc_body(
                 p2 = math.degrees(math.asin(ze / dist))
                 p3 = dist
             elif _use_mean_equator:
-                from skyfield.framelib import mean_equator_and_equinox_of_date
+                # Compute mean equatorial coords directly to avoid Skyfield's
+                # mean_equator_and_equinox_of_date frame which accesses t.P
+                # (the reify descriptor corrupts t.precession_matrix).
+                import numpy as np
 
-                dec_, ra_, dist_ = pos.frame_latlon(mean_equator_and_equinox_of_date)
-                p1, p2, p3 = ra_.degrees, dec_.degrees, dist_.au
+                P = t.precession_matrix()
+                from skyfield.framelib import ICRS_to_J2000
+
+                R = P @ ICRS_to_J2000
+                xyz_icrs = np.array(pos.position.au)
+                xyz_eq = R @ xyz_icrs
+                xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
+                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+                p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                p3 = dist
             else:
                 from skyfield.framelib import true_equator_and_equinox_of_date
 
@@ -2492,9 +2524,7 @@ def _calc_body(
                         if iflag & SEFLG_NOABERR:
                             pos_ = obs_at_t_.observe(target)
                         elif iflag & SEFLG_NOGDEFL:
-                            pos_ = (
-                                obs_at_t_.observe(target).apparent(deflectors=())
-                            )
+                            pos_ = obs_at_t_.observe(target).apparent(deflectors=())
                         else:
                             pos_ = obs_at_t_.observe(target).apparent()
 
@@ -2567,10 +2597,10 @@ def _calc_body(
 
                 mean_obliquity = t._mean_obliquity_radians
                 if is_icrs:
-                    mean_ecl_matrix = mxm(rot_x(-mean_obliquity), t.P)
+                    mean_ecl_matrix = mxm(rot_x(-mean_obliquity), t.precession_matrix())
                 else:
                     mean_ecl_matrix = mxm(
-                        rot_x(-mean_obliquity), mxm(t.P, ICRS_to_J2000)
+                        rot_x(-mean_obliquity), mxm(t.precession_matrix(), ICRS_to_J2000)
                     )
                 # Transform ICRS position to mean ecliptic
                 import numpy as np
@@ -2606,6 +2636,7 @@ def _calc_body(
                 except TypeError:
                     # Skyfield Time reify corruption: recompute with fresh Time
                     from .cache import clear_observer_cache
+
                     clear_observer_cache()
                     t_fresh = get_timescale().tt_jd(float(t.tt))
                     obs_fresh = observer.at(t_fresh)
@@ -2652,6 +2683,7 @@ def _calc_body(
             # Skyfield Time reify descriptor corruption: clear cache and retry
             # with fresh Time objects (see Skyfield #xxx)
             from .cache import clear_observer_cache
+
             clear_observer_cache()
             t_prev = ts_inner.tt_jd(float(t.tt - dt))
             t_next = ts_inner.tt_jd(float(t.tt + dt))
@@ -3824,7 +3856,9 @@ def swe_get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
     ayanamsa = _calc_ayanamsa_ex_value(tjdet, sid_mode)
-    return (flags, float(ayanamsa))
+    # Return SEFLG_SWIEPH as retflag (matching pyswisseph behaviour),
+    # not the raw input ``flags``.
+    return (SEFLG_SWIEPH, float(ayanamsa))
 
 
 def swe_get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
@@ -3858,7 +3892,9 @@ def swe_get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
     ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode)
-    return (flags, float(ayanamsa))
+    # Return SEFLG_SWIEPH as retflag (matching pyswisseph behaviour),
+    # not the raw input ``flags``.
+    return (SEFLG_SWIEPH, float(ayanamsa))
 
 
 def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int) -> float:
@@ -5234,9 +5270,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         # Apparent position
         target_pos_geo = obs_at_t.observe(target).apparent()
         sun_pos_geo = (
-            obs_at_t.observe(sun).apparent()
-            if not (iflag & SEFLG_HELCTR)
-            else None
+            obs_at_t.observe(sun).apparent() if not (iflag & SEFLG_HELCTR) else None
         )
 
     # Get heliocentric position of target for phase calculations
