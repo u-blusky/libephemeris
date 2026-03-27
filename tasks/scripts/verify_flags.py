@@ -137,6 +137,9 @@ DATES_50 = [random.uniform(JD_1900, JD_2100) for _ in range(50)]
 DATES_20 = [random.uniform(JD_1900, JD_2100) for _ in range(20)]
 
 
+# Force Skyfield mode to avoid LEB caching artifacts in this stress test
+lib.set_calc_mode("skyfield")
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -153,8 +156,12 @@ def safe_calc_ut(jd: float, body: int, flag: int) -> Tuple[Any, ...] | None:
     try:
         result = lib.calc_ut(jd, body, flag)
         return result
-    except Exception:
+    except Exception as e:
+        global _last_exception
+        _last_exception = e
         return None
+
+_last_exception = None
 
 
 def validate_result_basic(
@@ -166,7 +173,7 @@ def validate_result_basic(
     Returns the 6-float tuple on success, None on failure.
     """
     if result is None:
-        check(False, f"{label}: unhandled exception (calc_ut returned None)")
+        check(False, f"{label}: unhandled exception (calc_ut returned None: {_last_exception})")
         return None
 
     check(True, f"{label}: no exception")
@@ -262,7 +269,7 @@ def run_section_2_2() -> None:
                     f"pair={pair_name} body={BODY_NAMES.get(body, body)} "
                     f"jd={jd:.1f}"
                 )
-                result = safe_calc_ut(jd, body, pair_val)
+                result = safe_calc_ut(jd, body, pair_val | SEFLG_SWIEPH)
                 validate_result_basic(result, label)
 
 
