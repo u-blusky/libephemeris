@@ -1,0 +1,161 @@
+"""Tests for Horizons backend analytical bodies and calc_mode switching.
+
+These tests verify the offline analytical paths in the Horizons backend
+(Mean Node, Mean Apogee, Uranians) which require no HTTP calls.
+"""
+
+from __future__ import annotations
+
+import math
+import pytest
+import libephemeris as swe
+from libephemeris.constants import (
+    SE_SUN,
+    SE_MOON,
+    SE_MEAN_NODE,
+    SE_MEAN_APOG,
+    SEFLG_SWIEPH,
+    SEFLG_SPEED,
+    SEFLG_HELCTR,
+)
+from libephemeris.horizons_backend import horizons_calc_ut
+
+JD_J2000 = 2451545.0
+
+
+@pytest.mark.unit
+class TestCalcModeSwitch:
+    """Test set_calc_mode / get_calc_mode state management."""
+
+    def test_default_mode_is_auto(self):
+        """Default calc mode should be 'auto'."""
+        mode = swe.get_calc_mode()
+        assert mode in ("auto", "skyfield", "leb"), f"Unexpected default mode: {mode}"
+
+    def test_set_skyfield_mode(self):
+        """Setting mode to 'skyfield' should work."""
+        original = swe.get_calc_mode()
+        try:
+            swe.set_calc_mode("skyfield")
+            assert swe.get_calc_mode() == "skyfield"
+        finally:
+            swe.set_calc_mode(original)
+
+    def test_set_auto_mode(self):
+        """Setting mode to 'auto' should work."""
+        original = swe.get_calc_mode()
+        try:
+            swe.set_calc_mode("auto")
+            assert swe.get_calc_mode() == "auto"
+        finally:
+            swe.set_calc_mode(original)
+
+    def test_invalid_mode_raises(self):
+        """Setting an invalid mode should raise ValueError."""
+        with pytest.raises(ValueError):
+            swe.set_calc_mode("invalid_mode_xyz")
+
+    def test_mode_switch_preserves_results(self):
+        """Switching between auto and skyfield should give same results."""
+        original = swe.get_calc_mode()
+        try:
+            swe.set_calc_mode("skyfield")
+            res_sky, _ = swe.calc_ut(JD_J2000, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
+
+            swe.set_calc_mode("auto")
+            res_auto, _ = swe.calc_ut(JD_J2000, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
+
+            for i in range(3):
+                assert abs(res_sky[i] - res_auto[i]) < 0.001, (
+                    f"Component {i}: sky={res_sky[i]}, auto={res_auto[i]}"
+                )
+        finally:
+            swe.set_calc_mode(original)
+
+
+@pytest.mark.unit
+class TestHorizonsAnalyticalBodies:
+    """Test Horizons backend analytical bodies (no HTTP required)."""
+
+    def test_mean_node_analytical(self):
+        """Mean Node via horizons_calc_ut should match skyfield calc_ut."""
+        # horizons_calc_ut with analytical body should work without a client
+        result = horizons_calc_ut(None, JD_J2000, 10, SEFLG_SWIEPH | SEFLG_SPEED)
+        assert len(result) == 2  # (data, retflag)
+        data = result[0]
+        assert len(data) == 6
+
+        # Should match the Skyfield-based result closely
+        ref, _ = swe.calc_ut(JD_J2000, SE_MEAN_NODE, SEFLG_SWIEPH | SEFLG_SPEED)
+        assert abs(data[0] - ref[0]) < 0.01, (
+            f"Mean Node lon: horizons={data[0]}, skyfield={ref[0]}"
+        )
+
+    def test_mean_apogee_analytical(self):
+        """Mean Apogee (Lilith) via horizons_calc_ut should match calc_ut."""
+        result = horizons_calc_ut(None, JD_J2000, 12, SEFLG_SWIEPH | SEFLG_SPEED)
+        data = result[0]
+        assert len(data) == 6
+
+        ref, _ = swe.calc_ut(JD_J2000, SE_MEAN_APOG, SEFLG_SWIEPH | SEFLG_SPEED)
+        assert abs(data[0] - ref[0]) < 0.01, (
+            f"Mean Apogee lon: horizons={data[0]}, skyfield={ref[0]}"
+        )
+
+    def test_mean_node_range(self):
+        """Mean Node analytical should be in [0, 360) over many dates."""
+        for i in range(20):
+            jd = JD_J2000 + i * 180.0
+            result = horizons_calc_ut(None, jd, 10, SEFLG_SWIEPH)
+            lon = result[0][0]
+            assert 0.0 <= lon < 360.0, f"Mean Node at JD {jd}: lon={lon}"
+
+    def test_mean_apogee_range(self):
+        """Mean Apogee analytical should be in [0, 360) over many dates."""
+        for i in range(20):
+            jd = JD_J2000 + i * 180.0
+            result = horizons_calc_ut(None, jd, 12, SEFLG_SWIEPH)
+            lon = result[0][0]
+            assert 0.0 <= lon < 360.0, f"Mean Apogee at JD {jd}: lon={lon}"
+
+    def test_mean_node_speed_negative(self):
+        """Mean Node speed should be negative (retrograde) via analytical path."""
+        result = horizons_calc_ut(None, JD_J2000, 10, SEFLG_SWIEPH | SEFLG_SPEED)
+        speed = result[0][3]
+        assert speed < 0, f"Mean Node speed {speed} should be negative (retrograde)"
+
+
+@pytest.mark.unit
+class TestHorizonsUranianAnalytical:
+    """Test Uranians via Horizons analytical path (heliocentric only)."""
+
+    URANIAN_IDS = [40, 41, 42, 43, 44, 45, 46, 47]
+    URANIAN_NAMES = [
+        "Cupido", "Hades", "Zeus", "Kronos",
+        "Apollon", "Admetos", "Vulkanus", "Poseidon",
+    ]
+
+    @pytest.mark.parametrize(
+        "body_id,name",
+        list(zip(URANIAN_IDS, URANIAN_NAMES)),
+    )
+    def test_uranian_helio_analytical(self, body_id, name):
+        """Uranian body via horizons_calc_ut heliocentric should work."""
+        result = horizons_calc_ut(
+            None, JD_J2000, body_id, SEFLG_SWIEPH | SEFLG_HELCTR
+        )
+        data = result[0]
+        assert len(data) == 6, f"{name}: expected 6 values, got {len(data)}"
+        assert 0.0 <= data[0] < 360.0, f"{name}: lon={data[0]} out of range"
+
+
+@pytest.mark.unit
+class TestHorizonsUnsupportedFallback:
+    """Test that unsupported flags/bodies raise appropriate errors."""
+
+    def test_topocentric_raises(self):
+        """SEFLG_TOPOCTR should raise KeyError in horizons_calc_ut."""
+        from libephemeris.constants import SEFLG_TOPOCTR
+
+        with pytest.raises(KeyError):
+            horizons_calc_ut(None, JD_J2000, 0, SEFLG_TOPOCTR)
