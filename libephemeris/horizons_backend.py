@@ -697,20 +697,9 @@ def _calc_uranian(
 
     from .hypothetical import calc_uranian_planet, calc_transpluto
     if body_id == 48:
-        lon, lat, dist = calc_transpluto(jd_tt)
+        lon, lat, dist, dlon, dlat, ddist = calc_transpluto(jd_tt)
     else:
-        lon, lat, dist = calc_uranian_planet(jd_tt, body_id)
-
-    # Speed via finite difference
-    dt = 1.0 / 1440.0  # 1 minute
-    if body_id == 48:
-        lon2, lat2, dist2 = calc_transpluto(jd_tt + dt)
-    else:
-        lon2, lat2, dist2 = calc_uranian_planet(jd_tt + dt, body_id)
-
-    dlon = ((lon2 - lon + 180) % 360 - 180) / dt
-    dlat = (lat2 - lat) / dt
-    ddist = (dist2 - dist) / dt
+        lon, lat, dist, dlon, dlat, ddist = calc_uranian_planet(body_id, jd_tt)
 
     if iflag & SEFLG_SIDEREAL:
         from .ayanamsha import get_ayanamsha_ut
