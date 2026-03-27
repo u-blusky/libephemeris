@@ -166,6 +166,30 @@ except ImportError:
     PERIGEE_CORRECTION_END_YEAR = 0
     PERIGEE_CORRECTION_STEP_YEARS = 2
 
+try:
+    from .lunar_apse_corrections import (
+        APOGEE_CT_JD_START,
+        APOGEE_CT_STEP_DAYS,
+        APOGEE_CT_COUNT,
+        APOGEE_CORRECTIONS,
+        PERIGEE_CT_JD_START,
+        PERIGEE_CT_STEP_DAYS,
+        PERIGEE_CT_COUNT,
+        PERIGEE_CORRECTIONS,
+    )
+
+    _APSE_CORRECTIONS_AVAILABLE = True
+except ImportError:
+    _APSE_CORRECTIONS_AVAILABLE = False
+    APOGEE_CT_JD_START = 0.0
+    APOGEE_CT_STEP_DAYS = 10.0
+    APOGEE_CT_COUNT = 0
+    APOGEE_CORRECTIONS = ()
+    PERIGEE_CT_JD_START = 0.0
+    PERIGEE_CT_STEP_DAYS = 2.0
+    PERIGEE_CT_COUNT = 0
+    PERIGEE_CORRECTIONS = ()
+
 
 # Validity range constants for Meeus polynomial approximations
 # The polynomials are optimized for dates near J2000.0 (year 2000)
@@ -218,6 +242,40 @@ def _interpolate_perigee_correction(jd_tt: float) -> float:
     return float(PERIGEE_PERTURBATION_CORRECTIONS[idx_low]) + frac * (
         float(PERIGEE_PERTURBATION_CORRECTIONS[idx_low + 1])
         - float(PERIGEE_PERTURBATION_CORRECTIONS[idx_low])
+    )
+
+
+def _interpolate_apse_correction(
+    jd_tt: float, jd_start: float, step_days: float, corrections: tuple, n: int
+) -> float:
+    """
+    Interpolate apse correction from a JD-indexed correction table.
+
+    Uses linear interpolation between table entries. Returns the correction
+    in arcseconds.
+
+    Args:
+        jd_tt: Julian Day in TT
+        jd_start: JD of the first table entry
+        step_days: Spacing between table entries in days
+        corrections: Tuple of correction values in arcseconds
+        n: Number of entries in the table
+
+    Returns:
+        Interpolated correction in arcseconds, or 0.0 if outside table range
+    """
+    if not corrections or n == 0:
+        return 0.0
+
+    idx_float = (jd_tt - jd_start) / step_days
+    if idx_float < 0 or idx_float >= n - 1:
+        return 0.0
+
+    idx_low = int(idx_float)
+    frac = idx_float - idx_low
+
+    return float(corrections[idx_low]) + frac * (
+        float(corrections[idx_low + 1]) - float(corrections[idx_low])
     )
 
 
@@ -1393,7 +1451,8 @@ def _calc_elp2000_apogee_perturbations(jd_tt: float) -> float:
 
     Implements a perturbation series for the interpolated lunar apogee using
     Delaunay argument combinations. Coefficients fitted via least-squares
-    against reference ephemeris positions over 56 years (4 apsidal cycles).
+    against reference ephemeris positions over 402,498 data points spanning
+    1549-2651 CE (the DE440 medium ephemeris range).
 
     The perturbation series models the ~5-degree oscillations of the apogee
     around its mean position, caused by solar perturbations (evection),
@@ -1413,8 +1472,8 @@ def _calc_elp2000_apogee_perturbations(jd_tt: float) -> float:
         float: Total perturbation correction in degrees. Range: ~-5 to +5.
 
     Precision:
-        - Maximum error: <0.18 degrees
-        - RMS error: <0.05 degrees
+        - Trig-only RMS error: ~171" (~0.048°)
+        - With correction table: RMS ~6", Max ~40"
 
     References:
         - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988), A&A 190
@@ -1430,36 +1489,42 @@ def _calc_elp2000_apogee_perturbations(jd_tt: float) -> float:
 
     # Primary evection harmonics sin(kD - kM')
     perturbation = (
-        +0.250796 * math.sin(D - M_prime)
-        + 4.528258 * math.sin(2.0 * D - 2.0 * M_prime)
-        + 0.021303 * math.sin(3.0 * D - 3.0 * M_prime)
-        + 0.828413 * math.sin(4.0 * D - 4.0 * M_prime)
-        + 0.005729 * math.sin(5.0 * D - 5.0 * M_prime)
-        + 0.185010 * math.sin(6.0 * D - 6.0 * M_prime)
-        + 0.047698 * math.sin(8.0 * D - 8.0 * M_prime)
-        + 0.013332 * math.sin(10.0 * D - 10.0 * M_prime)
-        + 0.003909 * math.sin(12.0 * D - 12.0 * M_prime)
+        +0.250542 * math.sin(D - M_prime)
+        + 4.528899 * math.sin(2.0 * D - 2.0 * M_prime)
+        + 0.021548 * math.sin(3.0 * D - 3.0 * M_prime)
+        + 0.828318 * math.sin(4.0 * D - 4.0 * M_prime)
+        + 0.005654 * math.sin(5.0 * D - 5.0 * M_prime)
+        + 0.184695 * math.sin(6.0 * D - 6.0 * M_prime)
+        + 0.001681 * math.sin(7.0 * D - 7.0 * M_prime)
+        + 0.047535 * math.sin(8.0 * D - 8.0 * M_prime)
+        + 0.000529 * math.sin(9.0 * D - 9.0 * M_prime)
+        + 0.013307 * math.sin(10.0 * D - 10.0 * M_prime)
+        + 0.003936 * math.sin(12.0 * D - 12.0 * M_prime)
+        + 0.001211 * math.sin(14.0 * D - 14.0 * M_prime)
     )
 
     # Solar anomaly coupling (annual equation, E-weighted)
     perturbation += (
-        +0.421306 * E * math.sin(M)
-        + 0.478623 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
-        + 0.009764 * E * math.sin(2.0 * D - 2.0 * M_prime + M)
-        - 0.045063 * E * math.sin(D - M_prime + M)
-        + 0.138389 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
-        + 0.044144 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
+        +0.420755 * E * math.sin(M)
+        + 0.479262 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
+        + 0.009282 * E * math.sin(2.0 * D - 2.0 * M_prime + M)
+        - 0.045505 * E * math.sin(D - M_prime + M)
+        + 0.003014 * E * math.sin(D - M_prime - M)
+        + 0.138503 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
+        + 0.044265 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
+        + 0.014894 * E * math.sin(8.0 * D - 8.0 * M_prime - M)
+        + 0.005155 * E * math.sin(10.0 * D - 10.0 * M_prime - M)
     )
 
     # Double solar anomaly coupling (E²-weighted)
     perturbation += (
-        +0.006138 * E2 * math.sin(2.0 * M)
-        + 0.023538 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
-        + 0.007939 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+        +0.006575 * E2 * math.sin(2.0 * M)
+        + 0.023518 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
+        + 0.007564 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
     )
 
     # Latitude coupling (F-dependent, inclination effects)
-    perturbation += 0.273610 * math.sin(2.0 * F - 2.0 * M_prime)
+    perturbation += 0.273829 * math.sin(2.0 * F - 2.0 * M_prime)
 
     return perturbation
 
@@ -1475,9 +1540,9 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     apogee — solar perturbations affect perigee much more strongly.
 
     Coefficients fitted via least-squares against reference ephemeris positions
-    over 56 years (4 apsidal cycles, 5000 sample points). The series extends
-    to k=26 for the primary evection harmonics to capture the slowly-converging
-    perigee oscillation spectrum.
+    over 402,498 data points spanning 1549-2651 CE (DE440 medium range).
+    The series extends to k=30 for the primary evection harmonics to capture
+    the slowly-converging perigee oscillation spectrum.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT).
@@ -1486,8 +1551,8 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
         float: Total perturbation correction in degrees. Range: ~-25 to +25.
 
     Precision:
-        - Maximum error: <1.0 degrees
-        - RMS error: <0.14 degrees
+        - Trig-only RMS error: ~386" (~0.107°)
+        - With correction table: RMS ~11", Max ~100"
 
     References:
         - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988)
@@ -1501,62 +1566,86 @@ def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
     E = 1.0 - 0.002516 * T - 0.0000074 * T**2
     E2 = E * E
 
-    # Primary evection harmonics sin(kD - kM') — extended to k=26
+    # Primary evection harmonics sin(kD - kM') — extended to k=30
     # The perigee series converges much more slowly than apogee
     perturbation = (
-        +0.306193 * math.sin(D - M_prime)
-        - 22.247517 * math.sin(2.0 * D - 2.0 * M_prime)
-        - 0.162565 * math.sin(3.0 * D - 3.0 * M_prime)
-        + 6.650688 * math.sin(4.0 * D - 4.0 * M_prime)
-        + 0.103148 * math.sin(5.0 * D - 5.0 * M_prime)
-        - 2.904989 * math.sin(6.0 * D - 6.0 * M_prime)
-        - 0.069452 * math.sin(7.0 * D - 7.0 * M_prime)
-        + 1.489549 * math.sin(8.0 * D - 8.0 * M_prime)
-        + 0.048318 * math.sin(9.0 * D - 9.0 * M_prime)
-        - 0.834552 * math.sin(10.0 * D - 10.0 * M_prime)
-        + 0.495242 * math.sin(12.0 * D - 12.0 * M_prime)
-        - 0.305643 * math.sin(14.0 * D - 14.0 * M_prime)
-        + 0.194644 * math.sin(16.0 * D - 16.0 * M_prime)
-        - 0.126401 * math.sin(18.0 * D - 18.0 * M_prime)
-        + 0.083440 * math.sin(20.0 * D - 20.0 * M_prime)
-        - 0.055909 * math.sin(22.0 * D - 22.0 * M_prime)
-        + 0.037932 * math.sin(24.0 * D - 24.0 * M_prime)
-        - 0.025950 * math.sin(26.0 * D - 26.0 * M_prime)
-    )
-
-    # Cross-coupling D-M' terms (non-equal coefficients)
-    perturbation += (
-        +0.457056 * math.sin(6.0 * D - 5.0 * M_prime)
-        - 0.155906 * math.sin(4.0 * D - 3.0 * M_prime)
-        + 0.034135 * math.sin(2.0 * D - M_prime)
+        +0.306773 * math.sin(D - M_prime)
+        - 22.247860 * math.sin(2.0 * D - 2.0 * M_prime)
+        - 0.163050 * math.sin(3.0 * D - 3.0 * M_prime)
+        + 6.651642 * math.sin(4.0 * D - 4.0 * M_prime)
+        + 0.103569 * math.sin(5.0 * D - 5.0 * M_prime)
+        - 2.906333 * math.sin(6.0 * D - 6.0 * M_prime)
+        - 0.069610 * math.sin(7.0 * D - 7.0 * M_prime)
+        + 1.490631 * math.sin(8.0 * D - 8.0 * M_prime)
+        + 0.048191 * math.sin(9.0 * D - 9.0 * M_prime)
+        - 0.835784 * math.sin(10.0 * D - 10.0 * M_prime)
+        - 0.033994 * math.sin(11.0 * D - 11.0 * M_prime)
+        + 0.496008 * math.sin(12.0 * D - 12.0 * M_prime)
+        + 0.024278 * math.sin(13.0 * D - 13.0 * M_prime)
+        - 0.306194 * math.sin(14.0 * D - 14.0 * M_prime)
+        - 0.017531 * math.sin(15.0 * D - 15.0 * M_prime)
+        + 0.194538 * math.sin(16.0 * D - 16.0 * M_prime)
+        + 0.012705 * math.sin(17.0 * D - 17.0 * M_prime)
+        - 0.126363 * math.sin(18.0 * D - 18.0 * M_prime)
+        - 0.009273 * math.sin(19.0 * D - 19.0 * M_prime)
+        + 0.083499 * math.sin(20.0 * D - 20.0 * M_prime)
+        + 0.006796 * math.sin(21.0 * D - 21.0 * M_prime)
+        - 0.055962 * math.sin(22.0 * D - 22.0 * M_prime)
+        - 0.004997 * math.sin(23.0 * D - 23.0 * M_prime)
+        + 0.037928 * math.sin(24.0 * D - 24.0 * M_prime)
+        + 0.003687 * math.sin(25.0 * D - 25.0 * M_prime)
+        - 0.025959 * math.sin(26.0 * D - 26.0 * M_prime)
+        - 0.002723 * math.sin(27.0 * D - 27.0 * M_prime)
+        + 0.017906 * math.sin(28.0 * D - 28.0 * M_prime)
+        + 0.002019 * math.sin(29.0 * D - 29.0 * M_prime)
+        - 0.012439 * math.sin(30.0 * D - 30.0 * M_prime)
     )
 
     # Solar anomaly coupling (E-weighted)
     perturbation += (
-        +0.486697 * E * math.sin(M)
-        - 0.979504 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
-        + 0.053083 * E * math.sin(2.0 * D - 2.0 * M_prime + M)
-        + 0.661883 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
-        - 0.042104 * E * math.sin(4.0 * D - 4.0 * M_prime + M)
-        - 0.392577 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
-        + 0.030804 * E * math.sin(6.0 * D - 6.0 * M_prime + M)
-        + 0.268264 * E * math.sin(8.0 * D - 8.0 * M_prime - M)
-        - 0.022241 * E * math.sin(8.0 * D - 8.0 * M_prime + M)
-        - 0.189618 * E * math.sin(10.0 * D - 10.0 * M_prime - M)
-        + 0.016428 * E * math.sin(10.0 * D - 10.0 * M_prime + M)
-        + 0.135282 * E * math.sin(12.0 * D - 12.0 * M_prime - M)
-        - 0.044594 * E * math.sin(D - M_prime + M)
+        +0.487058 * E * math.sin(M)
+        - 0.979771 * E * math.sin(2.0 * D - 2.0 * M_prime - M)
+        + 0.053811 * E * math.sin(2.0 * D - 2.0 * M_prime + M)
+        - 0.044017 * E * math.sin(D - M_prime + M)
+        - 0.005028 * E * math.sin(D - M_prime - M)
+        - 0.003301 * E * math.sin(3.0 * D - 3.0 * M_prime - M)
+        + 0.022034 * E * math.sin(3.0 * D - 3.0 * M_prime + M)
+        + 0.598504 * E * math.sin(4.0 * D - 4.0 * M_prime - M)
+        - 0.041497 * E * math.sin(4.0 * D - 4.0 * M_prime + M)
+        + 0.006501 * E * math.sin(5.0 * D - 5.0 * M_prime - M)
+        - 0.013842 * E * math.sin(5.0 * D - 5.0 * M_prime + M)
+        - 0.392338 * E * math.sin(6.0 * D - 6.0 * M_prime - M)
+        + 0.030659 * E * math.sin(6.0 * D - 6.0 * M_prime + M)
+        - 0.007421 * E * math.sin(7.0 * D - 7.0 * M_prime - M)
+        + 0.009436 * E * math.sin(7.0 * D - 7.0 * M_prime + M)
+        + 0.267980 * E * math.sin(8.0 * D - 8.0 * M_prime - M)
+        - 0.022489 * E * math.sin(8.0 * D - 8.0 * M_prime + M)
+        + 0.007272 * E * math.sin(9.0 * D - 9.0 * M_prime - M)
+        - 0.006704 * E * math.sin(9.0 * D - 9.0 * M_prime + M)
+        - 0.187642 * E * math.sin(10.0 * D - 10.0 * M_prime - M)
+        + 0.016523 * E * math.sin(10.0 * D - 10.0 * M_prime + M)
+        - 0.006658 * E * math.sin(11.0 * D - 11.0 * M_prime - M)
+        + 0.004869 * E * math.sin(11.0 * D - 11.0 * M_prime + M)
+        + 0.133560 * E * math.sin(12.0 * D - 12.0 * M_prime - M)
+        - 0.012183 * E * math.sin(12.0 * D - 12.0 * M_prime + M)
+        + 0.005856 * E * math.sin(13.0 * D - 13.0 * M_prime - M)
+        - 0.003598 * E * math.sin(13.0 * D - 13.0 * M_prime + M)
+        - 0.096197 * E * math.sin(14.0 * D - 14.0 * M_prime - M)
+        + 0.009003 * E * math.sin(14.0 * D - 14.0 * M_prime + M)
     )
 
     # Double solar anomaly coupling (E²-weighted)
     perturbation += (
-        +0.007146 * E2 * math.sin(2.0 * M)
-        - 0.033149 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
-        - 0.064507 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+        +0.006768 * E2 * math.sin(2.0 * M)
+        - 0.033475 * E2 * math.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
+        + 0.005246 * E2 * math.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
+        + 0.033679 * E2 * math.sin(4.0 * D - 4.0 * M_prime - 2.0 * M)
+        - 0.003067 * E2 * math.sin(4.0 * D - 4.0 * M_prime + 2.0 * M)
+        - 0.030892 * E2 * math.sin(6.0 * D - 6.0 * M_prime - 2.0 * M)
     )
 
     # Latitude coupling (F-dependent, inclination effects)
-    perturbation += 0.188521 * math.sin(2.0 * F - 2.0 * M_prime)
+    perturbation += 0.188012 * math.sin(2.0 * F - 2.0 * M_prime)
 
     return perturbation
 
@@ -2486,9 +2575,8 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     Expected Precision
     ==================
 
-    - Maximum error: <0.5 degrees
-    - Mean error: <0.2 degrees
-    - Suitable for astrological applications requiring Lilith calculations
+    - With correction table (1549-2651): RMS ~6", Max ~40" vs Swiss Ephemeris
+    - Outside correction table range: RMS ~171" (~0.048°)
     - Smooth, continuous curve without the artifacts of osculating elements
 
     Args:
@@ -2497,7 +2585,7 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of interpolated apogee in degrees [0, 360)
-            - latitude: Ecliptic latitude in degrees (from osculating apogee)
+            - latitude: Ecliptic latitude in degrees
             - distance: Apogee distance from Earth in AU
 
     References:
@@ -2514,10 +2602,31 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     perturbation = _calc_elp2000_apogee_perturbations(jd_tt)
 
     # Combine mean position and perturbations
-    interp_lon = (mean_apogee + perturbation) % 360.0
+    interp_lon = mean_apogee + perturbation
 
-    # Get latitude and distance from osculating apogee (True Lilith)
-    _, interp_lat, interp_dist = calc_true_lilith(jd_tt)
+    # Add correction table residual (arcseconds -> degrees) for high precision
+    if _APSE_CORRECTIONS_AVAILABLE and APOGEE_CORRECTIONS:
+        correction_arcsec = _interpolate_apse_correction(
+            jd_tt,
+            APOGEE_CT_JD_START,
+            APOGEE_CT_STEP_DAYS,
+            APOGEE_CORRECTIONS,
+            APOGEE_CT_COUNT,
+        )
+        interp_lon += correction_arcsec / 3600.0
+
+    interp_lon = interp_lon % 360.0
+
+    # Latitude: inclination * sin(longitude - ascending node)
+    # The interpolated apogee lies near the lunar orbital plane, which is
+    # inclined ~5.145° to the ecliptic. Latitude varies sinusoidally as the
+    # apogee moves relative to the ascending node.
+    node_lon = calc_mean_lunar_node(jd_tt)
+    interp_lat = 5.145396 * math.sin(math.radians(interp_lon - node_lon))
+
+    # Distance: nearly constant for the interpolated apogee
+    # Mean apogee distance ~0.002710 AU (405,500 km)
+    interp_dist = 0.0027099
 
     return interp_lon, interp_lat, interp_dist
 
@@ -2829,7 +2938,8 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     Expected Precision
     ==================
 
-    - Precision: <0.5 degrees across the ephemeris range
+    - With correction table (1549-2651): RMS ~11", Max ~100" vs Swiss Ephemeris
+    - Outside correction table range: RMS ~386" (~0.107°)
     - Smooth, continuous curve
 
     Suitable for astrological applications, supermoon timing, and tidal predictions.
@@ -2840,7 +2950,7 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     Returns:
         Tuple[float, float, float]: (longitude, latitude, distance) where:
             - longitude: Ecliptic longitude of interpolated perigee in degrees [0, 360)
-            - latitude: Ecliptic latitude in degrees (essentially zero)
+            - latitude: Ecliptic latitude in degrees
             - distance: Perigee distance from Earth in AU
 
     References:
@@ -2851,9 +2961,30 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
 
     perturbation = _calc_elp2000_perigee_perturbations(jd_tt)
 
-    interp_lon = (mean_perigee + perturbation) % 360.0
+    interp_lon = mean_perigee + perturbation
 
-    _, interp_lat, interp_dist = calc_osculating_perigee(jd_tt)
+    # Add correction table residual (arcseconds -> degrees) for high precision
+    if _APSE_CORRECTIONS_AVAILABLE and PERIGEE_CORRECTIONS:
+        correction_arcsec = _interpolate_apse_correction(
+            jd_tt,
+            PERIGEE_CT_JD_START,
+            PERIGEE_CT_STEP_DAYS,
+            PERIGEE_CORRECTIONS,
+            PERIGEE_CT_COUNT,
+        )
+        interp_lon += correction_arcsec / 3600.0
+
+    interp_lon = interp_lon % 360.0
+
+    # Latitude: inclination * sin(longitude - ascending node)
+    # The interpolated perigee lies near the lunar orbital plane, which is
+    # inclined ~5.145° to the ecliptic.
+    node_lon = calc_mean_lunar_node(jd_tt)
+    interp_lat = 5.145396 * math.sin(math.radians(interp_lon - node_lon))
+
+    # Distance: mean perigee distance ~0.002422 AU (362,600 km)
+    # with variability from eccentricity oscillations
+    interp_dist = 0.0024222
 
     return interp_lon, interp_lat, interp_dist
 

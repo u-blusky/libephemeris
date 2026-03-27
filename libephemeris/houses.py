@@ -603,7 +603,7 @@ def swe_houses(
 
     armc_active = armc_deg
 
-    if hsys_char in ["R", "C", "T"]:
+    if hsys_char in ["R", "C", "T", "J"]:
         # Check altitude of MC calculated from original ARMC
         mc_dec_rad = math.atan(
             math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
@@ -843,6 +843,8 @@ def swe_houses(
         # Sunshine may flip MC internally (mc_under_horizon handling).
         # Sync ascmc[1] back from cusps[10] so the returned MC matches.
         ascmc[1] = cusps[10]
+    elif hsys_char == "J":  # Savard-A
+        cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -1154,7 +1156,7 @@ def swe_houses_armc(
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
     armc_active = armc_deg
 
-    if hsys_char in ["R", "C", "T"]:
+    if hsys_char in ["R", "C", "T", "J"]:
         # Check altitude of MC calculated from original ARMC
         mc_dec_rad = math.atan(
             math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
@@ -1376,6 +1378,8 @@ def swe_houses_armc(
         # houses_armc with Sunshine system.
         cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, 0.0)
         ascmc[1] = cusps[10]
+    elif hsys_char == "J":  # Savard-A
+        cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
     else:
         # Default to Placidus
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
@@ -1768,6 +1772,7 @@ def swe_house_name(hsys: int) -> str:
         "D": "equal (MC)",
         "I": "Sunshine",
         "i": "Sunshine/alt.",
+        "J": "Savard-A",
     }
     return names.get(hsys_char, "Unknown")
 
@@ -2385,6 +2390,81 @@ def _houses_campanus(
     cusps[12] = calc_cusp(60)
     cusps[2] = calc_cusp(120)
     cusps[3] = calc_cusp(150)
+
+    _set_opposite_cusps(cusps)
+
+    return cusps
+
+
+def _houses_savard_a(
+    armc: float, lat: float, eps: float, asc: float, mc: float
+) -> List[float]:
+    """
+    Savard-A house system (John Savard's "Albategnius" houses).
+
+    Similar to Campanus but divides the prime vertical based on latitude
+    circles at 1/3 and 2/3 of geographic latitude, instead of Campanus's
+    fixed 30°/60° segments.
+
+    Algorithm (from Swiss Ephemeris swehouse.c):
+        1. Compute prime vertical division points:
+           xs2 = arcsin(sin(lat/3) / sin(lat))
+           xs1 = arcsin(sin(2·lat/3) / sin(lat))
+        2. Equatorial offsets:
+           xh1 = arctan(tan(xs1) / cos(lat))
+           xh2 = arctan(tan(xs2) / cos(lat))
+        3. Pole heights:
+           fh1 = arcsin(sin(lat) · cos(xs1))
+           fh2 = arcsin(sin(lat) · cos(xs2))
+        4. Project using Asc1(ARMC+90 ± offset, pole_height, sin(ε), cos(ε))
+
+    Args:
+        armc: Sidereal time at Greenwich (RAMC) in degrees
+        lat: Geographic latitude in degrees
+        eps: True obliquity of ecliptic in degrees
+        asc: Ascendant longitude in degrees
+        mc: Midheaven longitude in degrees
+
+    Returns:
+        List of 13 house cusp longitudes
+    """
+    cusps = _init_cardinal_cusps(asc, mc)
+
+    VERY_SMALL = 1e-10
+    sin_lat = math.sin(math.radians(lat))
+    cos_lat = math.cos(math.radians(lat))
+
+    # Calculate prime vertical division points based on latitude
+    if abs(lat) < VERY_SMALL:
+        # Degenerate case: near equator, use limit values
+        # lim(sin(lat/3)/sin(lat)) as lat->0 = 1/3
+        # lim(sin(2*lat/3)/sin(lat)) as lat->0 = 2/3
+        xs2 = math.degrees(math.asin(1.0 / 3.0))
+        xs1 = math.degrees(math.asin(2.0 / 3.0))
+    else:
+        xs2 = math.degrees(math.asin(math.sin(math.radians(lat / 3.0)) / sin_lat))
+        xs1 = math.degrees(math.asin(math.sin(math.radians(2.0 * lat / 3.0)) / sin_lat))
+
+    # Equatorial offsets
+    if abs(cos_lat) < VERY_SMALL:
+        # Near pole
+        if lat > 0:
+            xh1 = xh2 = 90.0
+        else:
+            xh1 = xh2 = 270.0
+    else:
+        xh1 = math.degrees(math.atan(math.tan(math.radians(xs1)) / cos_lat))
+        xh2 = math.degrees(math.atan(math.tan(math.radians(xs2)) / cos_lat))
+
+    # Pole heights
+    fh1 = math.degrees(math.asin(sin_lat * math.cos(math.radians(xs1))))
+    fh2 = math.degrees(math.asin(sin_lat * math.cos(math.radians(xs2))))
+
+    # Project onto ecliptic using Asc1 equivalent (_calc_ascendant)
+    cusps[11] = _calc_ascendant(armc + 90.0 - xh1, eps, lat, fh1)
+    cusps[12] = _calc_ascendant(armc + 90.0 - xh2, eps, lat, fh2)
+    cusps[2] = _calc_ascendant(armc + 90.0 + xh2, eps, lat, fh2)
+    cusps[3] = _calc_ascendant(armc + 90.0 + xh1, eps, lat, fh1)
 
     _set_opposite_cusps(cusps)
 

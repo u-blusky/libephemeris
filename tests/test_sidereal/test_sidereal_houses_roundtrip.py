@@ -1,0 +1,135 @@
+"""
+Tests for sidereal houses round-trip and consistency.
+
+Verifies that sidereal house cusps = tropical cusps - ayanamsha,
+and that sidereal houses_ex is consistent across modes.
+"""
+
+from __future__ import annotations
+
+import math
+
+import pytest
+
+import libephemeris as swe
+from libephemeris.constants import (
+    SEFLG_SIDEREAL,
+    SE_SIDM_LAHIRI,
+    SE_SIDM_FAGAN_BRADLEY,
+)
+
+
+HOUSE_SYSTEMS_FOR_SIDEREAL = [
+    (ord("P"), "Placidus"),
+    (ord("K"), "Koch"),
+    (ord("R"), "Regiomontanus"),
+    (ord("E"), "Equal"),
+    (ord("W"), "Whole Sign"),
+    (ord("O"), "Porphyry"),
+    (ord("C"), "Campanus"),
+]
+
+
+class TestSiderealHousesRoundTrip:
+    """Test sidereal house cusp = tropical - ayanamsha."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("hsys,name", HOUSE_SYSTEMS_FOR_SIDEREAL)
+    def test_cusps_differ_by_ayanamsha(self, hsys: int, name: str):
+        """Sidereal cusps should differ from tropical by ~ayanamsha."""
+        jd = 2451545.0
+        lat, lon = 41.9, 12.5
+
+        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+
+        cusps_trop, _ = swe.swe_houses_ex(jd, lat, lon, hsys, 0)
+        cusps_sid, _ = swe.swe_houses_ex(jd, lat, lon, hsys, SEFLG_SIDEREAL)
+
+        ayan = swe.swe_get_ayanamsa_ut(jd)
+
+        # For most systems, cusp_sid ≈ cusp_trop - ayan (mod 360)
+        # Whole Sign is special — recalculated from sidereal ASC
+        diffs = []
+        for i in range(12):
+            expected_sid = (cusps_trop[i] - ayan) % 360
+            actual_diff = abs(cusps_sid[i] - expected_sid)
+            if actual_diff > 180:
+                actual_diff = 360 - actual_diff
+            diffs.append(actual_diff)
+
+        avg_diff = sum(diffs) / len(diffs)
+        # Most systems should have avg diff < 1 deg
+        # Whole Sign may differ more (cusps snap to sign boundaries)
+        if name == "Whole Sign":
+            assert avg_diff < 30, f"{name}: avg cusp diff {avg_diff:.2f} deg"
+        else:
+            assert avg_diff < 1.0, f"{name}: avg cusp diff {avg_diff:.2f} deg"
+
+    @pytest.mark.unit
+    def test_sidereal_cusps_in_range(self):
+        """All sidereal cusps should be [0, 360)."""
+        jd = 2451545.0
+        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        cusps, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        for i, c in enumerate(cusps[:12]):
+            assert 0 <= c < 360, f"Sidereal cusp {i + 1}: {c} deg"
+
+
+class TestSiderealModesHouses:
+    """Test different sidereal modes produce different house cusps."""
+
+    @pytest.mark.unit
+    def test_lahiri_vs_fagan_cusps_differ(self):
+        """Lahiri and Fagan-Bradley should produce different sidereal cusps."""
+        jd = 2451545.0
+
+        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        cusps_lahiri, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+
+        swe.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        cusps_fagan, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+
+        # Difference should be ~0.9 deg (difference between ayanamshas)
+        diffs = []
+        for i in range(12):
+            diff = abs(cusps_lahiri[i] - cusps_fagan[i])
+            if diff > 180:
+                diff = 360 - diff
+            diffs.append(diff)
+
+        avg_diff = sum(diffs) / len(diffs)
+        assert 0.5 < avg_diff < 2.0, f"Avg diff: {avg_diff:.2f} deg"
+
+
+class TestSiderealHousesAcrossDates:
+    """Test sidereal houses across dates."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("year", [1900, 1950, 2000, 2050, 2100])
+    def test_sidereal_placidus_across_years(self, year: int):
+        """Sidereal Placidus valid across years."""
+        jd = swe.swe_julday(year, 6, 21, 12.0)
+        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        cusps, ascmc = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        assert len(cusps) >= 12
+        for i, c in enumerate(cusps[:12]):
+            assert 0 <= c < 360, f"Year {year}: cusp {i + 1} = {c}"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "lat,lon,name",
+        [
+            (41.9, 12.5, "Rome"),
+            (0.0, 0.0, "Equator"),
+            (-33.9, 151.2, "Sydney"),
+            (55.7, 37.6, "Moscow"),
+        ],
+    )
+    def test_sidereal_various_locations(self, lat: float, lon: float, name: str):
+        """Sidereal houses valid at various locations."""
+        jd = 2451545.0
+        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        cusps, _ = swe.swe_houses_ex(jd, lat, lon, ord("R"), SEFLG_SIDEREAL)
+        assert len(cusps) >= 12
+        for c in cusps[:12]:
+            assert 0 <= c < 360, f"{name}: cusp out of range"
