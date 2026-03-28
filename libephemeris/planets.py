@@ -906,6 +906,12 @@ def swe_calc_ut(
         return pos, retflag
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
+    except ValueError as e:
+        # SPK type 21 kernels (asteroids) raise ValueError when date is
+        # outside the kernel's coverage. Convert to EphemerisRangeError.
+        if "Invalid Time" in str(e) or "time" in str(e).lower():
+            raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
+        raise
 
 
 def swe_calc(
@@ -1018,6 +1024,10 @@ def swe_calc(
         return pos, retflag
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
+    except ValueError as e:
+        if "Invalid Time" in str(e) or "time" in str(e).lower():
+            raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
+        raise
 
 
 def swe_calc_pctr(
@@ -1744,8 +1754,14 @@ def _calc_body(
                     dlon = lon_diff / (2.0 * dt)
                     dlat = (lat_next - lat_prev) / (2.0 * dt)
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
-                except (IndexError, ValueError, ArithmeticError):
+                except (
+                    IndexError,
+                    ValueError,
+                    ArithmeticError,
+                    SkyfieldRangeError,
+                ):
                     # At ephemeris boundaries, speed calculation may fail
+                    # (including Skyfield range errors from ±dt offsets)
                     # Return 0 for speed components
                     from .logging_config import get_logger
 
@@ -2863,18 +2879,18 @@ def swe_get_ayanamsa_ut(tjdut: float) -> float:
 
             delta_t = reader.delta_t(tjdut)
             jd_tt = tjdut + delta_t
-            return _calc_ayanamsa_from_leb(
+            return float(_calc_ayanamsa_from_leb(
                 reader,
                 jd_tt,
                 sid_mode=sid_mode,
                 sid_t0=sid_t0,
                 sid_ayan_t0=sid_ayan_t0,
-            )
+            ))
         except (KeyError, ValueError):
             pass  # star-based mode or out of range, fall through
     # --- END LEB fast path ---
 
-    return _calc_ayanamsa(tjdut, sid_mode)
+    return float(_calc_ayanamsa(tjdut, sid_mode))
 
 
 def swe_get_ayanamsa_name(sidmode: int) -> str:

@@ -629,12 +629,13 @@ def set_precision_tier(tier: str) -> None:
         >>> get_precision_tier()
         'extended'
     """
-    global _PRECISION_TIER, _PLANETS
+    global _PRECISION_TIER, _PLANETS, _EPHEMERIS_FILE_EXPLICIT
     if tier not in TIERS:
         raise ValueError(
             f"Invalid tier: {tier!r}. Must be one of: {list(TIERS.keys())}"
         )
     _PRECISION_TIER = tier
+    _EPHEMERIS_FILE_EXPLICIT = False
     # Close old kernel and clear caches before reloading
     if _PLANETS is not None:
         try:
