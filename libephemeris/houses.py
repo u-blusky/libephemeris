@@ -838,10 +838,15 @@ def swe_houses(
         cusps = _houses_pullen_sr(asc, mc)
     elif hsys_char == "D":  # Equal from MC
         cusps = _houses_equal_mc(asc, mc)
-    elif hsys_char in ("I", "i"):  # Sunshine (Makransky)
+    elif hsys_char == "I":  # Sunshine (Treindl)
         cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, sun_dec)
         # Sunshine may flip MC internally (mc_under_horizon handling).
         # Sync ascmc[1] back from cusps[10] so the returned MC matches.
+        ascmc[1] = cusps[10]
+    elif hsys_char == "i":  # Sunshine (Makransky)
+        cusps = _houses_sunshine_makransky(
+            armc_active, lat, eps, asc, mc, sun_dec
+        )
         ascmc[1] = cusps[10]
     elif hsys_char == "J":  # Savard-A
         cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
@@ -1371,12 +1376,13 @@ def swe_houses_armc(
         cusps = _houses_pullen_sr(asc, mc)
     elif hsys_char == "D":  # Equal from MC
         cusps = _houses_equal_mc(asc, mc)
-    elif hsys_char in ("I", "i"):  # Sunshine (Makransky)
-        # Sunshine requires Sun's declination which needs JD.
-        # swe_houses_armc doesn't have JD, so use sun_dec=0 (equinox
-        # approximation). This matches Swiss Ephemeris behavior for
-        # houses_armc with Sunshine system.
+    elif hsys_char == "I":  # Sunshine (Treindl)
         cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, 0.0)
+        ascmc[1] = cusps[10]
+    elif hsys_char == "i":  # Sunshine (Makransky)
+        cusps = _houses_sunshine_makransky(
+            armc_active, lat, eps, asc, mc, 0.0
+        )
         ascmc[1] = cusps[10]
     elif hsys_char == "J":  # Savard-A
         cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
@@ -1589,26 +1595,24 @@ def swe_houses_ex(
             start = (sid_asc - 15.0) % 360.0
             cusps = tuple([(start + i * 30.0) % 360.0 for i in range(12)])
         elif hsys_char in ("I", "i"):
-            # Sunshine (Makransky): Recalculate using sidereal Asc/MC
-            # The Sun's declination and ARMC are geometric (not zodiacal),
-            # so they remain unchanged. We need to recalculate the cusps
-            # using the sidereal Ascendant and MC.
+            # Sunshine: Recalculate using sidereal Asc/MC
+            # 'I' = Treindl algorithm, 'i' = Makransky algorithm
             try:
-                # Get Sun's declination (geometric, not affected by sidereal)
-                # Propagate ephemeris flags to swe_calc_ut
                 eph_flags = flags & (SEFLG_JPLEPH | SEFLG_SWIEPH)
                 sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
                 sun_dec = sun_pos[1]
             except (IndexError, TypeError, ValueError):
                 sun_dec = 0.0
-            # Get obliquity for Sunshine calculation
             ts = get_timescale()
             t = ts.ut1_jd(tjdut)
             eps = get_true_obliquity(t.tt)
-            # ARMC is geometric, not zodiacal (from original ascmc)
             armc = ascmc[2]
-            # Recalculate Sunshine cusps with sidereal Asc and MC
-            sunshine_cusps = _houses_sunshine(armc, lat, eps, sid_asc, sid_mc, sun_dec)
+            if hsys_char == "I":
+                sunshine_cusps = _houses_sunshine(armc, lat, eps, sid_asc, sid_mc, sun_dec)
+            else:
+                sunshine_cusps = _houses_sunshine_makransky(
+                    armc, lat, eps, sid_asc, sid_mc, sun_dec
+                )
             # Angular cusps (1, 4, 7, 10) are already correct with sid_asc/sid_mc
             # Intermediate cusps (2, 3, 5, 6, 8, 9, 11, 12) are calculated
             # geometrically and need to be converted to sidereal
@@ -3891,6 +3895,211 @@ def _houses_sunshine(
     if mc_under_horizon:
         for i in (2, 3, 5, 6, 8, 9, 11, 12):
             cusps[i] = (cusps[i] + 180.0) % 360.0
+
+    return cusps
+
+
+def _houses_sunshine_makransky(
+    armc: float, lat: float, eps: float, asc: float, mc: float, sun_dec: float
+) -> List[float]:
+    """
+    Sunshine house system — Makransky variant (code 'i').
+
+    Bob Makransky's original algorithm from *Primary Directions* (1988).
+    Differs from Treindl's ('I') solution in the geometric projection:
+    uses prime-vertical / meridian decomposition with explicit handling
+    of meridian distance > 90° (which occurs at high latitudes in winter).
+
+    Falls back to Porphyry if the Sun is circumpolar (within polar circle).
+
+    Args:
+        armc: Right Ascension of the Midheaven (RAMC) in degrees
+        lat: Geographic latitude in degrees
+        eps: True obliquity of ecliptic in degrees
+        asc: Ascendant longitude in degrees
+        mc: Midheaven longitude in degrees
+        sun_dec: Sun's declination in degrees
+
+    Returns:
+        List of 13 house cusp longitudes (index 0 unused)
+    """
+    NEAR_ZERO = 1e-10
+
+    # MC-below-horizon check (same as Treindl variant)
+    acmc = asc - mc
+    while acmc > 180:
+        acmc -= 360
+    while acmc < -180:
+        acmc += 360
+    mc_under_horizon = acmc < 0
+    if mc_under_horizon:
+        asc = (asc + 180.0) % 360.0
+
+    cusps = [0.0] * 13
+    cusps[1] = asc
+    cusps[10] = mc
+    cusps[4] = (mc + 180.0) % 360.0
+    cusps[7] = (asc + 180.0) % 360.0
+
+    # Ascensional difference
+    ad_arg = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
+    if ad_arg >= 1.0:
+        # Sun circumpolar — fall back to Porphyry
+        return _houses_porphyry(asc, mc)
+    elif ad_arg <= -1.0:
+        return _houses_porphyry(asc, mc)
+    else:
+        ascensional_diff = math.degrees(math.asin(ad_arg))
+
+    nsa = 90.0 - ascensional_diff
+    dsa = 90.0 + ascensional_diff
+
+    # Semi-arc offsets (same as Treindl)
+    xh = [0.0] * 13
+    xh[2] = -2.0 * nsa / 3.0
+    xh[3] = -1.0 * nsa / 3.0
+    xh[5] = 1.0 * nsa / 3.0
+    xh[6] = 2.0 * nsa / 3.0
+    xh[8] = -2.0 * dsa / 3.0
+    xh[9] = -1.0 * dsa / 3.0
+    xh[11] = 1.0 * dsa / 3.0
+    xh[12] = 2.0 * dsa / 3.0
+
+    sin_lat = math.sin(math.radians(lat))
+    cos_lat = math.cos(math.radians(lat))
+    tan_lat = math.tan(math.radians(lat))
+    tan_dec = math.tan(math.radians(sun_dec))
+    sin_ecl = math.sin(math.radians(eps))
+
+    south = lat < 0
+
+    for ih in range(1, 13):
+        if (ih - 1) % 3 == 0:
+            continue  # skip cardinal cusps 1, 4, 7, 10
+
+        md = abs(xh[ih])
+
+        # RA of the house point on the equator
+        if ih <= 6:
+            rah = (armc + 180.0 + xh[ih]) % 360.0
+        else:
+            rah = (armc + xh[ih]) % 360.0
+
+        if south:
+            rah = (180.0 + rah) % 360.0
+
+        # Compute zenith distance (zd) via Makransky's three-triangle method
+        if abs(md - 90.0) < NEAR_ZERO:
+            # Special case: md == 90 (house point is on the east/west point)
+            zd = 90.0 - math.degrees(math.atan(sin_lat * tan_dec))
+        else:
+            if md < 90.0:
+                # Triangle 1: CP-Zenith-NP: side (90-lat), angle md at NP
+                a = math.degrees(math.atan(cos_lat * math.tan(math.radians(md))))
+            else:
+                # md > 90: Triangle 1 reflected: MP-east point-CP
+                a = math.degrees(
+                    math.atan(
+                        math.tan(math.radians(md - 90.0)) / cos_lat
+                    )
+                )
+
+            # Triangle 2: CP-MP-east point
+            b = math.degrees(math.atan(tan_lat * math.cos(math.radians(md))))
+
+            # c = distance from house point to CP along meridian
+            if ih <= 6:
+                c = b + sun_dec
+            else:
+                c = b - sun_dec
+
+            # Triangle 3: HP-CP-XP
+            f = math.degrees(
+                math.atan(
+                    sin_lat * math.sin(math.radians(md)) * math.tan(math.radians(c))
+                )
+            )
+
+            zd = a + f
+
+        # Pole height of the house circle
+        pole = math.degrees(math.asin(math.sin(math.radians(zd)) * sin_lat))
+
+        # q: correction from declination and pole
+        q_arg = tan_dec * math.tan(math.radians(pole))
+        q_arg = max(-1.0, min(1.0, q_arg))
+        q = math.degrees(math.asin(q_arg))
+
+        # w: adjusted RA
+        if ih <= 3 or ih >= 11:
+            w = (rah - q) % 360.0
+        else:
+            w = (rah + q) % 360.0
+
+        # Project w and pole onto ecliptic
+        if abs(w - 90.0) < NEAR_ZERO:
+            r = math.degrees(math.atan(sin_ecl * math.tan(math.radians(pole))))
+            if ih <= 3 or ih >= 11:
+                cu = 90.0 + r
+            else:
+                cu = 90.0 - r
+        elif abs(w - 270.0) < NEAR_ZERO:
+            r = math.degrees(math.atan(sin_ecl * math.tan(math.radians(pole))))
+            if ih <= 3 or ih >= 11:
+                cu = 270.0 - r
+            else:
+                cu = 270.0 + r
+        else:
+            m = math.degrees(
+                math.atan(abs(math.tan(math.radians(pole)) / math.cos(math.radians(w))))
+            )
+            if ih <= 3 or ih >= 11:
+                if 90.0 < w < 270.0:
+                    z = m - eps
+                else:
+                    z = m + eps
+            else:
+                if 90.0 < w < 270.0:
+                    z = m + eps
+                else:
+                    z = m - eps
+
+            if abs(z - 90.0) < NEAR_ZERO:
+                cu = 90.0 if w < 180.0 else 270.0
+            else:
+                r = math.degrees(
+                    math.atan(
+                        abs(
+                            math.cos(math.radians(m))
+                            * math.tan(math.radians(w))
+                            / math.cos(math.radians(z))
+                        )
+                    )
+                )
+                if w < 90.0:
+                    cu = r
+                elif 90.0 < w < 180.0:
+                    cu = 180.0 - r
+                elif 180.0 < w < 270.0:
+                    cu = 180.0 + r
+                else:
+                    cu = 360.0 - r
+
+                # z > 90 correction (Makransky p. 146)
+                if z > 90.0:
+                    if w < 90.0:
+                        cu = 180.0 - r
+                    elif 90.0 < w < 180.0:
+                        cu = r
+                    elif 180.0 < w < 270.0:
+                        cu = 360.0 - r
+                    else:
+                        cu = 180.0 + r
+
+            if south:
+                cu = (cu + 180.0) % 360.0
+
+        cusps[ih] = cu % 360.0
 
     return cusps
 
