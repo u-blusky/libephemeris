@@ -16,6 +16,7 @@ from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SEFLG_S
 from tests.test_leb.compare.conftest import (
     ICRS_PLANETS,
     ECLIPTIC_BODIES,
+    ECLIPTIC_TOLERANCES,
     CompareHelper,
     lon_error_arcsec,
 )
@@ -120,6 +121,7 @@ class TestAncientEcliptic:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_EXT.ECLIPTIC_ARCSEC, (
+        tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("lon", TOLS_EXT.ECLIPTIC_ARCSEC)
+        assert max_err < tol, (
             f'{body_name}: max ancient lon error = {max_err:.4f}" at JD {worst_jd:.1f}'
         )

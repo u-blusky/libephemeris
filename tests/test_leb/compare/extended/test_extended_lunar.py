@@ -85,7 +85,10 @@ class TestExtLunarLatitude:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_EXT.ECLIPTIC_ARCSEC, (
+        tol_lat = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
+            "lat", TOLS_EXT.ECLIPTIC_ARCSEC
+        )
+        assert max_err < tol_lat, (
             f'{body_name}: max lat error = {max_err:.4f}" at JD {worst_jd:.1f}'
         )
 
@@ -186,7 +189,10 @@ class TestExtLunarLatSpeed:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_EXT.SPEED_LAT_DEG_DAY, (
+        tol_lat_speed = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
+            "speed", TOLS_EXT.SPEED_LAT_DEG_DAY
+        )
+        assert max_err < tol_lat_speed, (
             f"{body_name}: max lat speed error = {max_err:.6f} deg/day "
             f"at JD {worst_jd:.1f}"
         )

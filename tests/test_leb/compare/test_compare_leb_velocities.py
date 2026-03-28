@@ -15,6 +15,7 @@ from .conftest import (
     TOLS,
     ICRS_PLANETS,
     ECLIPTIC_BODIES,
+    ECLIPTIC_TOLERANCES,
     ASTEROID_BODIES,
     HYPOTHETICAL_BODIES,
     CompareHelper,
@@ -52,11 +53,13 @@ class TestLongitudeVelocity:
                 max_err = err
                 worst_jd = jd
 
-        tol = (
-            TOLS.ASTEROID_SPEED_LON_DEG_DAY
-            if body_id in _ASTEROID_BODY_IDS
-            else TOLS.SPEED_LON_DEG_DAY
-        )
+        ecl_tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("speed")
+        if ecl_tol is not None:
+            tol = ecl_tol
+        elif body_id in _ASTEROID_BODY_IDS:
+            tol = TOLS.ASTEROID_SPEED_LON_DEG_DAY
+        else:
+            tol = TOLS.SPEED_LON_DEG_DAY
         assert max_err < tol, (
             f"{body_name}: max lon speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )
@@ -89,11 +92,13 @@ class TestLatitudeVelocity:
                 max_err = err
                 worst_jd = jd
 
-        tol = (
-            TOLS.ASTEROID_SPEED_LAT_DEG_DAY
-            if body_id in _ASTEROID_BODY_IDS
-            else TOLS.SPEED_LAT_DEG_DAY
-        )
+        ecl_tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("speed")
+        if ecl_tol is not None:
+            tol = ecl_tol
+        elif body_id in _ASTEROID_BODY_IDS:
+            tol = TOLS.ASTEROID_SPEED_LAT_DEG_DAY
+        else:
+            tol = TOLS.SPEED_LAT_DEG_DAY
         assert max_err < tol, (
             f"{body_name}: max lat speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )

@@ -204,8 +204,8 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     11: (8, 13, COORD_ECLIPTIC, 3),  # SE_TRUE_NODE  — keep current
     12: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_APOG  — keep current
     13: (4, 15, COORD_ECLIPTIC, 3),  # SE_OSCU_APOG  — keep current
-    21: (4, 15, COORD_ECLIPTIC, 3),  # SE_INTP_APOG  — keep current
-    22: (4, 15, COORD_ECLIPTIC, 3),  # SE_INTP_PERG  — keep current
+    21: (1, 17, COORD_ECLIPTIC, 3),  # SE_INTP_APOG  — 1d interval for rapid oscillations
+    22: (1, 17, COORD_ECLIPTIC, 3),  # SE_INTP_PERG  — 1d interval for rapid oscillations
     # Main asteroids: ICRS barycentric — keep current (16d fails: 15-321")
     15: (8, 13, COORD_ICRS_BARY, 3),  # SE_CHIRON
     17: (8, 13, COORD_ICRS_BARY, 3),  # SE_CERES

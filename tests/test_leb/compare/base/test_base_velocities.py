@@ -14,6 +14,7 @@ from libephemeris.constants import SEFLG_SPEED, SEFLG_EQUATORIAL
 from tests.test_leb.compare.conftest import (
     ALL_LEB_BODIES,
     ASTEROID_BODIES,
+    ECLIPTIC_TOLERANCES,
     ICRS_PLANETS,
     CompareHelper,
 )
@@ -50,7 +51,9 @@ class TestBaseLongitudeVelocity:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_BASE.SPEED_LON_DEG_DAY, (
+        ecl_tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("speed")
+        tol = ecl_tol if ecl_tol is not None else TOLS_BASE.SPEED_LON_DEG_DAY
+        assert max_err < tol, (
             f"{body_name}: max lon speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )
 
@@ -87,12 +90,16 @@ class TestBaseLatitudeVelocity:
         # Asteroid latitude velocity is architecturally limited: the
         # ICRS→ecliptic pipeline amplifies errors by 1/geocentric_distance,
         # which is severe for nearby asteroids.  Use a separate tolerance.
-        asteroid_ids = {b[0] for b in ASTEROID_BODIES}
-        tol = (
-            TOLS_BASE.ASTEROID_SPEED_LAT_DEG_DAY
-            if body_id in asteroid_ids
-            else TOLS_BASE.SPEED_LAT_DEG_DAY
-        )
+        ecl_tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("speed")
+        if ecl_tol is not None:
+            tol = ecl_tol
+        else:
+            asteroid_ids = {b[0] for b in ASTEROID_BODIES}
+            tol = (
+                TOLS_BASE.ASTEROID_SPEED_LAT_DEG_DAY
+                if body_id in asteroid_ids
+                else TOLS_BASE.SPEED_LAT_DEG_DAY
+            )
         assert max_err < tol, (
             f"{body_name}: max lat speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )

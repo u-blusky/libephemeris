@@ -16,6 +16,7 @@ from libephemeris.constants import SEFLG_SPEED
 from tests.test_leb.compare.conftest import (
     ICRS_PLANETS,
     ECLIPTIC_BODIES,
+    ECLIPTIC_TOLERANCES,
     CompareHelper,
     lon_error_arcsec,
 )
@@ -112,6 +113,7 @@ class TestFutureEcliptic:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_EXT.ECLIPTIC_ARCSEC, (
+        tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("lon", TOLS_EXT.ECLIPTIC_ARCSEC)
+        assert max_err < tol, (
             f'{body_name}: max future lon error = {max_err:.4f}" at JD {worst_jd:.1f}'
         )

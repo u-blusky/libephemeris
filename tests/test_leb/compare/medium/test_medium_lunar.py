@@ -83,7 +83,10 @@ class TestMediumLunarLatitude:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_MEDIUM.ECLIPTIC_ARCSEC, (
+        tol_lat = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
+            "lat", TOLS_MEDIUM.ECLIPTIC_ARCSEC
+        )
+        assert max_err < tol_lat, (
             f'{body_name}: max lat error = {max_err:.4f}" at JD {worst_jd:.1f}'
         )
 
@@ -149,6 +152,9 @@ class TestMediumLunarDistance:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_MEDIUM.DISTANCE_AU, (
+        tol_dist = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
+            "dist", TOLS_MEDIUM.DISTANCE_AU
+        )
+        assert max_err < tol_dist, (
             f"{body_name}: max dist error = {max_err:.2e} AU at JD {worst_jd:.1f}"
         )

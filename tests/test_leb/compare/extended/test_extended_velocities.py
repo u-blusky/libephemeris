@@ -14,6 +14,7 @@ from libephemeris.constants import SEFLG_SPEED, SEFLG_EQUATORIAL
 
 from tests.test_leb.compare.conftest import (
     ECLIPTIC_BODIES,
+    ECLIPTIC_TOLERANCES,
     HYPOTHETICAL_BODIES,
     ICRS_PLANETS,
     CompareHelper,
@@ -51,7 +52,9 @@ class TestExtLongitudeVelocity:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_EXT.SPEED_LON_DEG_DAY, (
+        ecl_tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("speed")
+        tol = ecl_tol if ecl_tol is not None else TOLS_EXT.SPEED_LON_DEG_DAY
+        assert max_err < tol, (
             f"{body_name}: max lon speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )
 
@@ -82,7 +85,9 @@ class TestExtLatitudeVelocity:
                 max_err = err
                 worst_jd = jd
 
-        assert max_err < TOLS_EXT.SPEED_LAT_DEG_DAY, (
+        ecl_tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("speed")
+        tol = ecl_tol if ecl_tol is not None else TOLS_EXT.SPEED_LAT_DEG_DAY
+        assert max_err < tol, (
             f"{body_name}: max lat speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
         )
 
