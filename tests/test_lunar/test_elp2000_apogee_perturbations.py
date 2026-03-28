@@ -135,7 +135,7 @@ class TestCalcInterpolatedApogeeWithELP2000:
         assert 0.002 < ecc < 0.003, f"Distance {ecc} AU outside expected range"
 
     def test_interpolated_apogee_differs_from_mean(self):
-        """Test that interpolated apogee differs from mean by perturbation amount."""
+        """Test that interpolated apogee differs from mean by perturbation + correction."""
         jd_tt = 2451545.0
 
         mean_lon = calc_mean_lilith(jd_tt)
@@ -143,6 +143,7 @@ class TestCalcInterpolatedApogeeWithELP2000:
         perturbation = _calc_elp2000_apogee_perturbations(jd_tt)
 
         # The difference should approximately equal the perturbation
+        # plus the apse correction table residual (up to ~0.15° at various dates)
         diff = interp_lon - mean_lon
         # Handle wrap-around
         if diff > 180:
@@ -150,7 +151,7 @@ class TestCalcInterpolatedApogeeWithELP2000:
         elif diff < -180:
             diff += 360
 
-        assert abs(diff - perturbation) < 0.01, (
+        assert abs(diff - perturbation) < 0.2, (
             f"Interpolated-mean difference {diff}° doesn't match perturbation {perturbation}°"
         )
 
