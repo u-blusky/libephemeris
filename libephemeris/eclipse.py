@@ -4510,15 +4510,17 @@ def _calculate_lunar_eclipse_phases(
     """
     Calculate times of lunar eclipse phases (contacts).
 
-    Phase indices:
+    Phase indices (pyswisseph-compatible 10-element format):
         [0]: Time of maximum eclipse
-        [1]: Time of partial eclipse beginning (Moon enters umbra)
-        [2]: Time of total eclipse beginning (Moon fully in umbra)
-        [3]: Time of total eclipse ending (Moon starts leaving umbra)
-        [4]: Time of partial eclipse ending (Moon leaves umbra)
-        [5]: Time of penumbral eclipse beginning
-        [6]: Time of penumbral eclipse ending
-        [7]: Reserved
+        [1]: Reserved (0)
+        [2]: Time of partial eclipse beginning (Moon enters umbra)
+        [3]: Time of partial eclipse ending (Moon leaves umbra)
+        [4]: Time of total eclipse beginning (or 0 if not total)
+        [5]: Time of total eclipse ending (or 0 if not total)
+        [6]: Time of penumbral eclipse beginning
+        [7]: Time of penumbral eclipse ending
+        [8]: Reserved (0)
+        [9]: Reserved (0)
 
     Args:
         jd_max: Julian Day of maximum eclipse
@@ -4608,12 +4610,12 @@ def _calculate_lunar_eclipse_phases(
         t_total_end = 0.0
 
     return (
-        jd_max,  # [0] Maximum
+        jd_max,  # [0] Maximum eclipse
         0.0,  # [1] Reserved
-        t_partial_begin,  # [2] Partial begins (enters umbra)
-        t_partial_end,  # [3] Partial ends (leaves umbra)
-        t_total_begin,  # [4] Total begins
-        t_total_end,  # [5] Total ends
+        t_partial_begin,  # [2] Partial begins (Moon enters umbra)
+        t_partial_end,  # [3] Partial ends (Moon leaves umbra)
+        t_total_begin,  # [4] Total begins (or 0 if not total)
+        t_total_end,  # [5] Total ends (or 0 if not total)
         t_pen_begin,  # [6] Penumbral begins
         t_pen_end,  # [7] Penumbral ends
         0.0,  # [8] Reserved
@@ -4644,15 +4646,17 @@ def lun_eclipse_when(
     Returns:
         Tuple containing (matching reference API format):
             - retflag: Eclipse type flags bitmask (SE_ECL_* constants)
-            - tret: Tuple of 8 floats with eclipse phase times (JD UT):
+            - tret: Tuple of 10 floats with eclipse phase times (JD UT):
                 [0]: Time of maximum eclipse
-                [1]: Time of partial eclipse beginning (Moon enters umbra)
-                [2]: Time of total eclipse beginning (or 0 if not total)
-                [3]: Time of total eclipse ending (or 0 if not total)
-                [4]: Time of partial eclipse ending (Moon leaves umbra)
-                [5]: Time of penumbral eclipse beginning
-                [6]: Time of penumbral eclipse ending
-                [7]: Reserved (0)
+                [1]: Reserved (0)
+                [2]: Time of partial eclipse beginning (Moon enters umbra)
+                [3]: Time of partial eclipse ending (Moon leaves umbra)
+                [4]: Time of total eclipse beginning (or 0 if not total)
+                [5]: Time of total eclipse ending (or 0 if not total)
+                [6]: Time of penumbral eclipse beginning
+                [7]: Time of penumbral eclipse ending
+                [8]: Reserved (0)
+                [9]: Reserved (0)
 
     Raises:
         RuntimeError: If no eclipse found within search limit
@@ -4722,10 +4726,9 @@ def lun_eclipse_when(
                 umbra_radius,
             ) = _calculate_lunar_eclipse_type_and_magnitude(jd_max)
 
-            if ecl_type != 0 and not (ecl_type & SE_ECL_GRAZING):
-                # Eclipse found (skip grazing near-misses for pyswisseph
-                # compatibility — these have sub-threshold penumbral
-                # magnitudes that Swiss Ephemeris does not consider eclipses)
+            if ecl_type != 0:
+                # Eclipse found (including grazing — pyswisseph reports
+                # borderline eclipses as partial, so we must not skip them)
                 type_matches = (
                     (eclipse_type & SE_ECL_TOTAL and ecl_type & SE_ECL_TOTAL)
                     or (eclipse_type & SE_ECL_PARTIAL and ecl_type & SE_ECL_PARTIAL)
@@ -4748,7 +4751,9 @@ def lun_eclipse_when(
                         penumbra_radius,
                         moon_lat_max,
                     )
-                    return ecl_type, times
+                    # Strip internal GRAZING flag — pyswisseph
+                    # doesn't include it in the returned type
+                    return ecl_type & ~SE_ECL_GRAZING, times
 
         # Advance to next lunation
         jd = jd_full_moon + 25  # Skip ahead ~25 days to ensure we find next Full Moon

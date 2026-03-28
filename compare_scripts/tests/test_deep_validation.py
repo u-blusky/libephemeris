@@ -1205,8 +1205,9 @@ class TestFixedStarsDeep:
 
             if isinstance(mag_swe, tuple):
                 mag_swe = mag_swe[0] if mag_swe else None
+            if isinstance(mag_lib, tuple):
+                mag_lib = mag_lib[0] if mag_lib else None
 
-            # mag_lib is now a bare float
             if mag_swe is not None and mag_lib is not None:
                 d = abs(mag_swe - mag_lib)
                 print(f"  {star}: swe={mag_swe:.2f} lib={mag_lib:.2f} diff={d:.4f}")
