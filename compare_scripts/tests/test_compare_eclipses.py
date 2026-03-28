@@ -110,8 +110,8 @@ class TestEclipseAttributes:
 
         # pyswisseph signature: sol_eclipse_how(tjdut, geopos, flags)
         attr_swe = swe.sol_eclipse_how(jd, geopos, 0)
-        # libephemeris signature: swe_sol_eclipse_how(tjd_ut, ifl, geopos)
-        attr_py = ephem.swe_sol_eclipse_how(jd, 0, geopos)
+        # libephemeris signature: swe_sol_eclipse_how(tjdut, geopos, flags)
+        attr_py = ephem.swe_sol_eclipse_how(jd, geopos, 0)
 
         # Compare obscuration/magnitude
         # attr[0] = fraction of solar diameter covered

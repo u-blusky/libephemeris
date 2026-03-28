@@ -22,13 +22,11 @@ from libephemeris.crossing import (
 
 
 class TestSubArcsecondPrecision:
-    """Tests to verify sub-arcsecond convergence (0.05 arcsecond for Moon, 0.1 for planets, 0.001 for Sun)."""
+    """Tests to verify sub-milliarcsecond convergence (0.001 arcsecond for all bodies)."""
 
-    # 0.1 arcsecond = 0.1/3600 degrees = ~2.78e-5 degrees
-    SUB_ARCSEC = 0.1 / 3600.0
-    # 0.05 arcsecond = 0.05/3600 degrees (Moon tolerance)
-    SUB_ARCSEC_MOON = 0.05 / 3600.0
-    # 0.001 arcsecond = 0.001/3600 degrees = ~2.78e-7 degrees (Sun tolerance)
+    # All tolerances are now 0.001 arcsecond = 0.001/3600 degrees
+    SUB_ARCSEC = 0.001 / 3600.0
+    SUB_ARCSEC_MOON = 0.001 / 3600.0
     SUB_MILLIARCSEC = 0.001 / 3600.0
 
     @pytest.mark.unit
@@ -54,15 +52,15 @@ class TestSubArcsecondPrecision:
 
     @pytest.mark.unit
     def test_nr_max_iter_moon_constant(self):
-        """Verify NR_MAX_ITER_MOON is set to 30.
+        """Verify NR_MAX_ITER_MOON is set to 50.
 
-        30 iterations is sufficient for Moon due to rapid convergence:
+        50 iterations for sub-milliarcsecond convergence:
         - Longitude crossings (~13°/day): typically 7-12 iterations
-        - Node crossings (~1°/day latitude speed): up to 15-20 iterations
-        - 30 provides adequate safety margin (1.5-2.5x typical cases)
+        - Node crossings (~1°/day latitude speed): up to 20-30 iterations
+        - 50 provides adequate safety margin for extreme cases
         """
-        assert NR_MAX_ITER_MOON == 30, (
-            f"NR_MAX_ITER_MOON should be 30, got {NR_MAX_ITER_MOON}"
+        assert NR_MAX_ITER_MOON == 50, (
+            f"NR_MAX_ITER_MOON should be 50, got {NR_MAX_ITER_MOON}"
         )
 
     @pytest.mark.unit
@@ -1151,10 +1149,10 @@ class TestAdaptiveIterations:
 
     @pytest.mark.unit
     def test_iteration_constants_ordering(self):
-        """Iteration limits should increase as speed decreases."""
-        assert NR_MAX_ITER_PLANET < NR_MAX_ITER_HELIO
-        assert NR_MAX_ITER_HELIO < NR_MAX_ITER_VERY_SLOW
-        assert NR_MAX_ITER_VERY_SLOW < NR_MAX_ITER_STATION
+        """Iteration limits should increase (or equal) as speed decreases."""
+        assert NR_MAX_ITER_PLANET <= NR_MAX_ITER_HELIO
+        assert NR_MAX_ITER_HELIO <= NR_MAX_ITER_VERY_SLOW
+        assert NR_MAX_ITER_VERY_SLOW <= NR_MAX_ITER_STATION
 
     @pytest.mark.unit
     def test_pluto_typical_speed_configured(self):
@@ -1460,9 +1458,9 @@ class TestStationDetectionAndBrentsFallback:
         """Verify STATION_SPEED_THRESHOLD is defined and reasonable."""
         from libephemeris.crossing import STATION_SPEED_THRESHOLD
 
-        # Should be a small positive value (e.g., 0.001°/day)
-        assert 0 < STATION_SPEED_THRESHOLD < 0.01
-        assert STATION_SPEED_THRESHOLD == 0.001
+        # Should be a small positive value
+        assert 0 < STATION_SPEED_THRESHOLD <= 0.01
+        assert STATION_SPEED_THRESHOLD == 0.01
 
     @pytest.mark.unit
     def test_is_near_station_function(self):
@@ -1473,8 +1471,9 @@ class TestStationDetectionAndBrentsFallback:
         assert not _is_near_station(1.0)
         assert not _is_near_station(0.5)
         assert not _is_near_station(0.1)
-        assert not _is_near_station(0.01)
-        assert not _is_near_station(0.001)  # At threshold, not below
+        assert not _is_near_station(0.01)  # At threshold, not below (uses <)
+        assert _is_near_station(0.009)  # Below threshold
+        assert _is_near_station(0.001)
 
         # Near-zero speeds should be detected as stations
         assert _is_near_station(0.0005)
@@ -1483,7 +1482,7 @@ class TestStationDetectionAndBrentsFallback:
 
         # Negative speeds (retrograde) should also be detected
         assert not _is_near_station(-0.5)
-        assert not _is_near_station(-0.01)
+        assert not _is_near_station(-0.01)  # At threshold
         assert _is_near_station(-0.0005)
 
     @pytest.mark.unit

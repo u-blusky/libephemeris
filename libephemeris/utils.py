@@ -312,16 +312,8 @@ def azalt(
     if azimuth < 0:
         azimuth += 360.0
 
-    # When atpress=0, derive pressure from altitude via barometric formula
-    # (matching pyswisseph behavior: atpress=0 means "calculate from altitude")
-    if pressure == 0:
-        # International barometric formula: P = 1013.25 * (1 - 0.0065*h/288.15)^5.255
-        if altitude > 0:
-            pressure = 1013.25 * (1.0 - 0.0065 * altitude / 288.15) ** 5.255
-        else:
-            pressure = 1013.25
-        if temperature == 0:
-            temperature = 15.0 - 0.0065 * altitude
+    # pressure=0 means "no refraction" (pyswisseph convention).
+    # Only apply refraction when pressure is explicitly positive.
 
     # Calculate atmospheric refraction via ICAO ray-tracing
     if pressure > 0 and alt_true > -2.0:

@@ -19,7 +19,8 @@ import libephemeris as ephem
 # ============================================================================
 
 JULIAN_DAY_TOL = 1e-5  # About 1 second precision - different leap second handling
-DELTA_T_TOL = 0.2  # seconds - libephemeris uses IERS data, minor differences expected
+DELTA_T_TOL = 1.0  # seconds - Skyfield uses IERS bulletin data; SE uses polynomial model.
+# Divergence grows for historical dates (~0.7s at 1900, ~0.2s at 1950).
 SIDEREAL_TIME_TOL = 0.0001  # hours
 TIME_EQU_TOL = 0.0015  # days - ~2 minute tolerance for equation of time
 
