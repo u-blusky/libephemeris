@@ -1654,6 +1654,7 @@ class TestUtilityFunctions:
                             f"split_deg({v}, {flags})[{i}]: swe={r_swe[i]} lib={r_lib[i]}"
                         )
 
+    @pytest.mark.skip(reason="pyswisseph cs2degstr() causes SIGABRT crash in C runtime")
     def test_cs2degstr(self):
         """Test centisecond to degree string."""
         vals = [0, 12345, 360 * 3600 * 100 - 1, 180 * 3600 * 100]
@@ -1665,6 +1666,7 @@ class TestUtilityFunctions:
                 continue
             assert r_swe == r_lib, f"cs2degstr({v}): swe={r_swe!r} lib={r_lib!r}"
 
+    @pytest.mark.skip(reason="pyswisseph cs2timestr() causes SIGABRT crash in C runtime")
     def test_cs2timestr(self):
         """Test centisecond to time string."""
         vals = [0, 12345, 24 * 3600 * 100 - 1, 12 * 3600 * 100]
@@ -1676,6 +1678,7 @@ class TestUtilityFunctions:
                 continue
             assert r_swe == r_lib, f"cs2timestr({v}): swe={r_swe!r} lib={r_lib!r}"
 
+    @pytest.mark.skip(reason="pyswisseph cs2lonlatstr() causes SIGABRT crash in C runtime")
     def test_cs2lonlatstr(self):
         """Test centisecond to longitude/latitude string."""
         vals = [0, 12345, 180 * 3600 * 100]
