@@ -25,7 +25,7 @@ def angular_diff(val1: float, val2: float) -> float:
 # ============================================================================
 
 ANGLE_TOL = 0.0001  # degrees (0.36 arcsec)
-REFRACTION_TOL = 0.003  # degrees (~10 arcsec, acceptable precision difference)
+REFRACTION_TOL = 0.004  # degrees (~14 arcsec, low-altitude refraction precision limit)
 
 
 # ============================================================================

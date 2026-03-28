@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 import erfa
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, Union
 
 # Azalt calculation method flags (compatible with the reference API)
 SE_ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
@@ -34,37 +34,51 @@ APP_TO_TRUE: int = SE_APP_TO_TRUE
 
 def cotrans_sp(
     coord: "Sequence[float]",
-    eps: float,
-) -> Tuple[float, float, float, float, float, float]:
+    eps_or_speed: "Union[float, Sequence[float]]",
+    eps: "Optional[float]" = None,
+) -> "Union[Tuple[float, float, float, float, float, float], Tuple[Tuple[float, float, float], Tuple[float, float, float]]]":
     """
     Transform coordinates and velocities between ecliptic and equatorial systems.
 
-    Matches the pyswisseph signature: cotrans_sp(coord_6, eps).
+    Supports two calling conventions:
+      1. PySwissEph-compatible: cotrans_sp(coord_6, eps) -> flat 6-tuple
+      2. Split form: cotrans_sp(coord_3, speed_3, eps) -> (coord_3, speed_3)
 
     The direction of transformation depends on the sign of obliquity:
     - Negative obliquity: ecliptic (lon, lat) -> equatorial (RA, Dec)
     - Positive obliquity: equatorial (RA, Dec) -> ecliptic (lon, lat)
 
     Args:
-        coord: Sequence of 6 floats: (lon, lat, dist, lon_speed, lat_speed, dist_speed)
-        eps: Obliquity of the ecliptic in degrees.
-             Negative for ecliptic->equatorial, positive for equatorial->ecliptic.
+        coord: Sequence of 6 floats (lon,lat,dist,lon_sp,lat_sp,dist_sp),
+               or 3 floats (lon,lat,dist) when speed is given separately.
+        eps_or_speed: Obliquity (float) for 2-arg form, or speed tuple for 3-arg form.
+        eps: Obliquity (float) when using the 3-arg form.
 
     Returns:
-        Flat tuple of 6 floats: (new_lon, new_lat, dist, new_lon_speed, new_lat_speed, dist_speed)
-
-    Examples:
-        >>> result = cotrans_sp((90.0, 0.0, 1.0, 1.0, 0.0, 0.0), -23.4)
-        >>> new_lon, new_lat, dist, new_lon_sp, new_lat_sp, dist_sp = result
+        2-arg form: flat tuple of 6 floats
+        3-arg form: (coord_3, speed_3) tuple pair
     """
-    lon = float(coord[0])
-    lat = float(coord[1])
-    dist = float(coord[2])
-    lon_speed = float(coord[3])
-    lat_speed = float(coord[4])
-    dist_speed = float(coord[5])
-    obliquity = eps
-
+    if eps is not None:
+        # 3-arg form: cotrans_sp(coord_3, speed_3, eps)
+        speed_seq = eps_or_speed
+        obliquity = float(eps)
+        lon = float(coord[0])
+        lat = float(coord[1])
+        dist = float(coord[2])
+        lon_speed = float(speed_seq[0])
+        lat_speed = float(speed_seq[1])
+        dist_speed = float(speed_seq[2])
+        _split_return = True
+    else:
+        # 2-arg form: cotrans_sp(coord_6, eps)
+        obliquity = float(eps_or_speed)
+        lon = float(coord[0])
+        lat = float(coord[1])
+        dist = float(coord[2])
+        lon_speed = float(coord[3])
+        lat_speed = float(coord[4])
+        dist_speed = float(coord[5])
+        _split_return = False
     # Convert to radians
     # Negate obliquity to match the pyswisseph API convention
     lon_rad = math.radians(lon)
@@ -153,6 +167,8 @@ def cotrans_sp(
     new_lon_speed = math.degrees(new_lon_speed_rad)
     new_lat_speed = math.degrees(new_lat_speed_rad)
 
+    if _split_return:
+        return (new_lon, new_lat, dist), (new_lon_speed, new_lat_speed, dist_speed)
     return (new_lon, new_lat, dist, new_lon_speed, new_lat_speed, dist_speed)
 
 
