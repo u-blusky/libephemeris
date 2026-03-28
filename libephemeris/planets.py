@@ -1142,15 +1142,19 @@ def _calc_body_pctr(
     target = get_planet_target(planets, target_name)
     observer = get_planet_target(planets, observer_name)
 
-    from .cache import get_cached_observer_at
+    # Use a fresh Time object to avoid Skyfield reify descriptor corruption
+    # when the same Time is shared across multiple callers
+    t_fresh = get_timescale().tt_jd(float(t.tt))
 
     # Helper function to get position vector at time t_
+    # NOTE: We do NOT use get_cached_observer_at here because the cache
+    # can return positions computed with a corrupted Time object.
     def get_vector(t_):
         # Both positions relative to SSB (Solar System Barycenter)
         tgt = target.at(t_)
         tgt_pos = tgt.position.au
         tgt_vel = tgt.velocity.au_per_d
-        obs = get_cached_observer_at(observer, t_)
+        obs = observer.at(t_)
         obs_pos = obs.position.au
         obs_vel = obs.velocity.au_per_d
 
@@ -1167,12 +1171,12 @@ def _calc_body_pctr(
 
     if iflag & SEFLG_TRUEPOS:
         # Geometric position (no light-time correction)
-        p, v = get_vector(t)
+        p, v = get_vector(t_fresh)
     else:
         # Light-time corrected position
-        p, v = get_vector(t)
+        p, v = get_vector(t_fresh)
         # Hoist observer.at(t) out of the loop - observer stays at current time
-        obs_at_t = get_cached_observer_at(observer, t)
+        obs_at_t = observer.at(t_fresh)
         obs_pos = obs_at_t.position.au
         obs_vel = obs_at_t.velocity.au_per_d
         for _ in range(3):
@@ -1180,13 +1184,12 @@ def _calc_body_pctr(
             light_time = dist_au / C_AU_PER_DAY
             ts_lt = get_timescale()
             # Retard only the target, keep observer at current time
-            tgt_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time))
+            tgt_ret = target.at(ts_lt.tdb_jd(t_fresh.tdb - light_time))
             p = tgt_ret.position.au - obs_pos
             v = tgt_ret.velocity.au_per_d - obs_vel
 
     # Create position object for coordinate conversion
-    # Center doesn't matter for coordinate conversion, just for documentation
-    pos = ICRF(p, v, t=t, center=399)
+    pos = ICRF(p, v, t=t_fresh, center=399)
 
     # Extract coordinates based on flags
     is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
@@ -1216,10 +1219,19 @@ def _calc_body_pctr(
             p2 = math.degrees(math.asin(ze / dist_val))
             p3 = dist_val
         else:
-            from skyfield.framelib import true_equator_and_equinox_of_date
+            # True equator of date - use manual rotation to avoid Skyfield
+            # Time reify descriptor corruption
+            import numpy as np
 
-            dec, ra, dist = pos.frame_latlon(true_equator_and_equinox_of_date)
-        if not is_icrs or (iflag & SEFLG_J2000):
+            # t.M is the precession-nutation matrix (ICRS -> true equator of date)
+            xyz_icrs = np.array(pos.position.au)
+            xyz_eq = t.M @ xyz_icrs
+            xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
+            dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
+            p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+            p2 = math.degrees(math.asin(ze / dist_val)) if dist_val > 0 else 0.0
+            p3 = dist_val
+        if iflag & SEFLG_J2000:
             p1 = ra.degrees
             p2 = dec.degrees
             p3 = dist.au
@@ -1258,11 +1270,18 @@ def _calc_body_pctr(
             p2 = math.degrees(math.asin(ze / dist))
             p3 = dist
         else:
-            # Ecliptic of date
-            lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
-            p1 = lon_.degrees
-            p2 = lat_.degrees
-            p3 = dist_.au
+            # Ecliptic of date - use manual rotation to avoid Skyfield
+            # Time reify descriptor corruption
+            import numpy as np
+
+            R_ecl = ecliptic_frame.rotation_at(t)
+            xyz_icrs = np.array(pos.position.au)
+            xyz_ecl = R_ecl @ xyz_icrs
+            xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
+            dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+            p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+            p2 = math.degrees(math.asin(ze / dist)) if dist > 0 else 0.0
+            p3 = dist
 
     # Calculate speed using central difference numerical differentiation if requested
     # Central difference: f'(x) ≈ [f(x+h) - f(x-h)] / (2h) - error O(h²)
@@ -1864,7 +1883,12 @@ def _calc_body(
                     dlon = lon_diff / (2.0 * dt)
                     dlat = (lat_next - lat_prev) / (2.0 * dt)
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
-                except (IndexError, ValueError, ArithmeticError):
+                except (
+                    IndexError,
+                    ValueError,
+                    ArithmeticError,
+                    SkyfieldRangeError,
+                ):
                     # At ephemeris boundaries, speed calculation may fail
                     # Return 0 for speed components
                     from .logging_config import get_logger

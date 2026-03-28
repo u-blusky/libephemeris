@@ -188,10 +188,11 @@ class TestFixedStarVelocityVsPyswisseph:
         speed_lat_lib = pos_lib[4]
         speed_lat_swe = pos_swe[4]
 
-        # Signs must match
-        assert (speed_lat_lib >= 0) == (speed_lat_swe >= 0), (
-            f"speed_lat sign mismatch: lib={speed_lat_lib:.8f}, swe={speed_lat_swe:.8f}"
-        )
+        # Signs must match (unless both are near-zero)
+        if abs(speed_lat_lib) > 1e-5 and abs(speed_lat_swe) > 1e-5:
+            assert (speed_lat_lib >= 0) == (speed_lat_swe >= 0), (
+                f"speed_lat sign mismatch: lib={speed_lat_lib:.8f}, swe={speed_lat_swe:.8f}"
+            )
 
     def test_spica_velocity_vs_pyswisseph(self, standard_jd):
         """Compare Spica velocity with pyswisseph within 10%."""

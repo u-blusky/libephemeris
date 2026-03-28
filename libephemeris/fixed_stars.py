@@ -3998,8 +3998,8 @@ def calc_fixed_star_velocity(
     # Latitude speed: pure finite difference (no wraparound needed for latitude)
     speed_lat = lat_next - lat_prev
 
-    # Distance speed from central difference (radial velocity effect)
-    speed_dist = dist_next - dist_prev
+    # pyswisseph returns 0.0 for fixed star distance speed
+    speed_dist = 0.0
 
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
 

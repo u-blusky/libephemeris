@@ -186,10 +186,9 @@ class TestSwissEphemerisMethodologyComparison:
         assert len(ev_result) == 3, "Eccentricity vector method should return 3 values"
         assert len(oe_result) == 3, "Orbital elements method should return 3 values"
 
-        # Both should return physically reasonable eccentricity
-        # (confirming they use proper orbital mechanics)
-        assert 0.03 < ev_result[2] < 0.08, "Eccentricity should be ~0.055"
-        assert 0.03 < oe_result[2] < 0.08, "Eccentricity should be ~0.055"
+        # Both should return physically reasonable apogee distance in AU
+        assert 0.002 < ev_result[2] < 0.004, "Distance should be ~0.0027 AU"
+        assert 0.002 < oe_result[2] < 0.004, "Distance should be ~0.0027 AU"
 
     def test_both_methods_account_for_perturbations(self):
         """Both methods should apply perturbation corrections.

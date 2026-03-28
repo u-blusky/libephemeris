@@ -263,7 +263,7 @@ class TestSolEclipseHowDetails:
 
         # Dallas, TX (in totality path)
         geopos = [32.78, -96.80, 0.0]
-        details = ephem.swe_sol_eclipse_how_details(jd_max_glob, SEFLG_SWIEPH, geopos)
+        details = ephem.swe_sol_eclipse_how_details(jd_max_glob, geopos, SEFLG_SWIEPH)
 
         assert isinstance(details, dict), f"Expected dict, got {type(details)}"
 
@@ -273,7 +273,7 @@ class TestSolEclipseHowDetails:
         geopos = [45.0, 10.0, 0.0]
 
         # Should not crash
-        details = ephem.swe_sol_eclipse_how_details(jd, SEFLG_SWIEPH, geopos)
+        details = ephem.swe_sol_eclipse_how_details(jd, geopos, SEFLG_SWIEPH)
         assert isinstance(details, dict)
 
 
@@ -297,7 +297,7 @@ class TestSolEclipseObscurationAtLoc:
         geopos = [40.71, -74.01, 0.0]
 
         lib_obsc = ephem.swe_sol_eclipse_obscuration_at_loc(
-            jd_max_glob, SEFLG_SWIEPH, geopos
+            jd_max_glob, geopos, SEFLG_SWIEPH
         )
 
         # pyswisseph sol_eclipse_how(tjd_ut, geopos, flags) returns attr array
@@ -322,7 +322,7 @@ class TestSolEclipseObscurationAtLoc:
         jd = ephem.swe_julday(2024, 6, 1, 12.0)
         geopos = [45.0, 10.0, 0.0]
 
-        obsc = ephem.swe_sol_eclipse_obscuration_at_loc(jd, SEFLG_SWIEPH, geopos)
+        obsc = ephem.swe_sol_eclipse_obscuration_at_loc(jd, geopos, SEFLG_SWIEPH)
         assert obsc == 0.0 or obsc < 0.01, f"Expected ~0 obscuration, got {obsc}"
 
 
@@ -435,39 +435,44 @@ class TestHeliacalPhenoUt:
     """Test swe_heliacal_pheno_ut vs pyswisseph heliacal_pheno_ut."""
 
     def test_return_structure(self):
-        """Should return (tuple_of_floats, int)."""
+        """Should return a flat tuple of 50 floats."""
         jd = ephem.swe_julday(2024, 3, 21, 0.0)
-        result = ephem.swe_heliacal_pheno_ut(jd, lat=45.0, lon=10.0, body=SE_VENUS)
-        assert len(result) == 2, f"Expected 2-tuple, got {len(result)}"
-        pheno_data, retflag = result
-        assert isinstance(pheno_data, tuple)
-        assert isinstance(retflag, int)
+        geopos = (10.0, 45.0, 0.0)
+        atmo = (1013.25, 15.0, 40.0, 0.0)
+        observer = (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+        result = ephem.swe_heliacal_pheno_ut(
+            jd, geopos, atmo, observer, "Venus", 1, SEFLG_SWIEPH
+        )
+        assert isinstance(result, tuple), f"Expected tuple, got {type(result)}"
+        assert len(result) == 50, f"Expected 50-element tuple, got {len(result)}"
 
     def test_vs_pyswisseph(self):
         """Compare heliacal_pheno_ut output against pyswisseph."""
         jd = ephem.swe_julday(2024, 3, 21, 0.0)
         lat, lon, alt = 45.0, 10.0, 0.0
 
+        geopos = (lon, lat, alt)
+        atmo = (1013.25, 15.0, 40.0, 0.0)
+        observer = (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
         lib_result = ephem.swe_heliacal_pheno_ut(
-            jd, lat=lat, lon=lon, altitude=alt, body=SE_VENUS
+            jd, geopos, atmo, observer, "Venus", 1, SEFLG_SWIEPH
         )
-        lib_data = lib_result[0]
 
         try:
-            geopos = [lon, lat, alt]
+            geopos_swe = [lon, lat, alt]
             datm = [1013.25, 15.0, 0.5, 0.0]  # pressure, temp, humidity, unused
             dobs = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]  # observer params
             swe_result = swe.heliacal_pheno_ut(
-                jd, geopos, datm, dobs, "Venus", 1, swe.FLG_SWIEPH
+                jd, geopos_swe, datm, dobs, "Venus", 1, swe.FLG_SWIEPH
             )
         except Exception:
             pytest.skip("pyswisseph heliacal_pheno_ut failed")
 
         # Compare first few values (TAV, etc.)
         # Both should produce non-zero values
-        if len(lib_data) > 0 and len(swe_result) > 0:
+        if len(lib_result) > 0 and len(swe_result) > 0:
             # TAV (topocentric arcus visionis) should be similar
-            lib_tav = float(lib_data[0])
+            lib_tav = float(lib_result[0])
             swe_tav = float(swe_result[0])
             if abs(swe_tav) > 0.1:
                 ratio = lib_tav / swe_tav if swe_tav != 0 else 999
@@ -851,10 +856,10 @@ class TestCrossFunctionConsistency:
 
         geopos = [40.71, -74.01, 0.0]  # New York
 
-        obsc = ephem.swe_sol_eclipse_obscuration_at_loc(jd_max, SEFLG_SWIEPH, geopos)
+        obsc = ephem.swe_sol_eclipse_obscuration_at_loc(jd_max, geopos, SEFLG_SWIEPH)
 
         # eclipse_how returns attr tuple where attr[2] = fraction of disc covered
-        how_result = ephem.swe_sol_eclipse_how(jd_max, SEFLG_SWIEPH, geopos)
+        how_result = ephem.swe_sol_eclipse_how(jd_max, geopos, SEFLG_SWIEPH)
         if isinstance(how_result, tuple) and len(how_result) >= 2:
             attrs = how_result[1] if len(how_result) > 1 else how_result[0]
             if isinstance(attrs, (tuple, list)) and len(attrs) > 2:

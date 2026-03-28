@@ -35,22 +35,22 @@ class TestOptimalInterpolationParameters:
         # The function should work correctly with 9 sample points
         jd_tt = 2451545.0  # J2000.0
         result = lunar.calc_interpolated_apogee(jd_tt)
-        lon, lat, ecc = result
+        lon, lat, dist = result
 
         # Basic sanity checks
         assert 0 <= lon < 360
         assert -10 < lat < 10
-        assert 0.04 < ecc < 0.07
+        assert 0.002 < dist < 0.004  # Distance in AU
 
     def test_interpolated_perigee_uses_9_samples(self):
         """Verify calc_interpolated_perigee behavior is consistent with 9 samples."""
         jd_tt = 2451545.0
         result = lunar.calc_interpolated_perigee(jd_tt)
-        lon, lat, ecc = result
+        lon, lat, dist = result
 
         assert 0 <= lon < 360
         assert -10 < lat < 10
-        assert 0.04 < ecc < 0.07
+        assert 0.002 < dist < 0.004  # Distance in AU
 
 
 class TestInterpolatedSmoothness:

@@ -291,7 +291,7 @@ class TestSolarEclipseLocation:
         jd_start = ephem.swe_julday(2024, 1, 1, 0)
         dallas = [-96.797, 32.7767, 0]  # lon, lat, alt
 
-        lib_result = ephem.swe_sol_eclipse_when_loc(jd_start, SEFLG_SWIEPH, dallas)
+        lib_result = ephem.swe_sol_eclipse_when_loc(jd_start, dallas, SEFLG_SWIEPH)
         swe_result = swe.sol_eclipse_when_loc(jd_start, dallas)
 
         # Both should find the April 8, 2024 eclipse
@@ -321,7 +321,7 @@ class TestSolarEclipseLocation:
         for name, geopos in test_locs:
             try:
                 lib_result = ephem.swe_sol_eclipse_when_loc(
-                    jd_start, SEFLG_SWIEPH, geopos
+                    jd_start, geopos, SEFLG_SWIEPH
                 )
                 swe_result = swe.sol_eclipse_when_loc(jd_start, geopos)
 
@@ -347,7 +347,7 @@ class TestSolarEclipseLocation:
         jd_max = float(swe_result[1][0])
 
         # Calculate circumstances at maximum
-        lib_how = ephem.swe_sol_eclipse_how(jd_max, SEFLG_SWIEPH, dallas)
+        lib_how = ephem.swe_sol_eclipse_how(jd_max, dallas, SEFLG_SWIEPH)
         swe_how = swe.sol_eclipse_how(jd_max, dallas)
 
         lib_retflag = lib_how[0]
@@ -372,7 +372,7 @@ class TestSolarEclipseLocation:
         jd = ephem.swe_julday(2024, 7, 15, 12.0)  # Not an eclipse date
         rome = [12.4964, 41.9028, 0]
 
-        lib_result = ephem.swe_sol_eclipse_how(jd, SEFLG_SWIEPH, rome)
+        lib_result = ephem.swe_sol_eclipse_how(jd, rome, SEFLG_SWIEPH)
 
         # Should return 0 or very small magnitude
         lib_mag = float(lib_result[1][0])
@@ -394,7 +394,7 @@ class TestLunarEclipseLocation:
 
         la = [-118.24, 34.05, 0]  # Los Angeles
 
-        lib_result = ephem.swe_lun_eclipse_how(jd_max, SEFLG_SWIEPH, la)
+        lib_result = ephem.swe_lun_eclipse_how(jd_max, la, SEFLG_SWIEPH)
         swe_result = swe.lun_eclipse_how(jd_max, la)
 
         lib_retflag = lib_result[0]
@@ -420,7 +420,7 @@ class TestLunarEclipseLocation:
         jd = ephem.swe_julday(2024, 7, 15, 12.0)
         rome = [12.4964, 41.9028, 0]
 
-        lib_result = ephem.swe_lun_eclipse_how(jd, SEFLG_SWIEPH, rome)
+        lib_result = ephem.swe_lun_eclipse_how(jd, rome, SEFLG_SWIEPH)
 
         lib_umag = float(lib_result[1][0])
         assert lib_umag < 0.01, (
@@ -431,7 +431,7 @@ class TestLunarEclipseLocation:
         """lun_eclipse_when_loc should find eclipses visible from location."""
         jd_start = ephem.swe_julday(2022, 1, 1, 0)
 
-        lib_result = ephem.swe_lun_eclipse_when_loc(jd_start, 34.05, -118.24, 0.0)
+        lib_result = ephem.swe_lun_eclipse_when_loc(jd_start, [-118.24, 34.05, 0.0])
         swe_result = swe.lun_eclipse_when_loc(jd_start, [-118.24, 34.05, 0])
 
         lib_max = float(lib_result[1][0])
@@ -521,7 +521,7 @@ class TestSolarEclipseMagnitude:
         jd_max = float(swe_result[1][0])
 
         lib_mag = float(
-            ephem.swe_sol_eclipse_magnitude_at_loc(jd_max, SEFLG_SWIEPH, dallas)
+            ephem.swe_sol_eclipse_magnitude_at_loc(jd_max, dallas, SEFLG_SWIEPH)
         )
 
         # Dallas should see >0.9 magnitude for this total eclipse
@@ -534,7 +534,7 @@ class TestSolarEclipseMagnitude:
         jd = ephem.swe_julday(2024, 7, 15, 12.0)
         rome = [12.4964, 41.9028, 0]
 
-        lib_mag = float(ephem.swe_sol_eclipse_magnitude_at_loc(jd, SEFLG_SWIEPH, rome))
+        lib_mag = float(ephem.swe_sol_eclipse_magnitude_at_loc(jd, rome, SEFLG_SWIEPH))
         assert lib_mag < 0.01, f"No eclipse: magnitude {lib_mag} should be ~0"
 
 
@@ -1921,8 +1921,7 @@ class TestPhenoComprehensive:
         dates = [ephem.swe_julday(y, 6, 15, 12.0) for y in range(2020, 2026)]
 
         for jd in dates:
-            lib_result = ephem.swe_pheno_ut(jd, planet_id, SEFLG_SWIEPH)
-            vals = lib_result[0]
+            vals = ephem.swe_pheno_ut(jd, planet_id, SEFLG_SWIEPH)
 
             phase_angle = float(vals[0])
             phase = float(vals[1])
@@ -1970,10 +1969,9 @@ class TestPhenoComprehensive:
         """Detailed pheno_ut comparison with pyswisseph."""
         jd = ephem.swe_julday(2024, 6, 21, 12.0)
 
-        lib_result = ephem.swe_pheno_ut(jd, planet_id, SEFLG_SWIEPH)
+        lib_vals = ephem.swe_pheno_ut(jd, planet_id, SEFLG_SWIEPH)
         swe_result = swe.pheno_ut(jd, planet_id, swe.FLG_SWIEPH)
 
-        lib_vals = lib_result[0]
         swe_vals = swe_result[0] if isinstance(swe_result[0], tuple) else swe_result
 
         # Phase angle (index 0)

@@ -24,43 +24,43 @@ class TestOrbitalElementsMethodBasicFunctionality:
     def test_returns_valid_longitude(self):
         """Orbital elements method should return longitude in [0, 360) range."""
         jd_j2000 = 2451545.0
-        lon, lat, e_mag = calc_true_lilith_orbital_elements(jd_j2000)
+        lon, lat, dist = calc_true_lilith_orbital_elements(jd_j2000)
 
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
 
     def test_returns_valid_latitude(self):
         """Orbital elements method should return small latitude."""
         jd_j2000 = 2451545.0
-        lon, lat, e_mag = calc_true_lilith_orbital_elements(jd_j2000)
+        lon, lat, dist = calc_true_lilith_orbital_elements(jd_j2000)
 
         # Latitude should be less than 10 degrees
         assert -10 < lat < 10, f"Latitude {lat} unexpectedly large"
 
-    def test_returns_valid_eccentricity(self):
-        """Orbital elements method should return reasonable eccentricity."""
+    def test_returns_valid_distance(self):
+        """Orbital elements method should return reasonable apogee distance."""
         jd_j2000 = 2451545.0
-        lon, lat, e_mag = calc_true_lilith_orbital_elements(jd_j2000)
+        lon, lat, dist = calc_true_lilith_orbital_elements(jd_j2000)
 
-        # Lunar eccentricity is approximately 0.055
-        assert 0.03 < e_mag < 0.08, f"Eccentricity {e_mag} out of expected range"
+        # Apogee distance is approximately 0.0027 AU
+        assert 0.002 < dist < 0.004, f"Distance {dist} out of expected range"
 
     def test_works_for_historical_dates(self):
         """Should work for historical dates in ephemeris range."""
         jd_1950 = 2433282.5  # 1950-01-01
-        lon, lat, e_mag = calc_true_lilith_orbital_elements(jd_1950)
+        lon, lat, dist = calc_true_lilith_orbital_elements(jd_1950)
 
         assert 0 <= lon < 360
         assert -90 < lat < 90
-        assert 0.03 < e_mag < 0.08
+        assert 0.002 < dist < 0.004
 
     def test_works_for_future_dates(self):
         """Should work for future dates in ephemeris range."""
         jd_2050 = 2469807.5  # 2050-01-01
-        lon, lat, e_mag = calc_true_lilith_orbital_elements(jd_2050)
+        lon, lat, dist = calc_true_lilith_orbital_elements(jd_2050)
 
         assert 0 <= lon < 360
         assert -90 < lat < 90
-        assert 0.03 < e_mag < 0.08
+        assert 0.002 < dist < 0.004
 
 
 class TestOrbitalElementsVsEccentricityVector:

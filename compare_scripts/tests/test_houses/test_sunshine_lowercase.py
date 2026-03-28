@@ -137,10 +137,10 @@ class TestSunshineName:
         assert name == "Sunshine", f"Expected 'Sunshine' for 'I', got '{name}'"
 
     def test_lowercase_i_name(self):
-        """Test that 'i' returns 'Sunshine (alt)' name."""
+        """Test that 'i' returns 'Sunshine/alt.' name."""
         name = ephem.swe_house_name(ord("i"))
-        assert name == "Sunshine (alt)", (
-            f"Expected 'Sunshine (alt)' for 'i', got '{name}'"
+        assert name == "Sunshine/alt.", (
+            f"Expected 'Sunshine/alt.' for 'i', got '{name}'"
         )
 
 

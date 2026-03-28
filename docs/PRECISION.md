@@ -37,8 +37,8 @@ All planets sub-arcsecond. Moon ~3" max reflects different lunar models (JPL DE4
 | True Node | < 0.01" | Verified vs JPL Horizons to machine precision |
 | Mean Lilith | < 0.015" (lon) | Latitude ~20" systematic (different node formulas) |
 | True Lilith | < 0.5" | Both libraries ~240" from Horizons (inherent two-body limit) |
-| Interpolated Apogee | ~0.36° | Genuine algorithm difference (JPL DE440 vs ELP2000) |
-| Interpolated Perigee | ~2.6° | JPL DE440 physical passages vs truncated ELP2000 |
+| Interpolated Apogee | ~0.36° | Genuine algorithm difference (JPL DE440 vs ELP2000-82B perturbation series) |
+| Interpolated Perigee | ~2.6° | JPL DE440 physical passages vs truncated ELP2000-82B perturbation series |
 
 ## House Cusps
 

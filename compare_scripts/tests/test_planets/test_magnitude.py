@@ -50,7 +50,7 @@ class TestMallama2018Formulas:
 
         swe.set_ephe_path(None)
         swe_attr = swe.pheno_ut(jd, planet_id, 0)
-        lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+        lib_attr = ephem.pheno_ut(jd, planet_id, 0)
 
         swe_mag = swe_attr[4]
         lib_mag = lib_attr[4]
@@ -94,7 +94,7 @@ class TestMallama2018Formulas:
 
         for jd in test_dates:
             swe_attr = swe.pheno_ut(jd, planet_id, 0)
-            lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+            lib_attr = ephem.pheno_ut(jd, planet_id, 0)
 
             swe_mag = swe_attr[4]
             lib_mag = lib_attr[4]
@@ -119,7 +119,7 @@ class TestMercuryMagnitude:
     def test_mercury_magnitude_reasonable_range(self):
         """Mercury magnitude should be in reasonable range."""
         jd = 2451545.0
-        attr, _ = ephem.pheno_ut(jd, SE_MERCURY, 0)
+        attr = ephem.pheno_ut(jd, SE_MERCURY, 0)
         magnitude = attr[4]
 
         # Mercury typically ranges from about -2 to +5
@@ -132,7 +132,7 @@ class TestMercuryMagnitude:
         """Mercury should be brighter (lower magnitude) at smaller phase angles."""
         # At J2000, get Mercury's magnitude
         jd = 2451545.0
-        attr, _ = ephem.pheno_ut(jd, SE_MERCURY, 0)
+        attr = ephem.pheno_ut(jd, SE_MERCURY, 0)
         phase_angle_1 = attr[0]
         magnitude_1 = attr[4]
 
@@ -140,7 +140,7 @@ class TestMercuryMagnitude:
         # by scanning forward
         for offset in range(1, 100):
             jd2 = jd + offset
-            attr2, _ = ephem.pheno_ut(jd2, SE_MERCURY, 0)
+            attr2 = ephem.pheno_ut(jd2, SE_MERCURY, 0)
             phase_angle_2 = attr2[0]
             magnitude_2 = attr2[4]
 
@@ -161,10 +161,10 @@ class TestVenusMagnitude:
         """Venus should typically be the brightest planet (lowest magnitude)."""
         jd = 2451545.0
 
-        venus_attr, _ = ephem.pheno_ut(jd, SE_VENUS, 0)
-        jupiter_attr, _ = ephem.pheno_ut(jd, SE_JUPITER, 0)
-        mars_attr, _ = ephem.pheno_ut(jd, SE_MARS, 0)
-        saturn_attr, _ = ephem.pheno_ut(jd, SE_SATURN, 0)
+        venus_attr = ephem.pheno_ut(jd, SE_VENUS, 0)
+        jupiter_attr = ephem.pheno_ut(jd, SE_JUPITER, 0)
+        mars_attr = ephem.pheno_ut(jd, SE_MARS, 0)
+        saturn_attr = ephem.pheno_ut(jd, SE_SATURN, 0)
 
         venus_mag = venus_attr[4]
 
@@ -177,7 +177,7 @@ class TestVenusMagnitude:
     def test_venus_magnitude_reasonable_range(self):
         """Venus magnitude should be in reasonable range."""
         jd = 2451545.0
-        attr, _ = ephem.pheno_ut(jd, SE_VENUS, 0)
+        attr = ephem.pheno_ut(jd, SE_VENUS, 0)
         magnitude = attr[4]
 
         # Venus typically ranges from about -4.9 to -3.0
@@ -193,7 +193,7 @@ class TestMarsMagnitude:
     def test_mars_magnitude_reasonable_range(self):
         """Mars magnitude should be in reasonable range."""
         jd = 2451545.0
-        attr, _ = ephem.pheno_ut(jd, SE_MARS, 0)
+        attr = ephem.pheno_ut(jd, SE_MARS, 0)
         magnitude = attr[4]
 
         # Mars typically ranges from about -3 to +2
@@ -209,7 +209,7 @@ class TestJupiterMagnitude:
     def test_jupiter_magnitude_reasonable_range(self):
         """Jupiter magnitude should be in reasonable range."""
         jd = 2451545.0
-        attr, _ = ephem.pheno_ut(jd, SE_JUPITER, 0)
+        attr = ephem.pheno_ut(jd, SE_JUPITER, 0)
         magnitude = attr[4]
 
         # Jupiter typically ranges from about -2.9 to -1.6
@@ -221,7 +221,7 @@ class TestJupiterMagnitude:
     def test_jupiter_small_phase_angle(self):
         """Jupiter's phase angle should be small (< 12 degrees)."""
         jd = 2451545.0
-        attr, _ = ephem.pheno_ut(jd, SE_JUPITER, 0)
+        attr = ephem.pheno_ut(jd, SE_JUPITER, 0)
         phase_angle = attr[0]
 
         # Jupiter's phase angle as seen from Earth never exceeds 12 degrees
@@ -237,7 +237,7 @@ class TestSaturnMagnitude:
     def test_saturn_magnitude_reasonable_range(self):
         """Saturn magnitude should be in reasonable range."""
         jd = 2451545.0
-        attr, _ = ephem.pheno_ut(jd, SE_SATURN, 0)
+        attr = ephem.pheno_ut(jd, SE_SATURN, 0)
         magnitude = attr[4]
 
         # Saturn typically ranges from about -0.5 to +1.5
@@ -256,7 +256,7 @@ class TestSaturnMagnitude:
 
         swe.set_ephe_path(None)
         swe_attr = swe.pheno_ut(jd, SE_SATURN, 0)
-        lib_attr, _ = ephem.pheno_ut(jd, SE_SATURN, 0)
+        lib_attr = ephem.pheno_ut(jd, SE_SATURN, 0)
 
         swe_mag = swe_attr[4]
         lib_mag = lib_attr[4]
@@ -286,8 +286,8 @@ class TestMagnitudePhysics:
         jd_near = 2459965.0  # Near perihelion
         jd_far = 2457801.0  # Near aphelion
 
-        attr_near, _ = ephem.pheno_ut(jd_near, SE_JUPITER, 0)
-        attr_far, _ = ephem.pheno_ut(jd_far, SE_JUPITER, 0)
+        attr_near = ephem.pheno_ut(jd_near, SE_JUPITER, 0)
+        attr_far = ephem.pheno_ut(jd_far, SE_JUPITER, 0)
 
         # Magnitude at aphelion should be higher (dimmer)
         # But note: opposition effects can complicate this
@@ -309,7 +309,7 @@ class TestMagnitudePhysics:
     def test_magnitude_returns_finite_value(self, planet_id, planet_name):
         """Magnitude calculation should return finite values."""
         jd = 2451545.0
-        attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+        attr = ephem.pheno_ut(jd, planet_id, 0)
         magnitude = attr[4]
 
         assert math.isfinite(magnitude), (
@@ -349,7 +349,7 @@ class TestMagnitudeComparisonMultipleDates:
 
         for planet_id, planet_name, tol in planets:
             swe_attr = swe.pheno_ut(jd, planet_id, 0)
-            lib_attr, _ = ephem.pheno_ut(jd, planet_id, 0)
+            lib_attr = ephem.pheno_ut(jd, planet_id, 0)
 
             swe_mag = swe_attr[4]
             lib_mag = lib_attr[4]
