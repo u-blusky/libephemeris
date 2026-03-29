@@ -40,6 +40,13 @@ _FUTURE_END = year_to_jd(4990)
 
 TOLS_EXT = TierTolerances.for_tier(TIER)
 
+# Nutation polynomial degradation floor: beyond ±20 centuries from J2000,
+# Meeus nutation series loses ~0.003" precision. This is a known physical
+# limitation, not a Chebyshev approximation error. Use as floor for
+# per-body tolerances in extreme-date tests (ancient/future/sidereal).
+# Does NOT affect base/medium tiers or modern extended dates.
+NUTATION_FLOOR_ARCSEC = 0.005
+
 
 # =============================================================================
 # FIXTURES

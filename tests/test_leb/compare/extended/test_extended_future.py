@@ -21,7 +21,7 @@ from tests.test_leb.compare.conftest import (
     lon_error_arcsec,
 )
 
-from .conftest import TOLS_EXT
+from .conftest import TOLS_EXT, NUTATION_FLOOR_ARCSEC
 
 
 class TestFuturePlanetPosition:
@@ -113,7 +113,8 @@ class TestFutureEcliptic:
                 max_err = err
                 worst_jd = jd
 
-        tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("lon", TOLS_EXT.ECLIPTIC_ARCSEC)
+        per_body = ECLIPTIC_TOLERANCES.get(body_id, {}).get("lon", TOLS_EXT.ECLIPTIC_ARCSEC)
+        tol = max(per_body, NUTATION_FLOOR_ARCSEC)
         assert max_err < tol, (
             f'{body_name}: max future lon error = {max_err:.4f}" at JD {worst_jd:.1f}'
         )

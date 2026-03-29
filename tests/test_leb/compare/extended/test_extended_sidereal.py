@@ -39,7 +39,7 @@ from tests.test_leb.compare.conftest import (
     lon_error_arcsec,
 )
 
-from .conftest import TOLS_EXT
+from .conftest import TOLS_EXT, NUTATION_FLOOR_ARCSEC
 
 
 # ============================================================================
@@ -168,7 +168,8 @@ class TestExtSiderealEcliptic:
                 max_err = err
                 worst_jd = jd
 
-        tol = ECLIPTIC_TOLERANCES.get(body_id, {}).get("lon", SID_ECLIPTIC_TOL)
+        per_body = ECLIPTIC_TOLERANCES.get(body_id, {}).get("lon", SID_ECLIPTIC_TOL)
+        tol = max(per_body, NUTATION_FLOOR_ARCSEC)
         assert max_err < tol, (
             f'{body_name} SID Lahiri: max error = {max_err:.4f}" at JD {worst_jd:.1f}'
         )

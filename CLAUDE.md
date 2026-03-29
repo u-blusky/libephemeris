@@ -60,6 +60,23 @@ Three precision tiers: `base` (de440s.bsp, 1849-2150), `medium` (de440.bsp, 1550
 
 `SEFLG_MOSEPH` is accepted for API compatibility but silently ignored. All calculations always use JPL DE440/DE441 via Skyfield.
 
+## LEB vs Skyfield Precision (Measured)
+
+LEB Chebyshev approximation error vs Skyfield reference, per body group and tier:
+
+| Body Group | Base (1860-2140) | Medium (1560-2640) | Extended (-5000 to +5000) |
+|---|---|---|---|
+| **Planets** (Sun-Pluto, Earth) | <0.001" | <0.001" | <0.001" |
+| **Moon** | <0.001" (0.000332") | <0.001" (0.000325") | <0.001" |
+| **Asteroids** (Chiron-Vesta) | <0.001" (0.000045") | <0.001" (0.000036") | <0.001" |
+| **Ecliptic** (Nodes, Lilith) | <0.001" (0.000049") | <0.001" (0.000075") | <0.001" modern, <0.005" extreme dates |
+| **IntpApog/IntpPerig** | ~1-2° (pre-regen) | ~1-2° (pre-regen) | ~1-2° (pre-regen) |
+| **Uranians** | ~0.000000" | ~0.000000" | ~0.000000" |
+
+**Known limitation**: At extreme dates (beyond ±2000 years from J2000), Meeus nutation polynomial degradation adds ~0.003" to ecliptic body errors. This is a physical limit of the nutation series, not a Chebyshev fit error. Test tolerance floor: 0.005" for extended extreme-date tests only.
+
+**Asteroid SPK coverage**: Safe range 1920-2080 CE. Outside this range, SPK data is unavailable and calculations use Keplerian fallback (catastrophically wrong for LEB compare tests). Test dates are filtered to this range.
+
 ## Binary Ephemeris Mode (LEB)
 
 Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags (`SEFLG_TOPOCTR`, `SEFLG_XYZ`, `SEFLG_RADIANS`, `SEFLG_NONUT`).
