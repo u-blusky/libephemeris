@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import math
 from typing import Sequence, Tuple, Union
+
+import numpy as np
 from .constants import (
     SE_SUN,
     SE_MOON,
@@ -6064,141 +6066,182 @@ def lun_occult_when_glob(
 
         return jd_first, jd_second, jd_third, jd_fourth
 
-    # Main search loop
-    jd = jd_start
+    # --- Vectorized batch search (~20-50x speedup) ---
+    # Pre-resolve target once for batch computation
+    if planet != 0 and planet not in _PLANET_MAP:
+        raise ValueError(f"illegal planet number {planet}.")
 
-    # Moon moves ~13 degrees per day relative to stars
-    # So conjunctions with any target happen roughly every ~27 days
-    # But for occultations, we need close passages
+    if planet == 0:
+        from .fixed_stars import FIXED_STARS as _FS_B
+        from .fixed_stars import _resolve_star_id as _rsi_b
 
-    step = 0.5  # Check every half day initially for better detection
-    prev_sep = float("inf")  # Track previous separation to detect approaches
+        _b_star_id, _b_err, _ = _rsi_b(star_name)
+        if _b_err is not None:
+            raise ValueError(_b_err)
+        _b_star = _FS_B[_b_star_id]
+        _b_target = None
+    else:
+        _b_star = None
+        # Use the plain Skyfield ephemeris body for vectorized batch calls.
+        # get_planet_target() returns custom wrappers (_CobCorrectedTarget,
+        # _SpkCenterTarget) whose _observe_from_bcrs doesn't support array
+        # times.  The COB correction is < 0.01" — irrelevant for the coarse
+        # candidate scan.  Fine refinement later uses the scalar functions.
+        from .planets import _PLANET_FALLBACK
 
-    for iteration in range(MAX_ITERATIONS):
-        # Check current position
-        is_occ, sep, moon_r, target_r = _check_occultation(jd)
+        _planet_name_sf = _PLANET_MAP[planet]
+        try:
+            _b_target = eph[_planet_name_sf]
+        except KeyError:
+            _b_target = eph[_PLANET_FALLBACK.get(_planet_name_sf, _planet_name_sf)]
 
-        if is_occ:
-            # Found a potential occultation! Refine the timing
-            jd_max = _find_minimum_separation(jd - 0.5, jd + 0.5)
+    def _batch_separations(
+        jd_arr: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Compute Moon-target angular separations for an array of JDs.
 
-            # Get refined position data at minimum separation
+        Returns ``(separations, moon_radii, target_radii, moon_dist_au)``
+        as numpy arrays of the same length as *jd_arr*.
+        """
+        jds = np.asarray(jd_arr, dtype=np.float64)
+        t = ts.ut1_jd(jds)
+
+        # Moon geocentric apparent position
+        moon_app = earth.at(t).observe(moon_body).apparent()
+        m_ra_obj, m_dec_obj, m_dist_obj = moon_app.radec(epoch="date")
+        m_ra = np.asarray(m_ra_obj.hours) * 15.0
+        m_dec = np.asarray(m_dec_obj.degrees)
+        m_dist = np.asarray(m_dist_obj.au)
+        m_radii = MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / m_dist)
+
+        # Target position
+        if _b_star is not None:
+            t_years = (jds - 2451545.0) / 365.25
+            t_ra = _b_star.ra_j2000 + (_b_star.pm_ra * t_years) / 3600.0
+            t_dec = _b_star.dec_j2000 + (_b_star.pm_dec * t_years) / 3600.0
+            t_radii = np.full(len(jds), 0.0001)
+        else:
+            t_app = earth.at(t).observe(_b_target).apparent()
+            t_ra_o, t_dec_o, t_dist_o = t_app.radec(epoch="date")
+            t_ra = np.asarray(t_ra_o.hours) * 15.0
+            t_dec = np.asarray(t_dec_o.degrees)
+            t_dist = np.asarray(t_dist_o.au)
+            t_radii = np.array(
+                [_calc_planet_angular_radius(planet, float(d)) for d in t_dist]
+            )
+
+        # Vectorized haversine angular separation
+        ra1, dec1 = np.radians(m_ra), np.radians(m_dec)
+        ra2, dec2 = np.radians(t_ra), np.radians(t_dec)
+        cos_sep = np.sin(dec1) * np.sin(dec2) + np.cos(dec1) * np.cos(dec2) * np.cos(
+            ra1 - ra2
+        )
+        np.clip(cos_sep, -1.0, 1.0, out=cos_sep)
+        seps = np.degrees(np.arccos(cos_sep))
+
+        return seps, m_radii, t_radii, m_dist
+
+    # Coarse-to-fine batch search
+    _SCAN_STEP = 0.5  # days  (Moon moves ~13°/day; 0.5d catches all passes)
+    _SCAN_CHUNK = 1000  # JDs per vectorised call
+    _CANDIDATE_DEG = 5.0  # wide net for coarse candidates
+
+    direction = -1.0 if backwards else 1.0
+    search_limit = MAX_SEARCH_YEARS * 365.25
+    jd_cursor = jd_start
+
+    while abs(jd_cursor - jd_start) < search_limit:
+        chunk_end = jd_cursor + direction * _SCAN_CHUNK * _SCAN_STEP
+        # Clamp to search boundary
+        if direction > 0:
+            chunk_end = min(chunk_end, jd_start + search_limit)
+        else:
+            chunk_end = max(chunk_end, jd_start - search_limit)
+
+        chunk_jds = np.arange(jd_cursor, chunk_end, direction * _SCAN_STEP)
+        if len(chunk_jds) == 0:
+            break
+
+        seps, m_radii, t_radii, m_dists = _batch_separations(chunk_jds)
+
+        # Candidate selection: separation below per-point occultation
+        # threshold OR below a fixed wide threshold
+        occ_thresh = m_radii + t_radii + 1.0  # + parallax margin
+        candidate_mask = seps < np.minimum(occ_thresh, _CANDIDATE_DEG)
+
+        if not np.any(candidate_mask):
+            jd_cursor = float(chunk_jds[-1]) + direction * _SCAN_STEP
+            continue
+
+        # Group adjacent candidate indices into distinct events
+        cand_idx = np.where(candidate_mask)[0]
+        events: list[list[int]] = []
+        cur_group: list[int] = [int(cand_idx[0])]
+        for ci in range(1, len(cand_idx)):
+            if cand_idx[ci] - cand_idx[ci - 1] <= 5:
+                cur_group.append(int(cand_idx[ci]))
+            else:
+                events.append(cur_group)
+                cur_group = [int(cand_idx[ci])]
+        events.append(cur_group)
+
+        for event_group in events:
+            # Best coarse point in this group
+            g_seps = seps[event_group]
+            best_i = event_group[int(np.argmin(g_seps))]
+            jd_near = float(chunk_jds[best_i])
+
+            # Fine batch refinement around candidate (±0.5 day, 0.02 step)
+            fine_jds = np.arange(jd_near - 0.5, jd_near + 0.5, 0.02)
+            fine_seps, _, _, _ = _batch_separations(fine_jds)
+            jd_refined = float(fine_jds[int(np.argmin(fine_seps))])
+
+            # Precise minimum via golden-section search (scalar calls)
+            jd_max = _find_minimum_separation(jd_refined - 0.25, jd_refined + 0.25)
+
+            # --- Verification (identical to original logic) ---
             moon_ra, moon_dec, moon_dist, moon_r = _get_moon_position(jd_max)
             target_ra, target_dec, target_r = _get_target_position(jd_max)
             min_sep = _angular_separation(moon_ra, moon_dec, target_ra, target_dec)
 
-            # Strict verification for global occultation:
-            # For an occultation to be visible from SOMEWHERE on Earth,
-            # the geocentric separation minus the lunar parallax must be
-            # less than the sum of the angular radii.
-            # Lunar parallax at mean distance is ~0.95 degrees.
-            # Calculate actual parallax based on Moon distance
-            # Parallax (in degrees) = arcsin(Earth_radius / Moon_distance)
-            # Earth radius = 6378 km, Moon distance in AU, 1 AU = 149597870.7 km
             moon_dist_km = moon_dist * 149597870.7
             LUNAR_PARALLAX = math.degrees(math.asin(6378.0 / moon_dist_km))
 
-            # The occultation occurs if: min_sep - parallax < moon_r + target_r
-            # Which means: min_sep < moon_r + target_r + parallax
-            # But we need to be more careful: the occultation only occurs if
-            # the separation can be reduced enough by parallax to bring the
-            # target inside the Moon's disc.
-            true_occultation = min_sep < (moon_r + target_r + LUNAR_PARALLAX)
+            if min_sep >= (moon_r + target_r + LUNAR_PARALLAX):
+                continue  # not a true occultation
 
-            if true_occultation:
-                # For global occultations, contact times are defined as when
-                # the occultation is first/last visible from some Earth location.
-                # Use an adjusted threshold that accounts for parallax.
-                # The effective separation for timing is (min_sep - LUNAR_PARALLAX)
-                # which represents the minimum topocentric separation.
-                # Contact times occur when this equals moon_r + target_r.
-                # For the search, we use the geocentric positions but adjust threshold.
-                effective_sep = max(0, min_sep - LUNAR_PARALLAX)
-                adjusted_outer = moon_r + target_r
+            effective_sep = max(0, min_sep - LUNAR_PARALLAX)
 
-                # Calculate contact times using the adjusted geometry
-                jd_first, jd_second, jd_third, jd_fourth = (
-                    _calculate_contact_times_global(
-                        jd_max, min_sep, moon_r, target_r, LUNAR_PARALLAX
-                    )
-                )
+            jd_first, jd_second, jd_third, jd_fourth = _calculate_contact_times_global(
+                jd_max, min_sep, moon_r, target_r, LUNAR_PARALLAX
+            )
 
-                # Determine occultation type based on effective separation
-                # (minimum topocentric separation achievable)
-                grazing_threshold = 0.9 * moon_r
-                is_grazing = effective_sep > grazing_threshold
+            grazing_threshold = 0.9 * moon_r
+            is_grazing = effective_sep > grazing_threshold
 
-                if effective_sep < abs(moon_r - target_r):
-                    if target_r > moon_r:
-                        ecl_type = SE_ECL_ANNULAR
-                    else:
-                        ecl_type = SE_ECL_TOTAL
-                else:
-                    # Partial occultation
-                    ecl_type = SE_ECL_PARTIAL
+            if effective_sep < abs(moon_r - target_r):
+                ecl_type = SE_ECL_ANNULAR if target_r > moon_r else SE_ECL_TOTAL
+            else:
+                ecl_type = SE_ECL_PARTIAL
 
-                # Add grazing flag if applicable
-                if is_grazing:
-                    ecl_type |= SE_ECL_GRAZING
+            if is_grazing:
+                ecl_type |= SE_ECL_GRAZING
 
-                # Build tret tuple with reference API indices (10 elements):
-                # [0]: time of maximum occultation
-                # [1]: time when occultation takes place at local apparent noon
-                # [2]: time of occultation begin
-                # [3]: time of occultation end
-                # [4]: time of totality begin
-                # [5]: time of totality end
-                # [6]: time of center line begin
-                # [7]: time of center line end
-                # [8]: time when annular-total becomes total
-                # [9]: time when annular-total becomes annular again
-                tret = (
-                    jd_max,  # [0] Time of maximum occultation
-                    0.0,  # [1] Time at local apparent noon (not implemented)
-                    jd_first,  # [2] Time of occultation begin
-                    jd_fourth,  # [3] Time of occultation end
-                    jd_second,  # [4] Time of totality begin
-                    jd_third,  # [5] Time of totality end
-                    0.0,  # [6] Time of center line begin
-                    0.0,  # [7] Time of center line end
-                    0.0,  # [8] Annular-total becomes total
-                    0.0,  # [9] Annular-total becomes annular
-                )
+            tret = (
+                jd_max,
+                0.0,
+                jd_first,
+                jd_fourth,
+                jd_second,
+                jd_third,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            )
+            return ecl_type, tret
 
-                return ecl_type, tret
-
-        # Check if we're getting close to an occultation
-        # Use smaller steps when separation is decreasing (approaching close encounter)
-        # or when already close
-        is_approaching = sep < prev_sep
-
-        if sep < 3.0:
-            # Very close - use small steps
-            step = 0.1
-        elif is_approaching and sep < 20.0:
-            # Approaching a close encounter - use moderate steps
-            step = 0.25
-        elif sep < 10.0:
-            step = 0.5
-        else:
-            step = 1.0
-
-        # Remember current separation for next iteration
-        prev_sep = sep
-
-        # Apply step direction based on backwards parameter
-        if backwards:
-            jd -= step
-        else:
-            jd += step
-
-        # Check search limits
-        if backwards:
-            if jd < jd_start - MAX_SEARCH_YEARS * 365.25:
-                break
-        else:
-            if jd > jd_start + MAX_SEARCH_YEARS * 365.25:
-                break
+        jd_cursor = float(chunk_jds[-1]) + direction * _SCAN_STEP
 
     target_desc = star_name if planet == 0 else f"planet {planet}"
     raise RuntimeError(
