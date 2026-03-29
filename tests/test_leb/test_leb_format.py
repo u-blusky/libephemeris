@@ -283,11 +283,11 @@ class TestBodyParams:
 
     @pytest.mark.unit
     def test_degree_range(self):
-        """Polynomial degree should be in range [7, 16]."""
+        """Polynomial degree should be in range [7, 17]."""
         for body_id, params in BODY_PARAMS.items():
             _, degree, _, _ = params
-            assert 7 <= degree <= 16, (
-                f"Body {body_id} has degree {degree}, expected 7-16"
+            assert 7 <= degree <= 17, (
+                f"Body {body_id} has degree {degree}, expected 7-17"
             )
 
 

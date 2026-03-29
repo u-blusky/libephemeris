@@ -20,10 +20,13 @@ from libephemeris.constants import (
     SE_NEPTUNE,
 )
 
+from libephemeris.exceptions import EphemerisRangeError
+
 from tests.test_leb.compare.conftest import (
     ICRS_PLANETS,
     ASTEROID_BODIES,
     CompareHelper,
+    filter_asteroid_dates,
 )
 
 from .conftest import TOLS_BASE
@@ -53,14 +56,15 @@ class TestBaseGeocentricDistance:
         body_name: str,
     ):
         """Geocentric distance matches Skyfield within tolerance."""
+        dates = filter_asteroid_dates(base_dates_150, body_id)
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in base_dates_150:
+        for jd in dates:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[2] - leb[2])

@@ -10,6 +10,7 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import SEFLG_SPEED, SEFLG_EQUATORIAL
+from libephemeris.exceptions import EphemerisRangeError
 
 from tests.test_leb.compare.conftest import (
     ALL_LEB_BODIES,
@@ -45,7 +46,7 @@ class TestMediumLongitudeVelocity:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[3] - leb[3])
@@ -82,7 +83,7 @@ class TestMediumLatitudeVelocity:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[4] - leb[4])
@@ -130,7 +131,7 @@ class TestMediumDistanceVelocity:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[5] - leb[5])

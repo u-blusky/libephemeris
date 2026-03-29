@@ -11,9 +11,12 @@ import pytest
 import libephemeris as ephem
 from libephemeris.constants import SEFLG_SPEED
 
+from libephemeris.exceptions import EphemerisRangeError
+
 from tests.test_leb.compare.conftest import (
     ASTEROID_BODIES,
     CompareHelper,
+    filter_asteroid_dates,
     lon_error_arcsec,
 )
 
@@ -34,15 +37,16 @@ class TestBaseAsteroidPosition:
         body_name: str,
     ):
         """Asteroid longitude and latitude match Skyfield within tolerance."""
+        dates = filter_asteroid_dates(base_dates_300, body_id)
         max_lon_err = 0.0
         max_lat_err = 0.0
         worst_jd = 0.0
 
-        for jd in base_dates_300:
+        for jd in dates:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 # Asteroid may not have SPK coverage for all dates
                 continue
 
@@ -77,14 +81,15 @@ class TestBaseAsteroidSpeed:
         body_name: str,
     ):
         """Asteroid speed matches Skyfield within tolerance."""
+        dates = filter_asteroid_dates(base_dates_300, body_id)
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in base_dates_300:
+        for jd in dates:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[3] - leb[3])
@@ -111,14 +116,15 @@ class TestBaseAsteroidDistance:
         body_name: str,
     ):
         """Asteroid distance matches Skyfield within tolerance."""
+        dates = filter_asteroid_dates(base_dates_300, body_id)
         max_err = 0.0
         worst_jd = 0.0
 
-        for jd in base_dates_300:
+        for jd in dates:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[2] - leb[2])

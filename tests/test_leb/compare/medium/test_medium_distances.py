@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
+from libephemeris.exceptions import EphemerisRangeError
 from libephemeris.constants import (
     SEFLG_SPEED,
     SEFLG_HELCTR,
@@ -61,7 +62,7 @@ class TestMediumGeocentricDistance:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[2] - leb[2])

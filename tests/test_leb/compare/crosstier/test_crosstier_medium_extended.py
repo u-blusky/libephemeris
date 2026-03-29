@@ -11,6 +11,7 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import SEFLG_SPEED
+from libephemeris.exceptions import EphemerisRangeError
 
 from tests.test_leb.compare.conftest import (
     ECLIPTIC_BODIES,
@@ -50,7 +51,7 @@ class TestMediumExtendedPosition:
                 extended, _ = cross_medium_extended.tier_b(
                     ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
                 )
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = lon_error_arcsec(medium[0], extended[0])
@@ -89,7 +90,7 @@ class TestMediumExtendedSpeed:
                 extended, _ = cross_medium_extended.tier_b(
                     ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
                 )
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(medium[3] - extended[3])

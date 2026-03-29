@@ -11,6 +11,7 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import SEFLG_SPEED
+from libephemeris.exceptions import EphemerisRangeError
 
 from tests.test_leb.compare.conftest import (
     ALL_LEB_BODIES,
@@ -46,7 +47,7 @@ class TestBaseMediumPosition:
                 medium, _ = cross_base_medium.tier_b(
                     ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
                 )
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = lon_error_arcsec(base[0], medium[0])
@@ -84,7 +85,7 @@ class TestBaseMediumSpeed:
                 medium, _ = cross_base_medium.tier_b(
                     ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
                 )
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(base[3] - medium[3])

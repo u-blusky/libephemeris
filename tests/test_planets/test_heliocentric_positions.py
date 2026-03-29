@@ -264,9 +264,19 @@ class TestHeliocentricVsGeocentric:
     @pytest.mark.unit
     def test_earth_heliocentric_is_sun_geocentric_opposite(self):
         """Earth helio longitude should be ~180° from Sun geocentric."""
-        jd = 2451545.0
-        r_earth, _ = swe.swe_calc_ut(jd, SE_EARTH, SEFLG_HELCTR)
-        r_sun, _ = swe.swe_calc_ut(jd, SE_SUN, 0)
+        # Force Skyfield mode to avoid LEB state leakage from other tests
+        from libephemeris import state
+        saved_leb = state._LEB_FILE
+        saved_reader = state._LEB_READER
+        state._LEB_FILE = None
+        state._LEB_READER = None
+        try:
+            jd = 2451545.0
+            r_earth, _ = swe.swe_calc_ut(jd, SE_EARTH, SEFLG_HELCTR)
+            r_sun, _ = swe.swe_calc_ut(jd, SE_SUN, 0)
+        finally:
+            state._LEB_FILE = saved_leb
+            state._LEB_READER = saved_reader
         diff = abs(r_earth[0] - r_sun[0])
         if diff > 180:
             diff = 360 - diff

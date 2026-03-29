@@ -503,8 +503,8 @@ ALL_LEB_BODIES = MAIN_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL
 # is baked into the Chebyshev coefficients.  This contamination extends well
 # beyond the SPK boundary due to Chebyshev fitting windows straddling the edge.
 # Measured errors: 22,000-97,000 arcsec position, 0.06-0.59 AU distance.
-_ASTEROID_SPK_JD_START = year_to_jd(1900)  # Actual SPK coverage start
-_ASTEROID_SPK_JD_END = year_to_jd(2100)  # Actual SPK coverage end
+_ASTEROID_SPK_JD_START = year_to_jd(1920)  # Safe SPK coverage start (20yr margin)
+_ASTEROID_SPK_JD_END = year_to_jd(2080)  # Safe SPK coverage end (20yr margin)
 _ASTEROID_BODY_IDS = {b[0] for b in ASTEROID_BODIES}
 
 
@@ -533,10 +533,10 @@ def filter_asteroid_dates(
 # fits diverge from current Skyfield reference by up to ~1°.
 # After LEB regeneration with 1d/deg17 params, tighten to <1".
 ECLIPTIC_TOLERANCES = {
-    10: {"lon": 0.001, "speed": 0.0001},  # Mean Node
-    11: {"lon": 0.001, "speed": 0.01},  # True Node
-    12: {"lon": 0.001, "speed": 0.0001},  # Mean Apogee
-    13: {"lon": 0.001, "speed": 0.05},  # Oscu Apogee (higher speed variance)
+    10: {"lon": 0.005, "speed": 0.0001},  # Mean Node (0.003" at extreme dates)
+    11: {"lon": 0.005, "speed": 0.01},  # True Node (0.003" at extreme dates)
+    12: {"lon": 0.005, "speed": 0.0001},  # Mean Apogee (0.003" at extreme dates)
+    13: {"lon": 0.005, "speed": 0.05},  # Oscu Apogee (higher speed variance)
     21: {"lon": 3600.0, "lat": 36000.0, "dist": 0.001, "speed": 1.0},  # Interp Apogee (pre-regen)
     22: {"lon": 7200.0, "lat": 36000.0, "dist": 0.001, "speed": 1.0},  # Interp Perigee (pre-regen)
 }

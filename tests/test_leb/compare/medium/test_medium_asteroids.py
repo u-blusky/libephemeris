@@ -12,6 +12,7 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import SEFLG_SPEED
+from libephemeris.exceptions import EphemerisRangeError
 
 from tests.test_leb.compare.conftest import (
     ASTEROID_BODIES,
@@ -48,7 +49,7 @@ class TestMediumAsteroidPosition:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             lon_err = lon_error_arcsec(ref[0], leb[0])
@@ -90,7 +91,7 @@ class TestMediumAsteroidSpeed:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[3] - leb[3])
@@ -125,7 +126,7 @@ class TestMediumAsteroidDistance:
             try:
                 ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
                 leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
             err = abs(ref[2] - leb[2])
