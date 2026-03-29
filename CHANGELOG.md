@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a5] — 2026-03-29
+
+### Performance
+
+#### Vectorized `heliacal_ut()` and `lun_occult_when_glob()` Inner Loops
+
+Replaced per-day/per-step scalar Skyfield calls with batched numpy-vectorized
+computation, dramatically reducing wall-clock time for the two slowest functions
+in the library.
+
+**`heliacal_ut()`** — 5-15x faster (1-2.5s vs 5-30s):
+- New `_batch_check_twilight_visibility()` processes 100 days per batch using
+  2 vectorized Skyfield `altaz()` calls instead of hundreds of individual calls
+- Elongation derived from already-computed altaz coordinates, eliminating 2 extra
+  geocentric Skyfield calls per batch
+- Body magnitude sampled every 10 days and interpolated (saves ~5ms/call × ~90
+  calls per batch from `swe_pheno_ut()`)
+- All 4 search functions (`_search_heliacal_rising`, `_search_heliacal_setting`,
+  `_search_evening_first`, `_search_morning_last`) now process days in batches
+
+**`lun_occult_when_glob()`** — 15-100x faster (0.6-1.3s vs 10-60s):
+- New `_batch_separations()` computes Moon-target angular separations for arrays
+  of JDs in 2 vectorized Skyfield calls with numpy haversine
+- Replaced adaptive-step scalar loop with coarse-to-fine batch search: 0.5-day
+  scan in chunks of 1000, candidate detection below 5° threshold, golden-section
+  refinement only on promising candidates
+- Uses plain Skyfield ephemeris bodies (barycenters) for batch calls to avoid
+  custom wrapper vectorization issues; fine refinement uses full-precision scalar
+  functions
+
+| Function | Before | After | Speedup |
+|---|---|---|---|
+| `heliacal_ut()` Venus | 5-30s | 1-2.5s | 5-15x |
+| `heliacal_ut()` Mercury | 5-30s | ~1s | 5-30x |
+| `heliacal_ut()` stars (Sirius) | 5-30s | ~1s | 5-30x |
+| `lun_occult_when_glob()` star | 10-60s | ~0.6s | 15-100x |
+| `lun_occult_when_glob()` planet | 10-60s | ~0.9s | 10-65x |
+
 ## [1.0.0a4] — 2026-03-29
 
 ### Fixed
