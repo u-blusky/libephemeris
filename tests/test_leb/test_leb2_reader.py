@@ -35,7 +35,9 @@ from libephemeris.leb_format import (
 from libephemeris.leb_reader import LEBReader, open_leb
 
 # Skip all tests if base LEB file doesn't exist
-LEB1_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "leb", "ephemeris_base.leb")
+LEB1_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "data", "leb", "ephemeris_base.leb"
+)
 LEB2_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "leb2")
 
 requires_leb1 = pytest.mark.skipif(
@@ -62,7 +64,9 @@ def _create_mini_leb2(body_ids=(0,)):
             entry.segment_count, entry.components, entry.degree + 1
         )
         bits = compute_mantissa_bits(arr)
-        blob = compress_body(raw, entry.segment_count, entry.degree, entry.components, bits)
+        blob = compress_body(
+            raw, entry.segment_count, entry.degree, entry.components, bits
+        )
         body_entries.append((entry, blob, raw_size))
 
     reader1.close()
@@ -70,7 +74,7 @@ def _create_mini_leb2(body_ids=(0,)):
 
 
 def struct_pack_from_mmap(mm, offset, size):
-    return bytes(mm[offset:offset + size])
+    return bytes(mm[offset : offset + size])
 
 
 @requires_leb1
@@ -179,7 +183,7 @@ class TestLEB2Reader:
                 err = max(abs(a - b) for a, b in zip(pos1, pos2))
                 err_arcsec = err * 206265
                 assert err_arcsec < 0.01, (
-                    f"Body {bid} at JD {jd}: error {err_arcsec:.4f}\" > 0.01\""
+                    f'Body {bid} at JD {jd}: error {err_arcsec:.4f}" > 0.01"'
                 )
 
         reader1.close()
@@ -188,7 +192,7 @@ class TestLEB2Reader:
 
 requires_leb2_companions = pytest.mark.skipif(
     not os.path.isfile(os.path.join(LEB2_DIR, "base_asteroids.leb")),
-    reason="LEB2 companion files not available (only core is tracked in git)"
+    reason="LEB2 companion files not available (only core is tracked in git)",
 )
 
 
@@ -198,7 +202,7 @@ class TestCompositeLEBReader:
         from libephemeris.leb_composite import CompositeLEBReader
 
         reader = CompositeLEBReader.from_directory(LEB2_DIR)
-        assert reader.has_body(0)   # Sun (core always present)
+        assert reader.has_body(0)  # Sun (core always present)
         reader.close()
 
     @requires_leb2_companions
@@ -216,7 +220,7 @@ class TestCompositeLEBReader:
 
         path = os.path.join(LEB2_DIR, "base_core.leb")
         reader = CompositeLEBReader.from_file_with_companions(path)
-        assert reader.has_body(0)   # from primary
+        assert reader.has_body(0)  # from primary
         reader.close()
 
     @requires_leb2_companions
@@ -236,10 +240,10 @@ class TestCompositeLEBReader:
         jd = 2451545.0
 
         # Bodies from different files
-        pos_sun, _ = reader.eval_body(0, jd)     # core
-        pos_chi, _ = reader.eval_body(15, jd)     # asteroids
-        pos_osc, _ = reader.eval_body(13, jd)     # apogee
-        pos_cup, _ = reader.eval_body(40, jd)     # uranians
+        pos_sun, _ = reader.eval_body(0, jd)  # core
+        pos_chi, _ = reader.eval_body(15, jd)  # asteroids
+        pos_osc, _ = reader.eval_body(13, jd)  # apogee
+        pos_cup, _ = reader.eval_body(40, jd)  # uranians
 
         assert len(pos_sun) == 3
         assert len(pos_chi) == 3

@@ -131,8 +131,14 @@ class TestHorizonsUranianAnalytical:
 
     URANIAN_IDS = [40, 41, 42, 43, 44, 45, 46, 47]
     URANIAN_NAMES = [
-        "Cupido", "Hades", "Zeus", "Kronos",
-        "Apollon", "Admetos", "Vulkanus", "Poseidon",
+        "Cupido",
+        "Hades",
+        "Zeus",
+        "Kronos",
+        "Apollon",
+        "Admetos",
+        "Vulkanus",
+        "Poseidon",
     ]
 
     @pytest.mark.parametrize(
@@ -141,9 +147,7 @@ class TestHorizonsUranianAnalytical:
     )
     def test_uranian_helio_analytical(self, body_id, name):
         """Uranian body via horizons_calc_ut heliocentric should work."""
-        result = horizons_calc_ut(
-            None, JD_J2000, body_id, SEFLG_SWIEPH | SEFLG_HELCTR
-        )
+        result = horizons_calc_ut(None, JD_J2000, body_id, SEFLG_SWIEPH | SEFLG_HELCTR)
         data = result[0]
         assert len(data) == 6, f"{name}: expected 6 values, got {len(data)}"
         assert 0.0 <= data[0] < 360.0, f"{name}: lon={data[0]} out of range"

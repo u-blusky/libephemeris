@@ -376,9 +376,7 @@ class TestBaseTierPrecision:
                     max_err = lon_err
 
             tol = _ECLIPTIC_BODY_TOLERANCE.get(ipl, ECLIPTIC_TOLERANCE_ARCSEC)
-            assert max_err < tol, (
-                f"Body {ipl} max error = {max_err:.4f} arcsec"
-            )
+            assert max_err < tol, f"Body {ipl} max error = {max_err:.4f} arcsec"
 
 
 # =============================================================================
@@ -559,9 +557,7 @@ class TestMediumTierPrecision:
                     max_err = speed_err
 
             tol = _ECLIPTIC_SPEED_TOLERANCE.get(ipl, SPEED_TOLERANCE_DEG_DAY)
-            assert max_err < tol, (
-                f"Body {ipl} max speed error = {max_err:.6f} deg/day"
-            )
+            assert max_err < tol, f"Body {ipl} max speed error = {max_err:.6f} deg/day"
 
     @pytest.mark.slow
     @pytest.mark.precision
@@ -614,9 +610,7 @@ class TestMediumTierPrecision:
                     max_err = lon_err
 
             tol = _ECLIPTIC_BODY_TOLERANCE.get(ipl, ECLIPTIC_TOLERANCE_ARCSEC)
-            assert max_err < tol, (
-                f"Body {ipl} max error = {max_err:.4f} arcsec"
-            )
+            assert max_err < tol, f"Body {ipl} max error = {max_err:.4f} arcsec"
 
 
 # =============================================================================

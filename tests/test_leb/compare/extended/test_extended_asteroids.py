@@ -26,181 +26,91 @@ from tests.test_leb.compare.conftest import (
 
 from .conftest import TOLS_EXT
 
-
-# Generate dates within SPK coverage (~1900-2100)
 _SPK_START = year_to_jd(1910)
 _SPK_END = year_to_jd(2090)
 
 
 @pytest.fixture(scope="session")
 def asteroid_dates() -> list[float]:
-    """100 dates within asteroid SPK coverage (1910-2090)."""
     return generate_test_dates(100, _SPK_START, _SPK_END)
 
 
-class TestExtAsteroidLongitude:
-    """Asteroid longitude precision within SPK coverage."""
+class TestExtAsteroidPrecision:
+    """All-in-one precision check for asteroids within SPK coverage."""
 
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
-    def test_longitude(
+    def test_all_components(
         self,
         compare: CompareHelper,
         asteroid_dates: list[float],
         body_id: int,
         body_name: str,
     ):
-        """Asteroid ecliptic longitude matches Skyfield within tolerance."""
         dates = filter_asteroid_dates(asteroid_dates, body_id)
         if not dates:
             pytest.skip(f"No valid dates for {body_name}")
 
-        max_err = 0.0
-        worst_jd = 0.0
+        tol_lon = TOLS_EXT.ASTEROID_ARCSEC
+        tol_lat = TOLS_EXT.ASTEROID_ARCSEC
+        tol_dist = TOLS_EXT.DISTANCE_AU
+        tol_speed_lon = TOLS_EXT.ASTEROID_SPEED_LON_DEG_DAY
+        tol_speed_lat = TOLS_EXT.ASTEROID_SPEED_LAT_DEG_DAY
+
+        worst = {
+            "lon": (0.0, 0.0),
+            "lat": (0.0, 0.0),
+            "dist": (0.0, 0.0),
+            "speed_lon": (0.0, 0.0),
+            "speed_lat": (0.0, 0.0),
+        }
 
         for jd in dates:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
-            err = lon_error_arcsec(ref[0], leb[0])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
+            err_lon = lon_error_arcsec(ref[0], leb[0])
+            if err_lon > worst["lon"][0]:
+                worst["lon"] = (err_lon, jd)
 
-        assert max_err < TOLS_EXT.ASTEROID_ARCSEC, (
-            f'{body_name}: max lon error = {max_err:.4f}" at JD {worst_jd:.1f}'
+            err_lat = abs(ref[1] - leb[1]) * 3600.0
+            if err_lat > worst["lat"][0]:
+                worst["lat"] = (err_lat, jd)
+
+            err_dist = abs(ref[2] - leb[2])
+            if err_dist > worst["dist"][0]:
+                worst["dist"] = (err_dist, jd)
+
+            err_speed_lon = abs(ref[3] - leb[3])
+            if err_speed_lon > worst["speed_lon"][0]:
+                worst["speed_lon"] = (err_speed_lon, jd)
+
+            err_speed_lat = abs(ref[4] - leb[4])
+            if err_speed_lat > worst["speed_lat"][0]:
+                worst["speed_lat"] = (err_speed_lat, jd)
+
+        e_lon, jd_lon = worst["lon"]
+        assert e_lon < tol_lon, (
+            f'{body_name}: max lon error = {e_lon:.4f}" at JD {jd_lon:.1f}'
         )
 
-
-class TestExtAsteroidLatitude:
-    """Asteroid latitude precision within SPK coverage."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
-    def test_latitude(
-        self,
-        compare: CompareHelper,
-        asteroid_dates: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Asteroid ecliptic latitude matches Skyfield within tolerance."""
-        dates = filter_asteroid_dates(asteroid_dates, body_id)
-        if not dates:
-            pytest.skip(f"No valid dates for {body_name}")
-
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[1] - leb[1]) * 3600.0
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        assert max_err < TOLS_EXT.ASTEROID_ARCSEC, (
-            f'{body_name}: max lat error = {max_err:.4f}" at JD {worst_jd:.1f}'
+        e_lat, jd_lat = worst["lat"]
+        assert e_lat < tol_lat, (
+            f'{body_name}: max lat error = {e_lat:.4f}" at JD {jd_lat:.1f}'
         )
 
-
-class TestExtAsteroidDistance:
-    """Asteroid distance precision within SPK coverage."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
-    def test_distance(
-        self,
-        compare: CompareHelper,
-        asteroid_dates: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Asteroid geocentric distance matches Skyfield within tolerance."""
-        dates = filter_asteroid_dates(asteroid_dates, body_id)
-        if not dates:
-            pytest.skip(f"No valid dates for {body_name}")
-
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[2] - leb[2])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        assert max_err < TOLS_EXT.DISTANCE_AU, (
-            f"{body_name}: max dist error = {max_err:.2e} AU at JD {worst_jd:.1f}"
+        e_dist, jd_dist = worst["dist"]
+        assert e_dist < tol_dist, (
+            f"{body_name}: max dist error = {e_dist:.2e} AU at JD {jd_dist:.1f}"
         )
 
-
-class TestExtAsteroidSpeed:
-    """Asteroid velocity precision within SPK coverage."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
-    def test_speed_longitude(
-        self,
-        compare: CompareHelper,
-        asteroid_dates: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Asteroid longitude speed matches Skyfield within tolerance."""
-        dates = filter_asteroid_dates(asteroid_dates, body_id)
-        if not dates:
-            pytest.skip(f"No valid dates for {body_name}")
-
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[3] - leb[3])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        assert max_err < TOLS_EXT.ASTEROID_SPEED_LON_DEG_DAY, (
-            f"{body_name}: max speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
+        e_slon, jd_slon = worst["speed_lon"]
+        assert e_slon < tol_speed_lon, (
+            f"{body_name}: max speed error = {e_slon:.6f} deg/day at JD {jd_slon:.1f}"
         )
 
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
-    def test_speed_latitude(
-        self,
-        compare: CompareHelper,
-        asteroid_dates: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Asteroid latitude speed matches Skyfield within tolerance."""
-        dates = filter_asteroid_dates(asteroid_dates, body_id)
-        if not dates:
-            pytest.skip(f"No valid dates for {body_name}")
-
-        max_err = 0.0
-
-        for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[4] - leb[4])
-            max_err = max(max_err, err)
-
-        assert max_err < TOLS_EXT.ASTEROID_SPEED_LAT_DEG_DAY, (
-            f"{body_name}: max lat speed error = {max_err:.6f} deg/day"
+        e_slat, jd_slat = worst["speed_lat"]
+        assert e_slat < tol_speed_lat, (
+            f"{body_name}: max lat speed error = {e_slat:.6f} deg/day"
         )

@@ -39,7 +39,9 @@ class TestAzalt:
     def test_sun_azalt_returns_3_values(self):
         """azalt should return a 3-element tuple."""
         sun, _ = swe.calc_ut(JD_J2000, SE_SUN, SEFLG_SWIEPH)
-        result = swe.azalt(JD_J2000, SE_ECL2HOR, ROME, 1013.25, 15.0, (sun[0], sun[1], sun[2]))
+        result = swe.azalt(
+            JD_J2000, SE_ECL2HOR, ROME, 1013.25, 15.0, (sun[0], sun[1], sun[2])
+        )
         assert len(result) == 3
 
     def test_sun_azalt_values_finite(self):
@@ -201,9 +203,7 @@ class TestRefrac:
         """TRUE_TO_APP should increase altitude (for positive alt)."""
         true_alt = 10.0
         app_alt = swe.refrac(true_alt, 1013.25, 15.0, SE_TRUE_TO_APP)
-        assert app_alt > true_alt, (
-            f"Apparent alt {app_alt} not > true alt {true_alt}"
-        )
+        assert app_alt > true_alt, f"Apparent alt {app_alt} not > true alt {true_alt}"
 
     def test_refrac_decreases_with_altitude(self):
         """Refraction should decrease as altitude increases."""
@@ -248,9 +248,7 @@ class TestRefrac:
         """Cold air refracts more than warm air."""
         ref_cold = swe.refrac(10.0, 1013.25, -10.0, SE_TRUE_TO_APP) - 10.0
         ref_warm = swe.refrac(10.0, 1013.25, 30.0, SE_TRUE_TO_APP) - 10.0
-        assert ref_cold > ref_warm, (
-            f"Cold refraction {ref_cold} not > warm {ref_warm}"
-        )
+        assert ref_cold > ref_warm, f"Cold refraction {ref_cold} not > warm {ref_warm}"
 
 
 @pytest.mark.unit

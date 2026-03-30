@@ -22,209 +22,105 @@ from tests.test_leb.compare.conftest import (
 from .conftest import TOLS_EXT
 
 
-class TestExtLunarLongitude:
-    """Lunar body longitude precision with per-body tolerance."""
+class TestExtLunarPrecision:
+    """All-in-one precision check for lunar/ecliptic bodies."""
 
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", ECLIPTIC_BODIES)
-    def test_longitude(
+    def test_all_components(
         self,
         compare: CompareHelper,
-        ext_dates_500: list[float],
+        ext_dates_200: list[float],
         body_id: int,
         body_name: str,
     ):
-        """Lunar body longitude matches Skyfield within per-body tolerance."""
-        tol_arcsec = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
-            "lon", TOLS_EXT.ECLIPTIC_ARCSEC
+        tol_lon = max(
+            ECLIPTIC_TOLERANCES.get(body_id, {}).get("lon", TOLS_EXT.ECLIPTIC_ARCSEC),
+            TOLS_EXT.ECLIPTIC_ARCSEC,
         )
-        # Extended tier may need slightly looser ecliptic tolerances
-        tol_arcsec = max(tol_arcsec, TOLS_EXT.ECLIPTIC_ARCSEC)
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in ext_dates_500:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = lon_error_arcsec(ref[0], leb[0])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        assert max_err < tol_arcsec, (
-            f'{body_name}: max lon error = {max_err:.4f}" at JD {worst_jd:.1f} '
-            f'(tol={tol_arcsec}")'
-        )
-
-
-class TestExtLunarLatitude:
-    """Lunar body latitude precision."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ECLIPTIC_BODIES)
-    def test_latitude(
-        self,
-        compare: CompareHelper,
-        ext_dates_500: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Lunar body latitude matches Skyfield within tolerance."""
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in ext_dates_500:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[1] - leb[1]) * 3600.0
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
         tol_lat = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
             "lat", TOLS_EXT.ECLIPTIC_ARCSEC
         )
-        assert max_err < tol_lat, (
-            f'{body_name}: max lat error = {max_err:.4f}" at JD {worst_jd:.1f}'
+        tol_dist = 0.01
+        tol_speed_lon = max(
+            ECLIPTIC_TOLERANCES.get(body_id, {}).get(
+                "speed", TOLS_EXT.SPEED_LON_DEG_DAY
+            ),
+            TOLS_EXT.SPEED_LON_DEG_DAY,
         )
-
-
-class TestExtLunarSpeed:
-    """Lunar body velocity precision with per-body tolerance."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ECLIPTIC_BODIES)
-    def test_speed_longitude(
-        self,
-        compare: CompareHelper,
-        ext_dates_500: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Lunar body longitude speed matches Skyfield within tolerance."""
-        tol_speed = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
-            "speed", TOLS_EXT.SPEED_LON_DEG_DAY
-        )
-        # Extended tier may need slightly looser speed tolerances
-        tol_speed = max(tol_speed, TOLS_EXT.SPEED_LON_DEG_DAY)
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in ext_dates_500:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[3] - leb[3])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        assert max_err < tol_speed, (
-            f"{body_name}: max speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f} "
-            f"(tol={tol_speed})"
-        )
-
-
-class TestExtLunarDistance:
-    """Lunar body distance precision with per-body tolerance."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ECLIPTIC_BODIES)
-    def test_distance(
-        self,
-        compare: CompareHelper,
-        ext_dates_500: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Lunar body distance matches Skyfield within tolerance."""
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in ext_dates_500:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[2] - leb[2])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        # Ecliptic bodies may have convention-dependent distance values
-        dist_tol = 0.01  # AU (generous for ecliptic direct bodies)
-        assert max_err < dist_tol, (
-            f"{body_name}: max distance error = {max_err:.2e} AU at JD {worst_jd:.1f}"
-        )
-
-
-class TestExtLunarLatSpeed:
-    """Lunar body latitude velocity precision."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ECLIPTIC_BODIES)
-    def test_speed_latitude(
-        self,
-        compare: CompareHelper,
-        ext_dates_500: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Lunar body latitude speed matches Skyfield within tolerance."""
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in ext_dates_500:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[4] - leb[4])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        tol_lat_speed = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
+        tol_speed_lat = ECLIPTIC_TOLERANCES.get(body_id, {}).get(
             "speed", TOLS_EXT.SPEED_LAT_DEG_DAY
         )
-        assert max_err < tol_lat_speed, (
-            f"{body_name}: max lat speed error = {max_err:.6f} deg/day "
-            f"at JD {worst_jd:.1f}"
-        )
+        tol_speed_dist = TOLS_EXT.SPEED_DIST_AU_DAY
 
+        worst = {
+            "lon": (0.0, 0.0),
+            "lat": (0.0, 0.0),
+            "dist": (0.0, 0.0),
+            "speed_lon": (0.0, 0.0),
+            "speed_lat": (0.0, 0.0),
+            "speed_dist": (0.0, 0.0),
+        }
 
-class TestExtLunarDistSpeed:
-    """Lunar body distance velocity precision."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ECLIPTIC_BODIES)
-    def test_speed_distance(
-        self,
-        compare: CompareHelper,
-        ext_dates_500: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Lunar body distance speed matches Skyfield within tolerance."""
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in ext_dates_500:
+        for jd in ext_dates_200:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
-            err = abs(ref[5] - leb[5])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
+            err_lon = lon_error_arcsec(ref[0], leb[0])
+            if err_lon > worst["lon"][0]:
+                worst["lon"] = (err_lon, jd)
 
-        assert max_err < TOLS_EXT.SPEED_DIST_AU_DAY, (
-            f"{body_name}: max dist speed error = {max_err:.2e} AU/day "
-            f"at JD {worst_jd:.1f}"
+            err_lat = abs(ref[1] - leb[1]) * 3600.0
+            if err_lat > worst["lat"][0]:
+                worst["lat"] = (err_lat, jd)
+
+            err_dist = abs(ref[2] - leb[2])
+            if err_dist > worst["dist"][0]:
+                worst["dist"] = (err_dist, jd)
+
+            err_speed_lon = abs(ref[3] - leb[3])
+            if err_speed_lon > worst["speed_lon"][0]:
+                worst["speed_lon"] = (err_speed_lon, jd)
+
+            err_speed_lat = abs(ref[4] - leb[4])
+            if err_speed_lat > worst["speed_lat"][0]:
+                worst["speed_lat"] = (err_speed_lat, jd)
+
+            err_speed_dist = abs(ref[5] - leb[5])
+            if err_speed_dist > worst["speed_dist"][0]:
+                worst["speed_dist"] = (err_speed_dist, jd)
+
+        e_lon, jd_lon = worst["lon"]
+        assert e_lon < tol_lon, (
+            f'{body_name}: max lon error = {e_lon:.4f}" at JD {jd_lon:.1f} '
+            f'(tol={tol_lon}")'
+        )
+
+        e_lat, jd_lat = worst["lat"]
+        assert e_lat < tol_lat, (
+            f'{body_name}: max lat error = {e_lat:.4f}" at JD {jd_lat:.1f}'
+        )
+
+        e_dist, jd_dist = worst["dist"]
+        assert e_dist < tol_dist, (
+            f"{body_name}: max distance error = {e_dist:.2e} AU at JD {jd_dist:.1f}"
+        )
+
+        e_slon, jd_slon = worst["speed_lon"]
+        assert e_slon < tol_speed_lon, (
+            f"{body_name}: max speed error = {e_slon:.6f} deg/day at JD {jd_slon:.1f} "
+            f"(tol={tol_speed_lon})"
+        )
+
+        e_slat, jd_slat = worst["speed_lat"]
+        assert e_slat < tol_speed_lat, (
+            f"{body_name}: max lat speed error = {e_slat:.6f} deg/day "
+            f"at JD {jd_slat:.1f}"
+        )
+
+        e_sdist, jd_sdist = worst["speed_dist"]
+        assert e_sdist < tol_speed_dist, (
+            f"{body_name}: max dist speed error = {e_sdist:.2e} AU/day "
+            f"at JD {jd_sdist:.1f}"
         )

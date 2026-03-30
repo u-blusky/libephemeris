@@ -42,7 +42,11 @@ class TestReorder:
     def test_round_trip(self):
         rng = np.random.default_rng(42)
         segments, degree, components = 100, 13, 3
-        data = rng.random(segments * components * (degree + 1)).astype(np.float64).tobytes()
+        data = (
+            rng.random(segments * components * (degree + 1))
+            .astype(np.float64)
+            .tobytes()
+        )
         reordered = reorder_coeff_major(data, segments, degree, components)
         assert reordered != data
         restored = reorder_segment_major(reordered, segments, degree, components)
@@ -127,7 +131,9 @@ class TestCompressDecompress:
         bits = compute_mantissa_bits(arr)
 
         compressed = compress_body(raw_bytes, segments, degree, components, bits)
-        decompressed = decompress_body(compressed, len(raw_bytes), segments, degree, components)
+        decompressed = decompress_body(
+            compressed, len(raw_bytes), segments, degree, components
+        )
 
         assert len(decompressed) == len(raw_bytes)
         # Decompressed should be close to original (lossy)

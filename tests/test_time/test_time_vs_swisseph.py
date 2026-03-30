@@ -22,51 +22,51 @@ from libephemeris.constants import SE_GREG_CAL, SE_JUL_CAL
 # ---------------------------------------------------------------------------
 
 JULDAY_DATES = [
-    (2000, 1, 1, 12.0),      # J2000.0
-    (1970, 1, 1, 0.0),       # Unix epoch
-    (1999, 12, 31, 23.99),   # near Y2K
-    (2024, 3, 20, 12.5),     # equinox
-    (2024, 6, 21, 0.0),      # solstice
-    (2024, 12, 25, 18.0),    # Christmas
-    (1900, 1, 1, 0.0),       # turn of 20th century
-    (1582, 10, 15, 12.0),    # Gregorian calendar start
-    (1850, 7, 4, 6.25),      # mid-19th century
-    (1950, 6, 15, 12.0),     # mid-20th century
-    (2050, 1, 1, 0.0),       # mid-21st century
-    (2100, 12, 31, 23.5),    # end 21st century
-    (1800, 3, 21, 12.0),     # spring equinox 1800
-    (1920, 11, 11, 11.0),    # end of WWI armistice
-    (2000, 6, 21, 12.0),     # summer solstice 2000
-    (2010, 1, 15, 7.5),      # recent date
-    (2020, 3, 1, 0.0),       # start of pandemic year
-    (1975, 8, 15, 15.75),    # mid-1970s
-    (2040, 4, 8, 18.0),      # future eclipse
-    (1600, 1, 1, 12.0),      # early Gregorian
+    (2000, 1, 1, 12.0),  # J2000.0
+    (1970, 1, 1, 0.0),  # Unix epoch
+    (1999, 12, 31, 23.99),  # near Y2K
+    (2024, 3, 20, 12.5),  # equinox
+    (2024, 6, 21, 0.0),  # solstice
+    (2024, 12, 25, 18.0),  # Christmas
+    (1900, 1, 1, 0.0),  # turn of 20th century
+    (1582, 10, 15, 12.0),  # Gregorian calendar start
+    (1850, 7, 4, 6.25),  # mid-19th century
+    (1950, 6, 15, 12.0),  # mid-20th century
+    (2050, 1, 1, 0.0),  # mid-21st century
+    (2100, 12, 31, 23.5),  # end 21st century
+    (1800, 3, 21, 12.0),  # spring equinox 1800
+    (1920, 11, 11, 11.0),  # end of WWI armistice
+    (2000, 6, 21, 12.0),  # summer solstice 2000
+    (2010, 1, 15, 7.5),  # recent date
+    (2020, 3, 1, 0.0),  # start of pandemic year
+    (1975, 8, 15, 15.75),  # mid-1970s
+    (2040, 4, 8, 18.0),  # future eclipse
+    (1600, 1, 1, 12.0),  # early Gregorian
 ]
 
 
 # 20 Julian Day values for deltat/sidtime
 JD_VALUES = [
-    2415020.0,    # 1900-01-01
-    2418665.0,    # 1910-01-01
-    2422310.0,    # 1920-01-01
-    2425955.0,    # 1930-01-01
-    2429601.0,    # 1940-01-01
-    2433282.5,    # 1950-01-01
-    2436934.5,    # 1960-01-01
-    2440587.5,    # 1970-01-01
-    2444239.5,    # 1980-01-01
-    2447892.5,    # 1990-01-01
-    2451545.0,    # 2000-01-01 (J2000)
-    2453371.5,    # 2005-01-01
-    2455197.5,    # 2010-01-01
-    2457023.5,    # 2015-01-01
-    2458849.5,    # 2020-01-01
-    2459580.5,    # 2022-01-01
-    2460310.5,    # 2024-01-18
-    2462502.5,    # 2030-01-01
-    2470547.0,    # 2052-01-01
-    2488070.0,    # 2100-01-01
+    2415020.0,  # 1900-01-01
+    2418665.0,  # 1910-01-01
+    2422310.0,  # 1920-01-01
+    2425955.0,  # 1930-01-01
+    2429601.0,  # 1940-01-01
+    2433282.5,  # 1950-01-01
+    2436934.5,  # 1960-01-01
+    2440587.5,  # 1970-01-01
+    2444239.5,  # 1980-01-01
+    2447892.5,  # 1990-01-01
+    2451545.0,  # 2000-01-01 (J2000)
+    2453371.5,  # 2005-01-01
+    2455197.5,  # 2010-01-01
+    2457023.5,  # 2015-01-01
+    2458849.5,  # 2020-01-01
+    2459580.5,  # 2022-01-01
+    2460310.5,  # 2024-01-18
+    2462502.5,  # 2030-01-01
+    2470547.0,  # 2052-01-01
+    2488070.0,  # 2100-01-01
 ]
 
 # UTC dates for utc_to_jd (year, month, day, hour, minute, second)
@@ -86,16 +86,16 @@ UTC_DATES = [
 # Known day-of-week values: (year, month, day, hour, expected_dow)
 # 0=Monday, 1=Tuesday, ..., 6=Sunday
 DAY_OF_WEEK_DATES = [
-    (2000, 1, 1, 12.0, 5),    # Saturday
-    (2024, 1, 1, 12.0, 0),    # Monday
-    (2024, 3, 15, 12.0, 4),   # Friday
-    (2024, 7, 4, 12.0, 3),    # Thursday
-    (1970, 1, 1, 12.0, 3),    # Thursday
-    (2000, 2, 29, 12.0, 1),   # Tuesday (leap day)
+    (2000, 1, 1, 12.0, 5),  # Saturday
+    (2024, 1, 1, 12.0, 0),  # Monday
+    (2024, 3, 15, 12.0, 4),  # Friday
+    (2024, 7, 4, 12.0, 3),  # Thursday
+    (1970, 1, 1, 12.0, 3),  # Thursday
+    (2000, 2, 29, 12.0, 1),  # Tuesday (leap day)
     (1999, 12, 31, 12.0, 4),  # Friday
     (2023, 12, 25, 12.0, 0),  # Monday
-    (1969, 7, 20, 12.0, 6),   # Sunday (Moon landing)
-    (2025, 1, 1, 12.0, 2),    # Wednesday
+    (1969, 7, 20, 12.0, 6),  # Sunday (Moon landing)
+    (2025, 1, 1, 12.0, 2),  # Wednesday
 ]
 
 
@@ -150,9 +150,15 @@ class TestRevjul:
         jd = swe_ref.julday(y, m, d, h)
         lib_result = swe.swe_revjul(jd)
         ref_result = swe_ref.revjul(jd)
-        assert lib_result[0] == ref_result[0], f"Year: {lib_result[0]} != {ref_result[0]}"
-        assert lib_result[1] == ref_result[1], f"Month: {lib_result[1]} != {ref_result[1]}"
-        assert lib_result[2] == ref_result[2], f"Day: {lib_result[2]} != {ref_result[2]}"
+        assert lib_result[0] == ref_result[0], (
+            f"Year: {lib_result[0]} != {ref_result[0]}"
+        )
+        assert lib_result[1] == ref_result[1], (
+            f"Month: {lib_result[1]} != {ref_result[1]}"
+        )
+        assert lib_result[2] == ref_result[2], (
+            f"Day: {lib_result[2]} != {ref_result[2]}"
+        )
         assert abs(lib_result[3] - ref_result[3]) < 1e-6, (
             f"Hour: {lib_result[3]} != {ref_result[3]}"
         )
@@ -198,7 +204,7 @@ class TestDeltat:
         dts = [swe.swe_deltat(jd) for jd in modern_jds]
         for i in range(1, len(dts)):
             assert dts[i] >= dts[i - 1], (
-                f"Delta T not monotone: dt[{i-1}]={dts[i-1]} > dt[{i}]={dts[i]}"
+                f"Delta T not monotone: dt[{i - 1}]={dts[i - 1]} > dt[{i}]={dts[i]}"
             )
 
 
@@ -242,9 +248,7 @@ class TestUtcToJd:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("y,m,d,h,mi,s", UTC_DATES)
-    def test_utc_to_jd_matches(
-        self, y: int, m: int, d: int, h: int, mi: int, s: float
-    ):
+    def test_utc_to_jd_matches(self, y: int, m: int, d: int, h: int, mi: int, s: float):
         """utc_to_jd matches pyswisseph within 1e-6 day (~0.09s).
 
         Returns (jd_et, jd_ut1); we compare both components.
@@ -295,9 +299,7 @@ class TestDayOfWeek:
         jd = swe_ref.julday(y, m, d, h)
         lib_dow = swe.day_of_week(jd)
         ref_dow = swe_ref.day_of_week(jd)
-        assert lib_dow == ref_dow, (
-            f"{y}-{m:02d}-{d:02d}: lib={lib_dow}, ref={ref_dow}"
-        )
+        assert lib_dow == ref_dow, f"{y}-{m:02d}-{d:02d}: lib={lib_dow}, ref={ref_dow}"
 
     @pytest.mark.unit
     def test_day_of_week_returns_int(self):

@@ -1,9 +1,3 @@
-"""
-LEB vs Skyfield Comparison: Main-Belt Asteroids.
-
-Validates the 5 asteroids in LEB (all Pipeline A).
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -21,23 +15,21 @@ from .conftest import (
 )
 
 
-class TestAsteroidPosition:
-    """Asteroid position precision."""
-
+class TestAsteroidPrecision:
     @pytest.mark.leb_compare
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
-    def test_position(
+    def test_all_components(
         self,
         compare: CompareHelper,
         test_dates_200: list[float],
         body_id: int,
         body_name: str,
     ):
-        """Asteroid longitude and latitude match Skyfield within tolerance."""
         max_lon_err = 0.0
         max_lat_err = 0.0
-        worst_jd = 0.0
+        max_dist_err = 0.0
+        max_speed_lon_err = 0.0
 
         dates = filter_asteroid_dates(test_dates_200, body_id)
         for jd in dates:
@@ -46,85 +38,28 @@ class TestAsteroidPosition:
 
             lon_err = lon_error_arcsec(ref[0], leb[0])
             lat_err = abs(ref[1] - leb[1]) * 3600.0
+            dist_err = abs(ref[2] - leb[2])
+            speed_lon_err = abs(ref[3] - leb[3])
 
-            if lon_err > max_lon_err:
-                max_lon_err = lon_err
-                worst_jd = jd
-            if lat_err > max_lat_err:
-                max_lat_err = lat_err
+            max_lon_err = max(max_lon_err, lon_err)
+            max_lat_err = max(max_lat_err, lat_err)
+            max_dist_err = max(max_dist_err, dist_err)
+            max_speed_lon_err = max(max_speed_lon_err, speed_lon_err)
 
         assert max_lon_err < TOLS.ASTEROID_ARCSEC, (
-            f'{body_name}: max lon error = {max_lon_err:.4f}" at JD {worst_jd:.1f}'
+            f'{body_name}: lon error {max_lon_err:.4f}"'
         )
         assert max_lat_err < TOLS.ASTEROID_ARCSEC, (
-            f'{body_name}: max lat error = {max_lat_err:.4f}"'
+            f'{body_name}: lat error {max_lat_err:.4f}"'
         )
-
-
-class TestAsteroidSpeed:
-    """Asteroid velocity precision."""
-
-    @pytest.mark.leb_compare
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
-    def test_speed(
-        self,
-        compare: CompareHelper,
-        test_dates_200: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Asteroid speed matches Skyfield within tolerance."""
-        max_err = 0.0
-        worst_jd = 0.0
-
-        dates = filter_asteroid_dates(test_dates_200, body_id)
-        for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[3] - leb[3])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        tol = (
+        assert max_dist_err < TOLS.DISTANCE_AU, (
+            f"{body_name}: dist error {max_dist_err:.2e} AU"
+        )
+        tol_speed = (
             TOLS.ASTEROID_SPEED_LON_DEG_DAY
             if body_id in _ASTEROID_BODY_IDS
             else TOLS.SPEED_LON_DEG_DAY
         )
-        assert max_err < tol, (
-            f"{body_name}: max speed error = {max_err:.6f} deg/day at JD {worst_jd:.1f}"
-        )
-
-
-class TestAsteroidDistance:
-    """Asteroid distance precision."""
-
-    @pytest.mark.leb_compare
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", ASTEROID_BODIES)
-    def test_distance(
-        self,
-        compare: CompareHelper,
-        test_dates_200: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Asteroid distance matches Skyfield within tolerance."""
-        max_err = 0.0
-        worst_jd = 0.0
-
-        dates = filter_asteroid_dates(test_dates_200, body_id)
-        for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[2] - leb[2])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        assert max_err < TOLS.DISTANCE_AU, (
-            f"{body_name}: max dist error = {max_err:.2e} AU at JD {worst_jd:.1f}"
+        assert max_speed_lon_err < tol_speed, (
+            f"{body_name}: speed error {max_speed_lon_err:.6f} deg/day"
         )

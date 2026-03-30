@@ -67,38 +67,38 @@ HELIO_BODIES = [
 
 # 20 dates spanning 1900-2100
 DATES = [
-    2415020.0,    # 1900-01-01
-    2418665.0,    # 1910-01-01
-    2422310.0,    # 1920-01-01
-    2425955.0,    # 1930-01-01
-    2429601.0,    # 1940-01-01
-    2433282.5,    # 1950-01-01
-    2436934.5,    # 1960-01-01
-    2440587.5,    # 1970-01-01
-    2444239.5,    # 1980-01-01
-    2447892.5,    # 1990-01-01
-    2451545.0,    # 2000-01-01 (J2000)
-    2453371.5,    # 2005-01-01
-    2455197.5,    # 2010-01-01
-    2457023.5,    # 2015-01-01
-    2458849.5,    # 2020-01-01
-    2459580.5,    # 2022-01-01
-    2460310.5,    # 2024-01-18
-    2462502.5,    # 2030-01-01
-    2470547.0,    # 2052-01-01
-    2488070.0,    # 2100-01-01
+    2415020.0,  # 1900-01-01
+    2418665.0,  # 1910-01-01
+    2422310.0,  # 1920-01-01
+    2425955.0,  # 1930-01-01
+    2429601.0,  # 1940-01-01
+    2433282.5,  # 1950-01-01
+    2436934.5,  # 1960-01-01
+    2440587.5,  # 1970-01-01
+    2444239.5,  # 1980-01-01
+    2447892.5,  # 1990-01-01
+    2451545.0,  # 2000-01-01 (J2000)
+    2453371.5,  # 2005-01-01
+    2455197.5,  # 2010-01-01
+    2457023.5,  # 2015-01-01
+    2458849.5,  # 2020-01-01
+    2459580.5,  # 2022-01-01
+    2460310.5,  # 2024-01-18
+    2462502.5,  # 2030-01-01
+    2470547.0,  # 2052-01-01
+    2488070.0,  # 2100-01-01
 ]
 
 # Tolerance constants
 # libephemeris uses JPL DE440 via Skyfield whereas pyswisseph uses the Swiss
 # Ephemeris analytical fit to DE431.  Systematic differences of 1-3 arcseconds
 # are normal for the Moon and outer planets at dates far from J2000.
-TOL_ARCSEC = 3.0             # 3 arcseconds in degrees
+TOL_ARCSEC = 3.0  # 3 arcseconds in degrees
 TOL_LON_DEG = TOL_ARCSEC / 3600.0
 TOL_LAT_DEG = TOL_ARCSEC / 3600.0
-TOL_DIST_AU = 5e-4           # 5e-4 AU (outer planets drift more)
-TOL_SPEED = 0.05             # 0.05 deg/day for speed
-TOL_DIST_SPEED = 1e-4        # distance speed tolerance
+TOL_DIST_AU = 5e-4  # 5e-4 AU (outer planets drift more)
+TOL_SPEED = 0.05  # 0.05 deg/day for speed
+TOL_DIST_SPEED = 1e-4  # distance speed tolerance
 
 
 def _angle_diff(a: float, b: float) -> float:
@@ -122,9 +122,7 @@ class TestGeocentricPositions:
     @pytest.mark.unit
     @pytest.mark.parametrize("body_id,body_name", BODIES_WITH_CHIRON)
     @pytest.mark.parametrize("jd", DATES)
-    def test_geocentric_lon_lat_dist(
-        self, body_id: int, body_name: str, jd: float
-    ):
+    def test_geocentric_lon_lat_dist(self, body_id: int, body_name: str, jd: float):
         """Geocentric lon, lat, dist match pyswisseph within tolerances."""
         lib_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
         ref_vals, _ = swe_ref.calc_ut(jd, body_id, SEFLG_SPEED)
@@ -132,14 +130,14 @@ class TestGeocentricPositions:
         # Longitude
         dlon = abs(_angle_diff(lib_vals[0], ref_vals[0]))
         assert dlon < TOL_LON_DEG, (
-            f"{body_name} jd={jd}: lon diff={dlon * 3600:.4f}\" "
+            f'{body_name} jd={jd}: lon diff={dlon * 3600:.4f}" '
             f"(lib={lib_vals[0]:.8f}, ref={ref_vals[0]:.8f})"
         )
 
         # Latitude
         dlat = abs(lib_vals[1] - ref_vals[1])
         assert dlat < TOL_LAT_DEG, (
-            f"{body_name} jd={jd}: lat diff={dlat * 3600:.4f}\" "
+            f'{body_name} jd={jd}: lat diff={dlat * 3600:.4f}" '
             f"(lib={lib_vals[1]:.8f}, ref={ref_vals[1]:.8f})"
         )
 
@@ -160,9 +158,7 @@ class TestHeliocentricPositions:
         "jd",
         [DATES[0], DATES[5], DATES[10], DATES[15], DATES[19]],
     )
-    def test_heliocentric_lon_lat_dist(
-        self, body_id: int, body_name: str, jd: float
-    ):
+    def test_heliocentric_lon_lat_dist(self, body_id: int, body_name: str, jd: float):
         """Heliocentric lon, lat, dist match pyswisseph within tolerances."""
         flags = SEFLG_HELCTR | SEFLG_SPEED
         lib_vals, _ = swe.swe_calc_ut(jd, body_id, flags)
@@ -170,12 +166,12 @@ class TestHeliocentricPositions:
 
         dlon = abs(_angle_diff(lib_vals[0], ref_vals[0]))
         assert dlon < TOL_LON_DEG, (
-            f"{body_name} helio jd={jd}: lon diff={dlon * 3600:.4f}\""
+            f'{body_name} helio jd={jd}: lon diff={dlon * 3600:.4f}"'
         )
 
         dlat = abs(lib_vals[1] - ref_vals[1])
         assert dlat < TOL_LAT_DEG, (
-            f"{body_name} helio jd={jd}: lat diff={dlat * 3600:.4f}\""
+            f'{body_name} helio jd={jd}: lat diff={dlat * 3600:.4f}"'
         )
 
         ddist = abs(lib_vals[2] - ref_vals[2])
@@ -193,9 +189,7 @@ class TestEquatorialPositions:
         "jd",
         [DATES[0], DATES[5], DATES[10], DATES[15], DATES[19]],
     )
-    def test_equatorial_ra_dec(
-        self, body_id: int, body_name: str, jd: float
-    ):
+    def test_equatorial_ra_dec(self, body_id: int, body_name: str, jd: float):
         """Equatorial RA/Dec match pyswisseph within 1 arcsecond."""
         flags = SEFLG_EQUATORIAL | SEFLG_SPEED
         lib_vals, _ = swe.swe_calc_ut(jd, body_id, flags)
@@ -203,14 +197,12 @@ class TestEquatorialPositions:
 
         # RA
         dra = abs(_angle_diff(lib_vals[0], ref_vals[0]))
-        assert dra < TOL_LON_DEG, (
-            f"{body_name} eq jd={jd}: RA diff={dra * 3600:.4f}\""
-        )
+        assert dra < TOL_LON_DEG, f'{body_name} eq jd={jd}: RA diff={dra * 3600:.4f}"'
 
         # Dec
         ddec = abs(lib_vals[1] - ref_vals[1])
         assert ddec < TOL_LAT_DEG, (
-            f"{body_name} eq jd={jd}: Dec diff={ddec * 3600:.4f}\""
+            f'{body_name} eq jd={jd}: Dec diff={ddec * 3600:.4f}"'
         )
 
 
@@ -223,9 +215,7 @@ class TestSiderealPositions:
         "jd",
         [DATES[0], DATES[5], DATES[10], DATES[15], DATES[19]],
     )
-    def test_sidereal_lahiri_lon(
-        self, body_id: int, body_name: str, jd: float
-    ):
+    def test_sidereal_lahiri_lon(self, body_id: int, body_name: str, jd: float):
         """Sidereal Lahiri longitude matches pyswisseph within 1 arcsecond."""
         swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
         swe_ref.set_sid_mode(SE_SIDM_LAHIRI)
@@ -236,7 +226,7 @@ class TestSiderealPositions:
 
         dlon = abs(_angle_diff(lib_vals[0], ref_vals[0]))
         assert dlon < TOL_LON_DEG, (
-            f"{body_name} sid jd={jd}: lon diff={dlon * 3600:.4f}\""
+            f'{body_name} sid jd={jd}: lon diff={dlon * 3600:.4f}"'
         )
 
 
@@ -254,9 +244,7 @@ class TestSpeedNumericalDerivative:
             (SE_SATURN, "Saturn"),
         ],
     )
-    @pytest.mark.parametrize(
-        "jd", [DATES[5], DATES[10], DATES[15]]
-    )
+    @pytest.mark.parametrize("jd", [DATES[5], DATES[10], DATES[15]])
     def test_speed_vs_numerical_derivative(
         self, body_id: int, body_name: str, jd: float
     ):

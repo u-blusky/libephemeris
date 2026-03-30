@@ -1,10 +1,3 @@
-"""
-LEB vs Skyfield Comparison: Flag Combinations (Base Tier).
-
-Validates all flag combinations supported natively by LEB
-across the base tier range (1860-2140).
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -51,8 +44,6 @@ FLAG_COMBINATIONS = [
 
 
 class TestBaseFlagCombinations:
-    """All 8 flag combinations for 4 planets."""
-
     @pytest.mark.leb_compare_base
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", FLAG_BODIES)
@@ -66,8 +57,8 @@ class TestBaseFlagCombinations:
         flags: int,
         flag_name: str,
     ):
-        """All 6 components match within tolerance for each flag combo."""
         max_err = 0.0
+        max_speed_err = 0.0
         worst_jd = 0.0
 
         for jd in base_dates_100:
@@ -77,50 +68,16 @@ class TestBaseFlagCombinations:
             lon_err = lon_error_arcsec(ref[0], leb[0])
             lat_err = abs(ref[1] - leb[1]) * 3600.0
             err = max(lon_err, lat_err)
+            speed_err = abs(ref[3] - leb[3])
 
             if err > max_err:
                 max_err = err
                 worst_jd = jd
+            max_speed_err = max(max_speed_err, speed_err)
 
         assert max_err < TOLS_BASE.EQUATORIAL_ARCSEC, (
             f'{body_name} {flag_name}: max error = {max_err:.4f}" at JD {worst_jd:.1f}'
         )
-
-
-class TestBaseFlagVelocity:
-    """Velocity under different flag combinations."""
-
-    @pytest.mark.leb_compare_base
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", FLAG_BODIES)
-    @pytest.mark.parametrize(
-        "flags,flag_name",
-        [
-            (SEFLG_SPEED | SEFLG_EQUATORIAL, "equatorial"),
-            (SEFLG_SPEED | SEFLG_J2000, "J2000"),
-            (SEFLG_SPEED | SEFLG_HELCTR, "heliocentric"),
-            (SEFLG_SPEED | SEFLG_BARYCTR, "barycentric"),
-        ],
-    )
-    def test_flag_speed(
-        self,
-        compare: CompareHelper,
-        base_dates_50: list[float],
-        body_id: int,
-        body_name: str,
-        flags: int,
-        flag_name: str,
-    ):
-        """Speed matches within tolerance for each flag combo."""
-        max_err = 0.0
-
-        for jd in base_dates_50:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
-
-            err = abs(ref[3] - leb[3])
-            max_err = max(max_err, err)
-
-        assert max_err < TOLS_BASE.SPEED_LON_DEG_DAY, (
-            f"{body_name} {flag_name}: max speed error = {max_err:.6f} deg/day"
+        assert max_speed_err < TOLS_BASE.SPEED_LON_DEG_DAY, (
+            f"{body_name} {flag_name}: max speed error = {max_speed_err:.6f} deg/day"
         )

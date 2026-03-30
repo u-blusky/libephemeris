@@ -42,11 +42,6 @@ from tests.test_leb.compare.conftest import (
 from .conftest import TOLS_EXT
 
 
-# ============================================================================
-# GEOCENTRIC DISTANCE
-# ============================================================================
-
-# Bodies with meaningful geocentric distance (exclude Sun which has ~1 AU)
 DISTANCE_BODIES = [
     (SE_SUN, "Sun"),
     (SE_MOON, "Moon"),
@@ -60,7 +55,6 @@ DISTANCE_BODIES = [
     (SE_PLUTO, "Pluto"),
 ]
 
-# Bodies with geocentric distance output
 ECLIPTIC_DISTANCE_BODIES = [
     (SE_TRUE_NODE, "TrueNode"),
     (SE_OSCU_APOG, "OscuApog"),
@@ -68,7 +62,6 @@ ECLIPTIC_DISTANCE_BODIES = [
     (SE_INTP_PERG, "IntpPerg"),
 ]
 
-# Heliocentric test bodies (exclude Sun and Moon — Sun is center, Moon geocentric)
 HELIO_BODIES = [
     (SE_MERCURY, "Mercury"),
     (SE_VENUS, "Venus"),
@@ -81,35 +74,44 @@ HELIO_BODIES = [
 ]
 
 
-class TestExtGeocentricDistance:
-    """Geocentric distance precision for all ICRS planets."""
+class TestExtGeocentricPrecision:
+    """Geocentric distance and distance-speed for all ICRS planets."""
 
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", DISTANCE_BODIES)
-    def test_geocentric_distance(
+    def test_geocentric_distance_and_speed(
         self,
         compare: CompareHelper,
         ext_dates_200: list[float],
         body_id: int,
         body_name: str,
     ):
-        """Geocentric distance matches Skyfield within tolerance."""
-        max_err = 0.0
-        worst_jd = 0.0
+        worst_dist = (0.0, 0.0)
+        worst_speed = (0.0, 0.0)
 
         for jd in ext_dates_200:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
 
-            err = abs(ref[2] - leb[2])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
+            err_dist = abs(ref[2] - leb[2])
+            if err_dist > worst_dist[0]:
+                worst_dist = (err_dist, jd)
 
-        assert max_err < TOLS_EXT.DISTANCE_AU, (
-            f"{body_name}: max geocentric dist error = {max_err:.2e} AU "
-            f"at JD {worst_jd:.1f}"
+            err_speed = abs(ref[5] - leb[5])
+            if err_speed > worst_speed[0]:
+                worst_speed = (err_speed, jd)
+
+        e_dist, jd_dist = worst_dist
+        assert e_dist < TOLS_EXT.DISTANCE_AU, (
+            f"{body_name}: max geocentric dist error = {e_dist:.2e} AU "
+            f"at JD {jd_dist:.1f}"
+        )
+
+        e_speed, jd_speed = worst_speed
+        assert e_speed < TOLS_EXT.SPEED_DIST_AU_DAY, (
+            f"{body_name}: max dist speed error = {e_speed:.2e} AU/day "
+            f"at JD {jd_speed:.1f}"
         )
 
 
@@ -126,7 +128,6 @@ class TestExtEclipticBodyDistance:
         body_id: int,
         body_name: str,
     ):
-        """Ecliptic body distance matches Skyfield within tolerance."""
         max_err = 0.0
         worst_jd = 0.0
 
@@ -139,49 +140,10 @@ class TestExtEclipticBodyDistance:
                 max_err = err
                 worst_jd = jd
 
-        # Use a generous tolerance: some ecliptic bodies have non-physical
-        # or convention-dependent distance values
-        dist_tol = 0.01  # AU
+        dist_tol = 0.01
         assert max_err < dist_tol, (
             f"{body_name}: max distance error = {max_err:.2e} AU at JD {worst_jd:.1f}"
         )
-
-
-class TestExtDistanceSpeed:
-    """Distance velocity (AU/day) precision."""
-
-    @pytest.mark.leb_compare_extended
-    @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", DISTANCE_BODIES)
-    def test_distance_speed(
-        self,
-        compare: CompareHelper,
-        ext_dates_200: list[float],
-        body_id: int,
-        body_name: str,
-    ):
-        """Distance velocity matches Skyfield within tolerance."""
-        max_err = 0.0
-        worst_jd = 0.0
-
-        for jd in ext_dates_200:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-            err = abs(ref[5] - leb[5])
-            if err > max_err:
-                max_err = err
-                worst_jd = jd
-
-        assert max_err < TOLS_EXT.SPEED_DIST_AU_DAY, (
-            f"{body_name}: max dist speed error = {max_err:.2e} AU/day "
-            f"at JD {worst_jd:.1f}"
-        )
-
-
-# ============================================================================
-# HELIOCENTRIC DISTANCE
-# ============================================================================
 
 
 class TestExtHeliocentricDistance:
@@ -197,7 +159,6 @@ class TestExtHeliocentricDistance:
         body_id: int,
         body_name: str,
     ):
-        """Heliocentric distance matches Skyfield within tolerance."""
         flags = SEFLG_SPEED | SEFLG_HELCTR
         max_err = 0.0
         worst_jd = 0.0
@@ -211,7 +172,6 @@ class TestExtHeliocentricDistance:
                 max_err = err
                 worst_jd = jd
 
-        # HELCTR amplifies Chebyshev error 8-11x for inner planets
         helio_tol = TOLS_EXT.DISTANCE_AU * 15.0
         assert max_err < helio_tol, (
             f"{body_name}: max helio dist error = {max_err:.2e} AU at JD {worst_jd:.1f}"

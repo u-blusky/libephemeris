@@ -59,9 +59,7 @@ class TestLunarEclipseLocal:
         ref_result = compare.skyfield(
             ephem.swe_lun_eclipse_when_loc, jd_start, geopos, 2
         )
-        leb_result = compare.leb(
-            ephem.swe_lun_eclipse_when_loc, jd_start, geopos, 2
-        )
+        leb_result = compare.leb(ephem.swe_lun_eclipse_when_loc, jd_start, geopos, 2)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_jd = ref_result[1][0]

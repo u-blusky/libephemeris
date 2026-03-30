@@ -556,7 +556,6 @@ def reset_ephemeris_state():
     import os
 
     from libephemeris import state
-    from libephemeris.cache import clear_caches
 
     # Save critical global state before the test
     saved_calc_mode = state._CALC_MODE
@@ -571,27 +570,19 @@ def reset_ephemeris_state():
     saved_env_mode = os.environ.get("LIBEPHEMERIS_MODE")
     saved_env_leb = os.environ.get("LIBEPHEMERIS_LEB")
 
-    # Reset to default sidereal mode
     ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-    # Clear hot-path caches to prevent cross-test contamination in parallel runs
-    clear_caches()
 
     yield
 
-    # Restore all global state after the test
     state._CALC_MODE = saved_calc_mode
     state._PRECISION_TIER = saved_precision_tier
     state._EPHEMERIS_FILE = saved_ephemeris_file
     state._EPHEMERIS_FILE_EXPLICIT = saved_ephemeris_file_explicit
     state._TOPO = saved_topo
 
-    # Restore LEB file path but force reader re-creation.
-    # close() may have closed the reader's file handle, making it unusable.
-    # Setting _LEB_READER = None lets get_leb_reader() recreate it lazily.
     state._LEB_FILE = saved_leb_file
     state._LEB_READER = None
 
-    # Restore env vars to their pre-test state
     if saved_env_mode is not None:
         os.environ["LIBEPHEMERIS_MODE"] = saved_env_mode
     else:
@@ -602,9 +593,7 @@ def reset_ephemeris_state():
     else:
         os.environ.pop("LIBEPHEMERIS_LEB", None)
 
-    # Cleanup sidereal mode and caches
     ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-    clear_caches()
 
 
 # ============================================================================

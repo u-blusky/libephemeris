@@ -1,9 +1,3 @@
-"""
-LEB vs Skyfield Comparison: Distance Precision.
-
-Dedicated distance validation for geocentric bodies.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -38,8 +32,6 @@ HELIO_BODIES = [
 
 
 class TestGeocentricDistance:
-    """Geocentric distance precision for ICRS planets and asteroids."""
-
     @pytest.mark.leb_compare
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", DISTANCE_BODIES)
@@ -50,7 +42,6 @@ class TestGeocentricDistance:
         body_id: int,
         body_name: str,
     ):
-        """Geocentric distance matches Skyfield within tolerance."""
         max_err = 0.0
         worst_jd = 0.0
 
@@ -70,8 +61,6 @@ class TestGeocentricDistance:
 
 
 class TestHeliocentricDistance:
-    """Heliocentric distance precision for outer planets."""
-
     @pytest.mark.leb_compare
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", HELIO_BODIES)
@@ -82,7 +71,6 @@ class TestHeliocentricDistance:
         body_id: int,
         body_name: str,
     ):
-        """Heliocentric distance matches Skyfield within tolerance."""
         flags = SEFLG_SPEED | SEFLG_HELCTR
         max_err = 0.0
         worst_jd = 0.0
@@ -99,40 +87,3 @@ class TestHeliocentricDistance:
         assert max_err < TOLS.DISTANCE_AU, (
             f"{body_name} helio: max dist error = {max_err:.2e} AU at JD {worst_jd:.1f}"
         )
-
-
-class TestDistanceStatistics:
-    """Statistical analysis of distance errors."""
-
-    @pytest.mark.leb_compare
-    @pytest.mark.slow
-    def test_distance_error_distribution(
-        self, compare: CompareHelper, test_dates_100: list[float]
-    ):
-        """Report distance error distribution (informational)."""
-        from libephemeris.constants import SE_SUN, SE_MOON, SE_EARTH
-
-        errors = {name: [] for _, name in ICRS_PLANETS}
-
-        for jd in test_dates_100:
-            for body_id, body_name in ICRS_PLANETS:
-                ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-                leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-
-                err = abs(ref[2] - leb[2])
-                errors[body_name].append(err)
-
-        # Print statistics for informational purposes
-        stats = {}
-        for name, err_list in errors.items():
-            if err_list:
-                stats[name] = {
-                    "max": max(err_list),
-                    "mean": sum(err_list) / len(err_list),
-                }
-
-        # Verify all are within tolerance
-        for name, stat in stats.items():
-            assert stat["max"] < TOLS.DISTANCE_AU, (
-                f"{name}: max dist error {stat['max']:.2e} AU exceeds tolerance"
-            )
