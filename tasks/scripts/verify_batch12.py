@@ -9,6 +9,7 @@ Covers:
 - Horizons analytical bodies (Mean Node, Mean Apogee)
 - calc_mode switching
 """
+
 from __future__ import annotations
 
 import math
@@ -20,12 +21,26 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SE_MEAN_NODE, SE_MEAN_APOG,
-    SE_ECL_NUT, SEFLG_SWIEPH, SEFLG_SPEED, SEFLG_HELCTR, SEFLG_EQUATORIAL,
-    SEFLG_SIDEREAL, SEFLG_TOPOCTR,
+    SE_SUN,
+    SE_MOON,
+    SE_MARS,
+    SE_JUPITER,
+    SE_MEAN_NODE,
+    SE_MEAN_APOG,
+    SE_ECL_NUT,
+    SEFLG_SWIEPH,
+    SEFLG_SPEED,
+    SEFLG_HELCTR,
+    SEFLG_EQUATORIAL,
+    SEFLG_SIDEREAL,
+    SEFLG_TOPOCTR,
 )
 from libephemeris.utils import (
-    SE_ECL2HOR, SE_EQU2HOR, SE_HOR2EQU, SE_TRUE_TO_APP, SE_APP_TO_TRUE,
+    SE_ECL2HOR,
+    SE_EQU2HOR,
+    SE_HOR2EQU,
+    SE_TRUE_TO_APP,
+    SE_APP_TO_TRUE,
 )
 from libephemeris.horizons_backend import horizons_calc_ut
 
@@ -48,8 +63,16 @@ def check(name: str, condition: bool, detail: str = ""):
 
 # ── BUG-006: Uranian bodies via Horizons analytical path ──
 print("=== BUG-006: Uranian bodies via Horizons analytical ===")
-for body_id, name in [(40, "Cupido"), (41, "Hades"), (42, "Zeus"), (43, "Kronos"),
-                       (44, "Apollon"), (45, "Admetos"), (46, "Vulkanus"), (47, "Poseidon")]:
+for body_id, name in [
+    (40, "Cupido"),
+    (41, "Hades"),
+    (42, "Zeus"),
+    (43, "Kronos"),
+    (44, "Apollon"),
+    (45, "Admetos"),
+    (46, "Vulkanus"),
+    (47, "Poseidon"),
+]:
     try:
         result = horizons_calc_ut(None, JD, body_id, SEFLG_SWIEPH | SEFLG_HELCTR)
         data = result[0]
@@ -93,7 +116,11 @@ for body in [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SE_MEAN_NODE]:
     for i in range(20):
         jd = JD + i * 18.25
         r, _ = swe.calc_ut(jd, body, SEFLG_SWIEPH)
-        check(f"body {body} JD+{i*18.25:.0f} in [0,360)", 0.0 <= r[0] < 360.0, f"lon={r[0]}")
+        check(
+            f"body {body} JD+{i * 18.25:.0f} in [0,360)",
+            0.0 <= r[0] < 360.0,
+            f"lon={r[0]}",
+        )
 
 # solcross near 0°
 jd_cross = swe.solcross_ut(0.0, JD, 0)
@@ -121,14 +148,18 @@ check("ECL_NUT [5]=0", r[5] == 0.0)
 # ── azalt / azalt_rev / refrac ──
 print("\n=== azalt / azalt_rev / refrac ===")
 sun, _ = swe.calc_ut(JD, SE_SUN, SEFLG_SWIEPH)
-az, true_alt, app_alt = swe.azalt(JD, SE_ECL2HOR, (12.5, 41.9, 50.0), 1013.25, 15.0, (sun[0], sun[1], sun[2]))
+az, true_alt, app_alt = swe.azalt(
+    JD, SE_ECL2HOR, (12.5, 41.9, 50.0), 1013.25, 15.0, (sun[0], sun[1], sun[2])
+)
 check("azalt az in [0,360)", 0.0 <= az < 360.0, f"az={az}")
 check("azalt true_alt in [-90,90]", -90 <= true_alt <= 90, f"alt={true_alt}")
 check("azalt all finite", all(math.isfinite(v) for v in [az, true_alt, app_alt]))
 
 # azalt_rev round-trip
 sun_eq, _ = swe.calc_ut(JD, SE_SUN, SEFLG_SWIEPH | SEFLG_EQUATORIAL)
-az2, ta2, _ = swe.azalt(JD, SE_EQU2HOR, (12.5, 41.9, 50.0), 1013.25, 15.0, (sun_eq[0], sun_eq[1], sun_eq[2]))
+az2, ta2, _ = swe.azalt(
+    JD, SE_EQU2HOR, (12.5, 41.9, 50.0), 1013.25, 15.0, (sun_eq[0], sun_eq[1], sun_eq[2])
+)
 ra_out, dec_out = swe.azalt_rev(JD, 1, (12.5, 41.9, 50.0), az2, ta2)  # SE_HOR2EQU=1
 ra_diff = abs(ra_out - sun_eq[0])
 if ra_diff > 180:
@@ -140,7 +171,11 @@ check("azalt round-trip Dec < 0.05°", abs(dec_out - sun_eq[1]) < 0.05)
 for alt in [0.0, 5.0, 15.0, 30.0, 60.0, 85.0]:
     app = swe.refrac(alt, 1013.25, 15.0, SE_TRUE_TO_APP)
     recovered = swe.refrac(app, 1013.25, 15.0, SE_APP_TO_TRUE)
-    check(f"refrac round-trip alt={alt}°", abs(recovered - alt) < 0.02, f"err={abs(recovered-alt)}")
+    check(
+        f"refrac round-trip alt={alt}°",
+        abs(recovered - alt) < 0.02,
+        f"err={abs(recovered - alt)}",
+    )
 
 # Horizon refraction ~34'
 ref_horizon = swe.refrac(0.0, 1013.25, 15.0, SE_TRUE_TO_APP)
@@ -149,7 +184,11 @@ check("horizon refraction ~0.57°", 0.4 < ref_horizon < 0.7, f"ref={ref_horizon}
 # ── TAI time functions ──
 print("\n=== TAI time functions ===")
 # UTC -> TAI -> UTC round-trip
-for y, m, d, h, mi, s in [(2000,1,1,12,0,0.0), (2020,6,15,6,30,45.5), (2010,3,1,0,0,0.0)]:
+for y, m, d, h, mi, s in [
+    (2000, 1, 1, 12, 0, 0.0),
+    (2020, 6, 15, 6, 30, 45.5),
+    (2010, 3, 1, 0, 0, 0.0),
+]:
     jd_tai = swe.utc_to_tai_jd(y, m, d, h, mi, s)
     y2, m2, d2, h2, mi2, s2 = swe.tai_jd_to_utc(jd_tai)
     check(f"UTC-TAI-UTC {y}-{m}-{d} date match", y2 == y and m2 == m and d2 == d)
@@ -192,8 +231,8 @@ except ValueError:
 swe.set_calc_mode(orig)
 
 # ── Summary ──
-print(f"\n{'='*50}")
-print(f"TOTAL: {passed} passed, {failed} failed out of {passed+failed}")
+print(f"\n{'=' * 50}")
+print(f"TOTAL: {passed} passed, {failed} failed out of {passed + failed}")
 if errors:
     print("\nFailures:")
     for e in errors:

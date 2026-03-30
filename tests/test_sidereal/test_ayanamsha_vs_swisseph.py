@@ -58,9 +58,9 @@ GALACTIC_COINCIDENT_PAIRS = {(31, 34)}
 
 # Tolerance for ayanamsha comparison at J2000.
 # Standard modes: implementations share the same polynomial coefficients
-AYAN_TOL_DEG = 0.001        # 0.001 degrees = 3.6 arcseconds
+AYAN_TOL_DEG = 0.001  # 0.001 degrees = 3.6 arcseconds
 # True star modes: differ because of different star catalogs / ephemerides
-AYAN_TRUE_TOL_DEG = 0.005   # 0.005 degrees = 18 arcseconds
+AYAN_TRUE_TOL_DEG = 0.005  # 0.005 degrees = 18 arcseconds
 
 # Modes where libephemeris and pyswisseph are known to agree well
 SELECTED_MODES = [
@@ -78,9 +78,9 @@ POSITION_TEST_BODIES = [
 ]
 
 POSITION_TEST_DATES = [
-    2415020.0,    # 1900-01-01
-    2451545.0,    # J2000
-    2460310.5,    # 2024-01-18
+    2415020.0,  # 1900-01-01
+    2451545.0,  # J2000
+    2460310.5,  # 2024-01-18
 ]
 
 # Tolerance for sidereal position comparison: 2 arcseconds
@@ -123,7 +123,7 @@ class TestAyanamshaAtJ2000:
         diff = abs(lib_ayan - ref_ayan)
         assert diff < tol, (
             f"Mode {mode}: lib={lib_ayan:.8f}, ref={ref_ayan:.8f}, "
-            f"diff={diff:.6f} deg ({diff * 3600:.2f}\"), tol={tol}"
+            f'diff={diff:.6f} deg ({diff * 3600:.2f}"), tol={tol}'
         )
 
     @pytest.mark.unit
@@ -132,9 +132,7 @@ class TestAyanamshaAtJ2000:
         """Each ayanamsha mode returns a finite value at J2000."""
         swe.swe_set_sid_mode(mode)
         ayan = swe.swe_get_ayanamsa_ut(J2000)
-        assert math.isfinite(float(ayan)), (
-            f"Mode {mode}: ayanamsha={ayan} not finite"
-        )
+        assert math.isfinite(float(ayan)), f"Mode {mode}: ayanamsha={ayan} not finite"
 
     @pytest.mark.unit
     @pytest.mark.parametrize("mode", ALL_MODES)
@@ -245,7 +243,7 @@ class TestAyanamshaTimeVariation:
 
         rate_arcsec = (ayan_2100 - ayan_2000) * 3600 / 100.0  # arcsec/year
         assert 49 < rate_arcsec < 51, (
-            f"Mode {mode}: precession rate={rate_arcsec:.2f}\"/yr, expected ~50"
+            f'Mode {mode}: precession rate={rate_arcsec:.2f}"/yr, expected ~50'
         )
 
 
@@ -279,7 +277,7 @@ class TestSiderealPositions:
 
         dlon = abs(_angle_diff(lib_vals[0], ref_vals[0]))
         assert dlon < POS_TOL_DEG, (
-            f"{mode_name} {body_name} jd={jd}: lon diff={dlon * 3600:.4f}\" "
+            f'{mode_name} {body_name} jd={jd}: lon diff={dlon * 3600:.4f}" '
             f"(lib={lib_vals[0]:.8f}, ref={ref_vals[0]:.8f})"
         )
 
@@ -389,9 +387,7 @@ class TestDistinctModes:
         swe.swe_set_sid_mode(SE_SIDM_J2000)
         ayan = float(swe.swe_get_ayanamsa_ut(J2000))
         # Allow 1e-6 degree (about 0.004 arcsecond) for numerical noise
-        assert abs(ayan) < 1e-6, (
-            f"J2000 mode ayanamsha={ayan}, expected ~0.0"
-        )
+        assert abs(ayan) < 1e-6, f"J2000 mode ayanamsha={ayan}, expected ~0.0"
 
     @pytest.mark.unit
     def test_all_standard_modes_mostly_distinct(self):

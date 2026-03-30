@@ -67,7 +67,9 @@ class TestWrapAround360:
             for i in range(50):
                 jd = JD_J2000 + i * 7.3
                 result, _ = swe.calc_ut(jd, body, SEFLG_SWIEPH)
-                assert result[0] < 360.0, f"Body {body} at JD {jd}: lon {result[0]} >= 360"
+                assert result[0] < 360.0, (
+                    f"Body {body} at JD {jd}: lon {result[0]} >= 360"
+                )
 
     def test_solcross_near_zero(self):
         """solcross_ut at 0° should return a valid crossing JD."""
@@ -98,9 +100,7 @@ class TestWrapAround360:
         swe.set_sid_mode(1)  # Lahiri
         try:
             for body in [SE_SUN, SE_MOON, SE_MARS]:
-                result, _ = swe.calc_ut(
-                    JD_J2000, body, SEFLG_SWIEPH | SEFLG_SIDEREAL
-                )
+                result, _ = swe.calc_ut(JD_J2000, body, SEFLG_SWIEPH | SEFLG_SIDEREAL)
                 assert 0.0 <= result[0] < 360.0, (
                     f"Sidereal lon for body {body}: {result[0]}"
                 )

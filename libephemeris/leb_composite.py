@@ -56,11 +56,23 @@ class CompositeLEBReader:
         self._delta_t_reader = None
         self._star_reader = None
         for reader in readers:
-            if self._nutation_reader is None and hasattr(reader, '_nutation') and reader._nutation is not None:
+            if (
+                self._nutation_reader is None
+                and hasattr(reader, "_nutation")
+                and reader._nutation is not None
+            ):
                 self._nutation_reader = reader
-            if self._delta_t_reader is None and hasattr(reader, '_delta_t_jds') and reader._delta_t_jds:
+            if (
+                self._delta_t_reader is None
+                and hasattr(reader, "_delta_t_jds")
+                and reader._delta_t_jds
+            ):
                 self._delta_t_reader = reader
-            if self._star_reader is None and hasattr(reader, '_stars') and reader._stars:
+            if (
+                self._star_reader is None
+                and hasattr(reader, "_stars")
+                and reader._stars
+            ):
                 self._star_reader = reader
 
     @staticmethod
@@ -170,7 +182,7 @@ class CompositeLEBReader:
 
     def get_star(self, star_id: int) -> StarEntry:
         if self._star_reader is None:
-            raise KeyError(f"No star catalog in any LEB file")
+            raise KeyError("No star catalog in any LEB file")
         return self._star_reader.get_star(star_id)
 
     def close(self) -> None:

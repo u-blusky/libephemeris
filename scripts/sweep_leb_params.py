@@ -32,7 +32,11 @@ sys.path.insert(0, ".")
 from libephemeris import set_calc_mode, swe_calc
 from libephemeris.constants import SEFLG_SPEED, SEFLG_HELCTR
 from libephemeris.leb_format import (
-    BODY_PARAMS, COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM,
+    BODY_PARAMS,
+    COORD_ECLIPTIC,
+    COORD_HELIO_ECL,
+    COORD_ICRS_BARY,
+    COORD_ICRS_BARY_SYSTEM,
 )
 
 # Bodies requiring heliocentric flag (COORD_HELIO_ECL in LEB format)
@@ -41,8 +45,11 @@ _HELIO_BODIES = {40, 41, 42, 43, 44, 45, 46, 47, 48}
 # Bodies stored as ICRS barycentric in LEB — sweep cannot test these accurately
 # because the sweep fits ecliptic lon/lat but LEB fits ICRS x,y,z (much smoother).
 # These bodies are validated by regeneration + leb_accuracy_sweep instead.
-_ICRS_BODIES = {bid for bid, p in BODY_PARAMS.items()
-                if p[2] in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM)}
+_ICRS_BODIES = {
+    bid
+    for bid, p in BODY_PARAMS.items()
+    if p[2] in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM)
+}
 
 
 def _calc_flags(body_id: int) -> int:
@@ -51,19 +58,43 @@ def _calc_flags(body_id: int) -> int:
         return SEFLG_SPEED | SEFLG_HELCTR
     return SEFLG_SPEED
 
+
 # Base tier JD range (1850-2150)
 BASE_JD_START = 2396758.5
 BASE_JD_END = 2506331.5
 
 # All body names
 BODY_NAMES: dict[int, str] = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
-    10: "Mean Node", 11: "True Node", 12: "Mean Apogee", 13: "Oscu Apogee",
-    14: "Earth", 15: "Chiron", 17: "Ceres", 18: "Pallas", 19: "Juno",
-    20: "Vesta", 21: "Interp Apogee", 22: "Interp Perigee",
-    40: "Cupido", 41: "Hades", 42: "Zeus", 43: "Kronos",
-    44: "Apollon", 45: "Admetos", 46: "Vulkanus", 47: "Poseidon",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+    10: "Mean Node",
+    11: "True Node",
+    12: "Mean Apogee",
+    13: "Oscu Apogee",
+    14: "Earth",
+    15: "Chiron",
+    17: "Ceres",
+    18: "Pallas",
+    19: "Juno",
+    20: "Vesta",
+    21: "Interp Apogee",
+    22: "Interp Perigee",
+    40: "Cupido",
+    41: "Hades",
+    42: "Zeus",
+    43: "Kronos",
+    44: "Apollon",
+    45: "Admetos",
+    46: "Vulkanus",
+    47: "Poseidon",
     48: "Transpluto",
 }
 
@@ -187,21 +218,28 @@ def _build_segments(
         n_total = 1
 
     if scan_all:
-        return [(jd_start + i * interval, jd_start + (i + 1) * interval)
-                for i in range(n_total)]
+        return [
+            (jd_start + i * interval, jd_start + (i + 1) * interval)
+            for i in range(n_total)
+        ]
 
     if scan > 0 and scan < n_total:
         rng = np.random.default_rng(42)
         indices = sorted(rng.choice(n_total, min(scan, n_total), replace=False))
-        return [(jd_start + int(i) * interval, jd_start + (int(i) + 1) * interval)
-                for i in indices]
+        return [
+            (jd_start + int(i) * interval, jd_start + (int(i) + 1) * interval)
+            for i in indices
+        ]
 
     # Default: all segments if n_total <= scan, else scan random
-    return [(jd_start + i * interval, jd_start + (i + 1) * interval)
-            for i in range(n_total)]
+    return [
+        (jd_start + i * interval, jd_start + (i + 1) * interval) for i in range(n_total)
+    ]
 
 
-def _estimate_size_mb(interval: float, degree: int, jd_start: float, jd_end: float) -> float:
+def _estimate_size_mb(
+    interval: float, degree: int, jd_start: float, jd_end: float
+) -> float:
     """Estimate file size contribution in MB for one body."""
     n_segs = int((jd_end - jd_start) / interval) + 1
     seg_bytes = 3 * (degree + 1) * 8
@@ -238,10 +276,14 @@ def sweep_body(
             if (idx + 1) % 100 == 0:
                 elapsed = time.monotonic() - t0
                 pct = (idx + 1) / n_segs * 100
-                print(f"\r    {name:16s} {interval:g}d/{degree:2d}  "
-                      f"[{idx+1}/{n_segs} segs, {pct:.0f}%] "
-                      f"max_err={max(max_lon, max_lat):.6f}\"  "
-                      f"{elapsed:.0f}s", end="", flush=True)
+                print(
+                    f"\r    {name:16s} {interval:g}d/{degree:2d}  "
+                    f"[{idx + 1}/{n_segs} segs, {pct:.0f}%] "
+                    f'max_err={max(max_lon, max_lat):.6f}"  '
+                    f"{elapsed:.0f}s",
+                    end="",
+                    flush=True,
+                )
 
         elapsed = time.monotonic() - t0
         worst = max(max_lon, max_lat)
@@ -250,19 +292,21 @@ def sweep_body(
         # Clear progress line
         print(f"\r{' ' * 100}\r", end="", flush=True)
 
-        results.append({
-            "body_id": body_id,
-            "name": name,
-            "interval": interval,
-            "degree": degree,
-            "max_lon": max_lon,
-            "max_lat": max_lat,
-            "worst": worst,
-            "size_mb": size_mb,
-            "pass": worst < PRECISION_TARGET,
-            "n_segs_tested": n_segs,
-            "elapsed": elapsed,
-        })
+        results.append(
+            {
+                "body_id": body_id,
+                "name": name,
+                "interval": interval,
+                "degree": degree,
+                "max_lon": max_lon,
+                "max_lat": max_lat,
+                "worst": worst,
+                "size_mb": size_mb,
+                "pass": worst < PRECISION_TARGET,
+                "n_segs_tested": n_segs,
+                "elapsed": elapsed,
+            }
+        )
 
     return results
 
@@ -270,12 +314,18 @@ def sweep_body(
 def main() -> None:
     parser = argparse.ArgumentParser(description="LEB parameter sweep")
     parser.add_argument("--body", help="Single body name or ID (default: all)")
-    parser.add_argument("--scan", type=int, default=500,
-                        help="Random segments to scan per combo (default: 500)")
-    parser.add_argument("--scan-all", action="store_true",
-                        help="Scan ALL segments (definitive, slow)")
-    parser.add_argument("--n-test", type=int, default=50,
-                        help="Test points per segment (default: 50)")
+    parser.add_argument(
+        "--scan",
+        type=int,
+        default=500,
+        help="Random segments to scan per combo (default: 500)",
+    )
+    parser.add_argument(
+        "--scan-all", action="store_true", help="Scan ALL segments (definitive, slow)"
+    )
+    parser.add_argument(
+        "--n-test", type=int, default=50, help="Test points per segment (default: 50)"
+    )
     parser.add_argument("--jd-start", type=float, default=BASE_JD_START)
     parser.add_argument("--jd-end", type=float, default=BASE_JD_END)
     args = parser.parse_args()
@@ -292,16 +342,20 @@ def main() -> None:
                 print(f"Unknown body: {args.body}")
                 print(f"Available: {', '.join(sorted(_NAME_TO_ID.keys()))}")
                 sys.exit(1)
-        bodies_to_sweep = {body_id: SWEEP_MATRIX.get(body_id, [(BODY_PARAMS[body_id][0], BODY_PARAMS[body_id][1])])}
+        bodies_to_sweep = {
+            body_id: SWEEP_MATRIX.get(
+                body_id, [(BODY_PARAMS[body_id][0], BODY_PARAMS[body_id][1])]
+            )
+        }
     else:
         bodies_to_sweep = SWEEP_MATRIX
 
     scan_mode = "ALL" if args.scan_all else f"{args.scan} random"
     print(f"{'=' * 85}")
-    print(f"  LEB Parameter Sweep — Base Tier")
+    print("  LEB Parameter Sweep — Base Tier")
     print(f"  JD range: {args.jd_start:.1f} – {args.jd_end:.1f}")
     print(f"  Segments: {scan_mode} | Test points/seg: {args.n_test}")
-    print(f"  Precision target: <{PRECISION_TARGET}\" (2x margin below 0.001\")")
+    print(f'  Precision target: <{PRECISION_TARGET}" (2x margin below 0.001")')
     print(f"{'=' * 85}")
 
     all_results = []
@@ -309,30 +363,45 @@ def main() -> None:
         combos = bodies_to_sweep[body_id]
         name = BODY_NAMES.get(body_id, f"Body {body_id}")
         print(f"\n  --- {name} (id={body_id}) ---")
-        results = sweep_body(body_id, combos, args.jd_start, args.jd_end,
-                             args.scan, args.scan_all, args.n_test)
+        results = sweep_body(
+            body_id,
+            combos,
+            args.jd_start,
+            args.jd_end,
+            args.scan,
+            args.scan_all,
+            args.n_test,
+        )
         all_results.extend(results)
 
         # Print results for this body
         for r in results:
             marker = "PASS" if r["pass"] else "FAIL"
             icon = "+" if r["pass"] else "X"
-            is_current = (r["interval"] == BODY_PARAMS[body_id][0]
-                          and r["degree"] == BODY_PARAMS[body_id][1])
+            is_current = (
+                r["interval"] == BODY_PARAMS[body_id][0]
+                and r["degree"] == BODY_PARAMS[body_id][1]
+            )
             tag = " [current]" if is_current else ""
-            print(f"    [{icon}] {r['interval']:>5g}d / deg {r['degree']:2d}  "
-                  f"lon={r['max_lon']:.6f}\"  lat={r['max_lat']:.6f}\"  "
-                  f"max={r['worst']:.6f}\"  size={r['size_mb']:.2f} MB  "
-                  f"{r['elapsed']:.1f}s{tag}")
+            print(
+                f"    [{icon}] {r['interval']:>5g}d / deg {r['degree']:2d}  "
+                f'lon={r["max_lon"]:.6f}"  lat={r["max_lat"]:.6f}"  '
+                f'max={r["worst"]:.6f}"  size={r["size_mb"]:.2f} MB  '
+                f"{r['elapsed']:.1f}s{tag}"
+            )
 
     # Summary table
     print(f"\n{'=' * 85}")
-    print(f"  SUMMARY — Best passing combo per body")
+    print("  SUMMARY — Best passing combo per body")
     print(f"{'=' * 85}")
-    print(f"  {'Body':16s}  {'Current':>10s}  {'Proposed':>10s}  "
-          f"{'Curr MB':>8s}  {'Prop MB':>8s}  {'Saving':>8s}  {'Max Err':>10s}")
-    print(f"  {'─' * 16}  {'─' * 10}  {'─' * 10}  "
-          f"{'─' * 8}  {'─' * 8}  {'─' * 8}  {'─' * 10}")
+    print(
+        f"  {'Body':16s}  {'Current':>10s}  {'Proposed':>10s}  "
+        f"{'Curr MB':>8s}  {'Prop MB':>8s}  {'Saving':>8s}  {'Max Err':>10s}"
+    )
+    print(
+        f"  {'─' * 16}  {'─' * 10}  {'─' * 10}  "
+        f"{'─' * 8}  {'─' * 8}  {'─' * 8}  {'─' * 10}"
+    )
 
     total_current = 0.0
     total_proposed = 0.0
@@ -345,7 +414,9 @@ def main() -> None:
         name = BODY_NAMES.get(body_id, f"Body {body_id}")
         cur_params = BODY_PARAMS[body_id]
         cur_str = f"{cur_params[0]:g}d/{cur_params[1]}"
-        cur_mb = _estimate_size_mb(cur_params[0], cur_params[1], args.jd_start, args.jd_end)
+        cur_mb = _estimate_size_mb(
+            cur_params[0], cur_params[1], args.jd_start, args.jd_end
+        )
         total_current += cur_mb
 
         # Find best passing combo (smallest size among passing)
@@ -357,20 +428,28 @@ def main() -> None:
             saving = cur_mb - prop_mb
             max_err = best["worst"]
             total_proposed += prop_mb
-            print(f"  {name:16s}  {cur_str:>10s}  {prop_str:>10s}  "
-                  f"{cur_mb:7.2f}M  {prop_mb:7.2f}M  {saving:+7.2f}M  {max_err:.6f}\"")
+            print(
+                f"  {name:16s}  {cur_str:>10s}  {prop_str:>10s}  "
+                f'{cur_mb:7.2f}M  {prop_mb:7.2f}M  {saving:+7.2f}M  {max_err:.6f}"'
+            )
         else:
             # No passing combo — keep current
             total_proposed += cur_mb
-            print(f"  {name:16s}  {cur_str:>10s}  {'(keep)':>10s}  "
-                  f"{cur_mb:7.2f}M  {cur_mb:7.2f}M  {'+0.00':>8s}M  {'N/A':>10s}")
+            print(
+                f"  {name:16s}  {cur_str:>10s}  {'(keep)':>10s}  "
+                f"{cur_mb:7.2f}M  {cur_mb:7.2f}M  {'+0.00':>8s}M  {'N/A':>10s}"
+            )
 
     saving_total = total_current - total_proposed
     pct = saving_total / total_current * 100 if total_current > 0 else 0
-    print(f"  {'─' * 16}  {'─' * 10}  {'─' * 10}  "
-          f"{'─' * 8}  {'─' * 8}  {'─' * 8}  {'─' * 10}")
-    print(f"  {'TOTAL':16s}  {'':>10s}  {'':>10s}  "
-          f"{total_current:7.2f}M  {total_proposed:7.2f}M  {saving_total:+7.2f}M  ({pct:.0f}%)")
+    print(
+        f"  {'─' * 16}  {'─' * 10}  {'─' * 10}  "
+        f"{'─' * 8}  {'─' * 8}  {'─' * 8}  {'─' * 10}"
+    )
+    print(
+        f"  {'TOTAL':16s}  {'':>10s}  {'':>10s}  "
+        f"{total_current:7.2f}M  {total_proposed:7.2f}M  {saving_total:+7.2f}M  ({pct:.0f}%)"
+    )
     print()
 
 

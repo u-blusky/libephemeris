@@ -26,6 +26,7 @@ errors = []
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
+
 def check(cond, label):
     global passed, failed
     if cond:
@@ -37,9 +38,9 @@ def check(cond, label):
 
 
 def section(name):
-    print(f"\n{'='*72}")
+    print(f"\n{'=' * 72}")
     print(f"  {name}")
-    print(f"{'='*72}")
+    print(f"{'=' * 72}")
 
 
 J2000 = 2451545.0  # 2000-Jan-1.5 TT
@@ -73,19 +74,35 @@ SE_EQU2HOR = 1
 section("G08: Fixed Stars")
 
 STARS_20 = [
-    "Sirius", "Aldebaran", "Regulus", "Spica", "Antares",
-    "Vega", "Capella", "Rigel", "Procyon", "Betelgeuse",
-    "Altair", "Deneb", "Pollux", "Fomalhaut", "Canopus",
-    "Arcturus", "Achernar", "Acrux", "Mimosa", "Hadar",
+    "Sirius",
+    "Aldebaran",
+    "Regulus",
+    "Spica",
+    "Antares",
+    "Vega",
+    "Capella",
+    "Rigel",
+    "Procyon",
+    "Betelgeuse",
+    "Altair",
+    "Deneb",
+    "Pollux",
+    "Fomalhaut",
+    "Canopus",
+    "Arcturus",
+    "Achernar",
+    "Acrux",
+    "Mimosa",
+    "Hadar",
 ]
 
 # Five dates spanning ~75 years
 DATES_5 = [
-    J2000,                    # 2000
-    2433282.5,                # ~1950
-    2444239.5,                # ~1980
-    2455197.5,                # ~2010
-    2460310.5,                # ~2024
+    J2000,  # 2000
+    2433282.5,  # ~1950
+    2444239.5,  # ~1980
+    2455197.5,  # ~2010
+    2460310.5,  # ~2024
 ]
 
 # G08.01: 20 stars x 5 dates = 100 combos x 3 checks = 300 checks
@@ -103,10 +120,12 @@ for star in STARS_20:
                 dlon = 360 - dlon
             dlat = abs(pos_lib[1] - pos_ref[1])
 
-            check(dlon * 3600 < 1.0, f"{label_base} lon diff {dlon*3600:.4f}\"")
-            check(dlat * 3600 < 1.0, f"{label_base} lat diff {dlat*3600:.4f}\"")
-            check(len(name_lib) > 0 and star.lower() in name_lib.lower(),
-                  f"{label_base} name '{name_lib}'")
+            check(dlon * 3600 < 1.0, f'{label_base} lon diff {dlon * 3600:.4f}"')
+            check(dlat * 3600 < 1.0, f'{label_base} lat diff {dlat * 3600:.4f}"')
+            check(
+                len(name_lib) > 0 and star.lower() in name_lib.lower(),
+                f"{label_base} name '{name_lib}'",
+            )
         except Exception as e:
             check(False, f"{label_base} lon EXCEPTION: {e}")
             check(False, f"{label_base} lat EXCEPTION")
@@ -120,8 +139,10 @@ for star in STARS_20:
     try:
         mag_lib, name_lib = lib.swe_fixstar2_mag(star)
         mag_ref, name_ref = swe_ref.fixstar2_mag(star)
-        check(math.isfinite(mag_lib) and abs(mag_lib - mag_ref) < 0.3,
-              f"{label} lib={mag_lib:.2f} ref={mag_ref:.2f}")
+        check(
+            math.isfinite(mag_lib) and abs(mag_lib - mag_ref) < 0.3,
+            f"{label} lib={mag_lib:.2f} ref={mag_ref:.2f}",
+        )
     except Exception as e:
         check(False, f"{label} EXCEPTION: {e}")
 
@@ -136,8 +157,8 @@ for star in STARS_20[:10]:
         if dlon > 180:
             dlon = 360 - dlon
         dlat = abs(pos_lib[1] - pos_ref[1])
-        check(dlon * 3600 < 1.0, f"{label_base} lon diff {dlon*3600:.4f}\"")
-        check(dlat * 3600 < 1.0, f"{label_base} lat diff {dlat*3600:.4f}\"")
+        check(dlon * 3600 < 1.0, f'{label_base} lon diff {dlon * 3600:.4f}"')
+        check(dlat * 3600 < 1.0, f'{label_base} lat diff {dlat * 3600:.4f}"')
         check(star.lower() in name_lib.lower(), f"{label_base} name")
     except Exception as e:
         check(False, f"{label_base} lon EXCEPTION: {e}")
@@ -148,8 +169,16 @@ for star in STARS_20[:10]:
 # 10 stars x 1 shift check + 10 stars x 4 direction/ratio checks = 50
 print("\nG08.03: Proper motion over 100 years")
 HIGH_PM_STARS = [
-    "Sirius", "Arcturus", "Procyon", "Pollux", "Regulus",
-    "Aldebaran", "Vega", "Capella", "Altair", "Fomalhaut",
+    "Sirius",
+    "Arcturus",
+    "Procyon",
+    "Pollux",
+    "Regulus",
+    "Aldebaran",
+    "Vega",
+    "Capella",
+    "Altair",
+    "Fomalhaut",
 ]
 jd_j2000 = J2000
 jd_j2100 = J2000 + 100 * 365.25  # ~J2100
@@ -191,14 +220,12 @@ for star in HIGH_PM_STARS:
         dlon_ref_abs = abs(dlon_ref)
         if dlon_ref_abs > 0.01:
             ratio = dlon_lib_abs / dlon_ref_abs
-            check(0.5 < ratio < 2.0,
-                  f"{label} lon_ratio={ratio:.3f}")
+            check(0.5 < ratio < 2.0, f"{label} lon_ratio={ratio:.3f}")
         else:
             check(True, f"{label} lon_small")
         if abs(dlat_ref) > 0.01:
             ratio = abs(dlat_lib) / abs(dlat_ref)
-            check(0.5 < ratio < 2.0,
-                  f"{label} lat_ratio={ratio:.3f}")
+            check(0.5 < ratio < 2.0, f"{label} lat_ratio={ratio:.3f}")
         else:
             check(True, f"{label} lat_small")
     except Exception as e:
@@ -235,8 +262,10 @@ for eps in obliquities:
             if dlon > 180:
                 dlon = 360 - dlon
             dlat = abs(ecl[1] - lat)
-            check(dlon < 1e-8 and dlat < 1e-8,
-                  f"{label} round-trip dlon={dlon:.2e} dlat={dlat:.2e}")
+            check(
+                dlon < 1e-8 and dlat < 1e-8,
+                f"{label} round-trip dlon={dlon:.2e} dlat={dlat:.2e}",
+            )
         except Exception as e:
             check(False, f"{label} EXCEPTION: {e}")
 
@@ -248,8 +277,10 @@ for eps in obliquities:
             if dra > 180:
                 dra = 360 - dra
             ddec = abs(eq_lib[1] - eq_ref[1])
-            check(dra < 1e-8 and ddec < 1e-8,
-                  f"{label} vs_ref dRA={dra:.2e} dDec={ddec:.2e}")
+            check(
+                dra < 1e-8 and ddec < 1e-8,
+                f"{label} vs_ref dRA={dra:.2e} dDec={ddec:.2e}",
+            )
         except Exception as e:
             check(False, f"{label} vs_ref EXCEPTION: {e}")
 
@@ -271,12 +302,16 @@ for _ in range(25):
         if dlon > 180:
             dlon = 360 - dlon
         dlat = abs(ecl[1] - lat)
-        check(dlon < 1e-8 and dlat < 1e-8,
-              f"{label} pos round-trip dlon={dlon:.2e} dlat={dlat:.2e}")
+        check(
+            dlon < 1e-8 and dlat < 1e-8,
+            f"{label} pos round-trip dlon={dlon:.2e} dlat={dlat:.2e}",
+        )
         dslon = abs(ecl[3] - slon)
         dslat = abs(ecl[4] - slat)
-        check(dslon < 1e-6 and dslat < 1e-6,
-              f"{label} vel round-trip dslon={dslon:.2e} dslat={dslat:.2e}")
+        check(
+            dslon < 1e-6 and dslat < 1e-6,
+            f"{label} vel round-trip dslon={dslon:.2e} dslat={dslat:.2e}",
+        )
     except Exception as e:
         check(False, f"{label} pos EXCEPTION: {e}")
         check(False, f"{label} vel EXCEPTION: {e}")
@@ -284,11 +319,11 @@ for _ in range(25):
 # G09.03: azalt (100 checks)
 print("\nG09.03: azalt conversions")
 LOCATIONS = [
-    (0.0, 51.5, 0.0),      # London
+    (0.0, 51.5, 0.0),  # London
     (-73.97, 40.78, 10.0),  # New York
     (139.69, 35.69, 40.0),  # Tokyo
-    (-43.17, -22.91, 11.0), # Rio
-    (18.42, -33.93, 0.0),   # Cape Town
+    (-43.17, -22.91, 11.0),  # Rio
+    (18.42, -33.93, 0.0),  # Cape Town
 ]
 
 TEST_DATES_10 = [J2000 + i * 365.25 for i in range(10)]
@@ -307,7 +342,10 @@ for loc in LOCATIONS:
                 result = lib.azalt(jd, SE_EQU2HOR, loc, 1013.25, 15.0, xin)
                 az, alt_true, alt_app = result
                 check(0 <= az < 360, f"{label} az={az:.2f} in [0,360)")
-                check(-90 <= alt_true <= 90, f"{label} alt_true={alt_true:.2f} in [-90,90]")
+                check(
+                    -90 <= alt_true <= 90,
+                    f"{label} alt_true={alt_true:.2f} in [-90,90]",
+                )
             except Exception as e:
                 check(False, f"{label} az EXCEPTION: {e}")
                 check(False, f"{label} alt EXCEPTION: {e}")
@@ -339,8 +377,7 @@ for _ in range(25):
 print("\nG09.05: refrac round-trip and properties")
 
 # 20 altitudes x 3 temp/press combos = 60 refrac checks
-altitudes = [0, 1, 2, 5, 10, 15, 20, 25, 30, 35,
-             40, 45, 50, 55, 60, 65, 70, 75, 80, 85]
+altitudes = [0, 1, 2, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85]
 conditions = [
     (1013.25, 15.0),
     (900.0, 5.0),
@@ -382,7 +419,7 @@ for alt in [0, 10, 30, 60, 80]:
     label = f"G09.05 zero_press alt={alt}"
     try:
         app = lib.refrac(float(alt), 0.0, 15.0, SE_TRUE_TO_APP)
-        check(abs(app - alt) < 1e-10, f"{label} diff={abs(app-alt):.2e}")
+        check(abs(app - alt) < 1e-10, f"{label} diff={abs(app - alt):.2e}")
     except Exception as e:
         check(False, f"{label} EXCEPTION: {e}")
 
@@ -391,8 +428,9 @@ elevations = [0, 100, 500, 1000, 2000, 3000, 4000, 5000, 6000, 8000]
 for elev in elevations:
     label = f"G09.05 refrac_ext elev={elev}m"
     try:
-        result = lib.refrac_extended(10.0, float(elev), 1013.25, 15.0, 0.0065,
-                                     SE_TRUE_TO_APP)
+        result = lib.refrac_extended(
+            10.0, float(elev), 1013.25, 15.0, 0.0065, SE_TRUE_TO_APP
+        )
         if isinstance(result, tuple) and len(result) == 2:
             details = result[1]
             dip = details[3]
@@ -426,11 +464,27 @@ section("G10: Phenomena & Heliacal")
 # G10.01: pheno_ut (200 checks)
 # Use only planets where lib properly computes pheno (not Chiron which returns zeros)
 print("\nG10.01: pheno_ut -- 9 bodies x 10 dates x 4 checks + extras")
-PHENO_BODIES = [SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER,
-                SE_SATURN, SE_URANUS, SE_NEPTUNE, SE_PLUTO]
+PHENO_BODIES = [
+    SE_MOON,
+    SE_MERCURY,
+    SE_VENUS,
+    SE_MARS,
+    SE_JUPITER,
+    SE_SATURN,
+    SE_URANUS,
+    SE_NEPTUNE,
+    SE_PLUTO,
+]
 PHENO_BODY_NAMES = {
-    1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars", 5: "Jupiter",
-    6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
 }
 PHENO_DATES = [J2000 + i * 365.25 * 2.5 for i in range(10)]
 
@@ -443,17 +497,25 @@ for body in PHENO_BODIES:
             p_ref = swe_ref.pheno_ut(jd, body, SEFLG)
 
             # [0] phase angle
-            check(math.isfinite(p_lib[0]) and abs(p_lib[0] - p_ref[0]) < 0.1,
-                  f"{label_base} phase_angle lib={p_lib[0]:.4f} ref={p_ref[0]:.4f}")
+            check(
+                math.isfinite(p_lib[0]) and abs(p_lib[0] - p_ref[0]) < 0.1,
+                f"{label_base} phase_angle lib={p_lib[0]:.4f} ref={p_ref[0]:.4f}",
+            )
             # [1] phase (illuminated fraction)
-            check(math.isfinite(p_lib[1]) and 0 <= p_lib[1] <= 1.001,
-                  f"{label_base} phase={p_lib[1]:.4f}")
+            check(
+                math.isfinite(p_lib[1]) and 0 <= p_lib[1] <= 1.001,
+                f"{label_base} phase={p_lib[1]:.4f}",
+            )
             # [2] elongation
-            check(math.isfinite(p_lib[2]) and abs(p_lib[2] - p_ref[2]) < 0.1,
-                  f"{label_base} elong lib={p_lib[2]:.4f} ref={p_ref[2]:.4f}")
+            check(
+                math.isfinite(p_lib[2]) and abs(p_lib[2] - p_ref[2]) < 0.1,
+                f"{label_base} elong lib={p_lib[2]:.4f} ref={p_ref[2]:.4f}",
+            )
             # [4] magnitude
-            check(math.isfinite(p_lib[4]) and abs(p_lib[4] - p_ref[4]) < 0.5,
-                  f"{label_base} mag lib={p_lib[4]:.2f} ref={p_ref[4]:.2f}")
+            check(
+                math.isfinite(p_lib[4]) and abs(p_lib[4] - p_ref[4]) < 0.5,
+                f"{label_base} mag lib={p_lib[4]:.2f} ref={p_ref[4]:.2f}",
+            )
         except Exception as e:
             for c in range(4):
                 check(False, f"{label_base} field[{c}] EXCEPTION: {e}")
@@ -481,8 +543,10 @@ for jd in PHENO_DATES:
         p_ref = swe_ref.pheno_ut(jd, SE_MOON, SEFLG)
         diam_deg = p[3]
         diam_ref = p_ref[3]
-        check(abs(diam_deg - diam_ref) < 0.01,
-              f"{label} = {diam_deg:.4f}deg ref={diam_ref:.4f}deg")
+        check(
+            abs(diam_deg - diam_ref) < 0.01,
+            f"{label} = {diam_deg:.4f}deg ref={diam_ref:.4f}deg",
+        )
     except Exception as e:
         check(False, f"{label} EXCEPTION: {e}")
 
@@ -493,8 +557,10 @@ for jd in PHENO_DATES:
         p_ref = swe_ref.pheno_ut(jd, SE_JUPITER, SEFLG)
         diam_deg = p[3]
         diam_ref = p_ref[3]
-        check(abs(diam_deg - diam_ref) < 0.001,
-              f"{label} = {diam_deg:.6f}deg ref={diam_ref:.6f}deg")
+        check(
+            abs(diam_deg - diam_ref) < 0.001,
+            f"{label} = {diam_deg:.6f}deg ref={diam_ref:.6f}deg",
+        )
     except Exception as e:
         check(False, f"{label} EXCEPTION: {e}")
 
@@ -505,17 +571,23 @@ print("\nG10.02: Elongation helpers")
 ELONG_DATES = [J2000 + i * 36.525 for i in range(20)]  # 20 dates, ~0.1yr apart
 
 for jd in ELONG_DATES:
-    for body, bname, max_elong in [(SE_VENUS, "Venus", 47.5), (SE_MERCURY, "Mercury", 28.5)]:
+    for body, bname, max_elong in [
+        (SE_VENUS, "Venus", 47.5),
+        (SE_MERCURY, "Mercury", 28.5),
+    ]:
         label_base = f"G10.02 {bname} JD={jd:.1f}"
         try:
             elong, is_morn = lib.get_elongation_from_sun(jd, body)
             abs_elong = abs(elong)
-            check(math.isfinite(elong) and 0 <= abs_elong <= 180,
-                  f"{label_base} elong={elong:.2f}")
-            check(abs_elong <= max_elong + 1.0,
-                  f"{label_base} |elong|={abs_elong:.2f} <= {max_elong}")
-            check(isinstance(is_morn, bool),
-                  f"{label_base} is_morning={is_morn}")
+            check(
+                math.isfinite(elong) and 0 <= abs_elong <= 180,
+                f"{label_base} elong={elong:.2f}",
+            )
+            check(
+                abs_elong <= max_elong + 1.0,
+                f"{label_base} |elong|={abs_elong:.2f} <= {max_elong}",
+            )
+            check(isinstance(is_morn, bool), f"{label_base} is_morning={is_morn}")
         except Exception as e:
             check(False, f"{label_base} elong EXCEPTION: {e}")
             check(False, f"{label_base} max EXCEPTION")
@@ -534,8 +606,18 @@ for jd in ELONG_DATES:
 
 # G10.03: vis_limit_mag (100 checks)
 print("\nG10.03: vis_limit_mag")
-VLM_BODIES = ["Venus", "Mars", "Jupiter", "Saturn", "Sirius",
-              "Mercury", "Vega", "Arcturus", "Capella", "Altair"]
+VLM_BODIES = [
+    "Venus",
+    "Mars",
+    "Jupiter",
+    "Saturn",
+    "Sirius",
+    "Mercury",
+    "Vega",
+    "Arcturus",
+    "Capella",
+    "Altair",
+]
 VLM_DATES = [J2000 + i * 730.5 for i in range(10)]
 geopos = (0.0, 51.5, 0.0)
 atmo = (1013.25, 15.0, 40.0, 0.0)
@@ -591,8 +673,10 @@ for body in NAP_BODIES:
                 dlon = abs(lon_lib - lon_ref)
                 if dlon > 180:
                     dlon = 360 - dlon
-                check(math.isfinite(lon_lib) and dlon < tol,
-                      f"{label} lon lib={lon_lib:.4f} ref={lon_ref:.4f} d={dlon:.4f}")
+                check(
+                    math.isfinite(lon_lib) and dlon < tol,
+                    f"{label} lon lib={lon_lib:.4f} ref={lon_ref:.4f} d={dlon:.4f}",
+                )
         except Exception as e:
             for i in range(4):
                 check(False, f"{label_base} {NAMES_4[i]} EXCEPTION: {e}")
@@ -600,11 +684,25 @@ for body in NAP_BODIES:
 # G11.02: Orbital elements (200 checks)
 # Use only planets (not Chiron/Ceres which return zero elements in lib)
 print("\nG11.02: Orbital elements -- 8 planets x 10 dates x 2 checks + extras")
-ORB_BODIES_MAIN = [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN,
-                   SE_URANUS, SE_NEPTUNE, SE_PLUTO]
+ORB_BODIES_MAIN = [
+    SE_MERCURY,
+    SE_VENUS,
+    SE_MARS,
+    SE_JUPITER,
+    SE_SATURN,
+    SE_URANUS,
+    SE_NEPTUNE,
+    SE_PLUTO,
+]
 ORB_BODY_NAMES = {
-    2: "Mercury", 3: "Venus", 4: "Mars", 5: "Jupiter", 6: "Saturn",
-    7: "Uranus", 8: "Neptune", 9: "Pluto",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
 }
 ORB_DATES = [J2000 + i * 800 for i in range(10)]
 
@@ -620,8 +718,10 @@ for body in ORB_BODIES_MAIN:
             # [0] semi-major axis: should be positive and plausible
             a_lib = e_lib[0]
             a_ref = e_ref[0]
-            check(a_lib > 0 and abs(a_lib - a_ref) / max(a_ref, 0.01) < 0.05,
-                  f"{label_base} a={a_lib:.4f} ref={a_ref:.4f}")
+            check(
+                a_lib > 0 and abs(a_lib - a_ref) / max(a_ref, 0.01) < 0.05,
+                f"{label_base} a={a_lib:.4f} ref={a_ref:.4f}",
+            )
 
             # [1] eccentricity < 1 for bound orbits
             ecc = e_lib[1]
@@ -652,8 +752,10 @@ for body in ORB_BODIES_MAIN:
         try:
             dt = lib.swe_deltat(jd)
             dmax, dmin, dcur = lib.swe_orbit_max_min_true_distance(jd + dt, body, SEFLG)
-            check(dmax > dmin > 0 and dcur > 0,
-                  f"{label} max={dmax:.4f} min={dmin:.4f} cur={dcur:.4f}")
+            check(
+                dmax > dmin > 0 and dcur > 0,
+                f"{label} max={dmax:.4f} min={dmin:.4f} cur={dcur:.4f}",
+            )
         except Exception as e:
             check(False, f"{label} EXCEPTION: {e}")
 
@@ -716,8 +818,8 @@ for i in range(20):
     jd = J2000 + i * 365.25
     label = f"G11.04 Apog_Perig JD={jd:.0f}"
     try:
-        apog = lib.swe_calc_ut(jd, 21, SEFLG_SPD)   # SE_INTP_APOG
-        perig = lib.swe_calc_ut(jd, 22, SEFLG_SPD)   # SE_INTP_PERG
+        apog = lib.swe_calc_ut(jd, 21, SEFLG_SPD)  # SE_INTP_APOG
+        perig = lib.swe_calc_ut(jd, 22, SEFLG_SPD)  # SE_INTP_PERG
         sep = abs(apog[0][0] - perig[0][0])
         if sep > 180:
             sep = 360 - sep
@@ -766,8 +868,28 @@ section("G12: Crossings & Stations")
 
 # G12.01: solcross_ut (100 checks)
 print("\nG12.01: solcross_ut -- cardinal + intermediate degrees")
-CROSS_DEGS = [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0,
-              300.0, 330.0, 15.0, 45.0, 75.0, 105.0, 135.0, 165.0, 195.0, 225.0]
+CROSS_DEGS = [
+    0.0,
+    30.0,
+    60.0,
+    90.0,
+    120.0,
+    150.0,
+    180.0,
+    210.0,
+    240.0,
+    270.0,
+    300.0,
+    330.0,
+    15.0,
+    45.0,
+    75.0,
+    105.0,
+    135.0,
+    165.0,
+    195.0,
+    225.0,
+]
 
 # 20 target degrees x 5 start years = 100 checks
 START_JDS = [J2000 + i * 365.25 for i in range(5)]
@@ -852,8 +974,7 @@ for body, bname, n_stations in STATION_CONFIGS:
             pos = lib.swe_calc_ut(jd_station, body, SEFLG_SPD)
             speed = abs(pos[0][3])
             check(speed < 0.01, f"{label_base} speed={speed:.6f} (~0)")
-            check(station_type in ("SR", "SD"),
-                  f"{label_base} type={station_type}")
+            check(station_type in ("SR", "SD"), f"{label_base} type={station_type}")
             jd = jd_station + 30  # advance past station
         except Exception as e:
             check(False, f"{label_base} speed EXCEPTION: {e}")
@@ -865,17 +986,17 @@ for body, bname, n_stations in STATION_CONFIGS:
 # FINAL SUMMARY
 # ────────────────────────────────────────────────────────────────────────
 
-print(f"\n{'='*72}")
-print(f"  GRAND TOTAL")
-print(f"{'='*72}")
+print(f"\n{'=' * 72}")
+print("  GRAND TOTAL")
+print(f"{'=' * 72}")
 total = passed + failed
 print(f"  Passed:  {passed}")
 print(f"  Failed:  {failed}")
 print(f"  Total:   {total}")
-print(f"  Rate:    {passed/total*100:.1f}%" if total else "  Rate:    N/A")
+print(f"  Rate:    {passed / total * 100:.1f}%" if total else "  Rate:    N/A")
 
 if failed:
-    print(f"\n  First 20 failures:")
+    print("\n  First 20 failures:")
     for e in errors[:20]:
         print(f"    - {e}")
 

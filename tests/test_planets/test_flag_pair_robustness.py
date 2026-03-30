@@ -56,11 +56,11 @@ HELIO_BODIES = [
 ]
 
 DATES = [
-    2415020.0,   # 1900-01-01
-    2433282.5,   # 1950-01-01
-    2451545.0,   # 2000-01-01 (J2000)
-    2460310.5,   # 2024-01-18
-    2488070.0,   # 2100-01-01
+    2415020.0,  # 1900-01-01
+    2433282.5,  # 1950-01-01
+    2451545.0,  # 2000-01-01 (J2000)
+    2460310.5,  # 2024-01-18
+    2488070.0,  # 2100-01-01
 ]
 
 # ~30 flag pair combinations (geocentric-safe, no HELCTR with Sun/Moon)
@@ -171,9 +171,7 @@ class TestXYZCoherence:
     @pytest.mark.unit
     @pytest.mark.parametrize("body_id,body_name", BODIES)
     @pytest.mark.parametrize("jd", DATES)
-    def test_xyz_vs_spherical_distance(
-        self, body_id: int, body_name: str, jd: float
-    ):
+    def test_xyz_vs_spherical_distance(self, body_id: int, body_name: str, jd: float):
         """XYZ magnitude matches spherical distance within 1e-8 AU."""
         # Get spherical coordinates to extract distance
         sph_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
@@ -195,9 +193,7 @@ class TestXYZCoherence:
         """XYZ ecliptic and XYZ equatorial magnitudes match."""
         jd = 2451545.0
         ecl_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_XYZ)
-        equ_vals, _ = swe.swe_calc_ut(
-            jd, body_id, SEFLG_XYZ | SEFLG_EQUATORIAL
-        )
+        equ_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_XYZ | SEFLG_EQUATORIAL)
 
         r_ecl = math.sqrt(sum(v * v for v in ecl_vals[:3]))
         r_equ = math.sqrt(sum(v * v for v in equ_vals[:3]))

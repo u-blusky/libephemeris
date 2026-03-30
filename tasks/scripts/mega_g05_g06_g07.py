@@ -213,8 +213,16 @@ check(
 
 # Additional uniqueness: 10 checks for selected pairs
 selected_pairs = [
-    (0, 1), (1, 2), (3, 4), (5, 6), (7, 8),
-    (10, 11), (15, 16), (20, 21), (27, 28), (35, 36),
+    (0, 1),
+    (1, 2),
+    (3, 4),
+    (5, 6),
+    (7, 8),
+    (10, 11),
+    (15, 16),
+    (20, 21),
+    (27, 28),
+    (35, 36),
 ]
 for a, b in selected_pairs:
     if a in j2000_values and b in j2000_values:
@@ -233,13 +241,21 @@ print(f"\n--- {current_section}: Sidereal positions ---")
 SELECTED_MODES = [0, 1, 3, 5, 7, 14, 17, 21, 27, 30]
 BODIES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 BODY_NAMES = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
 }
 DATES_SID = [
-    2451545.0,   # J2000
-    2458849.5,   # 2020 Jan 1
-    2455197.5,   # 2010 Jan 1
+    2451545.0,  # J2000
+    2458849.5,  # 2020 Jan 1
+    2455197.5,  # 2010 Jan 1
 ]
 
 for mode in SELECTED_MODES:
@@ -266,7 +282,7 @@ for mode in SELECTED_MODES:
                 check(
                     diff_arcsec < lon_tol,
                     f"mode {mode} body {BODY_NAMES.get(body, body)} "
-                    f"JD {jd}: lon diff={diff_arcsec:.2f}\" >= {lon_tol}\"",
+                    f'JD {jd}: lon diff={diff_arcsec:.2f}" >= {lon_tol}"',
                 )
 
                 # Result in [0, 360)
@@ -345,7 +361,7 @@ for mode in [0, 1, 5, 14, 30]:
             diff_lat = abs(lib_pos[0][1] - ref_pos[0][1]) * 3600
             check(
                 diff_lat < 1.0,
-                f"mode {mode} body {body}: sidereal lat diff={diff_lat:.3f}\" >= 1\"",
+                f'mode {mode} body {body}: sidereal lat diff={diff_lat:.3f}" >= 1"',
             )
         else:
             check(False, f"mode {mode} body {body}: sidereal lat check skipped (None)")
@@ -375,8 +391,12 @@ for year in range(2000, 2011):
     jd_search = jd_start
     for _ in range(5):
         try:
-            retflag_lib, tret_lib = lib.sol_eclipse_when_glob(jd_search, SEFLG_SWIEPH, 0)
-            retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(jd_search, SEFLG_SWIEPH, 0)
+            retflag_lib, tret_lib = lib.sol_eclipse_when_glob(
+                jd_search, SEFLG_SWIEPH, 0
+            )
+            retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(
+                jd_search, SEFLG_SWIEPH, 0
+            )
         except Exception:
             break
 
@@ -558,7 +578,9 @@ for year in range(2000, 2011):
                 f"(lib={tmax_lib:.5f}, closest_ref={best_ref:.5f})",
             )
         else:
-            check(True, f"year {year}: lib found eclipse but ref found none (lib-only ok)")
+            check(
+                True, f"year {year}: lib found eclipse but ref found none (lib-only ok)"
+            )
 
         # Eclipse type flag should be nonzero
         check(
@@ -717,7 +739,9 @@ def compare_rise_set(body_id, rsmi, jd, geopos_tuple, label, tol_sec=120):
         return False
 
     try:
-        res_ref, tret_ref = swe_ref.rise_trans(jd, body_id, rsmi, geopos_tuple, 1013.25, 15)
+        res_ref, tret_ref = swe_ref.rise_trans(
+            jd, body_id, rsmi, geopos_tuple, 1013.25, 15
+        )
     except Exception as e:
         check(False, f"{label}: swe_ref exception: {e}")
         return False
@@ -752,11 +776,13 @@ for loc in LOCATIONS:
     loc_name = loc[3]
     for jd in DATES_20:
         # Rise
-        compare_rise_set(SE_SUN, SE_CALC_RISE, jd, geopos,
-                         f"Sun rise {loc_name} JD {jd:.1f}")
+        compare_rise_set(
+            SE_SUN, SE_CALC_RISE, jd, geopos, f"Sun rise {loc_name} JD {jd:.1f}"
+        )
         # Set
-        compare_rise_set(SE_SUN, SE_CALC_SET, jd, geopos,
-                         f"Sun set {loc_name} JD {jd:.1f}")
+        compare_rise_set(
+            SE_SUN, SE_CALC_SET, jd, geopos, f"Sun set {loc_name} JD {jd:.1f}"
+        )
 
 print(f"  {current_section}: {section_stats[current_section]}")
 
@@ -769,11 +795,13 @@ for loc in LOCATIONS_MOON:
     loc_name = loc[3]
     for jd in DATES_25:
         # Rise
-        compare_rise_set(SE_MOON, SE_CALC_RISE, jd, geopos,
-                         f"Moon rise {loc_name} JD {jd:.1f}")
+        compare_rise_set(
+            SE_MOON, SE_CALC_RISE, jd, geopos, f"Moon rise {loc_name} JD {jd:.1f}"
+        )
         # Set
-        compare_rise_set(SE_MOON, SE_CALC_SET, jd, geopos,
-                         f"Moon set {loc_name} JD {jd:.1f}")
+        compare_rise_set(
+            SE_MOON, SE_CALC_SET, jd, geopos, f"Moon set {loc_name} JD {jd:.1f}"
+        )
 
 print(f"  {current_section}: {section_stats[current_section]}")
 
@@ -789,11 +817,21 @@ geopos_default = (12.4964, 41.9028, 0)  # Rome
 for planet in PLANET_IDS:
     for jd in DATES_10:
         # Rise
-        compare_rise_set(planet, SE_CALC_RISE, jd, geopos_default,
-                         f"{PLANET_NAMES[planet]} rise JD {jd:.1f}")
+        compare_rise_set(
+            planet,
+            SE_CALC_RISE,
+            jd,
+            geopos_default,
+            f"{PLANET_NAMES[planet]} rise JD {jd:.1f}",
+        )
         # Set
-        compare_rise_set(planet, SE_CALC_SET, jd, geopos_default,
-                         f"{PLANET_NAMES[planet]} set JD {jd:.1f}")
+        compare_rise_set(
+            planet,
+            SE_CALC_SET,
+            jd,
+            geopos_default,
+            f"{PLANET_NAMES[planet]} set JD {jd:.1f}",
+        )
 
 print(f"  {current_section}: {section_stats[current_section]}")
 
@@ -822,17 +860,29 @@ for loc in twilight_locations:
             # Dawn (rise with twilight flag)
             rsmi_dawn = SE_CALC_RISE | twi_flag
             try:
-                res_lib, tret_lib = lib.rise_trans(jd, SE_SUN, rsmi_dawn, geopos, 1013.25, 15)
-                res_ref, tret_ref = swe_ref.rise_trans(jd, SE_SUN, rsmi_dawn, geopos, 1013.25, 15)
+                res_lib, tret_lib = lib.rise_trans(
+                    jd, SE_SUN, rsmi_dawn, geopos, 1013.25, 15
+                )
+                res_ref, tret_ref = swe_ref.rise_trans(
+                    jd, SE_SUN, rsmi_dawn, geopos, 1013.25, 15
+                )
 
-                if res_lib != -2 and res_ref != -2 and tret_lib[0] > 0 and tret_ref[0] > 0:
+                if (
+                    res_lib != -2
+                    and res_ref != -2
+                    and tret_lib[0] > 0
+                    and tret_ref[0] > 0
+                ):
                     diff_sec = abs(tret_lib[0] - tret_ref[0]) * 86400
                     check(
                         diff_sec < 120,
                         f"{twi_name} dawn {loc_name} JD {jd:.1f}: diff={diff_sec:.1f}s >= 120s",
                     )
                 else:
-                    check(True, f"{twi_name} dawn {loc_name} JD {jd:.1f}: circumpolar/no event (ok)")
+                    check(
+                        True,
+                        f"{twi_name} dawn {loc_name} JD {jd:.1f}: circumpolar/no event (ok)",
+                    )
             except Exception as e:
                 check(False, f"{twi_name} dawn {loc_name} JD {jd:.1f}: exception: {e}")
 
@@ -844,17 +894,29 @@ for loc in twilight_locations[:1]:  # Just Rome
         for twi_flag, twi_name in TWILIGHT_FLAGS:
             rsmi_dusk = SE_CALC_SET | twi_flag
             try:
-                res_lib, tret_lib = lib.rise_trans(jd, SE_SUN, rsmi_dusk, geopos, 1013.25, 15)
-                res_ref, tret_ref = swe_ref.rise_trans(jd, SE_SUN, rsmi_dusk, geopos, 1013.25, 15)
+                res_lib, tret_lib = lib.rise_trans(
+                    jd, SE_SUN, rsmi_dusk, geopos, 1013.25, 15
+                )
+                res_ref, tret_ref = swe_ref.rise_trans(
+                    jd, SE_SUN, rsmi_dusk, geopos, 1013.25, 15
+                )
 
-                if res_lib != -2 and res_ref != -2 and tret_lib[0] > 0 and tret_ref[0] > 0:
+                if (
+                    res_lib != -2
+                    and res_ref != -2
+                    and tret_lib[0] > 0
+                    and tret_ref[0] > 0
+                ):
                     diff_sec = abs(tret_lib[0] - tret_ref[0]) * 86400
                     check(
                         diff_sec < 120,
                         f"{twi_name} dusk {loc_name} JD {jd:.1f}: diff={diff_sec:.1f}s >= 120s",
                     )
                 else:
-                    check(True, f"{twi_name} dusk {loc_name} JD {jd:.1f}: circumpolar/no event")
+                    check(
+                        True,
+                        f"{twi_name} dusk {loc_name} JD {jd:.1f}: circumpolar/no event",
+                    )
             except Exception as e:
                 check(False, f"{twi_name} dusk {loc_name} JD {jd:.1f}: exception: {e}")
 

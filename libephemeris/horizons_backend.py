@@ -35,23 +35,23 @@ API_URL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 # Map SE_* body IDs to Horizons COMMAND strings
 _HORIZONS_COMMAND: Dict[int, str] = {
-    0: "10",       # Sun
-    1: "301",      # Moon
-    2: "199",      # Mercury
-    3: "299",      # Venus
-    4: "499",      # Mars
-    5: "599",      # Jupiter
-    6: "699",      # Saturn
-    7: "799",      # Uranus
-    8: "899",      # Neptune
-    9: "999",      # Pluto
-    14: "399",     # Earth
-    15: "2060;",   # Chiron (small body)
+    0: "10",  # Sun
+    1: "301",  # Moon
+    2: "199",  # Mercury
+    3: "299",  # Venus
+    4: "499",  # Mars
+    5: "599",  # Jupiter
+    6: "699",  # Saturn
+    7: "799",  # Uranus
+    8: "899",  # Neptune
+    9: "999",  # Pluto
+    14: "399",  # Earth
+    15: "2060;",  # Chiron (small body)
     # 16: "5145;", # Pholus
-    17: "1;",      # Ceres
-    18: "2;",      # Pallas
-    19: "3;",      # Juno
-    20: "4;",      # Vesta
+    17: "1;",  # Ceres
+    18: "2;",  # Pallas
+    19: "3;",  # Juno
+    20: "4;",  # Vesta
 }
 
 # Bodies computed analytically (no HTTP needed)
@@ -65,9 +65,9 @@ _URANIAN_BODIES = {40, 41, 42, 43, 44, 45, 46, 47, 48}
 
 # Deflector bodies for gravitational light bending
 _DEFLECTOR_NAIF = {
-    0: "10",    # Sun
-    5: "5",     # Jupiter barycenter
-    6: "6",     # Saturn barycenter
+    0: "10",  # Sun
+    5: "5",  # Jupiter barycenter
+    6: "6",  # Saturn barycenter
 }
 
 
@@ -75,12 +75,13 @@ _DEFLECTOR_NAIF = {
 # STATE VECTOR DATACLASS
 # =============================================================================
 
+
 class StateVector:
     """Barycentric ICRS state vector from Horizons."""
+
     __slots__ = ("x", "y", "z", "vx", "vy", "vz")
 
-    def __init__(self, x: float, y: float, z: float,
-                 vx: float, vy: float, vz: float):
+    def __init__(self, x: float, y: float, z: float, vx: float, vy: float, vz: float):
         self.x = x
         self.y = y
         self.z = z
@@ -100,6 +101,7 @@ class StateVector:
 # =============================================================================
 # HTTP CLIENT
 # =============================================================================
+
 
 class HorizonsClient:
     """HTTP client for NASA JPL Horizons API with LRU cache.
@@ -235,9 +237,7 @@ class HorizonsClient:
                     data = json.loads(resp.read().decode("utf-8"))
 
                 if "error" in data:
-                    raise KeyError(
-                        f"Horizons API error for {command}: {data['error']}"
-                    )
+                    raise KeyError(f"Horizons API error for {command}: {data['error']}")
 
                 return self._parse_response(data, command)
 
@@ -246,7 +246,7 @@ class HorizonsClient:
             except (OSError, ValueError, KeyError) as e:
                 last_err = e
                 if attempt < max_retries:
-                    time.sleep(0.5 * (2 ** attempt))
+                    time.sleep(0.5 * (2**attempt))
 
         raise ConnectionError(
             f"Horizons API request failed after {max_retries + 1} attempts "
@@ -294,8 +294,12 @@ class HorizonsClient:
 
         # Values: [JDTDB, X, Y, Z, VX, VY, VZ, ...]
         return StateVector(
-            x=values[1], y=values[2], z=values[3],
-            vx=values[4], vy=values[5], vz=values[6],
+            x=values[1],
+            y=values[2],
+            z=values[3],
+            vx=values[4],
+            vy=values[5],
+            vz=values[6],
         )
 
     def clear_cache(self) -> None:
@@ -309,6 +313,7 @@ class HorizonsClient:
 # =============================================================================
 # CALCULATION PIPELINE
 # =============================================================================
+
 
 def _get_body_command(body_id: int) -> str:
     """Get Horizons COMMAND for a body, or raise KeyError."""
@@ -377,7 +382,9 @@ def horizons_calc_ut(
     # Uranian hypotheticals — analytical, heliocentric only
     if body_id in _URANIAN_BODIES:
         if not (iflag & SEFLG_HELCTR):
-            raise KeyError(f"Uranian body {body_id} geocentric not supported via Horizons")
+            raise KeyError(
+                f"Uranian body {body_id} geocentric not supported via Horizons"
+            )
         return _calc_uranian(jd_ut, body_id, iflag)
 
     # Bodies not in Horizons command map
@@ -386,6 +393,7 @@ def horizons_calc_ut(
 
     # Convert UT to TT (approximate, good enough for Horizons queries)
     from .time_utils import swe_deltat
+
     delta_t = swe_deltat(jd_ut)
     jd_tt = jd_ut + delta_t
 
@@ -406,11 +414,11 @@ def horizons_calc_ut(
     # Geocentric apparent — full pipeline
     # Prefetch: target + Earth + deflectors (Sun, Jupiter, Saturn)
     prefetch_cmds = [
-        (command, jd_tt, "@0"),     # target barycentric
-        ("399", jd_tt, "@0"),       # Earth barycentric
-        ("10", jd_tt, "@0"),        # Sun barycentric (deflector)
-        ("5", jd_tt, "@0"),         # Jupiter barycenter (deflector)
-        ("6", jd_tt, "@0"),         # Saturn barycenter (deflector)
+        (command, jd_tt, "@0"),  # target barycentric
+        ("399", jd_tt, "@0"),  # Earth barycentric
+        ("10", jd_tt, "@0"),  # Sun barycentric (deflector)
+        ("5", jd_tt, "@0"),  # Jupiter barycenter (deflector)
+        ("6", jd_tt, "@0"),  # Saturn barycenter (deflector)
     ]
     batch = client.fetch_batch(prefetch_cmds)
 
@@ -430,8 +438,9 @@ def horizons_calc_ut(
     # Light-time correction (single iteration, sufficient for arcsecond precision)
     if not (iflag & SEFLG_TRUEPOS):
         import math
+
         c_au_day = 173.14463267  # speed of light in AU/day
-        dist = math.sqrt(geo[0]**2 + geo[1]**2 + geo[2]**2)
+        dist = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2)
         lt = dist / c_au_day
 
         # Re-fetch target at retarded time
@@ -441,20 +450,19 @@ def horizons_calc_ut(
             target_lt.y - earth_sv.y,
             target_lt.z - earth_sv.z,
         )
-        dist = math.sqrt(geo[0]**2 + geo[1]**2 + geo[2]**2)
+        dist = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2)
         lt = dist / c_au_day
     else:
         lt = 0.0
 
     # Gravitational deflection
     if not (iflag & SEFLG_NOGDEFL):
-        geo = _apply_deflection_horizons(
-            geo, earth_sv.pos, jd_tt, lt, batch
-        )
+        geo = _apply_deflection_horizons(geo, earth_sv.pos, jd_tt, lt, batch)
 
     # Aberration
     if not (iflag & SEFLG_NOABERR) and not (iflag & SEFLG_TRUEPOS):
         from .fast_calc import _apply_aberration
+
         geo = _apply_aberration(geo, earth_sv.vel)
 
     # Velocity via numerical derivative of the apparent position
@@ -473,7 +481,7 @@ def horizons_calc_ut(
 
     # Apply same corrections to geo2
     if not (iflag & SEFLG_TRUEPOS):
-        dist2 = math.sqrt(geo2[0]**2 + geo2[1]**2 + geo2[2]**2)
+        dist2 = math.sqrt(geo2[0] ** 2 + geo2[1] ** 2 + geo2[2] ** 2)
         lt2 = dist2 / c_au_day
         target_lt2 = client.fetch_state_vector(command, jd_tt2 - lt2, "@0", "TDB")
         geo2 = (
@@ -485,11 +493,16 @@ def horizons_calc_ut(
     if not (iflag & SEFLG_NOGDEFL):
         # Use same deflector positions (good enough for dt=1s)
         geo2 = _apply_deflection_horizons(
-            geo2, earth_sv2.pos, jd_tt2, lt if not (iflag & SEFLG_TRUEPOS) else 0.0, batch
+            geo2,
+            earth_sv2.pos,
+            jd_tt2,
+            lt if not (iflag & SEFLG_TRUEPOS) else 0.0,
+            batch,
         )
 
     if not (iflag & SEFLG_NOABERR) and not (iflag & SEFLG_TRUEPOS):
         from .fast_calc import _apply_aberration
+
         geo2 = _apply_aberration(geo2, earth_sv2.vel)
 
     # Velocity = (pos2 - pos1) / dt in ICRS
@@ -516,8 +529,8 @@ def _apply_deflection_horizons(
     c_au_day = 173.14463267
     deflectors = [
         ("10", 1.32712440041279419e11),  # Sun GM
-        ("5", 1.26712764945480000e8),    # Jupiter GM
-        ("6", 3.79406260288322009e7),    # Saturn GM
+        ("5", 1.26712764945480000e8),  # Jupiter GM
+        ("6", 3.79406260288322009e7),  # Saturn GM
     ]
 
     result = list(geo)
@@ -536,7 +549,7 @@ def _apply_deflection_horizons(
             defl_pos[1] - earth_bary[1],
             defl_pos[2] - earth_bary[2],
         )
-        e_dist = math.sqrt(e[0]**2 + e[1]**2 + e[2]**2)
+        e_dist = math.sqrt(e[0] ** 2 + e[1] ** 2 + e[2] ** 2)
 
         # Body relative to deflector
         q = (
@@ -544,9 +557,9 @@ def _apply_deflection_horizons(
             result[1] - e[1],
             result[2] - e[2],
         )
-        q_dist = math.sqrt(q[0]**2 + q[1]**2 + q[2]**2)
+        q_dist = math.sqrt(q[0] ** 2 + q[1] ** 2 + q[2] ** 2)
 
-        geo_dist = math.sqrt(result[0]**2 + result[1]**2 + result[2]**2)
+        geo_dist = math.sqrt(result[0] ** 2 + result[1] ** 2 + result[2] ** 2)
 
         if e_dist < 1e-20 or q_dist < 1e-20 or geo_dist < 1e-20:
             continue
@@ -555,7 +568,9 @@ def _apply_deflection_horizons(
         # δθ ≈ (1+γ) GM / (c² e_dist) * (unit_geo + unit_e) / (1 + cos(angle))
         two_gm_c2 = 2.0 * gm / (c_au_day * c_au_day * 1.495978707e8)  # km -> AU
 
-        dot_eq = (result[0]*e[0] + result[1]*e[1] + result[2]*e[2]) / (geo_dist * e_dist)
+        dot_eq = (result[0] * e[0] + result[1] * e[1] + result[2] * e[2]) / (
+            geo_dist * e_dist
+        )
 
         if dot_eq > 0.9999:
             continue  # body behind deflector, skip
@@ -578,8 +593,14 @@ def _to_ecliptic_output(
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Convert ICRS Cartesian to ecliptic spherical output."""
     from .constants import (
-        SEFLG_EQUATORIAL, SEFLG_J2000, SEFLG_SIDEREAL,
-        SEFLG_SPEED, SEFLG_XYZ, SEFLG_RADIANS, SEFLG_ICRS, SEFLG_NONUT,
+        SEFLG_EQUATORIAL,
+        SEFLG_J2000,
+        SEFLG_SIDEREAL,
+        SEFLG_SPEED,
+        SEFLG_XYZ,
+        SEFLG_RADIANS,
+        SEFLG_ICRS,
+        SEFLG_NONUT,
     )
     from .fast_calc import (
         _cartesian_to_spherical,
@@ -624,6 +645,7 @@ def _to_ecliptic_output(
     # Sidereal correction
     if iflag & SEFLG_SIDEREAL:
         from .ayanamsha import get_ayanamsha_ut
+
         ayan = get_ayanamsha_ut(jd_tt)
         lon = (lon - ayan) % 360.0
 
@@ -652,11 +674,13 @@ def _calc_analytical(
 
     if body_id == 10:  # Mean Node
         from .lunar import calc_mean_lunar_node
+
         lon = calc_mean_lunar_node(jd_tt)
         lat = 0.0
         dist = 0.002569  # mean lunar distance in AU (approximate)
     elif body_id == 12:  # Mean Apogee (Lilith)
         from .lunar import calc_mean_lilith_with_latitude
+
         lon, lat = calc_mean_lilith_with_latitude(jd_tt)
         dist = 0.002710  # mean apogee distance
     else:
@@ -666,12 +690,14 @@ def _calc_analytical(
     dt = 1.0 / 86400.0  # 1 second
     if body_id == 10:
         from .lunar import calc_mean_lunar_node
+
         lon2 = calc_mean_lunar_node(jd_tt + dt)
         dlon = (lon2 - lon) / dt
         if abs(dlon) > 180 / dt:
             dlon = ((lon2 - lon + 180) % 360 - 180) / dt
     elif body_id == 12:
         from .lunar import calc_mean_lilith_with_latitude
+
         lon2, lat2 = calc_mean_lilith_with_latitude(jd_tt + dt)
         dlon = ((lon2 - lon + 180) % 360 - 180) / dt
     else:
@@ -680,6 +706,7 @@ def _calc_analytical(
     # Sidereal
     if iflag & SEFLG_SIDEREAL:
         from .ayanamsha import get_ayanamsha_ut
+
         ayan = get_ayanamsha_ut(jd_tt)
         lon = (lon - ayan) % 360.0
 
@@ -696,6 +723,7 @@ def _calc_uranian(
     jd_tt = jd_ut + swe_deltat(jd_ut)
 
     from .hypothetical import calc_uranian_planet, calc_transpluto
+
     if body_id == 48:
         lon, lat, dist, dlon, dlat, ddist = calc_transpluto(jd_tt)
     else:
@@ -703,6 +731,7 @@ def _calc_uranian(
 
     if iflag & SEFLG_SIDEREAL:
         from .ayanamsha import get_ayanamsha_ut
+
         ayan = get_ayanamsha_ut(jd_tt)
         lon = (lon - ayan) % 360.0
 

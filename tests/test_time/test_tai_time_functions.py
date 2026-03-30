@@ -34,9 +34,7 @@ class TestUtcToTaiRoundTrip:
         assert d2 == day
         assert h2 == hour
         assert min2 == minute
-        assert abs(sec2 - second) < 0.001, (
-            f"Second mismatch: {sec2} vs {second}"
-        )
+        assert abs(sec2 - second) < 0.001, f"Second mismatch: {sec2} vs {second}"
 
     def test_tai_ahead_of_utc(self):
         """TAI JD should be ahead of UTC JD (by leap seconds)."""
@@ -44,9 +42,7 @@ class TestUtcToTaiRoundTrip:
         jd_utc = swe.julday(2020, 1, 1, 0.0)
         # TAI = UTC + leap_seconds. In 2020, TAI-UTC = 37s
         diff_seconds = (jd_tai - jd_utc) * 86400.0
-        assert 30.0 < diff_seconds < 45.0, (
-            f"TAI-UTC = {diff_seconds}s, expected ~37s"
-        )
+        assert 30.0 < diff_seconds < 45.0, f"TAI-UTC = {diff_seconds}s, expected ~37s"
 
 
 @pytest.mark.unit
@@ -57,9 +53,9 @@ class TestTtToTaiRoundTrip:
         "jd_tt",
         [
             JD_J2000,
-            JD_J2000 + 3652.5,   # ~2010
-            JD_J2000 - 3652.5,   # ~1990
-            JD_J2000 + 7305.0,   # ~2020
+            JD_J2000 + 3652.5,  # ~2010
+            JD_J2000 - 3652.5,  # ~1990
+            JD_J2000 + 7305.0,  # ~2020
             JD_J2000 + 18262.5,  # ~2050
         ],
     )
@@ -100,9 +96,7 @@ class TestTaiUtcJdConversion:
         jd_tai = swe.utc_jd_to_tai(jd_utc_approx)
         jd_utc_out = swe.tai_to_utc_jd(jd_tai)
         error_us = abs(jd_utc_out - jd_utc_approx) * 86400e6
-        assert error_us < 1.0, (
-            f"UTC-TAI-UTC round-trip error: {error_us} µs"
-        )
+        assert error_us < 1.0, f"UTC-TAI-UTC round-trip error: {error_us} µs"
 
     def test_tai_utc_jd_offset_positive(self):
         """TAI JD should be ahead of UTC JD by a positive number of seconds."""

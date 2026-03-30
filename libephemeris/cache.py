@@ -226,6 +226,15 @@ def clear_caches() -> None:
     get_cached_time_tt.cache_clear()
     _observer_at_cache.clear()
 
+    # Clear fast_calc frame-data caches (imported lazily to avoid circular deps)
+    try:
+        from .fast_calc import _get_skyfield_frame_data, _get_precession_matrix
+
+        _get_skyfield_frame_data.cache_clear()
+        _get_precession_matrix.cache_clear()
+    except ImportError:
+        pass
+
 
 def get_cache_info() -> dict:
     """

@@ -67,12 +67,12 @@ HOUSE_SYSTEMS = list("PKORECWBMTUHXGYIiNFDJLAS")
 
 # 6 locations: (lat, lon)
 LOCATIONS = [
-    (0.0, 0.0),        # Null Island (equator/prime meridian)
-    (41.9, 12.5),       # Rome
-    (51.5, -0.1),       # London
-    (-33.9, 151.2),     # Sydney
-    (35.7, 139.7),      # Tokyo
-    (64.0, -22.0),      # Reykjavik (high latitude)
+    (0.0, 0.0),  # Null Island (equator/prime meridian)
+    (41.9, 12.5),  # Rome
+    (51.5, -0.1),  # London
+    (-33.9, 151.2),  # Sydney
+    (35.7, 139.7),  # Tokyo
+    (64.0, -22.0),  # Reykjavik (high latitude)
 ]
 
 # 20 JDs evenly spaced 2000-01-01 to 2020-01-01
@@ -151,15 +151,15 @@ for hsys_char in HOUSE_SYSTEMS:
                 diff = angle_diff(lib_cusps[i], ref_cusps[i])
                 check(
                     diff < 0.01,
-                    f"3.2 {hsys_char} cusp{i+1} ({lat},{lon}) jd={jd:.1f} "
+                    f"3.2 {hsys_char} cusp{i + 1} ({lat},{lon}) jd={jd:.1f} "
                     f"lib={float(lib_cusps[i]):.4f} ref={float(ref_cusps[i]):.4f} diff={diff:.6f}",
-                    f"3.2/{hsys_char}/CUSP{i+1}",
+                    f"3.2/{hsys_char}/CUSP{i + 1}",
                 )
             # Pad remaining if fewer cusps
             for i in range(ncusps, 12):
                 check(
                     False,
-                    f"3.2 {hsys_char} cusp{i+1} missing",
+                    f"3.2 {hsys_char} cusp{i + 1} missing",
                     f"3.2/{hsys_char}/MISSING",
                 )
 
@@ -216,7 +216,9 @@ for hsys_char in SID_SYSTEMS:
             # --- pyswisseph ---
             try:
                 swe_ref.set_sid_mode(ayan_id)
-                ref_result = swe_ref.houses_ex(jd, 41.9, 12.5, hsys_bytes, SEFLG_SIDEREAL)
+                ref_result = swe_ref.houses_ex(
+                    jd, 41.9, 12.5, hsys_bytes, SEFLG_SIDEREAL
+                )
                 ref_cusps = ref_result[0]
                 ref_ascmc = ref_result[1]
                 swe_ref.set_sid_mode(0)
@@ -246,14 +248,14 @@ for hsys_char in SID_SYSTEMS:
                 diff = angle_diff(lib_cusps[i], ref_cusps[i])
                 check(
                     diff < 0.05,
-                    f"3.3 {hsys_char} ayan={ayan_id} cusp{i+1} jd={jd:.1f} "
+                    f"3.3 {hsys_char} ayan={ayan_id} cusp{i + 1} jd={jd:.1f} "
                     f"lib={float(lib_cusps[i]):.4f} ref={float(ref_cusps[i]):.4f} diff={diff:.6f}",
-                    f"3.3/{hsys_char}/CUSP{i+1}",
+                    f"3.3/{hsys_char}/CUSP{i + 1}",
                 )
             for i in range(ncusps, 12):
                 check(
                     False,
-                    f"3.3 {hsys_char} ayan={ayan_id} cusp{i+1} missing",
+                    f"3.3 {hsys_char} ayan={ayan_id} cusp{i + 1} missing",
                     f"3.3/{hsys_char}/MISSING",
                 )
 
@@ -335,14 +337,14 @@ for hsys_char in ARMC_SYSTEMS:
                 diff = angle_diff(lib_cusps[i], ref_cusps[i])
                 check(
                     diff < 0.01,
-                    f"3.5 {hsys_char} armc={armc:.0f} eps={eps} cusp{i+1} "
+                    f"3.5 {hsys_char} armc={armc:.0f} eps={eps} cusp{i + 1} "
                     f"lib={float(lib_cusps[i]):.4f} ref={float(ref_cusps[i]):.4f} diff={diff:.6f}",
-                    f"3.5/{hsys_char}/CUSP{i+1}",
+                    f"3.5/{hsys_char}/CUSP{i + 1}",
                 )
             for i in range(ncusps, 12):
                 check(
                     False,
-                    f"3.5 {hsys_char} armc={armc:.0f} cusp{i+1} missing",
+                    f"3.5 {hsys_char} armc={armc:.0f} cusp{i + 1} missing",
                     f"3.5/{hsys_char}/MISSING",
                 )
 
@@ -412,7 +414,9 @@ for jd in JDS_5:
             # --- pyswisseph: house_pos(armc, lat, eps, (lon, lat_body), hsys_bytes) ---
             try:
                 ref_pos = float(
-                    swe_ref.house_pos(armc, HPOS_LAT, eps, (planet_lon, 0.0), hsys_bytes)
+                    swe_ref.house_pos(
+                        armc, HPOS_LAT, eps, (planet_lon, 0.0), hsys_bytes
+                    )
                 )
             except Exception as e:
                 ref_ok = False
@@ -473,9 +477,7 @@ for jd in JDS_10:
         lib_ok = True
         lib_pos = None
         try:
-            lib_pos = float(
-                lib.house_pos(armc, GQ_LAT, eps, (planet_lon, 0.0), "G")
-            )
+            lib_pos = float(lib.house_pos(armc, GQ_LAT, eps, (planet_lon, 0.0), "G"))
         except Exception as e:
             lib_ok = False
 
@@ -564,9 +566,7 @@ print(text)
 
 # Write report to file
 os.makedirs("/Users/giacomo/dev/libephemeris/tasks/results", exist_ok=True)
-with open(
-    "/Users/giacomo/dev/libephemeris/tasks/results/verify_houses.txt", "w"
-) as f:
+with open("/Users/giacomo/dev/libephemeris/tasks/results/verify_houses.txt", "w") as f:
     f.write(text + "\n")
 
 # Cleanup

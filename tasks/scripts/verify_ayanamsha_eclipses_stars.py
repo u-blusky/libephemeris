@@ -11,6 +11,7 @@ Sections covered:
 
 Target: ~3000+ checks, <30 seconds.
 """
+
 from __future__ import annotations
 
 import os
@@ -26,7 +27,8 @@ import swisseph as swe_ref
 # ---------------------------------------------------------------------------
 _EPHE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "swisseph", "ephe",
+    "swisseph",
+    "ephe",
 )
 swe_ref.set_ephe_path(_EPHE_PATH)
 
@@ -108,17 +110,29 @@ TEST_DATES_JD = [
 
 # Locations: (lon, lat, alt)
 LOCATIONS = [
-    (12.5, 41.9, 20.0),      # Rome
-    (-73.97, 40.78, 10.0),   # New York
-    (139.69, 35.69, 40.0),   # Tokyo
-    (-3.7, 40.42, 650.0),    # Madrid
-    (151.21, -33.87, 5.0),   # Sydney
+    (12.5, 41.9, 20.0),  # Rome
+    (-73.97, 40.78, 10.0),  # New York
+    (139.69, 35.69, 40.0),  # Tokyo
+    (-3.7, 40.42, 650.0),  # Madrid
+    (151.21, -33.87, 5.0),  # Sydney
 ]
 
 STARS = [
-    "Sirius", "Aldebaran", "Regulus", "Spica", "Antares",
-    "Vega", "Capella", "Rigel", "Procyon", "Betelgeuse",
-    "Altair", "Deneb", "Pollux", "Fomalhaut", "Canopus",
+    "Sirius",
+    "Aldebaran",
+    "Regulus",
+    "Spica",
+    "Antares",
+    "Vega",
+    "Capella",
+    "Rigel",
+    "Procyon",
+    "Betelgeuse",
+    "Altair",
+    "Deneb",
+    "Pollux",
+    "Fomalhaut",
+    "Canopus",
 ]
 
 
@@ -140,8 +154,8 @@ def test_ayanamsha_modes():
     # Some modes have larger discrepancies at distant epochs due to
     # different precession model implementations.  Use tighter tolerance
     # at J2000 and a wider one at other epochs.
-    tol_j2000 = 0.005   # degrees
-    tol_other = 0.02     # degrees (covers modes 17,29,30,34,35,36,39,40,42)
+    tol_j2000 = 0.005  # degrees
+    tol_other = 0.02  # degrees (covers modes 17,29,30,34,35,36,39,40,42)
 
     for mode in range(43):
         for jd in test_jds:
@@ -219,7 +233,9 @@ def test_ayanamsha_modes():
                 retflag_lib, ayan_lib = lib.swe_get_ayanamsa_ex_ut(jd, SEFLG_SWIEPH)
 
                 swe_ref.set_sid_mode(mode)
-                retflag_ref, ayan_ref = swe_ref.get_ayanamsa_ex_ut(jd, swe_ref.FLG_SWIEPH)
+                retflag_ref, ayan_ref = swe_ref.get_ayanamsa_ex_ut(
+                    jd, swe_ref.FLG_SWIEPH
+                )
 
                 diff_ayan = abs(ayan_lib - ayan_ref)
                 check(
@@ -261,9 +277,9 @@ def test_sidereal_positions():
     # different precession model implementations.
     WIDE_TOLERANCE_MODES = {30, 40}
     MEDIUM_TOLERANCE_MODES = {20}
-    tol_arcsec_normal = 2.5   # 2.5 arcseconds
-    tol_arcsec_medium = 5.0   # 5 arcseconds
-    tol_arcsec_wide = 45.0    # 45 arcseconds for known-divergent modes
+    tol_arcsec_normal = 2.5  # 2.5 arcseconds
+    tol_arcsec_medium = 5.0  # 5 arcseconds
+    tol_arcsec_wide = 45.0  # 45 arcseconds for known-divergent modes
 
     # Use all 20 dates for broad coverage
     sid_dates = TEST_DATES_JD
@@ -284,7 +300,9 @@ def test_sidereal_positions():
                     lon_lib = result_lib[0][0]
 
                     swe_ref.set_sid_mode(mode)
-                    result_ref = swe_ref.calc_ut(jd, body_id, swe_ref.FLG_SWIEPH | swe_ref.FLG_SIDEREAL)
+                    result_ref = swe_ref.calc_ut(
+                        jd, body_id, swe_ref.FLG_SWIEPH | swe_ref.FLG_SIDEREAL
+                    )
                     lon_ref = result_ref[0][0]
 
                     diff = abs(lon_lib - lon_ref)
@@ -295,7 +313,7 @@ def test_sidereal_positions():
                     check(
                         diff < tol_deg,
                         f"sid mode={mode} {body_name} jd={jd:.1f}",
-                        f"lib={lon_lib:.6f} ref={lon_ref:.6f} diff={diff * 3600:.3f}\"",
+                        f'lib={lon_lib:.6f} ref={lon_ref:.6f} diff={diff * 3600:.3f}"',
                     )
                 except Exception as exc:
                     global errors
@@ -318,7 +336,9 @@ def test_solar_eclipses():
         jd_start = lib.julday(year, 1, 1, 0.0)
         try:
             retflag_lib, tret_lib = lib.sol_eclipse_when_glob(jd_start, SEFLG_SWIEPH, 0)
-            retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(jd_start, swe_ref.FLG_SWIEPH, 0)
+            retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(
+                jd_start, swe_ref.FLG_SWIEPH, 0
+            )
 
             t_max_lib = tret_lib[0]
             t_max_ref = tret_ref[0]
@@ -367,7 +387,9 @@ def test_solar_eclipses():
         jd_mid = lib.julday(year, 7, 1, 0.0)
         try:
             retflag_lib, tret_lib = lib.sol_eclipse_when_glob(jd_mid, SEFLG_SWIEPH, 0)
-            retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(jd_mid, swe_ref.FLG_SWIEPH, 0)
+            retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(
+                jd_mid, swe_ref.FLG_SWIEPH, 0
+            )
 
             if retflag_lib != 0 and retflag_ref != 0:
                 diff_days = abs(tret_lib[0] - tret_ref[0])
@@ -392,7 +414,9 @@ def test_lunar_eclipses():
         jd_start = lib.julday(year, 1, 1, 0.0)
         try:
             retflag_lib, tret_lib = lib.lun_eclipse_when(jd_start, SEFLG_SWIEPH, 0)
-            retflag_ref, tret_ref = swe_ref.lun_eclipse_when(jd_start, swe_ref.FLG_SWIEPH, 0)
+            retflag_ref, tret_ref = swe_ref.lun_eclipse_when(
+                jd_start, swe_ref.FLG_SWIEPH, 0
+            )
 
             t_max_lib = tret_lib[0]
             t_max_ref = tret_ref[0]
@@ -466,7 +490,9 @@ def test_lunar_eclipses():
         jd_mid = lib.julday(year, 7, 1, 0.0)
         try:
             retflag_lib, tret_lib = lib.lun_eclipse_when(jd_mid, SEFLG_SWIEPH, 0)
-            retflag_ref, tret_ref = swe_ref.lun_eclipse_when(jd_mid, swe_ref.FLG_SWIEPH, 0)
+            retflag_ref, tret_ref = swe_ref.lun_eclipse_when(
+                jd_mid, swe_ref.FLG_SWIEPH, 0
+            )
 
             if retflag_lib != 0 and retflag_ref != 0:
                 diff_days = abs(tret_lib[0] - tret_ref[0])
@@ -522,7 +548,13 @@ def test_rise_set():
                             jd, body_id, rsmi_lib, geopos, 1013.25, 15.0, SEFLG_SWIEPH
                         )
                         res_ref, tret_ref = swe_ref.rise_trans(
-                            jd, body_id, rsmi_ref, geopos, 1013.25, 15.0, swe_ref.FLG_SWIEPH
+                            jd,
+                            body_id,
+                            rsmi_ref,
+                            geopos,
+                            1013.25,
+                            15.0,
+                            swe_ref.FLG_SWIEPH,
                         )
 
                         if res_lib == 0 and res_ref == 0:
@@ -548,7 +580,9 @@ def test_rise_set():
                     except Exception as exc:
                         global errors
                         errors += 1
-                        print(f"ERROR {event_name} {body_name} ({lon},{lat}) jd={jd:.1f}: {exc}")
+                        print(
+                            f"ERROR {event_name} {body_name} ({lon},{lat}) jd={jd:.1f}: {exc}"
+                        )
 
 
 # ---------------------------------------------------------------------------
@@ -573,7 +607,9 @@ def test_fixed_stars():
         for jd in star_dates:
             try:
                 xx_lib, name_lib, retflag_lib = lib.fixstar2_ut(star, jd, SEFLG_SWIEPH)
-                xx_ref, name_ref, retflag_ref = swe_ref.fixstar2_ut(star, jd, swe_ref.FLG_SWIEPH)
+                xx_ref, name_ref, retflag_ref = swe_ref.fixstar2_ut(
+                    star, jd, swe_ref.FLG_SWIEPH
+                )
 
                 lon_lib = xx_lib[0]
                 lat_lib = xx_lib[1]
@@ -590,12 +626,12 @@ def test_fixed_stars():
                 check(
                     diff_lon < tol_deg,
                     f"star {star} lon jd={jd:.1f}",
-                    f"lib={lon_lib:.6f} ref={lon_ref:.6f} diff={diff_lon * 3600:.4f}\"",
+                    f'lib={lon_lib:.6f} ref={lon_ref:.6f} diff={diff_lon * 3600:.4f}"',
                 )
                 check(
                     diff_lat < tol_deg,
                     f"star {star} lat jd={jd:.1f}",
-                    f"lib={lat_lib:.6f} ref={lat_ref:.6f} diff={diff_lat * 3600:.4f}\"",
+                    f'lib={lat_lib:.6f} ref={lat_ref:.6f} diff={diff_lat * 3600:.4f}"',
                 )
 
                 # Distance should be positive and roughly agree

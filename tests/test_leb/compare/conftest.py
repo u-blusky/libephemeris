@@ -537,8 +537,18 @@ ECLIPTIC_TOLERANCES = {
     11: {"lon": 0.001, "speed": 0.01},  # True Node
     12: {"lon": 0.001, "speed": 0.0001},  # Mean Apogee
     13: {"lon": 0.001, "speed": 0.05},  # Oscu Apogee (higher speed variance)
-    21: {"lon": 3600.0, "lat": 36000.0, "dist": 0.001, "speed": 1.0},  # Interp Apogee (pre-regen)
-    22: {"lon": 7200.0, "lat": 36000.0, "dist": 0.001, "speed": 1.0},  # Interp Perigee (pre-regen)
+    21: {
+        "lon": 3600.0,
+        "lat": 36000.0,
+        "dist": 0.001,
+        "speed": 1.0,
+    },  # Interp Apogee (pre-regen)
+    22: {
+        "lon": 7200.0,
+        "lat": 36000.0,
+        "dist": 0.001,
+        "speed": 1.0,
+    },  # Interp Perigee (pre-regen)
 }
 
 # Formula-based sidereal modes (27 modes + user-defined)

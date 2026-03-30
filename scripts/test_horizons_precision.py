@@ -24,9 +24,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import libephemeris as swe
 
 BODIES = [
-    (0, "Sun"), (1, "Moon"), (2, "Mercury"), (3, "Venus"), (4, "Mars"),
-    (5, "Jupiter"), (6, "Saturn"), (7, "Uranus"), (8, "Neptune"), (9, "Pluto"),
-    (14, "Earth"), (15, "Chiron"), (17, "Ceres"),
+    (0, "Sun"),
+    (1, "Moon"),
+    (2, "Mercury"),
+    (3, "Venus"),
+    (4, "Mars"),
+    (5, "Jupiter"),
+    (6, "Saturn"),
+    (7, "Uranus"),
+    (8, "Neptune"),
+    (9, "Pluto"),
+    (14, "Earth"),
+    (15, "Chiron"),
+    (17, "Ceres"),
 ]
 
 # Known bug: Sun heliocentric in Skyfield path returns wrong results
@@ -43,11 +53,11 @@ FLAGS = [
 ]
 
 # Thresholds (arcseconds)
-GEOCENTRIC_THRESHOLD = 0.01   # strict for geocentric modes
+GEOCENTRIC_THRESHOLD = 0.01  # strict for geocentric modes
 HELIOCENTRIC_THRESHOLD = 0.05  # looser for heliocentric (systematic offset)
 
 JD_START = 2415020.5  # 1900
-JD_END = 2488069.5    # 2100
+JD_END = 2488069.5  # 2100
 
 
 def run_test(n_dates: int = 200, seed: int = 42) -> bool:
@@ -118,7 +128,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
     g = max(e[0] for e in body_max.values()) if body_max else 0
     ok = n_fail == 0
 
-    print(f"{'PASS' if ok else 'FAIL'} | {n} tests | max={g:.4f}\" | {elapsed:.1f}s")
+    print(f'{"PASS" if ok else "FAIL"} | {n} tests | max={g:.4f}" | {elapsed:.1f}s')
 
     # Show per-body max
     for bid in sorted(body_max):
@@ -128,12 +138,12 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
         threshold = HELIOCENTRIC_THRESHOLD if is_helio else GEOCENTRIC_THRESHOLD
         mark = " ***" if err >= threshold else ""
         if err > 0.001:
-            print(f"  {name:<12s}  {err:.4f}\"  {fn}{mark}")
+            print(f'  {name:<12s}  {err:.4f}"  {fn}{mark}')
 
     if failures:
         print(f"\n  {len(failures)} failures:")
         for bname, jd, fname, err in failures[:5]:
-            print(f"    {bname} at JD {jd:.1f} [{fname}]: {err:.4f}\"")
+            print(f'    {bname} at JD {jd:.1f} [{fname}]: {err:.4f}"')
 
     return ok
 
@@ -143,8 +153,10 @@ def main():
         description="Horizons vs Skyfield precision test (requires internet)"
     )
     parser.add_argument(
-        "--dates", type=int, default=200,
-        help="Number of random dates (default: 200, ~15K tests)"
+        "--dates",
+        type=int,
+        default=200,
+        help="Number of random dates (default: 200, ~15K tests)",
     )
     args = parser.parse_args()
 

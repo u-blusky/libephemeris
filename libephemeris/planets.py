@@ -2640,7 +2640,8 @@ def _calc_body(
                     mean_ecl_matrix = mxm(rot_x(-mean_obliquity), t.precession_matrix())
                 else:
                     mean_ecl_matrix = mxm(
-                        rot_x(-mean_obliquity), mxm(t.precession_matrix(), ICRS_to_J2000)
+                        rot_x(-mean_obliquity),
+                        mxm(t.precession_matrix(), ICRS_to_J2000),
                     )
                 # Transform ICRS position to mean ecliptic
                 import numpy as np
@@ -2903,13 +2904,15 @@ def swe_get_ayanamsa_ut(tjdut: float) -> float:
 
             delta_t = reader.delta_t(tjdut)
             jd_tt = tjdut + delta_t
-            return float(_calc_ayanamsa_from_leb(
-                reader,
-                jd_tt,
-                sid_mode=sid_mode,
-                sid_t0=sid_t0,
-                sid_ayan_t0=sid_ayan_t0,
-            ))
+            return float(
+                _calc_ayanamsa_from_leb(
+                    reader,
+                    jd_tt,
+                    sid_mode=sid_mode,
+                    sid_t0=sid_t0,
+                    sid_ayan_t0=sid_ayan_t0,
+                )
+            )
         except (KeyError, ValueError):
             pass  # star-based mode or out of range, fall through
     # --- END LEB fast path ---

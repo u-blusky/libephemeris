@@ -109,38 +109,63 @@ SEFLG_SIDEREAL = 65536
 # MeanApog(12), Chiron(15)
 LEB_BODIES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15]
 LEB_BODY_NAMES = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
-    10: "MeanNode", 11: "TrueNode", 12: "MeanApog", 15: "Chiron",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+    10: "MeanNode",
+    11: "TrueNode",
+    12: "MeanApog",
+    15: "Chiron",
 }
 
 # Uranian bodies (Sec 13)
 URANIAN_BODIES = [40, 41, 42, 43, 44, 45, 46, 47, 48]
 URANIAN_NAMES = {
-    40: "Cupido", 41: "Hades", 42: "Zeus", 43: "Kronos",
-    44: "Apollon", 45: "Admetos", 46: "Vulkanus", 47: "Poseidon",
+    40: "Cupido",
+    41: "Hades",
+    42: "Zeus",
+    43: "Kronos",
+    44: "Apollon",
+    45: "Admetos",
+    46: "Vulkanus",
+    47: "Poseidon",
     48: "Transpluto",
 }
 
 # Asteroids (Sec 14)
 ASTEROID_BODIES = [15, 17, 18, 19, 20]
 ASTEROID_NAMES = {
-    15: "Chiron", 17: "Ceres", 18: "Pallas", 19: "Juno", 20: "Vesta",
+    15: "Chiron",
+    17: "Ceres",
+    18: "Pallas",
+    19: "Juno",
+    20: "Vesta",
 }
 
 # Orbital elements bodies (Sec 16)
 ORBITAL_BODIES = [4, 5, 6, 7, 8]  # Mars, Jupiter, Saturn, Uranus, Neptune
 ORBITAL_NAMES = {
-    4: "Mars", 5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
 }
 
 # Known semi-major axes (AU) for sanity checks
 KNOWN_SEMI_MAJOR = {
-    4: 1.524,   # Mars
-    5: 5.203,   # Jupiter
-    6: 9.537,   # Saturn
-    7: 19.19,   # Uranus
-    8: 30.07,   # Neptune
+    4: 1.524,  # Mars
+    5: 5.203,  # Jupiter
+    6: 9.537,  # Saturn
+    7: 19.19,  # Uranus
+    8: 30.07,  # Neptune
 }
 
 # Sidereal ayanamsha modes for Sec 13
@@ -162,10 +187,10 @@ def random_jds(n: int, jd_min: float = JD_MIN, jd_max: float = JD_MAX) -> list[f
 # ===================================================================
 def run_section_1_3() -> None:
     set_section("Sec1.3 LEB vs Skyfield")
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SECTION 1.3: LEB vs Skyfield consistency")
-    print(f"  14 bodies x 100 dates x 3 checks = 4,200 checks")
-    print(f"{'='*70}")
+    print("  14 bodies x 100 dates x 3 checks = 4,200 checks")
+    print(f"{'=' * 70}")
 
     # Check if LEB is active
     reader = lib.get_leb_reader()
@@ -212,11 +237,11 @@ def run_section_1_3() -> None:
 
             check(
                 lon_diff < LON_TOL,
-                f"{bname} lon diff={lon_diff:.6f}\" > {LON_TOL}\" at jd={jd:.2f}",
+                f'{bname} lon diff={lon_diff:.6f}" > {LON_TOL}" at jd={jd:.2f}',
             )
             check(
                 lat_diff < LAT_TOL,
-                f"{bname} lat diff={lat_diff:.6f}\" > {LAT_TOL}\" at jd={jd:.2f}",
+                f'{bname} lat diff={lat_diff:.6f}" > {LAT_TOL}" at jd={jd:.2f}',
             )
             check(
                 dist_diff < DIST_TOL,
@@ -231,10 +256,10 @@ def run_section_1_3() -> None:
 # ===================================================================
 def run_section_1_4() -> None:
     set_section("Sec1.4 LEB flag modes")
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SECTION 1.4: LEB flag modes")
-    print(f"  14 bodies x 50 dates x 4 modes x 3 checks = 8,400 checks")
-    print(f"{'='*70}")
+    print("  14 bodies x 50 dates x 4 modes x 3 checks = 8,400 checks")
+    print(f"{'=' * 70}")
 
     reader = lib.get_leb_reader()
     if reader is None:
@@ -289,11 +314,11 @@ def run_section_1_4() -> None:
 
                 check(
                     lon_diff < TOL_ARCSEC,
-                    f"{mode_name} {bname} lon={lon_diff:.6f}\" at jd={jd:.2f}",
+                    f'{mode_name} {bname} lon={lon_diff:.6f}" at jd={jd:.2f}',
                 )
                 check(
                     lat_diff < TOL_ARCSEC,
-                    f"{mode_name} {bname} lat={lat_diff:.6f}\" at jd={jd:.2f}",
+                    f'{mode_name} {bname} lat={lat_diff:.6f}" at jd={jd:.2f}',
                 )
                 check(
                     dist_diff < DIST_TOL,
@@ -312,13 +337,13 @@ def run_section_1_4() -> None:
 # ===================================================================
 def run_section_13() -> None:
     set_section("Sec13 Uranians deep")
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SECTION 13: Uranians deep (vs pyswisseph)")
-    print(f"  Geocentric: 9x50x3 = 1,350")
-    print(f"  Heliocentric: 9x30x3 = 810")
-    print(f"  Sidereal: 8x3x10x3 = 720")
-    print(f"  Total = 2,880 checks")
-    print(f"{'='*70}")
+    print("  Geocentric: 9x50x3 = 1,350")
+    print("  Heliocentric: 9x30x3 = 810")
+    print("  Sidereal: 8x3x10x3 = 720")
+    print("  Total = 2,880 checks")
+    print(f"{'=' * 70}")
 
     # Uranians are hypothetical bodies (Hamburg School). libephemeris and
     # pyswisseph use slightly different orbital element sources and
@@ -361,11 +386,11 @@ def run_section_13() -> None:
 
             check(
                 lon_diff < GEO_LON_TOL,
-                f"Geo {bname} lon={lon_diff:.4f}\" > {GEO_LON_TOL}\" jd={jd:.2f}",
+                f'Geo {bname} lon={lon_diff:.4f}" > {GEO_LON_TOL}" jd={jd:.2f}',
             )
             check(
                 lat_diff < GEO_LAT_TOL,
-                f"Geo {bname} lat={lat_diff:.4f}\" > {GEO_LAT_TOL}\" jd={jd:.2f}",
+                f'Geo {bname} lat={lat_diff:.4f}" > {GEO_LAT_TOL}" jd={jd:.2f}',
             )
             check(
                 dist_diff < DIST_TOL,
@@ -401,11 +426,11 @@ def run_section_13() -> None:
 
             check(
                 lon_diff < HELIO_LON_TOL,
-                f"Helio {bname} lon={lon_diff:.4f}\" > {HELIO_LON_TOL}\" jd={jd:.2f}",
+                f'Helio {bname} lon={lon_diff:.4f}" > {HELIO_LON_TOL}" jd={jd:.2f}',
             )
             check(
                 lat_diff < HELIO_LAT_TOL,
-                f"Helio {bname} lat={lat_diff:.4f}\" > {HELIO_LAT_TOL}\" jd={jd:.2f}",
+                f'Helio {bname} lat={lat_diff:.4f}" > {HELIO_LAT_TOL}" jd={jd:.2f}',
             )
             check(
                 dist_diff < DIST_TOL,
@@ -449,11 +474,11 @@ def run_section_13() -> None:
 
                 check(
                     lon_diff < SID_LON_TOL,
-                    f"Sid({ayan_name}) {bname} lon={lon_diff:.4f}\" jd={jd:.2f}",
+                    f'Sid({ayan_name}) {bname} lon={lon_diff:.4f}" jd={jd:.2f}',
                 )
                 check(
                     lat_diff < SID_LAT_TOL,
-                    f"Sid({ayan_name}) {bname} lat={lat_diff:.4f}\" jd={jd:.2f}",
+                    f'Sid({ayan_name}) {bname} lat={lat_diff:.4f}" jd={jd:.2f}',
                 )
                 check(
                     dist_diff < DIST_TOL,
@@ -465,11 +490,11 @@ def run_section_13() -> None:
     swe_ref.set_sid_mode(0)
 
     # Print max diffs for diagnostics
-    print("  Max diffs (Uranians geocentric, lon\"):")
+    print('  Max diffs (Uranians geocentric, lon"):')
     for body_id in URANIAN_BODIES:
         bname = URANIAN_NAMES[body_id]
         k = f"13geo|{bname}|lon"
-        print(f"    {bname}: {max_diffs.get(k, 0):.2f}\"")
+        print(f'    {bname}: {max_diffs.get(k, 0):.2f}"')
 
     print(f"  Done: {section_stats[_current_section]}")
 
@@ -479,10 +504,10 @@ def run_section_13() -> None:
 # ===================================================================
 def run_section_14() -> None:
     set_section("Sec14 Asteroids")
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SECTION 14: Asteroids vs pyswisseph")
-    print(f"  5 bodies x 100 dates x 3 checks = 1,500 + AST_OFFSET mapping")
-    print(f"{'='*70}")
+    print("  5 bodies x 100 dates x 3 checks = 1,500 + AST_OFFSET mapping")
+    print(f"{'=' * 70}")
 
     N_DATES = 100
     # Pallas (18) and Juno (19) can differ by up to ~5.5" from pyswisseph
@@ -518,11 +543,11 @@ def run_section_14() -> None:
 
             check(
                 lon_diff < LON_TOL,
-                f"{bname} lon={lon_diff:.4f}\" > {LON_TOL}\" jd={jd:.2f}",
+                f'{bname} lon={lon_diff:.4f}" > {LON_TOL}" jd={jd:.2f}',
             )
             check(
                 lat_diff < LAT_TOL,
-                f"{bname} lat={lat_diff:.4f}\" > {LAT_TOL}\" jd={jd:.2f}",
+                f'{bname} lat={lat_diff:.4f}" > {LAT_TOL}" jd={jd:.2f}',
             )
             check(
                 dist_diff < DIST_TOL,
@@ -543,17 +568,17 @@ def run_section_14() -> None:
             lon_diff = arcsec(angular_diff(ref_ceres_by_offset[0], ref_ceres_by_id[0]))
             check(
                 lon_diff < 0.001,
-                f"AST_OFFSET Ceres 10001 vs 17 lon={lon_diff:.6f}\" jd={jd:.2f}",
+                f'AST_OFFSET Ceres 10001 vs 17 lon={lon_diff:.6f}" jd={jd:.2f}',
             )
         except Exception as e:
             check(False, f"AST_OFFSET mapping check crash: {e}")
 
     # Print max diffs
-    print("  Max diffs (asteroids, lon\"):")
+    print('  Max diffs (asteroids, lon"):')
     for body_id in ASTEROID_BODIES:
         bname = ASTEROID_NAMES[body_id]
         k = f"14|{bname}|lon"
-        print(f"    {bname}: {max_diffs.get(k, 0):.4f}\"")
+        print(f'    {bname}: {max_diffs.get(k, 0):.4f}"')
 
     print(f"  Done: {section_stats[_current_section]}")
 
@@ -563,10 +588,10 @@ def run_section_14() -> None:
 # ===================================================================
 def run_section_16() -> None:
     set_section("Sec16 Orbital elements")
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SECTION 16: Orbital elements")
-    print(f"  5 bodies x 10 dates x 6 checks = 300")
-    print(f"{'='*70}")
+    print("  5 bodies x 10 dates x 6 checks = 300")
+    print(f"{'=' * 70}")
 
     N_DATES = 10
     jds = random_jds(N_DATES)
@@ -648,10 +673,10 @@ def run_section_16() -> None:
 # ===================================================================
 def run_section_18() -> None:
     set_section("Sec18 Crossings/Stations")
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SECTION 18: Crossings and stations")
-    print(f"  Equinoxes + Solstices + Moon crossings + Stations")
-    print(f"{'='*70}")
+    print("  Equinoxes + Solstices + Moon crossings + Stations")
+    print(f"{'=' * 70}")
 
     SECONDS_PER_DAY = 86400.0
     TIME_TOL_SEC = 60.0  # 60 seconds tolerance
@@ -719,7 +744,9 @@ def run_section_18() -> None:
             check(False, f"Moon cross {target_deg}deg lib crash: {e}")
             continue
         try:
-            ref_jd = swe_ref.mooncross_ut(float(target_deg), jd_moon_start, SEFLG_SWIEPH)
+            ref_jd = swe_ref.mooncross_ut(
+                float(target_deg), jd_moon_start, SEFLG_SWIEPH
+            )
         except Exception as e:
             check(False, f"Moon cross {target_deg}deg ref crash: {e}")
             continue
@@ -824,9 +851,9 @@ def main() -> None:
     elapsed = time.time() - t0
 
     # ── Summary ──
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     for sec_name, stats in section_stats.items():
         total = stats["passed"] + stats["failed"]
         status = "PASS" if stats["failed"] == 0 else "FAIL"
@@ -837,7 +864,7 @@ def main() -> None:
     print(f"  Time:  {elapsed:.1f}s")
 
     if errors:
-        print(f"\n  First failures (max 100):")
+        print("\n  First failures (max 100):")
         for e in errors[:100]:
             print(f"    - {e}")
 
@@ -845,7 +872,7 @@ def main() -> None:
         print(f"\n  RESULT: FAILED ({failed} failures)")
         sys.exit(1)
     else:
-        print(f"\n  RESULT: ALL PASSED")
+        print("\n  RESULT: ALL PASSED")
         sys.exit(0)
 
 

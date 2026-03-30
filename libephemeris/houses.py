@@ -844,9 +844,7 @@ def swe_houses(
         # Sync ascmc[1] back from cusps[10] so the returned MC matches.
         ascmc[1] = cusps[10]
     elif hsys_char == "i":  # Sunshine (Makransky)
-        cusps = _houses_sunshine_makransky(
-            armc_active, lat, eps, asc, mc, sun_dec
-        )
+        cusps = _houses_sunshine_makransky(armc_active, lat, eps, asc, mc, sun_dec)
         ascmc[1] = cusps[10]
     elif hsys_char == "J":  # Savard-A
         cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
@@ -1380,9 +1378,7 @@ def swe_houses_armc(
         cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, 0.0)
         ascmc[1] = cusps[10]
     elif hsys_char == "i":  # Sunshine (Makransky)
-        cusps = _houses_sunshine_makransky(
-            armc_active, lat, eps, asc, mc, 0.0
-        )
+        cusps = _houses_sunshine_makransky(armc_active, lat, eps, asc, mc, 0.0)
         ascmc[1] = cusps[10]
     elif hsys_char == "J":  # Savard-A
         cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
@@ -1608,7 +1604,9 @@ def swe_houses_ex(
             eps = get_true_obliquity(t.tt)
             armc = ascmc[2]
             if hsys_char == "I":
-                sunshine_cusps = _houses_sunshine(armc, lat, eps, sid_asc, sid_mc, sun_dec)
+                sunshine_cusps = _houses_sunshine(
+                    armc, lat, eps, sid_asc, sid_mc, sun_dec
+                )
             else:
                 sunshine_cusps = _houses_sunshine_makransky(
                     armc, lat, eps, sid_asc, sid_mc, sun_dec
@@ -3998,11 +3996,7 @@ def _houses_sunshine_makransky(
                 a = math.degrees(math.atan(cos_lat * math.tan(math.radians(md))))
             else:
                 # md > 90: Triangle 1 reflected: MP-east point-CP
-                a = math.degrees(
-                    math.atan(
-                        math.tan(math.radians(md - 90.0)) / cos_lat
-                    )
-                )
+                a = math.degrees(math.atan(math.tan(math.radians(md - 90.0)) / cos_lat))
 
             # Triangle 2: CP-MP-east point
             b = math.degrees(math.atan(tan_lat * math.cos(math.radians(md))))

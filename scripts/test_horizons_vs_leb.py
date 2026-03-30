@@ -23,10 +23,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import libephemeris as swe
 
 BODIES = [
-    (0, "Sun"), (1, "Moon"), (2, "Mercury"), (3, "Venus"), (4, "Mars"),
-    (5, "Jupiter"), (6, "Saturn"), (7, "Uranus"), (8, "Neptune"), (9, "Pluto"),
-    (14, "Earth"), (10, "MeanNode"), (12, "MeanApog"),
-    (15, "Chiron"), (17, "Ceres"),
+    (0, "Sun"),
+    (1, "Moon"),
+    (2, "Mercury"),
+    (3, "Venus"),
+    (4, "Mars"),
+    (5, "Jupiter"),
+    (6, "Saturn"),
+    (7, "Uranus"),
+    (8, "Neptune"),
+    (9, "Pluto"),
+    (14, "Earth"),
+    (10, "MeanNode"),
+    (12, "MeanApog"),
+    (15, "Chiron"),
+    (17, "Ceres"),
 ]
 
 SKIP_COMBOS = {(0, swe.SEFLG_SPEED | swe.SEFLG_HELCTR)}
@@ -105,12 +116,14 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
     g = max(e[0] for e in body_max.values()) if body_max else 0
     ok = n_fail == 0
 
-    print(f"{'PASS' if ok else 'FAIL'} | Horizons vs LEB2 | {n} tests | max={g:.4f}\" | {elapsed:.1f}s")
+    print(
+        f'{"PASS" if ok else "FAIL"} | Horizons vs LEB2 | {n} tests | max={g:.4f}" | {elapsed:.1f}s'
+    )
     for bid in sorted(body_max):
         err, fn = body_max[bid]
         name = [nm for i, nm in BODIES if i == bid][0]
         if err > 0.001:
-            print(f"  {name:<12s}  {err:.4f}\"  {fn}")
+            print(f'  {name:<12s}  {err:.4f}"  {fn}')
 
     return ok
 

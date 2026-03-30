@@ -266,6 +266,7 @@ class TestHeliocentricVsGeocentric:
         """Earth helio longitude should be ~180° from Sun geocentric."""
         # Force Skyfield mode to avoid LEB state leakage from other tests
         from libephemeris import state
+
         saved_leb = state._LEB_FILE
         saved_reader = state._LEB_READER
         state._LEB_FILE = None

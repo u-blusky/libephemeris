@@ -67,6 +67,10 @@ class LEB2Reader:
         self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
         self._cache: Dict[int, bytes] = {}  # body_id -> decompressed coefficients
+        self._eval_cache: Dict[
+            Tuple[int, float],
+            Tuple[Tuple[float, float, float], Tuple[float, float, float]],
+        ] = {}
 
         try:
             self._parse()
@@ -170,6 +174,12 @@ class LEB2Reader:
 
         Same interface and return format as LEBReader.eval_body().
         """
+        # Check instance-level eval cache first (see LEBReader.eval_body).
+        _cache_key = (body_id, jd)
+        cached = self._eval_cache.get(_cache_key)
+        if cached is not None:
+            return cached
+
         if body_id not in self._bodies:
             raise KeyError(f"Body {body_id} not in LEB file")
 
@@ -202,9 +212,7 @@ class LEB2Reader:
         deg1 = body.degree + 1
         n_coeffs = body.components * deg1
         byte_offset = seg_idx * n_coeffs * 8
-        coeffs = struct.unpack_from(
-            f"<{n_coeffs}d", self._cache[body_id], byte_offset
-        )
+        coeffs = struct.unpack_from(f"<{n_coeffs}d", self._cache[body_id], byte_offset)
 
         # Evaluate each component via Clenshaw
         pos = []
@@ -221,7 +229,14 @@ class LEB2Reader:
         if body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_GEO_ECLIPTIC):
             pos[0] = pos[0] % 360.0
 
-        return tuple(pos), tuple(vel)  # type: ignore[return-value]
+        result = tuple(pos), tuple(vel)  # type: ignore[return-value]
+
+        # Store in cache (bounded: clear when exceeding 256 entries)
+        if len(self._eval_cache) > 256:
+            self._eval_cache.clear()
+        self._eval_cache[_cache_key] = result  # type: ignore[assignment]
+
+        return result  # type: ignore[return-value]
 
     def eval_nutation(self, jd_tt: float) -> Tuple[float, float]:
         """Evaluate nutation angles. Same as LEBReader.eval_nutation()."""
@@ -286,6 +301,7 @@ class LEB2Reader:
 
     def close(self) -> None:
         """Close the memory-mapped file and release resources."""
+        self._eval_cache.clear()
         self._cache.clear()
         if self._mm is not None:
             try:

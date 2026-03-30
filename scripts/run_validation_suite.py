@@ -31,17 +31,32 @@ BODIES_ASTEROIDS = [15, 17, 18, 19, 20]
 BODIES_ALL = BODIES_CORE + BODIES_LUNAR + BODIES_ASTEROIDS
 
 BODY_NAMES = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
-    10: "MeanNode", 11: "TrueNode", 12: "MeanApog", 14: "Earth",
-    15: "Chiron", 17: "Ceres", 18: "Pallas", 19: "Juno", 20: "Vesta",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+    10: "MeanNode",
+    11: "TrueNode",
+    12: "MeanApog",
+    14: "Earth",
+    15: "Chiron",
+    17: "Ceres",
+    18: "Pallas",
+    19: "Juno",
+    20: "Vesta",
 }
 
 
 def _section(name):
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {name}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 class Results:
@@ -68,7 +83,7 @@ class Results:
             for e in self.errors[:5]:
                 print(f"    - {e}")
             if len(self.errors) > 5:
-                print(f"    ... and {len(self.errors)-5} more")
+                print(f"    ... and {len(self.errors) - 5} more")
         return self.failed == 0
 
 
@@ -108,11 +123,14 @@ def run_section1_positions(rng, n_dates=200):
                     ld = 360 - ld
                 ld *= 3600
                 latd = abs(v2[1] - v1[1]) * 3600
-                r.check(ld < 0.01, f"Body {bid} JD {jd:.1f} lon={ld:.4f}\"")
-                r.check(latd < 0.01, f"Body {bid} JD {jd:.1f} lat={latd:.4f}\"")
+                r.check(ld < 0.01, f'Body {bid} JD {jd:.1f} lon={ld:.4f}"')
+                r.check(latd < 0.01, f'Body {bid} JD {jd:.1f} lat={latd:.4f}"')
                 # True Node (11) has known distance tolerance issue
                 dist_tol = 1e-3 if bid == 11 else 1e-6
-                r.check(abs(v2[2] - v1[2]) < dist_tol, f"Body {bid} dist diff={abs(v2[2]-v1[2]):.2e}")
+                r.check(
+                    abs(v2[2] - v1[2]) < dist_tol,
+                    f"Body {bid} dist diff={abs(v2[2] - v1[2]):.2e}",
+                )
             except Exception:
                 pass
     swe.swe_close()
@@ -150,14 +168,28 @@ def run_section2_flags(rng, n_dates=50):
                     try:
                         res = swe.swe_calc_ut(float(jd), bid, fl)
                         v = res[0]
-                        r.check(len(v) == 6, f"mode={mode} body={bid} flag={fl}: len != 6")
-                        r.check(math.isfinite(v[0]), f"mode={mode} body={bid}: lon not finite")
-                        r.check(math.isfinite(v[1]), f"mode={mode} body={bid}: lat not finite")
-                        r.check(v[2] >= 0 or (fl & swe.SEFLG_XYZ), f"mode={mode} body={bid}: dist < 0")
+                        r.check(
+                            len(v) == 6, f"mode={mode} body={bid} flag={fl}: len != 6"
+                        )
+                        r.check(
+                            math.isfinite(v[0]),
+                            f"mode={mode} body={bid}: lon not finite",
+                        )
+                        r.check(
+                            math.isfinite(v[1]),
+                            f"mode={mode} body={bid}: lat not finite",
+                        )
+                        r.check(
+                            v[2] >= 0 or (fl & swe.SEFLG_XYZ),
+                            f"mode={mode} body={bid}: dist < 0",
+                        )
                     except (KeyError, ValueError):
                         pass  # expected for unsupported combos
                     except Exception as e:
-                        r.check(False, f"mode={mode} body={bid} flag={fl}: {type(e).__name__}: {e}")
+                        r.check(
+                            False,
+                            f"mode={mode} body={bid} flag={fl}: {type(e).__name__}: {e}",
+                        )
         swe.swe_close()
     return r.summary("Flag combinations")
 
@@ -180,7 +212,10 @@ def run_section3_velocity(rng, n_dates=50):
                 if abs(num_speed) > 180 / dt:
                     num_speed = ((r2[0] - r1[0] + 180) % 360 - 180) / dt
                 diff = abs(r1[3] - num_speed)
-                r.check(diff < 0.05, f"Body {bid} JD {jd:.1f}: speed diff {diff:.4f} deg/day")
+                r.check(
+                    diff < 0.05,
+                    f"Body {bid} JD {jd:.1f}: speed diff {diff:.4f} deg/day",
+                )
             except Exception:
                 pass
     swe.swe_close()
@@ -202,10 +237,17 @@ def run_section4_houses(rng, n_dates=20):
                 try:
                     cusps, ascmc = swe.houses(float(jd), lat, lon, bytes([sys_byte]))
                     r.check(len(cusps) >= 12, f"sys={chr(sys_byte)}: cusps < 12")
-                    r.check(0 <= ascmc[0] < 360, f"sys={chr(sys_byte)}: ASC out of range")
-                    r.check(0 <= ascmc[1] < 360, f"sys={chr(sys_byte)}: MC out of range")
+                    r.check(
+                        0 <= ascmc[0] < 360, f"sys={chr(sys_byte)}: ASC out of range"
+                    )
+                    r.check(
+                        0 <= ascmc[1] < 360, f"sys={chr(sys_byte)}: MC out of range"
+                    )
                     for i in range(min(12, len(cusps))):
-                        r.check(0 <= cusps[i] < 360, f"sys={chr(sys_byte)}: cusp {i} out of range")
+                        r.check(
+                            0 <= cusps[i] < 360,
+                            f"sys={chr(sys_byte)}: cusp {i} out of range",
+                        )
                 except Exception as e:
                     r.check(False, f"sys={chr(sys_byte)} loc=({lon},{lat}): {e}")
 
@@ -225,11 +267,20 @@ def run_section5_sidereal(rng, n_dates=10):
             for bid in [0, 1, 4]:
                 try:
                     trop = swe.swe_calc_ut(float(jd), bid, swe.SEFLG_SPEED)[0]
-                    sid = swe.swe_calc_ut(float(jd), bid, swe.SEFLG_SPEED | swe.SEFLG_SIDEREAL)[0]
-                    r.check(math.isfinite(sid[0]), f"mode={mode_id} body={bid}: not finite")
-                    r.check(0 <= sid[0] < 360, f"mode={mode_id} body={bid}: out of range")
-                    r.check(abs(trop[0] - sid[0]) > 0.001 or abs(trop[0] - sid[0] + 360) > 0.001,
-                            f"mode={mode_id} body={bid}: sid == trop")
+                    sid = swe.swe_calc_ut(
+                        float(jd), bid, swe.SEFLG_SPEED | swe.SEFLG_SIDEREAL
+                    )[0]
+                    r.check(
+                        math.isfinite(sid[0]), f"mode={mode_id} body={bid}: not finite"
+                    )
+                    r.check(
+                        0 <= sid[0] < 360, f"mode={mode_id} body={bid}: out of range"
+                    )
+                    r.check(
+                        abs(trop[0] - sid[0]) > 0.001
+                        or abs(trop[0] - sid[0] + 360) > 0.001,
+                        f"mode={mode_id} body={bid}: sid == trop",
+                    )
                 except Exception as e:
                     r.check(False, f"mode={mode_id} body={bid}: {e}")
     # Reset
@@ -280,8 +331,10 @@ def run_section7_julday(rng):
         h = float(rng.uniform(0, 24))
         jd = swe.julday(y, m, d, h)
         y2, m2, d2, h2 = swe.revjul(jd)
-        r.check(y2 == y and m2 == m and d2 == d and abs(h2 - h) < 1e-6,
-                f"revjul(julday({y},{m},{d},{h:.4f})) mismatch")
+        r.check(
+            y2 == y and m2 == m and d2 == d and abs(h2 - h) < 1e-6,
+            f"revjul(julday({y},{m},{d},{h:.4f})) mismatch",
+        )
 
     return r.summary("Julian day round-trip")
 
@@ -324,7 +377,11 @@ def run_section8_crossbackend(rng, n_dates=50):
     for jd in jds:
         for bid in bodies:
             k = (float(jd), bid)
-            for a, b in [("skyfield", "leb2"), ("skyfield", "horizons"), ("leb2", "horizons")]:
+            for a, b in [
+                ("skyfield", "leb2"),
+                ("skyfield", "horizons"),
+                ("leb2", "horizons"),
+            ]:
                 if k in results_by_backend[a] and k in results_by_backend[b]:
                     va = results_by_backend[a][k]
                     vb = results_by_backend[b][k]
@@ -333,8 +390,10 @@ def run_section8_crossbackend(rng, n_dates=50):
                         ld = 360 - ld
                     ld *= 3600
                     latd = abs(va[1] - vb[1]) * 3600
-                    r.check(max(ld, latd) < 0.01,
-                            f"{a} vs {b} body={bid}: lon={ld:.4f}\" lat={latd:.4f}\"")
+                    r.check(
+                        max(ld, latd) < 0.01,
+                        f'{a} vs {b} body={bid}: lon={ld:.4f}" lat={latd:.4f}"',
+                    )
 
     return r.summary("Cross-backend consistency")
 
@@ -372,10 +431,10 @@ def main():
     elapsed = time.time() - t0
     total_checks = sum(1 for _ in [])  # placeholder
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  VERDICT: {'ALL PASS' if all_pass else 'FAILURES DETECTED'}")
     print(f"  Time: {elapsed:.1f}s")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     sys.exit(0 if all_pass else 1)
 

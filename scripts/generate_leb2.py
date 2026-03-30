@@ -90,13 +90,36 @@ LEB2_GROUPS = {
 }
 
 BODY_NAMES = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
-    10: "Mean Node", 11: "True Node", 12: "Mean Apogee", 13: "Oscu Apogee",
-    14: "Earth", 15: "Chiron", 17: "Ceres", 18: "Pallas", 19: "Juno",
-    20: "Vesta", 21: "Interp Apogee", 22: "Interp Perigee",
-    40: "Cupido", 41: "Hades", 42: "Zeus", 43: "Kronos",
-    44: "Apollon", 45: "Admetos", 46: "Vulkanus", 47: "Poseidon",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+    10: "Mean Node",
+    11: "True Node",
+    12: "Mean Apogee",
+    13: "Oscu Apogee",
+    14: "Earth",
+    15: "Chiron",
+    17: "Ceres",
+    18: "Pallas",
+    19: "Juno",
+    20: "Vesta",
+    21: "Interp Apogee",
+    22: "Interp Perigee",
+    40: "Cupido",
+    41: "Hades",
+    42: "Zeus",
+    43: "Kronos",
+    44: "Apollon",
+    45: "Admetos",
+    46: "Vulkanus",
+    47: "Poseidon",
     48: "Transpluto",
 }
 
@@ -104,6 +127,7 @@ BODY_NAMES = {
 # =============================================================================
 # LEB1 READER (minimal, for conversion)
 # =============================================================================
+
 
 class LEB1Source:
     """Reads an LEB1 file and extracts raw data for conversion to LEB2."""
@@ -136,14 +160,14 @@ class LEB1Source:
         entry = self.bodies[body_id]
         seg_size = segment_byte_size(entry.degree, entry.components)
         raw_size = seg_size * entry.segment_count
-        return bytes(self._mm[entry.data_offset:entry.data_offset + raw_size])
+        return bytes(self._mm[entry.data_offset : entry.data_offset + raw_size])
 
     def get_section_data(self, section_id: int) -> Optional[bytes]:
         """Extract raw bytes for a section (nutation, delta-t, stars)."""
         if section_id not in self.sections:
             return None
         sec = self.sections[section_id]
-        return bytes(self._mm[sec.offset:sec.offset + sec.size])
+        return bytes(self._mm[sec.offset : sec.offset + sec.size])
 
     def close(self):
         if self._mm:
@@ -155,6 +179,7 @@ class LEB1Source:
 # =============================================================================
 # LEB2 WRITER
 # =============================================================================
+
 
 def write_leb2(
     output: str,
@@ -226,7 +251,9 @@ def write_leb2(
         SectionEntry(SECTION_COMPRESSED_CHEBYSHEV, cheb_offset, total_cheb),
     ]
     if nutation_data:
-        sec_entries.append(SectionEntry(SECTION_NUTATION, nut_offset, len(nutation_data)))
+        sec_entries.append(
+            SectionEntry(SECTION_NUTATION, nut_offset, len(nutation_data))
+        )
     if delta_t_data:
         sec_entries.append(SectionEntry(SECTION_DELTA_T, dt_offset, len(delta_t_data)))
     if star_data:
@@ -254,16 +281,16 @@ def write_leb2(
         write_compressed_body_entry(
             buf, body_index_offset + idx * COMPRESSED_BODY_ENTRY_SIZE, cbe
         )
-        buf[blob_offset:blob_offset + len(blob)] = blob
+        buf[blob_offset : blob_offset + len(blob)] = blob
         blob_offset += len(blob)
 
     # Write auxiliary sections
     if nutation_data:
-        buf[nut_offset:nut_offset + len(nutation_data)] = nutation_data
+        buf[nut_offset : nut_offset + len(nutation_data)] = nutation_data
     if delta_t_data:
-        buf[dt_offset:dt_offset + len(delta_t_data)] = delta_t_data
+        buf[dt_offset : dt_offset + len(delta_t_data)] = delta_t_data
     if star_data:
-        buf[star_offset:star_offset + len(star_data)] = star_data
+        buf[star_offset : star_offset + len(star_data)] = star_data
 
     # Write to disk
     os.makedirs(os.path.dirname(os.path.abspath(output)) or ".", exist_ok=True)
@@ -278,6 +305,7 @@ def write_leb2(
 # =============================================================================
 # CONVERT MODE: LEB1 -> LEB2
 # =============================================================================
+
 
 def convert_leb1_to_leb2(
     input_path: str,
@@ -321,7 +349,7 @@ def convert_leb1_to_leb2(
 
     if verbose:
         print(f"\n  {'Body':<16s}  {'Raw KB':>8s}  {'Comp KB':>8s}  {'Ratio':>6s}")
-        print(f"  {'-'*44}")
+        print(f"  {'-' * 44}")
 
     for bid in body_ids:
         entry = src.bodies[bid]
@@ -337,7 +365,9 @@ def convert_leb1_to_leb2(
         bits = compute_mantissa_bits(arr, body_target)
 
         # Compress
-        blob = compress_body(raw, entry.segment_count, entry.degree, entry.components, bits)
+        blob = compress_body(
+            raw, entry.segment_count, entry.degree, entry.components, bits
+        )
 
         body_entries.append((entry, blob, raw_size))
         total_raw += raw_size
@@ -346,12 +376,16 @@ def convert_leb1_to_leb2(
         if verbose:
             name = BODY_NAMES.get(bid, f"Body {bid}")
             ratio = raw_size / len(blob) if len(blob) > 0 else 0
-            print(f"  {name:<16s}  {raw_size/1024:>8.1f}  {len(blob)/1024:>8.1f}  {ratio:>5.1f}x")
+            print(
+                f"  {name:<16s}  {raw_size / 1024:>8.1f}  {len(blob) / 1024:>8.1f}  {ratio:>5.1f}x"
+            )
 
     if verbose:
-        print(f"  {'-'*44}")
+        print(f"  {'-' * 44}")
         ratio = total_raw / total_compressed if total_compressed > 0 else 0
-        print(f"  {'TOTAL':<16s}  {total_raw/1024:>8.1f}  {total_compressed/1024:>8.1f}  {ratio:>5.1f}x")
+        print(
+            f"  {'TOTAL':<16s}  {total_raw / 1024:>8.1f}  {total_compressed / 1024:>8.1f}  {ratio:>5.1f}x"
+        )
 
     # Get auxiliary data
     nutation_data = src.get_section_data(SECTION_NUTATION)
@@ -398,7 +432,17 @@ def _year_to_jd(year: int) -> float:
     a = (14 - 1) // 12
     y = year + 4800 - a
     m = 1 + 12 * a - 3
-    return 1 + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045 + 0.5 - 0.5
+    return (
+        1
+        + (153 * m + 2) // 5
+        + 365 * y
+        + y // 4
+        - y // 100
+        + y // 400
+        - 32045
+        + 0.5
+        - 0.5
+    )
 
 
 def generate_and_compress(
@@ -449,9 +493,12 @@ def generate_and_compress(
     gen_cmd = [
         sys.executable,
         os.path.join(os.path.dirname(__file__), "generate_leb.py"),
-        "--tier", tier,
-        "--output", tmp_leb1,
-        "--workers", str(workers),
+        "--tier",
+        tier,
+        "--output",
+        tmp_leb1,
+        "--workers",
+        str(workers),
     ]
     if start_year is not None:
         gen_cmd += ["--start", str(start_year)]
@@ -462,11 +509,13 @@ def generate_and_compress(
 
     result = subprocess.run(gen_cmd)
     if result.returncode != 0:
-        print(f"Error: LEB1 generation failed (exit {result.returncode})", file=sys.stderr)
+        print(
+            f"Error: LEB1 generation failed (exit {result.returncode})", file=sys.stderr
+        )
         sys.exit(result.returncode)
 
     if verbose:
-        print(f"\nStep 2: Converting LEB1 -> LEB2...")
+        print("\nStep 2: Converting LEB1 -> LEB2...")
 
     # Convert to LEB2
     convert_leb1_to_leb2(
@@ -487,6 +536,7 @@ def generate_and_compress(
 # =============================================================================
 # VERIFICATION
 # =============================================================================
+
 
 def verify_leb2(
     leb2_path: str,
@@ -520,8 +570,10 @@ def verify_leb2(
             print(f"Verifying {leb2_path} against {reference_leb1}")
             print(f"  Samples per body: {n_samples}")
             arcsec_hdr = 'Max err (")'
-            print(f"\n  {'Body':<16s}  {'Max err (AU)':>14s}  {arcsec_hdr:>12s}  {'Status':>8s}")
-            print(f"  {'-'*56}")
+            print(
+                f"\n  {'Body':<16s}  {'Max err (AU)':>14s}  {arcsec_hdr:>12s}  {'Status':>8s}"
+            )
+            print(f"  {'-' * 56}")
 
         rng = np.random.default_rng(42)
 
@@ -548,7 +600,9 @@ def verify_leb2(
 
             if verbose:
                 name = BODY_NAMES.get(bid, f"Body {bid}")
-                print(f"  {name:<16s}  {max_err:>14.2e}  {err_arcsec:>12.4f}  {status:>8s}")
+                print(
+                    f"  {name:<16s}  {max_err:>14.2e}  {err_arcsec:>12.4f}  {status:>8s}"
+                )
 
         reader1.close()
     else:
@@ -581,6 +635,7 @@ def verify_leb2(
 # =============================================================================
 # BATCH CONVERSION (all groups for a tier)
 # =============================================================================
+
 
 def convert_all_groups(
     input_path: str,
@@ -629,7 +684,7 @@ def convert_all_groups(
 
     input_size = os.path.getsize(input_path)
     if verbose:
-        print(f"\n=== Summary ===")
+        print("\n=== Summary ===")
         print(f"  Input:  {input_size / 1e6:.1f} MB ({os.path.basename(input_path)})")
         print(f"  Output: {total_size / 1e6:.1f} MB (total, {len(LEB2_GROUPS)} files)")
         print(f"  Ratio:  {input_size / total_size:.1f}x")
@@ -638,6 +693,7 @@ def convert_all_groups(
 # =============================================================================
 # CLI
 # =============================================================================
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -671,42 +727,61 @@ def main():
     p_conv.add_argument("input", help="Input LEB1 file")
     p_conv.add_argument("-o", "--output", required=True, help="Output LEB2 file")
     p_conv.add_argument(
-        "--group", choices=list(LEB2_GROUPS.keys()),
+        "--group",
+        choices=list(LEB2_GROUPS.keys()),
         help="Only include bodies from this group",
     )
     p_conv.add_argument(
-        "--precision", type=float, default=DEFAULT_TARGET_AU,
+        "--precision",
+        type=float,
+        default=DEFAULT_TARGET_AU,
         help=f"Precision target in AU (default: {DEFAULT_TARGET_AU})",
     )
     p_conv.add_argument("-q", "--quiet", action="store_true")
 
     # --- convert-all ---
-    p_all = subparsers.add_parser("convert-all", help="Convert LEB1 -> LEB2 for all groups")
+    p_all = subparsers.add_parser(
+        "convert-all", help="Convert LEB1 -> LEB2 for all groups"
+    )
     p_all.add_argument("input", help="Input LEB1 file")
     p_all.add_argument("-o", "--output-dir", required=True, help="Output directory")
-    p_all.add_argument("--tier-name", required=True, help="Tier name for file naming (base/medium/extended)")
     p_all.add_argument(
-        "--precision", type=float, default=DEFAULT_TARGET_AU,
+        "--tier-name",
+        required=True,
+        help="Tier name for file naming (base/medium/extended)",
+    )
+    p_all.add_argument(
+        "--precision",
+        type=float,
+        default=DEFAULT_TARGET_AU,
         help=f"Precision target in AU (default: {DEFAULT_TARGET_AU})",
     )
     p_all.add_argument("-q", "--quiet", action="store_true")
 
     # --- generate ---
-    p_gen = subparsers.add_parser("generate", help="Generate LEB2 from scratch via Skyfield")
+    p_gen = subparsers.add_parser(
+        "generate", help="Generate LEB2 from scratch via Skyfield"
+    )
     p_gen.add_argument("-o", "--output", required=True, help="Output LEB2 file")
     p_gen.add_argument(
-        "--tier", "-t", choices=["base", "medium", "extended"],
-        required=True, help="Precision tier",
+        "--tier",
+        "-t",
+        choices=["base", "medium", "extended"],
+        required=True,
+        help="Precision tier",
     )
     p_gen.add_argument(
-        "--group", choices=list(LEB2_GROUPS.keys()),
+        "--group",
+        choices=list(LEB2_GROUPS.keys()),
         help="Only include bodies from this group",
     )
     p_gen.add_argument("--start", type=int, help="Override start year")
     p_gen.add_argument("--end", type=int, help="Override end year")
     p_gen.add_argument("--workers", type=int, default=os.cpu_count() or 1)
     p_gen.add_argument(
-        "--precision", type=float, default=DEFAULT_TARGET_AU,
+        "--precision",
+        type=float,
+        default=DEFAULT_TARGET_AU,
         help=f"Precision target in AU (default: {DEFAULT_TARGET_AU})",
     )
     p_gen.add_argument("-q", "--quiet", action="store_true")
@@ -715,7 +790,8 @@ def main():
     p_ver = subparsers.add_parser("verify", help="Verify a LEB2 file")
     p_ver.add_argument("input", help="LEB2 file to verify")
     p_ver.add_argument(
-        "--reference", help="LEB1 reference file for comparison",
+        "--reference",
+        help="LEB1 reference file for comparison",
     )
     p_ver.add_argument("--samples", type=int, default=200, help="Samples per body")
     p_ver.add_argument("-q", "--quiet", action="store_true")

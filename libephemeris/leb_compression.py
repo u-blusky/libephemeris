@@ -31,18 +31,19 @@ DEFAULT_TARGET_AU = 5e-9
 # Moon/Earth positions also feed into the pipeline's light-time, deflection,
 # and aberration corrections for ALL other bodies, further amplifying errors.
 BODY_TARGET_AU: dict[int, float] = {
-    1: 1e-12,   # Moon    — d_geo ~ 0.002 AU, need <0.001" through full pipeline
+    1: 1e-12,  # Moon    — d_geo ~ 0.002 AU, need <0.001" through full pipeline
     14: 1e-12,  # Earth   — used in corrections for every other body
-    0: 1e-10,   # Sun     — deflector for all bodies, high leverage
-    2: 1e-10,   # Mercury — d_geo ~ 0.55 AU, fast orbit amplifies errors
-    3: 1e-10,   # Venus   — d_geo ~ 0.27 AU, closest inner planet to Earth
-    4: 1e-10,   # Mars    — d_geo ~ 0.37 AU
+    0: 1e-10,  # Sun     — deflector for all bodies, high leverage
+    2: 1e-10,  # Mercury — d_geo ~ 0.55 AU, fast orbit amplifies errors
+    3: 1e-10,  # Venus   — d_geo ~ 0.27 AU, closest inner planet to Earth
+    4: 1e-10,  # Mars    — d_geo ~ 0.37 AU
 }
 
 
 # ---------------------------------------------------------------------------
 # Mantissa truncation
 # ---------------------------------------------------------------------------
+
 
 def compute_mantissa_bits(
     coeffs: np.ndarray,
@@ -119,6 +120,7 @@ def apply_truncation(
 # Coefficient-major reorder
 # ---------------------------------------------------------------------------
 
+
 def reorder_coeff_major(
     data: bytes,
     segment_count: int,
@@ -152,6 +154,7 @@ def reorder_segment_major(
 # ---------------------------------------------------------------------------
 # Byte shuffle (HDF5/Blosc-style)
 # ---------------------------------------------------------------------------
+
 
 def shuffle_bytes(data: bytes, element_size: int = 8) -> bytes:
     """Transpose byte lanes: (N_floats x 8 bytes) -> (8 lanes x N bytes)."""
@@ -221,6 +224,8 @@ def decompress_body(
     Returns:
         Raw coefficient bytes in segment-major layout (same as LEB1).
     """
-    decompressed = _DECOMPRESSOR.decompress(compressed, max_output_size=uncompressed_size)
+    decompressed = _DECOMPRESSOR.decompress(
+        compressed, max_output_size=uncompressed_size
+    )
     unshuffled = unshuffle_bytes(decompressed)
     return reorder_segment_major(unshuffled, segment_count, degree, components)
