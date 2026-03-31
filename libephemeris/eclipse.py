@@ -6167,7 +6167,7 @@ def lun_occult_when_glob(
         # Candidate selection: separation below per-point occultation
         # threshold OR below a fixed wide threshold
         occ_thresh = m_radii + t_radii + 1.0  # + parallax margin
-        candidate_mask = seps < np.minimum(occ_thresh, _CANDIDATE_DEG)
+        candidate_mask = seps < np.maximum(occ_thresh, _CANDIDATE_DEG)
 
         if not np.any(candidate_mask):
             jd_cursor = float(chunk_jds[-1]) + direction * _SCAN_STEP

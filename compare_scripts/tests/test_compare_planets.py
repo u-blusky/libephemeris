@@ -246,7 +246,11 @@ class TestInnerPlanets:
 
         diff_speed = abs(pos_swe[3] - pos_py[3])
 
-        assert diff_speed < 0.001, (
+        # Moon uses a wider tolerance because it moves ~13°/day, amplifying
+        # the sub-arcsecond position difference between DE440 (Skyfield) and
+        # Swiss Ephemeris through numerical differentiation (KI-010).
+        tol = 0.002 if planet_id == SE_MOON else 0.001
+        assert diff_speed < tol, (
             f"{planet_name} daily motion diff {diff_speed:.6f}°/day exceeds tight tolerance"
         )
 

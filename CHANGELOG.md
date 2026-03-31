@@ -5,6 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a6] — 2026-03-31
+
+### Fixed
+
+#### Skyfield `reify` Descriptor Corruption (TypeError in Sidereal Pipeline)
+
+Fixed `TypeError: 'numpy.ndarray' object is not callable` that affected 20+
+sidereal regression tests for Pipeline B bodies (TrueNode, OscuApog, MeanNode,
+MeanApog) at specific Julian Days.
+
+**Root cause:** Skyfield's `P = reify(precession_matrix)` descriptor uses
+`update_wrapper`, so `P.__name__` becomes `'precession_matrix'`. When `t.P` is
+accessed, the reify `__get__` stores the numpy result under
+`t.__dict__['precession_matrix']`, shadowing the *method* of the same name.
+Since `get_cached_time_tt()` caches Time objects via `lru_cache`, the corruption
+persists across callers — Pipeline A SID+EQ tests corrupt the cached Time, then
+Pipeline B bodies fail when they access `t.M` via `ecliptic_frame.rotation_at(t)`.
+
+**Fix:** Replaced `mean_equator_and_equinox_of_date.rotation_at(t)` with direct
+`mxm(t.precession_matrix(), ICRS_to_J2000)` in `fast_calc.py::_get_precession_matrix`,
+avoiding the reify descriptor entirely.
+
+#### Lunar Occultation Candidate Detection Threshold (`np.minimum` → `np.maximum`)
+
+Fixed `lun_occult_when_glob()` finding the wrong occultation event for Venus and
+Mars (time offsets of 421–530 days vs Swiss Ephemeris).
+
+**Root cause:** The coarse scan used `np.minimum(occ_thresh, _CANDIDATE_DEG)` at
+`eclipse.py:6170`. Since `occ_thresh` (~1.27°) is always less than
+`_CANDIDATE_DEG` (5.0°), the "wide net" threshold was never applied. The narrow
+1.27° detection window (~0.21 days) was smaller than the 0.5-day scan step,
+causing ~58% of valid occultation events to be missed entirely. The function
+would skip the correct event and return a later one many months away.
+
+**Fix:** Changed `np.minimum` to `np.maximum`, ensuring the candidate threshold
+is always at least 5.0°. The existing verification step (`moon_r + target_r +
+LUNAR_PARALLAX`) still rejects non-occultation close approaches.
+
+#### South Node Velocity Path Asymmetry
+
+Fixed south node (body -11, -10) velocity not matching north node velocity when
+LEB or Horizons backend is active.
+
+**Root cause:** `swe_calc_ut()` dispatched first to LEB/Horizons, which support
+north node (body 11) but not the negative south node IDs. The south node call
+fell through to the Skyfield fallback path, which computes velocity via numerical
+differentiation — producing a different value than LEB's Chebyshev polynomial
+derivatives used for the north node.
+
+**Fix:** Added early south node handling in `swe_calc_ut()` *before* the
+LEB/Horizons dispatch. South node requests now recursively call `swe_calc_ut()`
+for the north node (going through whichever backend is active), then transform
+the result (+180° longitude, negated latitude/lat-velocity).
+
+### Changed
+
+#### Comparison Test Tolerances Calibrated to KI-010
+
+Adjusted retrograde station timing, velocity, and duration tolerances in the
+comparison test suite to reflect the known architectural difference KI-010
+(numerical vs analytical velocity derivatives, ~0.0001–0.0002°/day offset).
+
+Near retrograde stations (velocity ≈ 0), the velocity offset δv is amplified
+into a timing offset δt = δv/a where a is the angular acceleration. Slower
+planets have smaller |a|, producing larger timing shifts:
+
+| Planet  | Acceleration | Tolerance (old → new) |
+|---------|-------------|----------------------|
+| Mercury | ~0.10°/day² | 60s → 90s            |
+| Venus   | ~0.03°/day² | 60s → 250s           |
+| Mars    | ~0.005      | 60s → 1000s          |
+| Jupiter | ~0.001      | 240s → 3000s         |
+| Saturn  | ~0.0005     | 240s → 4000s         |
+
+- **Velocity tolerance**: 0.0001 → 0.0003 °/day (matches KI-010 recommendation)
+- **Duration tolerance**: per-planet, ~2× station tolerance (compounds both endpoints)
+- **Moon daily motion tolerance**: 0.001 → 0.002 °/day (Moon moves ~13°/day,
+  amplifying sub-arcsecond ephemeris position differences through numerical
+  differentiation)
+
 ## [1.0.0a5] — 2026-03-29
 
 ### Performance

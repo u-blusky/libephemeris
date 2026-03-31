@@ -524,6 +524,22 @@ def _get_precession_matrix(
     Note: ``t.P`` was previously used here but it includes the ICRS frame bias
     (~17 mas), causing up to 0.015″ excess error vs the Skyfield reference path.
 
+    IMPORTANT: We must NOT call ``mean_equator_and_equinox_of_date.rotation_at(t)``
+    because it internally accesses ``t.P``.  Skyfield's ``P = reify(precession_matrix)``
+    descriptor uses ``update_wrapper``, so ``P.__name__`` = ``'precession_matrix'``.
+    When the reify ``__get__`` fires, it stores the numpy result under
+    ``t.__dict__['precession_matrix']``, shadowing the *method* of the same name.
+    Subsequent ``t.M`` computation calls ``self.precession_matrix()`` expecting a
+    callable method but finds the numpy array instead → TypeError.  Since we use
+    ``get_cached_time_tt()`` (LRU-cached Time objects), this corruption persists
+    across callers and causes Pipeline B bodies (TrueNode, OscuApog, etc.) to fail
+    when they later access ``t.M`` via ``ecliptic_frame.rotation_at(t)``.
+
+    The fix: call ``t.precession_matrix()`` directly (the method, not the ``P``
+    reify descriptor) and combine with ``ICRS_to_J2000`` manually.  This is
+    mathematically identical to ``mxm(t.P, ICRS_to_J2000)`` but avoids the
+    reify descriptor corruption.
+
     Args:
         jd_tt: Julian Day in TT.
 
@@ -531,11 +547,14 @@ def _get_precession_matrix(
         3x3 rotation matrix as nested tuples.
     """
     from .cache import get_cached_time_tt
-    from skyfield.framelib import mean_equator_and_equinox_of_date
+    from skyfield.framelib import ICRS_to_J2000
+    from skyfield.functions import mxm
 
     t = get_cached_time_tt(jd_tt)
 
-    R = mean_equator_and_equinox_of_date.rotation_at(t)
+    # Equivalent to mean_equator_and_equinox_of_date.rotation_at(t) which does
+    # mxm(t.P, ICRS_to_J2000), but avoids accessing t.P (reify descriptor).
+    R = mxm(t.precession_matrix(), ICRS_to_J2000)
     return (
         (float(R[0][0]), float(R[0][1]), float(R[0][2])),
         (float(R[1][0]), float(R[1][1]), float(R[1][2])),

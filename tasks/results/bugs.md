@@ -149,6 +149,33 @@
 - **Fix**: Added all 8 Uranian body names to `_PLANET_NAMES` dict and imported the missing constants (SE_HADES, SE_ZEUS, SE_KRONOS, SE_APOLLON, SE_ADMETOS, SE_VULKANUS) in `planets.py`.
 - **Files modified**: `libephemeris/planets.py`
 
+### BUG-006: Skyfield `reify` descriptor corruption causes TypeError in sidereal pipeline — FIXED (v1.0.0a6)
+- **Function**: `fast_calc._get_precession_matrix()`
+- **Status**: **FIXED** in v1.0.0a6
+- **Observed**: `TypeError: 'numpy.ndarray' object is not callable` for Pipeline B bodies (TrueNode, OscuApog, MeanNode, MeanApog) when sidereal+equatorial tests run at the same JD as prior Pipeline A tests.
+- **Root cause**: Skyfield's `P = reify(precession_matrix)` descriptor uses `update_wrapper`, so `P.__name__` = `'precession_matrix'`. When `t.P` is accessed, the reify `__get__` stores the numpy result under `t.__dict__['precession_matrix']`, shadowing the method. Since `get_cached_time_tt()` uses `lru_cache`, the corruption persists. Later calls to `t.M` (via `ecliptic_frame.rotation_at(t)`) call `self.precession_matrix()` expecting a method but find the numpy array.
+- **Severity**: HIGH — caused 20+ sidereal regression test failures
+- **Fix**: Replaced `mean_equator_and_equinox_of_date.rotation_at(t)` with `mxm(t.precession_matrix(), ICRS_to_J2000)` to bypass the reify descriptor.
+- **Files modified**: `libephemeris/fast_calc.py`
+
+### BUG-007: Lunar occultation `np.minimum` prevents candidate detection — FIXED (v1.0.0a6)
+- **Function**: `eclipse.lun_occult_when_glob()`
+- **Status**: **FIXED** in v1.0.0a6
+- **Observed**: Venus and Mars occultation searches returned events 421–530 days later than pyswisseph (wrong occultation event).
+- **Root cause**: `candidate_mask = seps < np.minimum(occ_thresh, _CANDIDATE_DEG)` at line 6170. Since `occ_thresh` (~1.27°) is always less than `_CANDIDATE_DEG` (5.0°), the wide threshold was never applied. The narrow 1.27° window (~0.21 days) was smaller than the 0.5-day scan step, causing ~58% of valid occultation events to be missed.
+- **Severity**: HIGH — returned wrong occultation events for planets
+- **Fix**: Changed `np.minimum` to `np.maximum`. The verification step still correctly rejects non-occultation close approaches.
+- **Files modified**: `libephemeris/eclipse.py`
+
+### BUG-008: South node velocity path asymmetry with LEB backend — FIXED (v1.0.0a6)
+- **Function**: `planets.swe_calc_ut()` for bodies -10 (south mean node), -11 (south true node)
+- **Status**: **FIXED** in v1.0.0a6
+- **Observed**: South node velocity (-0.05444°/day) did not equal north node velocity (-0.05474°/day) when LEB was active. Should be identical since south node = north node + 180°.
+- **Root cause**: `swe_calc_ut()` dispatches LEB → Horizons → Skyfield. North node (11) is handled by LEB (Chebyshev derivatives). South node (-11) is not in LEB, falls through to Skyfield (numerical derivatives). Two different derivative methods produce different velocity values.
+- **Severity**: MEDIUM — velocity mismatch between geometrically related bodies
+- **Fix**: Added early south node handling in `swe_calc_ut()` before LEB/Horizons dispatch. South node recursively calls `swe_calc_ut()` for north node (same backend path), then transforms the result.
+- **Files modified**: `libephemeris/planets.py`
+
 ### KI-008: Ayanamsha mode 40 returns ~357° (out of expected range)
 - **Mode**: 40
 - **Observed**: `get_ayanamsa_ut(J2000)` returns 356.846° instead of the expected [0, 30] range
@@ -167,6 +194,7 @@
 - **Cause**: Different derivative computation methods (Skyfield numerical vs Swiss Ephemeris analytical). The difference is ~0.001 arcsec/day — negligible for all practical applications.
 - **Severity**: VERY LOW — sub-arcsecond speed differences
 - **Recommendation**: Use 0.0003°/day tolerance for planet speeds in golden regression
+- **Secondary effect (v1.0.0a6)**: Near retrograde stations (velocity ≈ 0), this offset is amplified into a timing shift δt = δv/a, where a is angular acceleration. For outer planets (small a), this produces station timing differences of up to ~3400s (Saturn). Comparison test tolerances calibrated per-planet in v1.0.0a6.
 
 ### KI-011: Boundary date ephemeris range errors at DE440 edge
 - **Bodies**: Sun, Mars, Jupiter, Saturn at JD 2287184.5 (1550-01-01)
