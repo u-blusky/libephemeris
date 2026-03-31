@@ -30,6 +30,15 @@ Log Level Configuration:
 
     Or disable logging entirely:
         logging.getLogger("libephemeris").setLevel(logging.CRITICAL + 1)
+
+DEBUG-Level Source Tracing:
+    At DEBUG level, libephemeris logs which calculation backend was used for
+    every celestial body at every dispatch point. The log format is:
+
+        body=<id> jd=<julian_day> source=<SOURCE>
+
+    Possible source values: LEB, Skyfield, Horizons, SPK, ASSIST (n-body),
+    Keplerian (fallback). See docs/development/testing.md for details.
 """
 
 from __future__ import annotations

@@ -249,6 +249,56 @@ LibEphemeris respects these environment variables for testing:
 | `LIBEPHEMERIS_AUTO_SPK` | `1`, `true`, `yes` | Enable auto SPK download globally |
 | `LIBEPHEMERIS_LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR` | Control logging verbosity |
 
+### Source Tracing (DEBUG logs)
+
+At `DEBUG` level, libephemeris logs which calculation backend was used for
+every body at every dispatch point. The log format is:
+
+```
+body=<id> jd=<julian_day> source=<BACKEND>
+```
+
+Example output:
+
+```
+[libephemeris] DEBUG: body=0 jd=2448045.9167 source=LEB
+[libephemeris] DEBUG: body=15 jd=2448045.9167 source=SPK
+[libephemeris] DEBUG: body=146199 jd=2448045.9167 source=ASSIST (n-body)
+```
+
+Possible `source` values:
+
+| Value | Description |
+|-------|-------------|
+| `LEB` | Precomputed `.leb` binary ephemeris (Chebyshev polynomial fast-path) |
+| `LEB->fallback` | LEB lookup failed, retrying with Skyfield (the next log line shows the actual source) |
+| `Skyfield` | NASA JPL DE440/DE441 via Skyfield |
+| `Horizons` | NASA JPL Horizons online API |
+| `SPK` | Direct SPK kernel evaluation (minor bodies) |
+| `SPK (auto-downloaded)` | SPK kernel auto-downloaded for this body |
+| `ASSIST (n-body)` | N-body integration via ASSIST |
+| `Keplerian (fallback)` | Analytical Keplerian orbit (last resort, logged at WARNING) |
+
+These log statements are emitted in `planets.py` (`swe_calc_ut()`,
+`swe_calc()`, `_calc_body()`) and `context.py` (`calc_ut()`, `calc()`).
+
+To enable source tracing during tests:
+
+```bash
+LIBEPHEMERIS_LOG_LEVEL=DEBUG pytest -s tests/
+```
+
+Or programmatically:
+
+```python
+import logging
+logging.getLogger("libephemeris").setLevel(logging.DEBUG)
+```
+
+The Astrologer API uses this mechanism via an opt-in `X-Debug-Ephemeris: true`
+HTTP header that temporarily lowers the logger to DEBUG, captures `source=`
+entries, and injects them into the JSON response.
+
 ### Custom SPK Cache Directory
 
 For custom storage locations:
