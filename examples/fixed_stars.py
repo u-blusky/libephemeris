@@ -86,8 +86,8 @@ def example_star_positions() -> None:
             # Get star position
             pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
 
-            # Get magnitude
-            mag = eph.swe_fixstar_mag(star_name)
+            # Get magnitude (returns tuple of (magnitude, star_name))
+            mag, _ = eph.swe_fixstar_mag(star_name)
 
             formatted = format_zodiac(pos[0])
             print(f"{star_name:<14}{formatted:>18}{pos[1]:>11.4f}°{mag:>6.2f}")

@@ -5737,10 +5737,14 @@ def lun_occult_when_glob(
     def _get_target_position(jd: float) -> Tuple[float, float, float]:
         """Get target body's geocentric RA, Dec, and angular radius."""
         if planet == 0:
-            # Fixed star
-            # Get star data and calculate equatorial position
+            # Fixed star — use Skyfield Star for proper precession to epoch
+            # of date, matching the Moon's epoch="date" frame.  The previous
+            # approach used J2000 RA/Dec + proper motion without precession,
+            # introducing ~0.8° RA offset by 2017 and causing false-positive
+            # occultation detections.
             from .fixed_stars import FIXED_STARS
             from .fixed_stars import _resolve_star_id
+            from skyfield.api import Star as SkyfieldStar
 
             star_id, err, _ = _resolve_star_id(star_name)
             if err is not None:
@@ -5750,12 +5754,19 @@ def lun_occult_when_glob(
 
             t = ts.ut1_jd(jd)
 
-            # Time from J2000.0
-            t_years = (jd - 2451545.0) / 365.25
+            # Build a Skyfield Star with J2000 coordinates and proper motion
+            star_obj = SkyfieldStar(
+                ra_hours=star.ra_j2000 / 15.0,
+                dec_degrees=star.dec_j2000,
+                ra_mas_per_year=star.pm_ra * 1000.0,
+                dec_mas_per_year=star.pm_dec * 1000.0,
+            )
 
-            # Apply proper motion
-            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+            # Apparent position precessed to epoch of date (same as Moon)
+            star_app = earth.at(t).observe(star_obj).apparent()
+            ra, dec, _ = star_app.radec(epoch="date")
+            ra_deg = ra.hours * 15.0
+            dec_deg = dec.degrees
 
             # Stars have negligible angular radius
             return ra_deg, dec_deg, 0.0001  # ~0.4 arcsec for point source
@@ -6074,11 +6085,19 @@ def lun_occult_when_glob(
     if planet == 0:
         from .fixed_stars import FIXED_STARS as _FS_B
         from .fixed_stars import _resolve_star_id as _rsi_b
+        from skyfield.api import Star as _SkyfieldStarBatch
 
         _b_star_id, _b_err, _ = _rsi_b(star_name)
         if _b_err is not None:
             raise ValueError(_b_err)
         _b_star = _FS_B[_b_star_id]
+        # Build a Skyfield Star object for vectorized epoch-of-date positions
+        _b_star_sf = _SkyfieldStarBatch(
+            ra_hours=_b_star.ra_j2000 / 15.0,
+            dec_degrees=_b_star.dec_j2000,
+            ra_mas_per_year=_b_star.pm_ra * 1000.0,
+            dec_mas_per_year=_b_star.pm_dec * 1000.0,
+        )
         _b_target = None
     else:
         _b_star = None
@@ -6116,9 +6135,12 @@ def lun_occult_when_glob(
 
         # Target position
         if _b_star is not None:
-            t_years = (jds - 2451545.0) / 365.25
-            t_ra = _b_star.ra_j2000 + (_b_star.pm_ra * t_years) / 3600.0
-            t_dec = _b_star.dec_j2000 + (_b_star.pm_dec * t_years) / 3600.0
+            # Use Skyfield Star for proper precession to epoch of date,
+            # matching the Moon's epoch="date" frame.
+            star_app = earth.at(t).observe(_b_star_sf).apparent()
+            t_ra_o, t_dec_o, _ = star_app.radec(epoch="date")
+            t_ra = np.asarray(t_ra_o.hours) * 15.0
+            t_dec = np.asarray(t_dec_o.degrees)
             t_radii = np.full(len(jds), 0.0001)
         else:
             t_app = earth.at(t).observe(_b_target).apparent()
@@ -6198,6 +6220,15 @@ def lun_occult_when_glob(
 
             # Precise minimum via golden-section search (scalar calls)
             jd_max = _find_minimum_separation(jd_refined - 0.25, jd_refined + 0.25)
+
+            # Reject events whose maximum falls before the search start
+            # (forward) or after (backward).  The fine refinement window
+            # (±0.5 day) can drag jd_max past jd_start, producing results
+            # that predate the caller's requested start time.
+            if direction > 0 and jd_max < jd_start:
+                continue
+            if direction < 0 and jd_max > jd_start:
+                continue
 
             # --- Verification (identical to original logic) ---
             moon_ra, moon_dec, moon_dist, moon_r = _get_moon_position(jd_max)

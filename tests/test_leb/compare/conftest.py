@@ -499,7 +499,9 @@ ALL_LEB_BODIES = MAIN_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL
 # is baked into the Chebyshev coefficients.  This contamination extends well
 # beyond the SPK boundary due to Chebyshev fitting windows straddling the edge.
 # Measured errors: 22,000-97,000 arcsec position, 0.06-0.59 AU distance.
-_ASTEROID_SPK_JD_START = year_to_jd(1920)  # Safe SPK coverage start (20yr margin)
+_ASTEROID_SPK_JD_START = year_to_jd(
+    1930
+)  # Safe SPK coverage start (Horizons SPK21 ~1925)
 _ASTEROID_SPK_JD_END = year_to_jd(2080)  # Safe SPK coverage end (20yr margin)
 _ASTEROID_BODY_IDS = {b[0] for b in ASTEROID_BODIES}
 

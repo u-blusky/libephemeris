@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a7] — 2026-03-31
+
+### Fixed
+
+#### Lunar Occultation Frame Mismatch (Star Position Not Precessed)
+
+Fixed `lun_occult_when_glob()` missing the Regulus occultation on 2017-01-19
+(and potentially other fixed-star occultations) due to a coordinate frame
+mismatch between Moon and star positions.
+
+**Root cause:** Moon position was computed in the equinox-of-date frame
+(`epoch="date"`), but star position was computed in J2000 with only proper motion
+applied — no precession. By 2017, precession introduces ~0.8° offset in RA,
+causing the function to reject a valid occultation as too far apart.
+
+**Fix:** Both `_get_target_position()` (scalar path) and `_batch_separations()`
+(vectorized path) now use Skyfield's `Star` class with
+`.apparent().radec(epoch="date")`, ensuring Moon and star positions share the
+same equinox-of-date frame. Also added a boundary guard after golden-section
+refinement to reject events that fall before `jd_start` (forward search) or
+after `jd_start` (backward search) due to the ±0.5 day refinement window.
+
+#### Observer Cache Identity Collision (Stale Positions in Full Test Suite)
+
+Fixed Mars geocentric and Moon topocentric tests passing in isolation but failing
+in the full test suite due to observer cache collisions.
+
+**Root cause:** `get_cached_observer_at()` in `cache.py` used `id(observer)` as
+cache key. Python reuses memory addresses after object deallocation, so a new
+observer could receive the same `id()` as a previously deallocated one. The cache
+would return positions computed for a *different* observer object.
+
+**Fix:** Cache now stores `(observer, result)` tuples and validates
+`cached_observer is observer` (identity check) on lookup. A cache hit with a
+different object at the same address is treated as a miss.
+
+#### Asteroid LEB Comparison Test Date Range
+
+Fixed 10 asteroid comparison test failures (5 in `test_extended_asteroids.py`,
+5 in `test_compare_leb_asteroids.py`) caused by test dates falling outside
+Horizons SPK21 asteroid file coverage.
+
+**Root cause:** `_ASTEROID_SPK_JD_START` in test conftest was set to
+`year_to_jd(1920)`, but Horizons SPK21 files for asteroids (Chiron, Ceres,
+Pallas, Juno, Vesta) begin coverage around 1925. Test dates in 1922-1923 fell
+outside the SPK range, causing `EphemerisRangeError`.
+
+**Fix:** Changed `_ASTEROID_SPK_JD_START` to `year_to_jd(1930)`, providing a
+safe margin above the SPK21 coverage start.
+
+#### Fixed Stars Example Tuple Unpacking
+
+Fixed `examples/fixed_stars.py` raising `unsupported format string passed to
+tuple.__format__` at runtime.
+
+**Root cause:** `swe_fixstar_mag()` returns a `(float, str)` tuple, but the
+example assigned it to a single variable and passed the tuple directly to a
+format string expecting a float.
+
+**Fix:** Changed `mag = eph.swe_fixstar_mag(star_name)` to
+`mag, _ = eph.swe_fixstar_mag(star_name)`.
+
 ## [1.0.0a6] — 2026-03-31
 
 ### Fixed

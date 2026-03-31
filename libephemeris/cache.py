@@ -174,6 +174,11 @@ def get_cached_time_tt(jd: float):
 # Observer position cache: stores observer.at(t) results keyed on
 # (id(observer), jd_tt). This avoids recomputing Earth's position
 # for every planet in a multi-planet chart at the same JD.
+#
+# To guard against Python reusing memory addresses after deallocation
+# (which would cause cache hits returning positions computed for a
+# *different* observer), we store the observer object alongside the
+# result and validate identity on lookup.
 _observer_at_cache: dict = {}
 
 
@@ -193,12 +198,17 @@ def get_cached_observer_at(observer, t):
         Skyfield position object (Geocentric, Barycentric, etc.)
     """
     key = (id(observer), float(t.tt))
-    result = _observer_at_cache.get(key)
-    if result is None:
-        if len(_observer_at_cache) > _OBSERVER_CACHE_MAX:
-            _observer_at_cache.clear()
-        result = observer.at(t)
-        _observer_at_cache[key] = result
+    entry = _observer_at_cache.get(key)
+    # Validate that the cached observer is the *same* object, not just
+    # a new object that was allocated at the same memory address.
+    if entry is not None:
+        cached_observer, result = entry
+        if cached_observer is observer:
+            return result
+    if len(_observer_at_cache) > _OBSERVER_CACHE_MAX:
+        _observer_at_cache.clear()
+    result = observer.at(t)
+    _observer_at_cache[key] = (observer, result)
     return result
 
 
