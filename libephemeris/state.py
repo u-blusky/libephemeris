@@ -794,6 +794,7 @@ def get_planet_centers() -> Optional[SpiceKernel]:
     if _PLANET_CENTERS is None or _PLANET_CENTERS_TIER != current_tier:
         _PLANET_CENTERS = None
         _PLANET_CENTERS_TIER = None
+        _PLANET_CENTER_MISSING.clear()
 
         data_dir = _get_data_dir()
 
@@ -819,6 +820,12 @@ def get_planet_centers() -> Optional[SpiceKernel]:
     return _PLANET_CENTERS
 
 
+# Negative cache: NAIF IDs confirmed absent from the planet_centers SPK file.
+# Avoids redundant segment iteration when a requested body is not available.
+# Cleared on close() / tier change when _PLANET_CENTERS is reloaded.
+_PLANET_CENTER_MISSING: set[int] = set()
+
+
 def get_planet_center_segment(naif_id: int, jd: Optional[float] = None):
     """
     Get a planet center segment from the planet_centers SPK file.
@@ -840,6 +847,10 @@ def get_planet_center_segment(naif_id: int, jd: Optional[float] = None):
         >>> if seg:
         ...     offset = seg.at(t)  # Position relative to Jupiter barycenter
     """
+    # Fast negative-cache check: skip segment iteration for IDs known to be absent
+    if naif_id in _PLANET_CENTER_MISSING:
+        return None
+
     centers = get_planet_centers()
     if centers is None:
         return None
@@ -860,6 +871,9 @@ def get_planet_center_segment(naif_id: int, jd: Optional[float] = None):
                         "Could not check SPK segment coverage for jd=%.1f", jd
                     )
             return seg
+
+    # NAIF ID not found in any segment — remember for future calls
+    _PLANET_CENTER_MISSING.add(naif_id)
     return None
 
 
@@ -891,6 +905,15 @@ def set_topo(lon: float, lat: float, alt: float = 0.0) -> None:
     global _TOPO
     with _STATE_LOCK:
         _TOPO = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
+    # Invalidate the observer-at-time cache.  The cache keys include
+    # ``id(observer)`` which is the memory address of the ``earth + topo``
+    # VectorSum object.  When ``set_topo`` is called with a new location the
+    # old VectorSum is deallocated and Python may reuse the same address for
+    # the new one, causing cache hits that return positions computed for the
+    # *previous* observer location.
+    from .cache import clear_observer_cache
+
+    clear_observer_cache()
 
 
 def get_topo() -> Optional[Topos]:
@@ -1427,6 +1450,7 @@ def _close_inner() -> None:
     _LOADER = None
     _PLANETS = None
     _PLANET_CENTERS = None
+    _PLANET_CENTER_MISSING.clear()
     _TS = None
     _TOPO = None
     _SIDEREAL_MODE = None

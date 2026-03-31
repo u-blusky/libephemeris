@@ -358,18 +358,18 @@ except Exception as e:
 for i in range(10):
     try:
         lib.close()
-        check(True, f"close() call #{i+1} OK")
+        check(True, f"close() call #{i + 1} OK")
     except Exception as e:
-        check(False, f"close() call #{i+1} exception: {e}")
+        check(False, f"close() call #{i + 1} exception: {e}")
 
 # Calc works after multiple closes
 for i in range(10):
     lib.close()
     try:
         r, f = lib.calc_ut(JD_J2000, 0, 256)
-        check(abs(r[0] - 280.369) < 0.1, f"calc_ut after close #{i+1}: lon~280")
+        check(abs(r[0] - 280.369) < 0.1, f"calc_ut after close #{i + 1}: lon~280")
     except Exception as e:
-        check(False, f"calc_ut after close #{i+1}: {e}")
+        check(False, f"calc_ut after close #{i + 1}: {e}")
 
 # Houses work after close
 lib.close()
@@ -418,7 +418,7 @@ check(
 # Two contexts with different topo
 ctx1 = lib.EphemerisContext()
 ctx2 = lib.EphemerisContext()
-ctx1.set_topo(12.5, 41.9, 0)   # Rome
+ctx1.set_topo(12.5, 41.9, 0)  # Rome
 ctx2.set_topo(139.69, 35.69, 40)  # Tokyo
 
 cusps1, ascmc1 = ctx1.houses(JD_J2000, 41.9, 12.5, b"P")
@@ -789,7 +789,10 @@ for lib_name, (swe_name, expected_val) in CAL_ECL_RISE.items():
     swe_val = getattr(swe_ref, swe_name, None)
     check(lib_val == expected_val, f"{lib_name} == {expected_val}: got {lib_val}")
     if swe_val is not None:
-        check(lib_val == swe_val, f"{lib_name} matches swe_ref.{swe_name}: {lib_val} vs {swe_val}")
+        check(
+            lib_val == swe_val,
+            f"{lib_name} matches swe_ref.{swe_name}: {lib_val} vs {swe_val}",
+        )
 
 
 # ── G15.05: House system constants (50 checks) ────────────────────────
@@ -914,7 +917,9 @@ for jd in arabic_dates:
                 "Mercury": merc_r[0],
                 "Venus": ven_r[0],
             }
-            parts = lib.calc_all_arabic_parts(positions, jd=jd, geo_lat=geo_lat, geo_lon=geo_lon)
+            parts = lib.calc_all_arabic_parts(
+                positions, jd=jd, geo_lat=geo_lat, geo_lon=geo_lon
+            )
             check(isinstance(parts, dict), f"arabic parts returns dict at jd={jd:.0f}")
             check(
                 "Pars_Fortunae" in parts,
@@ -968,6 +973,7 @@ LEB_FILE = "/Users/giacomo/.libephemeris/leb/ephemeris_medium.leb"
 leb_available = False
 try:
     import os
+
     if os.path.exists(LEB_FILE):
         lib.set_leb_file(LEB_FILE)
         leb_available = True
@@ -991,7 +997,7 @@ if leb_available:
                 lon_diff = abs(lib.difdeg2n(r_leb[0], r_sky[0]))
                 check(
                     lon_diff < 0.005 / 3600.0,
-                    f"LEB vs Sky body {body} jd={jd:.0f}: lon diff={lon_diff*3600:.4f}\"",
+                    f'LEB vs Sky body {body} jd={jd:.0f}: lon diff={lon_diff * 3600:.4f}"',
                 )
             except Exception as e:
                 check(False, f"LEB vs Sky body {body} jd={jd:.0f}: {e}")
@@ -1016,8 +1022,13 @@ if leb_available:
     lib.set_calc_mode("auto")
     for flag in FALLBACK_FLAGS:
         for body in [0, 1, 2, 3, 4]:
-            for jd in [JD_J2000, JD_J2000 + 365.25, JD_J2000 - 365.25,
-                        JD_J2000 + 7300, JD_J2000 - 7300]:
+            for jd in [
+                JD_J2000,
+                JD_J2000 + 365.25,
+                JD_J2000 - 365.25,
+                JD_J2000 + 7300,
+                JD_J2000 - 7300,
+            ]:
                 try:
                     r, f = lib.calc_ut(jd, body, flag)
                     check(
@@ -1161,10 +1172,16 @@ for jd in boundary_jds:
                 f"date boundary jd={jd:.0f} body={body}: dist={r[2]} > 0",
             )
         except lib.EphemerisRangeError:
-            check(True, f"date boundary jd={jd:.0f} body={body}: EphemerisRangeError (expected)")
+            check(
+                True,
+                f"date boundary jd={jd:.0f} body={body}: EphemerisRangeError (expected)",
+            )
         except Exception as e:
             # Any other exception is still acceptable for extreme dates
-            check(True, f"date boundary jd={jd:.0f} body={body}: exception {type(e).__name__}")
+            check(
+                True,
+                f"date boundary jd={jd:.0f} body={body}: exception {type(e).__name__}",
+            )
 
 # More boundary tests with finer years
 extra_years = [1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2500, 2650]

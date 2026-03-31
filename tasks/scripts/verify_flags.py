@@ -10,6 +10,7 @@ Sections tested:
 
 Target: ~20 000+ checks, < 30 seconds.
 """
+
 from __future__ import annotations
 
 import math
@@ -45,67 +46,67 @@ def check(condition: bool, label: str) -> None:
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-SEFLG_DEFAULT   = 0
-SEFLG_SWIEPH    = 2
-SEFLG_SPEED     = 256
-SEFLG_HELCTR    = 8
-SEFLG_TRUEPOS   = 16
-SEFLG_J2000     = 32
-SEFLG_NONUT     = 64
-SEFLG_NOGDEFL   = 512
-SEFLG_NOABERR   = 1024
+SEFLG_DEFAULT = 0
+SEFLG_SWIEPH = 2
+SEFLG_SPEED = 256
+SEFLG_HELCTR = 8
+SEFLG_TRUEPOS = 16
+SEFLG_J2000 = 32
+SEFLG_NONUT = 64
+SEFLG_NOGDEFL = 512
+SEFLG_NOABERR = 1024
 SEFLG_EQUATORIAL = 2048
-SEFLG_XYZ       = 4096
-SEFLG_RADIANS   = 8192
-SEFLG_SIDEREAL  = 65536
+SEFLG_XYZ = 4096
+SEFLG_RADIANS = 8192
+SEFLG_SIDEREAL = 65536
 
 SINGLE_FLAGS = [
-    ("DEFAULT",     SEFLG_DEFAULT),
-    ("SWIEPH",      SEFLG_SWIEPH),
-    ("SPEED",       SEFLG_SPEED),
-    ("HELCTR",      SEFLG_HELCTR),
-    ("TRUEPOS",     SEFLG_TRUEPOS),
-    ("J2000",       SEFLG_J2000),
-    ("NONUT",       SEFLG_NONUT),
-    ("NOGDEFL",     SEFLG_NOGDEFL),
-    ("NOABERR",     SEFLG_NOABERR),
-    ("EQUATORIAL",  SEFLG_EQUATORIAL),
-    ("XYZ",         SEFLG_XYZ),
-    ("RADIANS",     SEFLG_RADIANS),
-    ("SIDEREAL",    SEFLG_SIDEREAL),
+    ("DEFAULT", SEFLG_DEFAULT),
+    ("SWIEPH", SEFLG_SWIEPH),
+    ("SPEED", SEFLG_SPEED),
+    ("HELCTR", SEFLG_HELCTR),
+    ("TRUEPOS", SEFLG_TRUEPOS),
+    ("J2000", SEFLG_J2000),
+    ("NONUT", SEFLG_NONUT),
+    ("NOGDEFL", SEFLG_NOGDEFL),
+    ("NOABERR", SEFLG_NOABERR),
+    ("EQUATORIAL", SEFLG_EQUATORIAL),
+    ("XYZ", SEFLG_XYZ),
+    ("RADIANS", SEFLG_RADIANS),
+    ("SIDEREAL", SEFLG_SIDEREAL),
 ]
 
 FLAG_PAIRS = [
-    ("SPEED+HELCTR",        SEFLG_SPEED | SEFLG_HELCTR),
-    ("SPEED+EQUATORIAL",    SEFLG_SPEED | SEFLG_EQUATORIAL),
-    ("SPEED+TRUEPOS",       SEFLG_SPEED | SEFLG_TRUEPOS),
-    ("SPEED+J2000",         SEFLG_SPEED | SEFLG_J2000),
-    ("SPEED+NONUT",         SEFLG_SPEED | SEFLG_NONUT),
-    ("SPEED+NOGDEFL",       SEFLG_SPEED | SEFLG_NOGDEFL),
-    ("SPEED+NOABERR",       SEFLG_SPEED | SEFLG_NOABERR),
-    ("HELCTR+TRUEPOS",      SEFLG_HELCTR | SEFLG_TRUEPOS),
-    ("HELCTR+J2000",        SEFLG_HELCTR | SEFLG_J2000),
-    ("HELCTR+NONUT",        SEFLG_HELCTR | SEFLG_NONUT),
-    ("EQUATORIAL+J2000",    SEFLG_EQUATORIAL | SEFLG_J2000),
-    ("EQUATORIAL+NONUT",    SEFLG_EQUATORIAL | SEFLG_NONUT),
-    ("EQUATORIAL+SPEED",    SEFLG_EQUATORIAL | SEFLG_SPEED),
-    ("XYZ+SPEED",           SEFLG_XYZ | SEFLG_SPEED),
-    ("TRUEPOS+J2000",       SEFLG_TRUEPOS | SEFLG_J2000),
-    ("TRUEPOS+NONUT",       SEFLG_TRUEPOS | SEFLG_NONUT),
-    ("J2000+NONUT",         SEFLG_J2000 | SEFLG_NONUT),
-    ("J2000+NOGDEFL",       SEFLG_J2000 | SEFLG_NOGDEFL),
-    ("J2000+NOABERR",       SEFLG_J2000 | SEFLG_NOABERR),
-    ("NONUT+NOGDEFL",       SEFLG_NONUT | SEFLG_NOGDEFL),
-    ("NONUT+NOABERR",       SEFLG_NONUT | SEFLG_NOABERR),
-    ("NOGDEFL+NOABERR",     SEFLG_NOGDEFL | SEFLG_NOABERR),
-    ("HELCTR+EQUATORIAL",   SEFLG_HELCTR | SEFLG_EQUATORIAL),
-    ("HELCTR+NOGDEFL",      SEFLG_HELCTR | SEFLG_NOGDEFL),
-    ("HELCTR+NOABERR",      SEFLG_HELCTR | SEFLG_NOABERR),
-    ("EQUATORIAL+NOGDEFL",  SEFLG_EQUATORIAL | SEFLG_NOGDEFL),
-    ("EQUATORIAL+NOABERR",  SEFLG_EQUATORIAL | SEFLG_NOABERR),
-    ("EQUATORIAL+TRUEPOS",  SEFLG_EQUATORIAL | SEFLG_TRUEPOS),
-    ("XYZ+HELCTR",          SEFLG_XYZ | SEFLG_HELCTR),
-    ("XYZ+EQUATORIAL",      SEFLG_XYZ | SEFLG_EQUATORIAL),
+    ("SPEED+HELCTR", SEFLG_SPEED | SEFLG_HELCTR),
+    ("SPEED+EQUATORIAL", SEFLG_SPEED | SEFLG_EQUATORIAL),
+    ("SPEED+TRUEPOS", SEFLG_SPEED | SEFLG_TRUEPOS),
+    ("SPEED+J2000", SEFLG_SPEED | SEFLG_J2000),
+    ("SPEED+NONUT", SEFLG_SPEED | SEFLG_NONUT),
+    ("SPEED+NOGDEFL", SEFLG_SPEED | SEFLG_NOGDEFL),
+    ("SPEED+NOABERR", SEFLG_SPEED | SEFLG_NOABERR),
+    ("HELCTR+TRUEPOS", SEFLG_HELCTR | SEFLG_TRUEPOS),
+    ("HELCTR+J2000", SEFLG_HELCTR | SEFLG_J2000),
+    ("HELCTR+NONUT", SEFLG_HELCTR | SEFLG_NONUT),
+    ("EQUATORIAL+J2000", SEFLG_EQUATORIAL | SEFLG_J2000),
+    ("EQUATORIAL+NONUT", SEFLG_EQUATORIAL | SEFLG_NONUT),
+    ("EQUATORIAL+SPEED", SEFLG_EQUATORIAL | SEFLG_SPEED),
+    ("XYZ+SPEED", SEFLG_XYZ | SEFLG_SPEED),
+    ("TRUEPOS+J2000", SEFLG_TRUEPOS | SEFLG_J2000),
+    ("TRUEPOS+NONUT", SEFLG_TRUEPOS | SEFLG_NONUT),
+    ("J2000+NONUT", SEFLG_J2000 | SEFLG_NONUT),
+    ("J2000+NOGDEFL", SEFLG_J2000 | SEFLG_NOGDEFL),
+    ("J2000+NOABERR", SEFLG_J2000 | SEFLG_NOABERR),
+    ("NONUT+NOGDEFL", SEFLG_NONUT | SEFLG_NOGDEFL),
+    ("NONUT+NOABERR", SEFLG_NONUT | SEFLG_NOABERR),
+    ("NOGDEFL+NOABERR", SEFLG_NOGDEFL | SEFLG_NOABERR),
+    ("HELCTR+EQUATORIAL", SEFLG_HELCTR | SEFLG_EQUATORIAL),
+    ("HELCTR+NOGDEFL", SEFLG_HELCTR | SEFLG_NOGDEFL),
+    ("HELCTR+NOABERR", SEFLG_HELCTR | SEFLG_NOABERR),
+    ("EQUATORIAL+NOGDEFL", SEFLG_EQUATORIAL | SEFLG_NOGDEFL),
+    ("EQUATORIAL+NOABERR", SEFLG_EQUATORIAL | SEFLG_NOABERR),
+    ("EQUATORIAL+TRUEPOS", SEFLG_EQUATORIAL | SEFLG_TRUEPOS),
+    ("XYZ+HELCTR", SEFLG_XYZ | SEFLG_HELCTR),
+    ("XYZ+EQUATORIAL", SEFLG_XYZ | SEFLG_EQUATORIAL),
 ]
 
 # 22 bodies: 0-9, 10-13, 14, 15, 17-22
@@ -113,11 +114,28 @@ ALL_BODIES = list(range(0, 16)) + list(range(17, 23))
 assert len(ALL_BODIES) == 22, f"Expected 22 bodies, got {len(ALL_BODIES)}"
 
 BODY_NAMES = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
-    10: "MeanNode", 11: "TrueNode", 12: "MeanApog", 13: "OscuApog",
-    14: "Earth", 15: "Chiron", 17: "Ceres", 18: "Pallas",
-    19: "Juno", 20: "Vesta", 21: "IntpApog", 22: "IntpPerig",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+    10: "MeanNode",
+    11: "TrueNode",
+    12: "MeanApog",
+    13: "OscuApog",
+    14: "Earth",
+    15: "Chiron",
+    17: "Ceres",
+    18: "Pallas",
+    19: "Juno",
+    20: "Vesta",
+    21: "IntpApog",
+    22: "IntpPerig",
 }
 
 PAIR_BODIES = [0, 1, 4, 5, 6]  # Sun, Moon, Mars, Jupiter, Saturn
@@ -140,6 +158,7 @@ DATES_20 = [random.uniform(JD_1900, JD_2100) for _ in range(20)]
 # Force Skyfield mode to avoid LEB caching artifacts in this stress test
 lib.set_calc_mode("skyfield")
 
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -161,6 +180,7 @@ def safe_calc_ut(jd: float, body: int, flag: int) -> Tuple[Any, ...] | None:
         _last_exception = e
         return None
 
+
 _last_exception = None
 
 
@@ -173,7 +193,10 @@ def validate_result_basic(
     Returns the 6-float tuple on success, None on failure.
     """
     if result is None:
-        check(False, f"{label}: unhandled exception (calc_ut returned None: {_last_exception})")
+        check(
+            False,
+            f"{label}: unhandled exception (calc_ut returned None: {_last_exception})",
+        )
         return None
 
     check(True, f"{label}: no exception")
@@ -213,8 +236,7 @@ def run_section_2_1() -> None:
 
             for jd in DATES_50:
                 label = (
-                    f"flag={flag_name} body={BODY_NAMES.get(body, body)} "
-                    f"jd={jd:.1f}"
+                    f"flag={flag_name} body={BODY_NAMES.get(body, body)} jd={jd:.1f}"
                 )
 
                 result = safe_calc_ut(jd, body, flag_val)
@@ -266,8 +288,7 @@ def run_section_2_2() -> None:
         for body in PAIR_BODIES:
             for jd in DATES_20:
                 label = (
-                    f"pair={pair_name} body={BODY_NAMES.get(body, body)} "
-                    f"jd={jd:.1f}"
+                    f"pair={pair_name} body={BODY_NAMES.get(body, body)} jd={jd:.1f}"
                 )
                 result = safe_calc_ut(jd, body, pair_val | SEFLG_SWIEPH)
                 validate_result_basic(result, label)

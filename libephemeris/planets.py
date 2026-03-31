@@ -840,6 +840,29 @@ def swe_calc_ut(
     if flags & SEFLG_SPEED3:
         flags = (flags & ~SEFLG_SPEED3) | SEFLG_SPEED
 
+    # --- South nodes: derive from north node via the same dispatch path ---
+    # South node = north node + 180° longitude, negated latitude.
+    # Must be handled here (before LEB/Horizons) so the north node sub-call
+    # goes through whichever backend (LEB, Horizons, Skyfield) is active.
+    # Otherwise, negative body IDs fall through LEB/Horizons (which don't
+    # store them) to the Skyfield path, causing velocity mismatches when
+    # LEB computes the north node with Chebyshev derivatives but Skyfield
+    # computes the south node with numerical differentiation.
+    from .constants import SE_MEAN_NODE, SE_TRUE_NODE
+
+    if planet in (-SE_MEAN_NODE, -SE_TRUE_NODE):
+        north_ipl = abs(planet)
+        north_result, retflag = swe_calc_ut(tjdut, north_ipl, flags)
+        south_lon = (north_result[0] + 180.0) % 360.0
+        return (
+            south_lon,
+            -north_result[1],
+            north_result[2],
+            north_result[3],
+            -north_result[4],
+            north_result[5],
+        ), retflag
+
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
     from .logging_config import get_logger
@@ -2640,7 +2663,8 @@ def _calc_body(
                     mean_ecl_matrix = mxm(rot_x(-mean_obliquity), t.precession_matrix())
                 else:
                     mean_ecl_matrix = mxm(
-                        rot_x(-mean_obliquity), mxm(t.precession_matrix(), ICRS_to_J2000)
+                        rot_x(-mean_obliquity),
+                        mxm(t.precession_matrix(), ICRS_to_J2000),
                     )
                 # Transform ICRS position to mean ecliptic
                 import numpy as np
@@ -2903,13 +2927,15 @@ def swe_get_ayanamsa_ut(tjdut: float) -> float:
 
             delta_t = reader.delta_t(tjdut)
             jd_tt = tjdut + delta_t
-            return float(_calc_ayanamsa_from_leb(
-                reader,
-                jd_tt,
-                sid_mode=sid_mode,
-                sid_t0=sid_t0,
-                sid_ayan_t0=sid_ayan_t0,
-            ))
+            return float(
+                _calc_ayanamsa_from_leb(
+                    reader,
+                    jd_tt,
+                    sid_mode=sid_mode,
+                    sid_t0=sid_t0,
+                    sid_ayan_t0=sid_ayan_t0,
+                )
+            )
         except (KeyError, ValueError):
             pass  # star-based mode or out of range, fall through
     # --- END LEB fast path ---

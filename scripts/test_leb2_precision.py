@@ -25,13 +25,36 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import libephemeris as swe
 
 BODY_NAMES = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
-    10: "MeanNode", 11: "TrueNode", 12: "MeanApog", 13: "OscuApog",
-    14: "Earth", 15: "Chiron", 17: "Ceres", 18: "Pallas", 19: "Juno",
-    20: "Vesta", 21: "IntpApog", 22: "IntpPerig",
-    40: "Cupido", 41: "Hades", 42: "Zeus", 43: "Kronos",
-    44: "Apollon", 45: "Admetos", 46: "Vulkanus", 47: "Poseidon",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+    10: "MeanNode",
+    11: "TrueNode",
+    12: "MeanApog",
+    13: "OscuApog",
+    14: "Earth",
+    15: "Chiron",
+    17: "Ceres",
+    18: "Pallas",
+    19: "Juno",
+    20: "Vesta",
+    21: "IntpApog",
+    22: "IntpPerig",
+    40: "Cupido",
+    41: "Hades",
+    42: "Zeus",
+    43: "Kronos",
+    44: "Apollon",
+    45: "Admetos",
+    46: "Vulkanus",
+    47: "Poseidon",
     48: "Transpluto",
 }
 
@@ -85,12 +108,13 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
 
     # Determine which bodies are in the LEB2 file
     from libephemeris.leb_reader import open_leb
+
     leb2_reader = open_leb(cfg["leb2"])
     leb2_bodies = set()
     # Walk the body map — works for both LEBReader, LEB2Reader, CompositeLEBReader
-    if hasattr(leb2_reader, '_bodies'):
+    if hasattr(leb2_reader, "_bodies"):
         leb2_bodies = set(leb2_reader._bodies.keys())
-    elif hasattr(leb2_reader, '_body_map'):
+    elif hasattr(leb2_reader, "_body_map"):
         leb2_bodies = set(leb2_reader._body_map.keys())
     leb2_reader.close()
 
@@ -106,7 +130,9 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
                 if bid in HELIO_ONLY and not (fl & swe.SEFLG_HELCTR):
                     continue
                 try:
-                    ref[(float(jd), bid, fl)] = swe.swe_calc_ut(float(jd), bid, fl)[0][:3]
+                    ref[(float(jd), bid, fl)] = swe.swe_calc_ut(float(jd), bid, fl)[0][
+                        :3
+                    ]
                 except Exception:
                     pass
     swe.swe_close()
@@ -147,7 +173,9 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
     g = max(e[0] for e in body_max.values()) if body_max else 0
     ok = n_over == 0
 
-    print(f"{'PASS' if ok else 'FAIL'} | {tier} | {n} tests | max={g:.4f}\" | {elapsed:.1f}s")
+    print(
+        f'{"PASS" if ok else "FAIL"} | {tier} | {n} tests | max={g:.4f}" | {elapsed:.1f}s'
+    )
 
     if not ok or g > THRESHOLD * 0.5:  # show details if close to threshold
         for bid in sorted(body_max):
@@ -155,7 +183,7 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
             if err >= THRESHOLD * 0.1:
                 name = BODY_NAMES.get(bid, str(bid))
                 mark = " ***" if err >= THRESHOLD else ""
-                print(f"  {name:<14s}  {err:.4f}\"  {fn}{mark}")
+                print(f'  {name:<14s}  {err:.4f}"  {fn}{mark}')
 
     return ok
 
@@ -163,7 +191,9 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
 def main():
     parser = argparse.ArgumentParser(description="Fast LEB2 precision test")
     parser.add_argument("tier", choices=["base", "medium", "extended", "all"])
-    parser.add_argument("--dates", type=int, default=200, help="Random dates per test (default: 200)")
+    parser.add_argument(
+        "--dates", type=int, default=200, help="Random dates per test (default: 200)"
+    )
     args = parser.parse_args()
 
     tiers = list(TIER_CONFIG.keys()) if args.tier == "all" else [args.tier]

@@ -43,24 +43,32 @@ PI = math.pi
 TWO_PI = 2.0 * PI
 
 # ── Constants ────────────────────────────────────────────────────────────
-SEFLG_DEFAULT   = 0
-SEFLG_SWIEPH    = 2
-SEFLG_HELCTR    = 8
-SEFLG_TRUEPOS   = 16
-SEFLG_J2000     = 32
-SEFLG_NONUT     = 64
-SEFLG_SPEED     = 256
-SEFLG_NOGDEFL   = 512
-SEFLG_NOABERR   = 1024
+SEFLG_DEFAULT = 0
+SEFLG_SWIEPH = 2
+SEFLG_HELCTR = 8
+SEFLG_TRUEPOS = 16
+SEFLG_J2000 = 32
+SEFLG_NONUT = 64
+SEFLG_SPEED = 256
+SEFLG_NOGDEFL = 512
+SEFLG_NOABERR = 1024
 SEFLG_EQUATORIAL = 2048
-SEFLG_XYZ       = 4096
-SEFLG_RADIANS   = 8192
-SEFLG_SIDEREAL  = 65536
+SEFLG_XYZ = 4096
+SEFLG_RADIANS = 8192
+SEFLG_SIDEREAL = 65536
 
 BODIES = list(range(10))  # 0..9 (Sun through Pluto)
 BODY_NAMES = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
     14: "Earth",
 }
 
@@ -91,19 +99,19 @@ t0 = time.time()
 # ── G03.01: 13 single flags x 10 bodies x 10 dates ──────────────────
 
 SINGLE_FLAGS = [
-    ("DEFAULT",     SEFLG_DEFAULT),
-    ("SWIEPH",      SEFLG_SWIEPH),
-    ("SPEED",       SEFLG_SPEED),
-    ("HELCTR",      SEFLG_HELCTR),
-    ("TRUEPOS",     SEFLG_TRUEPOS),
-    ("J2000",       SEFLG_J2000),
-    ("NONUT",       SEFLG_NONUT),
-    ("NOGDEFL",     SEFLG_NOGDEFL),
-    ("NOABERR",     SEFLG_NOABERR),
-    ("EQUATORIAL",  SEFLG_EQUATORIAL),
-    ("XYZ",         SEFLG_XYZ),
-    ("RADIANS",     SEFLG_RADIANS),
-    ("SIDEREAL",    SEFLG_SIDEREAL),
+    ("DEFAULT", SEFLG_DEFAULT),
+    ("SWIEPH", SEFLG_SWIEPH),
+    ("SPEED", SEFLG_SPEED),
+    ("HELCTR", SEFLG_HELCTR),
+    ("TRUEPOS", SEFLG_TRUEPOS),
+    ("J2000", SEFLG_J2000),
+    ("NONUT", SEFLG_NONUT),
+    ("NOGDEFL", SEFLG_NOGDEFL),
+    ("NOABERR", SEFLG_NOABERR),
+    ("EQUATORIAL", SEFLG_EQUATORIAL),
+    ("XYZ", SEFLG_XYZ),
+    ("RADIANS", SEFLG_RADIANS),
+    ("SIDEREAL", SEFLG_SIDEREAL),
 ]
 
 g03_01_passed = 0
@@ -179,7 +187,9 @@ for flag_name, flag_val in SINGLE_FLAGS:
                 lon_ok = -0.001 <= lon <= TWO_PI + 0.001
                 lat_ok = -(PI / 2.0 + 0.001) <= lat <= (PI / 2.0 + 0.001)
                 check(lon_ok, f"{desc_prefix}: RADIANS lon={lon:.6f} out of [0, 2pi)")
-                check(lat_ok, f"{desc_prefix}: RADIANS lat={lat:.6f} out of [-pi/2, pi/2]")
+                check(
+                    lat_ok, f"{desc_prefix}: RADIANS lat={lat:.6f} out of [-pi/2, pi/2]"
+                )
             else:
                 # Standard ecliptic or equatorial
                 lon_ok = -0.01 <= lon <= 360.01
@@ -205,12 +215,12 @@ print(f"\nG03.01 checks: {g03_01_total} passed, {g03_01_fail} failed")
 print("\n--- G03.02: Critical flag pairs (6 pairs x 5 bodies x ~7 dates) ---")
 
 FLAG_PAIRS = [
-    ("EQUATORIAL+NONUT",   SEFLG_EQUATORIAL | SEFLG_NONUT),
-    ("TRUEPOS+NONUT",      SEFLG_TRUEPOS | SEFLG_NONUT),
-    ("NONUT+NOGDEFL",      SEFLG_NONUT | SEFLG_NOGDEFL),
-    ("NONUT+NOABERR",      SEFLG_NONUT | SEFLG_NOABERR),
-    ("XYZ+HELCTR",         SEFLG_XYZ | SEFLG_HELCTR),
-    ("XYZ+EQUATORIAL",     SEFLG_XYZ | SEFLG_EQUATORIAL),
+    ("EQUATORIAL+NONUT", SEFLG_EQUATORIAL | SEFLG_NONUT),
+    ("TRUEPOS+NONUT", SEFLG_TRUEPOS | SEFLG_NONUT),
+    ("NONUT+NOGDEFL", SEFLG_NONUT | SEFLG_NOGDEFL),
+    ("NONUT+NOABERR", SEFLG_NONUT | SEFLG_NOABERR),
+    ("XYZ+HELCTR", SEFLG_XYZ | SEFLG_HELCTR),
+    ("XYZ+EQUATORIAL", SEFLG_XYZ | SEFLG_EQUATORIAL),
 ]
 
 PAIR_BODIES = [1, 2, 4, 5, 9]  # Moon, Mercury, Mars, Jupiter, Pluto
@@ -255,8 +265,10 @@ print(f"\nG03.02 checks: {g03_02_passed} passed, {g03_02_failed} failed")
 g03_time = time.time() - t0
 g03_total_passed = passed
 g03_total_failed = failed
-print(f"\n>>> G03 TOTAL: {g03_total_passed} passed, {g03_total_failed} failed "
-      f"({g03_time:.1f}s)")
+print(
+    f"\n>>> G03 TOTAL: {g03_total_passed} passed, {g03_total_failed} failed "
+    f"({g03_time:.1f}s)"
+)
 
 
 # ======================================================================
@@ -273,16 +285,16 @@ t1 = time.time()
 HOUSE_SYSTEMS = list("PKORCEWBMTUHXGYINFDJ") + ["i", "L", "A", "S"]
 
 LOCATIONS = [
-    (0.0, 0.0,     "Equator/GM"),
-    (41.9, 12.5,   "Rome"),
-    (51.5, -0.1,   "London"),
+    (0.0, 0.0, "Equator/GM"),
+    (41.9, 12.5, "Rome"),
+    (51.5, -0.1, "London"),
     (-33.9, 151.2, "Sydney"),
-    (35.7, 139.7,  "Tokyo"),
+    (35.7, 139.7, "Tokyo"),
 ]
 
 # 10 JDs evenly spaced 2000-2020
-JD_2000 = 2451545.0   # J2000.0
-JD_2020 = 2459215.5   # ~2021-01-01
+JD_2000 = 2451545.0  # J2000.0
+JD_2020 = 2459215.5  # ~2021-01-01
 HOUSE_DATES = [JD_2000 + i * (JD_2020 - JD_2000) / 9.0 for i in range(10)]
 
 CUSP_TOL = 0.01  # degrees
@@ -291,7 +303,7 @@ ANGLE_TOL = 0.01  # degrees
 p_before_g04 = passed
 f_before_g04 = failed
 
-print(f"\n--- G04.01: 24 systems x 5 locations x 10 dates ---")
+print("\n--- G04.01: 24 systems x 5 locations x 10 dates ---")
 
 # Track per-system stats
 system_stats = {}
@@ -342,9 +354,11 @@ for hsys_char in HOUSE_SYSTEMS:
                     diff = 360.0 - diff
                 if diff > CUSP_TOL:
                     cusps_ok = False
-                    check(False,
-                          f"{desc}: cusp[{ci}] diff={diff:.6f} "
-                          f"(ref={ref_cusps[ci]:.6f} lib={lib_cusps[ci]:.6f})")
+                    check(
+                        False,
+                        f"{desc}: cusp[{ci}] diff={diff:.6f} "
+                        f"(ref={ref_cusps[ci]:.6f} lib={lib_cusps[ci]:.6f})",
+                    )
                     sys_failed += 1
                     break
 
@@ -357,9 +371,11 @@ for hsys_char in HOUSE_SYSTEMS:
             if asc_diff > 180.0:
                 asc_diff = 360.0 - asc_diff
             asc_ok = asc_diff <= ANGLE_TOL
-            check(asc_ok,
-                  f"{desc}: ASC diff={asc_diff:.6f} "
-                  f"(ref={ref_ascmc[0]:.6f} lib={lib_ascmc[0]:.6f})")
+            check(
+                asc_ok,
+                f"{desc}: ASC diff={asc_diff:.6f} "
+                f"(ref={ref_ascmc[0]:.6f} lib={lib_ascmc[0]:.6f})",
+            )
             if asc_ok:
                 sys_passed += 1
             else:
@@ -370,9 +386,11 @@ for hsys_char in HOUSE_SYSTEMS:
             if mc_diff > 180.0:
                 mc_diff = 360.0 - mc_diff
             mc_ok = mc_diff <= ANGLE_TOL
-            check(mc_ok,
-                  f"{desc}: MC diff={mc_diff:.6f} "
-                  f"(ref={ref_ascmc[1]:.6f} lib={lib_ascmc[1]:.6f})")
+            check(
+                mc_ok,
+                f"{desc}: MC diff={mc_diff:.6f} "
+                f"(ref={ref_ascmc[1]:.6f} lib={lib_ascmc[1]:.6f})",
+            )
             if mc_ok:
                 sys_passed += 1
             else:
@@ -381,16 +399,17 @@ for hsys_char in HOUSE_SYSTEMS:
     system_stats[hsys_char] = (sys_passed, sys_failed, sys_skipped)
     status = "PASS" if sys_failed == 0 else "FAIL"
     skip_note = f" (skipped {sys_skipped})" if sys_skipped else ""
-    print(f"  System '{hsys_char}': {status} "
-          f"(pass={sys_passed} fail={sys_failed}{skip_note})")
+    print(
+        f"  System '{hsys_char}': {status} "
+        f"(pass={sys_passed} fail={sys_failed}{skip_note})"
+    )
 
 g04_passed = passed - p_before_g04
 g04_failed = failed - f_before_g04
 g04_time = time.time() - t1
 
 print(f"\nG04.01 checks: {g04_passed} passed, {g04_failed} failed")
-print(f"\n>>> G04 TOTAL: {g04_passed} passed, {g04_failed} failed "
-      f"({g04_time:.1f}s)")
+print(f"\n>>> G04 TOTAL: {g04_passed} passed, {g04_failed} failed ({g04_time:.1f}s)")
 
 
 # ======================================================================
@@ -401,9 +420,11 @@ total_time = time.time() - t0
 print("\n" + "=" * 72)
 print("GRAND SUMMARY")
 print("=" * 72)
-print(f"  G03 Flag Combinations : {g03_total_passed:5d} passed, {g03_total_failed:5d} failed")
+print(
+    f"  G03 Flag Combinations : {g03_total_passed:5d} passed, {g03_total_failed:5d} failed"
+)
 print(f"  G04 House Systems     : {g04_passed:5d} passed, {g04_failed:5d} failed")
-print(f"  ────────────────────────────────────────")
+print("  ────────────────────────────────────────")
 print(f"  TOTAL                 : {passed:5d} passed, {failed:5d} failed")
 print(f"  Total time            : {total_time:.1f}s")
 

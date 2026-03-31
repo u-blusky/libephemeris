@@ -14,6 +14,7 @@ Three pipelines:
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from .constants import (
@@ -320,15 +321,15 @@ def _apply_cob_correction(
     Returns:
         Planet center ICRS position (x, y, z) in AU.
     """
+    from .cache import get_cached_time_tt
     from .planets import _PLANET_CENTER_NAIF_IDS
-    from .state import get_planet_center_segment, get_timescale
+    from .state import get_planet_center_segment
 
     bary_name = _SYSTEM_BARY_NAMES.get(ipl)
     if bary_name is None:
         return pos  # Not an outer planet, no COB needed
 
-    ts = get_timescale()
-    t = ts.tt_jd(jd_tt)
+    t = get_cached_time_tt(jd_tt)
 
     # Map body_id to planet name for NAIF lookup
     planet_name = {5: "jupiter", 6: "saturn", 7: "uranus", 8: "neptune", 9: "pluto"}[
@@ -462,6 +463,7 @@ def _apply_gravitational_deflection(
     return (result[0], result[1], result[2])
 
 
+@lru_cache(maxsize=64)
 def _get_skyfield_frame_data(
     jd_tt: float,
 ) -> Tuple[
@@ -486,10 +488,9 @@ def _get_skyfield_frame_data(
         - deps: nutation in obliquity (radians, IAU 2000A)
         - eps_true_rad: true obliquity (radians)
     """
-    from .state import get_timescale
+    from .cache import get_cached_time_tt
 
-    ts = get_timescale()
-    t = ts.tt_jd(jd_tt)
+    t = get_cached_time_tt(jd_tt)
 
     # PNM matrix: ICRS -> true equatorial of date (N × P × B)
     M = t.M
@@ -506,6 +507,7 @@ def _get_skyfield_frame_data(
     return pn_mat, float(dpsi), float(deps), eps_true_rad
 
 
+@lru_cache(maxsize=64)
 def _get_precession_matrix(
     jd_tt: float,
 ) -> Tuple[Tuple[float, float, float], ...]:
@@ -522,19 +524,37 @@ def _get_precession_matrix(
     Note: ``t.P`` was previously used here but it includes the ICRS frame bias
     (~17 mas), causing up to 0.015″ excess error vs the Skyfield reference path.
 
+    IMPORTANT: We must NOT call ``mean_equator_and_equinox_of_date.rotation_at(t)``
+    because it internally accesses ``t.P``.  Skyfield's ``P = reify(precession_matrix)``
+    descriptor uses ``update_wrapper``, so ``P.__name__`` = ``'precession_matrix'``.
+    When the reify ``__get__`` fires, it stores the numpy result under
+    ``t.__dict__['precession_matrix']``, shadowing the *method* of the same name.
+    Subsequent ``t.M`` computation calls ``self.precession_matrix()`` expecting a
+    callable method but finds the numpy array instead → TypeError.  Since we use
+    ``get_cached_time_tt()`` (LRU-cached Time objects), this corruption persists
+    across callers and causes Pipeline B bodies (TrueNode, OscuApog, etc.) to fail
+    when they later access ``t.M`` via ``ecliptic_frame.rotation_at(t)``.
+
+    The fix: call ``t.precession_matrix()`` directly (the method, not the ``P``
+    reify descriptor) and combine with ``ICRS_to_J2000`` manually.  This is
+    mathematically identical to ``mxm(t.P, ICRS_to_J2000)`` but avoids the
+    reify descriptor corruption.
+
     Args:
         jd_tt: Julian Day in TT.
 
     Returns:
         3x3 rotation matrix as nested tuples.
     """
-    from .state import get_timescale
-    from skyfield.framelib import mean_equator_and_equinox_of_date
+    from .cache import get_cached_time_tt
+    from skyfield.framelib import ICRS_to_J2000
+    from skyfield.functions import mxm
 
-    ts = get_timescale()
-    t = ts.tt_jd(jd_tt)
+    t = get_cached_time_tt(jd_tt)
 
-    R = mean_equator_and_equinox_of_date.rotation_at(t)
+    # Equivalent to mean_equator_and_equinox_of_date.rotation_at(t) which does
+    # mxm(t.P, ICRS_to_J2000), but avoids accessing t.P (reify descriptor).
+    R = mxm(t.precession_matrix(), ICRS_to_J2000)
     return (
         (float(R[0][0]), float(R[0][1]), float(R[0][2])),
         (float(R[1][0]), float(R[1][1]), float(R[1][2])),

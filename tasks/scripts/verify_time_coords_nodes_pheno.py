@@ -16,6 +16,7 @@ Sections covered:
 
 Target: ~5000+ checks, <30 seconds.
 """
+
 from __future__ import annotations
 
 import math
@@ -319,16 +320,16 @@ def test_day_of_week():
     # Convention: 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
     known = [
         # (year, month, day, expected_dow)
-        (2000, 1, 1, 5),    # Saturday
-        (2024, 1, 1, 0),    # Monday
+        (2000, 1, 1, 5),  # Saturday
+        (2024, 1, 1, 0),  # Monday
         (2023, 12, 25, 0),  # Monday
-        (1969, 7, 20, 6),   # Sunday (Moon landing)
-        (1776, 7, 4, 3),    # Thursday
-        (2020, 2, 29, 5),   # Saturday (leap day)
+        (1969, 7, 20, 6),  # Sunday (Moon landing)
+        (1776, 7, 4, 3),  # Thursday
+        (2020, 2, 29, 5),  # Saturday (leap day)
         (1999, 12, 31, 4),  # Friday
-        (2001, 9, 11, 1),   # Tuesday
-        (1945, 5, 8, 1),    # Tuesday (V-E Day)
-        (2026, 3, 27, 4),   # Friday (today per context)
+        (2001, 9, 11, 1),  # Tuesday
+        (1945, 5, 8, 1),  # Tuesday (V-E Day)
+        (2026, 3, 27, 4),  # Friday (today per context)
     ]
     for y, m, d, expected_dow in known:
         try:
@@ -461,7 +462,7 @@ def test_lunar_nodes_apsides():
             check(
                 diff_mn < 1.0 / 3600.0,  # < 1 arcsec
                 f"Mean Node lon jd={jd:.2f}",
-                f"lib={mn_lib[0]:.6f} ref={mn_ref_lon:.6f} diff={diff_mn * 3600:.2f}\"",
+                f'lib={mn_lib[0]:.6f} ref={mn_ref_lon:.6f} diff={diff_mn * 3600:.2f}"',
             )
             check(
                 mn_lib[3] < 0,
@@ -482,7 +483,7 @@ def test_lunar_nodes_apsides():
             check(
                 diff_tn < 60.0 / 3600.0,
                 f"True Node lon jd={jd:.2f}",
-                f"lib={tn_lib[0]:.6f} ref={tn_ref_lon:.6f} diff={diff_tn * 3600:.2f}\"",
+                f'lib={tn_lib[0]:.6f} ref={tn_ref_lon:.6f} diff={diff_tn * 3600:.2f}"',
             )
         except Exception as exc:
             errors += 1
@@ -497,7 +498,7 @@ def test_lunar_nodes_apsides():
             check(
                 diff_ma < 5.0 / 3600.0,  # < 5 arcsec
                 f"Mean Apog lon jd={jd:.2f}",
-                f"lib={ma_lib[0]:.6f} ref={ma_ref_lon:.6f} diff={diff_ma * 3600:.2f}\"",
+                f'lib={ma_lib[0]:.6f} ref={ma_ref_lon:.6f} diff={diff_ma * 3600:.2f}"',
             )
             check(
                 ma_lib[3] > 0,
@@ -518,7 +519,7 @@ def test_lunar_nodes_apsides():
             check(
                 diff_oa < 240.0 / 3600.0,
                 f"Oscu Apog lon jd={jd:.2f}",
-                f"lib={oa_lib[0]:.6f} ref={oa_ref_lon:.6f} diff={diff_oa * 3600:.2f}\"",
+                f'lib={oa_lib[0]:.6f} ref={oa_ref_lon:.6f} diff={diff_oa * 3600:.2f}"',
             )
         except Exception as exc:
             errors += 1
@@ -546,8 +547,20 @@ def test_lunar_nodes_apsides():
 def test_nod_aps_ut():
     global errors
     print("\n=== 12.5  nod_aps_ut (5 bodies x 5 dates) ===")
-    bodies_lib = [lib.SE_MARS, lib.SE_JUPITER, lib.SE_SATURN, lib.SE_URANUS, lib.SE_NEPTUNE]
-    bodies_ref = [swe_ref.MARS, swe_ref.JUPITER, swe_ref.SATURN, swe_ref.URANUS, swe_ref.NEPTUNE]
+    bodies_lib = [
+        lib.SE_MARS,
+        lib.SE_JUPITER,
+        lib.SE_SATURN,
+        lib.SE_URANUS,
+        lib.SE_NEPTUNE,
+    ]
+    bodies_ref = [
+        swe_ref.MARS,
+        swe_ref.JUPITER,
+        swe_ref.SATURN,
+        swe_ref.URANUS,
+        swe_ref.NEPTUNE,
+    ]
     body_names = ["Mars", "Jupiter", "Saturn", "Uranus", "Neptune"]
     jds = [2451545.0, 2455000.0, 2458000.0, 2460000.0, 2462000.0]
     flags_lib = lib.SEFLG_SWIEPH | lib.SEFLG_SPEED
@@ -605,22 +618,43 @@ def test_pheno_ut():
     # Use only planets that pyswisseph can calculate without extra ephemeris files
     # (Chiron requires seas_18.se1 which may not be installed)
     bodies_lib = [
-        lib.SE_MERCURY, lib.SE_VENUS, lib.SE_MARS, lib.SE_JUPITER,
-        lib.SE_SATURN, lib.SE_URANUS, lib.SE_NEPTUNE, lib.SE_PLUTO,
-        lib.SE_SUN, lib.SE_MOON,
+        lib.SE_MERCURY,
+        lib.SE_VENUS,
+        lib.SE_MARS,
+        lib.SE_JUPITER,
+        lib.SE_SATURN,
+        lib.SE_URANUS,
+        lib.SE_NEPTUNE,
+        lib.SE_PLUTO,
+        lib.SE_SUN,
+        lib.SE_MOON,
     ]
     bodies_ref = [
-        swe_ref.MERCURY, swe_ref.VENUS, swe_ref.MARS, swe_ref.JUPITER,
-        swe_ref.SATURN, swe_ref.URANUS, swe_ref.NEPTUNE, swe_ref.PLUTO,
-        swe_ref.SUN, swe_ref.MOON,
+        swe_ref.MERCURY,
+        swe_ref.VENUS,
+        swe_ref.MARS,
+        swe_ref.JUPITER,
+        swe_ref.SATURN,
+        swe_ref.URANUS,
+        swe_ref.NEPTUNE,
+        swe_ref.PLUTO,
+        swe_ref.SUN,
+        swe_ref.MOON,
     ]
     body_names = [
-        "Mercury", "Venus", "Mars", "Jupiter",
-        "Saturn", "Uranus", "Neptune", "Pluto",
-        "Sun", "Moon",
+        "Mercury",
+        "Venus",
+        "Mars",
+        "Jupiter",
+        "Saturn",
+        "Uranus",
+        "Neptune",
+        "Pluto",
+        "Sun",
+        "Moon",
     ]
     jd_start = 2451545.0  # J2000
-    jd_end = 2460000.0    # ~2023
+    jd_end = 2460000.0  # ~2023
     jds = [jd_start + (jd_end - jd_start) * i / 9.0 for i in range(10)]
     flags_lib = lib.SEFLG_SWIEPH
     flags_ref = swe_ref.FLG_SWIEPH

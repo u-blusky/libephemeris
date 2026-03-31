@@ -51,7 +51,9 @@ SECTION_COMPRESSED_CHEBYSHEV = 6  # LEB2: per-body compressed blobs
 LEB2_MAGIC = b"LEB2"
 LEB2_VERSION = 1
 COMPRESSION_NONE = 0
-COMPRESSION_ZSTD_TRUNC_SHUFFLE = 1  # mantissa truncation + coeff-major reorder + byte shuffle + zstd
+COMPRESSION_ZSTD_TRUNC_SHUFFLE = (
+    1  # mantissa truncation + coeff-major reorder + byte shuffle + zstd
+)
 
 # Struct formats (little-endian, no padding with '<' prefix)
 HEADER_FMT = "<4sIIIdddI20s"
@@ -186,7 +188,12 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     # Runtime pipeline applies gravitational deflection + SR aberration
     # for <0.001" total error vs Skyfield apparent().
     0: (32, 13, COORD_ICRS_BARY, 3),  # SE_SUN       — <0.001"
-    1: (4, 13, COORD_ICRS_BARY, 3),  # SE_MOON      — <0.001" (margin 2.8x, DO NOT CHANGE)
+    1: (
+        4,
+        13,
+        COORD_ICRS_BARY,
+        3,
+    ),  # SE_MOON      — <0.001" (margin 2.8x, DO NOT CHANGE)
     2: (16, 15, COORD_ICRS_BARY, 3),  # SE_MERCURY   — <0.001"
     3: (16, 13, COORD_ICRS_BARY, 3),  # SE_VENUS     — <0.001"
     4: (16, 13, COORD_ICRS_BARY, 3),  # SE_MARS      — <0.001"
@@ -204,8 +211,18 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     11: (8, 13, COORD_ECLIPTIC, 3),  # SE_TRUE_NODE  — keep current
     12: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_APOG  — keep current
     13: (4, 15, COORD_ECLIPTIC, 3),  # SE_OSCU_APOG  — keep current
-    21: (1, 17, COORD_ECLIPTIC, 3),  # SE_INTP_APOG  — 1d interval for rapid oscillations
-    22: (1, 17, COORD_ECLIPTIC, 3),  # SE_INTP_PERG  — 1d interval for rapid oscillations
+    21: (
+        1,
+        17,
+        COORD_ECLIPTIC,
+        3,
+    ),  # SE_INTP_APOG  — 1d interval for rapid oscillations
+    22: (
+        1,
+        17,
+        COORD_ECLIPTIC,
+        3,
+    ),  # SE_INTP_PERG  — 1d interval for rapid oscillations
     # Main asteroids: ICRS barycentric — keep current (16d fails: 15-321")
     15: (8, 13, COORD_ICRS_BARY, 3),  # SE_CHIRON
     17: (8, 13, COORD_ICRS_BARY, 3),  # SE_CERES

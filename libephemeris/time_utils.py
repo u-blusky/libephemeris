@@ -24,7 +24,8 @@ from .constants import (
     SEFLG_JPLEPH,
     SEFLG_SWIEPH,
 )
-from .state import get_timescale, get_delta_t_userdef, get_iers_delta_t_enabled
+from .cache import get_cached_time_ut1
+from .state import get_delta_t_userdef, get_iers_delta_t_enabled, get_timescale
 
 # Julian Day of Gregorian calendar reform: Oct 15, 1582
 JD_GREGORIAN_REFORM = 2299161
@@ -210,9 +211,7 @@ def swe_deltat(tjdut: float) -> float:
             # Fall back to Skyfield if IERS data fails
             pass
 
-    ts = get_timescale()
-    t = ts.ut1_jd(tjdut)
-    # Skyfield returns delta_t in seconds, convert to days for reference API compatibility
+    t = get_cached_time_ut1(tjdut)
     delta_t_seconds = float(t.delta_t)
     return delta_t_seconds / 86400.0
 
@@ -297,9 +296,7 @@ def swe_deltat_ex(tjdut: float, flag: int = SEFLG_SWIEPH) -> float:
             # Fall back to Skyfield if IERS data fails
             pass
 
-    ts = get_timescale()
-    t = ts.ut1_jd(tjdut)
-    # Skyfield returns delta_t in seconds, convert to days for reference API compatibility
+    t = get_cached_time_ut1(tjdut)
     delta_t_seconds = float(t.delta_t)
     delta_t = delta_t_seconds / 86400.0
 

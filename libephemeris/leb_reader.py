@@ -181,6 +181,10 @@ class LEBReader:
         self._path = path
         self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        self._eval_cache: Dict[
+            Tuple[int, float],
+            Tuple[Tuple[float, float, float], Tuple[float, float, float]],
+        ] = {}
 
         try:
             self._parse()
@@ -296,6 +300,15 @@ class LEBReader:
             KeyError: If body_id is not in this .leb file.
             ValueError: If jd is outside the body's coverage range.
         """
+        # Check instance-level eval cache first.  During a multi-body chart
+        # calculation at the same jd_tt the observer (Earth) and gravitational
+        # deflectors (Sun, Jupiter, Saturn) are re-evaluated for every planet.
+        # Caching avoids ~40 redundant Chebyshev evaluations per chart.
+        _cache_key = (body_id, jd)
+        cached = self._eval_cache.get(_cache_key)
+        if cached is not None:
+            return cached
+
         if body_id not in self._bodies:
             raise KeyError(f"Body {body_id} not in LEB file")
 
@@ -347,7 +360,15 @@ class LEBReader:
         if body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_GEO_ECLIPTIC):
             pos[0] = pos[0] % 360.0
 
-        return tuple(pos), tuple(vel)  # type: ignore[return-value]
+        result = tuple(pos), tuple(vel)  # type: ignore[return-value]
+
+        # Store in cache (bounded: clear when exceeding 256 entries to
+        # prevent unbounded growth during ephemeris scans)
+        if len(self._eval_cache) > 256:
+            self._eval_cache.clear()
+        self._eval_cache[_cache_key] = result  # type: ignore[assignment]
+
+        return result  # type: ignore[return-value]
 
     def eval_nutation(self, jd_tt: float) -> Tuple[float, float]:
         """Evaluate nutation angles at a given Julian Day.
@@ -453,6 +474,7 @@ class LEBReader:
 
     def close(self) -> None:
         """Close the memory-mapped file and release resources."""
+        self._eval_cache.clear()
         if self._mm is not None:
             try:
                 self._mm.close()

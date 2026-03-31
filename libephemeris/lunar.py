@@ -1905,9 +1905,10 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
     """
     from skyfield.framelib import ecliptic_frame
 
+    from .cache import get_cached_time_tt
+
     planets = get_planets()
-    ts = get_timescale()
-    t = ts.tt_jd(jd_tt)
+    t = get_cached_time_tt(jd_tt)
 
     earth = planets["earth"]
     moon = planets["moon"]
@@ -2126,9 +2127,10 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     """
     from skyfield.framelib import ecliptic_frame
 
+    from .cache import get_cached_time_tt
+
     planets = get_planets()
-    ts = get_timescale()
-    t = ts.tt_jd(jd_tt)
+    t = get_cached_time_tt(jd_tt)
 
     earth = planets["earth"]
     moon = planets["moon"]
@@ -2268,9 +2270,10 @@ def calc_osculating_perigee(jd_tt: float) -> Tuple[float, float, float]:
     """
     from skyfield.framelib import ecliptic_frame
 
+    from .cache import get_cached_time_tt
+
     planets = get_planets()
-    ts = get_timescale()
-    t = ts.tt_jd(jd_tt)
+    t = get_cached_time_tt(jd_tt)
 
     earth = planets["earth"]
     moon = planets["moon"]

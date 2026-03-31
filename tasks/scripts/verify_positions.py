@@ -15,6 +15,7 @@ Tolerance tiers (DE440/Skyfield vs Swiss Ephemeris with proper .se1 files):
   - Tier 5 (asteroids 15,17-20): lon/lat < 2", dist < 5e-5, speed < 0.01
   - Tier 6 (IntpApog 21, IntpPerig 22): fundamentally different -- 1 degree tolerance
 """
+
 from __future__ import annotations
 
 import os
@@ -32,7 +33,8 @@ import swisseph as swe_ref
 # Set Swiss Ephemeris data path for pyswisseph reference
 EPHE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "swisseph", "ephe",
+    "swisseph",
+    "ephe",
 )
 swe_ref.set_ephe_path(EPHE_PATH)
 
@@ -80,23 +82,55 @@ JD_2100 = 2488069.5
 
 # Body lists
 ALL_BODIES = [
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,   # Sun-Pluto
-    10, 11,                             # Mean Node, True Node
-    12, 13,                             # Mean Apogee, Oscu Apogee
-    14,                                 # Earth
-    15,                                 # Chiron
-    17, 18, 19, 20,                     # Ceres, Pallas, Juno, Vesta
-    21, 22,                             # IntpApog, IntpPerig
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,  # Sun-Pluto
+    10,
+    11,  # Mean Node, True Node
+    12,
+    13,  # Mean Apogee, Oscu Apogee
+    14,  # Earth
+    15,  # Chiron
+    17,
+    18,
+    19,
+    20,  # Ceres, Pallas, Juno, Vesta
+    21,
+    22,  # IntpApog, IntpPerig
 ]
 
 PLANETS_0_9 = list(range(10))
 
 BODY_NAMES = {
-    0: "Sun", 1: "Moon", 2: "Mercury", 3: "Venus", 4: "Mars",
-    5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune", 9: "Pluto",
-    10: "MeanNode", 11: "TrueNode", 12: "MeanApog", 13: "OscuApog",
-    14: "Earth", 15: "Chiron", 17: "Ceres", 18: "Pallas",
-    19: "Juno", 20: "Vesta", 21: "IntpApog", 22: "IntpPerig",
+    0: "Sun",
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+    10: "MeanNode",
+    11: "TrueNode",
+    12: "MeanApog",
+    13: "OscuApog",
+    14: "Earth",
+    15: "Chiron",
+    17: "Ceres",
+    18: "Pallas",
+    19: "Juno",
+    20: "Vesta",
+    21: "IntpApog",
+    22: "IntpPerig",
 }
 
 # Category sets
@@ -119,51 +153,51 @@ def get_tolerances(body: int) -> dict:
         # Deviations can reach thousands of arcseconds (especially latitude).
         # Test only that values are in a sensible range.
         return {
-            "lon": 5.0,                # 5 degrees (lon can differ by arcminutes)
-            "lat": 5.0,                # 5 degrees (lat can differ by degrees)
-            "dist": 0.01,              # AU
-            "speed": 5.0,              # deg/day
+            "lon": 5.0,  # 5 degrees (lon can differ by arcminutes)
+            "lat": 5.0,  # 5 degrees (lat can differ by degrees)
+            "dist": 0.01,  # AU
+            "speed": 5.0,  # deg/day
         }
     if body in MOON:
         # Moon: DE440 vs Swiss Eph ELP2000. Max observed: lon ~2.1", lat ~0.15"
         return {
-            "lon": 3.0 / 3600.0,       # 3 arcseconds
-            "lat": 1.0 / 3600.0,       # 1 arcsecond
-            "dist": 1e-7,              # AU (very small, ~0.15m)
-            "speed": 0.005,            # deg/day
+            "lon": 3.0 / 3600.0,  # 3 arcseconds
+            "lat": 1.0 / 3600.0,  # 1 arcsecond
+            "dist": 1e-7,  # AU (very small, ~0.15m)
+            "speed": 0.005,  # deg/day
         }
     if body in OUTER_PLANETS:
         # Outer planets: max observed Neptune lon ~0.33", Pluto dist ~4e-5
         return {
-            "lon": 1.0 / 3600.0,       # 1 arcsecond
-            "lat": 1.0 / 3600.0,       # 1 arcsecond
-            "dist": 5e-5,              # AU
-            "speed": 0.005,            # deg/day
+            "lon": 1.0 / 3600.0,  # 1 arcsecond
+            "lat": 1.0 / 3600.0,  # 1 arcsecond
+            "dist": 5e-5,  # AU
+            "speed": 0.005,  # deg/day
         }
     if body in ASTEROIDS:
         # Asteroids use different SPK kernels. Max observed: Pallas lon ~4",
         # lat ~2.3", Chiron/Ceres lon ~1". Use 5"/3" to cover all.
         return {
-            "lon": 5.0 / 3600.0,       # 5 arcseconds
-            "lat": 3.0 / 3600.0,       # 3 arcseconds
-            "dist": 5e-5,              # AU
-            "speed": 0.01,             # deg/day
+            "lon": 5.0 / 3600.0,  # 5 arcseconds
+            "lat": 3.0 / 3600.0,  # 3 arcseconds
+            "dist": 5e-5,  # AU
+            "speed": 0.01,  # deg/day
         }
     if body in NODES_APSIDES:
         # Nodes/apsides: analytical, very good agreement
         # Max observed TrueNode ~0.03", OscuApog ~0.66"
         return {
-            "lon": 1.0 / 3600.0,       # 1 arcsecond
-            "lat": 1.0 / 3600.0,       # 1 arcsecond
-            "dist": 1e-5,              # AU
-            "speed": 0.01,             # deg/day
+            "lon": 1.0 / 3600.0,  # 1 arcsecond
+            "lat": 1.0 / 3600.0,  # 1 arcsecond
+            "dist": 1e-5,  # AU
+            "speed": 0.01,  # deg/day
         }
     # Inner planets + Sun + Earth: best agreement
     return {
-        "lon": 1.0 / 3600.0,           # 1 arcsecond
-        "lat": 1.0 / 3600.0,           # 1 arcsecond
-        "dist": 1e-5,                  # AU
-        "speed": 0.01,                 # deg/day
+        "lon": 1.0 / 3600.0,  # 1 arcsecond
+        "lat": 1.0 / 3600.0,  # 1 arcsecond
+        "dist": 1e-5,  # AU
+        "speed": 0.01,  # deg/day
     }
 
 
@@ -179,6 +213,7 @@ def random_jds(n: int) -> list[float]:
 # ---------------------------------------------------------------------------
 # Section 1.1 -- 22 bodies x 100 dates, basic comparison
 # ---------------------------------------------------------------------------
+
 
 def section_1_1() -> None:
     """22 bodies x 100 random dates -- basic lon/lat/dist/speed comparison."""
@@ -204,10 +239,16 @@ def section_1_1() -> None:
                 continue
 
             lon_lib, lat_lib, dist_lib, spd_lib = (
-                pos_lib[0], pos_lib[1], pos_lib[2], pos_lib[3],
+                pos_lib[0],
+                pos_lib[1],
+                pos_lib[2],
+                pos_lib[3],
             )
             lon_ref, lat_ref, dist_ref, spd_ref = (
-                pos_ref[0], pos_ref[1], pos_ref[2], pos_ref[3],
+                pos_ref[0],
+                pos_ref[1],
+                pos_ref[2],
+                pos_ref[3],
             )
 
             # Longitude (skip Earth body 14 -- returns zeros in geocentric)
@@ -218,7 +259,7 @@ def section_1_1() -> None:
                 check(
                     dlon < tol["lon"],
                     label + " lon",
-                    f"dlon={dlon * 3600:.4f}\" (tol {tol['lon'] * 3600:.1f}\")",
+                    f'dlon={dlon * 3600:.4f}" (tol {tol["lon"] * 3600:.1f}")',
                 )
 
             # Latitude
@@ -226,7 +267,7 @@ def section_1_1() -> None:
             check(
                 dlat < tol["lat"],
                 label + " lat",
-                f"dlat={dlat * 3600:.4f}\" (tol {tol['lat'] * 3600:.1f}\")",
+                f'dlat={dlat * 3600:.4f}" (tol {tol["lat"] * 3600:.1f}")',
             )
 
             # Distance
@@ -249,6 +290,7 @@ def section_1_1() -> None:
 # ---------------------------------------------------------------------------
 # Section 1.2 -- 10 flag variants x 10 bodies x 50 dates
 # ---------------------------------------------------------------------------
+
 
 def section_1_2() -> None:
     """10 flag variants x 10 bodies x 50 dates."""
@@ -307,7 +349,7 @@ def section_1_2() -> None:
                 check(
                     dlon < tol,
                     label + " lon",
-                    f"dlon={dlon * 3600:.4f}\" (tol {tol * 3600:.1f}\")",
+                    f'dlon={dlon * 3600:.4f}" (tol {tol * 3600:.1f}")',
                 )
 
                 # Latitude
@@ -315,7 +357,7 @@ def section_1_2() -> None:
                 check(
                     dlat < tol,
                     label + " lat",
-                    f"dlat={dlat * 3600:.4f}\" (tol {tol * 3600:.1f}\")",
+                    f'dlat={dlat * 3600:.4f}" (tol {tol * 3600:.1f}")',
                 )
 
         if needs_sid:
@@ -327,6 +369,7 @@ def section_1_2() -> None:
 # ---------------------------------------------------------------------------
 # Section 23.4 -- Speed vs numerical derivative
 # ---------------------------------------------------------------------------
+
 
 def section_23_4() -> None:
     """Speed vs numerical derivative for 11 bodies x 50 dates."""
@@ -378,6 +421,7 @@ def section_23_4() -> None:
 # Section 1.6 -- Heliocentric positions
 # ---------------------------------------------------------------------------
 
+
 def section_1_6() -> None:
     """Heliocentric positions for 10 bodies x 50 dates."""
     print("\n" + "=" * 72)
@@ -417,7 +461,7 @@ def section_1_6() -> None:
             check(
                 dlon < tol_angle,
                 label + " lon",
-                f"dlon={dlon * 3600:.4f}\" (tol {tol_angle * 3600:.1f}\")",
+                f'dlon={dlon * 3600:.4f}" (tol {tol_angle * 3600:.1f}")',
             )
 
             # Latitude
@@ -425,7 +469,7 @@ def section_1_6() -> None:
             check(
                 dlat < tol_angle,
                 label + " lat",
-                f"dlat={dlat * 3600:.4f}\" (tol {tol_angle * 3600:.1f}\")",
+                f'dlat={dlat * 3600:.4f}" (tol {tol_angle * 3600:.1f}")',
             )
 
             # Distance
@@ -440,6 +484,7 @@ def section_1_6() -> None:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     global passed, failed, errors
