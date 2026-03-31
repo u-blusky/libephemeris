@@ -176,6 +176,15 @@
 - **Fix**: Added early south node handling in `swe_calc_ut()` before LEB/Horizons dispatch. South node recursively calls `swe_calc_ut()` for north node (same backend path), then transforms the result.
 - **Files modified**: `libephemeris/planets.py`
 
+### BUG-009: Topocentric observer cache returns stale positions after `set_topo()` — FIXED (v1.0.0a6)
+- **Function**: `state.set_topo()` / `cache.get_cached_observer_at()`
+- **Status**: **FIXED** in v1.0.0a6
+- **Observed**: Topocentric Moon longitude differed by ~0.3" between libephemeris and pyswisseph after changing observer location with `set_topo()`. The first location's result was returned for the second location.
+- **Root cause**: `get_cached_observer_at()` uses `(id(observer), jd_tt)` as cache key. When `set_topo()` creates a new `VectorSum` object, Python can reuse the deallocated previous object's memory address, causing `id()` to match the old cache entry. The stale cached position from the previous observer location was returned.
+- **Severity**: HIGH — silently returns wrong topocentric positions when switching observer locations
+- **Fix**: `set_topo()` now calls `clear_observer_cache()` after updating `_TOPO`, ensuring no stale entries persist across location changes.
+- **Files modified**: `libephemeris/state.py`
+
 ### KI-008: Ayanamsha mode 40 returns ~357° (out of expected range)
 - **Mode**: 40
 - **Observed**: `get_ayanamsa_ut(J2000)` returns 356.846° instead of the expected [0, 30] range

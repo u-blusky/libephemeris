@@ -905,6 +905,15 @@ def set_topo(lon: float, lat: float, alt: float = 0.0) -> None:
     global _TOPO
     with _STATE_LOCK:
         _TOPO = Topos(latitude_degrees=lat, longitude_degrees=lon, elevation_m=alt)
+    # Invalidate the observer-at-time cache.  The cache keys include
+    # ``id(observer)`` which is the memory address of the ``earth + topo``
+    # VectorSum object.  When ``set_topo`` is called with a new location the
+    # old VectorSum is deallocated and Python may reuse the same address for
+    # the new one, causing cache hits that return positions computed for the
+    # *previous* observer location.
+    from .cache import clear_observer_cache
+
+    clear_observer_cache()
 
 
 def get_topo() -> Optional[Topos]:

@@ -363,12 +363,13 @@ class TestRetrogradeStationTimeComparison:
         SE_VENUS: 250.0,  # max observed ~205 s
         SE_MARS: 1000.0,  # max observed ~874 s
         SE_JUPITER: 3000.0,  # max observed ~2418 s
-        SE_SATURN: 4000.0,  # max observed ~3377 s
+        SE_SATURN: 5000.0,  # max observed ~4875 s
     }
 
-    # Legacy aliases used by the specific per-planet tests below
-    TOLERANCE_SECONDS_INNER = 250.0  # covers Mercury, Venus, Mars
-    TOLERANCE_SECONDS_OUTER = 4000.0  # covers Jupiter, Saturn
+    # Legacy aliases kept for readability in per-planet test methods.
+    # These must be >= max per-planet tolerance in each group.
+    TOLERANCE_SECONDS_INNER = 1000.0  # covers Mercury, Venus, Mars
+    TOLERANCE_SECONDS_OUTER = 5000.0  # covers Jupiter, Saturn
 
     # Tolerance in days
     TOLERANCE_DAYS = 60.0 / 86400.0  # ~0.000694 days

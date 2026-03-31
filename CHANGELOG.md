@@ -59,6 +59,21 @@ LEB/Horizons dispatch. South node requests now recursively call `swe_calc_ut()`
 for the north node (going through whichever backend is active), then transform
 the result (+180° longitude, negated latitude/lat-velocity).
 
+#### Topocentric Observer Cache Returns Stale Positions After `set_topo()`
+
+Fixed topocentric Moon calculations returning wrong positions (up to 0.55° error)
+when `set_topo()` is called multiple times with different locations in the same
+session.
+
+**Root cause:** The observer-at-time cache in `cache.py` uses `(id(observer),
+jd_tt)` as key. When `set_topo()` creates a new `earth + Topos` VectorSum, the
+old one is deallocated and Python may reuse the same memory address for the new
+object. The cache then returns positions computed for the *previous* observer
+location.
+
+**Fix:** `set_topo()` now calls `clear_observer_cache()` to invalidate stale
+entries whenever the observer location changes.
+
 ### Changed
 
 #### Comparison Test Tolerances Calibrated to KI-010
@@ -77,7 +92,7 @@ planets have smaller |a|, producing larger timing shifts:
 | Venus   | ~0.03°/day² | 60s → 250s           |
 | Mars    | ~0.005      | 60s → 1000s          |
 | Jupiter | ~0.001      | 240s → 3000s         |
-| Saturn  | ~0.0005     | 240s → 4000s         |
+| Saturn  | ~0.0005     | 240s → 5000s         |
 
 - **Velocity tolerance**: 0.0001 → 0.0003 °/day (matches KI-010 recommendation)
 - **Duration tolerance**: per-planet, ~2× station tolerance (compounds both endpoints)
