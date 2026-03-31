@@ -120,6 +120,7 @@ poe test:leb2:precision:all        # All tiers (~45s)
 
 ### Full documentation
 - `docs/leb/guide.md` — Complete LEB technical guide (section 13 for LEB2)
+- `docs/leb/quickstart.md` — Step-by-step commands for generating LEB1 and LEB2 files
 - `proposals/leb2-implementation-plan.md` — Implementation plan with benchmarks
 - `release-notes/v1.0.0a2.md` — Detailed release notes with measured results
 
