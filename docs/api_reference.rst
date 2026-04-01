@@ -1342,6 +1342,57 @@ swe_close / close
    before switching ephemeris files.
 
 
+Computation Tracing
+-------------------
+
+Lightweight tracing system that records which sub-backend (LEB, Skyfield,
+Horizons, SPK, ASSIST, Keplerian) computed each celestial body. Uses Python
+``ContextVar`` for thread-safe, per-session isolation with effectively zero
+overhead when inactive.
+
+See the :doc:`Tracing Guide <guides/tracing>` for full usage examples,
+thread safety details, and comparison with DEBUG log tracing.
+
+start_tracing
+~~~~~~~~~~~~~
+
+.. function:: start_tracing()
+
+   Activate computation tracing for the current context.
+
+   Returns a ``contextvars.Token`` that must be used to deactivate tracing
+   when done (via ``token.var.reset(token)``).
+
+   :returns: Token for resetting tracing state
+   :rtype: contextvars.Token
+
+   **Example:**
+
+   >>> import libephemeris as swe
+   >>> from libephemeris.constants import SE_SUN, SEFLG_SPEED
+   >>> token = swe.start_tracing()
+   >>> swe.calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+   >>> traces = swe.get_trace_results()  # {0: "LEB"}
+   >>> token.var.reset(token)  # deactivate tracing
+
+get_trace_results
+~~~~~~~~~~~~~~~~~
+
+.. function:: get_trace_results()
+
+   Return trace data collected since the last ``start_tracing()`` call.
+
+   Returns a **copy** of the internal accumulator. Mutating the returned
+   dict does not affect the active tracing session.
+
+   When tracing is not active, returns an empty dict.
+
+   :returns: Mapping of ``{body_id: source_name}`` where ``source_name``
+             is one of ``"LEB"``, ``"Skyfield"``, ``"Horizons"``, ``"SPK"``,
+             ``"ASSIST"``, ``"Keplerian"``
+   :rtype: dict[int, str]
+
+
 Utility Functions
 -----------------
 

@@ -789,6 +789,9 @@ __all__ = [
     "disable_logging",
     "enable_logging",
     "format_file_size",
+    # Computation tracing
+    "start_tracing",
+    "get_trace_results",
     # Exceptions - Base
     "Error",
     # Exceptions - Input Validation Category

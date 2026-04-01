@@ -141,6 +141,7 @@ Full flag reference with examples: [docs/reference/flags.md](docs/reference/flag
 - [Getting Started](docs/guides/getting-started.md) -- installation, ephemeris tiers, first calculations
 - [Migration from PySwissEph](docs/guides/migration-guide.md)
 - [Precision Tuning](docs/guides/precision-tuning.md)
+- [Computation Tracing](docs/guides/tracing.md) -- discover which backend computed each body
 
 ### Architecture
 - [LEB Binary Ephemeris](docs/leb/guide.md) -- format, reader, generation, fast-path pipeline

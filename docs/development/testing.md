@@ -299,6 +299,26 @@ The Astrologer API uses this mechanism via an opt-in `X-Debug-Ephemeris: true`
 HTTP header that temporarily lowers the logger to DEBUG, captures `source=`
 entries, and injects them into the JSON response.
 
+### Programmatic Tracing (ContextVar-based)
+
+For structured, machine-readable source tracing in application code or tests,
+use `start_tracing()` / `get_trace_results()` instead of DEBUG logging:
+
+```python
+import libephemeris as swe
+from libephemeris.constants import SE_SUN, SEFLG_SPEED
+
+token = swe.start_tracing()
+swe.calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+traces = swe.get_trace_results()   # {0: "LEB"}
+token.var.reset(token)
+```
+
+This returns a `{body_id: source_name}` dict and is thread-safe via
+`ContextVar`. Overhead is ~50 ns when inactive. See the
+[Tracing Guide](../guides/tracing.md) for full details, thread safety,
+and nested tracing.
+
 ### Custom SPK Cache Directory
 
 For custom storage locations:

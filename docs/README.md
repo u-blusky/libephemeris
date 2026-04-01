@@ -5,6 +5,7 @@
 - **[Getting Started](guides/getting-started.md)** -- Installation, ephemeris tiers, first calculations, thread safety
 - **[Migration from PySwissEph](guides/migration-guide.md)** -- API mapping and behavioral differences
 - **[Precision Tuning](guides/precision-tuning.md)** -- Configuring optional dependencies for maximum precision
+- **[Computation Tracing](guides/tracing.md)** -- Discover which backend computed each body (ContextVar + DEBUG logging)
 
 ## Architecture
 

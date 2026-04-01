@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0a7] — 2026-03-31
 
+### Added
+
+#### ContextVar-based Computation Tracing
+
+Added `start_tracing()` / `get_trace_results()` public API for discovering
+which sub-backend (LEB, Skyfield, Horizons, SPK, ASSIST, Keplerian) computed
+each celestial body. Uses `ContextVar` for thread-safe per-session isolation
+with ~50 ns overhead when inactive. Traced at 11 dispatch points in
+`planets.py` (9) and `context.py` (2).
+
 ### Fixed
 
 #### Lunar Occultation Frame Mismatch (Star Position Not Precessed)
