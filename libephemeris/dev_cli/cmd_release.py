@@ -19,13 +19,17 @@ def _release(args: list[str]) -> None:
 
 @click.group(
     "release",
+    short_help="Upload LEB files to GitHub Releases and update download hashes.",
     help="Upload LEB binary ephemeris files to GitHub Releases.\n\nCreates or updates a GitHub Release with LEB files for distribution.\nAlso updates the download hash table in the source code so that\nthe production CLI can verify file integrity after download.\n\nRequires: gh CLI authenticated (gh auth login).\n\n  leph release leb 1.0.0            # Upload all tiers\n  leph release leb-dry-run 1.0.0    # Preview without uploading",
 )
 def release_group() -> None:
     """Release commands."""
 
 
-@release_group.command("leb")
+@release_group.command(
+    "leb",
+    short_help="Upload all LEB files to GitHub release and update hashes.",
+)
 @click.argument("version")
 def release_leb(version: str) -> None:
     """Upload all LEB files to GitHub release and update download hashes.
@@ -36,7 +40,10 @@ def release_leb(version: str) -> None:
     _release(["--version", version, "--update-hashes"])
 
 
-@release_group.command("leb-base")
+@release_group.command(
+    "leb-base",
+    short_help="Upload base tier LEB to GitHub release and update hashes.",
+)
 @click.argument("version")
 def release_leb_base(version: str) -> None:
     """Upload base tier LEB to GitHub release and update hashes.
@@ -46,7 +53,10 @@ def release_leb_base(version: str) -> None:
     _release(["--version", version, "--tier", "base", "--update-hashes"])
 
 
-@release_group.command("leb-medium")
+@release_group.command(
+    "leb-medium",
+    short_help="Upload medium tier LEB to GitHub release and update hashes.",
+)
 @click.argument("version")
 def release_leb_medium(version: str) -> None:
     """Upload medium tier LEB to GitHub release and update hashes.
@@ -56,7 +66,10 @@ def release_leb_medium(version: str) -> None:
     _release(["--version", version, "--tier", "medium", "--update-hashes"])
 
 
-@release_group.command("leb-extended")
+@release_group.command(
+    "leb-extended",
+    short_help="Upload extended tier LEB to GitHub release and update hashes.",
+)
 @click.argument("version")
 def release_leb_extended(version: str) -> None:
     """Upload extended tier LEB to GitHub release and update hashes.
@@ -66,7 +79,10 @@ def release_leb_extended(version: str) -> None:
     _release(["--version", version, "--tier", "extended", "--update-hashes"])
 
 
-@release_group.command("leb-dry-run")
+@release_group.command(
+    "leb-dry-run",
+    short_help="Dry run: show what would be uploaded without uploading.",
+)
 @click.argument("version")
 def release_leb_dry_run(version: str) -> None:
     """Dry run: show what LEB files would be uploaded without uploading.

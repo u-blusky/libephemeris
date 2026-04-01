@@ -58,6 +58,7 @@ def _gen(args: list[str]) -> None:
 
 @click.group(
     "leb",
+    short_help="Generate and verify LEB1 binary ephemeris files (Chebyshev polynomials).",
     help="Generate and verify LEB1 binary ephemeris files.\n\n"
     "LEB files store precomputed Chebyshev polynomial approximations of\n"
     "planetary positions. At runtime they provide ~14x speedup over computing\n"
@@ -81,6 +82,7 @@ def leb_group() -> None:
 
 @click.group(
     "generate",
+    short_help="Generate LEB1 files from Skyfield/DE440 (groups, full, single, body).",
     help="Generate LEB1 binary ephemeris files from Skyfield/DE440 reference data.\n\n"
     "Each tier has multiple generation modes:\n\n"
     "  groups      RECOMMENDED: generate planets/asteroids/analytical separately then merge\n"
@@ -93,7 +95,10 @@ def generate_group() -> None:
     """LEB generation commands."""
 
 
-@generate_group.command("all")
+@generate_group.command(
+    "all",
+    short_help="Generate LEB for all three tiers sequentially.",
+)
 def generate_all() -> None:
     """Generate LEB files for all three tiers (base + medium + extended), sequentially."""
     for tier in _TIERS:
@@ -113,32 +118,45 @@ def generate_all() -> None:
 def _make_tier_group(tier: str) -> click.Group:
     """Create a generation subgroup for a specific tier."""
 
-    @click.group(tier, help=f"Generate {tier} tier LEB ({_TIER_INFO[tier]}).")
+    @click.group(
+        tier,
+        help=f"Generate {tier} tier LEB ({_TIER_INFO[tier]}).",
+        short_help=f"Generate {tier} tier LEB ({_TIER_INFO[tier]}).",
+    )
     def tier_group() -> None:
         pass
 
-    @tier_group.command("full")
+    @tier_group.command(
+        "full",
+        short_help=f"Generate {tier} tier, all bodies at once + verify.",
+    )
     def full() -> None:
         """Generate all bodies at once + verify."""
         _gen(["--tier", tier, "--verify"])
 
     full.__doc__ = f"Generate {tier} tier LEB file ({_TIER_INFO[tier]}), all bodies at once + verify."
 
-    @tier_group.command()
+    @tier_group.command(
+        short_help=f"Generate {tier} tier planets group (Sun-Pluto, Earth).",
+    )
     def planets() -> None:
         """Generate planets group (Sun-Pluto, Earth)."""
         _gen(["--tier", tier, "--group", "planets"])
 
     planets.__doc__ = f"Generate {tier} tier planets group (Sun-Pluto, Earth)."
 
-    @tier_group.command()
+    @tier_group.command(
+        short_help=f"Generate {tier} tier asteroids group (5 bodies).",
+    )
     def asteroids() -> None:
         """Generate asteroids group (Chiron, Ceres, Pallas, Juno, Vesta)."""
         _gen(["--tier", tier, "--group", "asteroids"])
 
     asteroids.__doc__ = f"Generate {tier} tier asteroids group (Chiron, Ceres-Vesta)."
 
-    @tier_group.command()
+    @tier_group.command(
+        short_help=f"Generate {tier} tier analytical group (nodes, Lilith, Uranians).",
+    )
     def analytical() -> None:
         """Generate analytical group (nodes, Lilith, Uranians)."""
         _gen(["--tier", tier, "--group", "analytical"])
@@ -147,14 +165,18 @@ def _make_tier_group(tier: str) -> click.Group:
         f"Generate {tier} tier analytical group (nodes, Lilith, Uranians)."
     )
 
-    @tier_group.command()
+    @tier_group.command(
+        short_help=f"Merge {tier} tier partial files into one .leb + verify.",
+    )
     def merge() -> None:
         """Merge partial group files into a single .leb + verify."""
         _gen(["--tier", tier, "--merge", *_MERGE_FILES[tier], "--verify"])
 
     merge.__doc__ = f"Merge {tier} tier partial files into ephemeris_{tier}.leb."
 
-    @tier_group.command()
+    @tier_group.command(
+        short_help=f"Full {tier} tier group workflow: planets + asteroids + analytical + merge.",
+    )
     def groups() -> None:
         """Full group workflow: planets + asteroids + analytical + merge.
 
@@ -175,14 +197,18 @@ def _make_tier_group(tier: str) -> click.Group:
 
     groups.__doc__ = f"Generate {tier} tier via groups (planets + asteroids + analytical) then merge."
 
-    @tier_group.command()
+    @tier_group.command(
+        short_help=f"Generate {tier} tier one body at a time (lowest memory).",
+    )
     def single() -> None:
         """Generate one body at a time (lowest memory usage) + verify."""
         _gen(["--tier", tier, "--single", "--verify"])
 
     single.__doc__ = f"Generate {tier} tier one body at a time (lowest memory usage)."
 
-    @tier_group.command()
+    @tier_group.command(
+        short_help=f"Generate {tier} tier for specific body(ies) by name/ID.",
+    )
     @click.argument("body")
     def body(body: str) -> None:
         """Generate specific body(ies).
@@ -212,6 +238,7 @@ leb_group.add_command(generate_group)
 
 @click.group(
     "verify",
+    short_help="Verify existing .leb files against Skyfield reference.",
     help="Verify existing LEB files against Skyfield reference without regenerating.\n\nReads each body from the .leb file, computes the same position via Skyfield,\nand reports the maximum error in arcseconds.",
 )
 def verify_group() -> None:
@@ -221,7 +248,10 @@ def verify_group() -> None:
 def _make_verify_cmd(tier: str) -> click.Command:
     """Create a verify command for a tier."""
 
-    @click.command(tier)
+    @click.command(
+        tier,
+        short_help=f"Verify {tier} tier .leb file ({_TIER_INFO[tier]}).",
+    )
     def verify_cmd() -> None:
         _gen(["--tier", tier, "--verify-only"])
 

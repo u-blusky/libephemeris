@@ -51,6 +51,7 @@ def _python(args: list[str], env: dict[str, str] | None = None) -> None:
 
 @click.group(
     "test",
+    short_help="Run tests: unit, comparison, lunar, LEB, Horizons, coverage.",
     help="Run tests: unit, comparison, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # ~490 tests, ~20s\n  leph test leb-backend unit-fast    # ~5890 tests, ~1 min\n\nNever run the full test suite -- always pick a targeted subcommand.",
 )
 def test_group() -> None:
@@ -113,6 +114,7 @@ _SMOKE_FILES = _ESSENTIAL_FILES + [
 
 @click.group(
     "skyfield",
+    short_help="Unit tests via Skyfield/DE440 backend (essential, smoke, unit, all).",
     help="Unit tests that calculate positions via the Skyfield/DE440 backend.\n\n"
     "This is the default calculation engine: it loads NASA JPL DE440 binary\n"
     "kernels via the Skyfield library and computes positions in real time.\n"
@@ -125,7 +127,10 @@ def skyfield_group() -> None:
     """Unit tests using the Skyfield/DE440 backend."""
 
 
-@skyfield_group.command("all")
+@skyfield_group.command(
+    "all",
+    short_help="Run all tests (unit + compare) sequentially, no @slow.",
+)
 def skyfield_all() -> None:
     """Run all tests (unit + compare) sequentially, excluding @slow markers.
 
@@ -136,7 +141,10 @@ def skyfield_all() -> None:
     _pytest(["-m", "not slow"])
 
 
-@skyfield_group.command("all-full")
+@skyfield_group.command(
+    "all-full",
+    short_help="Run ALL tests including @slow, sequentially.",
+)
 def skyfield_all_full() -> None:
     """Run ALL tests including @slow-marked tests, sequentially.
 
@@ -146,7 +154,10 @@ def skyfield_all_full() -> None:
     _pytest([])
 
 
-@skyfield_group.command("all-fast")
+@skyfield_group.command(
+    "all-fast",
+    short_help="Run all tests excluding @slow in parallel (-n auto).",
+)
 def skyfield_all_fast() -> None:
     """Run all tests excluding @slow in parallel across all CPU cores (-n auto).
 
@@ -156,13 +167,18 @@ def skyfield_all_fast() -> None:
     _pytest(["-n", "auto", "-m", "not slow"])
 
 
-@skyfield_group.command("all-full-fast")
+@skyfield_group.command(
+    "all-full-fast",
+    short_help="Run ALL tests including @slow in parallel.",
+)
 def skyfield_all_full_fast() -> None:
     """Run ALL tests including @slow in parallel. Still slow due to iterative tests."""
     _pytest(["-n", "auto"])
 
 
-@skyfield_group.command()
+@skyfield_group.command(
+    short_help="Run all tests with compact dots-only output (CI mode).",
+)
 def progress() -> None:
     """Run all tests with compact dots-only output (good for CI pipelines).
 
@@ -171,7 +187,9 @@ def progress() -> None:
     _pytest(["--no-header", "-q", "-m", "not slow"])
 
 
-@skyfield_group.command()
+@skyfield_group.command(
+    short_help="Quick sanity check: 1 test per module, parallel (~490 tests, ~20s).",
+)
 def essential() -> None:
     """Quick sanity check: 1 test file per major module, in parallel (~490 tests, ~20s).
 
@@ -182,7 +200,9 @@ def essential() -> None:
     _pytest(["-n", "auto", "-m", "not slow", *_ESSENTIAL_FILES])
 
 
-@skyfield_group.command()
+@skyfield_group.command(
+    short_help="Broader sanity check: 1+ test files per module, parallel (~1460 tests).",
+)
 def smoke() -> None:
     """Broader sanity check: 1+ test files per module, in parallel (~1460 tests, ~30s).
 
@@ -194,7 +214,9 @@ def smoke() -> None:
     _pytest(["-n", "auto", "-m", "not slow", *_SMOKE_FILES])
 
 
-@skyfield_group.command()
+@skyfield_group.command(
+    short_help="Run unit tests from tests/ sequentially, verbose, no @slow.",
+)
 def unit() -> None:
     """Run all unit tests from the tests/ directory sequentially with verbose output.
 
@@ -204,7 +226,10 @@ def unit() -> None:
     _pytest(["tests/", "-v", "-m", "not slow"])
 
 
-@skyfield_group.command("unit-full")
+@skyfield_group.command(
+    "unit-full",
+    short_help="Run ALL unit tests including @slow, sequentially.",
+)
 def unit_full() -> None:
     """Run ALL unit tests including @slow markers, sequentially (~10+ min).
 
@@ -214,7 +239,10 @@ def unit_full() -> None:
     _pytest(["tests/", "-v"])
 
 
-@skyfield_group.command("unit-fast")
+@skyfield_group.command(
+    "unit-fast",
+    short_help="Run unit tests in parallel (-n auto), no @slow (~1 min).",
+)
 def unit_fast() -> None:
     """Run unit tests in parallel across all CPU cores (-n auto), no @slow (~1 min).
 
@@ -235,6 +263,7 @@ _LEB_ENV = {"LIBEPHEMERIS_LEB": "data/leb/ephemeris_medium.leb"}
 
 @click.group(
     "leb-backend",
+    short_help="Unit tests via LEB precomputed Chebyshev backend (~14x faster).",
     help="Unit tests that calculate positions via the LEB precomputed Chebyshev backend.\n\n"
     "Instead of computing positions from DE440 kernels in real time (Skyfield),\n"
     "these tests use precomputed Chebyshev polynomial approximations stored in\n"
@@ -247,7 +276,10 @@ def leb_backend_group() -> None:
     """Unit tests using LEB as the calculation backend."""
 
 
-@leb_backend_group.command("unit")
+@leb_backend_group.command(
+    "unit",
+    short_help="Run unit tests sequentially in LEB mode, verbose output.",
+)
 def leb_unit() -> None:
     """Run unit tests sequentially in LEB mode with verbose output.
 
@@ -258,7 +290,10 @@ def leb_unit() -> None:
     _pytest(["tests/", "-v", "-m", "not slow", "--calc-mode", "leb"], env=_LEB_ENV)
 
 
-@leb_backend_group.command("unit-full")
+@leb_backend_group.command(
+    "unit-full",
+    short_help="Run ALL unit tests in LEB mode including @slow, sequentially.",
+)
 def leb_unit_full() -> None:
     """Run ALL unit tests in LEB mode including @slow markers, sequentially.
 
@@ -267,7 +302,10 @@ def leb_unit_full() -> None:
     _pytest(["tests/", "-v", "--calc-mode", "leb"], env=_LEB_ENV)
 
 
-@leb_backend_group.command("unit-fast")
+@leb_backend_group.command(
+    "unit-fast",
+    short_help="RECOMMENDED: run unit tests in LEB mode, parallel (~1 min).",
+)
 def leb_unit_fast() -> None:
     """RECOMMENDED: run unit tests in LEB mode, parallel across CPU cores (~1 min).
 
@@ -290,6 +328,7 @@ test_group.add_command(leb_backend_group)
 
 @click.group(
     "compare",
+    short_help="Compare libephemeris vs pyswisseph (Skyfield, LEB, or Horizons backend).",
     help="Compare libephemeris output against pyswisseph (the C reference implementation).\n\n"
     "These tests call the same function with the same inputs on both libraries\n"
     "and assert that the results match within tolerance. This is the primary\n"
@@ -305,7 +344,9 @@ def compare_group() -> None:
     """Comparison tests against pyswisseph."""
 
 
-@compare_group.command()
+@compare_group.command(
+    short_help="Compare via Skyfield/DE440, excluding @slow.",
+)
 def skyfield() -> None:
     """Compare via Skyfield/DE440 backend, excluding @slow tests.
 
@@ -316,19 +357,28 @@ def skyfield() -> None:
     _pytest(["compare_scripts/tests/", "-v", "-m", "not slow"])
 
 
-@compare_group.command("skyfield-full")
+@compare_group.command(
+    "skyfield-full",
+    short_help="Compare via Skyfield/DE440, ALL tests including @slow.",
+)
 def skyfield_full() -> None:
     """Compare via Skyfield/DE440 backend, ALL tests including @slow."""
     _pytest(["compare_scripts/tests/", "-v"])
 
 
-@compare_group.command("skyfield-fast")
+@compare_group.command(
+    "skyfield-fast",
+    short_help="Compare via Skyfield/DE440, parallel (-n auto).",
+)
 def skyfield_fast() -> None:
     """Compare via Skyfield/DE440 backend, parallel across CPU cores (-n auto)."""
     _pytest(["compare_scripts/tests/", "-n", "auto", "-m", "not slow"])
 
 
-@compare_group.command("skyfield-jpl")
+@compare_group.command(
+    "skyfield-jpl",
+    short_help="Compare via Skyfield with explicit env var, no @slow.",
+)
 def skyfield_jpl() -> None:
     """Compare via Skyfield with explicit LIBEPHEMERIS_COMPARE_MODE=skyfield env var.
 
@@ -341,7 +391,10 @@ def skyfield_jpl() -> None:
     )
 
 
-@compare_group.command("skyfield-jpl-full")
+@compare_group.command(
+    "skyfield-jpl-full",
+    short_help="Compare via Skyfield with explicit env var, ALL tests.",
+)
 def skyfield_jpl_full() -> None:
     """Compare via Skyfield with explicit env var, ALL tests including @slow."""
     _pytest(
@@ -350,7 +403,10 @@ def skyfield_jpl_full() -> None:
     )
 
 
-@compare_group.command("leb-backend")
+@compare_group.command(
+    "leb-backend",
+    short_help="Compare via LEB backend vs pyswisseph, no @slow.",
+)
 def leb_backend() -> None:
     """Compare via LEB precomputed backend vs pyswisseph, excluding @slow.
 
@@ -367,7 +423,10 @@ def leb_backend() -> None:
     )
 
 
-@compare_group.command("leb-backend-full")
+@compare_group.command(
+    "leb-backend-full",
+    short_help="Compare via LEB backend vs pyswisseph, ALL tests.",
+)
 def leb_backend_full() -> None:
     """Compare via LEB backend vs pyswisseph, ALL tests including @slow."""
     _pytest(
@@ -379,7 +438,10 @@ def leb_backend_full() -> None:
     )
 
 
-@compare_group.command("horizons-backend")
+@compare_group.command(
+    "horizons-backend",
+    short_help="Compare via Horizons API vs pyswisseph (requires internet).",
+)
 def horizons_backend() -> None:
     """Compare via NASA JPL Horizons API vs pyswisseph (requires internet).
 
@@ -413,19 +475,25 @@ _LILITH_FILES = [
 
 @click.group(
     "lunar",
+    short_help="Lunar module: nodes, apsides, Lilith, ELP2000 perturbation coefficients.",
     help="Tests for the lunar module: mean/true nodes, perigee/apogee apsides,\nmean and true Lilith (Black Moon), ELP2000 perturbation coefficients.\n\nThese tests validate the analytical lunar element calculations and\nthe interpolated perigee/apogee pipeline.\n\n  leph test lunar perigee   # ELP2000 coefficients + interpolated perigee\n  leph test lunar lilith    # Mean + true Lilith precision (8 test files)",
 )
 def lunar_group() -> None:
     """Lunar-specific test suites."""
 
 
-@lunar_group.command("all")
+@lunar_group.command(
+    "all",
+    short_help="Run all lunar tests (nodes, Lilith, perigee, apogee), no @slow.",
+)
 def lunar_all() -> None:
     """Run all lunar module tests (nodes, Lilith, perigee, apogee), excluding @slow."""
     _pytest(["tests/test_lunar/", "-v", "-m", "not slow"])
 
 
-@lunar_group.command()
+@lunar_group.command(
+    short_help="Test ELP2000 perigee coefficients + interpolated perigee.",
+)
 def perigee() -> None:
     """Test ELP2000 perigee perturbation coefficients, interpolated and osculating perigee.
 
@@ -442,7 +510,9 @@ def perigee() -> None:
     )
 
 
-@lunar_group.command()
+@lunar_group.command(
+    short_help="Test ELP2000 apogee coefficients and interpolated apogee.",
+)
 def apogee() -> None:
     """Test ELP2000 apogee perturbation coefficients and interpolated apogee.
 
@@ -457,7 +527,9 @@ def apogee() -> None:
     )
 
 
-@lunar_group.command()
+@lunar_group.command(
+    short_help="Test mean + true Lilith precision across 8 test files.",
+)
 def lilith() -> None:
     """Test mean Lilith and true Lilith precision across 8 test files.
 
@@ -485,6 +557,7 @@ _LEB_COMPARE_IGNORES = [
 
 @click.group(
     "leb-format",
+    short_help="LEB binary format internals: reader, writer, Chebyshev precision, vs Skyfield.",
     help="Tests for the LEB binary ephemeris FORMAT itself (reader, writer, precision).\n\n"
     "Unlike 'leb-backend' (which uses LEB as a calculation backend to run the\n"
     "standard test suite), these tests verify the LEB file format internals:\n"
@@ -498,7 +571,9 @@ def leb_format_group() -> None:
     """Tests for the LEB binary ephemeris format itself (not using it as a backend)."""
 
 
-@leb_format_group.command("all")
+@leb_format_group.command(
+    "all", short_help="Reader, writer, Chebyshev reader, fast_calc pipeline (no @slow)."
+)
 def leb_format_all() -> None:
     """Run all LEB module tests: binary format read/write, Chebyshev reader, fast_calc pipeline.
 
@@ -508,7 +583,10 @@ def leb_format_all() -> None:
     _pytest(["tests/test_leb/", "-v", "-m", "not slow"])
 
 
-@leb_format_group.command("precision")
+@leb_format_group.command(
+    "precision",
+    short_help="Chebyshev approximation error sweep for all bodies, all tiers.",
+)
 def leb_precision() -> None:
     """Verify Chebyshev polynomial approximation error for all bodies across all tiers.
 
@@ -519,7 +597,9 @@ def leb_precision() -> None:
     _pytest(["tests/test_leb/test_leb_precision.py", "-v"])
 
 
-@leb_format_group.command("precision-quick")
+@leb_format_group.command(
+    "precision-quick", short_help="Chebyshev error sweep for medium tier only (faster)."
+)
 def leb_precision_quick() -> None:
     """Chebyshev precision sweep for medium tier only (faster subset of 'precision')."""
     _pytest(["tests/test_leb/test_leb_precision.py", "-v", "-k", "medium"])
@@ -530,6 +610,7 @@ def leb_precision_quick() -> None:
 
 @click.group(
     "vs-skyfield",
+    short_help="Compare LEB Chebyshev output vs live Skyfield, per tier.",
     help="Compare LEB Chebyshev output against live Skyfield calculations.\n\n"
     "These tests evaluate the same body at the same Julian date using both\n"
     "the LEB reader and Skyfield, then assert the difference is within tolerance.\n"
@@ -539,7 +620,9 @@ def vs_skyfield_group() -> None:
     """Verify LEB output matches Skyfield reference."""
 
 
-@vs_skyfield_group.command()
+@vs_skyfield_group.command(
+    short_help="Medium tier legacy tests from compare/ root (original layout).",
+)
 def legacy() -> None:
     """Medium tier legacy tests from the compare/ root directory (original flat layout)."""
     _pytest(
@@ -547,7 +630,10 @@ def legacy() -> None:
     )
 
 
-@vs_skyfield_group.command("legacy-quick")
+@vs_skyfield_group.command(
+    "legacy-quick",
+    short_help="Medium tier legacy tests, excluding @slow.",
+)
 def legacy_quick() -> None:
     """Medium tier legacy tests, excluding @slow markers."""
     _pytest(
@@ -561,13 +647,18 @@ def legacy_quick() -> None:
     )
 
 
-@vs_skyfield_group.command()
+@vs_skyfield_group.command(
+    short_help="Base tier (1850-2150): positions, speeds, sidereal, equatorial.",
+)
 def base() -> None:
     """Base tier (de440s, 1850-2150): compare positions, speeds, sidereal, equatorial."""
     _pytest(["tests/test_leb/compare/base/", "-v", "-m", "leb_compare_base"])
 
 
-@vs_skyfield_group.command("base-quick")
+@vs_skyfield_group.command(
+    "base-quick",
+    short_help="Base tier, excluding @slow markers.",
+)
 def base_quick() -> None:
     """Base tier, excluding @slow markers."""
     _pytest(
@@ -575,13 +666,18 @@ def base_quick() -> None:
     )
 
 
-@vs_skyfield_group.command()
+@vs_skyfield_group.command(
+    short_help="Medium tier (1550-2650): positions, speeds, sidereal, equatorial.",
+)
 def medium() -> None:
     """Medium tier (de440, 1550-2650): compare positions, speeds, sidereal, equatorial."""
     _pytest(["tests/test_leb/compare/medium/", "-v", "-m", "leb_compare_medium"])
 
 
-@vs_skyfield_group.command("medium-quick")
+@vs_skyfield_group.command(
+    "medium-quick",
+    short_help="Medium tier, excluding @slow markers (~2 min).",
+)
 def medium_quick() -> None:
     """Medium tier, excluding @slow markers (~2 min)."""
     _pytest(
@@ -594,13 +690,18 @@ def medium_quick() -> None:
     )
 
 
-@vs_skyfield_group.command()
+@vs_skyfield_group.command(
+    short_help="Extended tier (-5000 to 5000): positions, speeds, sidereal.",
+)
 def extended() -> None:
     """Extended tier (de441, -5000 to 5000): compare positions, speeds, sidereal."""
     _pytest(["tests/test_leb/compare/extended/", "-v", "-m", "leb_compare_extended"])
 
 
-@vs_skyfield_group.command("extended-quick")
+@vs_skyfield_group.command(
+    "extended-quick",
+    short_help="Extended tier, excluding @slow markers.",
+)
 def extended_quick() -> None:
     """Extended tier, excluding @slow markers."""
     _pytest(
@@ -613,13 +714,18 @@ def extended_quick() -> None:
     )
 
 
-@vs_skyfield_group.command()
+@vs_skyfield_group.command(
+    short_help="Cross-tier consistency: base/medium/extended agree on overlapping dates.",
+)
 def crosstier() -> None:
     """Cross-tier consistency: verify that base, medium, and extended agree on overlapping date ranges."""
     _pytest(["tests/test_leb/compare/crosstier/", "-v", "-m", "leb_compare_crosstier"])
 
 
-@vs_skyfield_group.command("all")
+@vs_skyfield_group.command(
+    "all",
+    short_help="Run ALL tier comparisons + cross-tier checks (comprehensive).",
+)
 def vs_skyfield_all() -> None:
     """Run ALL tier comparisons + cross-tier checks combined (comprehensive, slow)."""
     _pytest(
@@ -643,6 +749,7 @@ test_group.add_command(leb_format_group)
 
 @click.group(
     "leb2-format",
+    short_help="LEB2 compressed format: compression roundtrip, precision vs LEB1.",
     help="Tests for the LEB2 compressed ephemeris format.\n\n"
     "LEB2 is a lossy-compressed version of LEB1 that achieves 4-10x smaller\n"
     'files while maintaining <0.001" precision. These tests verify the\n'
@@ -654,7 +761,10 @@ def leb2_format_group() -> None:
     """Tests for the LEB2 compressed format."""
 
 
-@leb2_format_group.command("all")
+@leb2_format_group.command(
+    "all",
+    short_help="Run LEB2 compression and reader unit tests (27 tests).",
+)
 def leb2_format_all() -> None:
     """Run LEB2 compression and reader unit tests (27 tests).
 
@@ -670,7 +780,10 @@ def leb2_format_all() -> None:
     )
 
 
-@leb2_format_group.command("precision-base")
+@leb2_format_group.command(
+    "precision-base",
+    short_help="Measure LEB2 vs LEB1 precision for base tier (~15s).",
+)
 def leb2_precision_base() -> None:
     """Measure LEB2 vs LEB1 precision for base tier (~15s).
 
@@ -680,19 +793,28 @@ def leb2_precision_base() -> None:
     _python(["scripts/test_leb2_precision.py", "base"])
 
 
-@leb2_format_group.command("precision-medium")
+@leb2_format_group.command(
+    "precision-medium",
+    short_help="Measure LEB2 vs LEB1 precision for medium tier (~15s).",
+)
 def leb2_precision_medium() -> None:
     """Measure LEB2 vs LEB1 precision for medium tier (~15s)."""
     _python(["scripts/test_leb2_precision.py", "medium"])
 
 
-@leb2_format_group.command("precision-extended")
+@leb2_format_group.command(
+    "precision-extended",
+    short_help="Measure LEB2 vs LEB1 precision for extended tier (~15s).",
+)
 def leb2_precision_extended() -> None:
     """Measure LEB2 vs LEB1 precision for extended tier (~15s)."""
     _python(["scripts/test_leb2_precision.py", "extended"])
 
 
-@leb2_format_group.command("precision-all")
+@leb2_format_group.command(
+    "precision-all",
+    short_help="Measure LEB2 vs LEB1 precision for ALL tiers (~45s).",
+)
 def leb2_precision_all() -> None:
     """Measure LEB2 vs LEB1 precision for ALL tiers (base + medium + extended, ~45s)."""
     _python(["scripts/test_leb2_precision.py", "all"])
@@ -708,6 +830,7 @@ test_group.add_command(leb2_format_group)
 
 @click.group(
     "horizons",
+    short_help="NASA JPL Horizons API precision tests (requires internet).",
     help="Precision tests for the NASA JPL Horizons REST API backend.\n\n"
     "These tests query the live Horizons API and compare results against\n"
     "Skyfield and/or LEB to verify the Horizons backend produces accurate\n"
@@ -720,7 +843,10 @@ def horizons_group() -> None:
     """Horizons API tests."""
 
 
-@horizons_group.command("precision")
+@horizons_group.command(
+    "precision",
+    short_help="Horizons vs Skyfield: 13 bodies, 200 dates, 6 flags (~45s).",
+)
 def horizons_precision() -> None:
     """Horizons vs Skyfield precision: 13 bodies, 200 random dates, 6 flags (~45s).
 
@@ -731,7 +857,10 @@ def horizons_precision() -> None:
     _python(["scripts/test_horizons_precision.py"])
 
 
-@horizons_group.command("precision-quick")
+@horizons_group.command(
+    "precision-quick",
+    short_help="Quick Horizons vs Skyfield check with 50 dates (~15s).",
+)
 def horizons_precision_quick() -> None:
     """Quick Horizons vs Skyfield precision check with 50 dates (~15s).
 
@@ -740,7 +869,10 @@ def horizons_precision_quick() -> None:
     _python(["scripts/test_horizons_precision.py", "--dates", "50"])
 
 
-@horizons_group.command("vs-leb")
+@horizons_group.command(
+    "vs-leb",
+    short_help="Cross-validate Horizons API against LEB2: 15 bodies, 100 dates.",
+)
 def vs_leb() -> None:
     """Cross-validate Horizons API against LEB2: 15 bodies, 100 dates.
 
@@ -760,6 +892,7 @@ test_group.add_command(horizons_group)
 
 @click.group(
     "coverage",
+    short_help="Run tests with code coverage reports (terminal + XML + HTML).",
     help="Run the test suite with code coverage measurement.\n\n"
     "Generates three report formats: terminal (with missing lines highlighted),\n"
     "XML (for CI integration), and HTML (for browsing in a browser).\n"
@@ -779,13 +912,17 @@ _COV_ARGS = [
 ]
 
 
-@coverage_group.command()
+@coverage_group.command(
+    short_help="Run all tests (no @slow) with coverage reports.",
+)
 def run() -> None:
     """Run all tests (excluding @slow) with coverage. Generates term + XML + HTML reports."""
     _pytest([*_COV_ARGS, "-m", "not slow"])
 
 
-@coverage_group.command()
+@coverage_group.command(
+    short_help="Run ALL tests (including @slow) with coverage reports.",
+)
 def full() -> None:
     """Run ALL tests (including @slow) with coverage. Very slow but most thorough."""
     _pytest(_COV_ARGS)

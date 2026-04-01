@@ -3,16 +3,12 @@
 Provides the ``leph`` command with hierarchical subcommands for testing,
 LEB generation, diagnostics, data downloads, release management, and more.
 
-Shell completion (add to your shell profile):
+Shell completion + shell function (works with uv, no venv activation needed):
 
-    # zsh
-    eval "$(_LEPH_COMPLETE=zsh_source leph)"
-
-    # bash
-    eval "$(_LEPH_COMPLETE=bash_source leph)"
-
-    # fish
-    _LEPH_COMPLETE=fish_source leph | source
+    eval "$(uv run leph completion zsh)"      # zsh — test it now
+    uv run leph completion zsh >> ~/.zshrc     # zsh — make permanent
+    uv run leph completion bash >> ~/.bashrc   # bash
+    uv run leph completion fish > ~/.config/fish/conf.d/leph.fish  # fish
 """
 
 from __future__ import annotations
@@ -21,6 +17,7 @@ import click
 
 from .cmd_calibrate import calibrate_group
 from .cmd_code import code_group
+from .cmd_completion import completion_group
 from .cmd_diag import diag_group
 from .cmd_download import download_group
 from .cmd_generate import generate_group
@@ -33,14 +30,38 @@ from .cmd_test import test_group
 
 @click.group(
     name="leph",
-    help="libephemeris developer CLI — run tests, generate data, lint, release.\n\n"
-    "Every subgroup is self-contained: use TAB completion or --help on any\n"
-    "subcommand to discover what's available.\n\n"
-    "Quick start:\n\n"
-    "  leph test skyfield essential     # Fast sanity check (~490 tests, ~20s)\n"
-    "  leph test leb-backend unit-fast  # Recommended daily driver (~1 min)\n"
-    "  leph code lint                   # Ruff linter with auto-fix\n",
-    context_settings={"help_option_names": ["-h", "--help"]},
+    help="""\
+libephemeris developer CLI — ~120 commands for testing, data generation,
+code quality, LEB binary ephemeris management, and release workflows.
+
+\b
+Quick start:
+  leph test skyfield essential     # Fast sanity check (~490 tests, ~20s)
+  leph test leb-backend unit-fast  # Recommended daily driver (~1 min)
+  leph code lint                   # Ruff linter with auto-fix
+
+\b
+Subgroups at a glance:
+  test        8 test suites: skyfield, leb-backend, compare, lunar,
+              leb-format, leb2-format, horizons, coverage
+  code        Ruff linter/formatter, mypy type checker
+  leb / leb2  Generate, verify, and compress LEB binary ephemeris files
+  download    Fetch SPK kernels, pre-built LEB files, ASSIST n-body data
+  generate    Planet-center SPKs, lunar corrections, Keplerian elements
+  calibrate   Fit lunar perigee perturbation coefficients vs JPL DE441
+  diag        Print body positions per tier, verify data integrity
+  release     Upload LEB files to GitHub Releases
+  manual      Build user manuals (EPUB/PDF, Italian/English)
+  completion  Generate shell completion scripts (zsh, bash, fish)
+
+\b
+TAB completion setup (works with uv, no venv activation needed):
+  eval "$(uv run leph completion zsh)"      # try it now
+  uv run leph completion zsh >> ~/.zshrc    # make permanent
+
+Use -h on any subcommand for details:  leph test -h, leph test skyfield -h, etc.
+""",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 120},
 )
 @click.version_option(package_name="libephemeris", prog_name="leph")
 def cli() -> None:
@@ -58,6 +79,7 @@ cli.add_command(generate_group)
 cli.add_command(calibrate_group)
 cli.add_command(release_group)
 cli.add_command(manual_group)
+cli.add_command(completion_group)
 
 
 def main() -> None:

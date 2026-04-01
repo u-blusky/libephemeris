@@ -27,6 +27,7 @@ def _python(args: list[str]) -> None:
 
 @click.group(
     "download",
+    short_help="Download SPK kernels, LEB binary ephemeris, and ASSIST n-body data.",
     help="Download data files needed by libephemeris.\n\n"
     "Three categories of data:\n\n"
     "  SPK kernels   NASA JPL binary ephemeris files (DE440/DE441) + asteroid SPKs\n"
@@ -46,7 +47,10 @@ def download_group() -> None:
 # ===========================================================================
 
 
-@download_group.command("spk-base")
+@download_group.command(
+    "spk-base",
+    short_help="Download asteroid SPK kernels for base tier (1850-2150).",
+)
 def spk_base() -> None:
     """Download asteroid SPK21 kernel files for base tier (1850-2150).
 
@@ -62,7 +66,10 @@ def spk_base() -> None:
     )
 
 
-@download_group.command("spk-medium")
+@download_group.command(
+    "spk-medium",
+    short_help="Download asteroid SPK kernels for medium tier (1550-2650).",
+)
 def spk_medium() -> None:
     """Download asteroid SPK21 kernel files for medium tier (1550-2650).
 
@@ -76,7 +83,10 @@ def spk_medium() -> None:
     )
 
 
-@download_group.command("spk-extended")
+@download_group.command(
+    "spk-extended",
+    short_help="Download max-range asteroid SPK files for extended tier.",
+)
 def spk_extended() -> None:
     """Download max-range asteroid SPK files for extended tier from JPL Horizons.
 
@@ -91,7 +101,10 @@ def spk_extended() -> None:
 # ===========================================================================
 
 
-@download_group.command("leb-base")
+@download_group.command(
+    "leb-base",
+    short_help="Download LEB binary ephemeris for base tier (~5 MB).",
+)
 def leb_base() -> None:
     """Download pre-built LEB binary ephemeris for base tier (~5 MB).
 
@@ -101,7 +114,10 @@ def leb_base() -> None:
     _python(["-m", "libephemeris.cli", "download:leb:base"])
 
 
-@download_group.command("leb-medium")
+@download_group.command(
+    "leb-medium",
+    short_help="Download LEB binary ephemeris for medium tier (~20 MB).",
+)
 def leb_medium() -> None:
     """Download pre-built LEB binary ephemeris for medium tier (~20 MB).
 
@@ -111,7 +127,10 @@ def leb_medium() -> None:
     _python(["-m", "libephemeris.cli", "download:leb:medium"])
 
 
-@download_group.command("leb-extended")
+@download_group.command(
+    "leb-extended",
+    short_help="Download LEB binary ephemeris for extended tier (~180 MB).",
+)
 def leb_extended() -> None:
     """Download pre-built LEB binary ephemeris for extended tier (~180 MB).
 
@@ -126,7 +145,9 @@ def leb_extended() -> None:
 # ===========================================================================
 
 
-@download_group.command()
+@download_group.command(
+    short_help="Download REBOUND/ASSIST n-body data (~120 MB).",
+)
 def assist() -> None:
     """Download REBOUND/ASSIST n-body integration data (~120 MB).
 

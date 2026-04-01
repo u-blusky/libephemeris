@@ -18,6 +18,7 @@ def _python(args: list[str]) -> None:
 
 @click.group(
     "manual",
+    short_help="Build user manuals: EPUB and PDF, Italian and English.",
     help="Build the libephemeris user manual in EPUB and/or PDF format.\n\n"
     "Two workflows are available:\n\n"
     "  Pandoc workflow (build*)      Requires: pandoc + tectonic\n"
@@ -36,7 +37,9 @@ def manual_group() -> None:
 # ===========================================================================
 
 
-@manual_group.command()
+@manual_group.command(
+    short_help="Build all manuals (EPUB + PDF, Italian + English).",
+)
 def build() -> None:
     """Build all manuals (EPUB + PDF, Italian + English).
 
@@ -45,7 +48,10 @@ def build() -> None:
     _python(["scripts/build_manual.py"])
 
 
-@manual_group.command("build-epub")
+@manual_group.command(
+    "build-epub",
+    short_help="Build all manuals in EPUB format only (both languages).",
+)
 def build_epub() -> None:
     """Build all manuals in EPUB format only (Italian + English).
 
@@ -54,7 +60,10 @@ def build_epub() -> None:
     _python(["scripts/build_manual.py", "--format", "epub"])
 
 
-@manual_group.command("build-pdf")
+@manual_group.command(
+    "build-pdf",
+    short_help="Build all manuals in PDF format only (both languages).",
+)
 def build_pdf() -> None:
     """Build all manuals in PDF format only (Italian + English).
 
@@ -63,7 +72,10 @@ def build_pdf() -> None:
     _python(["scripts/build_manual.py", "--format", "pdf"])
 
 
-@manual_group.command("build-it")
+@manual_group.command(
+    "build-it",
+    short_help="Build Italian manual (EPUB + PDF).",
+)
 def build_it() -> None:
     """Build Italian manual (EPUB + PDF).
 
@@ -72,7 +84,10 @@ def build_it() -> None:
     _python(["scripts/build_manual.py", "--lang", "it"])
 
 
-@manual_group.command("build-en")
+@manual_group.command(
+    "build-en",
+    short_help="Build English manual (EPUB + PDF).",
+)
 def build_en() -> None:
     """Build English manual (EPUB + PDF).
 
@@ -86,7 +101,10 @@ def build_en() -> None:
 # ===========================================================================
 
 
-@manual_group.command("generate-epub")
+@manual_group.command(
+    "generate-epub",
+    short_help="Generate all EPUBs (both languages, no pandoc required).",
+)
 def generate_epub() -> None:
     """Generate all manual EPUBs (Italian + English, no pandoc required).
 
@@ -96,13 +114,19 @@ def generate_epub() -> None:
     _python(["scripts/generate_manual_epub.py"])
 
 
-@manual_group.command("generate-epub-it")
+@manual_group.command(
+    "generate-epub-it",
+    short_help="Generate Italian manual EPUB (no pandoc required).",
+)
 def generate_epub_it() -> None:
     """Generate Italian manual EPUB (no pandoc required)."""
     _python(["scripts/generate_manual_epub.py", "--lang", "it"])
 
 
-@manual_group.command("generate-epub-en")
+@manual_group.command(
+    "generate-epub-en",
+    short_help="Generate English manual EPUB (no pandoc required).",
+)
 def generate_epub_en() -> None:
     """Generate English manual EPUB (no pandoc required)."""
     _python(["scripts/generate_manual_epub.py", "--lang", "en"])

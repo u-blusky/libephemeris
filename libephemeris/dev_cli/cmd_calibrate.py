@@ -31,6 +31,7 @@ def _python(args: list[str], use_dotenv: bool = True) -> None:
 
 @click.group(
     "calibrate",
+    short_help="Fit lunar perigee perturbation coefficients against JPL DE441.",
     help="Calibrate lunar perigee perturbation coefficients against JPL DE441.\n\n"
     "Fits ELP2000-based harmonic perturbation coefficients to minimize the\n"
     "difference between analytical and geometric (JPL) perigee positions.\n\n"
@@ -44,7 +45,9 @@ def calibrate_group() -> None:
     """Calibration commands."""
 
 
-@calibrate_group.command()
+@calibrate_group.command(
+    short_help="Full perigee calibration (1500-2500 CE, ~30 min).",
+)
 def perigee() -> None:
     """Calibrate perigee perturbation coefficients against JPL DE441 (~30 min).
 
@@ -70,7 +73,10 @@ def perigee() -> None:
     )
 
 
-@calibrate_group.command("perigee-quick")
+@calibrate_group.command(
+    "perigee-quick",
+    short_help="Quick perigee calibration (100-year range, ~2 min).",
+)
 def perigee_quick() -> None:
     """Quick perigee calibration (100-year range, ~2 min).
 

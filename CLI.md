@@ -38,30 +38,82 @@ uv run libephemeris download medium
 uv run poe lint
 ```
 
-### TAB completion
+### TAB completion + `leph` shell function
 
-Add one of these to your shell profile (`.zshrc`, `.bashrc`, or `config.fish`):
+Click's built-in completion doesn't work with `uv run` because it requires
+`leph` to be in PATH. The `leph completion` command generates custom scripts
+that solve this: they create a `leph` shell function (so you can type `leph`
+directly without activating the venv) and wire up TAB completion through
+`uv run` transparently.
+
+#### Quick test (try it now, no permanent changes)
 
 ```bash
-# zsh
-eval "$(_LEPH_COMPLETE=zsh_source leph)"
+eval "$(uv run leph completion zsh)"
+```
+
+After running this, `leph` and TAB completion work in that terminal session.
+
+#### Permanent setup
+
+**zsh** (most macOS / modern Linux):
+
+```bash
+# Option A: append directly to .zshrc
+uv run leph completion zsh >> ~/.zshrc
+
+# Option B: separate file (cleaner)
+uv run leph completion zsh > ~/.leph-completion.zsh
+echo 'source ~/.leph-completion.zsh' >> ~/.zshrc
+```
+
+**bash**:
+
+```bash
+uv run leph completion bash >> ~/.bashrc
+```
+
+**fish**:
+
+```bash
+uv run leph completion fish > ~/.config/fish/conf.d/leph.fish
+```
+
+Then reload your shell (`source ~/.zshrc`, `source ~/.bashrc`, or restart fish).
+
+#### What it does
+
+The generated script does two things:
+
+1. **Shell function**: creates `leph() { uv run leph "$@"; }` so you can type
+   `leph test skyfield essential` directly — no `uv run` prefix, no venv activation.
+   If the venv _is_ activated (so `leph` is in PATH), the function is not created
+   and the real binary is used directly.
+
+2. **TAB completion**: wires up completions that work at every nesting level,
+   with descriptions:
+
+```
+leph <TAB>                         # test, code, leb, download, ...
+leph test <TAB>                    # skyfield, leb-backend, compare, ...
+leph test skyfield <TAB>           # essential, smoke, unit, unit-fast, ...
+leph test leb-format vs-skyfield <TAB>  # base, medium, extended, crosstier, ...
+```
+
+#### libephemeris (production CLI) completion
+
+The production CLI uses the same Click mechanism. If you want completion for
+`libephemeris` too:
+
+```bash
+# zsh (requires venv activated or libephemeris in PATH)
 eval "$(_LIBEPHEMERIS_COMPLETE=zsh_source libephemeris)"
 
 # bash
-eval "$(_LEPH_COMPLETE=bash_source leph)"
 eval "$(_LIBEPHEMERIS_COMPLETE=bash_source libephemeris)"
 
 # fish
-_LEPH_COMPLETE=fish_source leph | source
 _LIBEPHEMERIS_COMPLETE=fish_source libephemeris | source
-```
-
-After reloading your shell, TAB works at every level:
-
-```
-leph <TAB>                    # test, code, leb, download, ...
-leph test <TAB>               # skyfield, leb-backend, compare, lunar, ...
-leph test skyfield <TAB>      # essential, smoke, unit, unit-fast, all, ...
 ```
 
 ---
@@ -444,6 +496,7 @@ pytest tests/ -m "not slow" --calc-mode leb            # With LEB backend
 | `cmd_calibrate.py` | 2 | Perigee calibration (full + quick) |
 | `cmd_release.py` | 5 | LEB upload to GitHub Releases |
 | `cmd_manual.py` | 8 | Manual build (EPUB/PDF, pandoc/ebooklib) |
+| `cmd_completion.py` | 3 | Shell completion scripts (zsh, bash, fish) |
 
 ### Production CLI source: `libephemeris/cli.py`
 

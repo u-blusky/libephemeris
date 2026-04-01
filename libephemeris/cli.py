@@ -75,7 +75,7 @@ def _handle_download(func, quiet: bool, **kwargs) -> None:  # type: ignore[no-un
     "  libephemeris download medium       Download data for the default tier\n"
     "  libephemeris status                Verify everything is installed\n"
     "  libephemeris info                  Show active backend and configuration",
-    context_settings={"help_option_names": ["-h", "--help"]},
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 120},
     epilog="""\
 Examples:
   libephemeris download medium        Download data for the default tier
@@ -245,7 +245,7 @@ cli.add_command(download_group)
 # ---------------------------------------------------------------------------
 
 
-@cli.command()
+@cli.command(short_help="Show installed data files, current tier, and download status.")
 def status() -> None:
     """Show installed data files, current precision tier, and download status.
 
@@ -262,7 +262,7 @@ def status() -> None:
 # ---------------------------------------------------------------------------
 
 
-@cli.command()
+@cli.command(short_help="Show version, active calc mode, LEB file, and precision tier.")
 def info() -> None:
     """Show library version, active calculation mode, LEB file path, and precision tier.
 

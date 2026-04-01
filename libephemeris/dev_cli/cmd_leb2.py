@@ -27,6 +27,7 @@ def _leb2(args: list[str]) -> None:
 
 @click.group(
     "leb2",
+    short_help='Convert LEB1 to LEB2 compressed format and verify precision (<0.001").',
     help="Convert LEB1 files to LEB2 compressed format and verify precision.\n\n"
     "LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major\n"
     "reorder + byte shuffle + zstd) to achieve 4-10x smaller files while keeping\n"
@@ -45,13 +46,16 @@ def leb2_group() -> None:
 
 @click.group(
     "convert",
+    short_help="Convert LEB1 files to LEB2 compressed format (per tier or per group).",
     help="Convert LEB1 files to LEB2 compressed format.\n\nEach tier can be converted as a whole (all 4 body groups: core, asteroids,\napogee, uranians) or one group at a time for finer control.",
 )
 def convert_group() -> None:
     """LEB2 conversion commands."""
 
 
-@convert_group.command()
+@convert_group.command(
+    short_help="Convert base tier LEB1 -> LEB2 (all 4 body groups).",
+)
 def base() -> None:
     """Convert base tier LEB1 -> LEB2 (all 4 groups: core/asteroids/apogee/uranians)."""
     _leb2(
@@ -66,7 +70,9 @@ def base() -> None:
     )
 
 
-@convert_group.command()
+@convert_group.command(
+    short_help="Convert medium tier LEB1 -> LEB2 (all 4 body groups).",
+)
 def medium() -> None:
     """Convert medium tier LEB1 -> LEB2 (all 4 groups)."""
     _leb2(
@@ -81,7 +87,9 @@ def medium() -> None:
     )
 
 
-@convert_group.command()
+@convert_group.command(
+    short_help="Convert extended tier LEB1 -> LEB2 (all 4 body groups).",
+)
 def extended() -> None:
     """Convert extended tier LEB1 -> LEB2 (all 4 groups)."""
     _leb2(
@@ -96,7 +104,10 @@ def extended() -> None:
     )
 
 
-@convert_group.command("base-core")
+@convert_group.command(
+    "base-core",
+    short_help="Convert base tier core group only (14 bodies, ~6.5 MB).",
+)
 def base_core() -> None:
     """Convert base tier core group only (14 bodies, ~6.5 MB for PyPI)."""
     _leb2(
@@ -111,7 +122,10 @@ def base_core() -> None:
     )
 
 
-@convert_group.command("base-asteroids")
+@convert_group.command(
+    "base-asteroids",
+    short_help="Convert base tier asteroids group (5 bodies).",
+)
 def base_asteroids() -> None:
     """Convert base tier asteroids group (Chiron, Ceres, Pallas, Juno, Vesta)."""
     _leb2(
@@ -126,7 +140,10 @@ def base_asteroids() -> None:
     )
 
 
-@convert_group.command("base-apogee")
+@convert_group.command(
+    "base-apogee",
+    short_help="Convert base tier apogee group (3 bodies).",
+)
 def base_apogee() -> None:
     """Convert base tier apogee group (OscuApog, IntpApog, IntpPerig)."""
     _leb2(
@@ -141,7 +158,10 @@ def base_apogee() -> None:
     )
 
 
-@convert_group.command("base-uranians")
+@convert_group.command(
+    "base-uranians",
+    short_help="Convert base tier uranians group (9 bodies).",
+)
 def base_uranians() -> None:
     """Convert base tier uranians group (Cupido-Transpluto, 9 bodies)."""
     _leb2(
@@ -166,13 +186,17 @@ leb2_group.add_command(convert_group)
 
 @click.group(
     "verify",
+    short_help='Verify LEB2 precision against LEB1 reference (target: <0.003").',
     help='Verify LEB2 files against LEB1 reference.\n\nSamples random dates and compares LEB2 output to LEB1, reporting\nthe maximum error in arcseconds. Target: <0.003".',
 )
 def verify_group() -> None:
     """LEB2 verification commands."""
 
 
-@verify_group.command("base")
+@verify_group.command(
+    "base",
+    short_help='Verify base tier LEB2 vs LEB1 (<0.003" precision).',
+)
 def verify_base() -> None:
     """Verify base tier LEB2 core against LEB1 reference (<0.003\" precision)."""
     _leb2(

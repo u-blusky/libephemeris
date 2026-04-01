@@ -19,6 +19,7 @@ def _python(args: list[str]) -> None:
 
 @click.group(
     "generate",
+    short_help="Generate planet-center SPKs, lunar corrections, Keplerian elements.",
     help="Generate derived data files from raw SPK kernels.\n\n"
     "These are one-time generation steps that produce data files used by\n"
     "the library at runtime. Most developers never need to run these unless\n"
@@ -36,7 +37,10 @@ def generate_group() -> None:
 # ===========================================================================
 
 
-@generate_group.command("planet-centers-base")
+@generate_group.command(
+    "planet-centers-base",
+    short_help="Build COB-corrected SPK for base tier (1850-2150).",
+)
 def planet_centers_base() -> None:
     """Build center-of-body corrected SPK for base tier (de440s, 1850-2150).
 
@@ -48,7 +52,10 @@ def planet_centers_base() -> None:
     _python(["scripts/generate_planet_centers_spk.py", "--tier", "base"])
 
 
-@generate_group.command("planet-centers-medium")
+@generate_group.command(
+    "planet-centers-medium",
+    short_help="Build COB-corrected SPK for medium tier (1550-2650).",
+)
 def planet_centers_medium() -> None:
     """Build center-of-body corrected SPK for medium tier (de440, 1550-2650).
 
@@ -58,7 +65,10 @@ def planet_centers_medium() -> None:
     _python(["scripts/generate_planet_centers_spk.py", "--tier", "medium"])
 
 
-@generate_group.command("planet-centers-extended")
+@generate_group.command(
+    "planet-centers-extended",
+    short_help="Build COB-corrected SPK for extended tier (full range).",
+)
 def planet_centers_extended() -> None:
     """Build center-of-body corrected SPK for extended tier (de441, full range).
 
@@ -67,7 +77,10 @@ def planet_centers_extended() -> None:
     _python(["scripts/generate_planet_centers_spk.py", "--tier", "extended"])
 
 
-@generate_group.command("planet-centers-all")
+@generate_group.command(
+    "planet-centers-all",
+    short_help="Build COB-corrected SPKs for all three tiers.",
+)
 def planet_centers_all() -> None:
     """Build center-of-body corrected SPKs for all three tiers at once.
 
@@ -76,7 +89,10 @@ def planet_centers_all() -> None:
     _python(["scripts/generate_planet_centers_spk.py", "--all"])
 
 
-@generate_group.command("planet-centers-spk")
+@generate_group.command(
+    "planet-centers-spk",
+    short_help="(Legacy alias) Same as planet-centers-medium.",
+)
 def planet_centers_spk() -> None:
     """(Legacy alias) Same as planet-centers-medium."""
     _python(["scripts/generate_planet_centers_spk.py", "--tier", "medium"])
@@ -87,7 +103,10 @@ def planet_centers_spk() -> None:
 # ===========================================================================
 
 
-@generate_group.command("lunar-corrections")
+@generate_group.command(
+    "lunar-corrections",
+    short_help="Regenerate mean lunar element correction tables.",
+)
 def lunar_corrections() -> None:
     """Regenerate precomputed correction tables for mean lunar elements.
 
@@ -104,7 +123,10 @@ def lunar_corrections() -> None:
 # ===========================================================================
 
 
-@generate_group.command("keplerian-elements")
+@generate_group.command(
+    "keplerian-elements",
+    short_help="Generate multi-epoch orbital elements from SPK files.",
+)
 def keplerian_elements() -> None:
     """Generate multi-epoch Keplerian orbital elements from SPK files.
 
@@ -115,7 +137,10 @@ def keplerian_elements() -> None:
     _python(["scripts/generate_multi_epoch_elements.py"])
 
 
-@generate_group.command("keplerian-dry-run")
+@generate_group.command(
+    "keplerian-dry-run",
+    short_help="Show available SPK files and epoch grid (no generation).",
+)
 def keplerian_dry_run() -> None:
     """Show which SPK files are available and the epoch grid, without generating.
 
