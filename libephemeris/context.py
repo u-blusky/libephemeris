@@ -24,6 +24,8 @@ from __future__ import annotations
 import os
 import threading
 from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
+
+from .tracing import _record
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
@@ -496,6 +498,7 @@ class EphemerisContext:
                 from .logging_config import get_logger
 
                 get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd_ut)
+                _record(ipl, "LEB")
                 return result
             except (KeyError, ValueError):
                 from .logging_config import get_logger
@@ -564,6 +567,7 @@ class EphemerisContext:
                 from .logging_config import get_logger
 
                 get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd)
+                _record(ipl, "LEB")
                 return result
             except (KeyError, ValueError):
                 from .logging_config import get_logger

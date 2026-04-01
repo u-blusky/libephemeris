@@ -38,6 +38,10 @@ from .logging_config import (
     format_file_size,
     LIBEPHEMERIS_LOG_LEVEL_ENV,
 )
+from .tracing import (
+    start_tracing,
+    get_trace_results,
+)
 from .exceptions import (
     # Base error class (reference API compatible)
     Error,

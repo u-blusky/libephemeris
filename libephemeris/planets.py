@@ -46,6 +46,8 @@ from __future__ import annotations
 import math
 import warnings
 from typing import Tuple, TYPE_CHECKING
+
+from .tracing import _record
 from jplephem.exceptions import OutOfRangeError
 from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
 from skyfield.api import Star
@@ -874,6 +876,7 @@ def swe_calc_ut(
 
             result = fast_calc.fast_calc_ut(reader, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdut)
+            _record(planet, "LEB")
             return result
         except (KeyError, ValueError) as _leb_err:
             get_logger().debug(
@@ -894,6 +897,7 @@ def swe_calc_ut(
 
             result = horizons_backend.horizons_calc_ut(h_client, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdut)
+            _record(planet, "Horizons")
             return result
         except KeyError as _hz_err:
             get_logger().debug(
@@ -922,6 +926,7 @@ def swe_calc_ut(
         # for minor bodies; for standard planets it's always Skyfield
         if planet in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdut)
+            _record(planet, "Skyfield")
         # Apply output format flags (XYZ, RADIANS)
         pos = _apply_output_flags(pos, flags)
         # Restore output format flags in retflag (they were stripped for calc)
@@ -990,6 +995,7 @@ def swe_calc(
 
             result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
+            _record(planet, "LEB")
             return result
         except (KeyError, ValueError) as _leb_err:
             get_logger().debug(
@@ -1015,6 +1021,7 @@ def swe_calc(
                 h_client, jd_ut_approx, planet, flags
             )
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdet)
+            _record(planet, "Horizons")
             return result
         except KeyError as _hz_err:
             get_logger().debug(
@@ -1040,6 +1047,7 @@ def swe_calc(
         pos, retflag = _calc_body(t, planet, calc_iflag)
         if planet in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdet)
+            _record(planet, "Skyfield")
         # Apply output format flags (XYZ, RADIANS)
         pos = _apply_output_flags(pos, flags)
         # Restore output format flags in retflag (they were stripped for calc)
@@ -2165,6 +2173,7 @@ def _calc_body(
             spk_result = spk.calc_spk_body_position(t, ipl, iflag)
             if spk_result is not None:
                 get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
+                _record(ipl, "SPK")
                 spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
                 return _to_native_floats(spk_result), iflag
 
@@ -2206,6 +2215,7 @@ def _calc_body(
                     get_logger().debug(
                         "body=%d jd=%.1f source=ASSIST (n-body)", ipl, jd_tt
                     )
+                    _record(ipl, "ASSIST")
                     return _to_native_floats(
                         _maybe_equatorial_convert(
                             (lon, lat, dist, speed_lon, speed_lat, speed_dist),
@@ -2224,6 +2234,7 @@ def _calc_body(
                 ipl,
                 jd_tt,
             )
+            _record(ipl, "Keplerian")
             lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
 
             speed_lon = 0.0
