@@ -277,6 +277,23 @@ def leb_backend_group() -> None:
 
 
 @leb_backend_group.command(
+    "essential",
+    short_help="Quick sanity check in LEB mode: ~490 tests, parallel (~20s).",
+)
+def leb_essential() -> None:
+    """Quick sanity check in LEB mode: 1 test file per major module, parallel (~490 tests, ~20s).
+
+    Same file set as 'leph test skyfield essential' but positions are read from
+    precomputed Chebyshev polynomials instead of computed from DE440.
+    Requires data/leb/ephemeris_medium.leb.
+    """
+    _pytest(
+        ["-n", "auto", "-m", "not slow", "--calc-mode", "leb", *_ESSENTIAL_FILES],
+        env=_LEB_ENV,
+    )
+
+
+@leb_backend_group.command(
     "unit",
     short_help="Run unit tests sequentially in LEB mode, verbose output.",
 )
@@ -450,6 +467,21 @@ def horizons_backend() -> None:
     """
     _pytest(
         ["compare_scripts/tests/", "-v", "-m", "not slow"],
+        env={"LIBEPHEMERIS_COMPARE_MODE": "horizons"},
+    )
+
+
+@compare_group.command(
+    "horizons-backend-full",
+    short_help="Compare via Horizons API vs pyswisseph, ALL tests.",
+)
+def horizons_backend_full() -> None:
+    """Compare via Horizons API vs pyswisseph, ALL tests including @slow.
+
+    Full comparison including slow iterative tests. Requires internet.
+    """
+    _pytest(
+        ["compare_scripts/tests/", "-v"],
         env={"LIBEPHEMERIS_COMPARE_MODE": "horizons"},
     )
 

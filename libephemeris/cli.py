@@ -11,9 +11,11 @@ Usage:
     libephemeris download leb-base      Download LEB binary ephemeris for 'base' (~53 MB)
     libephemeris download leb-medium    Download LEB binary ephemeris for 'medium' (~175 MB)
     libephemeris download leb-extended  Download LEB binary ephemeris for 'extended'
+    libephemeris download leb2-base     Download LEB2 compressed ephemeris for 'base'
+    libephemeris download leb2-medium   Download LEB2 compressed ephemeris for 'medium'
+    libephemeris download leb2-extended Download LEB2 compressed ephemeris for 'extended'
     libephemeris download assist        Download ASSIST n-body data files (~714 MB)
-    libephemeris status                 Show data file status
-    libephemeris info                   Show version, calc mode, LEB file, tier
+    libephemeris status                 Show comprehensive library and data status
     libephemeris --version              Show version
     libephemeris --help                 Show help
 
@@ -73,8 +75,7 @@ def _handle_download(func, quiet: bool, **kwargs) -> None:  # type: ignore[no-un
     "the calculation backend. It is intended for end-users and CI pipelines.\n\n"
     "First-time setup:\n\n"
     "  libephemeris download medium       Download data for the default tier\n"
-    "  libephemeris status                Verify everything is installed\n"
-    "  libephemeris info                  Show active backend and configuration",
+    "  libephemeris status                Verify everything is installed",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 120},
     epilog="""\
 Examples:
@@ -83,9 +84,9 @@ Examples:
   libephemeris download extended      Full range (-13200 to +17191 CE)
   libephemeris download leb-base      LEB binary ephemeris (~53 MB, ~14x speedup)
   libephemeris download leb-medium    LEB binary ephemeris (~175 MB, ~14x speedup)
+  libephemeris download leb2-base     LEB2 compressed ephemeris (smaller, modular)
   libephemeris download assist        ASSIST n-body data (~714 MB)
-  libephemeris status                 Show installed data files
-  libephemeris info                   Show version, calc mode, tier info
+  libephemeris status                 Show comprehensive library and data status
 
 For more information, visit: https://github.com/g-battaglia/libephemeris
 """,
@@ -102,11 +103,13 @@ def cli() -> None:
 
 @click.group(
     "download",
+    short_help="Download data files: tier SPKs, LEB, LEB2, ASSIST.",
     help="Download data files required by libephemeris.\n\n"
-    "Three types of data:\n\n"
-    "  Tier data (base/medium/extended)  DE440/441 kernels + asteroid SPKs\n"
-    "  LEB files (leb-base/medium/ext)   Precomputed Chebyshev (~14x speedup)\n"
-    "  ASSIST data                       N-body integration files (~714 MB)\n\n"
+    "Four types of data:\n\n"
+    "  Tier data (base/medium/extended)   DE440/441 kernels + asteroid SPKs\n"
+    "  LEB files (leb-base/medium/ext)    Precomputed Chebyshev (~14x speedup)\n"
+    "  LEB2 files (leb2-base/medium/ext)  Compressed modular (4-10x smaller)\n"
+    "  ASSIST data                        N-body integration files (~714 MB)\n\n"
     "Most users need only: libephemeris download medium",
 )
 def download_group() -> None:
@@ -136,6 +139,7 @@ def _make_tier_download(tier: str) -> click.Command:
 
     @click.command(
         tier,
+        short_help=f"Download DE kernel + SPKs for '{tier}' tier ({TIER_INFO[tier]['range']}).",
         help=f"Download data for '{tier}' tier ({TIER_INFO[tier]['range']}).\n\n"
         + tier_download_help(tier),
     )
@@ -166,6 +170,7 @@ def _make_leb_download(tier: str) -> click.Command:
 
     @click.command(
         f"leb-{tier}",
+        short_help=f"Download LEB1 binary ephemeris for '{tier}' tier (~14x speedup).",
         help=f"Download LEB binary ephemeris for '{tier}' tier.\n\n"
         + leb_download_help(tier),
     )
@@ -189,10 +194,50 @@ for _tier in TIER_INFO:
     download_group.add_command(_make_leb_download(_tier))
 
 
+# --- LEB2 downloads ---
+
+_LEB2_SIZES = {"base": "~28 MB", "medium": "~99 MB", "extended": "~734 MB"}
+
+
+def _make_leb2_download(tier: str) -> click.Command:
+    """Create a LEB2 download command for a tier."""
+
+    @click.command(
+        f"leb2-{tier}",
+        short_help=f"Download LEB2 compressed ephemeris for '{tier}' tier ({_LEB2_SIZES.get(tier, '')}).",
+        help=f"Download LEB2 compressed modular ephemeris for '{tier}' tier.\n\n"
+        f"LEB2 uses error-bounded lossy compression (mantissa truncation + zstd)\n"
+        f'to achieve 4-10x smaller files while maintaining <0.001" precision vs LEB1.\n\n'
+        f"Downloads 4 group files: core, asteroids, apogee, uranians.\n"
+        f"Total size: {_LEB2_SIZES.get(tier, 'varies')}.\n\n"
+        f"Files are saved to ~/.libephemeris/leb/ by default.",
+    )
+    @_download_options
+    def cmd(force: bool, no_progress: bool, quiet: bool) -> None:
+        from .download import download_leb2_for_tier
+
+        _handle_download(
+            download_leb2_for_tier,
+            quiet=quiet,
+            tier_name=tier,
+            force=force,
+            show_progress=not no_progress,
+            activate=True,
+        )
+
+    return cmd
+
+
+for _tier in TIER_INFO:
+    download_group.add_command(_make_leb2_download(_tier))
+
+
 # --- ASSIST download ---
 
 
-@download_group.command()
+@download_group.command(
+    short_help="Download ASSIST n-body data files (~714 MB, requires libephemeris[nbody]).",
+)
 @_download_options
 @click.option("--no-planets", is_flag=True, help="Skip planet ephemeris download")
 @click.option("--no-asteroids", is_flag=True, help="Skip asteroid perturbers download")
@@ -241,77 +286,59 @@ cli.add_command(download_group)
 
 
 # ---------------------------------------------------------------------------
-# status command
+# status command — comprehensive library and data overview
 # ---------------------------------------------------------------------------
 
 
-@cli.command(short_help="Show installed data files, current tier, and download status.")
-def status() -> None:
-    """Show installed data files, current precision tier, and download status.
+@cli.command(
+    short_help="Show comprehensive library status: version, config, all data files.",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output status as machine-readable JSON.",
+)
+def status(as_json: bool) -> None:
+    """Show comprehensive library and data file status.
 
-    Lists all data files (BSP kernels, SPKs, LEB files), their sizes,
-    and whether they are present on disk.
+    Displays version, calculation mode, precision tier, LEB file, data directory,
+    and the status of all data files: DE kernels, planet center corrections,
+    LEB1 binary ephemeris, LEB2 compressed files, SPK asteroid cache,
+    ASSIST n-body data, and IERS Earth orientation data.
+
+    \b
+    Use --json for machine-readable output (e.g. for CI pipelines).
     """
     from .download import print_data_status
 
-    print_data_status()
+    print_data_status(as_json=as_json)
 
 
 # ---------------------------------------------------------------------------
-# info command (NEW)
+# info command (deprecated — alias for status --brief)
 # ---------------------------------------------------------------------------
 
 
-@cli.command(short_help="Show version, active calc mode, LEB file, and precision tier.")
+@cli.command(
+    short_help="[Deprecated] Use 'status' instead.",
+    deprecated=True,
+)
 def info() -> None:
-    """Show library version, active calculation mode, LEB file path, and precision tier.
+    """Show library version, calc mode, and precision tier.
 
-    Displays a quick summary of the current libephemeris configuration:
-    which backend is active (skyfield/leb/horizons/auto), the precision tier,
-    the configured LEB file (if any), and the data directory path.
+    DEPRECATED: This command is superseded by 'libephemeris status' which
+    shows everything 'info' showed plus comprehensive data file status.
     """
-    from . import __version__ as ver
-
-    click.echo(f"libephemeris {ver}")
+    click.echo(
+        click.style("Note: ", fg="yellow")
+        + "'info' is deprecated. Use 'libephemeris status' instead."
+    )
     click.echo()
 
-    # Calculation mode
-    try:
-        import os
+    from .download import print_data_status
 
-        from .state import get_calc_mode, get_precision_tier
-
-        mode = get_calc_mode()
-        click.echo(f"  Calc mode:      {mode}")
-
-        tier = get_precision_tier()
-        tier_info = TIER_INFO.get(tier, {})
-        click.echo(f"  Precision tier:  {tier} ({tier_info.get('range', 'unknown')})")
-
-        # LEB file: check env var and internal state
-        leb_path = os.environ.get("LIBEPHEMERIS_LEB")
-        if not leb_path:
-            from . import state as _state
-
-            leb_path = getattr(_state, "_LEB_FILE", None)
-        if leb_path:
-            click.echo(f"  LEB file:        {leb_path}")
-        else:
-            click.echo("  LEB file:        (none configured)")
-    except Exception as e:
-        click.echo(f"  (could not read state: {e})")
-
-    # Data directory
-    try:
-        from .download import get_data_dir
-
-        data_dir = get_data_dir()
-        click.echo(f"  Data directory:  {data_dir}")
-    except Exception:
-        pass
-
-    click.echo()
-    click.echo("For detailed file status: libephemeris status")
+    print_data_status(as_json=False)
 
 
 # ---------------------------------------------------------------------------

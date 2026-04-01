@@ -566,79 +566,348 @@ def check_data_status() -> dict[str, dict]:
     return status
 
 
-def print_data_status():
-    """Print the status of all data files to stdout."""
-    from .state import get_precision_tier
+def print_data_status(as_json: bool = False) -> None:
+    """Print comprehensive library and data file status.
 
-    status = check_data_status()
+    Shows version, calc mode, precision tier, LEB file, data directory,
+    and status of all data files: DE kernels, planet centers, LEB1, LEB2,
+    SPK cache, ASSIST, and IERS Earth orientation data.
+
+    Args:
+        as_json: If True, output machine-readable JSON instead of formatted text.
+    """
+    import json as json_mod
+    import os
+
+    from .state import get_calc_mode, get_precision_tier, _get_data_dir
+
+    data_dir = get_data_dir()
+    workspace_root = Path(__file__).parent.parent
     current_tier = get_precision_tier()
 
-    print("libephemeris data files:")
-    print()
+    # Collect all status data into a dict (used for both JSON and text output)
+    result: dict[str, Any] = {}
 
-    # Show tier-specific planet_centers first
-    tier_files = [
-        "planet_centers_base.bsp",
-        "planet_centers_medium.bsp",
-        "planet_centers_extended.bsp",
-    ]
-    for filename in tier_files:
-        if filename not in status:
-            continue
-        info = status[filename]
-        tier_name = filename.replace("planet_centers_", "").replace(".bsp", "")
-        marker = " *" if tier_name == current_tier else ""
-        if info["exists"]:
-            size_str = _format_size(info["size"])
-            print(f"  [OK] {filename} ({size_str}){marker}")
-            print(f"        {info['description']}")
-        else:
-            print(f"  [--] {filename} (not installed){marker}")
-            print(f"        {info['description']}")
+    # --- Library info ---
+    try:
+        from . import __version__ as ver
+    except Exception:
+        ver = "unknown"
 
-    # Show LEB binary ephemeris files
-    leb_files = [
-        "ephemeris_base.leb",
-        "ephemeris_medium.leb",
-        "ephemeris_extended.leb",
-    ]
-    print()
-    print("LEB binary ephemeris (~14x speedup):")
-    for filename in leb_files:
-        if filename not in status:
-            continue
-        info = status[filename]
-        tier_name = filename.replace("ephemeris_", "").replace(".leb", "")
-        marker = " *" if tier_name == current_tier else ""
-        if info["exists"]:
-            size_str = _format_size(info["size"])
-            print(f"  [OK] {filename} ({size_str}){marker}")
+    calc_mode = "unknown"
+    try:
+        calc_mode = get_calc_mode()
+    except Exception:
+        pass
+
+    leb_path_str = "(none)"
+    try:
+        leb_path_val = os.environ.get("LIBEPHEMERIS_LEB")
+        if not leb_path_val:
+            from . import state as _state
+
+            leb_path_val = getattr(_state, "_LEB_FILE", None)
+        if leb_path_val:
+            leb_path_str = str(leb_path_val)
+    except Exception:
+        pass
+
+    result["version"] = str(ver)
+    result["calc_mode"] = str(calc_mode)
+    result["precision_tier"] = current_tier
+    result["leb_file"] = leb_path_str
+    result["data_directory"] = str(data_dir)
+
+    # --- DE Ephemeris Kernels ---
+    de_kernels_info: dict[str, dict[str, Any]] = {}
+    de_files = {
+        "base": ("de440s.bsp", "DE440s — lightweight (1849-2150)"),
+        "medium": ("de440.bsp", "DE440 — general purpose (1549-2650)"),
+        "extended": ("de441.bsp", "DE441 — full range (-13198 to +17191)"),
+    }
+    for tier_name, (filename, desc) in de_files.items():
+        # DE kernels can be in the Skyfield data directory or data_dir
+        path = Path(data_dir) / filename
+        if not path.exists():
+            # Check Skyfield's default location
+            try:
+                from skyfield.api import Loader
+
+                loader = Loader(str(data_dir))
+                sf_path = Path(loader.directory) / filename
+                if sf_path.exists():
+                    path = sf_path
+            except Exception:
+                pass
+        exists = path.exists()
+        size = path.stat().st_size if exists else None
+        de_kernels_info[filename] = {
+            "exists": exists,
+            "size": size,
+            "description": desc,
+            "active": tier_name == current_tier,
+        }
+    result["de_kernels"] = de_kernels_info
+
+    # --- Planet Center Corrections ---
+    planet_centers_info: dict[str, dict[str, Any]] = {}
+    for tier_name in ["base", "medium", "extended"]:
+        filename = f"planet_centers_{tier_name}.bsp"
+        path = Path(data_dir) / filename
+        if not path.exists():
+            path = workspace_root / filename
+        exists = path.exists()
+        size = path.stat().st_size if exists else None
+        planet_centers_info[filename] = {
+            "exists": exists,
+            "size": size,
+            "active": tier_name == current_tier,
+        }
+    result["planet_centers"] = planet_centers_info
+
+    # --- LEB1 Binary Ephemeris ---
+    leb1_info: dict[str, dict[str, Any]] = {}
+    for tier_name in ["base", "medium", "extended"]:
+        filename = f"ephemeris_{tier_name}.leb"
+        path = Path(data_dir) / "leb" / filename
+        exists = path.exists()
+        size = path.stat().st_size if exists else None
+        active = leb_path_str.endswith(filename) if leb_path_str != "(none)" else False
+        leb1_info[filename] = {
+            "exists": exists,
+            "size": size,
+            "active": active,
+        }
+    result["leb1_files"] = leb1_info
+
+    # --- LEB2 Compressed Files ---
+    leb2_info: dict[str, dict[str, Any]] = {}
+    leb2_groups = ["core", "asteroids", "apogee", "uranians"]
+    for tier_name in ["base", "medium", "extended"]:
+        for group in leb2_groups:
+            filename = f"{tier_name}_{group}.leb"
+            path = Path(data_dir) / "leb" / filename
+            exists = path.exists()
+            size = path.stat().st_size if exists else None
+            leb2_info[filename] = {
+                "exists": exists,
+                "size": size,
+            }
+    result["leb2_files"] = leb2_info
+
+    # --- SPK Asteroid Cache ---
+    spk_info: dict[str, Any] = {}
+    try:
+        from .spk_auto import DEFAULT_AUTO_SPK_DIR
+        from .state import get_spk_cache_dir
+
+        spk_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
+        spk_path = Path(spk_dir)
+        if spk_path.exists():
+            spk_files = list(spk_path.glob("*.bsp"))
+            total_size = sum(f.stat().st_size for f in spk_files)
+            spk_info = {
+                "directory": str(spk_path),
+                "file_count": len(spk_files),
+                "total_size": total_size,
+            }
         else:
-            available = (
-                " (not yet generated)" if info["expected_size_mb"] is None else ""
+            spk_info = {
+                "directory": str(spk_path),
+                "file_count": 0,
+                "total_size": 0,
+            }
+    except Exception:
+        spk_info = {"directory": "(unknown)", "file_count": 0, "total_size": 0}
+    result["spk_cache"] = spk_info
+
+    # --- ASSIST N-body Data ---
+    assist_info: dict[str, dict[str, Any]] = {}
+    try:
+        assist_dir = Path(os.path.expanduser("~/.libephemeris/assist"))
+        for filename, desc in [
+            ("linux_p1550p2650.440", "Planet ephemeris (~98 MB)"),
+            ("sb441-n16.bsp", "Asteroid perturbers (~616 MB)"),
+        ]:
+            path = assist_dir / filename
+            exists = path.exists()
+            size = path.stat().st_size if exists else None
+            assist_info[filename] = {
+                "exists": exists,
+                "size": size,
+                "description": desc,
+            }
+    except Exception:
+        pass
+    result["assist_files"] = assist_info
+
+    # --- IERS Earth Orientation Data ---
+    iers_info: dict[str, Any] = {}
+    try:
+        from .iers_data import get_iers_cache_info
+
+        cache_info = get_iers_cache_info()
+        iers_info = {
+            "cache_dir": str(cache_info.get("cache_dir", "")),
+            "finals": {
+                "exists": bool(cache_info.get("finals_exists")),
+                "age_days": cache_info.get("finals_age_days"),
+            },
+            "leap_seconds": {
+                "exists": bool(cache_info.get("leap_seconds_exists")),
+                "age_days": cache_info.get("leap_seconds_age_days"),
+            },
+            "delta_t": {
+                "exists": bool(cache_info.get("delta_t_exists")),
+                "age_days": cache_info.get("delta_t_age_days"),
+            },
+        }
+    except Exception:
+        pass
+    result["iers_data"] = iers_info
+
+    # --- Output ---
+    import click as _click
+
+    if as_json:
+        # Convert Path objects and other non-serializable types
+        def _serialize(obj: Any) -> Any:
+            if isinstance(obj, Path):
+                return str(obj)
+            return obj
+
+        _click.echo(json_mod.dumps(result, indent=2, default=_serialize))
+        return
+
+    # --- Formatted text output ---
+
+    def _ok(text: str) -> str:
+        return _click.style("[OK]", fg="green") + " " + text
+
+    def _missing(text: str) -> str:
+        return _click.style("[--]", fg="yellow") + " " + text
+
+    def _active_marker(is_active: bool) -> str:
+        return _click.style(" *", fg="cyan") if is_active else ""
+
+    _click.echo(_click.style(f"libephemeris {ver}", bold=True))
+    _click.echo()
+
+    # Library configuration
+    _click.echo(_click.style("Configuration", bold=True))
+    _click.echo(f"  Calc mode:       {calc_mode}")
+    _click.echo(f"  Precision tier:  {current_tier}")
+    _click.echo(f"  LEB file:        {leb_path_str}")
+    _click.echo(f"  Data directory:  {data_dir}")
+    _click.echo()
+
+    # DE Ephemeris Kernels
+    _click.echo(_click.style("Ephemeris Kernels", bold=True))
+    for filename, info in de_kernels_info.items():
+        marker = _active_marker(info["active"])
+        if info["exists"]:
+            _click.echo(f"  {_ok(filename)} ({_format_size(info['size'])}){marker}")
+        else:
+            _click.echo(f"  {_missing(filename)}{marker}")
+    _click.echo()
+
+    # Planet Center Corrections
+    _click.echo(_click.style("Planet Center Corrections", bold=True))
+    for filename, info in planet_centers_info.items():
+        marker = _active_marker(info["active"])
+        if info["exists"]:
+            _click.echo(f"  {_ok(filename)} ({_format_size(info['size'])}){marker}")
+        else:
+            _click.echo(f"  {_missing(filename)}{marker}")
+    _click.echo()
+
+    # LEB1 Binary Ephemeris
+    _click.echo(_click.style("LEB1 Binary Ephemeris (~14x speedup)", bold=True))
+    for filename, info in leb1_info.items():
+        marker = _active_marker(info["active"])
+        if info["exists"]:
+            _click.echo(f"  {_ok(filename)} ({_format_size(info['size'])}){marker}")
+        else:
+            _click.echo(f"  {_missing(filename)}{marker}")
+    _click.echo()
+
+    # LEB2 Compressed Files
+    _click.echo(_click.style("LEB2 Compressed Ephemeris (4-10x smaller)", bold=True))
+    for tier_name in ["base", "medium", "extended"]:
+        tier_files = [f"{tier_name}_{g}.leb" for g in leb2_groups]
+        present = sum(1 for f in tier_files if leb2_info.get(f, {}).get("exists"))
+        total = len(tier_files)
+        total_size = sum(
+            leb2_info[f]["size"]
+            for f in tier_files
+            if leb2_info.get(f, {}).get("exists") and leb2_info[f]["size"]
+        )
+        if present == total:
+            _click.echo(
+                f"  {_ok(tier_name)}: {present}/{total} groups"
+                f" ({_format_size(total_size)})"
             )
-            print(f"  [--] {filename} (not installed){marker}{available}")
-
-    # Show legacy planet_centers.bsp
-    legacy_file = "planet_centers.bsp"
-    if legacy_file in status:
-        info = status[legacy_file]
-        print()
-        if info["exists"]:
-            size_str = _format_size(info["size"])
-            print(f"  [OK] {legacy_file} ({size_str}) - legacy")
-            print(f"        {info['description']}")
+        elif present > 0:
+            _click.echo(
+                _click.style("[~~]", fg="yellow")
+                + f" {tier_name}: {present}/{total} groups"
+                f" ({_format_size(total_size)})"
+            )
         else:
-            print(f"  [--] {legacy_file} (not installed) - legacy")
+            _click.echo(f"  {_missing(tier_name)}: 0/{total} groups")
+    _click.echo()
 
-    print()
-    print(f"Current tier: {current_tier}")
-    print()
-    print("Commands:")
-    print("  libephemeris download:<tier>       Download SPK + planet centers data")
-    print("  libephemeris download:leb:<tier>    Download LEB binary ephemeris")
-    print("  libephemeris download:assist        Download ASSIST n-body data")
-    print("Available tiers: base, medium, extended")
+    # SPK Asteroid Cache
+    _click.echo(_click.style("SPK Asteroid Cache", bold=True))
+    _click.echo(f"  Directory:  {spk_info.get('directory', '(unknown)')}")
+    fc = spk_info.get("file_count", 0)
+    ts = spk_info.get("total_size", 0)
+    if fc > 0:
+        _click.echo(f"  Files:      {fc} ({_format_size(ts)})")
+    else:
+        _click.echo("  Files:      (none)")
+    _click.echo()
+
+    # ASSIST N-body Data
+    _click.echo(_click.style("ASSIST N-body Data", bold=True))
+    if assist_info:
+        for filename, info in assist_info.items():
+            if info["exists"]:
+                _click.echo(f"  {_ok(filename)} ({_format_size(info['size'])})")
+            else:
+                _click.echo(f"  {_missing(filename)}")
+    else:
+        _click.echo("  (could not check)")
+    _click.echo()
+
+    # IERS Earth Orientation Data
+    _click.echo(_click.style("IERS Earth Orientation Data", bold=True))
+    if iers_info:
+        for label, key in [
+            ("finals2000A.data", "finals"),
+            ("Leap_Second.dat", "leap_seconds"),
+            ("deltat.data", "delta_t"),
+        ]:
+            finfo = iers_info.get(key, {})
+            if finfo.get("exists"):
+                age = finfo.get("age_days")
+                age_str = f", {age:.0f} days old" if age is not None else ""
+                _click.echo(f"  {_ok(label)}{age_str}")
+            else:
+                _click.echo(f"  {_missing(label)}")
+    else:
+        _click.echo("  (could not check)")
+    _click.echo()
+
+    # Setup hints
+    _click.echo(_click.style("Commands", bold=True))
+    _click.echo("  libephemeris download <tier>         Download DE kernel + SPKs")
+    _click.echo("  libephemeris download leb-<tier>     Download LEB1 binary ephemeris")
+    _click.echo(
+        "  libephemeris download leb2-<tier>    Download LEB2 compressed ephemeris"
+    )
+    _click.echo("  libephemeris download assist         Download ASSIST n-body data")
+    _click.echo("  Available tiers: base, medium, extended")
 
 
 def init_all(

@@ -211,4 +211,40 @@ def verify_base() -> None:
     )
 
 
+@verify_group.command(
+    "medium",
+    short_help='Verify medium tier LEB2 vs LEB1 (<0.003" precision).',
+)
+def verify_medium() -> None:
+    """Verify medium tier LEB2 core against LEB1 reference (<0.003\" precision)."""
+    _leb2(
+        [
+            "verify",
+            "data/leb2/medium_core.leb",
+            "--reference",
+            "data/leb/ephemeris_medium.leb",
+            "--samples",
+            "500",
+        ]
+    )
+
+
+@verify_group.command(
+    "extended",
+    short_help='Verify extended tier LEB2 vs LEB1 (<0.003" precision).',
+)
+def verify_extended() -> None:
+    """Verify extended tier LEB2 core against LEB1 reference (<0.003\" precision)."""
+    _leb2(
+        [
+            "verify",
+            "data/leb2/extended_core.leb",
+            "--reference",
+            "data/leb/ephemeris_extended.leb",
+            "--samples",
+            "500",
+        ]
+    )
+
+
 leb2_group.add_command(verify_group)
