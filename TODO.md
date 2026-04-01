@@ -1,9 +1,6 @@
 # TODO - Improvements and Technical Debt
 
-## Open
-
-- `leph download all` should exist as a developer-only command that downloads every file needed for local development: runtime data, LEB generation inputs, planet-center generation inputs, and any other files required to build or regenerate artifacts locally.
-- Keep the CLI split explicit: `leph` is for libephemeris developers, while `libephemeris` is for end users of the library.
+All items completed as of March 2026.
 
 ---
 
@@ -23,3 +20,4 @@
 - ~~#11b~~ Sun heliocentric — returns (0,0,0) correctly now
 - ~~#11c~~ True Node distance — full osculating orbit calc (2000x improvement)
 - ~~#12~~ Skyfield TypeError — retry + radec removal, cache clear
+- ~~#13~~ Developer CLI split — `leph` now has its own `status` command and `download all` for the full local-development dataset, while `libephemeris` stays focused on end-user runtime setup

@@ -1,4 +1,4 @@
-"""Data download commands: SPK kernels, LEB files, ASSIST data.
+"""Data download commands for local libephemeris development.
 
 Replaces 7 poe tasks: spk:download:*, download:leb:*, download:assist.
 """
@@ -11,13 +11,31 @@ import sys
 import click
 
 
+def _run_python(args: list[str]) -> int:
+    """Run a Python module or script and return its exit code."""
+    return subprocess.call([sys.executable, *args])
+
+
 def _python(args: list[str]) -> None:
-    """Run a python expression or script."""
-    sys.exit(
-        subprocess.call(
-            [sys.executable, *args],
-        )
-    )
+    """Run a Python module or script and exit with the same status."""
+    sys.exit(_run_python(args))
+
+
+def _libephemeris_download_args(
+    *parts: str,
+    force: bool,
+    no_progress: bool,
+    quiet: bool,
+) -> list[str]:
+    """Build a wrapped `libephemeris download ...` invocation."""
+    args = ["-m", "libephemeris.cli", "download", *parts]
+    if force:
+        args.append("--force")
+    if no_progress:
+        args.append("--no-progress")
+    if quiet:
+        args.append("--quiet")
+    return args
 
 
 # ---------------------------------------------------------------------------
@@ -27,19 +45,83 @@ def _python(args: list[str]) -> None:
 
 @click.group(
     "download",
-    short_help="Download SPK kernels, LEB binary ephemeris, and ASSIST n-body data.",
-    help="Download data files needed by libephemeris.\n\n"
-    "Three categories of data:\n\n"
-    "  SPK kernels   NASA JPL binary ephemeris files (DE440/DE441) + asteroid SPKs\n"
-    "  LEB files     Precomputed Chebyshev polynomial approximations (~14x speedup)\n"
-    "  ASSIST data   REBOUND/ASSIST n-body integration data for TNOs/asteroids\n\n"
-    "SPK files are required for the Skyfield backend. LEB files are optional\n"
-    "but provide a major speedup. ASSIST data is only needed for n-body work.\n\n"
-    "  leph download spk-medium    # DE440 + asteroid SPKs for medium tier\n"
-    "  leph download leb-medium    # Pre-built LEB file (~20 MB)",
+    short_help="Download runtime and developer data files.",
+    help="Download data files needed for libephemeris development.\n\n"
+    "\b\n"
+    "Categories:\n"
+    "  all          Full developer dataset: runtime files + pre-built LEB1 + ASSIST\n"
+    "  spk-*        DE kernels + asteroid SPKs for a specific tier\n"
+    "  leb-*        Pre-built LEB1 files for verification and tooling\n"
+    "  assist       REBOUND/ASSIST n-body files\n\n"
+    "Use `leph download all` to prepare a machine for local development, data\n"
+    "generation, verification, and packaging workflows.\n\n"
+    "\b\n"
+    "Examples:\n"
+    "  leph download all\n"
+    "  leph download spk-medium\n"
+    "  leph download leb-medium",
 )
 def download_group() -> None:
     """Data download commands."""
+
+
+@download_group.command(
+    "all",
+    short_help="Download the full local-development dataset for libephemeris.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Re-download files even if they are already present.",
+)
+@click.option(
+    "--no-progress",
+    is_flag=True,
+    help="Disable progress output for wrapped libephemeris downloads.",
+)
+@click.option(
+    "--quiet",
+    is_flag=True,
+    help="Suppress wrapper output and pass quiet mode through to subcommands.",
+)
+def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
+    """Download the full developer dataset used for local libephemeris work.
+
+    This is the developer superset of `libephemeris download all`.
+
+    \b
+    Includes:
+      1. All runtime data for every tier: DE kernels, planet centers,
+         asteroid SPKs, IERS files, and LEB2 modules.
+      2. Pre-built LEB1 files for base, medium, and extended tiers.
+      3. ASSIST n-body data used by REBOUND/ASSIST integrations.
+
+    This command is meant for contributors working on generation, verification,
+    packaging, and release tasks. Some generation workflows still require extra
+    tools or upstream network calls at generation time (for example `spiceypy`).
+    """
+    phases = [
+        ("runtime dataset", ["all"]),
+        ("LEB1 base", ["leb-base"]),
+        ("LEB1 medium", ["leb-medium"]),
+        ("LEB1 extended", ["leb-extended"]),
+        ("ASSIST", ["assist"]),
+    ]
+
+    for label, command in phases:
+        if not quiet:
+            click.echo(f"\n== {label} ==")
+
+        exit_code = _run_python(
+            _libephemeris_download_args(
+                *command,
+                force=force,
+                no_progress=no_progress,
+                quiet=quiet,
+            )
+        )
+        if exit_code != 0:
+            sys.exit(exit_code)
 
 
 # ===========================================================================
