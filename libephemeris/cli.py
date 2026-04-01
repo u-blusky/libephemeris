@@ -68,16 +68,27 @@ def _handle_download(func, quiet: bool, **kwargs) -> None:  # type: ignore[no-un
 # ---------------------------------------------------------------------------
 
 
-@click.group(
-    name="libephemeris",
-    help="High-precision astronomical ephemeris library.\n\n"
-    "This CLI manages data files, shows library status, and configures\n"
-    "the calculation backend. It is intended for end-users and CI pipelines.\n\n"
-    "First-time setup:\n\n"
-    "  libephemeris download medium       Download data for the default tier\n"
-    "  libephemeris status                Verify everything is installed",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 120},
-    epilog="""\
+_HELP = """\
+\b
+     *  .  *       .
+  .    _/\\_ .    *
+   .  / () \\   .        libephemeris
+  *  |  /\\  |    .      High-precision astronomical ephemeris
+     |_/  \\_|  *        NASA JPL DE440/DE441
+  .  /_\\  /_\\ .
+       \\/         *
+
+This CLI manages data files, shows library status, and configures
+the calculation backend. It is intended for end-users and CI pipelines.
+
+\b
+First-time setup:
+
+  libephemeris download medium       Download data for the default tier
+  libephemeris status                Verify everything is installed"""
+
+_EPILOG = """\
+\b
 Examples:
   libephemeris download medium        Download data for the default tier
   libephemeris download base          Lightweight, modern-era data
@@ -88,8 +99,14 @@ Examples:
   libephemeris download assist        ASSIST n-body data (~714 MB)
   libephemeris status                 Show comprehensive library and data status
 
-For more information, visit: https://github.com/g-battaglia/libephemeris
-""",
+For more information, visit: https://github.com/g-battaglia/libephemeris"""
+
+
+@click.group(
+    name="libephemeris",
+    help=_HELP,
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 120},
+    epilog=_EPILOG,
 )
 @click.version_option(__version__, prog_name="libephemeris")
 def cli() -> None:
@@ -491,9 +508,30 @@ def config() -> None:
     env_file_var = os.environ.get("LIBEPHEMERIS_ENV_FILE", "")
     click.echo(_b(".env file"))
     click.echo(f"  Env var:  {_e('LIBEPHEMERIS_ENV_FILE')}  (path to .env file)")
-    click.echo("  Default:  .libephemeris.env in current directory or home")
+    click.echo("  Default:  ./.env then ~/.libephemeris/.env")
     if env_file_var:
         click.echo(f"  Current:  {env_file_var}")
+    click.echo()
+
+    # --- TOML config file ---
+    from ._config_toml import get_config_path
+
+    toml_path = get_config_path()
+    click.echo(_b("TOML config file"))
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_CONFIG')}  (path to config file)")
+    click.echo(
+        "  Default:  ./libephemeris-config.toml then ~/.libephemeris/config.toml"
+    )
+    click.echo(f"  Current:  {toml_path or '(none found)'}")
+    if toml_path:
+        from ._config_toml import get_all
+
+        cfg = get_all()
+        if cfg:
+            click.echo(f"  Values:   {len(cfg)} key(s) loaded")
+            for k, v in cfg.items():
+                click.echo(f"            {_d(k)} = {v!r}")
+    click.echo("  Generate: libephemeris init")
     click.echo()
 
     # --- Logging ---
@@ -516,6 +554,280 @@ def config() -> None:
 
     click.echo("For current file status:  libephemeris status")
     click.echo("Full CLI reference:       see CLI.md")
+
+
+# ---------------------------------------------------------------------------
+# init command — interactive wizard to generate libephemeris-config.toml
+# ---------------------------------------------------------------------------
+
+
+@cli.command(
+    short_help="Create a libephemeris-config.toml via interactive wizard.",
+)
+@click.option(
+    "--output",
+    "-o",
+    default="libephemeris-config.toml",
+    show_default=True,
+    help="Output file path for the generated config.",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Overwrite existing config file without asking.",
+)
+@click.option(
+    "--non-interactive",
+    is_flag=True,
+    help="Generate config with all defaults (no prompts).",
+)
+def init(output: str, force: bool, non_interactive: bool) -> None:
+    """Generate a libephemeris-config.toml configuration file.
+
+    Walks through each configuration option interactively, showing the
+    current default and available choices.  The resulting file can be
+    committed to version control so every developer on the project uses
+    the same library settings.
+
+    \b
+    Quick start:
+      libephemeris init                    Interactive wizard
+      libephemeris init -o config.toml     Custom output path
+      libephemeris init --non-interactive  All defaults, no prompts
+    """
+    import os
+    from pathlib import Path
+
+    _b = lambda t: click.style(t, bold=True)  # noqa: E731
+    _d = lambda t: click.style(t, fg="cyan")  # noqa: E731
+    _g = lambda t: click.style(t, fg="green")  # noqa: E731
+
+    out_path = Path(output)
+    if out_path.exists() and not force:
+        if non_interactive:
+            click.echo(f"Error: {output} already exists. Use --force to overwrite.")
+            sys.exit(1)
+        if not click.confirm(f"{output} already exists. Overwrite?"):
+            click.echo("Aborted.")
+            return
+
+    click.echo()
+    click.echo(_b("libephemeris configuration wizard"))
+    click.echo("Each option shows the default in [brackets]. Press Enter to accept.")
+    click.echo()
+
+    # --- Collect values ---
+    config: dict[str, object] = {}
+
+    # 1. Precision tier
+    tier_choices = ["base", "medium", "extended"]
+    if non_interactive:
+        tier = "medium"
+    else:
+        click.echo(_b("Precision tier"))
+        click.echo(f"  {_d('base')}      de440s.bsp (~31 MB)   1849-2150 CE")
+        click.echo(f"  {_d('medium')}    de440.bsp  (~114 MB)  1549-2650 CE")
+        click.echo(f"  {_d('extended')}  de441.bsp  (~3.1 GB)  -13200 to +17191 CE")
+        tier = click.prompt(
+            "  precision",
+            type=click.Choice(tier_choices, case_sensitive=False),
+            default="medium",
+            show_choices=False,
+        )
+    config["precision"] = tier
+    click.echo()
+
+    # 2. Calculation mode
+    mode_choices = ["auto", "skyfield", "leb", "horizons"]
+    if non_interactive:
+        mode = "auto"
+    else:
+        click.echo(_b("Calculation mode"))
+        click.echo(f"  {_d('auto')}      LEB -> Horizons -> Skyfield fallback chain")
+        click.echo(f"  {_d('skyfield')}  Compute from DE kernel via Skyfield")
+        click.echo(
+            f"  {_d('leb')}       Precomputed Chebyshev polynomials (~14x faster)"
+        )
+        click.echo(
+            f"  {_d('horizons')}  Query NASA JPL Horizons API (requires internet)"
+        )
+        mode = click.prompt(
+            "  mode",
+            type=click.Choice(mode_choices, case_sensitive=False),
+            default="auto",
+            show_choices=False,
+        )
+    config["mode"] = mode
+    click.echo()
+
+    # 3. Auto SPK download
+    if non_interactive:
+        auto_spk = True
+    else:
+        click.echo(_b("Auto SPK download"))
+        click.echo("  Automatically download high-precision SPK files for minor bodies")
+        click.echo("  (Chiron, Ceres, Pallas, Juno, Vesta) from JPL Horizons.")
+        auto_spk = click.confirm("  auto_spk", default=True)
+    config["auto_spk"] = auto_spk
+    click.echo()
+
+    # 4. Strict precision
+    if non_interactive:
+        strict = True
+    else:
+        click.echo(_b("Strict precision"))
+        click.echo("  Require SPK kernels for major asteroids (raise errors instead")
+        click.echo("  of falling back to inaccurate Keplerian propagation).")
+        strict = click.confirm("  strict_precision", default=True)
+    config["strict_precision"] = strict
+    click.echo()
+
+    # 5. IERS auto download
+    if non_interactive:
+        iers_auto = False
+    else:
+        click.echo(_b("IERS auto download"))
+        click.echo("  Automatically download Earth orientation data for high-precision")
+        click.echo("  Delta T calculations (requires internet).")
+        iers_auto = click.confirm("  iers_auto_download", default=False)
+    config["iers_auto_download"] = iers_auto
+    click.echo()
+
+    # 6. IERS Delta T
+    if non_interactive:
+        iers_dt = False
+    else:
+        click.echo(_b("IERS observed Delta T"))
+        click.echo("  Use observed Delta T values from IERS for recent dates (1973+).")
+        click.echo("  Requires IERS data to be downloaded first.")
+        iers_dt = click.confirm("  iers_delta_t", default=False)
+    config["iers_delta_t"] = iers_dt
+    click.echo()
+
+    # 7. Log level
+    log_choices = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    if non_interactive:
+        log_level = "WARNING"
+    else:
+        click.echo(_b("Log level"))
+        click.echo("  Controls verbosity of library messages to stderr.")
+        log_level = click.prompt(
+            "  log_level",
+            type=click.Choice(log_choices, case_sensitive=False),
+            default="WARNING",
+            show_choices=False,
+        )
+        log_level = log_level.upper()
+    config["log_level"] = log_level
+    click.echo()
+
+    # 8. Optional: custom paths (only in interactive mode)
+    if not non_interactive:
+        click.echo(_b("Optional paths"))
+        click.echo("  Leave blank to use defaults. These are rarely needed.")
+        click.echo()
+
+        data_dir = click.prompt("  data_dir", default="", show_default=False).strip()
+        if data_dir:
+            config["data_dir"] = data_dir
+
+        leb_file = click.prompt("  leb_file", default="", show_default=False).strip()
+        if leb_file:
+            config["leb_file"] = leb_file
+
+        spk_dir = click.prompt("  spk_dir", default="", show_default=False).strip()
+        if spk_dir:
+            config["spk_dir"] = spk_dir
+
+        ephemeris = click.prompt(
+            "  ephemeris (e.g. de441.bsp)", default="", show_default=False
+        ).strip()
+        if ephemeris:
+            config["ephemeris"] = ephemeris
+
+        click.echo()
+
+    # --- Generate TOML ---
+    lines = [
+        "# libephemeris configuration file",
+        "# Generated by: libephemeris init",
+        "#",
+        "# Resolution order (highest to lowest priority):",
+        "#   1. set_*() function calls (programmatic)",
+        "#   2. Environment variables / .env file",
+        "#   3. This file (libephemeris-config.toml)",
+        "#   4. Built-in defaults",
+        "#",
+        "# Search order for this file:",
+        "#   1. LIBEPHEMERIS_CONFIG env var (explicit path)",
+        "#   2. ./libephemeris-config.toml (project directory)",
+        "#   3. ~/.libephemeris/config.toml (global)",
+        "",
+        "[libephemeris]",
+    ]
+
+    # Emit values with inline comments
+    _comments: dict[str, str] = {
+        "precision": "base | medium | extended",
+        "mode": "auto | skyfield | leb | horizons",
+        "auto_spk": "auto-download SPK for minor bodies from Horizons",
+        "strict_precision": "require SPK for major asteroids",
+        "iers_auto_download": "auto-download IERS Earth orientation data",
+        "iers_delta_t": "use observed Delta T from IERS (1973+)",
+        "log_level": "DEBUG | INFO | WARNING | ERROR | CRITICAL",
+        "data_dir": "base directory for all downloaded files",
+        "leb_file": "path to .leb or .leb2 binary ephemeris",
+        "spk_dir": "SPK cache directory",
+        "ephemeris": "DE kernel filename override",
+    }
+
+    # Ordered keys for output
+    _key_order = [
+        "precision",
+        "mode",
+        "auto_spk",
+        "strict_precision",
+        "iers_auto_download",
+        "iers_delta_t",
+        "log_level",
+        "data_dir",
+        "leb_file",
+        "spk_dir",
+        "ephemeris",
+    ]
+
+    for key in _key_order:
+        if key not in config:
+            continue
+        value = config[key]
+        comment = _comments.get(key, "")
+        comment_suffix = f"  # {comment}" if comment else ""
+
+        if isinstance(value, bool):
+            toml_val = "true" if value else "false"
+        elif isinstance(value, str):
+            toml_val = f'"{value}"'
+        else:
+            toml_val = str(value)
+
+        lines.append(f"{key} = {toml_val}{comment_suffix}")
+
+    content = "\n".join(lines) + "\n"
+
+    # --- Write file ---
+    try:
+        out_path.write_text(content, encoding="utf-8")
+    except OSError as e:
+        click.echo(f"Error writing {output}: {e}", err=True)
+        sys.exit(1)
+
+    click.echo(_g(f"Created {output}"))
+    click.echo()
+    click.echo("Next steps:")
+    click.echo(f"  - Commit {output} to version control")
+    click.echo("  - Override individual values via env vars or .env for local tweaks")
+    click.echo("  - Run 'libephemeris config' to see the full configuration reference")
 
 
 # ---------------------------------------------------------------------------

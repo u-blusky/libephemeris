@@ -29,6 +29,13 @@ from ._dotenv import load_dotenv as _load_dotenv
 _load_dotenv()
 del _load_dotenv
 
+# Auto-load TOML config file (libephemeris-config.toml) after .env.
+# TOML values have lower priority than env vars (which includes .env).
+from ._config_toml import load_config as _load_config
+
+_load_config()
+del _load_config
+
 from .constants import *
 from .logging_config import (
     get_logger,
@@ -760,7 +767,7 @@ from .arabic_parts import calc_all_arabic_parts
 # .env file loader (public API for manual reloading)
 from ._dotenv import load_dotenv
 
-__version__ = "1.0.0a7"
+__version__ = "1.0.0a8"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0"

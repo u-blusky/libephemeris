@@ -1,6 +1,6 @@
 [project]
 name = "libephemeris"
-version = "1.0.0a7"
+version = "1.0.0a8"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -50,6 +50,7 @@ dependencies = [
     "spktype21>=0.1.0",  # Support for SPK type 21 files from JPL Horizons (asteroids, comets)
     "pyerfa>=2.0.0",  # IAU ERFA: high-precision nutation (IAU 2006/2000A), obliquity, precession, aberration
     "zstandard>=0.22.0",  # Zstandard compression for LEB2 compressed ephemeris format
+    "tomli>=1.1.0; python_version < '3.11'",  # TOML parser for config files (stdlib on 3.11+)
 ]
 
 [project.optional-dependencies]

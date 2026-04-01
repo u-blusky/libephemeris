@@ -406,6 +406,12 @@ libephemeris status --json              # Machine-readable JSON
 # Configuration guide (env vars, file locations, Python API)
 libephemeris config                     # Show all settings and how to change them
 
+# Generate a TOML config file (interactive wizard)
+libephemeris init                       # Interactive wizard -> libephemeris-config.toml
+libephemeris init -o config.toml        # Custom output path
+libephemeris init --non-interactive     # All defaults, no prompts
+libephemeris init --force               # Overwrite existing file
+
 # Options available on all download commands
 libephemeris download medium --force           # Re-download even if present
 libephemeris download medium --no-progress     # Suppress progress bars
@@ -449,10 +455,52 @@ The `config` command is a reference guide showing every configurable setting:
 - **IERS Earth orientation data**: file names, env vars
 - **ASSIST n-body data**: file names, sizes, install requirements
 - **.env file**: location and override env var
+- **TOML config file**: path, loaded values, generate command
 - **Logging**: log level env var
 - **Other settings**: strict precision mode
 
 Each section shows the current value, relevant env var, and Python API equivalent.
+
+### `libephemeris init`
+
+Interactive wizard that generates a `libephemeris-config.toml` file.
+The file can be committed to version control so every developer on the
+project uses the same library settings.
+
+```bash
+libephemeris init                       # Interactive wizard
+libephemeris init -o config.toml        # Custom output path
+libephemeris init --non-interactive     # All defaults, no prompts
+libephemeris init --force               # Overwrite existing file
+```
+
+Generated file example:
+
+```toml
+[libephemeris]
+precision = "extended"       # base | medium | extended
+mode = "leb"                 # auto | skyfield | leb | horizons
+auto_spk = true              # auto-download SPK for minor bodies
+strict_precision = true      # require SPK for major asteroids
+iers_auto_download = false   # auto-download IERS data
+iers_delta_t = false         # use observed Delta T from IERS
+log_level = "WARNING"        # DEBUG | INFO | WARNING | ERROR | CRITICAL
+```
+
+### Configuration resolution order
+
+When multiple sources set the same value, highest priority wins:
+
+1. **`set_*()`** function calls (programmatic, in code)
+2. **Environment variables** (including `.env` file)
+3. **TOML config file** (`libephemeris-config.toml`)
+4. **Built-in defaults**
+
+TOML file search order:
+
+1. `LIBEPHEMERIS_CONFIG` env var (explicit path)
+2. `./libephemeris-config.toml` (project directory)
+3. `~/.libephemeris/config.toml` (global user config)
 
 ---
 

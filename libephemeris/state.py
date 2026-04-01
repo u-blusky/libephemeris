@@ -40,7 +40,8 @@ def _get_data_dir() -> str:
 
     Resolution order:
         1. LIBEPHEMERIS_DATA_DIR environment variable
-        2. DEFAULT_DATA_DIR (~/.libephemeris)
+        2. TOML config ``data_dir``
+        3. DEFAULT_DATA_DIR (~/.libephemeris)
 
     The directory is created if it doesn't exist.
 
@@ -48,7 +49,13 @@ def _get_data_dir() -> str:
         str: Absolute path to the data directory.
     """
     env_value = os.environ.get(_DATA_DIR_ENV_VAR, "").strip()
-    data_dir = env_value if env_value else DEFAULT_DATA_DIR
+    if env_value:
+        data_dir = env_value
+    else:
+        from ._config_toml import get_str as _toml_str
+
+        toml_value = _toml_str("data_dir")
+        data_dir = toml_value if toml_value else DEFAULT_DATA_DIR
     data_dir = os.path.abspath(data_dir)
     os.makedirs(data_dir, exist_ok=True)
     return data_dir
@@ -249,6 +256,12 @@ def get_calc_mode() -> str:
     env_value = os.environ.get(_CALC_MODE_ENV_VAR, "").lower().strip()
     if env_value in _VALID_CALC_MODES:
         return env_value
+    # TOML config fallback
+    from ._config_toml import get_str as _toml_str
+
+    toml_value = _toml_str("mode")
+    if toml_value and toml_value.lower().strip() in _VALID_CALC_MODES:
+        return toml_value.lower().strip()
     return "auto"
 
 
@@ -349,6 +362,12 @@ def get_leb_reader() -> Optional["LEBReader"]:
 
     if _LEB_READER is None:
         path = _LEB_FILE or os.environ.get("LIBEPHEMERIS_LEB")
+
+        # TOML config fallback
+        if path is None:
+            from ._config_toml import get_str as _toml_str
+
+            path = _toml_str("leb_file")
 
         # Auto-discover if no explicit path configured
         if path is None:
@@ -587,7 +606,14 @@ def _get_current_tier() -> PrecisionTier:
     if env_value in TIERS:
         return TIERS[env_value]
 
-    # Priority 3: default
+    # Priority 3: TOML config
+    from ._config_toml import get_str as _toml_str
+
+    toml_value = _toml_str("precision")
+    if toml_value and toml_value.lower().strip() in TIERS:
+        return TIERS[toml_value.lower().strip()]
+
+    # Priority 4: default
     return TIERS[_DEFAULT_TIER]
 
 
@@ -709,7 +735,14 @@ def _get_effective_ephemeris_file() -> str:
     if _EPHEMERIS_FILE_EXPLICIT:
         return _EPHEMERIS_FILE
 
-    # Priority 3: precision tier
+    # Priority 3: TOML config
+    from ._config_toml import get_str as _toml_str
+
+    toml_value = _toml_str("ephemeris")
+    if toml_value:
+        return toml_value
+
+    # Priority 4: precision tier
     tier = _get_current_tier()
     return tier.ephemeris_file
 
@@ -1474,6 +1507,14 @@ def _close_inner() -> None:
     except ImportError:
         pass
 
+    # Reset TOML config cache so it re-discovers on next access
+    try:
+        from ._config_toml import reset as _reset_toml_config
+
+        _reset_toml_config()
+    except ImportError:
+        pass
+
     # Close and clear SPK kernels
     for kernel in _SPK_KERNELS.values():
         try:
@@ -1680,6 +1721,16 @@ def get_auto_spk_download() -> bool:
     # If env var explicitly disables, return False
     if env_value in ("0", "false", "no", "off", "disabled"):
         return False
+    # If env var explicitly enables, return True
+    if env_value in ("1", "true", "yes", "on", "enabled"):
+        return True
+
+    # TOML config fallback
+    from ._config_toml import get_bool as _toml_bool
+
+    toml_value = _toml_bool("auto_spk")
+    if toml_value is not None:
+        return toml_value
 
     # Default to True (auto-download enabled) because:
     # - strict_precision defaults to True, so SPK kernels are required
@@ -1756,6 +1807,12 @@ def get_spk_cache_dir() -> Optional[str]:
     env_dir = os.environ.get(_SPK_CACHE_DIR_ENV_VAR)
     if env_dir:
         return env_dir
+    # TOML config fallback
+    from ._config_toml import get_str as _toml_str
+
+    toml_value = _toml_str("spk_dir")
+    if toml_value:
+        return toml_value
     return None
 
 
@@ -1878,7 +1935,19 @@ def get_iers_delta_t_enabled() -> bool:
 
     # Otherwise check environment variable
     env_value = os.environ.get(_IERS_DELTA_T_ENV_VAR, "").lower().strip()
-    return env_value in ("1", "true", "yes", "on", "enabled")
+    if env_value in ("1", "true", "yes", "on", "enabled"):
+        return True
+    if env_value in ("0", "false", "no", "off", "disabled"):
+        return False
+
+    # TOML config fallback
+    from ._config_toml import get_bool as _toml_bool
+
+    toml_value = _toml_bool("iers_delta_t")
+    if toml_value is not None:
+        return toml_value
+
+    return False
 
 
 # =============================================================================
@@ -1957,6 +2026,16 @@ def get_strict_precision() -> bool:
     # If env var explicitly disables, return False
     if env_value in ("0", "false", "no", "off", "disabled"):
         return False
+    # If env var explicitly enables, return True
+    if env_value in ("1", "true", "yes", "on", "enabled"):
+        return True
+
+    # TOML config fallback
+    from ._config_toml import get_bool as _toml_bool
+
+    toml_value = _toml_bool("strict_precision")
+    if toml_value is not None:
+        return toml_value
 
     # Default to True (strict mode enabled) because:
     # - SPK type 21 is now fully supported via spktype21 library

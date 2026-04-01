@@ -1120,6 +1120,7 @@ dependencies = [
     { name = "skyfield" },
     { name = "skyfield-data" },
     { name = "spktype21" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "zstandard" },
 ]
 
@@ -1206,6 +1207,7 @@ requires-dist = [
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "spiceypy", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "spktype21", specifier = ">=0.1.0" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=1.1.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "zstandard", specifier = ">=0.22.0" },
 ]

@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a8] — 2026-04-01
+
+### Added
+
+#### TOML Configuration File Support
+
+Added `libephemeris-config.toml` as a structured, version-controllable
+alternative to `.env` files for projects using libephemeris as a dependency.
+
+- New module `_config_toml.py`: TOML loader with auto-discovery
+  (`./libephemeris-config.toml` → `~/.libephemeris/config.toml`),
+  override via `LIBEPHEMERIS_CONFIG` env var.
+- All getter functions in `state.py`, `iers_data.py`, and `logging_config.py`
+  now include TOML in the resolution chain: `set_*()` > env var > TOML > default.
+- TOML config is loaded at import time (after `.env`), reset on `close()`.
+- Added `tomli>=1.1.0` dependency for Python <3.11 (stdlib `tomllib` on 3.11+).
+
+#### `libephemeris init` Wizard
+
+Interactive TUI wizard that generates a `libephemeris-config.toml` file.
+Walks through precision tier, calculation mode, SPK settings, IERS options,
+log level, and optional custom paths. Supports `--non-interactive` for CI
+and `--force` to overwrite.
+
+#### CLI Banner and Help Formatting
+
+- Added ASCII art banner to the `libephemeris --help` output.
+- Fixed Click text wrapping on all help/epilog blocks using `\b` markers.
+- `libephemeris config` now shows the loaded TOML config file path and values.
+
 ## [1.0.0a7] — 2026-03-31
 
 ### Added

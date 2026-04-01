@@ -224,7 +224,19 @@ def get_iers_auto_download() -> bool:
         return _IERS_AUTO_DOWNLOAD
 
     env_value = os.environ.get(_IERS_AUTO_DOWNLOAD_ENV_VAR, "").lower().strip()
-    return env_value in ("1", "true", "yes", "on", "enabled")
+    if env_value in ("1", "true", "yes", "on", "enabled"):
+        return True
+    if env_value in ("0", "false", "no", "off", "disabled"):
+        return False
+
+    # TOML config fallback
+    from ._config_toml import get_bool as _toml_bool
+
+    toml_value = _toml_bool("iers_auto_download")
+    if toml_value is not None:
+        return toml_value
+
+    return False
 
 
 # =============================================================================

@@ -75,13 +75,20 @@ def _get_log_level_from_env() -> int:
     """
     env_level = os.environ.get(LIBEPHEMERIS_LOG_LEVEL_ENV, "").upper().strip()
 
-    if not env_level:
-        return logging.WARNING  # Default for production quietness
-
-    if env_level in _VALID_LOG_LEVELS:
+    if env_level and env_level in _VALID_LOG_LEVELS:
         return getattr(logging, env_level)
 
-    # Invalid value, fall back to WARNING
+    # TOML config fallback
+    try:
+        from ._config_toml import get_str as _toml_str
+
+        toml_value = _toml_str("log_level")
+        if toml_value and toml_value.upper().strip() in _VALID_LOG_LEVELS:
+            return getattr(logging, toml_value.upper().strip())
+    except Exception:
+        pass
+
+    # Default for production quietness
     return logging.WARNING
 
 
