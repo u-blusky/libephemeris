@@ -1,6 +1,9 @@
 # TODO - Improvements and Technical Debt
 
-All items completed as of March 2026.
+## Open
+
+- `leph download all` should exist as a developer-only command that downloads every file needed for local development: runtime data, LEB generation inputs, planet-center generation inputs, and any other files required to build or regenerate artifacts locally.
+- Keep the CLI split explicit: `leph` is for libephemeris developers, while `libephemeris` is for end users of the library.
 
 ---
 

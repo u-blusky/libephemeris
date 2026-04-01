@@ -566,7 +566,7 @@ def check_data_status() -> dict[str, dict]:
     return status
 
 
-def print_data_status(as_json: bool = False) -> None:
+def print_data_status(as_json: bool = False, verbose: int = 0) -> None:
     """Print comprehensive library and data file status.
 
     Shows version, calc mode, precision tier, LEB file, data directory,
@@ -575,11 +575,12 @@ def print_data_status(as_json: bool = False) -> None:
 
     Args:
         as_json: If True, output machine-readable JSON instead of formatted text.
+        verbose: Detail level for human-readable output.
     """
     import json as json_mod
     import os
 
-    from .state import get_calc_mode, get_precision_tier, _get_data_dir
+    from .state import get_calc_mode, get_precision_tier
 
     data_dir = get_data_dir()
     workspace_root = Path(__file__).parent.parent
@@ -646,6 +647,7 @@ def print_data_status(as_json: bool = False) -> None:
             "size": size,
             "description": desc,
             "active": tier_name == current_tier,
+            "path": str(path),
         }
     result["de_kernels"] = de_kernels_info
 
@@ -662,6 +664,7 @@ def print_data_status(as_json: bool = False) -> None:
             "exists": exists,
             "size": size,
             "active": tier_name == current_tier,
+            "path": str(path),
         }
     result["planet_centers"] = planet_centers_info
 
@@ -677,6 +680,7 @@ def print_data_status(as_json: bool = False) -> None:
             "exists": exists,
             "size": size,
             "active": active,
+            "path": str(path),
         }
     result["leb1_files"] = leb1_info
 
@@ -692,6 +696,7 @@ def print_data_status(as_json: bool = False) -> None:
             leb2_info[filename] = {
                 "exists": exists,
                 "size": size,
+                "path": str(path),
             }
     result["leb2_files"] = leb2_info
 
@@ -704,21 +709,35 @@ def print_data_status(as_json: bool = False) -> None:
         spk_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         spk_path = Path(spk_dir)
         if spk_path.exists():
-            spk_files = list(spk_path.glob("*.bsp"))
+            spk_files = sorted(spk_path.glob("*.bsp"))
             total_size = sum(f.stat().st_size for f in spk_files)
             spk_info = {
                 "directory": str(spk_path),
                 "file_count": len(spk_files),
                 "total_size": total_size,
+                "files": [
+                    {
+                        "name": f.name,
+                        "path": str(f),
+                        "size": f.stat().st_size,
+                    }
+                    for f in spk_files
+                ],
             }
         else:
             spk_info = {
                 "directory": str(spk_path),
                 "file_count": 0,
                 "total_size": 0,
+                "files": [],
             }
     except Exception:
-        spk_info = {"directory": "(unknown)", "file_count": 0, "total_size": 0}
+        spk_info = {
+            "directory": "(unknown)",
+            "file_count": 0,
+            "total_size": 0,
+            "files": [],
+        }
     result["spk_cache"] = spk_info
 
     # --- ASSIST N-body Data ---
@@ -736,6 +755,7 @@ def print_data_status(as_json: bool = False) -> None:
                 "exists": exists,
                 "size": size,
                 "description": desc,
+                "path": str(path),
             }
     except Exception:
         pass
@@ -747,19 +767,24 @@ def print_data_status(as_json: bool = False) -> None:
         from .iers_data import get_iers_cache_info
 
         cache_info = get_iers_cache_info()
+        cache_dir = Path(str(cache_info.get("cache_dir", "")))
+
         iers_info = {
-            "cache_dir": str(cache_info.get("cache_dir", "")),
+            "cache_dir": str(cache_dir),
             "finals": {
                 "exists": bool(cache_info.get("finals_exists")),
                 "age_days": cache_info.get("finals_age_days"),
+                "path": str(cache_dir / "finals2000A.data"),
             },
             "leap_seconds": {
                 "exists": bool(cache_info.get("leap_seconds_exists")),
                 "age_days": cache_info.get("leap_seconds_age_days"),
+                "path": str(cache_dir / "leap_seconds.dat"),
             },
             "delta_t": {
                 "exists": bool(cache_info.get("delta_t_exists")),
                 "age_days": cache_info.get("delta_t_age_days"),
+                "path": str(cache_dir / "deltat.data"),
             },
         }
     except Exception:
@@ -790,6 +815,13 @@ def print_data_status(as_json: bool = False) -> None:
     def _active_marker(is_active: bool) -> str:
         return _click.style(" *", fg="cyan") if is_active else ""
 
+    def _print_path(info: dict[str, Any]) -> None:
+        if verbose < 1:
+            return
+        path = info.get("path")
+        if path:
+            _click.echo(f"    Path: {path}")
+
     _click.echo(_click.style(f"libephemeris {ver}", bold=True))
     _click.echo()
 
@@ -809,6 +841,7 @@ def print_data_status(as_json: bool = False) -> None:
             _click.echo(f"  {_ok(filename)} ({_format_size(info['size'])}){marker}")
         else:
             _click.echo(f"  {_missing(filename)}{marker}")
+        _print_path(info)
     _click.echo()
 
     # Planet Center Corrections
@@ -819,6 +852,7 @@ def print_data_status(as_json: bool = False) -> None:
             _click.echo(f"  {_ok(filename)} ({_format_size(info['size'])}){marker}")
         else:
             _click.echo(f"  {_missing(filename)}{marker}")
+        _print_path(info)
     _click.echo()
 
     # LEB1 Binary Ephemeris
@@ -829,6 +863,7 @@ def print_data_status(as_json: bool = False) -> None:
             _click.echo(f"  {_ok(filename)} ({_format_size(info['size'])}){marker}")
         else:
             _click.echo(f"  {_missing(filename)}{marker}")
+        _print_path(info)
     _click.echo()
 
     # LEB2 Compressed Files
@@ -855,6 +890,14 @@ def print_data_status(as_json: bool = False) -> None:
             )
         else:
             _click.echo(f"  {_missing(tier_name)}: 0/{total} groups")
+        if verbose >= 1:
+            for filename in tier_files:
+                info = leb2_info[filename]
+                if info["exists"]:
+                    _click.echo(f"    {_ok(filename)} ({_format_size(info['size'])})")
+                else:
+                    _click.echo(f"    {_missing(filename)}")
+                _print_path(info)
     _click.echo()
 
     # SPK Asteroid Cache
@@ -866,6 +909,10 @@ def print_data_status(as_json: bool = False) -> None:
         _click.echo(f"  Files:      {fc} ({_format_size(ts)})")
     else:
         _click.echo("  Files:      (none)")
+    if verbose >= 2:
+        for info in spk_info.get("files", []):
+            _click.echo(f"  {_ok(info['name'])} ({_format_size(info['size'])})")
+            _click.echo(f"    Path: {info['path']}")
     _click.echo()
 
     # ASSIST N-body Data
@@ -876,6 +923,7 @@ def print_data_status(as_json: bool = False) -> None:
                 _click.echo(f"  {_ok(filename)} ({_format_size(info['size'])})")
             else:
                 _click.echo(f"  {_missing(filename)}")
+            _print_path(info)
     else:
         _click.echo("  (could not check)")
     _click.echo()
@@ -885,7 +933,7 @@ def print_data_status(as_json: bool = False) -> None:
     if iers_info:
         for label, key in [
             ("finals2000A.data", "finals"),
-            ("Leap_Second.dat", "leap_seconds"),
+            ("leap_seconds.dat", "leap_seconds"),
             ("deltat.data", "delta_t"),
         ]:
             finfo = iers_info.get(key, {})
@@ -895,6 +943,7 @@ def print_data_status(as_json: bool = False) -> None:
                 _click.echo(f"  {_ok(label)}{age_str}")
             else:
                 _click.echo(f"  {_missing(label)}")
+            _print_path(finfo)
     else:
         _click.echo("  (could not check)")
     _click.echo()

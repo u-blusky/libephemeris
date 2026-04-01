@@ -403,15 +403,16 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
 
 @download_group.command(
     "all",
-    short_help="Download ALL data files for every tier and mode (~5 GB).",
+    short_help="Download ALL data files for every tier and mode (~5 GB + IERS).",
 )
 @_download_options
 def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
     """Download every data file for complete offline readiness.
 
-    Downloads LEB2 files, DE kernels, planet centers, and SPK kernels
-    for ALL three tiers (base, medium, extended).  This lets you switch
-    between any configuration without needing to download anything later.
+    Downloads LEB2 files, DE kernels, planet centers, SPK kernels, and IERS
+    Earth orientation data for ALL three tiers (base, medium, extended).
+    This lets you switch between any configuration without needing to
+    download anything later.
 
     \b
     WARNING: This will download approximately 5-6 GB of data.
@@ -422,6 +423,7 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
       - DE kernels: de440s, de440, de441            (~3.2 GB)
       - Planet centers for all tiers                (~320 MB)
       - SPK kernels for 21 minor bodies             (~varies)
+      - IERS data: finals, leap seconds, delta T    (~3 MB)
 
     \b
     Examples:
@@ -474,6 +476,21 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
                 click.echo()
 
         if not quiet:
+            click.echo(_w("  ── IERS data ──"))
+            click.echo()
+            click.echo(_d("  Earth orientation parameters + leap seconds..."))
+
+        from ..iers_data import (
+            download_delta_t_data,
+            download_iers_finals,
+            download_leap_seconds,
+        )
+
+        download_iers_finals(force=force)
+        download_leap_seconds(force=force)
+        download_delta_t_data(force=force)
+
+        if not quiet:
             click.echo(f"  {_g('All tiers downloaded!')} Full offline readiness.")
             click.echo(_d("  Run 'libephemeris status' to verify."))
             click.echo()
@@ -481,7 +498,7 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
     except KeyboardInterrupt:
         click.echo("\n  Download cancelled.")
         sys.exit(130)
-    except (OSError, ValueError, RuntimeError) as e:
+    except (ConnectionError, OSError, ValueError, RuntimeError) as e:
         if not quiet:
             click.echo(f"\n  {_y(f'Error: {e}')}", err=True)
         sys.exit(1)
@@ -504,7 +521,13 @@ cli.add_command(download_group)
     is_flag=True,
     help="Output status as machine-readable JSON.",
 )
-def status(as_json: bool) -> None:
+@click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    help="Increase detail: -v shows paths, -vv shows full file lists.",
+)
+def status(as_json: bool, verbose: int) -> None:
     """Show comprehensive library and data file status.
 
     Displays version, calculation mode, precision tier, LEB file, data directory,
@@ -514,10 +537,11 @@ def status(as_json: bool) -> None:
 
     \b
     Use --json for machine-readable output (e.g. for CI pipelines).
+    Use -v or -vv for more detailed human-readable reports.
     """
     from ..download import print_data_status
 
-    print_data_status(as_json=as_json)
+    print_data_status(as_json=as_json, verbose=verbose)
 
 
 # ---------------------------------------------------------------------------

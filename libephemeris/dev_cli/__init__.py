@@ -25,6 +25,7 @@ from .cmd_leb import leb_group
 from .cmd_leb2 import leb2_group
 from .cmd_manual import manual_group
 from .cmd_release import release_group
+from .cmd_status import status
 from .cmd_test import test_group
 
 
@@ -47,6 +48,7 @@ Subgroups at a glance:
   code        Ruff linter/formatter, mypy type checker
   leb / leb2  Generate, verify, and compress LEB binary ephemeris files
   download    Fetch SPK kernels, pre-built LEB files, ASSIST n-body data
+  status      Show current data/configuration status for the local setup
   generate    Planet-center SPKs, lunar corrections, Keplerian elements
   calibrate   Fit lunar perigee perturbation coefficients vs JPL DE441
   diag        Print body positions per tier, verify data integrity
@@ -80,6 +82,7 @@ cli.add_command(calibrate_group)
 cli.add_command(release_group)
 cli.add_command(manual_group)
 cli.add_command(completion_group)
+cli.add_command(status)
 
 
 def main() -> None:
