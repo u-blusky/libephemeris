@@ -68,15 +68,14 @@ def _handle_download(func, quiet: bool, **kwargs) -> None:  # type: ignore[no-un
 # ---------------------------------------------------------------------------
 
 
-_HELP = """\
+_HELP = f"""\
 \b
-     *  .  *       .
-  .    _/\\_ .    *
-   .  / () \\   .        libephemeris
-  *  |  /\\  |    .      High-precision astronomical ephemeris
-     |_/  \\_|  *        NASA JPL DE440/DE441
-  .  /_\\  /_\\ .
-       \\/         *
+  _ _ _              _                      _    
+ | (_) |__  ___ _ __| |_  ___ _ __  ___ _ _(_)___
+ | | | '_ \\/ -_) '_ \\ ' \\/ -_) '  \\/ -_) '_| (_-<
+ |_|_|_.__/\\___| .__/_||_\\___|_|_|_\\___|_| |_/__/
+               |_|   [ Powered by NASA JPL DE440/441 ]
+                     [ v{__version__} ]
 
 This CLI manages data files, shows library status, and configures
 the calculation backend. It is intended for end-users and CI pipelines.
