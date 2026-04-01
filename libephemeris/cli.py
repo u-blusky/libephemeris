@@ -316,29 +316,206 @@ def status(as_json: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
-# info command (deprecated — alias for status --brief)
+# config command — explain data file locations and environment variables
 # ---------------------------------------------------------------------------
 
 
 @cli.command(
-    short_help="[Deprecated] Use 'status' instead.",
-    deprecated=True,
+    short_help="Show data file locations, environment variables, and configuration guide.",
 )
-def info() -> None:
-    """Show library version, calc mode, and precision tier.
+def config() -> None:
+    """Show where data files are stored and how to configure libephemeris.
 
-    DEPRECATED: This command is superseded by 'libephemeris status' which
-    shows everything 'info' showed plus comprehensive data file status.
+    Prints every configurable path, environment variable, and Python API
+    function, organized by subsystem: data directory, precision tier,
+    calculation mode, LEB ephemeris, SPK asteroid cache, IERS data, and
+    ASSIST n-body integration.
+
+    \b
+    Useful when you need to:
+      - Find where files are stored on disk
+      - Override default paths via environment variables
+      - Configure the library in a .env file or CI pipeline
+      - Understand which env vars control which behavior
     """
+    import os
+
+    from .download import get_data_dir
+
+    data_dir = get_data_dir()
+
+    _b = lambda t: click.style(t, bold=True)  # noqa: E731
+    _d = lambda t: click.style(t, fg="cyan")  # noqa: E731
+    _e = lambda t: click.style(t, fg="green")  # noqa: E731
+
+    click.echo(_b("libephemeris configuration guide"))
+    click.echo()
+
+    # --- Data directory ---
+    click.echo(_b("Data directory"))
+    click.echo(f"  Current:  {data_dir}")
+    click.echo("  Default:  ~/.libephemeris")
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_DATA_DIR')}")
+    click.echo("  All downloaded files (DE kernels, planet centers, LEB, SPK)")
+    click.echo("  are stored under this directory.")
+    click.echo()
+
+    # --- Precision tier ---
+    try:
+        from .state import get_precision_tier
+
+        current_tier = get_precision_tier()
+    except Exception:
+        current_tier = "medium"
+    click.echo(_b("Precision tier"))
+    click.echo(f"  Current:  {current_tier}")
     click.echo(
-        click.style("Note: ", fg="yellow")
-        + "'info' is deprecated. Use 'libephemeris status' instead."
+        f"  Env var:  {_e('LIBEPHEMERIS_PRECISION')}  (base | medium | extended)"
+    )
+    click.echo("  Python:   set_precision_tier('medium')")
+    click.echo()
+    click.echo(f"  {_d('base')}      de440s.bsp (~31 MB)   1849-2150 CE")
+    click.echo(f"  {_d('medium')}    de440.bsp  (~114 MB)  1549-2650 CE  (default)")
+    click.echo(f"  {_d('extended')}  de441.bsp  (~3.1 GB)  -13200 to +17191 CE")
+    click.echo()
+
+    # --- Ephemeris file ---
+    eph_file = os.environ.get("LIBEPHEMERIS_EPHEMERIS", "")
+    click.echo(_b("Ephemeris file (DE kernel)"))
+    click.echo(f"  Current:  {eph_file or '(from tier)'}")
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_EPHEMERIS')}  (e.g. de441.bsp)")
+    click.echo("  Python:   set_ephemeris_file('de441.bsp')")
+    click.echo("  Usually set automatically by the precision tier.")
+    click.echo(f"  Location: {data_dir}/")
+    click.echo()
+
+    # --- Calculation mode ---
+    try:
+        from .state import get_calc_mode
+
+        calc_mode = get_calc_mode()
+    except Exception:
+        calc_mode = "auto"
+    click.echo(_b("Calculation mode"))
+    click.echo(f"  Current:  {calc_mode}")
+    click.echo(
+        f"  Env var:  {_e('LIBEPHEMERIS_MODE')}  (auto | skyfield | leb | horizons)"
+    )
+    click.echo("  Python:   set_calc_mode('leb')")
+    click.echo()
+    click.echo(
+        f"  {_d('auto')}      LEB -> Horizons -> Skyfield fallback chain (default)"
+    )
+    click.echo(f"  {_d('skyfield')}  Compute from DE kernel via Skyfield (real-time)")
+    click.echo(f"  {_d('leb')}       Precomputed Chebyshev polynomials (~14x faster)")
+    click.echo(f"  {_d('horizons')}  Query NASA JPL Horizons API (requires internet)")
+    click.echo()
+
+    # --- LEB file ---
+    leb_path = os.environ.get("LIBEPHEMERIS_LEB", "")
+    if not leb_path:
+        try:
+            from . import state as _state
+
+            leb_path = getattr(_state, "_LEB_FILE", None) or ""
+        except Exception:
+            pass
+    click.echo(_b("LEB binary ephemeris"))
+    click.echo(f"  Current:  {leb_path or '(none)'}")
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_LEB')}  (path to .leb or .leb2 file)")
+    click.echo("  Python:   set_leb_file('path/to/ephemeris_medium.leb')")
+    click.echo(f"  Location: {data_dir}/leb/")
+    click.echo()
+    click.echo("  LEB1 files (full precision, larger):")
+    click.echo("    ephemeris_base.leb     ~53 MB    1849-2150")
+    click.echo("    ephemeris_medium.leb   ~175 MB   1549-2650")
+    click.echo("    ephemeris_extended.leb ~1.6 GB   -5000 to +5000")
+    click.echo()
+    click.echo("  LEB2 files (compressed, modular, 4 groups per tier):")
+    click.echo("    {tier}_core.leb       core 14 bodies")
+    click.echo("    {tier}_asteroids.leb  Chiron, Ceres, Pallas, Juno, Vesta")
+    click.echo("    {tier}_apogee.leb     OscuApog, IntpApog, IntpPerig")
+    click.echo("    {tier}_uranians.leb   Cupido-Transpluto (9 bodies)")
+    click.echo()
+    click.echo("  Download:  libephemeris download leb-medium")
+    click.echo("             libephemeris download leb2-base")
+    click.echo()
+
+    # --- SPK cache ---
+    try:
+        from .spk_auto import DEFAULT_AUTO_SPK_DIR
+        from .state import get_spk_cache_dir
+
+        spk_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
+    except Exception:
+        spk_dir = f"{data_dir}/spk"
+    auto_spk = os.environ.get("LIBEPHEMERIS_AUTO_SPK", "")
+    click.echo(_b("SPK asteroid cache"))
+    click.echo(f"  Current:  {spk_dir}")
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_SPK_DIR')}  (override cache directory)")
+    click.echo("  Python:   set_spk_cache_dir('/custom/path')")
+    click.echo("  Auto-download from Horizons on demand:")
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_AUTO_SPK')}  (1/0, default: 1)")
+    click.echo(f"  Current:  {auto_spk or '(default: enabled)'}")
+    click.echo()
+
+    # --- Planet centers ---
+    click.echo(_b("Planet center corrections"))
+    click.echo(f"  Location: {data_dir}/planet_centers_{{tier}}.bsp")
+    click.echo("  Downloaded automatically with: libephemeris download <tier>")
+    click.echo("  Provides sub-arcsecond precision for Jupiter-Pluto.")
+    click.echo()
+
+    # --- IERS ---
+    click.echo(_b("IERS Earth orientation data"))
+    iers_auto = os.environ.get("LIBEPHEMERIS_IERS_AUTO_DOWNLOAD", "")
+    iers_dt = os.environ.get("LIBEPHEMERIS_IERS_DELTA_T", "")
+    click.echo(f"  Location: {data_dir}/iers_cache/")
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_IERS_AUTO_DOWNLOAD')}  (1/0)")
+    click.echo(
+        f"  Env var:  {_e('LIBEPHEMERIS_IERS_DELTA_T')}  (1/0, use observed Delta T)"
+    )
+    click.echo("  Files:    finals2000A.data, Leap_Second.dat, deltat.data")
+    click.echo()
+
+    # --- ASSIST ---
+    click.echo(_b("ASSIST n-body data"))
+    click.echo("  Location: ~/.libephemeris/assist/")
+    click.echo("  Files:    linux_p1550p2650.440 (~98 MB)")
+    click.echo("            sb441-n16.bsp (~616 MB)")
+    click.echo("  Download: libephemeris download assist")
+    click.echo("  Requires: pip install libephemeris[nbody]")
+    click.echo()
+
+    # --- .env file ---
+    env_file_var = os.environ.get("LIBEPHEMERIS_ENV_FILE", "")
+    click.echo(_b(".env file"))
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_ENV_FILE')}  (path to .env file)")
+    click.echo("  Default:  .libephemeris.env in current directory or home")
+    if env_file_var:
+        click.echo(f"  Current:  {env_file_var}")
+    click.echo()
+
+    # --- Logging ---
+    log_level = os.environ.get("LIBEPHEMERIS_LOG_LEVEL", "")
+    click.echo(_b("Logging"))
+    click.echo(
+        f"  Env var:  {_e('LIBEPHEMERIS_LOG_LEVEL')}  (DEBUG | INFO | WARNING | ERROR)"
+    )
+    click.echo(f"  Current:  {log_level or '(default: WARNING)'}")
+    click.echo()
+
+    # --- Other ---
+    click.echo(_b("Other settings"))
+    strict = os.environ.get("LIBEPHEMERIS_STRICT_PRECISION", "")
+    click.echo(
+        f"  {_e('LIBEPHEMERIS_STRICT_PRECISION')}  (1/0) "
+        f"Raise errors instead of falling back  [{strict or 'default: 0'}]"
     )
     click.echo()
 
-    from .download import print_data_status
-
-    print_data_status(as_json=False)
+    click.echo("For current file status:  libephemeris status")
+    click.echo("Full CLI reference:       see CLI.md")
 
 
 # ---------------------------------------------------------------------------

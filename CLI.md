@@ -403,6 +403,9 @@ libephemeris download assist            # ASSIST n-body data (~714 MB)
 libephemeris status                     # Formatted text output
 libephemeris status --json              # Machine-readable JSON
 
+# Configuration guide (env vars, file locations, Python API)
+libephemeris config                     # Show all settings and how to change them
+
 # Options available on all download commands
 libephemeris download medium --force           # Re-download even if present
 libephemeris download medium --no-progress     # Suppress progress bars
@@ -432,7 +435,24 @@ libephemeris download:medium      # Same as: libephemeris download medium
 libephemeris download:leb:base    # Same as: libephemeris download leb-base
 ```
 
-The `info` command still works but is deprecated — use `status` instead.
+### `libephemeris config`
+
+The `config` command is a reference guide showing every configurable setting:
+
+- **Data directory**: current path, default, env var
+- **Precision tier**: base/medium/extended with kernel sizes and date ranges
+- **Ephemeris file**: DE kernel override
+- **Calculation mode**: auto/skyfield/leb/horizons with descriptions
+- **LEB binary ephemeris**: LEB1 and LEB2 file listings, sizes, download commands
+- **SPK asteroid cache**: directory, auto-download toggle
+- **Planet center corrections**: per-tier BSP files
+- **IERS Earth orientation data**: file names, env vars
+- **ASSIST n-body data**: file names, sizes, install requirements
+- **.env file**: location and override env var
+- **Logging**: log level env var
+- **Other settings**: strict precision mode
+
+Each section shows the current value, relevant env var, and Python API equivalent.
 
 ---
 
@@ -528,7 +548,7 @@ pytest tests/ -m "not slow" --calc-mode leb            # With LEB backend
 ### Production CLI source: `libephemeris/cli.py`
 
 Click-based CLI with `download` subgroup (tier data, LEB1, LEB2, ASSIST),
-comprehensive `status` command (with `--json`), and deprecated `info` alias.
+comprehensive `status` command (with `--json`), and `config` reference guide.
 Backward compatible with old colon-separated syntax via alias rewriting.
 
 ### Shared: `libephemeris/cli_shared.py`
