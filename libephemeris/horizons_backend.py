@@ -269,7 +269,7 @@ class HorizonsClient:
 
         data_block = result_text[soe_idx + 5 : eoe_idx].strip()
         # CSV format: JDTDB, Calendar Date, X, Y, Z, VX, VY, VZ, LT, RG, RR,
-        lines = [l.strip() for l in data_block.split("\n") if l.strip()]
+        lines = [line.strip() for line in data_block.split("\n") if line.strip()]
         if not lines:
             raise ValueError(f"Empty data block in Horizons response for {command}")
 

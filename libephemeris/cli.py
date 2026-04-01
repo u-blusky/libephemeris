@@ -1,432 +1,351 @@
-"""
-Command-line interface for libephemeris.
+"""Command-line interface for libephemeris.
 
 This module provides CLI commands for managing libephemeris data files.
+Migrated from argparse to click for tab completion and consistency with
+the dev CLI (``leph``).
 
 Usage:
-    libephemeris download:base         Download data for 'base' tier (1850-2150)
-    libephemeris download:medium       Download data for 'medium' tier (1550-2650)
-    libephemeris download:extended     Download data for 'extended' tier (-13200 to +17191)
-    libephemeris download:leb:base     Download LEB binary ephemeris for 'base' (~53 MB)
-    libephemeris download:leb:medium   Download LEB binary ephemeris for 'medium' (~175 MB)
-    libephemeris download:leb:extended Download LEB binary ephemeris for 'extended'
-    libephemeris download:assist       Download ASSIST n-body data files (~714 MB)
-    libephemeris status                Show data file status
-    libephemeris --version             Show version
-    libephemeris --help                Show help
+    libephemeris download base          Download data for 'base' tier (1850-2150)
+    libephemeris download medium        Download data for 'medium' tier (1550-2650)
+    libephemeris download extended      Download data for 'extended' tier (-13200 to +17191)
+    libephemeris download leb-base      Download LEB binary ephemeris for 'base' (~53 MB)
+    libephemeris download leb-medium    Download LEB binary ephemeris for 'medium' (~175 MB)
+    libephemeris download leb-extended  Download LEB binary ephemeris for 'extended'
+    libephemeris download assist        Download ASSIST n-body data files (~714 MB)
+    libephemeris status                 Show data file status
+    libephemeris info                   Show version, calc mode, LEB file, tier
+    libephemeris --version              Show version
+    libephemeris --help                 Show help
+
+Shell completion (add to your shell profile):
+
+    # zsh
+    eval "$(_LIBEPHEMERIS_COMPLETE=zsh_source libephemeris)"
+
+    # bash
+    eval "$(_LIBEPHEMERIS_COMPLETE=bash_source libephemeris)"
 """
 
 from __future__ import annotations
 
-import argparse
 import sys
 
+import click
+
 from . import __version__
+from .cli_shared import TIER_INFO, leb_download_help, tier_download_help
 
 
 # ---------------------------------------------------------------------------
-# Tier descriptions for --help output
-# ---------------------------------------------------------------------------
-
-_TIER_INFO = {
-    "base": {
-        "label": "base",
-        "ephemeris": "de440s.bsp (~31 MB)",
-        "range": "1850-2150 CE",
-        "spk_range": "1850-2150",
-        "description": "Lightweight tier for modern-era calculations.",
-    },
-    "medium": {
-        "label": "medium",
-        "ephemeris": "de440.bsp (~114 MB)",
-        "range": "1550-2650 CE",
-        "spk_range": "1900-2100",
-        "description": "General purpose tier (default). Covers most historical and future dates.",
-    },
-    "extended": {
-        "label": "extended",
-        "ephemeris": "de441.bsp (~3.1 GB)",
-        "range": "-13200 to +17191 CE",
-        "spk_range": "1600-2500 (JPL Horizons limit)",
-        "description": "Full extended range for deep historical and far-future research.",
-    },
-}
-
-
-# ---------------------------------------------------------------------------
-# Command handlers
+# Helpers
 # ---------------------------------------------------------------------------
 
 
-def _cmd_download(tier_name: str, args: argparse.Namespace) -> int:
-    """Handle a download:<tier> command."""
-    from .download import download_for_tier
-
+def _handle_download(func, quiet: bool, **kwargs) -> None:  # type: ignore[no-untyped-def]
+    """Run a download function with standard error handling."""
     try:
-        download_for_tier(
-            tier_name=tier_name,
-            force=args.force,
-            show_progress=not args.no_progress,
-            quiet=args.quiet,
-        )
-        return 0
+        func(**kwargs)
     except KeyboardInterrupt:
-        print("\nDownload cancelled.")
-        return 130
-    except (OSError, ValueError, RuntimeError) as e:
-        if not args.quiet:
-            print(f"Error: {e}", file=sys.stderr)
-        return 1
-
-
-def cmd_download_base(args: argparse.Namespace) -> int:
-    """Download data for the 'base' tier."""
-    return _cmd_download("base", args)
-
-
-def cmd_download_medium(args: argparse.Namespace) -> int:
-    """Download data for the 'medium' tier."""
-    return _cmd_download("medium", args)
-
-
-def cmd_download_extended(args: argparse.Namespace) -> int:
-    """Download data for the 'extended' tier."""
-    return _cmd_download("extended", args)
-
-
-def _cmd_download_leb(tier_name: str, args: argparse.Namespace) -> int:
-    """Handle a download:leb:<tier> command."""
-    from .download import download_leb_for_tier
-
-    try:
-        download_leb_for_tier(
-            tier_name=tier_name,
-            force=args.force,
-            show_progress=not args.no_progress,
-            quiet=args.quiet,
-            activate=False,  # CLI context — no active session to activate
-        )
-        return 0
-    except KeyboardInterrupt:
-        print("\nDownload cancelled.")
-        return 130
-    except RuntimeError as e:
-        if not args.quiet:
-            print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except (OSError, ValueError, RuntimeError) as e:
-        if not args.quiet:
-            print(f"Error: {e}", file=sys.stderr)
-        return 1
-
-
-def cmd_download_leb_base(args: argparse.Namespace) -> int:
-    """Download LEB binary ephemeris for the 'base' tier."""
-    return _cmd_download_leb("base", args)
-
-
-def cmd_download_leb_medium(args: argparse.Namespace) -> int:
-    """Download LEB binary ephemeris for the 'medium' tier."""
-    return _cmd_download_leb("medium", args)
-
-
-def cmd_download_leb_extended(args: argparse.Namespace) -> int:
-    """Download LEB binary ephemeris for the 'extended' tier."""
-    return _cmd_download_leb("extended", args)
-
-
-def cmd_download_assist(args: argparse.Namespace) -> int:
-    """Download ASSIST n-body integration data files."""
-    from .rebound_integration import download_assist_data
-
-    try:
-        download_assist_data(
-            target_dir=args.target_dir if hasattr(args, "target_dir") else None,
-            planets=not args.no_planets,
-            asteroids=not args.no_asteroids,
-            force=args.force,
-            show_progress=not args.no_progress,
-            quiet=args.quiet,
-        )
-        return 0
-    except KeyboardInterrupt:
-        print("\nDownload cancelled.")
-        return 130
+        click.echo("\nDownload cancelled.")
+        sys.exit(130)
     except ImportError as e:
-        if not args.quiet:
-            print(
+        if not quiet:
+            click.echo(
                 f"Error: {e}\nInstall the nbody extra: pip install libephemeris[nbody]",
-                file=sys.stderr,
+                err=True,
             )
-        return 1
+        sys.exit(1)
     except (OSError, ValueError, RuntimeError) as e:
-        if not args.quiet:
-            print(f"Error: {e}", file=sys.stderr)
-        return 1
-
-
-def cmd_status(args: argparse.Namespace) -> int:
-    """Handle the status command."""
-    from .download import print_data_status
-
-    print_data_status()
-    return 0
-
-
-def cmd_version(args: argparse.Namespace) -> int:
-    """Handle the version command."""
-    print(f"libephemeris {__version__}")
-    return 0
+        if not quiet:
+            click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
-# Parser construction
+# Root CLI group
 # ---------------------------------------------------------------------------
 
 
-def _add_download_flags(parser: argparse.ArgumentParser) -> None:
-    """Add common --force / --no-progress / --quiet flags to a download subparser."""
-    parser.add_argument(
-        "--force",
-        "-f",
-        action="store_true",
-        help="Force download even if files already exist",
-    )
-    parser.add_argument(
-        "--no-progress",
-        action="store_true",
-        help="Disable progress output",
-    )
-    parser.add_argument(
-        "--quiet",
-        "-q",
-        action="store_true",
-        help="Suppress all output except errors",
-    )
-
-
-def _make_download_description(tier: str) -> str:
-    """Build the long description for a download:<tier> subparser."""
-    info = _TIER_INFO[tier]
-    return f"""\
-Download all data files for the '{tier}' precision tier.
-
-  Ephemeris:  {info["ephemeris"]}
-  Date range: {info["range"]}
-  SPK range:  {info["spk_range"]}
-
-{info["description"]}
-
-Downloads:
-  1. The ephemeris file ({info["ephemeris"].split(" ")[0]})
-  2. planet_centers.bsp precision offsets (~25 MB)
-  3. SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
-"""
-
-
-def create_parser() -> argparse.ArgumentParser:
-    """Create the argument parser for the CLI."""
-    parser = argparse.ArgumentParser(
-        prog="libephemeris",
-        description="High-precision astronomical ephemeris library",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""\
+@click.group(
+    name="libephemeris",
+    help="High-precision astronomical ephemeris library.\n\n"
+    "This CLI manages data files, shows library status, and configures\n"
+    "the calculation backend. It is intended for end-users and CI pipelines.\n\n"
+    "First-time setup:\n\n"
+    "  libephemeris download medium       Download data for the default tier\n"
+    "  libephemeris status                Verify everything is installed\n"
+    "  libephemeris info                  Show active backend and configuration",
+    context_settings={"help_option_names": ["-h", "--help"]},
+    epilog="""\
 Examples:
-  libephemeris download:medium       Download data for the default tier
-  libephemeris download:base         Lightweight, modern-era data
-  libephemeris download:extended     Full range (-13200 to +17191 CE)
-  libephemeris download:leb:base     LEB binary ephemeris (~53 MB, ~14x speedup)
-  libephemeris download:leb:medium   LEB binary ephemeris (~175 MB, ~14x speedup)
-  libephemeris download:assist       ASSIST n-body data (~714 MB)
-  libephemeris status                Show installed data files
-  libephemeris --version             Show version information
+  libephemeris download medium        Download data for the default tier
+  libephemeris download base          Lightweight, modern-era data
+  libephemeris download extended      Full range (-13200 to +17191 CE)
+  libephemeris download leb-base      LEB binary ephemeris (~53 MB, ~14x speedup)
+  libephemeris download leb-medium    LEB binary ephemeris (~175 MB, ~14x speedup)
+  libephemeris download assist        ASSIST n-body data (~714 MB)
+  libephemeris status                 Show installed data files
+  libephemeris info                   Show version, calc mode, tier info
 
 For more information, visit: https://github.com/g-battaglia/libephemeris
 """,
+)
+@click.version_option(__version__, prog_name="libephemeris")
+def cli() -> None:
+    """Root CLI group."""
+
+
+# ---------------------------------------------------------------------------
+# download subgroup
+# ---------------------------------------------------------------------------
+
+
+@click.group(
+    "download",
+    help="Download data files required by libephemeris.\n\n"
+    "Three types of data:\n\n"
+    "  Tier data (base/medium/extended)  DE440/441 kernels + asteroid SPKs\n"
+    "  LEB files (leb-base/medium/ext)   Precomputed Chebyshev (~14x speedup)\n"
+    "  ASSIST data                       N-body integration files (~714 MB)\n\n"
+    "Most users need only: libephemeris download medium",
+)
+def download_group() -> None:
+    """Download subcommands."""
+
+
+# --- Common download options ---
+
+
+def _download_options(f):  # type: ignore[no-untyped-def]
+    """Add --force / --no-progress / --quiet to a download command."""
+    f = click.option(
+        "--force", "-f", is_flag=True, help="Force download even if files already exist"
+    )(f)
+    f = click.option("--no-progress", is_flag=True, help="Disable progress output")(f)
+    f = click.option(
+        "--quiet", "-q", is_flag=True, help="Suppress all output except errors"
+    )(f)
+    return f
+
+
+# --- Tier data downloads ---
+
+
+def _make_tier_download(tier: str) -> click.Command:
+    """Create a download command for a tier."""
+
+    @click.command(
+        tier,
+        help=f"Download data for '{tier}' tier ({TIER_INFO[tier]['range']}).\n\n"
+        + tier_download_help(tier),
+    )
+    @_download_options
+    def cmd(force: bool, no_progress: bool, quiet: bool) -> None:
+        from .download import download_for_tier
+
+        _handle_download(
+            download_for_tier,
+            quiet=quiet,
+            tier_name=tier,
+            force=force,
+            show_progress=not no_progress,
+        )
+
+    return cmd
+
+
+for _tier in TIER_INFO:
+    download_group.add_command(_make_tier_download(_tier))
+
+
+# --- LEB downloads ---
+
+
+def _make_leb_download(tier: str) -> click.Command:
+    """Create a LEB download command for a tier."""
+
+    @click.command(
+        f"leb-{tier}",
+        help=f"Download LEB binary ephemeris for '{tier}' tier.\n\n"
+        + leb_download_help(tier),
+    )
+    @_download_options
+    def cmd(force: bool, no_progress: bool, quiet: bool) -> None:
+        from .download import download_leb_for_tier
+
+        _handle_download(
+            download_leb_for_tier,
+            quiet=quiet,
+            tier_name=tier,
+            force=force,
+            show_progress=not no_progress,
+            activate=False,
+        )
+
+    return cmd
+
+
+for _tier in TIER_INFO:
+    download_group.add_command(_make_leb_download(_tier))
+
+
+# --- ASSIST download ---
+
+
+@download_group.command()
+@_download_options
+@click.option("--no-planets", is_flag=True, help="Skip planet ephemeris download")
+@click.option("--no-asteroids", is_flag=True, help="Skip asteroid perturbers download")
+@click.option(
+    "--target-dir",
+    type=str,
+    default=None,
+    help="Directory to save files (default: ~/.libephemeris/assist/)",
+)
+def assist(
+    force: bool,
+    no_progress: bool,
+    quiet: bool,
+    no_planets: bool,
+    no_asteroids: bool,
+    target_dir: str | None,
+) -> None:
+    """Download ASSIST n-body data files (~714 MB).
+
+    ASSIST provides sub-arcsecond precision for asteroid orbit propagation by
+    including gravitational perturbations from the Sun, Moon, 8 planets, and
+    16 massive asteroids.
+
+    \b
+    Downloads:
+      1. Planet ephemeris (linux_p1550p2650.440, ~98 MB)
+      2. Asteroid perturbers (sb441-n16.bsp, ~616 MB)
+
+    Files are saved to ~/.libephemeris/assist/ by default.
+    Requires: pip install libephemeris[nbody]
+    """
+    from .rebound_integration import download_assist_data
+
+    _handle_download(
+        download_assist_data,
+        quiet=quiet,
+        target_dir=target_dir,
+        planets=not no_planets,
+        asteroids=not no_asteroids,
+        force=force,
+        show_progress=not no_progress,
     )
 
-    parser.add_argument(
-        "--version",
-        action="store_true",
-        help="Show version and exit",
-    )
 
-    # Subcommands
-    subparsers = parser.add_subparsers(
-        title="commands",
-        dest="command",
-        metavar="<command>",
-    )
-
-    # download:base
-    dl_base = subparsers.add_parser(
-        "download:base",
-        help=f"Download data for 'base' tier ({_TIER_INFO['base']['range']})",
-        description=_make_download_description("base"),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    _add_download_flags(dl_base)
-    dl_base.set_defaults(func=cmd_download_base)
-
-    # download:medium
-    dl_medium = subparsers.add_parser(
-        "download:medium",
-        help=f"Download data for 'medium' tier ({_TIER_INFO['medium']['range']})",
-        description=_make_download_description("medium"),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    _add_download_flags(dl_medium)
-    dl_medium.set_defaults(func=cmd_download_medium)
-
-    # download:extended
-    dl_extended = subparsers.add_parser(
-        "download:extended",
-        help=f"Download data for 'extended' tier ({_TIER_INFO['extended']['range']})",
-        description=_make_download_description("extended"),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    _add_download_flags(dl_extended)
-    dl_extended.set_defaults(func=cmd_download_extended)
-
-    # download:leb:base
-    dl_leb_base = subparsers.add_parser(
-        "download:leb:base",
-        help="Download LEB binary ephemeris for 'base' tier (~53 MB)",
-        description="""\
-Download the precomputed LEB binary ephemeris for the 'base' tier.
-
-LEB files contain Chebyshev polynomial approximations for all celestial bodies,
-providing ~14x speedup over the Skyfield/JPL pipeline.
-
-  Tier:       base (1850-2150 CE)
-  File:       ephemeris_base.leb (~53 MB)
-  Bodies:     31 (Sun, Moon, planets, nodes, apsides, asteroids)
-
-Files are saved to ~/.libephemeris/leb/ by default.
-""",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    _add_download_flags(dl_leb_base)
-    dl_leb_base.set_defaults(func=cmd_download_leb_base)
-
-    # download:leb:medium
-    dl_leb_medium = subparsers.add_parser(
-        "download:leb:medium",
-        help="Download LEB binary ephemeris for 'medium' tier (~175 MB)",
-        description="""\
-Download the precomputed LEB binary ephemeris for the 'medium' tier.
-
-LEB files contain Chebyshev polynomial approximations for all celestial bodies,
-providing ~14x speedup over the Skyfield/JPL pipeline.
-
-  Tier:       medium (1550-2650 CE)
-  File:       ephemeris_medium.leb (~175 MB)
-  Bodies:     31 (Sun, Moon, planets, nodes, apsides, asteroids)
-
-Files are saved to ~/.libephemeris/leb/ by default.
-""",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    _add_download_flags(dl_leb_medium)
-    dl_leb_medium.set_defaults(func=cmd_download_leb_medium)
-
-    # download:leb:extended
-    dl_leb_extended = subparsers.add_parser(
-        "download:leb:extended",
-        help="Download LEB binary ephemeris for 'extended' tier",
-        description="""\
-Download the precomputed LEB binary ephemeris for the 'extended' tier.
-
-LEB files contain Chebyshev polynomial approximations for all celestial bodies,
-providing ~14x speedup over the Skyfield/JPL pipeline.
-
-  Tier:       extended (-5000 to +5000 CE)
-  File:       ephemeris_extended.leb (not yet available)
-
-NOTE: The extended tier LEB file has not been generated yet.
-You can generate it locally with: poe leb:generate:extended:groups
-""",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    _add_download_flags(dl_leb_extended)
-    dl_leb_extended.set_defaults(func=cmd_download_leb_extended)
-
-    # download:assist
-    dl_assist = subparsers.add_parser(
-        "download:assist",
-        help="Download ASSIST n-body data files (~714 MB)",
-        description="""\
-Download data files required by ASSIST for ephemeris-quality n-body integration.
-
-ASSIST provides sub-arcsecond precision for asteroid orbit propagation by
-including gravitational perturbations from the Sun, Moon, 8 planets, and
-16 massive asteroids.
-
-Downloads:
-  1. Planet ephemeris (linux_p1550p2650.440, ~98 MB)
-     JPL DE440 in Linux binary format, 1550-2650 CE
-  2. Asteroid perturbers (sb441-n16.bsp, ~616 MB)
-     16 massive asteroids for gravitational perturbation modeling
-
-Files are saved to ~/.libephemeris/assist/ by default.
-Requires: pip install libephemeris[nbody]
-""",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    _add_download_flags(dl_assist)
-    dl_assist.add_argument(
-        "--no-planets",
-        action="store_true",
-        help="Skip planet ephemeris download",
-    )
-    dl_assist.add_argument(
-        "--no-asteroids",
-        action="store_true",
-        help="Skip asteroid perturbers download",
-    )
-    dl_assist.add_argument(
-        "--target-dir",
-        type=str,
-        default=None,
-        help="Directory to save files (default: ~/.libephemeris/assist/)",
-    )
-    dl_assist.set_defaults(func=cmd_download_assist)
-
-    # status
-    status_parser = subparsers.add_parser(
-        "status",
-        help="Show data file status",
-        description="Show the status of installed data files and current tier.",
-    )
-    status_parser.set_defaults(func=cmd_status)
-
-    return parser
+cli.add_command(download_group)
 
 
-def main(argv: list[str] | None = None) -> int:
+# ---------------------------------------------------------------------------
+# status command
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+def status() -> None:
+    """Show installed data files, current precision tier, and download status.
+
+    Lists all data files (BSP kernels, SPKs, LEB files), their sizes,
+    and whether they are present on disk.
+    """
+    from .download import print_data_status
+
+    print_data_status()
+
+
+# ---------------------------------------------------------------------------
+# info command (NEW)
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+def info() -> None:
+    """Show library version, active calculation mode, LEB file path, and precision tier.
+
+    Displays a quick summary of the current libephemeris configuration:
+    which backend is active (skyfield/leb/horizons/auto), the precision tier,
+    the configured LEB file (if any), and the data directory path.
+    """
+    from . import __version__ as ver
+
+    click.echo(f"libephemeris {ver}")
+    click.echo()
+
+    # Calculation mode
+    try:
+        import os
+
+        from .state import get_calc_mode, get_precision_tier
+
+        mode = get_calc_mode()
+        click.echo(f"  Calc mode:      {mode}")
+
+        tier = get_precision_tier()
+        tier_info = TIER_INFO.get(tier, {})
+        click.echo(f"  Precision tier:  {tier} ({tier_info.get('range', 'unknown')})")
+
+        # LEB file: check env var and internal state
+        leb_path = os.environ.get("LIBEPHEMERIS_LEB")
+        if not leb_path:
+            from . import state as _state
+
+            leb_path = getattr(_state, "_LEB_FILE", None)
+        if leb_path:
+            click.echo(f"  LEB file:        {leb_path}")
+        else:
+            click.echo("  LEB file:        (none configured)")
+    except Exception as e:
+        click.echo(f"  (could not read state: {e})")
+
+    # Data directory
+    try:
+        from .download import get_data_dir
+
+        data_dir = get_data_dir()
+        click.echo(f"  Data directory:  {data_dir}")
+    except Exception:
+        pass
+
+    click.echo()
+    click.echo("For detailed file status: libephemeris status")
+
+
+# ---------------------------------------------------------------------------
+# Backward compatibility aliases (download:base -> download base)
+# ---------------------------------------------------------------------------
+# These allow the old colon-separated syntax to still work for users
+# who have scripts or muscle memory using the old argparse-based CLI.
+
+_LEGACY_ALIASES = {
+    "download:base": ["download", "base"],
+    "download:medium": ["download", "medium"],
+    "download:extended": ["download", "extended"],
+    "download:leb:base": ["download", "leb-base"],
+    "download:leb:medium": ["download", "leb-medium"],
+    "download:leb:extended": ["download", "leb-extended"],
+    "download:assist": ["download", "assist"],
+}
+
+
+def main(argv: list[str] | None = None) -> None:
     """Main entry point for the CLI.
 
-    Args:
-        argv: Command line arguments (defaults to sys.argv[1:])
-
-    Returns:
-        Exit code (0 for success, non-zero for errors)
+    Supports both old (colon-separated) and new (space-separated) command syntax.
     """
-    parser = create_parser()
-    args = parser.parse_args(argv)
+    args = argv if argv is not None else sys.argv[1:]
 
-    # Handle --version at top level
-    if args.version:
-        return cmd_version(args)
+    # Rewrite legacy colon-separated commands to space-separated equivalents
+    if args:
+        first = args[0]
+        if first in _LEGACY_ALIASES:
+            args = [*_LEGACY_ALIASES[first], *args[1:]]
 
-    # Handle no command
-    if not args.command:
-        parser.print_help()
-        return 0
-
-    # Run the command
-    return args.func(args)
+    cli(args=args, standalone_mode=True)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

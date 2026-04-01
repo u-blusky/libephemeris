@@ -15,9 +15,10 @@ import mmap
 import os
 import struct
 from bisect import bisect_right
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
-from typing import Union
+if TYPE_CHECKING:
+    from .leb2_reader import LEB2Reader
 
 from .leb_format import (
     BODY_ENTRY_SIZE,

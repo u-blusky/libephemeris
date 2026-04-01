@@ -1114,6 +1114,8 @@ source = { editable = "." }
 dependencies = [
     { name = "astroquery" },
     { name = "certifi" },
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "click", version = "8.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pyerfa" },
     { name = "skyfield" },
     { name = "skyfield-data" },
@@ -1181,6 +1183,7 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=25.1.0" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "certifi" },
+    { name = "click", specifier = ">=8.0" },
     { name = "ebooklib", marker = "extra == 'dev'", specifier = ">=0.20" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "markdown", marker = "extra == 'dev'", specifier = ">=3.7" },

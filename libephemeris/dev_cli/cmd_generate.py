@@ -1,0 +1,125 @@
+"""Data generation commands: planet centers SPK, lunar corrections, Keplerian elements.
+
+Replaces 8 poe tasks: generate-planet-centers:*, generate-lunar-corrections,
+keplerian:generate-multi-epoch*.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+
+import click
+
+
+def _python(args: list[str]) -> None:
+    """Run a python script."""
+    sys.exit(subprocess.call([sys.executable, *args]))
+
+
+@click.group(
+    "generate",
+    help="Generate derived data files from raw SPK kernels.\n\n"
+    "These are one-time generation steps that produce data files used by\n"
+    "the library at runtime. Most developers never need to run these unless\n"
+    "they are updating the underlying data or adding new bodies.\n\n"
+    "  planet-centers   COB-corrected SPKs for sub-arcsecond gas giant positions\n"
+    "  lunar-corrections  Precomputed mean lunar element correction tables\n"
+    "  keplerian-elements Multi-epoch orbital elements for Keplerian fallback",
+)
+def generate_group() -> None:
+    """Data generation commands."""
+
+
+# ===========================================================================
+# Planet centers SPK
+# ===========================================================================
+
+
+@generate_group.command("planet-centers-base")
+def planet_centers_base() -> None:
+    """Build center-of-body corrected SPK for base tier (de440s, 1850-2150).
+
+    Creates SPK files that correct Jupiter, Saturn, Uranus, and Neptune
+    positions from barycenter to center-of-body using satellite ephemeris data.
+    This provides sub-arcsecond accuracy for gas giant positions.
+    Requires: spiceypy (pip install spiceypy). Downloads satellite SPKs from JPL.
+    """
+    _python(["scripts/generate_planet_centers_spk.py", "--tier", "base"])
+
+
+@generate_group.command("planet-centers-medium")
+def planet_centers_medium() -> None:
+    """Build center-of-body corrected SPK for medium tier (de440, 1550-2650).
+
+    Same as planet-centers-base but for the wider medium tier date range.
+    Requires spiceypy.
+    """
+    _python(["scripts/generate_planet_centers_spk.py", "--tier", "medium"])
+
+
+@generate_group.command("planet-centers-extended")
+def planet_centers_extended() -> None:
+    """Build center-of-body corrected SPK for extended tier (de441, full range).
+
+    Requires spiceypy.
+    """
+    _python(["scripts/generate_planet_centers_spk.py", "--tier", "extended"])
+
+
+@generate_group.command("planet-centers-all")
+def planet_centers_all() -> None:
+    """Build center-of-body corrected SPKs for all three tiers at once.
+
+    Runs base, medium, and extended sequentially. Requires spiceypy.
+    """
+    _python(["scripts/generate_planet_centers_spk.py", "--all"])
+
+
+@generate_group.command("planet-centers-spk")
+def planet_centers_spk() -> None:
+    """(Legacy alias) Same as planet-centers-medium."""
+    _python(["scripts/generate_planet_centers_spk.py", "--tier", "medium"])
+
+
+# ===========================================================================
+# Lunar corrections
+# ===========================================================================
+
+
+@generate_group.command("lunar-corrections")
+def lunar_corrections() -> None:
+    """Regenerate precomputed correction tables for mean lunar elements.
+
+    Computes (geometric_mean - analytical_mean) corrections over the full
+    DE441 date range and writes them to libephemeris/lunar_corrections.py.
+    Run this after updating perigee calibration coefficients.
+    Requires: de441.bsp to be downloaded.
+    """
+    _python(["scripts/generate_lunar_corrections.py", "--force"])
+
+
+# ===========================================================================
+# Keplerian elements
+# ===========================================================================
+
+
+@generate_group.command("keplerian-elements")
+def keplerian_elements() -> None:
+    """Generate multi-epoch Keplerian orbital elements from SPK files.
+
+    Creates orbital elements at 20-year intervals for all 37 minor bodies.
+    These are used by the Keplerian fallback when SPK files are not available
+    for a given body/date, providing approximate positions (~1 degree accuracy).
+    """
+    _python(["scripts/generate_multi_epoch_elements.py"])
+
+
+@generate_group.command("keplerian-dry-run")
+def keplerian_dry_run() -> None:
+    """Show which SPK files are available and the epoch grid, without generating.
+
+    Useful to check which bodies have SPK coverage before running the
+    full generation. No files are created or modified.
+    """
+    _python(["scripts/generate_multi_epoch_elements.py", "--dry-run"])
