@@ -142,6 +142,102 @@ def _teardown_path_completion() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Arrow-key interactive selector
+# ---------------------------------------------------------------------------
+
+
+def _select(
+    options: List[Dict[str, str]],
+    default: int = 0,
+) -> str:
+    """Arrow-key selector for multiple-choice prompts.
+
+    Each *option* must have a ``value`` key and optionally ``description``.
+    Returns the selected ``value``.  Falls back to ``click.prompt`` when
+    stdin is not a TTY (piped input, CI, Windows without termios).
+    """
+    can_interact = sys.stdin.isatty() and sys.stdout.isatty()
+    if can_interact:
+        try:
+            __import__("termios")
+            __import__("tty")
+        except ImportError:
+            can_interact = False
+
+    # Fallback: show options list + typed input
+    if not can_interact:
+        values = [o["value"] for o in options]
+        for o in options:
+            desc = ""
+            if o.get("description"):
+                desc = "  " + _d(o["description"])
+            click.echo(f"    {_c(o['value'])}{desc}")
+        return click.prompt(
+            f"  {_bc('>')}",
+            type=click.Choice(values, case_sensitive=False),
+            default=values[default],
+            show_choices=False,
+        )
+
+    # Interactive arrow-key selector
+    import termios
+    import tty
+
+    selected = default
+    n = len(options)
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    max_w = max(len(o["value"]) for o in options)
+
+    def _render() -> None:
+        for i, opt in enumerate(options):
+            padded = opt["value"].ljust(max_w)
+            if i == selected:
+                arrow = _bc("> ")
+                label = _bc(padded)
+            else:
+                arrow = "  "
+                label = _c(padded)
+            desc = ""
+            if opt.get("description"):
+                desc = "  " + _d(opt["description"])
+            click.echo(f"    {arrow}{label}{desc}")
+
+    click.echo(_d("  (arrow keys to move, Enter to confirm)"))
+    click.echo()
+    _render()
+
+    try:
+        tty.setcbreak(fd)
+        while True:
+            ch = os.read(fd, 1)
+            if ch in (b"\r", b"\n"):
+                break
+            if ch == b"\x03":  # Ctrl+C
+                raise KeyboardInterrupt
+            if ch == b"\x1b":
+                seq = os.read(fd, 2)
+                if seq == b"[A":  # Up
+                    selected = (selected - 1) % n
+                elif seq == b"[B":  # Down
+                    selected = (selected + 1) % n
+                else:
+                    continue
+                sys.stdout.write(f"\x1b[{n}A\x1b[0J")
+                sys.stdout.flush()
+                _render()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    # Collapse selector to a single result line
+    sys.stdout.write(f"\x1b[{n + 2}A\x1b[0J")
+    sys.stdout.flush()
+    click.echo(f"  {_bc('>')} {_c(options[selected]['value'])}")
+
+    return options[selected]["value"]
+
+
+# ---------------------------------------------------------------------------
 # Required-files logic
 # ---------------------------------------------------------------------------
 
@@ -159,30 +255,30 @@ def _get_required_files(tier: str, mode: str) -> List[Dict[str, Any]]:
                     "filename": f"{tier}_{group}.leb",
                     "size_mb": size,
                     "category": "LEB2",
-                    "required": True,
+                    "status": "required",
                     "subdir": "leb",
                 }
             )
 
     # DE kernel
     de_file, de_size = _DE_KERNELS[tier]
-    if mode in ("auto", "skyfield"):
+    if mode == "auto":
         files.append(
             {
                 "filename": de_file,
                 "size_mb": de_size,
                 "category": "DE kernel",
-                "required": True,
+                "status": "fallback",
                 "subdir": "",
             }
         )
-    elif mode == "leb":
+    elif mode == "skyfield":
         files.append(
             {
                 "filename": de_file,
                 "size_mb": de_size,
                 "category": "DE kernel",
-                "required": False,
+                "status": "required",
                 "subdir": "",
             }
         )
@@ -194,7 +290,13 @@ def _get_required_files(tier: str, mode: str) -> List[Dict[str, Any]]:
             "filename": f"planet_centers_{tier}.bsp",
             "size_mb": pc_size,
             "category": "Planet centers",
-            "required": mode != "horizons",
+            "status": (
+                "fallback"
+                if mode == "auto"
+                else "optional"
+                if mode == "horizons"
+                else "required"
+            ),
             "subdir": "",
         }
     )
@@ -312,7 +414,7 @@ def _run_downloads(tier: str, mode: str) -> None:
         if mode in ("auto", "leb"):
             click.echo()
             click.echo(_d("  Downloading LEB2 files..."))
-            from .download import download_leb2_for_tier
+            from ..download import download_leb2_for_tier
 
             download_leb2_for_tier(
                 tier_name=tier,
@@ -325,7 +427,7 @@ def _run_downloads(tier: str, mode: str) -> None:
 
         if mode in ("auto", "skyfield"):
             click.echo(_d("  Downloading DE kernel + planet centers + SPK..."))
-            from .download import download_for_tier
+            from ..download import download_for_tier
 
             download_for_tier(
                 tier_name=tier,
@@ -335,7 +437,7 @@ def _run_downloads(tier: str, mode: str) -> None:
             )
         elif mode in ("leb", "horizons"):
             click.echo(_d("  Downloading planet centers..."))
-            from .download import _download_planet_centers_for_tier
+            from ..download import _download_planet_centers_for_tier
 
             _download_planet_centers_for_tier(
                 tier_name=tier,
@@ -394,30 +496,47 @@ def _post_wizard(
     click.echo(_w("  Files needed for your configuration:"))
     click.echo()
 
-    missing_count = 0
-    missing_size = 0.0
+    missing_required_count = 0
+    missing_required_size = 0.0
+    missing_fallback_count = 0
+    missing_fallback_size = 0.0
+
+    def _status_suffix(status: str) -> str:
+        if status == "fallback":
+            return _d(" (fallback)")
+        if status == "optional":
+            return _d(" (optional)")
+        return ""
 
     for f in checked:
         s = _size(f["size_mb"])
-        opt = "" if f["required"] else _d(" (optional)")
+        suffix = _status_suffix(f["status"])
         if f["exists"]:
             marker = click.style("[OK]", fg="green")
-            click.echo(f"    {marker} {f['filename']:<30s} {s:>8s}{opt}")
+            click.echo(f"    {marker} {f['filename']:<30s} {s:>8s}{suffix}")
         else:
             marker = click.style("[--]", fg="yellow")
-            click.echo(f"    {marker} {f['filename']:<30s} {s:>8s}{opt}")
-            if f["required"]:
-                missing_count += 1
-                missing_size += f["size_mb"]
+            click.echo(f"    {marker} {f['filename']:<30s} {s:>8s}{suffix}")
+            if f["status"] == "required":
+                missing_required_count += 1
+                missing_required_size += f["size_mb"]
+            elif f["status"] == "fallback":
+                missing_fallback_count += 1
+                missing_fallback_size += f["size_mb"]
 
     click.echo()
 
-    if missing_count == 0:
-        click.echo(f"  {_g('All required files are present!')}")
+    if missing_required_count == 0 and missing_fallback_count == 0:
+        click.echo(f"  {_g('All files for this mode are present!')}")
     else:
-        click.echo(
-            f"  {_y(f'Missing: {missing_count} file(s) (~{_size(missing_size)})')}"
-        )
+        if missing_required_count > 0:
+            click.echo(
+                f"  {_y(f'Missing required: {missing_required_count} file(s) (~{_size(missing_required_size)})')}"
+            )
+        if missing_fallback_count > 0:
+            click.echo(
+                f"  {_y(f'Missing fallback: {missing_fallback_count} file(s) (~{_size(missing_fallback_size)})')}"
+            )
         if interactive:
             click.echo()
             if click.confirm(f"  {_bc('>')} Download missing files now?", default=True):
@@ -514,35 +633,39 @@ def run_wizard(
     _sep()
     click.echo()
     click.echo(_w("Precision tier"))
-    for t in ("base", "medium", "extended"):
-        _, sz = _DE_KERNELS[t]
-        click.echo(f"  {_c(t):<20s} {_d(f'~{_size(sz):<8s} {_TIER_RANGES[t]}')}")
-    tier = click.prompt(
-        f"  {_bc('>')}",
-        type=click.Choice(["base", "medium", "extended"], case_sensitive=False),
-        default="medium",
-        show_choices=False,
+    tier = _select(
+        [
+            {
+                "value": "base",
+                "description": f"~{_size(_DE_KERNELS['base'][1])} {_TIER_RANGES['base']}",
+            },
+            {
+                "value": "medium",
+                "description": f"~{_size(_DE_KERNELS['medium'][1])} {_TIER_RANGES['medium']}",
+            },
+            {
+                "value": "extended",
+                "description": f"~{_size(_DE_KERNELS['extended'][1])} {_TIER_RANGES['extended']}",
+            },
+        ],
+        default=1,
     )
     config["precision"] = tier
 
     # ── 2. Calculation mode ──────────────────────────────────────
     click.echo()
     click.echo(_w("Calculation mode"))
-    _auto_desc = _d("LEB \u2192 Horizons \u2192 Skyfield (recommended)")
-    _leb_desc = _d("Precomputed polynomials (~14x faster)")
-    _sky_desc = _d("DE kernel via Skyfield")
-    _hor_desc = _d("NASA JPL API (requires internet)")
-    click.echo(f"  {_c('auto'):<20s} {_auto_desc}")
-    click.echo(f"  {_c('leb'):<20s} {_leb_desc}")
-    click.echo(f"  {_c('skyfield'):<20s} {_sky_desc}")
-    click.echo(f"  {_c('horizons'):<20s} {_hor_desc}")
-    mode = click.prompt(
-        f"  {_bc('>')}",
-        type=click.Choice(
-            ["auto", "leb", "skyfield", "horizons"], case_sensitive=False
-        ),
-        default="auto",
-        show_choices=False,
+    mode = _select(
+        [
+            {
+                "value": "auto",
+                "description": "LEB -> Horizons -> Skyfield (recommended)",
+            },
+            {"value": "leb", "description": "Precomputed polynomials (~14x faster)"},
+            {"value": "skyfield", "description": "DE kernel via Skyfield"},
+            {"value": "horizons", "description": "NASA JPL API (requires internet)"},
+        ],
+        default=0,
     )
     config["mode"] = mode
 

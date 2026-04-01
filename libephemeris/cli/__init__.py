@@ -34,8 +34,8 @@ import sys
 
 import click
 
-from . import __version__
-from .cli_shared import TIER_INFO, leb_download_help, tier_download_help
+from .. import __version__
+from .shared import TIER_INFO, leb_download_help, tier_download_help
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ def _make_tier_download(tier: str) -> click.Command:
     )
     @_download_options
     def cmd(force: bool, no_progress: bool, quiet: bool) -> None:
-        from .download import download_for_tier
+        from ..download import download_for_tier
 
         _handle_download(
             download_for_tier,
@@ -192,7 +192,7 @@ def _make_leb_download(tier: str) -> click.Command:
     )
     @_download_options
     def cmd(force: bool, no_progress: bool, quiet: bool) -> None:
-        from .download import download_leb_for_tier
+        from ..download import download_leb_for_tier
 
         _handle_download(
             download_leb_for_tier,
@@ -230,7 +230,7 @@ def _make_leb2_download(tier: str) -> click.Command:
     )
     @_download_options
     def cmd(force: bool, no_progress: bool, quiet: bool) -> None:
-        from .download import download_leb2_for_tier
+        from ..download import download_leb2_for_tier
 
         _handle_download(
             download_leb2_for_tier,
@@ -285,7 +285,7 @@ def assist(
     Files are saved to ~/.libephemeris/assist/ by default.
     Requires: pip install libephemeris[nbody]
     """
-    from .rebound_integration import download_assist_data
+    from ..rebound_integration import download_assist_data
 
     _handle_download(
         download_assist_data,
@@ -325,11 +325,11 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
       libephemeris download auto           Download what your config needs
       libephemeris download auto --force   Re-download everything
     """
-    from ._init_wizard import _g, _w, _d, _y, _sep, _size
+    from .init_wizard import _d, _g, _w, _y
 
     # Read config
     try:
-        from .state import get_precision_tier, get_calc_mode
+        from ..state import get_calc_mode, get_precision_tier
     except Exception:
         if not quiet:
             click.echo("Error: could not read library configuration.", err=True)
@@ -348,7 +348,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
         if mode in ("auto", "leb"):
             if not quiet:
                 click.echo(_d("  LEB2 ephemeris files..."))
-            from .download import download_leb2_for_tier
+            from ..download import download_leb2_for_tier
 
             download_leb2_for_tier(
                 tier_name=tier,
@@ -364,7 +364,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
         if mode in ("auto", "skyfield"):
             if not quiet:
                 click.echo(_d("  DE kernel + planet centers + SPK kernels..."))
-            from .download import download_for_tier
+            from ..download import download_for_tier
 
             download_for_tier(
                 tier_name=tier,
@@ -375,7 +375,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
         elif mode in ("leb", "horizons"):
             if not quiet:
                 click.echo(_d("  Planet centers..."))
-            from .download import _download_planet_centers_for_tier
+            from ..download import _download_planet_centers_for_tier
 
             _download_planet_centers_for_tier(
                 tier_name=tier,
@@ -428,7 +428,7 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
       libephemeris download all            Download everything
       libephemeris download all --force    Re-download everything
     """
-    from ._init_wizard import _g, _w, _d, _y, _sep
+    from .init_wizard import _d, _g, _w, _y
 
     tiers = ["base", "medium", "extended"]
 
@@ -447,7 +447,7 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
             # LEB2
             if not quiet:
                 click.echo(_d(f"  LEB2 {tier}..."))
-            from .download import download_leb2_for_tier
+            from ..download import download_leb2_for_tier
 
             download_leb2_for_tier(
                 tier_name=tier,
@@ -461,7 +461,7 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
             if not quiet:
                 click.echo()
                 click.echo(_d(f"  DE kernel + planet centers + SPK for {tier}..."))
-            from .download import download_for_tier
+            from ..download import download_for_tier
 
             download_for_tier(
                 tier_name=tier,
@@ -515,7 +515,7 @@ def status(as_json: bool) -> None:
     \b
     Use --json for machine-readable output (e.g. for CI pipelines).
     """
-    from .download import print_data_status
+    from ..download import print_data_status
 
     print_data_status(as_json=as_json)
 
@@ -545,7 +545,7 @@ def config() -> None:
     """
     import os
 
-    from .download import get_data_dir
+    from ..download import get_data_dir
 
     data_dir = get_data_dir()
 
@@ -567,7 +567,7 @@ def config() -> None:
 
     # --- Precision tier ---
     try:
-        from .state import get_precision_tier
+        from ..state import get_precision_tier
 
         current_tier = get_precision_tier()
     except Exception:
@@ -596,7 +596,7 @@ def config() -> None:
 
     # --- Calculation mode ---
     try:
-        from .state import get_calc_mode
+        from ..state import get_calc_mode
 
         calc_mode = get_calc_mode()
     except Exception:
@@ -620,7 +620,7 @@ def config() -> None:
     leb_path = os.environ.get("LIBEPHEMERIS_LEB", "")
     if not leb_path:
         try:
-            from . import state as _state
+            from .. import state as _state
 
             leb_path = getattr(_state, "_LEB_FILE", None) or ""
         except Exception:
@@ -648,8 +648,8 @@ def config() -> None:
 
     # --- SPK cache ---
     try:
-        from .spk_auto import DEFAULT_AUTO_SPK_DIR
-        from .state import get_spk_cache_dir
+        from ..spk_auto import DEFAULT_AUTO_SPK_DIR
+        from ..state import get_spk_cache_dir
 
         spk_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
     except Exception:
@@ -702,7 +702,7 @@ def config() -> None:
     click.echo()
 
     # --- TOML config file ---
-    from ._config_toml import get_config_path
+    from .._config_toml import get_config_path
 
     toml_path = get_config_path()
     click.echo(_b("TOML config file"))
@@ -712,7 +712,7 @@ def config() -> None:
     )
     click.echo(f"  Current:  {toml_path or '(none found)'}")
     if toml_path:
-        from ._config_toml import get_all
+        from .._config_toml import get_all
 
         cfg = get_all()
         if cfg:
@@ -783,7 +783,7 @@ def init(output: str, force: bool, non_interactive: bool) -> None:
       libephemeris init -o config.toml     Custom output path
       libephemeris init --non-interactive  All defaults, no prompts
     """
-    from ._init_wizard import run_wizard
+    from .init_wizard import run_wizard
 
     run_wizard(output=output, force=force, non_interactive=non_interactive)
 
