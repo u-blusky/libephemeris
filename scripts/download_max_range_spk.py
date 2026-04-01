@@ -28,6 +28,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # JPL Horizons maximum SPK date range for minor bodies
 MAX_START = "1600-01-01"
 MAX_END = "2500-01-01"
+EXPECTED_SKIPPED_BODIES = {
+    "bennu": "JPL blocks SPK generation; local Keplerian fallback is expected.",
+}
 
 
 def _get_all_bodies() -> list[tuple[str, str, int, int]]:
@@ -37,7 +40,10 @@ def _get_all_bodies() -> list[tuple[str, str, int, int]]:
 
     bodies = []
     for ipl, (horizons_id, naif_id) in SPK_BODY_NAME_MAP.items():
-        name = _get_body_name(ipl) or f"body_{ipl}"
+        name = _get_body_name(ipl)
+        if name is None:
+            cleaned = horizons_id.rstrip(";")
+            name = cleaned if not cleaned.isdigit() else f"body_{ipl}"
         bodies.append((name, horizons_id, ipl, naif_id))
     return sorted(bodies, key=lambda b: b[0])
 
@@ -160,16 +166,26 @@ def main() -> int:
         for name, horizons_id, ipl, naif_id in bodies:
             filename = _make_filename(horizons_id, MAX_START, MAX_END)
             output_path = os.path.join(args.output_dir, filename)
-            exists = "EXISTS" if os.path.exists(output_path) else "TO DOWNLOAD"
+            skip_key = horizons_id.rstrip(";").lower()
+            if skip_key in EXPECTED_SKIPPED_BODIES:
+                exists = "SKIPPED"
+            else:
+                exists = "EXISTS" if os.path.exists(output_path) else "TO DOWNLOAD"
             print(f"  {name:14s} {filename:40s} [{exists}]")
         return 0
 
     success = 0
     failed = 0
+    skipped = 0
 
     total = len(bodies)
     for i, (name, horizons_id, ipl, naif_id) in enumerate(bodies):
         progress = f"[{i + 1:2d}/{total}] "
+        reason = EXPECTED_SKIPPED_BODIES.get(horizons_id.rstrip(";").lower())
+        if reason is not None:
+            print(f"  {progress}{name:14s} SKIPPED  {reason}")
+            skipped += 1
+            continue
         ok = download_body(
             name=name,
             horizons_id=horizons_id,
@@ -189,7 +205,7 @@ def main() -> int:
             time.sleep(args.delay)
 
     print()
-    print(f"Done: {success} success, {failed} failed")
+    print(f"Done: {success} success, {failed} failed, {skipped} skipped")
 
     return 0 if failed == 0 else 1
 

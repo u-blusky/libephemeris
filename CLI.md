@@ -156,7 +156,7 @@ leph test skyfield progress       # dots-only output (CI-friendly)
 #### `leph test leb-backend` — Unit tests via LEB precomputed backend
 
 Same test suite but positions come from precomputed Chebyshev polynomials (~14x faster).
-Requires `data/leb/ephemeris_medium.leb` (run `leph download leb-medium`).
+Requires `data/leb/ephemeris_medium.leb` (generate it with `leph leb generate medium groups`).
 
 ```bash
 leph test leb-backend essential   # ~490 tests, ~20s — fast sanity check (parallel)
@@ -297,15 +297,20 @@ leph leb2 verify extended
 ### `leph download` — Data files
 
 ```bash
-# SPK kernels (required for Skyfield backend)
+# Full bootstrap for developers (downloadable prerequisites only)
+leph download all             # DE/SPK + IERS + planet-center source kernels + ASSIST
+
+# SPK kernels (required for Skyfield backend and LEB generation)
 leph download spk-base        # DE440s + asteroid SPKs (1850-2150)
 leph download spk-medium      # DE440 + asteroid SPKs (1550-2650)
-leph download spk-extended    # Max-range SPKs from Horizons
+leph download spk-extended    # de441 + max-range SPKs from Horizons
 
-# LEB files (optional, ~14x speedup)
-leph download leb-base        # ~5 MB
-leph download leb-medium      # ~20 MB
-leph download leb-extended    # ~180 MB
+# Time / Earth-orientation data
+leph download iers            # finals2000A.data + leap_seconds.dat + deltat.data
+
+# Source kernels used by `leph generate planet-centers-*`
+leph download planet-centers-sources   # All tiers
+leph download planet-centers-sources --tier medium
 
 # ASSIST n-body data
 leph download assist           # ~120 MB (requires libephemeris[nbody])

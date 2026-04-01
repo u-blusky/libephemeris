@@ -47,7 +47,7 @@ Subgroups at a glance:
               leb-format, leb2-format, horizons, coverage
   code        Ruff linter/formatter, mypy type checker
   leb / leb2  Generate, verify, and compress LEB binary ephemeris files
-  download    Fetch SPK kernels, pre-built LEB files, ASSIST n-body data
+  download    Fetch DE/SPK/IERS data, ASSIST files, and generation source kernels
   status      Show current data/configuration status for the local setup
   generate    Planet-center SPKs, lunar corrections, Keplerian elements
   calibrate   Fit lunar perigee perturbation coefficients vs JPL DE441

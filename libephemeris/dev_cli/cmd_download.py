@@ -1,6 +1,8 @@
 """Data download commands for local libephemeris development.
 
-Replaces 7 poe tasks: spk:download:*, download:leb:*, download:assist.
+The developer CLI downloads only local-development prerequisites and source
+inputs. Generated artifacts such as LEB files and planet-centers outputs are
+produced by dedicated generation commands, not downloaded here.
 """
 
 from __future__ import annotations
@@ -16,26 +18,85 @@ def _run_python(args: list[str]) -> int:
     return subprocess.call([sys.executable, *args])
 
 
-def _python(args: list[str]) -> None:
-    """Run a Python module or script and exit with the same status."""
-    sys.exit(_run_python(args))
+def _run_script_or_raise(args: list[str], description: str) -> None:
+    """Run a helper script and raise a Click-friendly error on failure."""
+    exit_code = _run_python(args)
+    if exit_code != 0:
+        raise click.ClickException(f"{description} failed with exit code {exit_code}.")
 
 
-def _libephemeris_download_args(
-    *parts: str,
-    force: bool,
-    no_progress: bool,
-    quiet: bool,
-) -> list[str]:
-    """Build a wrapped `libephemeris download ...` invocation."""
-    args = ["-m", "libephemeris.cli", "download", *parts]
+def _download_spk_tier(tier: str, force: bool = False) -> None:
+    """Download the DE kernel and asteroid SPKs for a specific tier."""
+    import libephemeris as eph
+
+    eph.set_precision_tier(tier)
+    results = eph.ensure_all_ephemerides(force_download=force, show_progress=True)
+    spk_results = results.get("spks", {})
+    fallback_bodies = [
+        str(name).rstrip(";")
+        for name, status in spk_results.items()
+        if str(status).startswith("fallback")
+    ]
+    if fallback_bodies:
+        label = "body" if len(fallback_bodies) == 1 else "bodies"
+        pronoun = "it" if len(fallback_bodies) == 1 else "them"
+        click.echo(
+            f"  Expected fallback {label}: "
+            + ", ".join(fallback_bodies)
+            + f" (JPL does not provide SPKs for {pronoun})."
+        )
+
+
+def _download_spk_extended(force: bool = False) -> None:
+    """Download `de441.bsp` plus max-range minor-body SPKs for extended work."""
+    from libephemeris.state import get_loader
+
+    click.echo("Ensuring de441.bsp is available...")
+    get_loader()("de441.bsp")
+
+    args = ["scripts/download_max_range_spk.py"]
     if force:
         args.append("--force")
-    if no_progress:
-        args.append("--no-progress")
-    if quiet:
-        args.append("--quiet")
-    return args
+    _run_script_or_raise(args, "Extended-tier SPK bootstrap")
+
+
+def _download_iers(force: bool = False) -> None:
+    """Download all IERS files used for Earth-orientation and Delta T work."""
+    from libephemeris.iers_data import (
+        download_delta_t_data,
+        download_iers_finals,
+        download_leap_seconds,
+    )
+
+    finals = download_iers_finals(force=force)
+    leap_seconds = download_leap_seconds(force=force)
+    delta_t = download_delta_t_data(force=force)
+
+    click.echo(f"  finals2000A.data  -> {finals}")
+    click.echo(f"  leap_seconds.dat -> {leap_seconds}")
+    click.echo(f"  deltat.data      -> {delta_t}")
+
+
+def _download_planet_center_sources(
+    force: bool = False,
+    tier: str | None = None,
+) -> None:
+    """Download cached NAIF source kernels for planet-center generation."""
+    args = ["scripts/generate_planet_centers_spk.py", "--download-only"]
+    if tier is None:
+        args.append("--all")
+    else:
+        args.extend(["--tier", tier])
+    if force:
+        args.append("--force")
+    _run_script_or_raise(args, "Planet-center source bootstrap")
+
+
+def _download_assist(force: bool = False) -> None:
+    """Download ASSIST n-body data used by local development workflows."""
+    from libephemeris.rebound_integration import download_assist_data
+
+    download_assist_data(force=force, show_progress=True, quiet=False)
 
 
 # ---------------------------------------------------------------------------
@@ -45,21 +106,25 @@ def _libephemeris_download_args(
 
 @click.group(
     "download",
-    short_help="Download runtime and developer data files.",
+    short_help="Download source and runtime prerequisites for development.",
     help="Download data files needed for libephemeris development.\n\n"
     "\b\n"
     "Categories:\n"
-    "  all          Full developer dataset: runtime files + pre-built LEB1 + ASSIST\n"
+    "  all                    Full downloadable bootstrap for local development\n"
     "  spk-*        DE kernels + asteroid SPKs for a specific tier\n"
-    "  leb-*        Pre-built LEB1 files for verification and tooling\n"
-    "  assist       REBOUND/ASSIST n-body files\n\n"
+    "  iers                   Earth-orientation and Delta T data\n"
+    "  planet-centers-sources Cached NAIF source kernels for later generation\n"
+    "  assist                 REBOUND/ASSIST n-body files\n\n"
     "Use `leph download all` to prepare a machine for local development, data\n"
     "generation, verification, and packaging workflows.\n\n"
+    "Generated artifacts are intentionally excluded here: use `leph leb ...`,\n"
+    "`leph leb2 ...`, and `leph generate planet-centers-*` to build them.\n\n"
     "\b\n"
     "Examples:\n"
     "  leph download all\n"
     "  leph download spk-medium\n"
-    "  leph download leb-medium",
+    "  leph download planet-centers-sources\n"
+    "  leph download iers",
 )
 def download_group() -> None:
     """Data download commands."""
@@ -67,61 +132,40 @@ def download_group() -> None:
 
 @download_group.command(
     "all",
-    short_help="Download the full local-development dataset for libephemeris.",
+    short_help="Download the full bootstrap dataset for local development.",
 )
 @click.option(
     "--force",
     is_flag=True,
     help="Re-download files even if they are already present.",
 )
-@click.option(
-    "--no-progress",
-    is_flag=True,
-    help="Disable progress output for wrapped libephemeris downloads.",
-)
-@click.option(
-    "--quiet",
-    is_flag=True,
-    help="Suppress wrapper output and pass quiet mode through to subcommands.",
-)
-def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
-    """Download the full developer dataset used for local libephemeris work.
+def download_all(force: bool) -> None:
+    """Download every downloadable prerequisite needed for local development.
 
-    This is the developer superset of `libephemeris download all`.
+    This bootstrap intentionally excludes generated artifacts.
 
     \b
     Includes:
-      1. All runtime data for every tier: DE kernels, planet centers,
-         asteroid SPKs, IERS files, and LEB2 modules.
-      2. Pre-built LEB1 files for base, medium, and extended tiers.
-      3. ASSIST n-body data used by REBOUND/ASSIST integrations.
-
-    This command is meant for contributors working on generation, verification,
-    packaging, and release tasks. Some generation workflows still require extra
-    tools or upstream network calls at generation time (for example `spiceypy`).
+      1. DE kernels and asteroid SPKs for base, medium, and extended workflows.
+      2. IERS data files used by time-scale and Delta T logic.
+      3. Cached NAIF source kernels used later by `leph generate planet-centers-*`.
+      4. ASSIST data used by n-body tooling.
     """
     phases = [
-        ("runtime dataset", ["all"]),
-        ("LEB1 base", ["leb-base"]),
-        ("LEB1 medium", ["leb-medium"]),
-        ("LEB1 extended", ["leb-extended"]),
-        ("ASSIST", ["assist"]),
+        ("SPK base", lambda: _download_spk_tier("base", force=force)),
+        ("SPK medium", lambda: _download_spk_tier("medium", force=force)),
+        ("SPK extended", lambda: _download_spk_extended(force=force)),
+        ("IERS", lambda: _download_iers(force=force)),
+        (
+            "planet-center sources",
+            lambda: _download_planet_center_sources(force=force),
+        ),
+        ("ASSIST", lambda: _download_assist(force=force)),
     ]
 
-    for label, command in phases:
-        if not quiet:
-            click.echo(f"\n== {label} ==")
-
-        exit_code = _run_python(
-            _libephemeris_download_args(
-                *command,
-                force=force,
-                no_progress=no_progress,
-                quiet=quiet,
-            )
-        )
-        if exit_code != 0:
-            sys.exit(exit_code)
+    for label, action in phases:
+        click.echo(f"\n== {label} ==")
+        action()
 
 
 # ===========================================================================
@@ -133,93 +177,89 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
     "spk-base",
     short_help="Download asteroid SPK kernels for base tier (1850-2150).",
 )
-def spk_base() -> None:
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Re-download files even if they are already present.",
+)
+def spk_base(force: bool) -> None:
     """Download asteroid SPK21 kernel files for base tier (1850-2150).
 
     Downloads SPK kernels for Chiron, Ceres, Pallas, Juno, Vesta and other
     minor bodies. Also downloads DE440s if not already present.
     Files are saved to ~/.libephemeris/ by default.
     """
-    _python(
-        [
-            "-c",
-            "import libephemeris as eph; eph.set_precision_tier('base'); eph.ensure_all_ephemerides(show_progress=True)",
-        ]
-    )
+    _download_spk_tier("base", force=force)
 
 
 @download_group.command(
     "spk-medium",
     short_help="Download asteroid SPK kernels for medium tier (1550-2650).",
 )
-def spk_medium() -> None:
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Re-download files even if they are already present.",
+)
+def spk_medium(force: bool) -> None:
     """Download asteroid SPK21 kernel files for medium tier (1550-2650).
 
     Downloads SPK kernels for all supported minor bodies plus DE440.
     """
-    _python(
-        [
-            "-c",
-            "import libephemeris as eph; eph.set_precision_tier('medium'); eph.ensure_all_ephemerides(show_progress=True)",
-        ]
-    )
+    _download_spk_tier("medium", force=force)
 
 
 @download_group.command(
     "spk-extended",
-    short_help="Download max-range asteroid SPK files for extended tier.",
+    short_help="Download de441 plus max-range asteroid SPKs for extended work.",
 )
-def spk_extended() -> None:
-    """Download max-range asteroid SPK files for extended tier from JPL Horizons.
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Re-download files even if they are already present.",
+)
+def spk_extended(force: bool) -> None:
+    """Download de441 plus max-range asteroid SPK files for extended work.
 
-    These are custom-generated SPK files with the widest date range available.
-    Requires internet access to query JPL Horizons for each body.
+    The DE441 kernel is downloaded to the shared data directory. Minor-body SPKs
+    are then fetched from JPL Horizons with the widest practical range currently
+    available to the project.
     """
-    _python(["scripts/download_max_range_spk.py"])
-
-
-# ===========================================================================
-# LEB downloads
-# ===========================================================================
+    _download_spk_extended(force=force)
 
 
 @download_group.command(
-    "leb-base",
-    short_help="Download LEB binary ephemeris for base tier (~5 MB).",
+    "iers",
+    short_help="Download IERS Earth-orientation and Delta T data.",
 )
-def leb_base() -> None:
-    """Download pre-built LEB binary ephemeris for base tier (~5 MB).
-
-    Covers 1850-2150 (de440s). Provides ~14x speedup over Skyfield.
-    Downloaded from GitHub Releases to data/leb/.
-    """
-    _python(["-m", "libephemeris.cli", "download:leb:base"])
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Re-download files even if they are already present.",
+)
+def iers(force: bool) -> None:
+    """Download all IERS files used by local time and Earth-orientation logic."""
+    _download_iers(force=force)
 
 
 @download_group.command(
-    "leb-medium",
-    short_help="Download LEB binary ephemeris for medium tier (~20 MB).",
+    "planet-centers-sources",
+    short_help="Download NAIF source kernels for later planet-centers generation.",
 )
-def leb_medium() -> None:
-    """Download pre-built LEB binary ephemeris for medium tier (~20 MB).
-
-    Covers 1550-2650 (de440). This is the recommended tier for most users.
-    Downloaded from GitHub Releases to data/leb/.
-    """
-    _python(["-m", "libephemeris.cli", "download:leb:medium"])
-
-
-@download_group.command(
-    "leb-extended",
-    short_help="Download LEB binary ephemeris for extended tier (~180 MB).",
+@click.option(
+    "--tier",
+    type=click.Choice(["base", "medium", "extended"], case_sensitive=False),
+    default=None,
+    help="Limit the source download to one tier (default: all tiers).",
 )
-def leb_extended() -> None:
-    """Download pre-built LEB binary ephemeris for extended tier (~180 MB).
-
-    Covers -5000 to 5000 CE (de441). Largest file, widest date range.
-    Downloaded from GitHub Releases to data/leb/.
-    """
-    _python(["-m", "libephemeris.cli", "download:leb:extended"])
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Re-download files even if they are already present.",
+)
+def planet_centers_sources(tier: str | None, force: bool) -> None:
+    """Download cached source kernels for `leph generate planet-centers-*`."""
+    _download_planet_center_sources(force=force, tier=tier)
 
 
 # ===========================================================================
@@ -230,7 +270,12 @@ def leb_extended() -> None:
 @download_group.command(
     short_help="Download REBOUND/ASSIST n-body data (~120 MB).",
 )
-def assist() -> None:
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Re-download files even if they are already present.",
+)
+def assist(force: bool) -> None:
     """Download REBOUND/ASSIST n-body integration data (~120 MB).
 
     Downloads planet ephemeris and asteroid perturber SPK files needed
@@ -238,4 +283,4 @@ def assist() -> None:
     Files are saved to ~/.libephemeris/assist/.
     Requires: pip install libephemeris[nbody]
     """
-    _python(["-m", "libephemeris.cli", "download:assist"])
+    _download_assist(force=force)

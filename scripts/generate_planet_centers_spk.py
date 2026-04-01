@@ -530,6 +530,13 @@ def generate_for_tier(
     return result
 
 
+def download_sources_for_tier(tier: str, cache_dir: str, force: bool = False) -> None:
+    """Download only the source kernels needed to generate one tier later."""
+    ssl_ctx = _get_ssl_context(verify=True)
+    fallback_ctx = _get_ssl_context(verify=False)
+    download_source_files(tier, cache_dir, ssl_ctx, fallback_ctx, force)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate tier-specific planet_centers SPK files for libephemeris",
@@ -554,6 +561,11 @@ Examples:
         help="Generate SPK for all tiers",
     )
     parser.add_argument(
+        "--download-only",
+        action="store_true",
+        help="Only download and cache source kernels, do not generate outputs",
+    )
+    parser.add_argument(
         "--force",
         "-f",
         action="store_true",
@@ -575,34 +587,37 @@ Examples:
     if not args.tier and not args.all:
         parser.error("Specify --tier or --all")
 
-    # Check for spiceypy
-    try:
-        import spiceypy
-
-        print(f"Using spiceypy version {spiceypy.__version__}")
-    except ImportError:
-        print("ERROR: spiceypy is required but not installed.")
-        print("Install with: pip install spiceypy>=6.0.0")
-        return 1
-
-    # Determine paths
-    default_output = Path.home() / ".libephemeris"
-    output_dir = args.output_dir or default_output
-
     print("=" * 70)
     print("PLANET CENTERS SPK GENERATOR")
     print("=" * 70)
     print()
-    print(f"Output directory: {output_dir}")
-    print()
 
     tiers = ["base", "medium", "extended"] if args.all else [args.tier]
+
+    if not args.download_only:
+        # Check for spiceypy only when generation is requested.
+        try:
+            import spiceypy
+
+            print(f"Using spiceypy version {spiceypy.__version__}")
+        except ImportError:
+            print("ERROR: spiceypy is required but not installed.")
+            print("Install with: pip install spiceypy>=6.0.0")
+            return 1
+
+        default_output = Path.home() / ".libephemeris"
+        output_dir = args.output_dir or default_output
+        print(f"Output directory: {output_dir}")
+        print()
 
     for tier in tiers:
         print(f"\n{'=' * 70}")
         print(f"TIER: {tier}")
         print(f"Expected coverage: {TIER_COVERAGE[tier]}")
-        print(f"Output file: {TIER_OUTPUT[tier]}")
+        if args.download_only:
+            print("Mode: source download only")
+        else:
+            print(f"Output file: {TIER_OUTPUT[tier]}")
         print("=" * 70)
 
         if args.cache_dir:
@@ -613,7 +628,11 @@ Examples:
             )
         os.makedirs(cache_dir, exist_ok=True)
         print(f"Cache directory: {cache_dir}")
-        generate_for_tier(tier, output_dir, cache_dir, args.force)
+
+        if args.download_only:
+            download_sources_for_tier(tier, cache_dir, args.force)
+        else:
+            generate_for_tier(tier, output_dir, cache_dir, args.force)
 
     print("\n" + "=" * 70)
     print("COMPLETE")

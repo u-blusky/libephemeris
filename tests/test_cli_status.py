@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 import libephemeris.cli as cli_module
 import libephemeris.dev_cli as dev_cli_module
+import libephemeris.dev_cli.cmd_status as dev_status_module
 import libephemeris.download as download_module
 import libephemeris.iers_data as iers_data_module
 import libephemeris.state as state_module
@@ -15,6 +16,346 @@ import libephemeris.state as state_module
 def _write_file(path: Path, size: int = 16) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"x" * size)
+
+
+def _sample_dev_status_report() -> dict[str, object]:
+    return {
+        "version": "1.0.0-test",
+        "project_root": "/repo",
+        "data_directory": "/data",
+        "download_prerequisites": {
+            "spk": {
+                "cache_dir": "/data/spk",
+                "cache_files": [
+                    {
+                        "exists": True,
+                        "name": "chiron_1_2.bsp",
+                        "path": "/data/spk/chiron_1_2.bsp",
+                        "size": 12,
+                    }
+                ],
+                "tiers": {
+                    "base": {
+                        "status": "ok",
+                        "de_kernel": {
+                            "exists": True,
+                            "name": "de440s.bsp",
+                            "path": "/data/de440s.bsp",
+                            "size": 10,
+                        },
+                        "range": {"start": "1900-01-01", "end": "2100-01-01"},
+                        "cache_dir": "/data/spk",
+                        "total_bodies": 2,
+                        "required_bodies": 2,
+                        "ready_bodies": 2,
+                        "partial_bodies": 0,
+                        "missing_bodies": 0,
+                        "expected_fallback_bodies": 0,
+                        "bodies": [
+                            {
+                                "name": "Chiron",
+                                "status": "ready",
+                                "path": "/data/spk/chiron_1_2.bsp",
+                                "coverage": [1.0, 2.0],
+                            },
+                            {
+                                "name": "Ceres",
+                                "status": "ready",
+                                "path": "/data/spk/ceres_1_2.bsp",
+                                "coverage": [1.0, 2.0],
+                            },
+                        ],
+                    },
+                    "medium": {
+                        "status": "partial",
+                        "de_kernel": {
+                            "exists": True,
+                            "name": "de440.bsp",
+                            "path": "/data/de440.bsp",
+                            "size": 10,
+                        },
+                        "range": {"start": "1550-01-01", "end": "2650-01-01"},
+                        "cache_dir": "/data/spk",
+                        "total_bodies": 3,
+                        "required_bodies": 2,
+                        "ready_bodies": 1,
+                        "partial_bodies": 0,
+                        "missing_bodies": 1,
+                        "expected_fallback_bodies": 1,
+                        "bodies": [
+                            {
+                                "name": "Chiron",
+                                "status": "ready",
+                                "path": "/data/spk/chiron_1_2.bsp",
+                                "coverage": [1.0, 2.0],
+                            },
+                            {
+                                "name": "Ceres",
+                                "status": "missing",
+                                "path": None,
+                                "coverage": None,
+                            },
+                            {
+                                "name": "Bennu",
+                                "status": "expected_fallback",
+                                "path": None,
+                                "coverage": None,
+                                "reason": "JPL blocks SPK generation; Keplerian fallback is expected.",
+                            },
+                        ],
+                    },
+                    "extended": {
+                        "status": "missing",
+                        "de_kernel": {
+                            "exists": False,
+                            "name": "de441.bsp",
+                            "path": "/data/de441.bsp",
+                            "size": None,
+                        },
+                        "range": {"start": "1600-01-01", "end": "2500-01-01"},
+                        "cache_dir": "/data/spk",
+                        "total_bodies": 3,
+                        "required_bodies": 2,
+                        "ready_bodies": 0,
+                        "partial_bodies": 0,
+                        "missing_bodies": 2,
+                        "expected_fallback_bodies": 1,
+                        "bodies": [
+                            {
+                                "name": "Chiron",
+                                "status": "missing",
+                                "path": None,
+                                "coverage": None,
+                            },
+                            {
+                                "name": "Ceres",
+                                "status": "missing",
+                                "path": None,
+                                "coverage": None,
+                            },
+                            {
+                                "name": "Bennu",
+                                "status": "expected_fallback",
+                                "path": None,
+                                "coverage": None,
+                                "reason": "JPL blocks SPK generation; Keplerian fallback is expected.",
+                            },
+                        ],
+                    },
+                },
+            },
+            "iers": {
+                "status": "partial",
+                "cache_dir": "/data/iers",
+                "present": 2,
+                "total": 3,
+                "files": {
+                    "finals2000A.data": {
+                        "exists": True,
+                        "path": "/data/iers/finals2000A.data",
+                        "age_days": 2.0,
+                    },
+                    "leap_seconds.dat": {
+                        "exists": False,
+                        "path": "/data/iers/leap_seconds.dat",
+                        "age_days": None,
+                    },
+                    "deltat.data": {
+                        "exists": True,
+                        "path": "/data/iers/deltat.data",
+                        "age_days": 4.0,
+                    },
+                },
+            },
+            "planet_center_sources": {
+                "status": "partial",
+                "cache_dir": "/data/tmp/planet_centers",
+                "shared": {
+                    "status": "ok",
+                    "present": 1,
+                    "total": 1,
+                    "files": {
+                        "naif0012.tls": {
+                            "exists": True,
+                            "name": "naif0012.tls",
+                            "path": "/data/tmp/planet_centers/naif0012.tls",
+                            "size": 8,
+                        }
+                    },
+                },
+                "tiers": {
+                    "base": {
+                        "status": "ok",
+                        "present": 5,
+                        "total": 5,
+                        "files": {},
+                    },
+                    "medium": {
+                        "status": "partial",
+                        "present": 4,
+                        "total": 5,
+                        "files": {
+                            "sat441.bsp": {
+                                "exists": False,
+                                "name": "sat441.bsp",
+                                "path": "/data/tmp/planet_centers/sat441.bsp",
+                                "size": None,
+                            }
+                        },
+                    },
+                    "extended": {
+                        "status": "ok",
+                        "present": 6,
+                        "total": 6,
+                        "files": {},
+                    },
+                },
+            },
+            "assist": {
+                "status": "ok",
+                "directory": "/data/assist",
+                "present": 2,
+                "total": 2,
+                "files": {
+                    "linux_p1550p2650.440": {
+                        "exists": True,
+                        "name": "linux_p1550p2650.440",
+                        "path": "/data/assist/linux_p1550p2650.440",
+                        "size": 10,
+                    },
+                    "sb441-n16.bsp": {
+                        "exists": True,
+                        "name": "sb441-n16.bsp",
+                        "path": "/data/assist/sb441-n16.bsp",
+                        "size": 10,
+                    },
+                },
+            },
+        },
+        "generated_artifacts": {
+            "leb1": {
+                "base": {
+                    "status": "ok",
+                    "final": {
+                        "exists": True,
+                        "name": "ephemeris_base.leb",
+                        "path": "/repo/data/leb/ephemeris_base.leb",
+                        "size": 10,
+                    },
+                    "partial_present": 0,
+                    "partial_total": 3,
+                    "partials": {},
+                },
+                "medium": {
+                    "status": "partial",
+                    "final": {
+                        "exists": False,
+                        "name": "ephemeris_medium.leb",
+                        "path": "/repo/data/leb/ephemeris_medium.leb",
+                        "size": None,
+                    },
+                    "partial_present": 2,
+                    "partial_total": 3,
+                    "partials": {
+                        "planets": {
+                            "exists": True,
+                            "name": "ephemeris_medium_planets.leb",
+                            "path": "/repo/data/leb/ephemeris_medium_planets.leb",
+                            "size": 10,
+                        }
+                    },
+                },
+                "extended": {
+                    "status": "missing",
+                    "final": {
+                        "exists": False,
+                        "name": "ephemeris_extended.leb",
+                        "path": "/repo/data/leb/ephemeris_extended.leb",
+                        "size": None,
+                    },
+                    "partial_present": 0,
+                    "partial_total": 3,
+                    "partials": {},
+                },
+            },
+            "leb2": {
+                "base": {
+                    "status": "ok",
+                    "present": 4,
+                    "total": 4,
+                    "files": {
+                        "core": {
+                            "exists": True,
+                            "name": "base_core.leb",
+                            "path": "/repo/data/leb2/base_core.leb",
+                            "size": 10,
+                        }
+                    },
+                },
+                "medium": {
+                    "status": "partial",
+                    "present": 2,
+                    "total": 4,
+                    "files": {
+                        "core": {
+                            "exists": True,
+                            "name": "medium_core.leb",
+                            "path": "/repo/data/leb2/medium_core.leb",
+                            "size": 10,
+                        }
+                    },
+                },
+                "extended": {
+                    "status": "missing",
+                    "present": 0,
+                    "total": 4,
+                    "files": {
+                        "core": {
+                            "exists": False,
+                            "name": "extended_core.leb",
+                            "path": "/repo/data/leb2/extended_core.leb",
+                            "size": None,
+                        }
+                    },
+                },
+            },
+            "planet_centers": {
+                "base": {
+                    "status": "ok",
+                    "file": {
+                        "exists": True,
+                        "name": "planet_centers_base.bsp",
+                        "path": "/data/planet_centers_base.bsp",
+                        "size": 10,
+                    },
+                },
+                "medium": {
+                    "status": "missing",
+                    "file": {
+                        "exists": False,
+                        "name": "planet_centers_medium.bsp",
+                        "path": "/data/planet_centers_medium.bsp",
+                        "size": None,
+                    },
+                },
+                "extended": {
+                    "status": "missing",
+                    "file": {
+                        "exists": False,
+                        "name": "planet_centers_extended.bsp",
+                        "path": "/data/planet_centers_extended.bsp",
+                        "size": None,
+                    },
+                },
+            },
+        },
+        "missing_commands": [
+            "leph download spk-medium",
+            "leph download iers",
+            "leph leb generate medium groups",
+            "leph generate planet-centers-medium",
+        ],
+    }
 
 
 def test_download_all_includes_iers_downloads(monkeypatch):
@@ -148,17 +489,55 @@ def test_status_verbose_levels(monkeypatch, tmp_path):
     assert parsed["precision_tier"] == "base"
 
 
-def test_leph_status_delegates_to_shared_status_renderer(monkeypatch):
-    calls: list[tuple[bool, int]] = []
-
+def test_leph_status_reports_development_status(monkeypatch):
     monkeypatch.setattr(
-        download_module,
-        "print_data_status",
-        lambda *, as_json=False, verbose=0: calls.append((as_json, verbose)),
+        dev_status_module,
+        "_build_dev_status_report",
+        _sample_dev_status_report,
     )
 
     runner = CliRunner()
-    result = runner.invoke(dev_cli_module.cli, ["status", "--json", "-vv"])
+    result = runner.invoke(dev_cli_module.cli, ["status"])
 
     assert result.exit_code == 0, result.output
-    assert calls == [(True, 2)]
+    assert "libephemeris dev 1.0.0-test" in result.output
+    assert (
+        "spk-medium: de440.bsp + 1/2 downloadable bodies, 1 expected fallback"
+        in result.output
+    )
+    assert "LEB1 medium: ephemeris_medium.leb (partials 2/3)" in result.output
+    assert "leph download iers" in result.output
+
+
+def test_leph_status_verbose_modes_and_json(monkeypatch):
+    monkeypatch.setattr(
+        dev_status_module,
+        "_build_dev_status_report",
+        _sample_dev_status_report,
+    )
+
+    runner = CliRunner()
+
+    verbose_result = runner.invoke(dev_cli_module.cli, ["status", "-v"])
+    assert verbose_result.exit_code == 0, verbose_result.output
+    assert "Kernel: /data/de440.bsp" in verbose_result.output
+    assert "Missing bodies: Ceres" in verbose_result.output
+    assert (
+        "Expected fallback body: Bennu (JPL blocks SPK generation; Keplerian fallback is expected.)"
+        in verbose_result.output
+    )
+    assert "Path: /repo/data/leb/ephemeris_medium.leb" in verbose_result.output
+
+    very_verbose_result = runner.invoke(dev_cli_module.cli, ["status", "-vv"])
+    assert very_verbose_result.exit_code == 0, very_verbose_result.output
+    assert "Coverage: JD 1.0 -> 2.0" in very_verbose_result.output
+    assert "Bennu (fallback)" in very_verbose_result.output
+    assert "Path: /data/tmp/planet_centers/sat441.bsp" in very_verbose_result.output
+    assert "Path: /repo/data/leb2/medium_core.leb" in very_verbose_result.output
+
+    json_result = runner.invoke(dev_cli_module.cli, ["status", "--json"])
+    assert json_result.exit_code == 0, json_result.output
+    parsed = json.loads(json_result.output)
+    assert parsed["version"] == "1.0.0-test"
+    assert parsed["project_root"] == "/repo"
+    assert parsed["missing_commands"][0] == "leph download spk-medium"

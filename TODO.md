@@ -20,4 +20,4 @@ All items completed as of March 2026.
 - ~~#11b~~ Sun heliocentric — returns (0,0,0) correctly now
 - ~~#11c~~ True Node distance — full osculating orbit calc (2000x improvement)
 - ~~#12~~ Skyfield TypeError — retry + radec removal, cache clear
-- ~~#13~~ Developer CLI split — `leph` now has its own `status` command and `download all` for the full local-development dataset, while `libephemeris` stays focused on end-user runtime setup
+- ~~#13~~ Developer CLI split — `leph` now has its own `status` command and a development bootstrap `download all` that fetches prerequisites and source inputs, while `libephemeris` stays focused on end-user runtime setup

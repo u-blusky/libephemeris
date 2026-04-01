@@ -268,7 +268,7 @@ _LEB_ENV = {"LIBEPHEMERIS_LEB": "data/leb/ephemeris_medium.leb"}
     "Instead of computing positions from DE440 kernels in real time (Skyfield),\n"
     "these tests use precomputed Chebyshev polynomial approximations stored in\n"
     ".leb files. ~14x faster than Skyfield at runtime.\n\n"
-    "Requires: data/leb/ephemeris_medium.leb (run 'leph download leb-medium').\n\n"
+    "Requires: data/leb/ephemeris_medium.leb (generate with 'leph leb generate medium groups').\n\n"
     "Recommended for everyday development:\n\n"
     "  leph test leb-backend unit-fast   # ~5890 tests, ~1 min, parallel",
 )
@@ -328,7 +328,7 @@ def leb_unit_fast() -> None:
 
     Best balance of speed and coverage for everyday development.
     Runs ~5890 tests in ~1 minute using pytest-xdist parallelism.
-    Requires data/leb/ephemeris_medium.leb (run 'leph download leb-medium').
+    Requires data/leb/ephemeris_medium.leb (generate with 'leph leb generate medium groups').
     """
     _pytest(
         ["tests/", "-n", "auto", "-m", "not slow", "--calc-mode", "leb"], env=_LEB_ENV
