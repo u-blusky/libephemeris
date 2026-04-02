@@ -324,21 +324,25 @@ def _discover_leb_file() -> Optional[str]:
         return candidate
 
     # Fall back to bundled LEB2 core (ships with the PyPI wheel, base tier only)
-    bundled = os.path.join(os.path.dirname(__file__), "data", "leb2", "base_core.leb2")
-    if os.path.isfile(bundled):
-        return bundled
-    # Legacy bundled path
-    bundled_legacy = os.path.join(
-        os.path.dirname(__file__), "data", "leb2", "base_core.leb"
-    )
-    if os.path.isfile(bundled_legacy):
-        return bundled_legacy
+    if tier == "base":
+        bundled = os.path.join(
+            os.path.dirname(__file__), "data", "leb2", "base_core.leb2"
+        )
+        if os.path.isfile(bundled):
+            return bundled
+        # Legacy bundled path
+        bundled_legacy = os.path.join(
+            os.path.dirname(__file__), "data", "leb2", "base_core.leb"
+        )
+        if os.path.isfile(bundled_legacy):
+            return bundled_legacy
 
-    # Auto-download LEB2 from GitHub Releases in "auto" mode.
-    # This gives new users fast LEB2-based calculations (~28 MB download)
+    # Auto-download LEB2 from GitHub Releases when no local LEB exists.
+    # In "auto" mode: gives new users fast LEB2 calculations (~28 MB)
     # instead of falling through to Skyfield which downloads DE440 (~114 MB).
+    # In "leb" mode: download what the user asked for instead of crashing.
     mode = get_calc_mode()
-    if mode == "auto":
+    if mode in ("auto", "leb"):
         logger = get_logger()
         logger.info(
             "No LEB file found for '%s' tier. Downloading LEB2 from GitHub Releases...",
