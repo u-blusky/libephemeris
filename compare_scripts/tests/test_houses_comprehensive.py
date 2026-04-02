@@ -78,21 +78,22 @@ HOUSE_SYSTEMS = [
     ("Q", "Pullen SR"),
 ]
 
-# Per-system cusp tolerance (degrees). Default 0.001° (~3.6 arcsec).
-CUSP_TOLERANCE_DEFAULT = 0.001
+# Per-system cusp tolerance (degrees). Default 0.0011° (~4 arcsec).
+# Worst observed: H at 0.00108°. All others < 0.001°.
+CUSP_TOLERANCE_DEFAULT = 0.0011
 CUSP_TOLERANCE = {
-    "P": 0.002,  # Placidus: iteration differences at high latitudes
-    "R": 0.002,  # Regiomontanus: minor precision differences
-    "H": 0.002,  # Horizontal: minor differences at extreme locations
+    "H": 0.0012,  # Horizontal: 0.00108° worst case at Sydney
 }
 
-# Sidereal cusp tolerance — higher due to ayanamsha computation drift over time
+# Sidereal cusp tolerance — ayanamsha computation drift over 1950-2050 range
+# Worst observed: ~0.004° at epoch boundaries
 SIDEREAL_CUSP_TOLERANCE = 0.005
 
-# house_pos per-system tolerance — B/T have larger differences with non-zero body latitude
+# house_pos default tolerance and per-system overrides
+# Most systems: < 0.001. T: 0.019 (semi-arc approximation). B: 0.084 (cusp fallback).
+HPOS_TOLERANCE = 0.02
 HPOS_TOLERANCE_PER_SYSTEM = {
-    "B": 0.10,   # Alcabitius: body latitude handling differs
-    "T": 0.30,   # Topocentric: body latitude handling differs
+    "B": 0.09,   # Alcabitius: cusp-based fallback, body latitude not fully accounted
 }
 
 # ASCMC indices to skip at equator for specific systems (mathematically undefined)
@@ -102,19 +103,22 @@ SKIP_ASCMC_AT_EQUATOR: dict[str, set[int]] = {
 }
 
 # ASCMC labels and tolerances per index
+# Tightened to just above worst observed values:
+#   ASC: 0.00070°, MC: 0.00058°, ARMC: 0.00053°, Vertex: 0.00108°
+#   EquAsc: 0.00057°, CoAsc_Koch: 0.00140°, CoAsc_Munk: 0.00076°, PolarAsc: 0.00140°
 ASCMC_LABELS = [
     "ASC", "MC", "ARMC", "Vertex",
     "EquAsc", "CoAsc_Koch", "CoAsc_Munkasey", "PolarAsc",
 ]
 ASCMC_TOLERANCE = {
-    0: 0.001,   # ASC
-    1: 0.001,   # MC
-    2: 0.001,   # ARMC
-    3: 0.01,    # Vertex
-    4: 0.01,    # Equatorial Ascendant
-    5: 0.01,    # Co-Ascendant Koch
-    6: 0.01,    # Co-Ascendant Munkasey
-    7: 0.01,    # Polar Ascendant
+    0: 0.001,    # ASC — worst: 0.00070°
+    1: 0.001,    # MC — worst: 0.00058°
+    2: 0.001,    # ARMC — worst: 0.00053°
+    3: 0.002,    # Vertex — worst: 0.00108°
+    4: 0.001,    # Equatorial Ascendant — worst: 0.00057°
+    5: 0.002,    # Co-Ascendant Koch — worst: 0.00140°
+    6: 0.001,    # Co-Ascendant Munkasey — worst: 0.00076°
+    7: 0.002,    # Polar Ascendant — worst: 0.00140°
 }
 
 # 8 test locations: (name, lat, lon)

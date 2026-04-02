@@ -4821,7 +4821,36 @@ def house_pos(
             hpos = xp0 / 30.0 + 1.0
             return hpos
 
-    # Default fallback: use cusp-based method
+    elif hsys_char == "T":
+        # Topocentric (Polich-Page) house position.
+        # For house position purposes, Topocentric uses the same semi-arc
+        # method as Placidus — the difference between the systems is only
+        # in how cusps are computed (different pole heights per house),
+        # not in how a body is placed within those cusps.
+        if 90.0 - abs(de) <= abs(geolat):
+            if de * geolat < 0:
+                xp0 = (90.0 + mdn / 2.0) % 360.0
+            else:
+                xp0 = (270.0 + mdd / 2.0) % 360.0
+        else:
+            sinad = math.tan(math.radians(de)) * math.tan(math.radians(geolat))
+            if abs(sinad) > 1.0:
+                sinad = 1.0 if sinad > 0 else -1.0
+            ad = math.degrees(math.asin(sinad))
+            a = sinad + math.cos(math.radians(mdd))
+            is_above_hor = a >= 0
+            sad = 90.0 + ad
+            san = 90.0 - ad
+            if is_above_hor:
+                xp0 = (mdd / sad + 3.0) * 90.0
+            else:
+                xp0 = (mdn / san + 1.0) * 90.0
+            xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
+        hpos = xp0 / 30.0 + 1.0
+        return hpos
+
+    # Default fallback: use cusp-based method (ecliptic longitude interpolation)
+    # This applies to B (Alcabitius), H, F, I, i, J, S, L, Q, Y, and others
     cusps, ascmc = swe_houses_armc(armc, lat, obliquity, hsys_int)
 
     # Find the house containing this longitude

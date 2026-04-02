@@ -73,15 +73,15 @@ def track(system: str, value: str, diff: float) -> None:
 HOUSE_SYSTEMS = list("PKORECAWBTMXVHUFGIiNYDJLSQ")
 
 ASCMC_LABELS = ["ASC", "MC", "ARMC", "Vertex", "EquAsc", "CoAsc_Koch", "CoAsc_Munk", "PolarAsc"]
-ASCMC_TOLERANCES = [0.001, 0.001, 0.001, 0.01, 0.01, 0.01, 0.01, 0.01]
+ASCMC_TOLERANCES = [0.001, 0.001, 0.001, 0.002, 0.001, 0.002, 0.001, 0.002]
 
-CUSP_TOL_DEFAULT = 0.001
-CUSP_TOL = {"P": 0.002, "R": 0.002, "H": 0.002}
+CUSP_TOL_DEFAULT = 0.0011
+CUSP_TOL = {"H": 0.0012}
 
 SIDEREAL_CUSP_TOL = 0.005  # ayanamsha computation drift over time
 
 HPOS_TOL_DEFAULT = 0.02
-HPOS_TOL = {"B": 0.10, "T": 0.30}  # body latitude handling differs
+HPOS_TOL = {"B": 0.09}  # Alcabitius cusp-based fallback, body_lat not fully accounted
 
 # ASCMC indices to skip at equator for specific systems (mathematically undefined)
 SKIP_ASCMC_EQ = {"H": {3, 6}}  # Vertex and CoAsc_Munkasey undefined at equator
