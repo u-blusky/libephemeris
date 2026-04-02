@@ -352,14 +352,30 @@ def _collect_leb1_status() -> dict[str, Any]:
     return tiers
 
 
-def _collect_leb2_status() -> dict[str, Any]:
-    """Collect status for generated LEB2 group artifacts in the repository."""
+def _collect_leb2_status(data_dir: Path) -> dict[str, Any]:
+    """Collect status for LEB2 group files in both repo and user data dir.
+
+    Checks two locations for each group file:
+    1. ``data/leb2/`` in the project repo (freshly generated artifacts)
+    2. ``~/.libephemeris/leb/`` user data dir (downloaded or installed files)
+
+    Reports the first found for each group.
+    """
+    user_leb_dir = data_dir / "leb"
     tiers: dict[str, Any] = {}
     for tier in ["base", "medium", "extended"]:
-        files = {
-            group: _file_entry(_LEB2_DIR / f"{tier}_{group}.leb2")
-            for group in _LEB2_GROUPS
-        }
+        files: dict[str, dict[str, Any]] = {}
+        for group in _LEB2_GROUPS:
+            fname = f"{tier}_{group}.leb2"
+            repo_path = _LEB2_DIR / fname
+            user_path = user_leb_dir / fname
+            if repo_path.exists():
+                files[group] = _file_entry(repo_path)
+            elif user_path.exists():
+                files[group] = _file_entry(user_path)
+            else:
+                # Report repo path as the expected location
+                files[group] = _file_entry(repo_path)
         present = sum(1 for info in files.values() if info["exists"])
         tiers[tier] = {
             "status": _status_from_counts(present, len(files)),
@@ -435,7 +451,7 @@ def _build_dev_status_report() -> dict[str, Any]:
         },
         "generated_artifacts": {
             "leb1": _collect_leb1_status(),
-            "leb2": _collect_leb2_status(),
+            "leb2": _collect_leb2_status(data_dir),
             "planet_centers": _collect_planet_centers_artifacts(data_dir),
         },
     }
