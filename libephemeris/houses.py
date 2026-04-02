@@ -683,6 +683,10 @@ def swe_houses(
     if 0.0 < h_deg < 180.0:
         asc = (asc + 180.0) % 360.0
 
+    # Ensure ASC is in [0, 360) range (handle floating-point near-360 values)
+    if asc >= 360.0 or (360.0 - asc) < 1e-10:
+        asc = 0.0
+
     # Vertex uses armc_deg (Original)
     # Hemisphere check relative to TRUE ARMC (West of True ARMC)
     vertex = _calc_vertex(armc_deg, eps, lat, armc_deg)
@@ -1239,8 +1243,8 @@ def swe_houses_armc(
     if 0.0 < h_deg < 180.0:
         asc = (asc + 180.0) % 360.0
 
-    # Ensure ASC is in [0, 360) range (handle edge case of exactly 360.0)
-    if asc >= 360.0:
+    # Ensure ASC is in [0, 360) range (handle floating-point near-360 values)
+    if asc >= 360.0 or (360.0 - asc) < 1e-10:
         asc = 0.0
 
     # Vertex uses armc_deg (Original)
