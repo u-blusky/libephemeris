@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a14] — 2026-04-02
+
+### Fixed
+
+- **TNO/asteroid SPK loading with numpy 2.x**: Vendored `spktype21` (upstream
+  unmaintained since 2018) with `.item()` fix for `daf.map_array()` calls.
+  numpy 2.x returns 1-element arrays instead of scalars, causing `TypeError`
+  in `int()`. TNOs (Eris, Sedna, Haumea, etc.) and asteroids (Pholus) now
+  load SPK data from JPL Horizons at full precision instead of falling back to
+  arcminute-level Keplerian orbits.
+
+- **White Moon (SE_WHITE_MOON, body ID 56) not calculated**: Added dispatch
+  handler in `_calc_body()` for fictitious bodies 55–58 (Vulcan, White Moon,
+  Proserpina, Waldemath) via `hypothetical.calc_hypothetical_position()`.
+  Previously these fell through to `UnknownBodyError`.
+
+- **SPK auto-download failure blocking Keplerian fallback**: When strict
+  precision mode is enabled and SPK auto-download fails (e.g. due to
+  `spktype21` incompatibility), the Keplerian fallback is now allowed instead
+  of raising `SPKRequiredError`.
+
+### Changed
+
+- **Campanus house system**: Clean-room rewrite of `_houses_campanus()` using
+  spherical trigonometry derived from the prime-vertical pole geometry.
+  Mathematically equivalent to the previous implementation but with proper
+  derivation, academic references (Smart, Meeus), and polar-circle handling.
+
+- **spktype21 vendored**: `spktype21==0.1.0` (MIT, Shushi Uetsuki) is now
+  vendored at `libephemeris/vendor/spktype21.py` instead of being an external
+  dependency. The external `spktype21` package is no longer required.
+
 ## [1.0.0a13] — 2026-04-02
 
 ### Performance
