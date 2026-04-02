@@ -30,21 +30,7 @@ def _download_spk_tier(tier: str, force: bool = False) -> None:
     import libephemeris as eph
 
     eph.set_precision_tier(tier)
-    results = eph.ensure_all_ephemerides(force_download=force, show_progress=True)
-    spk_results = results.get("spks", {})
-    fallback_bodies = [
-        str(name).rstrip(";")
-        for name, status in spk_results.items()
-        if str(status).startswith("fallback")
-    ]
-    if fallback_bodies:
-        label = "body" if len(fallback_bodies) == 1 else "bodies"
-        pronoun = "it" if len(fallback_bodies) == 1 else "them"
-        click.echo(
-            f"  Expected fallback {label}: "
-            + ", ".join(fallback_bodies)
-            + f" (JPL does not provide SPKs for {pronoun})."
-        )
+    eph.ensure_all_ephemerides(force_download=force, show_progress=True)
 
 
 def _download_spk_extended(force: bool = False) -> None:
