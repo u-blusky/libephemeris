@@ -1759,7 +1759,7 @@ The compression is transparent: `open_leb()` auto-detects the format via magic
 bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
 
 **Motivation:** LEB1 files exceed PyPI's 100 MB limit (base tier = 101.8 MB).
-LEB2 compresses the core body set to ~7.7 MB, enabling `pip install libephemeris`
+LEB2 compresses the core body set to ~10.6 MB, enabling `pip install libephemeris`
 to include precomputed ephemeris with zero additional downloads.
 
 **Dependency:** `zstandard>=0.22.0` (required, ~200 KB wheel).

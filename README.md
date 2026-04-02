@@ -95,7 +95,7 @@ All backends produce the same positions (sub-arcsecond agreement). The default `
 |---------|---------|
 | **Skyfield** | Pure JPL DE440/DE441 via Skyfield. Gold standard. [Ephemeris tiers](docs/getting-started.md#ephemeris-tiers) |
 | **LEB** | Precomputed Chebyshev polynomials, ~14x speedup. [LEB Guide](docs/leb/guide.md) |
-| **LEB2** | Compressed LEB format (4-10x smaller). Core bodies (~8.7 MB) ship in the PyPI wheel. [LEB2 details](docs/leb/guide.md#13-leb2-compressed-format) |
+| **LEB2** | Compressed LEB format (4-10x smaller). Core bodies (~10.1 MB) ship in the PyPI wheel. [LEB2 details](docs/leb/guide.md#13-leb2-compressed-format) |
 | **Horizons** | NASA JPL Horizons REST API. No local files needed. [Horizons Guide](docs/horizons-backend.md) |
 
 ---

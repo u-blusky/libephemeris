@@ -115,10 +115,10 @@ LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reo
 
 | Group | Bodies | Base size |
 |-------|--------|-----------|
-| `core` | Sun-Pluto, Earth, Mean/True Node, Mean Apogee (14) | ~8.7 MB |
-| `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~7.3 MB |
-| `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~9.8 MB |
-| `uranians` | Cupido-Transpluto (9) | ~1.9 MB |
+| `core` | Sun-Pluto, Earth, Mean/True Node, Mean Apogee (14) | ~10.6 MB |
+| `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~8.7 MB |
+| `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~11.4 MB |
+| `uranians` | Cupido-Transpluto (9) | ~2.1 MB |
 
 ### Per-body Precision Targets (`BODY_TARGET_AU` in `leb_compression.py`)
 

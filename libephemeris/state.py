@@ -339,7 +339,7 @@ def _discover_leb_file() -> Optional[str]:
             return bundled_legacy
 
     # Auto-download LEB2 from GitHub Releases when no local LEB exists.
-    # In "auto" mode: gives new users fast LEB2 calculations (~28 MB)
+    # In "auto" mode: gives new users fast LEB2 calculations (~31 MB)
     # instead of falling through to Skyfield which downloads DE440 (~114 MB).
     # In "leb" mode: download what the user asked for instead of crashing.
     mode = get_calc_mode()

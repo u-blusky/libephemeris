@@ -109,7 +109,7 @@ New method on all LEB readers:
 
 In `"auto"` mode, when no LEB file is found locally, the library now
 automatically downloads LEB2 files for the active tier from GitHub
-Releases (~28 MB for base) instead of falling through to Skyfield which
+Releases (~31 MB for base) instead of falling through to Skyfield which
 would download DE440 (~114 MB). New users get faster startup with the
 more efficient LEB2 calculation path.
 
@@ -477,7 +477,7 @@ Heliocentric: ~0.01-0.03" systematic offset (Horizons Sun center vs Skyfield SSB
 
 A new binary ephemeris format (LEB2) that uses error-bounded lossy compression to achieve
 5-15x compression per body while maintaining <0.001" precision. This enables shipping
-precomputed ephemeris data directly inside the PyPI wheel (~6.5 MB for core bodies).
+precomputed ephemeris data directly inside the PyPI wheel (~10.6 MB for core bodies).
 
 **Compression pipeline** (mantissa truncation + coefficient-major reorder + byte shuffle + zstd):
 - Analyzes each Chebyshev coefficient order and keeps only the mantissa bits needed for

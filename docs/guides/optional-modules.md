@@ -167,7 +167,7 @@ Different setups require different data downloads:
 | **Minimal** | Nothing (uses Horizons API) | 0 | -- |
 | **Recommended** | Medium tier DE440 + SPKs | ~200 MB | `libephemeris download medium` |
 | **High precision asteroids** | Above + ASSIST data | ~900 MB | Above + `libephemeris download assist` |
-| **Binary ephemeris (fast)** | LEB2 compressed | ~28-734 MB | `libephemeris download leb2-medium` |
+| **Binary ephemeris (fast)** | LEB2 compressed | ~31-855 MB | `libephemeris download leb2-medium` |
 | **Offline everything** | All tiers + LEB + ASSIST | ~5-6 GB | `libephemeris download all` |
 
 ---

@@ -106,10 +106,10 @@ def extended() -> None:
 
 @convert_group.command(
     "base-core",
-    short_help="Convert base tier core group only (14 bodies, ~6.5 MB).",
+    short_help="Convert base tier core group only (14 bodies, ~10.6 MB).",
 )
 def base_core() -> None:
-    """Convert base tier core group only (14 bodies, ~6.5 MB for PyPI)."""
+    """Convert base tier core group only (14 bodies, ~10.6 MB for PyPI)."""
     _leb2(
         [
             "convert",

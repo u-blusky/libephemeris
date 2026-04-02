@@ -141,11 +141,11 @@ python scripts/generate_leb2.py generate --tier base --group core \
 
 | Group | File | Size | Bodies |
 |-------|------|------|--------|
-| core | `data/leb2/base_core.leb2` | 7.7 MB | Sun-Pluto, Earth, Nodes, Mean Apogee (14) |
-| asteroids | `data/leb2/base_asteroids.leb2` | 7.7 MB | Chiron, Ceres, Pallas, Juno, Vesta (5) |
-| apogee | `data/leb2/base_apogee.leb2` | 10.3 MB | OscuApog, IntpApog, IntpPerig (3) |
-| uranians | `data/leb2/base_uranians.leb2` | 2.0 MB | Cupido-Transpluto (9) |
-| **Total** | | **28.0 MB** | **31 bodies** |
+| core | `data/leb2/base_core.leb2` | 10.6 MB | Sun-Pluto, Earth, Nodes, Mean Apogee (14) |
+| asteroids | `data/leb2/base_asteroids.leb2` | 8.7 MB | Chiron, Ceres, Pallas, Juno, Vesta (5) |
+| apogee | `data/leb2/base_apogee.leb2` | 11.4 MB | OscuApog, IntpApog, IntpPerig (3) |
+| uranians | `data/leb2/base_uranians.leb2` | 2.1 MB | Cupido-Transpluto (9) |
+| **Total** | | **32.7 MB** | **31 bodies** |
 
 ### LEB2 groups vs LEB1 groups
 

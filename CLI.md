@@ -283,7 +283,7 @@ leph leb verify extended
 leph leb2 convert base              # All 4 groups (core/asteroids/apogee/uranians)
 leph leb2 convert medium
 leph leb2 convert extended
-leph leb2 convert base-core         # Core group only (~6.5 MB, for PyPI)
+leph leb2 convert base-core         # Core group only (~10.6 MB, for PyPI)
 leph leb2 convert base-asteroids    # Asteroids group only
 leph leb2 convert base-apogee       # Apogee group only
 leph leb2 convert base-uranians     # Uranians group only
@@ -399,9 +399,9 @@ libephemeris download extended          # DE441 + SPKs (-13200 to +17191)
 libephemeris download leb-base          # LEB1 binary (~53 MB)
 libephemeris download leb-medium        # LEB1 binary (~175 MB)
 libephemeris download leb-extended      # LEB1 binary
-libephemeris download leb2-base         # LEB2 compressed (~28 MB, modular)
-libephemeris download leb2-medium       # LEB2 compressed (~99 MB, modular)
-libephemeris download leb2-extended     # LEB2 compressed (~734 MB, modular)
+libephemeris download leb2-base         # LEB2 compressed (~31 MB, modular)
+libephemeris download leb2-medium       # LEB2 compressed (~113 MB, modular)
+libephemeris download leb2-extended     # LEB2 compressed (~855 MB, modular)
 libephemeris download assist            # ASSIST n-body data (~714 MB)
 
 # Status (comprehensive: version, config, all data files)

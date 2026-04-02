@@ -36,9 +36,9 @@ _PC_SIZES: Dict[str, float] = {"base": 25.4, "medium": 72.6, "extended": 222.6}
 
 _LEB2_GROUPS = ["core", "asteroids", "apogee", "uranians"]
 _LEB2_SIZES: Dict[str, Dict[str, float]] = {
-    "base": {"core": 8.7, "asteroids": 7.3, "apogee": 9.8, "uranians": 1.9},
-    "medium": {"core": 31.0, "asteroids": 25.0, "apogee": 35.0, "uranians": 8.1},
-    "extended": {"core": 264.0, "asteroids": 79.0, "apogee": 320.0, "uranians": 71.0},
+    "base": {"core": 10.1, "asteroids": 8.3, "apogee": 10.9, "uranians": 2.0},
+    "medium": {"core": 36.6, "asteroids": 27.9, "apogee": 40.1, "uranians": 8.8},
+    "extended": {"core": 319.4, "asteroids": 82.2, "apogee": 373.5, "uranians": 80.1},
 }
 
 _TIER_RANGES: Dict[str, str] = {
@@ -252,7 +252,7 @@ def _get_required_files(tier: str, mode: str) -> List[Dict[str, Any]]:
             size = _LEB2_SIZES.get(tier, {}).get(group, 0)
             files.append(
                 {
-                    "filename": f"{tier}_{group}.leb",
+                    "filename": f"{tier}_{group}.leb2",
                     "size_mb": size,
                     "category": "LEB2",
                     "status": "required",
