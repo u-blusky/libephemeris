@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a12] — 2026-04-02
+
+### Performance
+
+#### LEB Fast Path: 3x Speedup (Skyfield-Free)
+
+Eliminated all Skyfield calls from the LEB calculation pipeline. The
+precession-nutation matrix is now built entirely from LEB-native data:
+
+- **Nutation**: LEB-stored Chebyshev coefficients via `eval_nutation()`
+  (~1.5 µs, was ~200 µs via Skyfield Time object creation)
+- **Precession**: IAU 2006 Fukushima-Williams polynomials in pure Python
+  (~1 µs, was part of Skyfield's `t.M` computation)
+- **Matrix**: Pure-Python `_fw2m()` builds the bias-precession-nutation
+  matrix from the 4 FW angles (~2 µs)
+
+Measured results (14-body astrological chart):
+
+| Metric | Before | After | Speedup |
+|--------|--------|-------|---------|
+| Single `calc_ut()` | ~500 µs | ~161 µs | 3.1x |
+| Full 14-body chart | ~7 ms | ~2.25 ms | 3.1x |
+| Precision vs Skyfield | — | <0.001" | unchanged |
+
+The Skyfield path is kept as automatic fallback for LEB files that
+don't contain nutation data (old files, custom builds).
+
+New internal functions in `fast_calc.py`:
+- `_iau2006_precession_angles()` — IAU 2006 FW precession polynomials
+- `_fw2m()` — Fukushima-Williams angles to rotation matrix
+- `_get_leb_frame_data()` — pure-LEB frame data with caching
+- `_get_leb_precession_matrix()` — pure-Python precession matrix
+
+New method on all LEB readers:
+- `has_nutation()` — check if nutation Chebyshev data is available
+
 ## [1.0.0a11] — 2026-04-02
 
 ### Fixed
