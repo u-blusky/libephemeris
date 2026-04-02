@@ -2,9 +2,9 @@
 ====================================================================================================
 VERIFY HOUSES COMPREHENSIVE: libephemeris vs pyswisseph
 ====================================================================================================
-Result: 78487/79704 PASS (98.5%)
-Passed: 78487
-Failed: 1217
+Result: 79704/79704 PASS (100.0%)
+Passed: 79704
+Failed: 0
 Time:   0.6s
 
 Max cusp error per system (swe_houses):
@@ -45,7 +45,7 @@ Max ASCMC error per system (swe_houses):
   E        0.0007013    0.0005763    0.0005299    0.0010792    0.0005738    0.0013953    0.0007638    0.0013953
   F        0.0007013    0.0005763    0.0005299    0.0010792    0.0005738    0.0013953    0.0007638    0.0013953
   G        0.0007013    0.0005763    0.0005299    0.0010792    0.0005738    0.0013953    0.0007638    0.0013953
-  H        0.0007013    0.0005763    0.0005299    0.0010792    0.0005738    0.0013953  180.0000000    0.0013953
+  H        0.0007013    0.0005763    0.0005299    0.0010792    0.0005738    0.0013953    0.0007638    0.0013953
   I        0.0007013    0.0005763    0.0005299    0.0010792    0.0005738    0.0013953    0.0007638    0.0013953
   J        0.0007013    0.0005763    0.0005299    0.0010792    0.0005738    0.0013953    0.0007638    0.0013953
   K        0.0007013    0.0005763    0.0005299    0.0010792    0.0005738    0.0013953    0.0007638    0.0013953
@@ -89,7 +89,6 @@ Max cusp error per system (swe_houses_armc):
   T             0.0000000
   U             0.0000000
   V             0.0000000
-  W            30.0000000
   X             0.0000000
   Y             0.0000000
   i             0.0000000
@@ -97,7 +96,7 @@ Max cusp error per system (swe_houses_armc):
 Max house_pos error per system:
   System         Max Diff
   ———————— ——————————————
-  B             0.0838597
+  B             0.0000000
   C             0.0000000
   E             0.0000000
   K             0.0000000
@@ -105,122 +104,10 @@ Max house_pos error per system:
   O             0.0000000
   P             0.0000000
   R             0.0000000
-  T             0.2515226
+  T             0.0192398
   V             0.0000000
   W             0.0000000
   X             0.0000000
 
-Failure breakdown (top 50):
-  3/T/POS                                            =   122
-  3/B/POS                                            =   103
-  1/H/CoAsc_Munk                                     =    12
-  2/H/CoAsc_Munk                                     =    12
-  4/P/ASC                                            =    10
-  4/P/MC                                             =    10
-  4/K/cusp1                                          =    10
-  4/K/cusp2                                          =    10
-  4/K/cusp3                                          =    10
-  4/K/cusp4                                          =    10
-  4/K/cusp5                                          =    10
-  4/K/cusp6                                          =    10
-  4/K/cusp7                                          =    10
-  4/K/cusp8                                          =    10
-  4/K/cusp9                                          =    10
-  4/K/cusp10                                         =    10
-  4/K/cusp11                                         =    10
-  4/K/cusp12                                         =    10
-  4/K/ASC                                            =    10
-  4/K/MC                                             =    10
-  4/E/cusp1                                          =    10
-  4/E/cusp2                                          =    10
-  4/E/cusp3                                          =    10
-  4/E/cusp4                                          =    10
-  4/E/cusp5                                          =    10
-  4/E/cusp6                                          =    10
-  4/E/cusp7                                          =    10
-  4/E/cusp8                                          =    10
-  4/E/cusp9                                          =    10
-  4/E/cusp10                                         =    10
-  4/E/cusp11                                         =    10
-  4/E/cusp12                                         =    10
-  4/E/ASC                                            =    10
-  4/E/MC                                             =    10
-  4/W/ASC                                            =    10
-  4/W/MC                                             =    10
-  4/O/cusp1                                          =    10
-  4/O/cusp2                                          =    10
-  4/O/cusp3                                          =    10
-  4/O/cusp4                                          =    10
-  4/O/cusp5                                          =    10
-  4/O/cusp6                                          =    10
-  4/O/cusp7                                          =    10
-  4/O/cusp8                                          =    10
-  4/O/cusp9                                          =    10
-  4/O/cusp10                                         =    10
-  4/O/cusp11                                         =    10
-  4/O/cusp12                                         =    10
-  4/O/ASC                                            =    10
-  4/O/MC                                             =    10
-
-Sample failures (first 60 of 1217):
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2433282.5 lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2436603.0 lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2439923.4 lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2443243.9 lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2446564.3 lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2449884.8 lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2453205.2 lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2456525.7 lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2459846.1 lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2463166.6 lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2466487.0 lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 1 H CoAsc_Munk (0.0,0.0) jd=2469807.5 lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 1 H cusp1 (-33.9,151.2) jd=2469807.5 lib=312.368659 ref=312.367580 diff=0.0010792
-  FAIL: 1 H cusp7 (-33.9,151.2) jd=2469807.5 lib=132.368659 ref=132.367580 diff=0.0010792
-  FAIL: 2 W armc=270 lat=60.0 cusp1 lib=330.000000 ref=0.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp2 lib=0.000000 ref=30.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp3 lib=30.000000 ref=60.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp4 lib=60.000000 ref=90.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp5 lib=90.000000 ref=120.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp6 lib=120.000000 ref=150.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp7 lib=150.000000 ref=180.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp8 lib=180.000000 ref=210.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp9 lib=210.000000 ref=240.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp10 lib=240.000000 ref=270.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp11 lib=270.000000 ref=300.000000 diff=30.0000000
-  FAIL: 2 W armc=270 lat=60.0 cusp12 lib=300.000000 ref=330.000000 diff=30.0000000
-  FAIL: 2 H armc=0 lat=0.0 Vertex lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 2 H armc=0 lat=0.0 CoAsc_Munk lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 2 H armc=30 lat=0.0 CoAsc_Munk lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 2 H armc=60 lat=0.0 CoAsc_Munk lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 2 H armc=90 lat=0.0 CoAsc_Munk lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 2 H armc=120 lat=0.0 CoAsc_Munk lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 2 H armc=150 lat=0.0 CoAsc_Munk lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 2 H armc=180 lat=0.0 Vertex lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 2 H armc=180 lat=0.0 CoAsc_Munk lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 2 H armc=210 lat=0.0 CoAsc_Munk lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 2 H armc=240 lat=0.0 CoAsc_Munk lib=180.000000 ref=360.000000 diff=180.0000000
-  FAIL: 2 H armc=270 lat=0.0 CoAsc_Munk lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 2 H armc=300 lat=0.0 CoAsc_Munk lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 2 H armc=330 lat=0.0 CoAsc_Munk lib=180.000000 ref=0.000000 diff=180.0000000
-  FAIL: 3 B lon=0 blat=3.0 jd=2433282.5 lib=6.4164 ref=6.3731 diff=0.043393
-  FAIL: 3 B lon=0 blat=-5.0 jd=2433282.5 lib=6.4164 ref=6.4873 diff=0.070852
-  FAIL: 3 T lon=0 blat=-5.0 jd=2433282.5 lib=6.2665 ref=6.2125 diff=0.053948
-  FAIL: 3 B lon=20 blat=3.0 jd=2433282.5 lib=7.0699 ref=7.0315 diff=0.038430
-  FAIL: 3 T lon=20 blat=3.0 jd=2433282.5 lib=7.0850 ref=7.1324 diff=0.047443
-  FAIL: 3 B lon=20 blat=-5.0 jd=2433282.5 lib=7.0699 ref=7.1262 diff=0.056287
-  FAIL: 3 T lon=20 blat=-5.0 jd=2433282.5 lib=7.0850 ref=7.0208 diff=0.064223
-  FAIL: 3 B lon=40 blat=3.0 jd=2433282.5 lib=7.6733 ref=7.6324 diff=0.040881
-  FAIL: 3 T lon=40 blat=3.0 jd=2433282.5 lib=7.8185 ref=7.8595 diff=0.041024
-  FAIL: 3 B lon=40 blat=-5.0 jd=2433282.5 lib=7.6733 ref=7.7132 diff=0.039882
-  FAIL: 3 T lon=40 blat=-5.0 jd=2433282.5 lib=7.8185 ref=7.7796 diff=0.038939
-  FAIL: 3 B lon=60 blat=3.0 jd=2433282.5 lib=8.3014 ref=8.2721 diff=0.029252
-  FAIL: 3 T lon=60 blat=3.0 jd=2433282.5 lib=8.4766 ref=8.5154 diff=0.038779
-  FAIL: 3 B lon=60 blat=-5.0 jd=2433282.5 lib=8.3014 ref=8.3278 diff=0.026467
-  FAIL: 3 T lon=60 blat=-5.0 jd=2433282.5 lib=8.4766 ref=8.4531 diff=0.023479
-  FAIL: 3 T lon=80 blat=3.0 jd=2433282.5 lib=9.1011 ref=9.1224 diff=0.021258
-  FAIL: 3 T lon=80 blat=-5.0 jd=2433282.5 lib=9.1011 ref=9.0714 diff=0.029654
-  FAIL: 3 T lon=100 blat=-5.0 jd=2433282.5 lib=9.6833 ref=9.6604 diff=0.022970
-  FAIL: 3 B lon=120 blat=3.0 jd=2433282.5 lib=10.3358 ref=10.3690 diff=0.033207
-  FAIL: 3 B lon=120 blat=-5.0 jd=2433282.5 lib=10.3358 ref=10.3049 diff=0.030859
+ALL CHECKS PASSED!
 

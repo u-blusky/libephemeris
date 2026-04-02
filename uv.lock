@@ -561,7 +561,7 @@ wheels = [
 
 [[package]]
 name = "libephemeris"
-version = "1.0.0a13"
+version = "1.0.0a15"
 source = { editable = "." }
 dependencies = [
     { name = "astroquery" },
@@ -570,7 +570,6 @@ dependencies = [
     { name = "pyerfa" },
     { name = "skyfield" },
     { name = "skyfield-data" },
-    { name = "spktype21" },
     { name = "zstandard" },
 ]
 
@@ -643,7 +642,6 @@ requires-dist = [
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "spiceypy", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "spktype21", specifier = ">=0.1.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "zstandard", specifier = ">=0.22.0" },
 ]
@@ -1653,15 +1651,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/88/85/db6248542c8b38981c98f4f1f5b2b9940f2281c263fbcd1290aee4cba8b8/spiceypy-8.0.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c6e6169c658ae4d6821b2bf096fefd8afe0b0c1ebd4c381b888539b1e7d5d745", size = 2212100, upload-time = "2026-01-08T03:20:12.103Z" },
     { url = "https://files.pythonhosted.org/packages/73/22/74233e7641aed6ab71d27f9e0fc64fd27bc94e2e6cb4f304eac81cf092e1/spiceypy-8.0.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:85840b43b4dcbeb6d77c354b61ae41e6507b198205483c3a61f55b74c03eceda", size = 2324218, upload-time = "2026-01-08T03:20:13.471Z" },
     { url = "https://files.pythonhosted.org/packages/c1/c5/b7314263595e1a80ed599cde6d0ec881338d54d84edc56907ef4332f48cf/spiceypy-8.0.1-cp314-cp314-win_amd64.whl", hash = "sha256:fa6f232615c4120fb73cc9dd6820b5b72f898f4d2eb042d4ea51740674f81fb7", size = 2077452, upload-time = "2026-01-08T03:20:14.707Z" },
-]
-
-[[package]]
-name = "spktype21"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/08/1f/48d9d9e41c092b86e62facc63fc0d35f1b1a4556f86b145b86eda58ec090/spktype21-0.1.0.tar.gz", hash = "sha256:e7fbeb15a13493eb34b5ea5ab3c4d57c7beb239d66916ca522cea1da9d22356b", size = 8836, upload-time = "2018-10-16T01:12:57.022Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/a0/225c807eebf51abf8a2bece8bc92feaa029d4dca822e704f5fdfa39ac6b2/spktype21-0.1.0-py3-none-any.whl", hash = "sha256:440db3b86492e19095738c9676910504729f604318040808ec37582c3a06bbe4", size = 10498, upload-time = "2018-10-16T01:12:55.588Z" },
 ]
 
 [[package]]

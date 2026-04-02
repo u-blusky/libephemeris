@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a15] — 2026-04-02
+
+### Fixed
+
+- **ASC near-360° normalization**: Values like 359.99999999999994° were not
+  normalized to 0°, causing Whole Sign cusps to be offset by 30° at the
+  0°/360° boundary. Fixed in both `swe_houses()` and `swe_houses_armc()`.
+
+- **Topocentric house_pos with body latitude**: Added explicit semi-arc handler
+  for Topocentric (T). Max error reduced from 0.25 to 0.019 house position
+  units when the body has non-zero ecliptic latitude.
+
+- **Alcabitius house_pos with body latitude**: Implemented RA-based interpolation
+  for Alcabitius (B). Cusps are RA-spaced, so the body's RA must be interpolated
+  between cusp RAs, not ecliptic longitudes. Max error reduced from 0.084 to 0.000.
+
+### Added
+
+- **Comprehensive house system comparison tests**: 8,318 pytest tests + 79,704
+  standalone checks comparing all 24 house systems against pyswisseph. Coverage:
+  - `swe_houses`: 26 systems × 8 locations × 12 dates — all 12 cusps + all 8 ASCMC
+  - `swe_houses_armc`: 26 systems × 12 ARMC × 4 latitudes
+  - `swe_house_pos`: 12 systems × 18 longitudes × 3 body latitudes × 4 dates
+  - `swe_houses_ex` sidereal: 8 systems × 3 ayanamshas × 6 dates
+  - Edge cases: near-polar, date line, tropics, solstices, equinoxes, 1900–2099
+  - Structural: opposite houses 180°, cusp1=ASC, cusp10=MC, Gauquelin 36 sectors
+  - Precision report with per-system max error table
+
+- **`poe test:houses` / `leph test compare houses`**: Dedicated CLI command for
+  house system comparison with precision report output.
+
+### Precision (vs pyswisseph)
+
+| Value | Max error | Tolerance |
+|-------|-----------|-----------|
+| Cusps (all 26 systems) | 0.00108° | 0.0011° (~4") |
+| ASC / MC / ARMC | 0.00070° | 0.001° (~3.6") |
+| Vertex / CoAsc Koch / Polar Asc | 0.00140° | 0.002° (~7") |
+| house_pos (all systems) | 0.019 | 0.02 |
+| houses_armc cusps | ~0.000° | 0.0011° |
+| Sidereal cusps | 0.004° | 0.005° |
+
 ## [1.0.0a14] — 2026-04-02
 
 ### Fixed
