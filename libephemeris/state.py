@@ -239,11 +239,12 @@ def get_calc_mode() -> str:
     Resolution order:
         1. Programmatic override via set_calc_mode()
         2. LIBEPHEMERIS_MODE environment variable
-        3. Default: ``"auto"``
+        3. TOML config ``mode`` key
+        4. Default: ``"auto"``
 
     Returns:
-        str: The active calculation mode (``"auto"``, ``"skyfield"``,
-             or ``"leb"``).
+        str: The active calculation mode (``"auto"``, ``"leb"``,
+             ``"skyfield"``, or ``"horizons"``).
 
     Example:
         >>> from libephemeris import get_calc_mode
