@@ -826,8 +826,7 @@ def get_planets() -> SpiceKernel:
                         logger.info("Ephemeris loaded: %s", bsp_path)
                         return _PLANETS
 
-                # Load from data dir (downloads automatically if missing,
-                # unless mode="leb" where we only use already-present files)
+                # Load from data dir (downloads automatically if missing)
                 data_dir = _get_data_dir()
                 bsp_path = os.path.join(data_dir, _EPHEMERIS_FILE)
                 if os.path.exists(bsp_path):
@@ -835,12 +834,30 @@ def get_planets() -> SpiceKernel:
                     _PLANETS = load(bsp_path)
                     logger.info("Ephemeris loaded: %s", bsp_path)
                 elif get_calc_mode() == "leb":
-                    raise FileNotFoundError(
-                        f"mode='leb' but DE kernel {_EPHEMERIS_FILE} not found "
-                        f"in {data_dir}. LEB covers most calculations; the DE "
-                        f"kernel is only needed for unsupported flags/bodies. "
-                        f"Run: libephemeris download {get_precision_tier()}"
-                    )
+                    # In LEB mode, the DE kernel is only needed for
+                    # internal Skyfield calls (True Node, houses, etc.).
+                    # Try lighter alternatives before downloading the
+                    # full tier kernel (e.g., de441.bsp at 3.1 GB).
+                    _fallback_files = ["de440s.bsp", "de440.bsp", "de441.bsp"]
+                    loaded = False
+                    for fb in _fallback_files:
+                        fb_path = os.path.join(data_dir, fb)
+                        if os.path.exists(fb_path):
+                            logger.info(
+                                "LEB mode: using available %s instead of %s",
+                                fb,
+                                _EPHEMERIS_FILE,
+                            )
+                            _PLANETS = load(fb_path)
+                            loaded = True
+                            break
+                    if not loaded:
+                        # No DE kernel at all — download the smallest one
+                        logger.info(
+                            "LEB mode: downloading de440s.bsp (31 MB) for "
+                            "internal calculations..."
+                        )
+                        _PLANETS = load("de440s.bsp")
                 else:
                     logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
                     _PLANETS = load(_EPHEMERIS_FILE)
