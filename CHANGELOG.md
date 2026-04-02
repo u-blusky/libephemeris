@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a9] — 2026-04-02
+
+### Added
+
+#### LEB2 Auto-Download on First Use
+
+In `"auto"` mode, when no LEB file is found locally, the library now
+automatically downloads LEB2 files for the active tier from GitHub
+Releases (~28 MB for base) instead of falling through to Skyfield which
+would download DE440 (~114 MB). New users get faster startup with the
+more efficient LEB2 calculation path.
+
+#### Optional Modules Documentation
+
+New guide `docs/guides/optional-modules.md` consolidating documentation
+for calculation backends, the minor body fallback chain, optional extras
+(`nbody`, `stars`, `all`, `dev`), data requirements, and known
+limitations (e.g., Bennu SPK unavailability).
+
+#### Bennu SPK Classification
+
+- New `SPK_AUTO_DOWNLOAD_BLOCKED` constant in `constants.py` for bodies
+  where JPL Horizons blocks SPK generation.
+- Runtime now skips auto-download and strict-precision check for blocked
+  bodies, allowing ASSIST/Keplerian fallback instead of raising a
+  misleading `SPKRequiredError`.
+- `is_spk_downloadable(SE_BENNU)` correctly returns `False`.
+- Dev CLI (`leph status`, `leph download`) uses the same canonical
+  constant instead of local copies.
+
+### Changed
+
+#### `.leb2` File Extension for LEB2 Format
+
+LEB2 compressed files now use the `.leb2` extension instead of `.leb`,
+making the format visually distinguishable from LEB1 on disk. The reader
+auto-detects format via magic bytes regardless of extension. Backward
+compatibility: `state.py` falls back to `.leb` if `.leb2` not found.
+
+#### Unified GitHub Release
+
+Consolidated the two separate releases (`data-v1` and `data-v2`) into a
+single `data-v1` release containing all 17 generated artifacts: 3 planet
+centers, 2 LEB1 (base + medium), and 12 LEB2 files (4 groups x 3 tiers).
+
+#### `leph status` Dual-Path LEB2 Lookup
+
+`leph status` now checks both `data/leb2/` (repo, freshly generated) and
+`~/.libephemeris/leb/` (user data dir, downloaded/installed) for LEB2
+files, so the developer sees all available files regardless of location.
+
+#### Developer CLI Refinements
+
+- `leph download all` downloads only prerequisites (DE/SPK, IERS,
+  planet-center sources, ASSIST), not generated artifacts.
+- `leph status` reports development-oriented status with `-v` and `-vv`.
+- Removed duplicate Bennu fallback messages from `leph download`.
+
 ## [1.0.0a8] — 2026-04-01
 
 ### Added
