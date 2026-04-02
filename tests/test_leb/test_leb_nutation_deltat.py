@@ -17,7 +17,7 @@ from libephemeris.constants import SE_SUN, SE_MOON
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 LEB1_BASE = os.path.join(PROJECT_ROOT, "data", "leb", "ephemeris_base.leb")
-LEB2_BASE_CORE = os.path.join(PROJECT_ROOT, "data", "leb2", "base_core.leb")
+LEB2_BASE_CORE = os.path.join(PROJECT_ROOT, "data", "leb2", "base_core.leb2")
 
 SKIP_NO_LEB1 = pytest.mark.skipif(
     not os.path.exists(LEB1_BASE), reason="LEB1 base not found"

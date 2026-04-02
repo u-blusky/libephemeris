@@ -107,7 +107,7 @@ def run_section1_positions(rng, n_dates=200):
     swe.swe_close()
 
     # LEB2
-    swe.set_leb_file("data/leb2/base_core.leb")
+    swe.set_leb_file("data/leb2/base_core.leb2")
     swe.set_calc_mode("leb")
     for jd in jds:
         for bid in BODIES_CORE + BODIES_LUNAR:
@@ -361,7 +361,7 @@ def run_section8_crossbackend(rng, n_dates=50):
         swe.swe_close()
 
     # LEB2
-    swe.set_leb_file("data/leb2/base_core.leb")
+    swe.set_leb_file("data/leb2/base_core.leb2")
     swe.set_calc_mode("leb")
     results_by_backend["leb2"] = {}
     for jd in jds:

@@ -26,10 +26,10 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 LEB1_BASE = os.path.join(PROJECT_ROOT, "data", "leb", "ephemeris_base.leb")
 LEB1_MEDIUM = os.path.join(PROJECT_ROOT, "data", "leb", "ephemeris_medium.leb")
 LEB2_DIR = os.path.join(PROJECT_ROOT, "data", "leb2")
-LEB2_BASE_CORE = os.path.join(LEB2_DIR, "base_core.leb")
-LEB2_BASE_ASTEROIDS = os.path.join(LEB2_DIR, "base_asteroids.leb")
-LEB2_MEDIUM_CORE = os.path.join(LEB2_DIR, "medium_core.leb")
-LEB2_EXTENDED_CORE = os.path.join(LEB2_DIR, "extended_core.leb")
+LEB2_BASE_CORE = os.path.join(LEB2_DIR, "base_core.leb2")
+LEB2_BASE_ASTEROIDS = os.path.join(LEB2_DIR, "base_asteroids.leb2")
+LEB2_MEDIUM_CORE = os.path.join(LEB2_DIR, "medium_core.leb2")
+LEB2_EXTENDED_CORE = os.path.join(LEB2_DIR, "extended_core.leb2")
 
 JD_J2000 = 2451545.0
 

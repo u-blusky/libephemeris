@@ -37,7 +37,7 @@ poe leb:generate:extended
 ```bash
 # 1. Generate each group separately
 poe leb:generate:base:planets      # → ephemeris_base_planets.leb    (~1s)
-poe leb:generate:base:asteroids    # → ephemeris_base_asteroids.leb  (~15-60s)
+poe leb:generate:base:asteroids    # → ephemeris_base_asteroids.leb2  (~15-60s)
 poe leb:generate:base:analytical   # → ephemeris_base_analytical.leb (~2-3min)
 
 # 2. Merge + verify
@@ -71,7 +71,7 @@ python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_asteroids.leb2 \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -106,10 +106,10 @@ python scripts/generate_leb.py --tier base --merge \
 poe leb2:convert:base              # → data/leb2/base_{core,asteroids,apogee,uranians}.leb
 
 # Single group
-poe leb2:convert:base:core         # → data/leb2/base_core.leb
-poe leb2:convert:base:asteroids    # → data/leb2/base_asteroids.leb
-poe leb2:convert:base:apogee       # → data/leb2/base_apogee.leb
-poe leb2:convert:base:uranians     # → data/leb2/base_uranians.leb
+poe leb2:convert:base:core         # → data/leb2/base_core.leb2
+poe leb2:convert:base:asteroids    # → data/leb2/base_asteroids.leb2
+poe leb2:convert:base:apogee       # → data/leb2/base_apogee.leb2
+poe leb2:convert:base:uranians     # → data/leb2/base_uranians.leb2
 
 # Medium / Extended
 poe leb2:convert:medium
@@ -121,7 +121,7 @@ poe leb2:convert:extended
 ```bash
 # Single group
 python scripts/generate_leb2.py convert data/leb/ephemeris_base.leb \
-  -o data/leb2/base_core.leb --group core
+  -o data/leb2/base_core.leb2 --group core
 
 # All groups at once
 python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
@@ -134,17 +134,17 @@ Creates a temporary LEB1 and converts it automatically:
 
 ```bash
 python scripts/generate_leb2.py generate --tier base --group core \
-  -o data/leb2/base_core.leb
+  -o data/leb2/base_core.leb2
 ```
 
 ### Output files (base tier)
 
 | Group | File | Size | Bodies |
 |-------|------|------|--------|
-| core | `data/leb2/base_core.leb` | 7.7 MB | Sun-Pluto, Earth, Nodes, Mean Apogee (14) |
-| asteroids | `data/leb2/base_asteroids.leb` | 7.7 MB | Chiron, Ceres, Pallas, Juno, Vesta (5) |
-| apogee | `data/leb2/base_apogee.leb` | 10.3 MB | OscuApog, IntpApog, IntpPerig (3) |
-| uranians | `data/leb2/base_uranians.leb` | 2.0 MB | Cupido-Transpluto (9) |
+| core | `data/leb2/base_core.leb2` | 7.7 MB | Sun-Pluto, Earth, Nodes, Mean Apogee (14) |
+| asteroids | `data/leb2/base_asteroids.leb2` | 7.7 MB | Chiron, Ceres, Pallas, Juno, Vesta (5) |
+| apogee | `data/leb2/base_apogee.leb2` | 10.3 MB | OscuApog, IntpApog, IntpPerig (3) |
+| uranians | `data/leb2/base_uranians.leb2` | 2.0 MB | Cupido-Transpluto (9) |
 | **Total** | | **28.0 MB** | **31 bodies** |
 
 ### LEB2 groups vs LEB1 groups
@@ -184,7 +184,7 @@ reader.close()
 poe leb2:verify:base
 
 # Direct CLI
-python scripts/generate_leb2.py verify data/leb2/base_core.leb \
+python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
   --reference data/leb/ephemeris_base.leb --samples 500
 ```
 
@@ -246,7 +246,7 @@ from libephemeris import set_leb_file, set_calc_mode
 set_leb_file("data/leb/ephemeris_base.leb")
 
 # LEB2 (auto-discovers companion files)
-set_leb_file("data/leb2/base_core.leb")
+set_leb_file("data/leb2/base_core.leb2")
 
 # Or via environment variable
 # export LIBEPHEMERIS_LEB=/path/to/file.leb

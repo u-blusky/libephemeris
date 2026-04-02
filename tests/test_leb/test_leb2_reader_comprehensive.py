@@ -29,7 +29,7 @@ LEB2_BASE_CORE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "data",
     "leb2",
-    "base_core.leb",
+    "base_core.leb2",
 )
 
 LEB1_BASE = os.path.join(

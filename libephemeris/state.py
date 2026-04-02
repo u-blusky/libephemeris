@@ -296,9 +296,10 @@ def _discover_leb_file() -> Optional[str]:
     """Auto-discover a LEB file for the active precision tier.
 
     Checks in order:
-    1. LEB2 modular files in user data dir: ``~/.libephemeris/leb/{tier}_core.leb``
-    2. LEB1 merged file in user data dir: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
-    3. Bundled LEB2 core file shipped with the package (base tier only)
+    1. LEB2 modular files in user data dir: ``~/.libephemeris/leb/{tier}_core.leb2``
+    2. LEB2 legacy extension: ``~/.libephemeris/leb/{tier}_core.leb``
+    3. LEB1 merged file in user data dir: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
+    4. Bundled LEB2 core file shipped with the package (base tier only)
 
     Returns:
         Path to the discovered LEB file, or None if not found.
@@ -307,9 +308,14 @@ def _discover_leb_file() -> Optional[str]:
     leb_dir = os.path.join(_get_data_dir(), "leb")
 
     # Check for LEB2 modular files first (core is the primary)
-    leb2_core = os.path.join(leb_dir, f"{tier}_core.leb")
+    leb2_core = os.path.join(leb_dir, f"{tier}_core.leb2")
     if os.path.isfile(leb2_core):
         return leb2_core
+
+    # Legacy: LEB2 files with .leb extension (backward compatibility)
+    leb2_core_legacy = os.path.join(leb_dir, f"{tier}_core.leb")
+    if os.path.isfile(leb2_core_legacy):
+        return leb2_core_legacy
 
     # Fall back to LEB1 merged file
     candidate = os.path.join(leb_dir, f"ephemeris_{tier}.leb")
@@ -317,9 +323,15 @@ def _discover_leb_file() -> Optional[str]:
         return candidate
 
     # Fall back to bundled LEB2 core (ships with the PyPI wheel, base tier only)
-    bundled = os.path.join(os.path.dirname(__file__), "data", "leb2", "base_core.leb")
+    bundled = os.path.join(os.path.dirname(__file__), "data", "leb2", "base_core.leb2")
     if os.path.isfile(bundled):
         return bundled
+    # Legacy bundled path
+    bundled_legacy = os.path.join(
+        os.path.dirname(__file__), "data", "leb2", "base_core.leb"
+    )
+    if os.path.isfile(bundled_legacy):
+        return bundled_legacy
 
     return None
 
@@ -385,7 +397,7 @@ def get_leb_reader() -> Optional["LEBReader"]:
                 directory = os.path.dirname(os.path.abspath(path))
                 basename = os.path.splitext(os.path.basename(path))[0]
                 if "_" in basename:
-                    # Looks like a modular file (e.g. base_core.leb)
+                    # Looks like a modular file (e.g. base_core.leb2)
                     from .leb_composite import CompositeLEBReader
 
                     _LEB_READER = CompositeLEBReader.from_file_with_companions(path)

@@ -1013,7 +1013,7 @@ is generated in every group run; stars likewise).
 # Merge three partial files into one complete file
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_asteroids.leb2 \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -1041,7 +1041,7 @@ python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_asteroids.leb2 \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
@@ -1058,7 +1058,7 @@ files), regenerate just that group and re-merge:
 python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_asteroids.leb2 \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -1577,7 +1577,7 @@ poe leb:generate:all        # All three tiers sequentially
 
 # Group generation (recommended — avoids fork-deadlock, allows partial regen)
 poe leb:generate:base:planets     # Planets group only → ephemeris_base_planets.leb
-poe leb:generate:base:asteroids   # Asteroids group only → ephemeris_base_asteroids.leb
+poe leb:generate:base:asteroids   # Asteroids group only → ephemeris_base_asteroids.leb2
 poe leb:generate:base:analytical  # Analytical group only → ephemeris_base_analytical.leb
 poe leb:generate:base:merge       # Merge partial files → ephemeris_base.leb (with --verify)
 poe leb:generate:base:groups      # All three groups + merge in one command
@@ -1651,7 +1651,7 @@ python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_asteroids.leb2 \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
@@ -1659,7 +1659,7 @@ python scripts/generate_leb.py --tier base --merge \
 python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_asteroids.leb2 \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
@@ -1915,8 +1915,8 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 | `apogee` | 3 | 10.3 MB | Oscu Apogee, Interp Apogee/Perigee |
 | `uranians` | 9 | 2.0 MB | Cupido-Transpluto |
 
-**File naming convention:** `{tier}_{group}.leb` (e.g. `base_core.leb`,
-`medium_asteroids.leb`).
+**File naming convention:** `{tier}_{group}.leb` (e.g. `base_core.leb2`,
+`medium_asteroids.leb2`).
 
 **Output directory:** `data/leb2/`
 
@@ -1926,13 +1926,13 @@ The `CompositeLEBReader` (`leb_composite.py`) wraps multiple LEB readers
 and dispatches `eval_body()` to the reader containing the requested body.
 
 **Auto-discovery:** when `set_leb_file()` is called with a group file
-(e.g. `base_core.leb`), companion files in the same directory with the
+(e.g. `base_core.leb2`), companion files in the same directory with the
 same tier prefix are automatically loaded.
 
 ```python
 import libephemeris as swe
 
-swe.set_leb_file("data/leb2/base_core.leb")  # companions auto-discovered
+swe.set_leb_file("data/leb2/base_core.leb2")  # companions auto-discovered
 swe.set_calc_mode("leb")
 
 # Bodies from different files work transparently
@@ -1958,7 +1958,7 @@ from libephemeris.leb_composite import CompositeLEBReader
 reader = CompositeLEBReader.from_directory("data/leb2/")
 
 # From a single file + companions
-reader = CompositeLEBReader.from_file_with_companions("data/leb2/base_core.leb")
+reader = CompositeLEBReader.from_file_with_companions("data/leb2/base_core.leb2")
 ```
 
 ### 13.8 LEB2Reader
@@ -2022,7 +2022,7 @@ poe test:leb2:precision:base
 LEB1 file, then converts it:
 
 ```bash
-python scripts/generate_leb2.py generate --tier base --group core -o data/leb2/base_core.leb
+python scripts/generate_leb2.py generate --tier base --group core -o data/leb2/base_core.leb2
 ```
 
 ### 13.11 Commands Reference
@@ -2059,7 +2059,7 @@ poe test:leb2:precision:all        # All tiers (~45s)
 ```bash
 # Convert a single group
 python scripts/generate_leb2.py convert data/leb/ephemeris_base.leb \
-  -o data/leb2/base_core.leb --group core
+  -o data/leb2/base_core.leb2 --group core
 
 # Convert all groups at once
 python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
@@ -2067,10 +2067,10 @@ python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
 
 # Generate from scratch (Skyfield → Chebyshev → compress)
 python scripts/generate_leb2.py generate --tier base --group core \
-  -o data/leb2/base_core.leb
+  -o data/leb2/base_core.leb2
 
 # Verify against LEB1
-python scripts/generate_leb2.py verify data/leb2/base_core.leb \
+python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
   --reference data/leb/ephemeris_base.leb --samples 500
 ```
 

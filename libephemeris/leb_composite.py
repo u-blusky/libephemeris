@@ -82,19 +82,22 @@ class CompositeLEBReader:
 
     @classmethod
     def from_directory(cls, directory: str) -> "CompositeLEBReader":
-        """Discover and open all .leb files in a directory.
+        """Discover and open all .leb/.leb2 files in a directory.
 
         Args:
-            directory: Path to directory containing .leb files.
+            directory: Path to directory containing .leb or .leb2 files.
 
         Returns:
             CompositeLEBReader wrapping all discovered readers.
         """
         from .leb_reader import open_leb
 
-        leb_files = sorted(glob.glob(os.path.join(directory, "*.leb")))
+        leb_files = sorted(
+            glob.glob(os.path.join(directory, "*.leb"))
+            + glob.glob(os.path.join(directory, "*.leb2"))
+        )
         if not leb_files:
-            raise FileNotFoundError(f"No .leb files found in {directory}")
+            raise FileNotFoundError(f"No .leb/.leb2 files found in {directory}")
 
         readers = []
         for path in leb_files:
@@ -110,16 +113,16 @@ class CompositeLEBReader:
 
     @classmethod
     def from_file_with_companions(cls, path: str) -> "CompositeLEBReader":
-        """Open a .leb file and discover companion files in the same directory.
+        """Open a .leb/.leb2 file and discover companion files in the same directory.
 
         Companion files share a common tier prefix. For example, if the primary
-        file is ``base_core.leb``, companions would be ``base_asteroids.leb``,
-        ``base_apogee.leb``, ``base_uranians.leb``.
+        file is ``base_core.leb2``, companions would be ``base_asteroids.leb2``,
+        ``base_apogee.leb2``, ``base_uranians.leb2``.
 
         If no companions are found, returns a composite with a single reader.
 
         Args:
-            path: Path to the primary .leb file.
+            path: Path to the primary .leb or .leb2 file.
 
         Returns:
             CompositeLEBReader wrapping the primary and companion readers.
@@ -129,17 +132,20 @@ class CompositeLEBReader:
         directory = os.path.dirname(os.path.abspath(path))
         basename = os.path.basename(path)
 
-        # Try to extract tier prefix (e.g., "base" from "base_core.leb")
-        name_no_ext = os.path.splitext(basename)[0]
+        # Try to extract tier prefix (e.g., "base" from "base_core.leb2")
+        name_no_ext = basename.rsplit(".", 1)[0]
         parts = name_no_ext.split("_")
 
         readers = [open_leb(path)]
 
         if len(parts) >= 2:
             prefix = parts[0]  # e.g., "base"
-            # Find companion files with same prefix
-            pattern = os.path.join(directory, f"{prefix}_*.leb")
-            for companion_path in sorted(glob.glob(pattern)):
+            # Find companion files with same prefix (both extensions)
+            companions = sorted(
+                glob.glob(os.path.join(directory, f"{prefix}_*.leb"))
+                + glob.glob(os.path.join(directory, f"{prefix}_*.leb2"))
+            )
+            for companion_path in companions:
                 if os.path.abspath(companion_path) != os.path.abspath(path):
                     try:
                         readers.append(open_leb(companion_path))

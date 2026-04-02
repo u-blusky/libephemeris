@@ -286,8 +286,8 @@ def _sample_dev_status_report() -> dict[str, object]:
                     "files": {
                         "core": {
                             "exists": True,
-                            "name": "base_core.leb",
-                            "path": "/repo/data/leb2/base_core.leb",
+                            "name": "base_core.leb2",
+                            "path": "/repo/data/leb2/base_core.leb2",
                             "size": 10,
                         }
                     },
@@ -299,8 +299,8 @@ def _sample_dev_status_report() -> dict[str, object]:
                     "files": {
                         "core": {
                             "exists": True,
-                            "name": "medium_core.leb",
-                            "path": "/repo/data/leb2/medium_core.leb",
+                            "name": "medium_core.leb2",
+                            "path": "/repo/data/leb2/medium_core.leb2",
                             "size": 10,
                         }
                     },
@@ -312,8 +312,8 @@ def _sample_dev_status_report() -> dict[str, object]:
                     "files": {
                         "core": {
                             "exists": False,
-                            "name": "extended_core.leb",
-                            "path": "/repo/data/leb2/extended_core.leb",
+                            "name": "extended_core.leb2",
+                            "path": "/repo/data/leb2/extended_core.leb2",
                             "size": None,
                         }
                     },
@@ -431,10 +431,10 @@ def test_status_verbose_levels(monkeypatch, tmp_path):
     _write_file(data_dir / "de440s.bsp", 32)
     _write_file(data_dir / "planet_centers_base.bsp", 48)
     _write_file(leb_dir / "ephemeris_medium.leb", 64)
-    _write_file(leb_dir / "base_core.leb", 12)
-    _write_file(leb_dir / "base_asteroids.leb", 12)
-    _write_file(leb_dir / "base_apogee.leb", 12)
-    _write_file(leb_dir / "base_uranians.leb", 12)
+    _write_file(leb_dir / "base_core.leb2", 12)
+    _write_file(leb_dir / "base_asteroids.leb2", 12)
+    _write_file(leb_dir / "base_apogee.leb2", 12)
+    _write_file(leb_dir / "base_uranians.leb2", 12)
     _write_file(spk_dir / "alpha.bsp", 24)
     _write_file(spk_dir / "beta.bsp", 24)
     _write_file(assist_dir / "linux_p1550p2650.440", 20)
@@ -473,8 +473,8 @@ def test_status_verbose_levels(monkeypatch, tmp_path):
     verbose_result = runner.invoke(cli_module.cli, ["status", "-v"])
     assert verbose_result.exit_code == 0, verbose_result.output
     assert f"Path: {data_dir / 'de440s.bsp'}" in verbose_result.output
-    assert f"Path: {leb_dir / 'base_core.leb'}" in verbose_result.output
-    assert "base_core.leb" in verbose_result.output
+    assert f"Path: {leb_dir / 'base_core.leb2'}" in verbose_result.output
+    assert "base_core.leb2" in verbose_result.output
 
     very_verbose_result = runner.invoke(cli_module.cli, ["status", "-vv"])
     assert very_verbose_result.exit_code == 0, very_verbose_result.output
@@ -533,7 +533,7 @@ def test_leph_status_verbose_modes_and_json(monkeypatch):
     assert "Coverage: JD 1.0 -> 2.0" in very_verbose_result.output
     assert "Bennu (fallback)" in very_verbose_result.output
     assert "Path: /data/tmp/planet_centers/sat441.bsp" in very_verbose_result.output
-    assert "Path: /repo/data/leb2/medium_core.leb" in very_verbose_result.output
+    assert "Path: /repo/data/leb2/medium_core.leb2" in very_verbose_result.output
 
     json_result = runner.invoke(dev_cli_module.cli, ["status", "--json"])
     assert json_result.exit_code == 0, json_result.output

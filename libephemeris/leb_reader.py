@@ -491,10 +491,10 @@ class LEBReader:
 
 
 def open_leb(path: str) -> Union["LEBReader", "LEB2Reader"]:
-    """Open a .leb file, auto-detecting LEB1 vs LEB2 format.
+    """Open a .leb or .leb2 file, auto-detecting LEB1 vs LEB2 format.
 
     Args:
-        path: Path to the .leb file.
+        path: Path to the .leb or .leb2 file.
 
     Returns:
         LEBReader for LEB1 files, LEB2Reader for LEB2 files.

@@ -115,7 +115,7 @@ def base_core() -> None:
             "convert",
             "data/leb/ephemeris_base.leb",
             "-o",
-            "data/leb2/base_core.leb",
+            "data/leb2/base_core.leb2",
             "--group",
             "core",
         ]
@@ -133,7 +133,7 @@ def base_asteroids() -> None:
             "convert",
             "data/leb/ephemeris_base.leb",
             "-o",
-            "data/leb2/base_asteroids.leb",
+            "data/leb2/base_asteroids.leb2",
             "--group",
             "asteroids",
         ]
@@ -151,7 +151,7 @@ def base_apogee() -> None:
             "convert",
             "data/leb/ephemeris_base.leb",
             "-o",
-            "data/leb2/base_apogee.leb",
+            "data/leb2/base_apogee.leb2",
             "--group",
             "apogee",
         ]
@@ -169,7 +169,7 @@ def base_uranians() -> None:
             "convert",
             "data/leb/ephemeris_base.leb",
             "-o",
-            "data/leb2/base_uranians.leb",
+            "data/leb2/base_uranians.leb2",
             "--group",
             "uranians",
         ]
@@ -202,7 +202,7 @@ def verify_base() -> None:
     _leb2(
         [
             "verify",
-            "data/leb2/base_core.leb",
+            "data/leb2/base_core.leb2",
             "--reference",
             "data/leb/ephemeris_base.leb",
             "--samples",
@@ -220,7 +220,7 @@ def verify_medium() -> None:
     _leb2(
         [
             "verify",
-            "data/leb2/medium_core.leb",
+            "data/leb2/medium_core.leb2",
             "--reference",
             "data/leb/ephemeris_medium.leb",
             "--samples",
@@ -238,7 +238,7 @@ def verify_extended() -> None:
     _leb2(
         [
             "verify",
-            "data/leb2/extended_core.leb",
+            "data/leb2/extended_core.leb2",
             "--reference",
             "data/leb/ephemeris_extended.leb",
             "--samples",

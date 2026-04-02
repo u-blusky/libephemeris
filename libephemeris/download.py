@@ -121,84 +121,84 @@ DATA_FILES: dict[str, dict[str, Any]] = {
     },
     # LEB2 compressed modular files (data-v2 release)
     # Core (14 bodies): Sun-Pluto, Earth, Mean/True Node, Mean Apogee
-    "base_core.leb": {
+    "base_core.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/base_core.leb",
         "sha256": None,
         "size_mb": 8.7,
         "description": "LEB2 core bodies for 'base' tier (1850-2150)",
         "dest_subdir": "leb",
     },
-    "base_asteroids.leb": {
+    "base_asteroids.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/base_asteroids.leb",
         "sha256": None,
         "size_mb": 7.3,
         "description": "LEB2 asteroids for 'base' tier (Chiron, Ceres, Pallas, Juno, Vesta)",
         "dest_subdir": "leb",
     },
-    "base_apogee.leb": {
+    "base_apogee.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/base_apogee.leb",
         "sha256": None,
         "size_mb": 9.8,
         "description": "LEB2 apogee variants for 'base' tier (Oscu/Interp Apogee, Interp Perigee)",
         "dest_subdir": "leb",
     },
-    "base_uranians.leb": {
+    "base_uranians.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/base_uranians.leb",
         "sha256": None,
         "size_mb": 1.9,
         "description": "LEB2 Uranian hypotheticals for 'base' tier (Cupido-Transpluto)",
         "dest_subdir": "leb",
     },
-    "medium_core.leb": {
+    "medium_core.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/medium_core.leb",
         "sha256": None,
         "size_mb": 31.0,
         "description": "LEB2 core bodies for 'medium' tier (1550-2650)",
         "dest_subdir": "leb",
     },
-    "medium_asteroids.leb": {
+    "medium_asteroids.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/medium_asteroids.leb",
         "sha256": None,
         "size_mb": 25.0,
         "description": "LEB2 asteroids for 'medium' tier",
         "dest_subdir": "leb",
     },
-    "medium_apogee.leb": {
+    "medium_apogee.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/medium_apogee.leb",
         "sha256": None,
         "size_mb": 35.0,
         "description": "LEB2 apogee variants for 'medium' tier",
         "dest_subdir": "leb",
     },
-    "medium_uranians.leb": {
+    "medium_uranians.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/medium_uranians.leb",
         "sha256": None,
         "size_mb": 8.1,
         "description": "LEB2 Uranian hypotheticals for 'medium' tier",
         "dest_subdir": "leb",
     },
-    "extended_core.leb": {
+    "extended_core.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/extended_core.leb",
         "sha256": None,
         "size_mb": 264.0,
         "description": "LEB2 core bodies for 'extended' tier (-5000 to +5000)",
         "dest_subdir": "leb",
     },
-    "extended_asteroids.leb": {
+    "extended_asteroids.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/extended_asteroids.leb",
         "sha256": None,
         "size_mb": 79.0,
         "description": "LEB2 asteroids for 'extended' tier",
         "dest_subdir": "leb",
     },
-    "extended_apogee.leb": {
+    "extended_apogee.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/extended_apogee.leb",
         "sha256": None,
         "size_mb": 320.0,
         "description": "LEB2 apogee variants for 'extended' tier",
         "dest_subdir": "leb",
     },
-    "extended_uranians.leb": {
+    "extended_uranians.leb2": {
         "url": f"{GITHUB_RELEASES_V2}/extended_uranians.leb",
         "sha256": None,
         "size_mb": 71.0,
@@ -549,7 +549,7 @@ def check_data_status() -> dict[str, dict]:
         # Resolve path based on file type
         if filename.startswith("planet_centers_"):
             path = workspace_root / filename
-        elif filename.endswith(".leb"):
+        elif filename.endswith((".leb", ".leb2")):
             path = data_dir / "leb" / filename
         else:
             path = data_dir / filename
@@ -689,7 +689,7 @@ def print_data_status(as_json: bool = False, verbose: int = 0) -> None:
     leb2_groups = ["core", "asteroids", "apogee", "uranians"]
     for tier_name in ["base", "medium", "extended"]:
         for group in leb2_groups:
-            filename = f"{tier_name}_{group}.leb"
+            filename = f"{tier_name}_{group}.leb2"
             path = Path(data_dir) / "leb" / filename
             exists = path.exists()
             size = path.stat().st_size if exists else None
@@ -869,7 +869,7 @@ def print_data_status(as_json: bool = False, verbose: int = 0) -> None:
     # LEB2 Compressed Files
     _click.echo(_click.style("LEB2 Compressed Ephemeris (4-10x smaller)", bold=True))
     for tier_name in ["base", "medium", "extended"]:
-        tier_files = [f"{tier_name}_{g}.leb" for g in leb2_groups]
+        tier_files = [f"{tier_name}_{g}.leb2" for g in leb2_groups]
         present = sum(1 for f in tier_files if leb2_info.get(f, {}).get("exists"))
         total = len(tier_files)
         total_size = sum(
@@ -1507,7 +1507,7 @@ def download_leb2_for_tier(
     downloaded = []
 
     for group in groups:
-        filename = f"{tier_name}_{group}.leb"
+        filename = f"{tier_name}_{group}.leb2"
         file_info = DATA_FILES.get(filename)
         if file_info is None:
             if not quiet:
@@ -1543,8 +1543,8 @@ def download_leb2_for_tier(
                 print(f"  [FAIL] {filename}: {e}")
 
     # Activate core file
-    if activate and any(str(p).endswith("_core.leb") for p in downloaded):
-        core_path = leb_dir / f"{tier_name}_core.leb"
+    if activate and any(str(p).endswith("_core.leb2") for p in downloaded):
+        core_path = leb_dir / f"{tier_name}_core.leb2"
         if core_path.exists():
             from .state import set_leb_file
 

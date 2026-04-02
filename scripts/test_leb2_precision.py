@@ -73,19 +73,19 @@ FLAGS = [
 TIER_CONFIG = {
     "base": {
         "leb1": "data/leb/ephemeris_base.leb",
-        "leb2": "data/leb2/base_core.leb",
+        "leb2": "data/leb2/base_core.leb2",
         "jd_start": 2396759,
         "jd_end": 2506330,
     },
     "medium": {
         "leb1": "data/leb/ephemeris_medium.leb",
-        "leb2": "data/leb2/medium_core.leb",
+        "leb2": "data/leb2/medium_core.leb2",
         "jd_start": 2305448,
         "jd_end": 2634165,
     },
     "extended": {
         "leb1": "data/leb/ephemeris_extended.leb",
-        "leb2": "data/leb2/extended_core.leb",
+        "leb2": "data/leb2/extended_core.leb2",
         "jd_start": 625673,
         "jd_end": 4279532,
     },

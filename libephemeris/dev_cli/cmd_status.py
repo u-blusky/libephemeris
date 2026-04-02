@@ -357,7 +357,7 @@ def _collect_leb2_status() -> dict[str, Any]:
     tiers: dict[str, Any] = {}
     for tier in ["base", "medium", "extended"]:
         files = {
-            group: _file_entry(_LEB2_DIR / f"{tier}_{group}.leb")
+            group: _file_entry(_LEB2_DIR / f"{tier}_{group}.leb2")
             for group in _LEB2_GROUPS
         }
         present = sum(1 for info in files.values() if info["exists"])
@@ -612,7 +612,7 @@ def _render_generated_artifacts(report: dict[str, Any], verbose: int) -> None:
                     else ""
                 )
                 click.echo(
-                    f"    {_status_tag('ok' if entry['exists'] else 'missing')} {tier}_{group}.leb{size_text}"
+                    f"    {_status_tag('ok' if entry['exists'] else 'missing')} {tier}_{group}.leb2{size_text}"
                 )
                 click.echo(f"      Path: {entry['path']}")
 

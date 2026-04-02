@@ -43,10 +43,10 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
 LEB1_BASE = os.path.join(PROJECT_ROOT, "data", "leb", "ephemeris_base.leb")
 LEB2_DIR = os.path.join(PROJECT_ROOT, "data", "leb2")
-LEB2_BASE_CORE = os.path.join(LEB2_DIR, "base_core.leb")
-LEB2_BASE_ASTEROIDS = os.path.join(LEB2_DIR, "base_asteroids.leb")
-LEB2_BASE_APOGEE = os.path.join(LEB2_DIR, "base_apogee.leb")
-LEB2_BASE_URANIANS = os.path.join(LEB2_DIR, "base_uranians.leb")
+LEB2_BASE_CORE = os.path.join(LEB2_DIR, "base_core.leb2")
+LEB2_BASE_ASTEROIDS = os.path.join(LEB2_DIR, "base_asteroids.leb2")
+LEB2_BASE_APOGEE = os.path.join(LEB2_DIR, "base_apogee.leb2")
+LEB2_BASE_URANIANS = os.path.join(LEB2_DIR, "base_uranians.leb2")
 
 SKIP_NO_LEB1 = pytest.mark.skipif(
     not os.path.exists(LEB1_BASE), reason="LEB1 base file not found"
@@ -102,7 +102,7 @@ class TestFromDirectory:
     def test_from_directory_has_asteroid_bodies(self):
         """Asteroid bodies are accessible when asteroids group is present."""
         if not os.path.exists(LEB2_BASE_ASTEROIDS):
-            pytest.skip("base_asteroids.leb not found")
+            pytest.skip("base_asteroids.leb2 not found")
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
             for body in [SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA]:
                 assert reader.has_body(body), f"Missing asteroid body {body}"
@@ -111,7 +111,7 @@ class TestFromDirectory:
     def test_from_directory_has_apogee_bodies(self):
         """Apogee bodies are accessible when apogee group is present."""
         if not os.path.exists(LEB2_BASE_APOGEE):
-            pytest.skip("base_apogee.leb not found")
+            pytest.skip("base_apogee.leb2 not found")
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
             for body in [SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG]:
                 assert reader.has_body(body), f"Missing apogee body {body}"
@@ -191,7 +191,7 @@ class TestFromFileWithCompanions:
         import shutil
 
         # Copy just one file to a temp directory
-        isolated = tmp_path / "base_core.leb"
+        isolated = tmp_path / "base_core.leb2"
         shutil.copy2(LEB2_BASE_CORE, str(isolated))
 
         with CompositeLEBReader.from_file_with_companions(str(isolated)) as reader:
@@ -204,7 +204,7 @@ class TestFromFileWithCompanions:
     def test_eval_body_across_groups(self):
         """eval_body dispatches to correct reader for each body group."""
         if not os.path.exists(LEB2_BASE_ASTEROIDS):
-            pytest.skip("base_asteroids.leb not found")
+            pytest.skip("base_asteroids.leb2 not found")
 
         with CompositeLEBReader.from_file_with_companions(LEB2_BASE_CORE) as reader:
             # Core body — eval_body returns raw coords (cartesian AU or ecliptic)
@@ -284,7 +284,7 @@ class TestBodyDispatch:
     def test_asteroid_body_eval(self, body):
         """Each asteroid body can be evaluated at J2000."""
         if not os.path.exists(LEB2_BASE_ASTEROIDS):
-            pytest.skip("base_asteroids.leb not found")
+            pytest.skip("base_asteroids.leb2 not found")
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
             if not reader.has_body(body):
                 pytest.skip(f"Body {body} not in composite reader")
@@ -299,7 +299,7 @@ class TestBodyDispatch:
     def test_apogee_body_eval(self, body):
         """Each apogee body can be evaluated at J2000."""
         if not os.path.exists(LEB2_BASE_APOGEE):
-            pytest.skip("base_apogee.leb not found")
+            pytest.skip("base_apogee.leb2 not found")
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
             if not reader.has_body(body):
                 pytest.skip(f"Body {body} not in composite reader")

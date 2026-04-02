@@ -57,7 +57,7 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
     rng = np.random.default_rng(seed)
     jds = rng.uniform(JD_START, JD_END, n_dates)
 
-    leb_path = "data/leb2/base_core.leb"
+    leb_path = "data/leb2/base_core.leb2"
     if not os.path.isfile(leb_path):
         print(f"SKIP: {leb_path} not found")
         return True

@@ -114,7 +114,7 @@ build-backend = "setuptools.build_meta"
 packages = ["libephemeris", "libephemeris.cli", "libephemeris.dev_cli"]
 
 [tool.setuptools.package-data]
-libephemeris = ["py.typed", "data/*.csv", "data/leb2/base_core.leb"]
+libephemeris = ["py.typed", "data/*.csv", "data/leb2/base_core.leb2"]
 
 # ---------------------------------------------------------------------------
 # Poe shortcuts — curated aliases for the most common dev workflows.

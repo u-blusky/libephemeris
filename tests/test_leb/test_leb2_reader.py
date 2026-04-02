@@ -101,9 +101,9 @@ class TestLEB2Reader:
     def test_open_and_read(self):
         from libephemeris.leb2_reader import LEB2Reader
 
-        path = os.path.join(LEB2_DIR, "base_core.leb")
+        path = os.path.join(LEB2_DIR, "base_core.leb2")
         if not os.path.isfile(path):
-            pytest.skip("base_core.leb not found")
+            pytest.skip("base_core.leb2 not found")
 
         reader = LEB2Reader(path)
         assert reader.has_body(0)  # Sun
@@ -119,9 +119,9 @@ class TestLEB2Reader:
     def test_context_manager(self):
         from libephemeris.leb2_reader import LEB2Reader
 
-        path = os.path.join(LEB2_DIR, "base_core.leb")
+        path = os.path.join(LEB2_DIR, "base_core.leb2")
         if not os.path.isfile(path):
-            pytest.skip("base_core.leb not found")
+            pytest.skip("base_core.leb2 not found")
 
         with LEB2Reader(path) as reader:
             pos, _ = reader.eval_body(0, 2451545.0)
@@ -130,9 +130,9 @@ class TestLEB2Reader:
     def test_nutation(self):
         from libephemeris.leb2_reader import LEB2Reader
 
-        path = os.path.join(LEB2_DIR, "base_core.leb")
+        path = os.path.join(LEB2_DIR, "base_core.leb2")
         if not os.path.isfile(path):
-            pytest.skip("base_core.leb not found")
+            pytest.skip("base_core.leb2 not found")
 
         with LEB2Reader(path) as reader:
             dpsi, deps = reader.eval_nutation(2451545.0)
@@ -142,9 +142,9 @@ class TestLEB2Reader:
     def test_delta_t(self):
         from libephemeris.leb2_reader import LEB2Reader
 
-        path = os.path.join(LEB2_DIR, "base_core.leb")
+        path = os.path.join(LEB2_DIR, "base_core.leb2")
         if not os.path.isfile(path):
-            pytest.skip("base_core.leb not found")
+            pytest.skip("base_core.leb2 not found")
 
         with LEB2Reader(path) as reader:
             dt = reader.delta_t(2451545.0)
@@ -153,9 +153,9 @@ class TestLEB2Reader:
     def test_body_not_found(self):
         from libephemeris.leb2_reader import LEB2Reader
 
-        path = os.path.join(LEB2_DIR, "base_core.leb")
+        path = os.path.join(LEB2_DIR, "base_core.leb2")
         if not os.path.isfile(path):
-            pytest.skip("base_core.leb not found")
+            pytest.skip("base_core.leb2 not found")
 
         with LEB2Reader(path) as reader:
             with pytest.raises(KeyError):
@@ -166,9 +166,9 @@ class TestLEB2Reader:
         """Verify LEB2 results are within 0.003\" of LEB1 for core bodies."""
         from libephemeris.leb2_reader import LEB2Reader
 
-        path = os.path.join(LEB2_DIR, "base_core.leb")
+        path = os.path.join(LEB2_DIR, "base_core.leb2")
         if not os.path.isfile(path):
-            pytest.skip("base_core.leb not found")
+            pytest.skip("base_core.leb2 not found")
 
         reader1 = LEBReader(LEB1_PATH)
         reader2 = LEB2Reader(path)
@@ -191,7 +191,7 @@ class TestLEB2Reader:
 
 
 requires_leb2_companions = pytest.mark.skipif(
-    not os.path.isfile(os.path.join(LEB2_DIR, "base_asteroids.leb")),
+    not os.path.isfile(os.path.join(LEB2_DIR, "base_asteroids.leb2")),
     reason="LEB2 companion files not available (only core is tracked in git)",
 )
 
@@ -218,7 +218,7 @@ class TestCompositeLEBReader:
     def test_from_file_with_companions(self):
         from libephemeris.leb_composite import CompositeLEBReader
 
-        path = os.path.join(LEB2_DIR, "base_core.leb")
+        path = os.path.join(LEB2_DIR, "base_core.leb2")
         reader = CompositeLEBReader.from_file_with_companions(path)
         assert reader.has_body(0)  # from primary
         reader.close()
@@ -227,7 +227,7 @@ class TestCompositeLEBReader:
     def test_from_file_with_companions_all(self):
         from libephemeris.leb_composite import CompositeLEBReader
 
-        path = os.path.join(LEB2_DIR, "base_core.leb")
+        path = os.path.join(LEB2_DIR, "base_core.leb2")
         reader = CompositeLEBReader.from_file_with_companions(path)
         assert reader.has_body(15)  # from companion
         reader.close()

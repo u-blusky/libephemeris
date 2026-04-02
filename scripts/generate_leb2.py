@@ -647,10 +647,10 @@ def convert_all_groups(
     """Convert a LEB1 file into separate LEB2 files for each group.
 
     Produces:
-      {output_dir}/{tier_name}_core.leb
-      {output_dir}/{tier_name}_asteroids.leb
-      {output_dir}/{tier_name}_apogee.leb
-      {output_dir}/{tier_name}_uranians.leb
+      {output_dir}/{tier_name}_core.leb2
+      {output_dir}/{tier_name}_asteroids.leb2
+      {output_dir}/{tier_name}_apogee.leb2
+      {output_dir}/{tier_name}_uranians.leb2
 
     Args:
         input_path: Source LEB1 file.
@@ -667,7 +667,7 @@ def convert_all_groups(
     total_size = 0
 
     for group_name, body_ids in LEB2_GROUPS.items():
-        output_path = os.path.join(output_dir, f"{tier_name}_{group_name}.leb")
+        output_path = os.path.join(output_dir, f"{tier_name}_{group_name}.leb2")
 
         if verbose:
             print(f"\n--- Group: {group_name} ({len(body_ids)} bodies) ---")
