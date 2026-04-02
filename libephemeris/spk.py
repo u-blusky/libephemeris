@@ -61,16 +61,17 @@ from .exceptions import SPKNotFoundError
 from .logging_config import format_file_size, get_logger
 from .state import get_loader, get_timescale
 
-# Lazy import for spktype21 (optional dependency for type 21 support)
+# Vendored spktype21 for SPK type 21 support (upstream unmaintained since 2018).
+# Includes numpy 2.x compatibility fix (.item() on map_array results).
 _spktype21_module = None
 
 
 def _get_spktype21():
-    """Lazy load spktype21 module."""
+    """Lazy load vendored spktype21 module."""
     global _spktype21_module
     if _spktype21_module is None:
         try:
-            from spktype21 import SPKType21
+            from .vendor.spktype21 import SPKType21
 
             _spktype21_module = SPKType21
         except ImportError:

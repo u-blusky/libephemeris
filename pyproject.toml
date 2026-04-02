@@ -45,7 +45,7 @@ dependencies = [
     "astroquery>=0.4.7",  # Required for automatic SPK kernel downloads from JPL Horizons
     "certifi",  # SSL certificates for HTTPS connections to JPL Horizons
     "click>=8.0",  # CLI framework for both prod (libephemeris) and dev (leph) commands
-    "spktype21>=0.1.0",  # Support for SPK type 21 files from JPL Horizons (asteroids, comets)
+    # spktype21 vendored in libephemeris/vendor/spktype21.py (upstream unmaintained since 2018, numpy 2.x fix applied)
     "pyerfa>=2.0.0",  # IAU ERFA: high-precision nutation (IAU 2006/2000A), obliquity, precession, aberration
     "zstandard>=0.22.0",  # Zstandard compression for LEB2 compressed ephemeris format
     # tomllib is in stdlib since 3.11, no longer needed with >=3.12
