@@ -182,6 +182,7 @@ class LEBReader:
         self._path = path
         self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        self._mm.madvise(mmap.MADV_WILLNEED)
         self._eval_cache: Dict[
             Tuple[int, float],
             Tuple[Tuple[float, float, float], Tuple[float, float, float]],

@@ -1,10 +1,15 @@
 """
-Reader for LEB2 compressed ephemeris files.
+Reader for LEB2 compressed ephemeris files (v1 and v2).
 
-Provides the same interface as LEBReader. Decompresses each body's Chebyshev
-coefficients lazily on first access and caches the result for subsequent calls.
+Provides the same interface as LEBReader.
 
-After decompression, eval_body() follows the identical Clenshaw path as LEB1.
+- **v1 (legacy)**: Decompresses each body's entire coefficient blob lazily on
+  first access and caches the result.  Fast for small bodies but can be slow
+  for large ones (e.g. Moon at 307 MB decompressed).
+
+- **v2 (chunked)**: Each body is split into 10-year temporal chunks, each
+  compressed independently.  Only the chunk containing the requested JD is
+  decompressed (~300 KB for Moon), giving near-instant cold-start performance.
 """
 
 from __future__ import annotations
@@ -17,6 +22,8 @@ from typing import Dict, List, Optional, Tuple
 
 from .leb_compression import decompress_body
 from .leb_format import (
+    CHUNK_ENTRY_SIZE,
+    CHUNK_INDEX_HEADER_SIZE,
     COMPRESSED_BODY_ENTRY_SIZE,
     COORD_ECLIPTIC,
     COORD_GEO_ECLIPTIC,
@@ -28,6 +35,7 @@ from .leb_format import (
     HEADER_SIZE,
     LEB2_MAGIC,
     LEB2_VERSION,
+    LEB2_VERSION_V1,
     NUTATION_HEADER_SIZE,
     SECTION_BODY_INDEX,
     SECTION_COMPRESSED_CHEBYSHEV,
@@ -36,10 +44,13 @@ from .leb_format import (
     SECTION_NUTATION,
     SECTION_STARS,
     STAR_ENTRY_SIZE,
+    ChunkEntry,
     CompressedBodyEntry,
     NutationHeader,
     SectionEntry,
     StarEntry,
+    read_chunk_entry,
+    read_chunk_index_header,
     read_compressed_body_entry,
     read_header,
     read_nutation_header,
@@ -50,12 +61,12 @@ from .leb_reader import _clenshaw, _clenshaw_with_derivative
 
 
 class LEB2Reader:
-    """Reader for LEB2 compressed .leb files.
+    """Reader for LEB2 compressed .leb2 files (v1 monolithic and v2 chunked).
 
-    Same interface as LEBReader. Decompresses body data lazily on first access.
+    Same interface as LEBReader.
 
     Usage:
-        with LEB2Reader("ephemeris.leb") as reader:
+        with LEB2Reader("ephemeris.leb2") as reader:
             pos, vel = reader.eval_body(SE_SUN, jd_tt)
     """
 
@@ -66,7 +77,11 @@ class LEB2Reader:
         self._path = path
         self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-        self._cache: Dict[int, bytes] = {}  # body_id -> decompressed coefficients
+        self._mm.madvise(mmap.MADV_WILLNEED)
+        self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
+        self._chunk_cache: Dict[Tuple[int, int], bytes] = {}  # v2: (body_id, chunk_idx) -> decompressed chunk
+        self._chunk_index: Dict[int, List[ChunkEntry]] = {}  # v2: body_id -> list of ChunkEntry
+        self._chunked: bool = False  # True for v2 chunked format
         self._eval_cache: Dict[
             Tuple[int, float],
             Tuple[Tuple[float, float, float], Tuple[float, float, float]],
@@ -84,10 +99,12 @@ class LEB2Reader:
             raise ValueError(
                 f"Invalid LEB2 magic: {self._header.magic!r} (expected {LEB2_MAGIC!r})"
             )
-        if self._header.version != LEB2_VERSION:
+        if self._header.version not in (LEB2_VERSION_V1, LEB2_VERSION):
             raise ValueError(
-                f"Unsupported LEB2 version: {self._header.version} (expected {LEB2_VERSION})"
+                f"Unsupported LEB2 version: {self._header.version} "
+                f"(supported: {LEB2_VERSION_V1}, {LEB2_VERSION})"
             )
+        self._chunked = self._header.version >= LEB2_VERSION
 
         # Parse section directory
         self._sections: Dict[int, SectionEntry] = {}
@@ -104,6 +121,11 @@ class LEB2Reader:
                 offset = sec.offset + i * COMPRESSED_BODY_ENTRY_SIZE
                 entry = read_compressed_body_entry(self._mm, offset)
                 self._bodies[entry.body_id] = entry
+
+        # For v2: parse chunk indices for each body
+        if self._chunked:
+            for body_id, entry in self._bodies.items():
+                self._chunk_index[body_id] = self._parse_chunk_index(entry)
 
         # Parse nutation header (uncompressed, same as LEB1)
         self._nutation: Optional[NutationHeader] = None
@@ -136,11 +158,63 @@ class LEB2Reader:
                 star = read_star_entry(self._mm, offset)
                 self._stars[star.star_id] = star
 
+    def _parse_chunk_index(self, entry: CompressedBodyEntry) -> List[ChunkEntry]:
+        """Parse the chunk index for a v2 body."""
+        offset = entry.data_offset
+        chunk_count, _ = read_chunk_index_header(self._mm, offset)
+        offset += CHUNK_INDEX_HEADER_SIZE
+
+        chunks = []
+        for i in range(chunk_count):
+            chunk = read_chunk_entry(self._mm, offset + i * CHUNK_ENTRY_SIZE)
+            chunks.append(chunk)
+        return chunks
+
+    def _find_chunk(self, body_id: int, jd: float) -> int:
+        """Find the chunk index containing jd via binary search."""
+        chunks = self._chunk_index[body_id]
+        # Binary search: chunks are sorted by jd_start
+        lo, hi = 0, len(chunks) - 1
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if jd >= chunks[mid].jd_end:
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo
+
+    def _decompress_chunk(self, body_id: int, chunk_idx: int) -> bytes:
+        """Decompress a single chunk (v2)."""
+        key = (body_id, chunk_idx)
+        cached = self._chunk_cache.get(key)
+        if cached is not None:
+            return cached
+
+        body = self._bodies[body_id]
+        chunk = self._chunk_index[body_id][chunk_idx]
+
+        compressed = self._mm[
+            chunk.blob_offset: chunk.blob_offset + chunk.compressed_size
+        ]
+        decompressed = decompress_body(
+            bytes(compressed),
+            chunk.uncompressed_size,
+            chunk.segment_count,
+            body.degree,
+            body.components,
+        )
+
+        # Bounded cache: keep max 64 chunks in memory
+        if len(self._chunk_cache) > 64:
+            self._chunk_cache.clear()
+        self._chunk_cache[key] = decompressed
+        return decompressed
+
     def _decompress_body(self, body_id: int) -> None:
-        """Decompress a body's coefficients on first access."""
+        """Decompress a body's full coefficients (v1 legacy)."""
         entry = self._bodies[body_id]
         compressed = self._mm[
-            entry.data_offset : entry.data_offset + entry.compressed_size
+            entry.data_offset: entry.data_offset + entry.compressed_size
         ]
         self._cache[body_id] = decompress_body(
             bytes(compressed),
@@ -170,11 +244,8 @@ class LEB2Reader:
     def eval_body(
         self, body_id: int, jd: float
     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
-        """Evaluate a body's position and velocity at a given Julian Day.
-
-        Same interface and return format as LEBReader.eval_body().
-        """
-        # Check instance-level eval cache first (see LEBReader.eval_body).
+        """Evaluate a body's position and velocity at a given Julian Day."""
+        # Check eval cache
         _cache_key = (body_id, jd)
         cached = self._eval_cache.get(_cache_key)
         if cached is not None:
@@ -182,10 +253,6 @@ class LEB2Reader:
 
         if body_id not in self._bodies:
             raise KeyError(f"Body {body_id} not in LEB file")
-
-        # Lazy decompress
-        if body_id not in self._cache:
-            self._decompress_body(body_id)
 
         body = self._bodies[body_id]
 
@@ -195,9 +262,29 @@ class LEB2Reader:
                 f"for body {body_id}"
             )
 
-        # O(1) segment lookup
+        # Global segment index
         seg_idx = int((jd - body.jd_start) / body.interval_days)
         seg_idx = max(0, min(seg_idx, body.segment_count - 1))
+
+        # Get coefficients — chunked (v2) or monolithic (v1)
+        if self._chunked:
+            chunk_idx = self._find_chunk(body_id, jd)
+            chunk_data = self._decompress_chunk(body_id, chunk_idx)
+            chunk = self._chunk_index[body_id][chunk_idx]
+            local_seg = seg_idx - chunk.segment_start
+            local_seg = max(0, min(local_seg, chunk.segment_count - 1))
+            deg1 = body.degree + 1
+            n_coeffs = body.components * deg1
+            byte_offset = local_seg * n_coeffs * 8
+            coeffs = struct.unpack_from(f"<{n_coeffs}d", chunk_data, byte_offset)
+        else:
+            # v1: decompress full body on first access
+            if body_id not in self._cache:
+                self._decompress_body(body_id)
+            deg1 = body.degree + 1
+            n_coeffs = body.components * deg1
+            byte_offset = seg_idx * n_coeffs * 8
+            coeffs = struct.unpack_from(f"<{n_coeffs}d", self._cache[body_id], byte_offset)
 
         # Compute tau
         seg_start = body.jd_start + seg_idx * body.interval_days
@@ -208,19 +295,13 @@ class LEB2Reader:
         elif tau < -1.0:
             tau = -1.0
 
-        # Read coefficients from decompressed cache
-        deg1 = body.degree + 1
-        n_coeffs = body.components * deg1
-        byte_offset = seg_idx * n_coeffs * 8
-        coeffs = struct.unpack_from(f"<{n_coeffs}d", self._cache[body_id], byte_offset)
-
         # Evaluate each component via Clenshaw
         pos = []
         vel = []
         scale = 2.0 / body.interval_days
 
         for c in range(body.components):
-            comp_coeffs = coeffs[c * deg1 : (c + 1) * deg1]
+            comp_coeffs = coeffs[c * deg1: (c + 1) * deg1]
             val, deriv = _clenshaw_with_derivative(comp_coeffs, tau)
             pos.append(val)
             vel.append(deriv * scale)
@@ -231,7 +312,7 @@ class LEB2Reader:
 
         result = tuple(pos), tuple(vel)  # type: ignore[return-value]
 
-        # Store in cache (bounded: clear when exceeding 256 entries)
+        # Store in eval cache (bounded)
         if len(self._eval_cache) > 256:
             self._eval_cache.clear()
         self._eval_cache[_cache_key] = result  # type: ignore[assignment]
@@ -271,7 +352,7 @@ class LEB2Reader:
         coeffs = struct.unpack_from(f"<{n_coeffs}d", self._mm, byte_offset)
 
         dpsi = _clenshaw(coeffs[0:deg1], tau)
-        deps = _clenshaw(coeffs[deg1 : 2 * deg1], tau)
+        deps = _clenshaw(coeffs[deg1: 2 * deg1], tau)
         return dpsi, deps
 
     def delta_t(self, jd: float) -> float:
@@ -307,6 +388,8 @@ class LEB2Reader:
         """Close the memory-mapped file and release resources."""
         self._eval_cache.clear()
         self._cache.clear()
+        self._chunk_cache.clear()
+        self._chunk_index.clear()
         if self._mm is not None:
             try:
                 self._mm.close()

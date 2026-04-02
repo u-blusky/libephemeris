@@ -1115,6 +1115,29 @@ def clear_angles_cache() -> None:
     _ANGLES_CACHE = {}
 
 
+def reset_session() -> None:
+    """Reset per-calculation state without closing files or clearing caches.
+
+    Resets: topo, sidereal mode, angles cache, observer cache.
+    Keeps alive: LEB reader, Skyfield timescale, SPK kernels, LRU caches.
+
+    Use this between independent calculations that may use different
+    topo/sidereal settings. Use close() only for full teardown (e.g.
+    switching ephemeris files, test cleanup, or application shutdown).
+    """
+    global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
+    global _ANGLES_CACHE
+    with _STATE_LOCK:
+        _TOPO = None
+        _SIDEREAL_MODE = None
+        _SIDEREAL_AYAN_T0 = 0.0
+        _SIDEREAL_T0 = 0.0
+        _ANGLES_CACHE = {}
+    from .cache import clear_observer_cache
+
+    clear_observer_cache()
+
+
 def set_ephe_path(path: Optional[str]) -> None:
     """
     Set the path for ephemeris files.
@@ -1131,8 +1154,12 @@ def set_ephe_path(path: Optional[str]) -> None:
         it are automatically scanned and registered for known minor bodies.
         This allows pre-downloaded SPK files to be used without manual
         registration. No network requests are made during this scan.
+
+        Idempotent: if the path hasn't changed, no resources are released.
     """
     global _EPHEMERIS_PATH, _PLANETS
+    if path == _EPHEMERIS_PATH:
+        return  # No-op: path unchanged, keep loaded kernels and caches
     _EPHEMERIS_PATH = path
     # Close old kernel and clear caches before reloading
     if _PLANETS is not None:

@@ -40,11 +40,15 @@ from libephemeris.leb_compression import (
     BODY_TARGET_AU,
     DEFAULT_TARGET_AU,
     compress_body,
+    compress_body_chunked,
     compute_mantissa_bits,
 )
 from libephemeris.leb_format import (
     BODY_ENTRY_FMT,
     BODY_ENTRY_SIZE,
+    CHUNK_ENTRY_SIZE,
+    CHUNK_INDEX_HEADER_SIZE,
+    CHUNK_INTERVAL_DAYS,
     COMPRESSED_BODY_ENTRY_SIZE,
     COMPRESSION_ZSTD_TRUNC_SHUFFLE,
     DELTA_T_ENTRY_FMT,
@@ -66,6 +70,7 @@ from libephemeris.leb_format import (
     SECTION_NUTATION,
     SECTION_STARS,
     STAR_ENTRY_SIZE,
+    ChunkEntry,
     CompressedBodyEntry,
     FileHeader,
     SectionEntry,
@@ -73,6 +78,8 @@ from libephemeris.leb_format import (
     read_header,
     read_section_dir,
     segment_byte_size,
+    write_chunk_entry,
+    write_chunk_index_header,
     write_compressed_body_entry,
     write_header,
     write_section_dir,
@@ -303,7 +310,178 @@ def write_leb2(
 
 
 # =============================================================================
-# CONVERT MODE: LEB1 -> LEB2
+# LEB2 v2 CHUNKED WRITER
+# =============================================================================
+
+
+def write_leb2_chunked(
+    output: str,
+    body_chunks: list,
+    # list of (BodyEntry, list[(compressed_bytes, uncompressed_size)], total_uncompressed)
+    nutation_data: Optional[bytes],
+    delta_t_data: Optional[bytes],
+    star_data: Optional[bytes],
+    jd_start: float,
+    jd_end: float,
+    generation_epoch: float,
+    chunk_interval_days: float = CHUNK_INTERVAL_DAYS,
+    verbose: bool = True,
+) -> None:
+    """Write a LEB2 v2 file with chunked per-body compression.
+
+    Each body's data is split into temporal chunks (default 10 years).
+    Each chunk is compressed independently, enabling per-chunk decompression
+    at read time for near-instant cold-start performance.
+    """
+    n_bodies = len(body_chunks)
+
+    # Count sections
+    section_list = [SECTION_BODY_INDEX, SECTION_COMPRESSED_CHEBYSHEV]
+    if nutation_data:
+        section_list.append(SECTION_NUTATION)
+    if delta_t_data:
+        section_list.append(SECTION_DELTA_T)
+    if star_data:
+        section_list.append(SECTION_STARS)
+    n_sections = len(section_list)
+
+    # Calculate layout: header + section dir + body index
+    body_index_offset = HEADER_SIZE + n_sections * SECTION_DIR_SIZE
+    body_index_size = n_bodies * COMPRESSED_BODY_ENTRY_SIZE
+
+    # Chebyshev data: for each body = chunk_index_header + chunk_entries + chunk_blobs
+    cheb_offset = body_index_offset + body_index_size
+    cheb_total = 0
+    for body, chunks, _ in body_chunks:
+        n_chunks = len(chunks)
+        chunk_index_size = CHUNK_INDEX_HEADER_SIZE + n_chunks * CHUNK_ENTRY_SIZE
+        blobs_size = sum(len(blob) for blob, _ in chunks)
+        cheb_total += chunk_index_size + blobs_size
+
+    current = cheb_offset + cheb_total
+
+    nut_offset = current
+    if nutation_data:
+        current += len(nutation_data)
+    dt_offset = current
+    if delta_t_data:
+        current += len(delta_t_data)
+    star_offset = current
+    if star_data:
+        current += len(star_data)
+
+    total_size = current
+    buf = bytearray(total_size)
+
+    # Write header (version 2)
+    file_hdr = FileHeader(
+        magic=LEB2_MAGIC,
+        version=LEB2_VERSION,
+        section_count=n_sections,
+        body_count=n_bodies,
+        jd_start=jd_start,
+        jd_end=jd_end,
+        generation_epoch=generation_epoch,
+        flags=COMPRESSION_ZSTD_TRUNC_SHUFFLE,
+    )
+    write_header(buf, file_hdr)
+
+    # Write section directory
+    sec_entries = [
+        SectionEntry(SECTION_BODY_INDEX, body_index_offset, body_index_size),
+        SectionEntry(SECTION_COMPRESSED_CHEBYSHEV, cheb_offset, cheb_total),
+    ]
+    if nutation_data:
+        sec_entries.append(SectionEntry(SECTION_NUTATION, nut_offset, len(nutation_data)))
+    if delta_t_data:
+        sec_entries.append(SectionEntry(SECTION_DELTA_T, dt_offset, len(delta_t_data)))
+    if star_data:
+        sec_entries.append(SectionEntry(SECTION_STARS, star_offset, len(star_data)))
+    for i, se in enumerate(sec_entries):
+        write_section_dir(buf, HEADER_SIZE + i * SECTION_DIR_SIZE, se)
+
+    # Write body index and chunked data
+    data_cursor = cheb_offset
+    for idx, (body, chunks, total_uncomp) in enumerate(body_chunks):
+        n_chunks = len(chunks)
+        chunk_index_size = CHUNK_INDEX_HEADER_SIZE + n_chunks * CHUNK_ENTRY_SIZE
+        blobs_size = sum(len(blob) for blob, _ in chunks)
+        body_data_size = chunk_index_size + blobs_size
+
+        # Body entry: data_offset points to the chunk index header
+        cbe = CompressedBodyEntry(
+            body_id=body.body_id,
+            coord_type=body.coord_type,
+            segment_count=body.segment_count,
+            jd_start=body.jd_start,
+            jd_end=body.jd_end,
+            interval_days=body.interval_days,
+            degree=body.degree,
+            components=body.components,
+            data_offset=data_cursor,
+            compressed_size=body_data_size,
+            uncompressed_size=total_uncomp,
+        )
+        write_compressed_body_entry(
+            buf, body_index_offset + idx * COMPRESSED_BODY_ENTRY_SIZE, cbe
+        )
+
+        # Write chunk index header
+        write_chunk_index_header(buf, data_cursor, n_chunks, chunk_interval_days)
+        ci_cursor = data_cursor + CHUNK_INDEX_HEADER_SIZE
+
+        # Blob data starts after the chunk index
+        blob_base = data_cursor + chunk_index_size
+        blob_cursor = blob_base
+
+        # Build chunk entries
+        seg_bytes = segment_byte_size(body.degree, body.components)
+        seg_cursor = 0  # running segment start
+
+        for ci, (blob, uncomp_size) in enumerate(chunks):
+            chunk_seg_count = uncomp_size // seg_bytes
+            chunk_jd_start = body.jd_start + seg_cursor * body.interval_days
+            chunk_jd_end = chunk_jd_start + chunk_seg_count * body.interval_days
+
+            chunk_entry = ChunkEntry(
+                jd_start=chunk_jd_start,
+                jd_end=chunk_jd_end,
+                blob_offset=blob_cursor,  # absolute offset
+                compressed_size=len(blob),
+                uncompressed_size=uncomp_size,
+                segment_start=seg_cursor,
+                segment_count=chunk_seg_count,
+            )
+            write_chunk_entry(buf, ci_cursor + ci * CHUNK_ENTRY_SIZE, chunk_entry)
+
+            # Write blob
+            buf[blob_cursor: blob_cursor + len(blob)] = blob
+            blob_cursor += len(blob)
+            seg_cursor += chunk_seg_count
+
+        data_cursor += body_data_size
+
+    # Write auxiliary sections
+    if nutation_data:
+        buf[nut_offset: nut_offset + len(nutation_data)] = nutation_data
+    if delta_t_data:
+        buf[dt_offset: dt_offset + len(delta_t_data)] = delta_t_data
+    if star_data:
+        buf[star_offset: star_offset + len(star_data)] = star_data
+
+    # Flush
+    os.makedirs(os.path.dirname(os.path.abspath(output)) or ".", exist_ok=True)
+    with open(output, "wb") as f:
+        f.write(buf)
+
+    if verbose:
+        print(f"\n  Output: {output}")
+        print(f"  File size: {total_size / 1e6:.2f} MB ({total_size:,} bytes)")
+        print(f"  Format: LEB2 v2 (chunked, {chunk_interval_days / 365.25:.0f}-year chunks)")
+
+
+# =============================================================================
+# CONVERT MODE: LEB1 -> LEB2 (v2 chunked)
 # =============================================================================
 
 
@@ -314,7 +492,7 @@ def convert_leb1_to_leb2(
     target_precision: float = DEFAULT_TARGET_AU,
     verbose: bool = True,
 ) -> None:
-    """Convert an existing LEB1 file to LEB2 format.
+    """Convert an existing LEB1 file to LEB2 v2 format (chunked).
 
     Args:
         input_path: Path to source LEB1 file.
@@ -324,7 +502,8 @@ def convert_leb1_to_leb2(
         verbose: Print progress.
     """
     if verbose:
-        print(f"Converting {input_path} -> {output_path}")
+        chunk_years = CHUNK_INTERVAL_DAYS / 365.25
+        print(f"Converting {input_path} -> {output_path} (v2, {chunk_years:.0f}-year chunks)")
         if group:
             print(f"  Group: {group} ({len(LEB2_GROUPS[group])} bodies)")
 
@@ -342,21 +521,21 @@ def convert_leb1_to_leb2(
         input_size = os.path.getsize(input_path)
         print(f"  Input size: {input_size / 1e6:.1f} MB")
 
-    # Compress each body
-    body_entries = []
+    # Compress each body into chunks
+    body_chunks = []
     total_raw = 0
     total_compressed = 0
 
     if verbose:
-        print(f"\n  {'Body':<16s}  {'Raw KB':>8s}  {'Comp KB':>8s}  {'Ratio':>6s}")
-        print(f"  {'-' * 44}")
+        print(f"\n  {'Body':<16s}  {'Raw KB':>8s}  {'Comp KB':>8s}  {'Ratio':>6s}  {'Chunks':>6s}")
+        print(f"  {'-' * 52}")
 
     for bid in body_ids:
         entry = src.bodies[bid]
         raw = src.get_body_coefficients(bid)
         raw_size = len(raw)
 
-        # Compute mantissa bits needed (use per-body target if available)
+        # Compute mantissa bits (use per-body target if available)
         body_target = BODY_TARGET_AU.get(bid, target_precision)
         deg1 = entry.degree + 1
         arr = np.frombuffer(raw, dtype=np.float64).reshape(
@@ -364,24 +543,28 @@ def convert_leb1_to_leb2(
         )
         bits = compute_mantissa_bits(arr, body_target)
 
-        # Compress
-        blob = compress_body(
-            raw, entry.segment_count, entry.degree, entry.components, bits
+        # Calculate segments per chunk
+        segs_per_chunk = max(1, int(CHUNK_INTERVAL_DAYS / entry.interval_days))
+
+        # Compress into chunks
+        chunks = compress_body_chunked(
+            raw, entry.segment_count, entry.degree, entry.components, bits, segs_per_chunk
         )
 
-        body_entries.append((entry, blob, raw_size))
+        comp_size = sum(len(blob) for blob, _ in chunks)
+        body_chunks.append((entry, chunks, raw_size))
         total_raw += raw_size
-        total_compressed += len(blob)
+        total_compressed += comp_size
 
         if verbose:
             name = BODY_NAMES.get(bid, f"Body {bid}")
-            ratio = raw_size / len(blob) if len(blob) > 0 else 0
+            ratio = raw_size / comp_size if comp_size > 0 else 0
             print(
-                f"  {name:<16s}  {raw_size / 1024:>8.1f}  {len(blob) / 1024:>8.1f}  {ratio:>5.1f}x"
+                f"  {name:<16s}  {raw_size / 1024:>8.1f}  {comp_size / 1024:>8.1f}  {ratio:>5.1f}x  {len(chunks):>6d}"
             )
 
     if verbose:
-        print(f"  {'-' * 44}")
+        print(f"  {'-' * 52}")
         ratio = total_raw / total_compressed if total_compressed > 0 else 0
         print(
             f"  {'TOTAL':<16s}  {total_raw / 1024:>8.1f}  {total_compressed / 1024:>8.1f}  {ratio:>5.1f}x"
@@ -392,10 +575,10 @@ def convert_leb1_to_leb2(
     delta_t_data = src.get_section_data(SECTION_DELTA_T)
     star_data = src.get_section_data(SECTION_STARS)
 
-    # Write LEB2
-    write_leb2(
+    # Write LEB2 v2 (chunked)
+    write_leb2_chunked(
         output=output_path,
-        body_entries=body_entries,
+        body_chunks=body_chunks,
         nutation_data=nutation_data,
         delta_t_data=delta_t_data,
         star_data=star_data,

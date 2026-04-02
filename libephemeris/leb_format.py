@@ -49,11 +49,19 @@ SECTION_COMPRESSED_CHEBYSHEV = 6  # LEB2: per-body compressed blobs
 
 # LEB2 format constants
 LEB2_MAGIC = b"LEB2"
-LEB2_VERSION = 1
+LEB2_VERSION = 2  # v2: chunked per-body compression (10-year chunks)
+LEB2_VERSION_V1 = 1  # v1: monolithic per-body compression (legacy)
 COMPRESSION_NONE = 0
 COMPRESSION_ZSTD_TRUNC_SHUFFLE = (
     1  # mantissa truncation + coeff-major reorder + byte shuffle + zstd
 )
+
+# LEB2 v2 chunk index constants (10-year temporal chunks per body)
+CHUNK_INTERVAL_DAYS = 10 * 365.25  # 10 years in days
+CHUNK_INDEX_HEADER_FMT = "<IIfI"  # chunk_count, reserved, chunk_interval_days, reserved2
+CHUNK_INDEX_HEADER_SIZE = struct.calcsize(CHUNK_INDEX_HEADER_FMT)  # 16
+CHUNK_ENTRY_FMT = "<ddQQQII"  # jd_start, jd_end, blob_offset, compressed_size, uncompressed_size, segment_start, segment_count
+CHUNK_ENTRY_SIZE = struct.calcsize(CHUNK_ENTRY_FMT)  # 48
 
 # Struct formats (little-endian, no padding with '<' prefix)
 HEADER_FMT = "<4sIIIdddI20s"
@@ -160,6 +168,24 @@ class CompressedBodyEntry:
     data_offset: int  # Offset to compressed blob
     compressed_size: int
     uncompressed_size: int
+
+
+@dataclass
+class ChunkEntry:
+    """LEB2 v2 chunk index entry (48 bytes).
+
+    Each chunk covers a temporal slice (typically 10 years) of a body's
+    Chebyshev coefficients.  Only the chunk containing the requested JD
+    is decompressed, avoiding the full-body decompression penalty of v1.
+    """
+
+    jd_start: float  # Start JD of this chunk
+    jd_end: float  # End JD of this chunk
+    blob_offset: int  # Absolute byte offset to compressed blob
+    compressed_size: int  # Bytes in compressed blob
+    uncompressed_size: int  # Original bytes before compression
+    segment_start: int  # First segment index in this chunk
+    segment_count: int  # Number of segments in this chunk
 
 
 @dataclass
@@ -439,6 +465,59 @@ def read_compressed_body_entry(data: Any, offset: int) -> CompressedBodyEntry:
         data_offset=fields[8],
         compressed_size=fields[9],
         uncompressed_size=fields[10],
+    )
+
+
+def write_chunk_index_header(
+    buf: bytearray, offset: int, chunk_count: int, chunk_interval_days: float
+) -> None:
+    """Pack a chunk index header into a bytearray."""
+    struct.pack_into(
+        CHUNK_INDEX_HEADER_FMT,
+        buf,
+        offset,
+        chunk_count,
+        0,  # reserved
+        chunk_interval_days,
+        0,  # reserved2
+    )
+
+
+def read_chunk_index_header(
+    data: Any, offset: int
+) -> tuple:
+    """Unpack a chunk index header. Returns (chunk_count, chunk_interval_days)."""
+    fields = struct.unpack_from(CHUNK_INDEX_HEADER_FMT, data, offset)
+    return fields[0], fields[2]  # chunk_count, chunk_interval_days
+
+
+def write_chunk_entry(buf: bytearray, offset: int, entry: ChunkEntry) -> None:
+    """Pack a ChunkEntry into a bytearray."""
+    struct.pack_into(
+        CHUNK_ENTRY_FMT,
+        buf,
+        offset,
+        entry.jd_start,
+        entry.jd_end,
+        entry.blob_offset,
+        entry.compressed_size,
+        entry.uncompressed_size,
+        entry.segment_start,
+        entry.segment_count,
+    )
+
+
+def read_chunk_entry(data: Any, offset: int) -> ChunkEntry:
+    """Unpack a ChunkEntry from bytes."""
+    fields = struct.unpack_from(CHUNK_ENTRY_FMT, data, offset)
+    return ChunkEntry(
+        jd_start=fields[0],
+        jd_end=fields[1],
+        blob_offset=fields[2],
+        compressed_size=fields[3],
+        uncompressed_size=fields[4],
+        segment_start=fields[5],
+        segment_count=fields[6],
     )
 
 

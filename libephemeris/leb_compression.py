@@ -210,6 +210,49 @@ def compress_body(
     return _COMPRESSOR.compress(shuffled)
 
 
+def compress_body_chunked(
+    raw_coeffs: bytes,
+    segment_count: int,
+    degree: int,
+    components: int,
+    bits_per_order: list[int],
+    chunk_segments: int,
+) -> list[tuple[bytes, int]]:
+    """Compress a body's coefficients in temporal chunks.
+
+    Splits the segment-major coefficient data into chunks of
+    ``chunk_segments`` segments each, compresses each chunk
+    independently.  This enables per-chunk decompression at read time.
+
+    Args:
+        raw_coeffs: Raw coefficient bytes in segment-major layout.
+        segment_count: Total number of time segments.
+        degree: Chebyshev polynomial degree.
+        components: Number of components (always 3).
+        bits_per_order: Mantissa bits to keep per coefficient order.
+        chunk_segments: Number of segments per chunk.
+
+    Returns:
+        List of (compressed_bytes, uncompressed_size) tuples, one per chunk.
+    """
+    deg1 = degree + 1
+    n_coeffs = components * deg1
+    seg_bytes = n_coeffs * 8
+    chunks = []
+    offset = 0
+    remaining = segment_count
+
+    while remaining > 0:
+        n = min(chunk_segments, remaining)
+        chunk_raw = raw_coeffs[offset: offset + n * seg_bytes]
+        compressed = compress_body(chunk_raw, n, degree, components, bits_per_order)
+        chunks.append((compressed, n * seg_bytes))
+        offset += n * seg_bytes
+        remaining -= n
+
+    return chunks
+
+
 def decompress_body(
     compressed: bytes,
     uncompressed_size: int,

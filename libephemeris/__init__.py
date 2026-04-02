@@ -162,6 +162,8 @@ from .state import (
     get_library_path as swe_get_library_path,
     get_current_file_data as swe_get_current_file_data,
     close as swe_close,
+    reset_session as swe_reset_session,
+    reset_session,
     # LEB binary ephemeris mode
     set_leb_file,
     get_leb_reader,
@@ -767,7 +769,7 @@ from .arabic_parts import calc_all_arabic_parts
 # .env file loader (public API for manual reloading)
 from ._dotenv import load_dotenv
 
-__version__ = "1.0.0a12"
+__version__ = "1.0.0a13"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0"
