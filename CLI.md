@@ -399,9 +399,9 @@ libephemeris download extended          # DE441 + SPKs (-13200 to +17191)
 libephemeris download leb-base          # LEB1 binary (~53 MB)
 libephemeris download leb-medium        # LEB1 binary (~175 MB)
 libephemeris download leb-extended      # LEB1 binary
-libephemeris download leb2-base         # LEB2 compressed (~31 MB, modular)
-libephemeris download leb2-medium       # LEB2 compressed (~113 MB, modular)
-libephemeris download leb2-extended     # LEB2 compressed (~855 MB, modular)
+libephemeris download leb2-base         # LEB2 compressed (~33 MB, modular)
+libephemeris download leb2-medium       # LEB2 compressed (~119 MB, modular)
+libephemeris download leb2-extended     # LEB2 compressed (~897 MB, modular)
 libephemeris download assist            # ASSIST n-body data (~714 MB)
 
 # Status (comprehensive: version, config, all data files)

@@ -1910,12 +1910,12 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 
 | Group | Bodies | Base size | Description |
 |-------|--------|-----------|-------------|
-| `core` | 14 | 7.7 MB | Sun-Pluto, Earth, Mean/True Node, Mean Apogee |
-| `asteroids` | 5 | 7.7 MB | Chiron, Ceres, Pallas, Juno, Vesta |
-| `apogee` | 3 | 10.3 MB | Oscu Apogee, Interp Apogee/Perigee |
-| `uranians` | 9 | 2.0 MB | Cupido-Transpluto |
+| `core` | 14 | 10.6 MB | Sun-Pluto, Earth, Mean/True Node, Mean Apogee |
+| `asteroids` | 5 | 8.7 MB | Chiron, Ceres, Pallas, Juno, Vesta |
+| `apogee` | 3 | 11.4 MB | Oscu Apogee, Interp Apogee/Perigee |
+| `uranians` | 9 | 2.1 MB | Cupido-Transpluto |
 
-**File naming convention:** `{tier}_{group}.leb` (e.g. `base_core.leb2`,
+**File naming convention:** `{tier}_{group}.leb2` (e.g. `base_core.leb2`,
 `medium_asteroids.leb2`).
 
 **Output directory:** `data/leb2/`
@@ -2078,11 +2078,11 @@ python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
 
 | Group | Bodies | LEB1 | LEB2 | Ratio |
 |-------|--------|------|------|-------|
-| Core | 14 | 44.5 MB | 7.7 MB | 7.3x |
-| Asteroids | 5 | 23.0 MB | 7.7 MB | 4.0x |
-| Apogee | 3 | 31.6 MB | 10.3 MB | 3.8x |
-| Uranians | 9 | 0.7 MB | 2.0 MB | 8.6x |
-| **Total** | **31** | **101.8 MB** | **28.0 MB** | **3.8x** |
+| Core | 14 | 43.5 MB | 10.6 MB | 5.1x |
+| Asteroids | 5 | 22.5 MB | 8.7 MB | 3.4x |
+| Apogee | 3 | 30.8 MB | 11.4 MB | 3.3x |
+| Uranians | 9 | 0.7 MB | 2.1 MB | 6.2x |
+| **Total** | **31** | **101.8 MB** | **32.7 MB** | **3.1x** |
 
 ---
 

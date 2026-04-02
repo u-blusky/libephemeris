@@ -109,7 +109,7 @@ New method on all LEB readers:
 
 In `"auto"` mode, when no LEB file is found locally, the library now
 automatically downloads LEB2 files for the active tier from GitHub
-Releases (~31 MB for base) instead of falling through to Skyfield which
+Releases (~33 MB for base) instead of falling through to Skyfield which
 would download DE440 (~114 MB). New users get faster startup with the
 more efficient LEB2 calculation path.
 
@@ -507,11 +507,11 @@ precomputed ephemeris data directly inside the PyPI wheel (~10.6 MB for core bod
 - `verify` — Precision verification against LEB1 reference
 
 **Modular body groups:**
-- `core` (14 bodies): Sun-Pluto, Earth, Mean/True Node, Mean Apogee — **7.7 MB** (7.3x compression)
-- `asteroids` (5 bodies): Chiron, Ceres, Pallas, Juno, Vesta — 7.66 MB (4.0x)
-- `apogee` (3 bodies): Osculating Apogee, Interpolated Apogee/Perigee — 10.31 MB (3.8x)
-- `uranians` (9 bodies): Cupido-Transpluto — 2.02 MB (8.6x)
-- Total for all 31 bodies: 28.0 MB (3.6x vs 101.8 MB LEB1)
+- `core` (14 bodies): Sun-Pluto, Earth, Mean/True Node, Mean Apogee — **10.6 MB** (5.1x compression)
+- `asteroids` (5 bodies): Chiron, Ceres, Pallas, Juno, Vesta — 8.7 MB (3.4x)
+- `apogee` (3 bodies): Osculating Apogee, Interpolated Apogee/Perigee — 11.4 MB (3.3x)
+- `uranians` (9 bodies): Cupido-Transpluto — 2.1 MB (6.2x)
+- Total for all 31 bodies: 32.7 MB (3.1x vs 101.8 MB LEB1)
 
 **Integration:**
 - `open_leb()` factory in `leb_reader.py` auto-detects LEB1 vs LEB2 via magic bytes

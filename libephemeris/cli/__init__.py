@@ -212,7 +212,7 @@ for _tier in TIER_INFO:
 
 # --- LEB2 downloads ---
 
-_LEB2_SIZES = {"base": "~31 MB", "medium": "~113 MB", "extended": "~855 MB"}
+_LEB2_SIZES = {"base": "~33 MB", "medium": "~119 MB", "extended": "~897 MB"}
 
 
 def _make_leb2_download(tier: str) -> click.Command:
@@ -419,7 +419,7 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
 
     \b
     Files downloaded:
-      - LEB2 ephemeris for base, medium, extended  (~1000 MB)
+      - LEB2 ephemeris for base, medium, extended  (~1050 MB)
       - DE kernels: de440s, de440, de441            (~3.2 GB)
       - Planet centers for all tiers                (~320 MB)
       - SPK kernels for 21 minor bodies             (~varies)
