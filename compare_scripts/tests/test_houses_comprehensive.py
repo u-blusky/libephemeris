@@ -92,9 +92,7 @@ SIDEREAL_CUSP_TOLERANCE = 0.005
 # house_pos default tolerance and per-system overrides
 # Most systems: < 0.001. T: 0.019 (semi-arc approximation). B: 0.084 (cusp fallback).
 HPOS_TOLERANCE = 0.02
-HPOS_TOLERANCE_PER_SYSTEM = {
-    "B": 0.09,   # Alcabitius: cusp-based fallback, body latitude not fully accounted
-}
+HPOS_TOLERANCE_PER_SYSTEM: dict[str, float] = {}
 
 # ASCMC indices to skip at equator for specific systems (mathematically undefined)
 # H (Horizontal): Vertex (3) and CoAsc_Munkasey (6) are degenerate at lat=0

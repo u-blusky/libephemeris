@@ -81,7 +81,7 @@ CUSP_TOL = {"H": 0.0012}
 SIDEREAL_CUSP_TOL = 0.005  # ayanamsha computation drift over time
 
 HPOS_TOL_DEFAULT = 0.02
-HPOS_TOL = {"B": 0.09}  # Alcabitius cusp-based fallback, body_lat not fully accounted
+HPOS_TOL: dict[str, float] = {}
 
 # ASCMC indices to skip at equator for specific systems (mathematically undefined)
 SKIP_ASCMC_EQ = {"H": {3, 6}}  # Vertex and CoAsc_Munkasey undefined at equator

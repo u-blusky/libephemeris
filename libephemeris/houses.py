@@ -4849,8 +4849,41 @@ def house_pos(
         hpos = xp0 / 30.0 + 1.0
         return hpos
 
+    elif hsys_char == "B":
+        # Alcabitius house position.
+        # Alcabitius cusps are equally spaced in RA within each quadrant.
+        # For house_pos, we interpolate the body's RA between the cusp RAs.
+        cusps, _ = swe_houses_armc(armc, lat, obliquity, hsys_int)
+
+        # Convert cusp ecliptic longitudes to RA
+        cusp_ras = []
+        for c in cusps:
+            c_r = math.radians(c)
+            y_c = math.sin(c_r) * cos_eps
+            x_c = math.cos(c_r)
+            cusp_ras.append(math.degrees(math.atan2(y_c, x_c)) % 360.0)
+
+        # Find which RA interval contains the body's RA
+        for i in range(12):
+            ra_start = cusp_ras[i]
+            ra_end = cusp_ras[(i + 1) % 12]
+
+            diff_to_body = (ra - ra_start + 360.0) % 360.0
+            interval_size = (ra_end - ra_start + 360.0) % 360.0
+
+            if interval_size < 0.0001:
+                interval_size = 30.0
+
+            if diff_to_body < interval_size:
+                house_num = i + 1
+                fraction = diff_to_body / interval_size
+                fraction = max(0.0, min(fraction, 0.9999999999))
+                return float(house_num) + fraction
+
+        return 1.0
+
     # Default fallback: use cusp-based method (ecliptic longitude interpolation)
-    # This applies to B (Alcabitius), H, F, I, i, J, S, L, Q, Y, and others
+    # This applies to H, F, I, i, J, S, L, Q, Y, and others
     cusps, ascmc = swe_houses_armc(armc, lat, obliquity, hsys_int)
 
     # Find the house containing this longitude
