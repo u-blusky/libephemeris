@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a11] — 2026-04-02
+
+### Fixed
+
+#### LEB Mode Fully Self-Contained
+
+- True Node calculation in the LEB fast path no longer calls Skyfield.
+  Previously, `_pipeline_ecliptic` called `calc_true_lunar_node()` to
+  get a more precise distance value, which triggered a DE kernel download
+  (de440s.bsp at 31 MB or de441.bsp at 3.1 GB). Now uses the LEB-stored
+  distance directly. True Node distance is not used in astrological
+  calculations; longitude and latitude remain at full LEB precision.
+- In LEB mode, `get_planets()` tries locally-available lighter DE kernels
+  (de440s → de440 → de441) before downloading, and downloads only
+  de440s.bsp (31 MB) if none found — never the full tier kernel.
+
 ## [1.0.0a9] — 2026-04-02
 
 ### Added
