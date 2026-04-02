@@ -157,6 +157,7 @@ typecheck = {cmd = "leph code typecheck", help = "Type-check libephemeris (mypy)
 "test:compare:leb:full" = {cmd = "leph test compare leb-backend-full", help = "Compare vs pyswisseph via LEB backend (ALL tests)"}
 "test:compare:horizons" = {cmd = "leph test compare horizons-backend", help = "Compare vs pyswisseph via Horizons API (no @slow)"}
 "test:compare:horizons:full" = {cmd = "leph test compare horizons-backend-full", help = "Compare vs pyswisseph via Horizons API (ALL tests)"}
+"test:houses" = {cmd = "leph test compare houses", help = "Compare all 24 house systems vs pyswisseph with precision report"}
 
 # --- Coverage ---
 coverage = {cmd = "leph test coverage run", help = "Tests with coverage reports (no @slow)"}

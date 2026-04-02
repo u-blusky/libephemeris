@@ -2310,88 +2310,89 @@ def _houses_campanus(
     """
     Campanus (Prime Vertical) house system.
 
-    Divides the prime vertical (great circle through zenith and east/west points)
-    into 12 equal 30° arcs, then projects onto the ecliptic.
+    Divides the prime vertical (great circle through Zenith, East, Nadir, West)
+    into 12 equal 30° arcs, then projects onto the ecliptic via great circles
+    through the North and South points of the horizon.
 
-    Algorithm:
-        1. Divide prime vertical into 30° segments
-        2. For each segment, calculate azimuth and altitude
-        3. Transform to equatorial coordinates
-        4. Project to ecliptic longitude
+    Derivation from spherical trigonometry
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    The North point of the horizon (N) is the **pole** of the prime vertical
+    (PV), since it is exactly 90° from every point on the PV.
 
-    Mathematical Formulas:
-        Prime vertical offset: h_pv = 30°, 60°, 120°, 150°
+    For a division point D at angular offset *h* from the East point along the
+    PV (positive towards zenith, negative towards nadir), the house circle is
+    the great circle through N, D, and S.  Because N is the pole of the PV,
+    the distance ND = 90° and the house circle is perpendicular to the PV at D.
 
-        Prime vertical to hour angle transformation:
-            tan(H_eff) = tan(h_pv) · cos(φ)
-            (Adjust H_eff by +180° if h_pv > 90°)
+    The pole of this house circle lies on the PV at 90° from D.  Converting
+    the pole's horizontal coordinates (azimuth 270°, altitude 90° − h) to
+    equatorial gives:
 
-        Pole calculation:
-            tan(P) = tan(φ) · sin(H_eff)
+        pole_height  = arcsin(sin φ · cos h)
+        H_pole       = atan2(sin h,  cos h · cos φ)
 
-        Right Ascension offset:
-            R = ARMC + H_eff - 90°
+    The equator crossing of the house circle is at:
 
-        Ecliptic projection:
-            λ = atan2(cos(R), -(sin(R)·cos(ε) + tan(P)·sin(ε)))
+        RA_crossing  = ARMC + 90° − H_pole
+
+    Ecliptic longitude follows from _ra_to_ecliptic_longitude().
+
+    Ref: Smart, "Textbook on Spherical Astronomy", Ch. 3 (pole/great-circle
+         geometry); Meeus, "Astronomical Algorithms", Ch. 13 (coordinate
+         transforms).
 
     Args:
-        armc: Sidereal time at Greenwich (RAMC) in degrees
-        lat: Geographic latitude in degrees
-        eps: True obliquity of ecliptic in degrees
-        asc: Ascendant longitude in degrees
-        mc: Midheaven longitude in degrees
+        armc: Right Ascension of the Midheaven (RAMC) in degrees.
+        lat: Geographic latitude in degrees.
+        eps: True obliquity of the ecliptic in degrees.
+        asc: Ascendant longitude in degrees.
+        mc: Midheaven longitude in degrees.
 
     Returns:
-        List of 13 house cusp longitudes
+        List of 13 house cusp longitudes (index 0 unused).
     """
-    # Campanus
-    # House circles pass through North and South points of Horizon.
-    # They divide the Prime Vertical into 30 degree segments.
-    # We map the Prime Vertical division h to an Equatorial division H_eff.
-    # tan(H_eff) = tan(h) * cos(lat)
-
     cusps = _init_cardinal_cusps(asc, mc)
 
-    rad_lat = math.radians(lat)
-    rad_eps = math.radians(eps)
-    cos_lat = math.cos(rad_lat)
+    sin_lat = math.sin(math.radians(lat))
+    cos_lat = math.cos(math.radians(lat))
+    sin_eps = math.sin(math.radians(eps))
+    cos_eps = math.cos(math.radians(eps))
 
-    def calc_cusp(prime_vert_offset):
-        # prime_vert_offset: 30, 60, ...
-        h_pv_rad = math.radians(prime_vert_offset)
+    def _cusp_from_pv_offset(h_deg: float) -> float:
+        """Ecliptic longitude for a Campanus house circle at PV offset *h_deg*."""
+        h = math.radians(h_deg)
+        sin_h = math.sin(h)
+        cos_h = math.cos(h)
 
-        # Calculate H_eff
-        # tan(H_eff) = tan(h_pv) * cos(lat)
-        tan_h_eff = math.tan(h_pv_rad) * cos_lat
-        h_eff = math.atan(tan_h_eff)
+        # Pole height of the house circle (declination of the circle's pole)
+        pole_height = math.degrees(math.asin(
+            max(-1.0, min(1.0, sin_lat * cos_h))
+        ))
 
-        # Quadrant of H_eff should match h_pv?
-        # Yes, both in [0, 90] or [90, 180].
-        if prime_vert_offset > 90:
-            h_eff += math.pi
+        # Hour angle of the pole → RA of equator crossing
+        h_pole = math.degrees(math.atan2(sin_h, cos_h * cos_lat))
+        ra_crossing = armc + 90.0 - h_pole
 
-        # Now use Regiomontanus logic with H_eff
-        # tan(Pole) = tan(lat) * sin(H_eff)
-        sin_h_eff = math.sin(h_eff)
-        tan_pole = math.tan(rad_lat) * sin_h_eff
+        return _ra_to_ecliptic_longitude(ra_crossing, pole_height, sin_eps, cos_eps)
 
-        # R = RAMC + H_eff - 90
-        h_eff_deg = math.degrees(h_eff)
-        r_deg = (armc + h_eff_deg - 90.0) % 360.0
-        r_rad = math.radians(r_deg)
+    # Cusp mapping: angular offset from East point along prime vertical
+    #   +30° / +60° = above horizon (cusps 12, 11 — between ASC and MC)
+    #   −30° / −60° = below horizon (cusps  2,  3 — between ASC and IC)
+    cusps[12] = _cusp_from_pv_offset(30.0)
+    cusps[11] = _cusp_from_pv_offset(60.0)
+    cusps[2] = _cusp_from_pv_offset(-30.0)
+    cusps[3] = _cusp_from_pv_offset(-60.0)
 
-        # Flip signs for East intersection
-        num = math.cos(r_rad)
-        den = -(math.sin(r_rad) * math.cos(rad_eps) + tan_pole * math.sin(rad_eps))
-
-        lon = math.degrees(math.atan2(num, den))
-        return lon % 360.0
-
-    cusps[11] = calc_cusp(30)
-    cusps[12] = calc_cusp(60)
-    cusps[2] = calc_cusp(120)
-    cusps[3] = calc_cusp(150)
+    # Within the polar circle the Ascendant can flip to the western hemisphere.
+    # When that happens (AC − MC normalised to ±180° is negative) all non-IC
+    # cusps must be rotated by 180° to preserve clockwise house ordering.
+    if abs(lat) >= 90.0 - eps:
+        ac_mc = (asc - mc + 180.0) % 360.0 - 180.0  # normalise to −180..+180
+        if ac_mc < 0:
+            cusps[1] = (cusps[1] + 180.0) % 360.0  # ASC
+            cusps[10] = (cusps[10] + 180.0) % 360.0  # MC
+            for i in (11, 12, 2, 3):
+                cusps[i] = (cusps[i] + 180.0) % 360.0
 
     _set_opposite_cusps(cusps)
 

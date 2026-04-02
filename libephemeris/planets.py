@@ -772,7 +772,7 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         # Now try to calculate using the newly registered SPK
         return spk.calc_spk_body_position(t, ipl, iflag)
 
-    except (OSError, ValueError, KeyError, RuntimeError) as e:
+    except (OSError, ValueError, KeyError, RuntimeError, TypeError) as e:
         logger.warning("Auto SPK download failed for body %d: %s", ipl, e)
         return None
 
@@ -2142,6 +2142,34 @@ def _calc_body(
         result = _maybe_equatorial_convert(result, jd_tt, iflag & ~SEFLG_J2000)
         return _to_native_floats(result), iflag
 
+    # Handle White Moon (Selena), Vulcan, Proserpina, Waldemath — fictitious bodies (IDs 55-58)
+    # These are geocentric symbolic points computed in hypothetical.py.
+    # White Moon = Mean Lilith + 180° (ecliptic of date), same coordinate system as Mean Apogee.
+    if ipl in (SE_WHITE_MOON, SE_VULCAN, SE_PROSERPINA, SE_WALDEMATH):
+        from . import hypothetical
+
+        jd_tt = t.tt
+        is_sidereal = bool(iflag & SEFLG_SIDEREAL)
+
+        pos = hypothetical.calc_hypothetical_position(ipl, jd_tt)
+        lon, lat, dist = pos[0], pos[1], pos[2]
+        dlon, dlat, ddist = pos[3], pos[4], pos[5]
+
+        # These functions return mean ecliptic of date. Add nutation unless suppressed.
+        _sid_eq = is_sidereal and bool(iflag & SEFLG_EQUATORIAL)
+        if not (iflag & SEFLG_NONUT) and not _sid_eq:
+            from .cache import get_cached_nutation
+
+            dpsi_rad, _ = get_cached_nutation(jd_tt)
+            lon = (lon + math.degrees(dpsi_rad)) % 360.0
+
+        if is_sidereal and not (iflag & SEFLG_EQUATORIAL):
+            lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
+
+        result = (lon, lat, dist, dlon, dlat, ddist)
+        result = _maybe_equatorial_convert(result, jd_tt, iflag)
+        return _to_native_floats(result), iflag
+
     # Handle minor bodies (asteroids and TNOs)
     # Strategy: try to get a type21 VectorFunction target so we can route
     # through the Skyfield observe/apparent pipeline (same as planets).
@@ -2158,13 +2186,15 @@ def _calc_body(
         # First check if already registered
         _spk_type21_target = spk.get_spk_type21_target(ipl)
 
+        _auto_download_attempted = False
         if _spk_type21_target is None:
             # Not registered yet — try auto-download, then check again
             if get_auto_spk_download():
+                _auto_download_attempted = True
                 try:
                     # _try_auto_spk_download registers the SPK as a side effect
                     _try_auto_spk_download(t, ipl, iflag)
-                except (OSError, ValueError, KeyError, RuntimeError):
+                except (OSError, ValueError, KeyError, RuntimeError, TypeError):
                     pass
                 # Re-check after download
                 _spk_type21_target = spk.get_spk_type21_target(ipl)
@@ -2183,8 +2213,11 @@ def _calc_body(
 
             # In strict precision mode, require SPK for all downloadable bodies.
             # Bodies blocked from auto-download are exempt (no SPK obtainable).
+            # Also exempt bodies whose auto-download was attempted but failed
+            # (e.g. due to third-party library incompatibility) — allow
+            # Keplerian fallback rather than blocking the calculation entirely.
             if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
-                if ipl not in SPK_AUTO_DOWNLOAD_BLOCKED:
+                if ipl not in SPK_AUTO_DOWNLOAD_BLOCKED and not _auto_download_attempted:
                     horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
                     body_name = spk._get_body_name(ipl) or str(ipl)
                     raise SPKRequiredError.for_body(ipl, body_name, horizons_id)

@@ -486,6 +486,30 @@ def horizons_backend_full() -> None:
     )
 
 
+@compare_group.command(
+    "houses",
+    short_help="Compare all 24 house systems vs pyswisseph with precision report.",
+)
+def compare_houses() -> None:
+    """Compare all 24 house systems against pyswisseph.
+
+    Tests cusps, all 8 ASCMC values, houses_armc, house_pos, and sidereal
+    houses across 8 locations and 12 dates. Prints per-system precision report
+    showing max error for each value.
+
+    \b
+    Coverage:
+      - swe_houses: 24 systems × 8 locations × 12 dates (cusps + 8 ASCMC)
+      - swe_houses_armc: 24 systems × 12 ARMC × 4 latitudes
+      - swe_house_pos: 12 systems × 18 longitudes × 3 body latitudes
+      - swe_houses_ex sidereal: 8 systems × 3 ayanamshas × 6 dates
+    """
+    _pytest([
+        "compare_scripts/tests/test_houses_comprehensive.py",
+        "-v", "-s",
+    ])
+
+
 test_group.add_command(compare_group)
 
 
