@@ -1109,7 +1109,7 @@ wheels = [
 
 [[package]]
 name = "libephemeris"
-version = "1.0.0a11"
+version = "1.0.0a12"
 source = { editable = "." }
 dependencies = [
     { name = "astroquery" },
