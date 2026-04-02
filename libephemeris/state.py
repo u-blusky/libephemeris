@@ -300,6 +300,7 @@ def _discover_leb_file() -> Optional[str]:
     2. LEB2 legacy extension: ``~/.libephemeris/leb/{tier}_core.leb``
     3. LEB1 merged file in user data dir: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
     4. Bundled LEB2 core file shipped with the package (base tier only)
+    5. Auto-download LEB2 from GitHub Releases (in ``"auto"`` mode only)
 
     Returns:
         Path to the discovered LEB file, or None if not found.
@@ -332,6 +333,31 @@ def _discover_leb_file() -> Optional[str]:
     )
     if os.path.isfile(bundled_legacy):
         return bundled_legacy
+
+    # Auto-download LEB2 from GitHub Releases in "auto" mode.
+    # This gives new users fast LEB2-based calculations (~28 MB download)
+    # instead of falling through to Skyfield which downloads DE440 (~114 MB).
+    mode = get_calc_mode()
+    if mode == "auto":
+        logger = get_logger()
+        logger.info(
+            "No LEB file found for '%s' tier. Downloading LEB2 from GitHub Releases...",
+            tier,
+        )
+        try:
+            from .download import download_leb2_for_tier
+
+            downloaded = download_leb2_for_tier(
+                tier, quiet=False, show_progress=True, activate=False
+            )
+            if downloaded:
+                # Re-check — the download should have placed the file
+                leb2_core = os.path.join(leb_dir, f"{tier}_core.leb2")
+                if os.path.isfile(leb2_core):
+                    logger.info("LEB2 downloaded and ready: %s", leb2_core)
+                    return leb2_core
+        except Exception as e:
+            logger.warning("LEB2 auto-download failed: %s", e)
 
     return None
 

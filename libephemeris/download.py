@@ -64,142 +64,139 @@ def _is_valid_bsp(filepath: str) -> bool:
         return False
 
 
-# GitHub Releases URLs for data files
-GITHUB_RELEASES_BASE = (
+# GitHub Releases URL for data files (single unified release)
+GITHUB_RELEASES = (
     "https://github.com/g-battaglia/libephemeris/releases/download/data-v1"
-)
-GITHUB_RELEASES_V2 = (
-    "https://github.com/g-battaglia/libephemeris/releases/download/data-v2"
 )
 
 # Data file definitions: (filename, sha256 hash, description)
 DATA_FILES: dict[str, dict[str, Any]] = {
     # Legacy single file (kept for backward compatibility)
     "planet_centers.bsp": {
-        "url": f"{GITHUB_RELEASES_BASE}/planet_centers.bsp",
+        "url": f"{GITHUB_RELEASES}/planet_centers.bsp",
         "sha256": None,  # Will be set after first release
         "size_mb": 25.4,
         "description": "Precise planet center positions for Jupiter, Saturn, Uranus, Neptune, Pluto (1989-2049)",
     },
     # Tier-specific files
     "planet_centers_base.bsp": {
-        "url": f"{GITHUB_RELEASES_BASE}/planet_centers_base.bsp",
+        "url": f"{GITHUB_RELEASES}/planet_centers_base.bsp",
         "sha256": "a9ec744ff412b095129166587ea0814f81c850faebf92586a738cb5dc103c92a",
         "size_mb": 25.4,
         "description": "Planet centers for 'base' tier (1850-2150)",
     },
     "planet_centers_medium.bsp": {
-        "url": f"{GITHUB_RELEASES_BASE}/planet_centers_medium.bsp",
+        "url": f"{GITHUB_RELEASES}/planet_centers_medium.bsp",
         "sha256": "b4fd366f2d00958ee3dd4a8884164d339674d5f7f2ea25c5f6959705c2b66852",
         "size_mb": 72.6,
         "description": "Planet centers for 'medium' tier (1550-2650)",
     },
     "planet_centers_extended.bsp": {
-        "url": f"{GITHUB_RELEASES_BASE}/planet_centers_extended.bsp",
+        "url": f"{GITHUB_RELEASES}/planet_centers_extended.bsp",
         "sha256": "a07b046b89a9992fc7fda445b00e656341a3bab66a035adb8108de7d4bd69edc",
         "size_mb": 222.6,
         "description": "Planet centers for 'extended' tier (partial -12000 to +17000)",
     },
     # LEB (LibEphemeris Binary) precomputed ephemeris files
     "ephemeris_base.leb": {
-        "url": f"{GITHUB_RELEASES_BASE}/ephemeris_base.leb",
+        "url": f"{GITHUB_RELEASES}/ephemeris_base.leb",
         "sha256": "006073f4c1b7926b94fb9137322dc5dd0939d079a12fd81b42e771c5a1c9cb61",
         "size_mb": 53.1,
         "description": "LEB binary ephemeris for 'base' tier (1850-2150, ~14x speedup)",
     },
     "ephemeris_medium.leb": {
-        "url": f"{GITHUB_RELEASES_BASE}/ephemeris_medium.leb",
+        "url": f"{GITHUB_RELEASES}/ephemeris_medium.leb",
         "sha256": "dbd7239ac2aac96ce2dc33c322a5ff9bd9fd7b3d7ec5792cfba3250e6ab3b665",
         "size_mb": 174.6,
         "description": "LEB binary ephemeris for 'medium' tier (1550-2650, ~14x speedup)",
     },
     "ephemeris_extended.leb": {
-        "url": f"{GITHUB_RELEASES_BASE}/ephemeris_extended.leb",
+        "url": f"{GITHUB_RELEASES}/ephemeris_extended.leb",
         "sha256": "8f3d9ca0efac7c8616041c96efa63fa0c64f375e5a4671cb37c70f98f0193a27",
         "size_mb": 1603.6,
         "description": "LEB binary ephemeris for 'extended' tier (-5000 to +5000, ~14x speedup)",
     },
-    # LEB2 compressed modular files (data-v2 release)
+    # LEB2 compressed modular files
     # Core (14 bodies): Sun-Pluto, Earth, Mean/True Node, Mean Apogee
     "base_core.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/base_core.leb",
+        "url": f"{GITHUB_RELEASES}/base_core.leb2",
         "sha256": None,
         "size_mb": 8.7,
         "description": "LEB2 core bodies for 'base' tier (1850-2150)",
         "dest_subdir": "leb",
     },
     "base_asteroids.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/base_asteroids.leb",
+        "url": f"{GITHUB_RELEASES}/base_asteroids.leb2",
         "sha256": None,
         "size_mb": 7.3,
         "description": "LEB2 asteroids for 'base' tier (Chiron, Ceres, Pallas, Juno, Vesta)",
         "dest_subdir": "leb",
     },
     "base_apogee.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/base_apogee.leb",
+        "url": f"{GITHUB_RELEASES}/base_apogee.leb2",
         "sha256": None,
         "size_mb": 9.8,
         "description": "LEB2 apogee variants for 'base' tier (Oscu/Interp Apogee, Interp Perigee)",
         "dest_subdir": "leb",
     },
     "base_uranians.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/base_uranians.leb",
+        "url": f"{GITHUB_RELEASES}/base_uranians.leb2",
         "sha256": None,
         "size_mb": 1.9,
         "description": "LEB2 Uranian hypotheticals for 'base' tier (Cupido-Transpluto)",
         "dest_subdir": "leb",
     },
     "medium_core.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/medium_core.leb",
+        "url": f"{GITHUB_RELEASES}/medium_core.leb2",
         "sha256": None,
         "size_mb": 31.0,
         "description": "LEB2 core bodies for 'medium' tier (1550-2650)",
         "dest_subdir": "leb",
     },
     "medium_asteroids.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/medium_asteroids.leb",
+        "url": f"{GITHUB_RELEASES}/medium_asteroids.leb2",
         "sha256": None,
         "size_mb": 25.0,
         "description": "LEB2 asteroids for 'medium' tier",
         "dest_subdir": "leb",
     },
     "medium_apogee.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/medium_apogee.leb",
+        "url": f"{GITHUB_RELEASES}/medium_apogee.leb2",
         "sha256": None,
         "size_mb": 35.0,
         "description": "LEB2 apogee variants for 'medium' tier",
         "dest_subdir": "leb",
     },
     "medium_uranians.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/medium_uranians.leb",
+        "url": f"{GITHUB_RELEASES}/medium_uranians.leb2",
         "sha256": None,
         "size_mb": 8.1,
         "description": "LEB2 Uranian hypotheticals for 'medium' tier",
         "dest_subdir": "leb",
     },
     "extended_core.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/extended_core.leb",
+        "url": f"{GITHUB_RELEASES}/extended_core.leb2",
         "sha256": None,
         "size_mb": 264.0,
         "description": "LEB2 core bodies for 'extended' tier (-5000 to +5000)",
         "dest_subdir": "leb",
     },
     "extended_asteroids.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/extended_asteroids.leb",
+        "url": f"{GITHUB_RELEASES}/extended_asteroids.leb2",
         "sha256": None,
         "size_mb": 79.0,
         "description": "LEB2 asteroids for 'extended' tier",
         "dest_subdir": "leb",
     },
     "extended_apogee.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/extended_apogee.leb",
+        "url": f"{GITHUB_RELEASES}/extended_apogee.leb2",
         "sha256": None,
         "size_mb": 320.0,
         "description": "LEB2 apogee variants for 'extended' tier",
         "dest_subdir": "leb",
     },
     "extended_uranians.leb2": {
-        "url": f"{GITHUB_RELEASES_V2}/extended_uranians.leb",
+        "url": f"{GITHUB_RELEASES}/extended_uranians.leb2",
         "sha256": None,
         "size_mb": 71.0,
         "description": "LEB2 Uranian hypotheticals for 'extended' tier",
