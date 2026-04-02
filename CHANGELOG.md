@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0a13] — 2026-04-02
 
+### Performance
+
+#### `reset_session()` — 1750x faster consecutive calculations
+
+New lightweight state reset function that preserves file handles, LRU caches,
+LEB reader, and Skyfield timescale across consecutive calculations. Only resets
+per-calculation state (topo, sidereal mode, angles cache). Consecutive
+`build_subject()` calls drop from ~3500ms to ~2ms.
+
+#### `set_ephe_path()` idempotent
+
+When called with an unchanged path, `set_ephe_path()` is now a no-op — no
+file handles are closed and no caches are cleared. Eliminates redundant
+teardown when the same path is set repeatedly (common in kerykeion's
+`ephemeris_context()`).
+
+#### LEB2 v2 chunked format — 33x faster cold start
+
+New LEB2 file format version that splits each body's Chebyshev coefficients
+into 10-year temporal chunks, each compressed independently. On first access,
+only the ~300 KB chunk containing the requested JD is decompressed instead of
+the entire body (up to 307 MB for Moon). Cold-start decompression drops from
+1568ms (v1) to 47ms (v2). The reader transparently supports both v1 and v2.
+
+The bundled `base_core.leb2` is regenerated in v2 format.
+
+#### `madvise(MADV_WILLNEED)` on LEB reader open
+
+Both LEB1 and LEB2 readers now issue `madvise(MADV_WILLNEED)` after
+`mmap.mmap()` to hint the OS to pre-load pages in the background.
+
 ### Fixed
 
 - **Occultation search range clamping**: `lun_occult_when_glob()` now clamps

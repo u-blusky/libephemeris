@@ -208,6 +208,49 @@ Key commands ([full list](docs/development/testing.md)):
 
 ---
 
+## Performance Optimizations (v1.0.0a13+)
+
+### `reset_session()` — lightweight state reset
+
+Resets only per-calculation state (topo, sidereal mode, angles cache) without closing
+file handles or clearing LRU caches. Use between independent calculations to avoid the
+full teardown cost of `close()`.
+
+```python
+import libephemeris as swe
+
+swe.calc_ut(jd1, swe.SE_SUN, flags)  # First calculation
+swe.reset_session()                    # Reset topo/sidereal, keep reader alive
+swe.calc_ut(jd2, swe.SE_SUN, flags)  # Reuses LEB reader, timescale, caches
+```
+
+**Impact**: Consecutive calculations drop from ~3500ms to ~2ms (1750x speedup).
+
+### `set_ephe_path()` idempotent
+
+When called with the same path, `set_ephe_path()` is now a no-op — no file handles are
+closed and no caches are cleared. Previously, every call triggered a full teardown.
+
+### LEB2 v2 chunked format
+
+LEB2 files now use 10-year temporal chunks instead of monolithic per-body compression.
+Only the chunk containing the requested Julian Day is decompressed (~300 KB for Moon
+instead of 307 MB). The reader transparently supports both v1 (legacy) and v2 (chunked).
+
+**Impact**: Cold-start decompression drops from 1568ms to 47ms (33x speedup).
+
+Generate v2 files from LEB1 sources:
+```bash
+python scripts/generate_leb2.py convert ephemeris_extended.leb -o extended_core.leb2 --group core
+```
+
+### `madvise(MADV_WILLNEED)`
+
+LEB1 and LEB2 readers issue `madvise(MADV_WILLNEED)` on `mmap.mmap()` to hint the OS
+to pre-load pages in the background, reducing cold-start latency.
+
+---
+
 ## License
 
 AGPL-3.0. See [LICENSE](LICENSE).
