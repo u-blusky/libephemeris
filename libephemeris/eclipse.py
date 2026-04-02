@@ -35,6 +35,7 @@ import math
 from typing import Sequence, Tuple, Union
 
 import numpy as np
+from skyfield.errors import EphemerisRangeError
 from .constants import (
     SE_SUN,
     SE_MOON,
@@ -6172,13 +6173,17 @@ def lun_occult_when_glob(
     search_limit = MAX_SEARCH_YEARS * 365.25
     jd_cursor = jd_start
 
+    # Clamp search to the loaded DE kernel range to avoid EphemerisRangeError
+    _eph_jd_min = min(seg.spk_segment.start_jd for seg in eph.segments)
+    _eph_jd_max = min(seg.spk_segment.end_jd for seg in eph.segments)
+
     while abs(jd_cursor - jd_start) < search_limit:
         chunk_end = jd_cursor + direction * _SCAN_CHUNK * _SCAN_STEP
         # Clamp to search boundary
         if direction > 0:
-            chunk_end = min(chunk_end, jd_start + search_limit)
+            chunk_end = min(chunk_end, jd_start + search_limit, _eph_jd_max)
         else:
-            chunk_end = max(chunk_end, jd_start - search_limit)
+            chunk_end = max(chunk_end, jd_start - search_limit, _eph_jd_min)
 
         chunk_jds = np.arange(jd_cursor, chunk_end, direction * _SCAN_STEP)
         if len(chunk_jds) == 0:
@@ -6516,6 +6521,12 @@ def lun_occult_when_loc(
                 f"No lunar occultation of {'star ' + star_name if planet == 0 else 'planet ' + str(planet)} "
                 f"visible from lat={lat}, lon={lon} "
                 f"within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+            )
+        except EphemerisRangeError:
+            raise RuntimeError(
+                f"No lunar occultation of {'star ' + star_name if planet == 0 else 'planet ' + str(planet)} "
+                f"visible from lat={lat}, lon={lon} "
+                f"within ephemeris range (search from JD {jd_start})"
             )
 
         # Extract times using reference API indices:

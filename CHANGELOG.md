@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0a13] — 2026-04-02
+
+### Fixed
+
+- **Occultation search range clamping**: `lun_occult_when_glob()` now clamps
+  the batch scan to the loaded DE kernel's JD range, preventing
+  `EphemerisRangeError` when the search window exceeds the ephemeris coverage
+  (e.g. DE440s: 1849–2150).
+- **`lun_occult_when_loc()` graceful termination**: catches
+  `EphemerisRangeError` from `lun_occult_when_glob()` and converts it to a
+  `RuntimeError`, matching the existing "no event found" behavior instead of
+  crashing.
+
 ## [1.0.0a12] — 2026-04-02
 
 ### Performance
