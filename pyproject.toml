@@ -3,7 +3,7 @@ name = "libephemeris"
 version = "1.0.0a13"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [
@@ -32,11 +32,9 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
 
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Astronomy",
     "Topic :: Scientific/Engineering :: Physics",
     "Typing :: Typed",
@@ -50,7 +48,7 @@ dependencies = [
     "spktype21>=0.1.0",  # Support for SPK type 21 files from JPL Horizons (asteroids, comets)
     "pyerfa>=2.0.0",  # IAU ERFA: high-precision nutation (IAU 2006/2000A), obliquity, precession, aberration
     "zstandard>=0.22.0",  # Zstandard compression for LEB2 compressed ephemeris format
-    "tomli>=1.1.0; python_version < '3.11'",  # TOML parser for config files (stdlib on 3.11+)
+    # tomllib is in stdlib since 3.11, no longer needed with >=3.12
 ]
 
 [project.optional-dependencies]
@@ -189,7 +187,7 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.12"
 warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
@@ -199,7 +197,7 @@ exclude = ["compare_scripts"]
 
 [tool.black]
 line-length = 88
-target-version = ["py39"]
+target-version = ["py312"]
 include = '\.pyi?$'
 extend-exclude = '''
 /(
