@@ -370,7 +370,9 @@ class TestGetPlanetsLogging:
             logger.propagate = True
             with patch.object(state, "get_loader", return_value=mock_loader):
                 # Mock os.path.exists to return False for all paths (force download path)
-                with patch("os.path.exists", return_value=False):
+                # Force non-LEB calc mode so we hit the standard download branch
+                with patch("os.path.exists", return_value=False), \
+                     patch.object(state, "get_calc_mode", return_value="auto"):
                     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
                         state.get_planets()
 
@@ -410,7 +412,9 @@ class TestGetPlanetsLogging:
             logger.propagate = True
             with patch.object(state, "get_loader", return_value=mock_loader):
                 # Mock os.path.exists to return False (force download path)
-                with patch("os.path.exists", return_value=False):
+                # Force non-LEB calc mode so we hit the standard download branch
+                with patch("os.path.exists", return_value=False), \
+                     patch.object(state, "get_calc_mode", return_value="auto"):
                     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
                         state.get_planets()
 
