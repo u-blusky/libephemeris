@@ -1081,8 +1081,20 @@ def init_all(
         )
         print()
 
+    from .constants import SPK_AUTO_DOWNLOAD_BLOCKED
+
     for body_idx, (ipl, (horizons_id, naif_id)) in enumerate(SPK_BODY_NAME_MAP.items()):
         body_name = _get_body_name(ipl) or f"body_{ipl}"
+
+        # Skip bodies where JPL blocks SPK generation
+        if ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
+            if not quiet:
+                print(
+                    f"  [{body_idx + 1}/{total_bodies}] {body_name} "
+                    f"— skipped ({SPK_AUTO_DOWNLOAD_BLOCKED[ipl].split('.')[0]})"
+                )
+            result.setdefault("spk_blocked", []).append(body_name)
+            continue
 
         if not quiet:
             print(

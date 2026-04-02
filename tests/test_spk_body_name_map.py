@@ -47,9 +47,12 @@ from libephemeris.constants import (
     NAIF_ASTEROID_OFFSET,
     # Mapping and functions
     SPK_BODY_NAME_MAP,
+    SPK_AUTO_DOWNLOAD_BLOCKED,
+    REQUIRED_SPK_BODIES,
     get_horizons_id,
     get_naif_id_from_ipl,
     get_spk_body_info_from_map,
+    is_spk_auto_download_blocked,
 )
 
 
@@ -369,3 +372,51 @@ class TestHorizonsIdFormat:
             assert horizons_id == expected_id, (
                 f"Horizons ID for ipl={ipl}: expected '{expected_id}', got '{horizons_id}'"
             )
+
+
+class TestSpkAutoDownloadBlocked:
+    """Verify the SPK_AUTO_DOWNLOAD_BLOCKED constant and helper."""
+
+    def test_bennu_is_blocked(self):
+        """Bennu is in the blocked set."""
+        assert SE_BENNU in SPK_AUTO_DOWNLOAD_BLOCKED
+        assert is_spk_auto_download_blocked(SE_BENNU)
+
+    def test_blocked_bodies_are_in_name_map(self):
+        """All blocked bodies must also be in SPK_BODY_NAME_MAP."""
+        for ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
+            assert ipl in SPK_BODY_NAME_MAP, (
+                f"Body {ipl} is in SPK_AUTO_DOWNLOAD_BLOCKED but not SPK_BODY_NAME_MAP"
+            )
+
+    def test_blocked_bodies_not_in_required(self):
+        """Blocked bodies must not be in REQUIRED_SPK_BODIES."""
+        for ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
+            assert ipl not in REQUIRED_SPK_BODIES, (
+                f"Body {ipl} is blocked but also in REQUIRED_SPK_BODIES"
+            )
+
+    def test_is_spk_downloadable_returns_false_for_blocked(self):
+        """is_spk_downloadable() returns False for blocked bodies."""
+        from libephemeris.minor_bodies import is_spk_downloadable
+
+        for ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
+            assert not is_spk_downloadable(ipl), (
+                f"is_spk_downloadable should return False for blocked body {ipl}"
+            )
+
+    def test_get_horizons_id_still_works_for_blocked(self):
+        """Blocked bodies still have valid Horizons IDs for manual use."""
+        for ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
+            assert get_horizons_id(ipl) is not None
+
+    def test_non_blocked_body_returns_false(self):
+        """Non-blocked body returns False from helper."""
+        assert not is_spk_auto_download_blocked(SE_CHIRON)
+
+    def test_exported_from_package(self):
+        """SPK_AUTO_DOWNLOAD_BLOCKED is exported from libephemeris."""
+        assert hasattr(eph, "SPK_AUTO_DOWNLOAD_BLOCKED")
+        assert eph.SPK_AUTO_DOWNLOAD_BLOCKED is SPK_AUTO_DOWNLOAD_BLOCKED
+        assert hasattr(eph, "is_spk_auto_download_blocked")
+        assert eph.is_spk_auto_download_blocked is is_spk_auto_download_blocked

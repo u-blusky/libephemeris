@@ -110,4 +110,4 @@ pos, _ = swe.calc_ut(2460000.0, swe.SE_CHIRON, 0)
 
 Fallback chain: SPK kernel > auto-download > REBOUND/ASSIST > Keplerian propagation.
 
-See [REBOUND integration](methodology/rebound-integration.md) for n-body details.
+See [Optional Modules and Calculation Backends](optional-modules.md) for details on the fallback chain, ASSIST n-body integration, and known limitations (e.g., Bennu).

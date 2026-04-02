@@ -732,13 +732,17 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         directly with JPL Horizons API via HTTP. No astroquery dependency.
     """
     from . import spk
-    from .constants import SPK_BODY_NAME_MAP
+    from .constants import SPK_AUTO_DOWNLOAD_BLOCKED, SPK_BODY_NAME_MAP
     from .logging_config import get_logger
 
     logger = get_logger()
 
     # Check if this body is in the SPK download map
     if ipl not in SPK_BODY_NAME_MAP:
+        return None
+
+    # Skip bodies where JPL blocks SPK generation
+    if ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
         return None
 
     horizons_id, naif_id = SPK_BODY_NAME_MAP[ipl]
@@ -2148,7 +2152,7 @@ def _calc_body(
         from . import spk
         from .state import get_auto_spk_download, get_strict_precision
         from .exceptions import SPKRequiredError
-        from .constants import SPK_BODY_NAME_MAP
+        from .constants import SPK_AUTO_DOWNLOAD_BLOCKED, SPK_BODY_NAME_MAP
         from .logging_config import get_logger
 
         # First check if already registered
@@ -2178,10 +2182,12 @@ def _calc_body(
                 return _to_native_floats(spk_result), iflag
 
             # In strict precision mode, require SPK for all downloadable bodies.
+            # Bodies blocked from auto-download are exempt (no SPK obtainable).
             if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
-                horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
-                body_name = spk._get_body_name(ipl) or str(ipl)
-                raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
+                if ipl not in SPK_AUTO_DOWNLOAD_BLOCKED:
+                    horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
+                    body_name = spk._get_body_name(ipl) or str(ipl)
+                    raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
 
             jd_tt = t.tt
 

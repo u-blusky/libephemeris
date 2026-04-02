@@ -28,9 +28,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # JPL Horizons maximum SPK date range for minor bodies
 MAX_START = "1600-01-01"
 MAX_END = "2500-01-01"
-EXPECTED_SKIPPED_BODIES = {
-    "bennu": "JPL blocks SPK generation; local Keplerian fallback is expected.",
-}
+
+
+def _build_expected_skipped() -> dict[str, str]:
+    """Derive name-keyed skip dict from SPK_AUTO_DOWNLOAD_BLOCKED."""
+    from libephemeris.constants import SPK_AUTO_DOWNLOAD_BLOCKED, SPK_BODY_NAME_MAP
+    from libephemeris.spk import _get_body_name
+
+    result: dict[str, str] = {}
+    for ipl, reason in SPK_AUTO_DOWNLOAD_BLOCKED.items():
+        if ipl in SPK_BODY_NAME_MAP:
+            horizons_id = SPK_BODY_NAME_MAP[ipl][0]
+            key = horizons_id.rstrip(";").lower()
+        else:
+            name = _get_body_name(ipl) or str(ipl)
+            key = name.lower()
+        result[key] = reason
+    return result
 
 
 def _get_all_bodies() -> list[tuple[str, str, int, int]]:
@@ -143,6 +157,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    EXPECTED_SKIPPED_BODIES = _build_expected_skipped()
     all_bodies = _get_all_bodies()
 
     # Filter bodies if requested

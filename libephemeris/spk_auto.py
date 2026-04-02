@@ -1853,6 +1853,8 @@ def ensure_all_ephemerides(
         end_date,
     )
 
+    from .constants import SPK_AUTO_DOWNLOAD_BLOCKED
+
     for ipl, (horizons_id, naif_id) in SPK_BODY_NAME_MAP.items():
         body_name = spk._get_body_name(ipl) or horizons_id
         processed += 1
@@ -1864,6 +1866,13 @@ def ensure_all_ephemerides(
                 f"\r  SPK files: [{processed}/{total_spks}] {pct}% - {body_name:<20s}"
             )
             sys.stdout.flush()
+
+        # Skip bodies where JPL blocks SPK generation
+        if ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
+            spk_results[body_name] = f"fallback ({SPK_AUTO_DOWNLOAD_BLOCKED[ipl]})"
+            summary.setdefault("fallback", 0)
+            summary["fallback"] += 1
+            continue
 
         # Check if already registered
         if ipl in state._SPK_BODY_MAP and not force_download:

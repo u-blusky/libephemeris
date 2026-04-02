@@ -1233,6 +1233,8 @@ __all__ = [
     "get_spk_date_padding",
     # SPK body name mapping
     "SPK_BODY_NAME_MAP",
+    "SPK_AUTO_DOWNLOAD_BLOCKED",
+    "is_spk_auto_download_blocked",
     "get_horizons_id",
     "get_naif_id_from_ipl",
     "get_spk_body_info_from_map",

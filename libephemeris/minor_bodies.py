@@ -3100,7 +3100,8 @@ def is_spk_downloadable(body_id: int) -> bool:
     downloaded. Bodies in JPL's major body index are downloaded using the
     name syntax (e.g., "Ceres;") which bypasses the restriction.
 
-    Additionally, any body in SPK_BODY_NAME_MAP (constants.py) is downloadable.
+    Additionally, any body in SPK_BODY_NAME_MAP (constants.py) is downloadable,
+    unless it appears in SPK_AUTO_DOWNLOAD_BLOCKED (e.g., Bennu).
 
     Args:
         body_id: Minor body identifier (SE_CERES, SE_CHIRON, etc.)
@@ -3110,14 +3111,16 @@ def is_spk_downloadable(body_id: int) -> bool:
 
     Example:
         >>> from libephemeris.minor_bodies import is_spk_downloadable
-        >>> from libephemeris.constants import SE_CERES, SE_CHIRON
+        >>> from libephemeris.constants import SE_CERES, SE_BENNU
         >>> is_spk_downloadable(SE_CERES)
         True
-        >>> is_spk_downloadable(SE_CHIRON)
-        True
+        >>> is_spk_downloadable(SE_BENNU)
+        False
     """
-    from .constants import SPK_BODY_NAME_MAP
+    from .constants import SPK_AUTO_DOWNLOAD_BLOCKED, SPK_BODY_NAME_MAP
 
+    if body_id in SPK_AUTO_DOWNLOAD_BLOCKED:
+        return False
     return body_id in SPK_DOWNLOADABLE_ASTEROIDS or body_id in SPK_BODY_NAME_MAP
 
 

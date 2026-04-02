@@ -291,6 +291,9 @@ NAIF_RYUGU: int = 2162173  # 162173 Ryugu (Apollo asteroid)
 #   (horizons_id: str, naif_id: int)
 # where horizons_id is the identifier used in JPL Horizons queries (typically
 # the asteroid catalog number), and naif_id is the NAIF SPICE ID.
+#
+# Note: Some bodies in this map cannot be auto-downloaded from JPL Horizons.
+# See SPK_AUTO_DOWNLOAD_BLOCKED below for the list and reasons.
 
 SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
     SE_CHIRON: ("2060", NAIF_CHIRON),  # 2060 Chiron (centaur)
@@ -419,6 +422,44 @@ def get_spk_body_info_from_map(ipl: int) -> tuple[str, int] | None:
         ('136199', 2136199)
     """
     return SPK_BODY_NAME_MAP.get(ipl)
+
+
+# =============================================================================
+# SPK AUTO-DOWNLOAD BLOCKED BODIES
+# =============================================================================
+# Bodies that are in SPK_BODY_NAME_MAP (they have valid Horizons/NAIF IDs and
+# can accept manually-registered mission-specific kernels) but for which JPL
+# Horizons blocks automatic SPK generation.
+#
+# At runtime these bodies skip the auto-download attempt and the strict-
+# precision check, allowing the fallback chain (ASSIST / Keplerian) to proceed.
+#
+# The dict maps SE_* body ID -> human-readable reason string.
+# Adding a new body is a one-line change.
+
+SPK_AUTO_DOWNLOAD_BLOCKED: dict[int, str] = {
+    SE_BENNU: (
+        "JPL Horizons blocks SPK generation for Bennu. "
+        "Use ASSIST n-body or register a mission-specific kernel "
+        "(e.g. bennu_refdrmc_v1.bsp from OSIRIS-REx)."
+    ),
+}
+
+
+def is_spk_auto_download_blocked(ipl: int) -> bool:
+    """Return True if JPL Horizons blocks SPK generation for this body.
+
+    Bodies in this set are still in SPK_BODY_NAME_MAP (they have valid
+    Horizons/NAIF identifiers for manual registration) but cannot be
+    auto-downloaded via the standard Horizons SPK generation path.
+
+    Args:
+        ipl: libephemeris body ID (e.g., SE_BENNU)
+
+    Returns:
+        True if auto-download is blocked for this body.
+    """
+    return ipl in SPK_AUTO_DOWNLOAD_BLOCKED
 
 
 # =============================================================================

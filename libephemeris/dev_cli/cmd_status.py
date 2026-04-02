@@ -9,7 +9,7 @@ from typing import Any
 import click
 
 from .. import __version__
-from ..constants import SE_BENNU
+from ..constants import SPK_AUTO_DOWNLOAD_BLOCKED
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _LEB1_DIR = _PROJECT_ROOT / "data" / "leb"
@@ -51,9 +51,7 @@ _PLANET_CENTER_SOURCE_FILES = {
     ],
 }
 _EXTENDED_SPK_RANGE = ("1600-01-01", "2500-01-01")
-_EXPECTED_SPK_FALLBACKS = {
-    SE_BENNU: "JPL blocks SPK generation; Keplerian fallback is expected.",
-}
+_EXPECTED_SPK_FALLBACKS = SPK_AUTO_DOWNLOAD_BLOCKED
 
 
 def _display_body_name(name: str) -> str:
