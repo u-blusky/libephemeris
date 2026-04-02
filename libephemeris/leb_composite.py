@@ -176,6 +176,10 @@ class CompositeLEBReader:
             raise KeyError(f"Body {body_id} not in any LEB file")
         return self._body_map[body_id].eval_body(body_id, jd)
 
+    def has_nutation(self) -> bool:
+        """Return True if any constituent LEB file contains nutation data."""
+        return self._nutation_reader is not None
+
     def eval_nutation(self, jd_tt: float) -> Tuple[float, float]:
         if self._nutation_reader is None:
             raise ValueError("No nutation data in any LEB file")

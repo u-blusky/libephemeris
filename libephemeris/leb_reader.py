@@ -371,6 +371,10 @@ class LEBReader:
 
         return result  # type: ignore[return-value]
 
+    def has_nutation(self) -> bool:
+        """Return True if this LEB file contains nutation data."""
+        return self._nutation is not None
+
     def eval_nutation(self, jd_tt: float) -> Tuple[float, float]:
         """Evaluate nutation angles at a given Julian Day.
 

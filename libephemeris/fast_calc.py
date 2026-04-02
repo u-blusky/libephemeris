@@ -562,6 +562,198 @@ def _get_precession_matrix(
     )
 
 
+# =============================================================================
+# PURE-LEB FRAME DATA (no Skyfield dependency)
+# =============================================================================
+# IAU 2006 Fukushima-Williams precession polynomials (IERS 2010 Table 5.1)
+# combined with LEB-stored IAU 2006/2000A nutation to build the full
+# bias-precession-nutation matrix without any Skyfield or erfa calls.
+
+_AS2R = math.pi / (180.0 * 3600.0)  # arcseconds to radians
+_J2000 = 2451545.0
+_CENTURY = 36525.0
+
+
+def _iau2006_precession_angles(
+    jd_tt: float,
+) -> Tuple[float, float, float, float]:
+    """IAU 2006 Fukushima-Williams precession angles.
+
+    Equivalent to erfa.pfw06. Returns (gamb, phib, psib, epsa) in radians.
+    """
+    T = (jd_tt - _J2000) / _CENTURY
+    gamb = (
+        -0.052928
+        + (
+            10.556378
+            + (0.4932044 + (-0.00031238 + (-0.000002788 + 0.0000000260 * T) * T) * T)
+            * T
+        )
+        * T
+    ) * _AS2R
+    phib = (
+        84381.412819
+        + (
+            -46.811016
+            + (0.0511268 + (0.00053289 + (-0.000000440 - 0.0000000176 * T) * T) * T) * T
+        )
+        * T
+    ) * _AS2R
+    psib = (
+        -0.041775
+        + (
+            5038.481484
+            + (1.5584175 + (-0.00018522 + (-0.000026452 - 0.0000000148 * T) * T) * T)
+            * T
+        )
+        * T
+    ) * _AS2R
+    epsa = (
+        84381.406
+        + (
+            -46.836769
+            + (-0.0001831 + (0.00200340 + (-0.000000576 - 0.0000000434 * T) * T) * T)
+            * T
+        )
+        * T
+    ) * _AS2R
+    return gamb, phib, psib, epsa
+
+
+def _fw2m(
+    gamb: float, phib: float, psi: float, eps: float
+) -> Tuple[Tuple[float, float, float], ...]:
+    """Fukushima-Williams angles to BPN rotation matrix.
+
+    Computes R = R1(-eps) x R3(-psi) x R1(phib) x R3(gamb).
+    Equivalent to erfa.fw2m / SOFA iauFw2m.
+    """
+    sg = math.sin(gamb)
+    cg = math.cos(gamb)
+    sp = math.sin(phib)
+    cp = math.cos(phib)
+    ss = math.sin(psi)
+    cs = math.cos(psi)
+    se = math.sin(eps)
+    ce = math.cos(eps)
+
+    # BA = R1(phib) x R3(gamb)
+    ba10 = -sg * cp
+    ba11 = cg * cp
+    ba20 = sg * sp
+    ba21 = -cg * sp
+
+    # CBA = R3(-psi) x BA
+    cba00 = cs * cg + ss * sg * cp
+    cba01 = cs * sg - ss * cg * cp
+    cba02 = -ss * sp
+    cba10 = ss * cg - cs * sg * cp
+    cba11 = ss * sg + cs * cg * cp
+    cba12 = cs * sp
+
+    # DCBA = R1(-eps) x CBA
+    return (
+        (cba00, cba01, cba02),
+        (ce * cba10 - se * ba20, ce * cba11 - se * ba21, ce * cba12 - se * cp),
+        (se * cba10 + ce * ba20, se * cba11 + ce * ba21, se * cba12 + ce * cp),
+    )
+
+
+# Thread-local cache for _get_leb_frame_data (keyed by exact jd_tt float).
+# Using a plain dict + maxsize check is faster than @lru_cache for this
+# because the reader argument makes lru_cache less efficient.
+_leb_frame_cache: Dict[float, Tuple] = {}
+_LEB_FRAME_CACHE_MAX = 64
+
+
+def _get_leb_frame_data(
+    reader: "LEBReader",
+    jd_tt: float,
+) -> Tuple[
+    Tuple[Tuple[float, float, float], ...],
+    float,
+    float,
+    float,
+]:
+    """Get precession-nutation matrix and nutation angles from LEB data.
+
+    Pure-Python replacement for _get_skyfield_frame_data() that uses
+    LEB-stored nutation Chebyshev coefficients and IAU 2006 precession
+    polynomials. No Skyfield or erfa calls.
+
+    Args:
+        reader: LEBReader or LEB2Reader with nutation data.
+        jd_tt: Julian Day in TT.
+
+    Returns:
+        Same (pn_mat, dpsi, deps, eps_true_rad) as _get_skyfield_frame_data.
+    """
+    cached = _leb_frame_cache.get(jd_tt)
+    if cached is not None:
+        return cached
+
+    # Nutation from LEB Chebyshev (~1.5 µs)
+    dpsi, deps = reader.eval_nutation(jd_tt)
+
+    # Precession angles from IAU 2006 polynomials (~1 µs)
+    gamb, phib, psib, epsa = _iau2006_precession_angles(jd_tt)
+
+    # True obliquity
+    eps_true_rad = epsa + deps
+
+    # Build bias-precession-nutation matrix
+    pn_mat = _fw2m(gamb, phib, psib + dpsi, eps_true_rad)
+
+    result = (pn_mat, dpsi, deps, eps_true_rad)
+
+    # Cache with bounded size
+    if len(_leb_frame_cache) >= _LEB_FRAME_CACHE_MAX:
+        _leb_frame_cache.clear()
+    _leb_frame_cache[jd_tt] = result
+
+    return result
+
+
+def _get_leb_precession_matrix(
+    jd_tt: float,
+) -> Tuple[Tuple[float, float, float], ...]:
+    """Get mean-equator-of-date precession matrix (pure Python).
+
+    Equivalent to _get_precession_matrix() but without Skyfield.
+    Uses IAU 2006 Fukushima-Williams angles with zero nutation.
+    """
+    gamb, phib, psib, epsa = _iau2006_precession_angles(jd_tt)
+    return _fw2m(gamb, phib, psib, epsa)
+
+
+# Module-level reference to the active reader for frame data dispatch.
+# Set by _fast_calc_core() at the start of each calculation. This avoids
+# threading the reader argument through every coordinate-transform helper.
+_active_reader: Optional["LEBReader"] = None
+_active_reader_has_nutation: bool = False
+
+
+def _frame_data(
+    jd_tt: float,
+) -> Tuple[Tuple[Tuple[float, float, float], ...], float, float, float]:
+    """Get frame data from LEB (fast) or Skyfield (fallback).
+
+    Uses the module-level _active_reader set by _fast_calc_core().
+    """
+    if _active_reader_has_nutation:
+        return _get_leb_frame_data(_active_reader, jd_tt)  # type: ignore[arg-type]
+    return _get_skyfield_frame_data(jd_tt)
+
+
+def _prec_matrix(
+    jd_tt: float,
+) -> Tuple[Tuple[float, float, float], ...]:
+    """Get precession matrix from pure Python (fast) or Skyfield (fallback)."""
+    if _active_reader_has_nutation:
+        return _get_leb_precession_matrix(jd_tt)
+    return _get_precession_matrix(jd_tt)
+
+
 def _mat3_vec3(
     mat: Tuple[Tuple[float, float, float], ...],
     vec: Tuple[float, float, float],
@@ -894,7 +1086,7 @@ def _pipeline_icrs(
     elif (iflag & SEFLG_EQUATORIAL) and _is_sidereal:
         # Sidereal equatorial of date: use MEAN equator (P matrix, no nutation)
         # Pyswisseph uses the precession-only frame for SID+EQ output.
-        p_mat = _get_precession_matrix(jd_tt)
+        p_mat = _prec_matrix(jd_tt)
         geo_eq = _mat3_vec3(p_mat, geo)
         lon_deg, lat_deg, dist = _cartesian_to_spherical(
             geo_eq[0], geo_eq[1], geo_eq[2]
@@ -912,7 +1104,7 @@ def _pipeline_icrs(
 
     elif iflag & SEFLG_EQUATORIAL:
         # True equator of date (non-sidereal)
-        pn_mat, _, _, _ = _get_skyfield_frame_data(jd_tt)
+        pn_mat, _, _, _ = _frame_data(jd_tt)
         geo_eq = _mat3_vec3(pn_mat, geo)
         lon_deg, lat_deg, dist = _cartesian_to_spherical(
             geo_eq[0], geo_eq[1], geo_eq[2]
@@ -946,7 +1138,7 @@ def _pipeline_icrs(
     else:
         # TRUE ECLIPTIC OF DATE (default) -- most common path
         # Get PNM matrix and true obliquity from Skyfield (IAU 2000A)
-        pn_mat, _, _, eps_true_rad = _get_skyfield_frame_data(jd_tt)
+        pn_mat, _, _, eps_true_rad = _frame_data(jd_tt)
 
         # Step 1: Precess ICRS -> equatorial of date
         geo_eq = _mat3_vec3(pn_mat, geo)
@@ -1035,14 +1227,14 @@ def _pipeline_ecliptic(
         # Mean bodies are stored without nutation.  Add dpsi for true ecliptic
         # output, UNLESS sidereal+equatorial (which needs mean ecliptic).
         if not _sid_eq:
-            _, dpsi_rad, _, _ = _get_skyfield_frame_data(jd_tt)
+            _, dpsi_rad, _, _ = _frame_data(jd_tt)
             lon = (lon + math.degrees(dpsi_rad)) % 360.0
     elif ipl in (SE_TRUE_NODE, SE_OSCU_APOG):
         # True/osculating bodies naturally include nutation from orbital
         # computation.  When sidereal+equatorial, strip dpsi to get mean
         # ecliptic, matching pyswisseph behavior.
         if _sid_eq:
-            _, dpsi_rad, _, _ = _get_skyfield_frame_data(jd_tt)
+            _, dpsi_rad, _, _ = _frame_data(jd_tt)
             lon = (lon - math.degrees(dpsi_rad)) % 360.0
 
     # Coordinate transforms for ecliptic-direct bodies.
@@ -1087,7 +1279,7 @@ def _pipeline_ecliptic(
         if iflag & SEFLG_SIDEREAL:
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
-            _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+            _, _, deps, _ = _frame_data(jd_tt)
             eps_mean = _mean_obliquity_iau2006(jd_tt)
             eps = eps_mean + math.degrees(deps)
 
@@ -1224,7 +1416,7 @@ def _pipeline_helio(
         if iflag & SEFLG_SIDEREAL:
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
-            _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+            _, _, deps, _ = _frame_data(jd_tt)
             eps_mean = _mean_obliquity_iau2006(jd_tt)
             eps = eps_mean + math.degrees(deps)
 
@@ -1250,7 +1442,7 @@ def _pipeline_helio(
         if iflag & SEFLG_SIDEREAL:
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
-            _, _, deps, _ = _get_skyfield_frame_data(jd_tt)
+            _, _, deps, _ = _frame_data(jd_tt)
             eps_mean = _mean_obliquity_iau2006(jd_tt)
             eps = eps_mean + math.degrees(deps)
 
@@ -1450,6 +1642,14 @@ def _fast_calc_core(
     Returns:
         ((lon, lat, dist, dlon, dlat, ddist), iflag)
     """
+    # Set active reader for frame data dispatch (avoids threading reader
+    # through every coordinate-transform helper).
+    global _active_reader, _active_reader_has_nutation
+    _active_reader = reader
+    _active_reader_has_nutation = (
+        hasattr(reader, "has_nutation") and reader.has_nutation()
+    )
+
     # Check if body is in the .leb file
     if not reader.has_body(ipl):
         raise KeyError(f"Body {ipl} not in LEB file")
@@ -1568,7 +1768,7 @@ def _fast_calc_core(
                 aya = mean_aya
             else:
                 try:
-                    _, dpsi_sid, _, _ = _get_skyfield_frame_data(jd_tt)
+                    _, dpsi_sid, _, _ = _frame_data(jd_tt)
                     nutation_deg = math.degrees(dpsi_sid)
                     aya = mean_aya + nutation_deg
                 except (ValueError, Exception):
