@@ -826,13 +826,21 @@ def get_planets() -> SpiceKernel:
                         logger.info("Ephemeris loaded: %s", bsp_path)
                         return _PLANETS
 
-                # Load from data dir (downloads automatically if missing)
+                # Load from data dir (downloads automatically if missing,
+                # unless mode="leb" where we only use already-present files)
                 data_dir = _get_data_dir()
                 bsp_path = os.path.join(data_dir, _EPHEMERIS_FILE)
                 if os.path.exists(bsp_path):
                     logger.debug("Using cached ephemeris: %s", bsp_path)
                     _PLANETS = load(bsp_path)
                     logger.info("Ephemeris loaded: %s", bsp_path)
+                elif get_calc_mode() == "leb":
+                    raise FileNotFoundError(
+                        f"mode='leb' but DE kernel {_EPHEMERIS_FILE} not found "
+                        f"in {data_dir}. LEB covers most calculations; the DE "
+                        f"kernel is only needed for unsupported flags/bodies. "
+                        f"Run: libephemeris download {get_precision_tier()}"
+                    )
                 else:
                     logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
                     _PLANETS = load(_EPHEMERIS_FILE)
