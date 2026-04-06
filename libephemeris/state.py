@@ -199,8 +199,9 @@ def set_calc_mode(mode: Optional[str]) -> None:
       local DE440), then Skyfield. This is the standard behavior.
     - ``"skyfield"``: Always use Skyfield/DE440. Fails if DE440 is not
       available locally.
-    - ``"leb"``: Require LEB. Raises RuntimeError if no .leb file is
-      configured. Bodies not in the .leb file fall through to Skyfield.
+    - ``"leb"``: Require a valid LEB file (configured, auto-discovered,
+      or auto-downloaded). Raises RuntimeError if none can be resolved.
+      Bodies not in the .leb file fall through to Skyfield.
     - ``"horizons"``: Always use NASA JPL Horizons API (requires internet).
       Bodies not supported by Horizons fall through to Skyfield.
 

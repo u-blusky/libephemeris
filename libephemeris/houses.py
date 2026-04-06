@@ -1,26 +1,32 @@
 """
 Astrological house system calculations for libephemeris.
 
-Implements 19 house systems compatible with the reference API:
+Implements 25 distinct house systems across 26 character codes (A as alias of E):
 - Placidus (P): Most common, time-based, fails at polar latitudes
 - Koch (K): Birthplace system, similar to Placidus
-- Porphyrius (O): Space-based trisection
+- Porphyry (O): Space-based trisection
 - Regiomontanus (R): Medieval rational system
 - Campanus (C): Prime vertical system
 - Equal (A/E): Equal 30° divisions from Ascendant
 - Whole Sign (W): Whole zodiac signs from Ascendant sign
 - Meridian (X): Equatorial meridian divisions
 - Azimuthal/Horizontal (H): Based on horizon
-- Polich-Page (T): Topocentric system
-- Alcabitus (B): Ancient Arabic system
+- Polich-Page/Topocentric (T)
+- Alcabitius (B): Ancient Arabic system
 - Morinus (M): Equatorial divisions
-- Krusinski-Pisa (U): Modified Regiomontanus
-- Gauquelin (G): Sector system
+- Krusinski-Pisa-Goelzer (U)
+- Gauquelin (G): 36 sectors
 - Vehlow (V): Equal from midpoint
-- APC (houses): Astronomical Planetary Cusps
+- APC (Y): Astronomical Planetary Cusps
 - Carter Poli-Equatorial (F)
-- Pulhemus (L)
+- Pullen SD (L): Sinusoidal Delta / Neo-Porphyry
+- Pullen SR (Q): Sinusoidal Ratio
 - Sripati (S): Divide quadrants equally
+- Natural Gradient (N): Equal from 1=Aries
+- Equal from MC (D)
+- Sunshine/Treindl (I)
+- Sunshine/Makransky (i)
+- Savard-A (J)
 
 Main Functions:
 - swe_houses(): Calculate house cusps and angles (ASCMC)

@@ -47,7 +47,7 @@ poe test:leb                # LEB-specific unit tests (no slow)
 
 - `from __future__ import annotations` at top of every module
 - Imports grouped: stdlib, third-party, local (relative imports)
-- Line length 88, Python 3.9+, double quotes, Ruff formatter
+- Line length 88, Python 3.12+, double quotes, Ruff formatter
 - Google-style docstrings with Args/Returns/Raises
 - Naming: `snake_case` functions, `PascalCase` classes, `SCREAMING_SNAKE_CASE` constants, `_underscore` private
 - Swiss Ephemeris compatible functions use `swe_` prefix
@@ -148,10 +148,10 @@ Zero-install ephemeris via NASA JPL Horizons REST API. Used automatically in `"a
 
 | Mode | Flow | Fails when |
 |------|------|-----------|
-| `"auto"` (default) | LEB -> Horizons (if no DE440) -> Skyfield | never (always has fallback) |
-| `"leb"` | LEB only | no .leb file configured |
-| `"horizons"` | Horizons only | no internet / body not supported |
-| `"skyfield"` | Skyfield/DE440 only | DE440 not downloaded |
+| `"auto"` (default) | LEB → Horizons (if no DE440) → Skyfield | never (always has fallback) |
+| `"leb"` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield | no LEB resolvable |
+| `"horizons"` | Prefer Horizons; unsupported bodies/flags fall back to Skyfield | no internet |
+| `"skyfield"` | Always Skyfield/DE440 | DE440 not downloaded |
 
 Set via `set_calc_mode()` or env var `LIBEPHEMERIS_MODE`.
 

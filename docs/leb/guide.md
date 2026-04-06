@@ -54,12 +54,14 @@ astrological chart calculations.
 - **Immutable after init.** Once a `LEBReader` is constructed, all its data
   structures are read-only. This makes it inherently thread-safe.
 
-### Two Modes of Operation
+### Two Data Paths
 
-| Mode | Data Source | Activation | Speed |
+| Path | Data Source | Activation | Speed |
 |------|------------|------------|-------|
-| **Skyfield mode** (default) | JPL DE440/DE441 via Skyfield | Always available | ~120 us/eval |
-| **Binary mode** (LEB) | Precomputed `.leb` file | `set_leb_file()` or `LIBEPHEMERIS_LEB` env var | ~8 us/eval |
+| **Skyfield path** | JPL DE440/DE441 via Skyfield | Always available as fallback | ~120 µs/eval |
+| **LEB path** | Precomputed `.leb` / `.leb2` file | `set_leb_file()`, auto-discovery, or auto-download | ~5-8 µs/eval |
+
+The default `auto` mode uses the LEB path when available (including auto-download), falling back to Skyfield otherwise.
 
 ---
 
@@ -78,9 +80,9 @@ scripts/
   generate_leb.py  CLI generator: Chebyshev fitting, vectorized evaluation, binary assembly (3668 lines)
 
 data/leb/
-  ephemeris_base.leb      Base tier (de440s, 1850-2150, ~112 MB)
-  ephemeris_medium.leb    Medium tier (de440, 1550-2650, ~377 MB)
-  ephemeris_extended.leb  Extended tier (de441, -5000 to 5000)
+  ephemeris_base.leb      Base tier (de440s, 1850-2150, ~53 MB)
+  ephemeris_medium.leb    Medium tier (de440, 1550-2650, ~175 MB)
+  ephemeris_extended.leb  Extended tier (de441, -5000 to 5000, ~1.6 GB)
 
 tests/test_leb/
   test_leb_format.py      Format constants and serialization
@@ -128,8 +130,8 @@ planets.py: swe_calc_ut()
 
 ```bash
 # Method 0: Download pre-generated LEB file (easiest)
-libephemeris download:leb:base       # ~53 MB, 1850-2150
-libephemeris download:leb:medium     # ~175 MB, 1550-2650
+libephemeris download leb-base       # ~53 MB, 1850-2150
+libephemeris download leb-medium     # ~175 MB, 1550-2650
 # Auto-discovered from ~/.libephemeris/leb/ — no further configuration needed
 ```
 
@@ -151,7 +153,7 @@ ctx.set_leb_file("/path/to/ephemeris.leb")
 1. `EphemerisContext._leb_file` (per-context)
 2. Global `set_leb_file()` call
 3. `LIBEPHEMERIS_LEB` environment variable
-4. Auto-discovery: `~/.libephemeris/leb/ephemeris_{tier}.leb`
+4. Auto-discovery: `~/.libephemeris/leb/{tier}_core.leb2` (LEB2) or `~/.libephemeris/leb/ephemeris_{tier}.leb` (LEB1)
 
 ### Calculation Mode (`LIBEPHEMERIS_MODE`)
 
@@ -161,15 +163,17 @@ variable.
 
 | Mode | Behavior |
 |------|----------|
-| `auto` (default) | Use LEB if configured, otherwise Skyfield |
+| `auto` (default) | LEB if configured, then Horizons (if no local DE440), then Skyfield |
 | `skyfield` | Always use Skyfield, even if a `.leb` file is configured |
-| `leb` | Require LEB; raises `RuntimeError` if no `.leb` file is available |
+| `leb` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield |
+| `horizons` | Prefer Horizons API; unsupported bodies/flags fall back to Skyfield |
 
 ```python
 from libephemeris import set_calc_mode, get_calc_mode
 
 set_calc_mode("skyfield")  # Force Skyfield for benchmarking/validation
 set_calc_mode("leb")       # Require LEB (error if unavailable)
+set_calc_mode("horizons")  # Prefer Horizons API
 set_calc_mode("auto")      # Default behavior
 set_calc_mode(None)        # Reset to env var / default
 ```
@@ -177,6 +181,7 @@ set_calc_mode(None)        # Reset to env var / default
 ```bash
 export LIBEPHEMERIS_MODE=skyfield   # Force Skyfield
 export LIBEPHEMERIS_MODE=leb        # Require LEB
+export LIBEPHEMERIS_MODE=horizons   # Prefer Horizons API
 export LIBEPHEMERIS_MODE=auto       # Default (same as unset)
 ```
 
@@ -737,9 +742,9 @@ python scripts/generate_leb.py --output custom.leb --start 1900 --end 2100
 
 | Tier | Ephemeris | Years | Output | Approx Size |
 |------|-----------|-------|--------|-------------|
-| `base` | de440s.bsp | 1850-2150 | `ephemeris_base.leb` | ~112 MB |
-| `medium` | de440.bsp | 1550-2650 | `ephemeris_medium.leb` | ~377 MB |
-| `extended` | de441.bsp | -5000 to 5000 | `ephemeris_extended.leb` | ~3.3 GB |
+| `base` | de440s.bsp | 1850-2150 | `ephemeris_base.leb` | ~53 MB |
+| `medium` | de440.bsp | 1550-2650 | `ephemeris_medium.leb` | ~175 MB |
+| `extended` | de441.bsp | -5000 to 5000 | `ephemeris_extended.leb` | ~1.6 GB |
 
 ### 6.4 Chebyshev Fitting
 
@@ -1013,7 +1018,7 @@ is generated in every group run; stars likewise).
 # Merge three partial files into one complete file
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb2 \
+  data/leb/ephemeris_base_asteroids.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -1041,12 +1046,12 @@ python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb2 \
+  data/leb/ephemeris_base_asteroids.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
-# Or all at once via poe
-poe leb:generate:base:groups
+# Or all at once via leph
+leph leb generate base groups
 ```
 
 #### Regenerating a Single Group
@@ -1058,7 +1063,7 @@ files), regenerate just that group and re-merge:
 python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb2 \
+  data/leb/ephemeris_base_asteroids.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -1480,7 +1485,7 @@ body errors are <0.001".
 **Tests passed:** 261 comparison tests (planets, hypothetical, velocities,
 lunar, flags, ancient/future sub-ranges, boundary dates).
 
-**File size:** 2.8 GB (de441.bsp, -5000 to 5000 CE, 10,000 years).
+**File size:** ~1.6 GB (de441.bsp, -5000 to 5000 CE, 10,000 years).
 
 #### Test Tolerances (as configured in `conftest.py`)
 
@@ -1566,50 +1571,30 @@ generating. Use `_spk_covers_range()` to verify.
 
 ## 12. Commands Reference
 
-### 12.1 poe Tasks
+### 12.1 leph Tasks (Developer CLI)
 
 ```bash
-# Full generation (all bodies at once)
-poe leb:generate:base       # Base tier (de440s, 1850-2150) with verification
-poe leb:generate:medium     # Medium tier (de440, 1550-2650) with verification
-poe leb:generate:extended   # Extended tier (de441, -5000 to 5000) with verification
-poe leb:generate:all        # All three tiers sequentially
-
 # Group generation (recommended — avoids fork-deadlock, allows partial regen)
-poe leb:generate:base:planets     # Planets group only → ephemeris_base_planets.leb
-poe leb:generate:base:asteroids   # Asteroids group only → ephemeris_base_asteroids.leb2
-poe leb:generate:base:analytical  # Analytical group only → ephemeris_base_analytical.leb
-poe leb:generate:base:merge       # Merge partial files → ephemeris_base.leb (with --verify)
-poe leb:generate:base:groups      # All three groups + merge in one command
+leph leb generate base groups      # All three groups + merge in one command
+leph leb generate medium groups    # Medium tier
+leph leb generate extended groups  # Extended tier
 
-poe leb:generate:medium:planets     # Medium tier planets group
-poe leb:generate:medium:asteroids   # Medium tier asteroids group
-poe leb:generate:medium:analytical  # Medium tier analytical group
-poe leb:generate:medium:merge       # Merge → ephemeris_medium.leb
-poe leb:generate:medium:groups      # All three groups + merge
-
-poe leb:generate:extended:planets     # Extended tier planets group
-poe leb:generate:extended:asteroids   # Extended tier asteroids group
-poe leb:generate:extended:analytical  # Extended tier analytical group
-poe leb:generate:extended:merge       # Merge → ephemeris_extended.leb
-poe leb:generate:extended:groups      # All three groups + merge
+# Verify existing LEB files
+leph leb verify base               # Verify base tier
+leph leb verify medium             # Verify medium tier
 
 # Download (convenience wrappers for libephemeris CLI)
-poe download:leb:base       # Download base tier LEB (~53 MB)
-poe download:leb:medium     # Download medium tier LEB (~175 MB)
-poe download:leb:extended   # Download extended tier LEB (not yet available)
+libephemeris download leb-base       # Download base tier LEB (~53 MB)
+libephemeris download leb-medium     # Download medium tier LEB (~175 MB)
+libephemeris download leb-extended   # Download extended tier LEB (~1.6 GB)
 
 # Release — upload to GitHub Releases (requires: gh auth login)
-poe release:leb 0.22.0            # Upload all tiers + update hashes in download.py
-poe release:leb:base 0.22.0       # Upload base tier only
-poe release:leb:medium 0.22.0     # Upload medium tier only
-poe release:leb:extended 0.22.0   # Upload extended tier only
-poe release:leb:dry-run 0.22.0    # Show what would be uploaded (no changes)
+leph release leb 1.0.0             # Upload all tiers + update hashes in download.py
+leph release leb-dry-run 1.0.0     # Show what would be uploaded (no changes)
 
 # Testing
-poe test:leb                # All LEB tests (excludes @slow)
-poe test:leb:precision      # Full precision suite (slow, all tiers)
-poe test:leb:precision:quick # Precision tests for medium tier only
+leph test leb-format all           # All LEB format tests (excludes @slow)
+leph test leb-format precision     # Full precision suite (slow, all tiers)
 ```
 
 ### 12.2 Direct pytest
@@ -1651,7 +1636,7 @@ python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb2 \
+  data/leb/ephemeris_base_asteroids.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
@@ -1659,7 +1644,7 @@ python scripts/generate_leb.py --tier base --merge \
 python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb2 \
+  data/leb/ephemeris_base_asteroids.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
@@ -1687,23 +1672,17 @@ The release script (`scripts/release_leb.py`) handles upload and hash updates.
 
 ```bash
 # 1. Generate LEB file(s)
-poe leb:generate:medium:groups    # recommended group workflow
+leph leb generate medium groups    # recommended group workflow
 
 # 2. Dry run — verify what would be uploaded
-poe release:leb:dry-run 0.22.0
+leph release leb-dry-run 1.0.0
 
 # 3. Upload to GitHub Releases + auto-update hashes in download.py
-poe release:leb:medium 0.22.0
+leph release leb 1.0.0
 
 # 4. Commit the updated download.py
 git add libephemeris/download.py
 git commit -m "update LEB medium tier hash after regeneration"
-```
-
-**Release all tiers at once:**
-
-```bash
-poe release:leb 0.22.0           # uploads all found .leb files
 ```
 
 **What the release script does:**
@@ -1714,26 +1693,26 @@ poe release:leb 0.22.0           # uploads all found .leb files
 4. With `--update-hashes`: updates `DATA_FILES` in `libephemeris/download.py`
    with the new SHA256 and size_mb values
 
-**Direct script usage (without poe):**
+**Direct script usage (without leph):**
 
 ```bash
-python scripts/release_leb.py --version 0.22.0 --tier medium --update-hashes
-python scripts/release_leb.py --version 0.22.0 --dry-run
-python scripts/release_leb.py --version 0.22.0 --tier base --tag data-v1
+python scripts/release_leb.py --version 1.0.0 --tier medium --update-hashes
+python scripts/release_leb.py --version 1.0.0 --dry-run
+python scripts/release_leb.py --version 1.0.0 --tier base --tag data-v1
 ```
 
 ### 12.5 User Download
 
-End users download pre-generated LEB files via the library CLI (no `poe` needed):
+End users download pre-generated LEB files via the library CLI (no `leph` needed):
 
 ```bash
 # Install the library
 pip install libephemeris
 
 # Download LEB for the desired tier
-libephemeris download:leb:base       # ~53 MB, 1850-2150
-libephemeris download:leb:medium     # ~175 MB, 1550-2650
-libephemeris download:leb:extended   # not yet available
+libephemeris download leb-base       # ~53 MB, 1850-2150
+libephemeris download leb-medium     # ~175 MB, 1550-2650
+libephemeris download leb-extended   # ~1.6 GB, -5000 to +5000
 ```
 
 Files are saved to `~/.libephemeris/leb/` and auto-discovered at runtime
@@ -1762,7 +1741,7 @@ bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
 LEB2 compresses the core body set to ~10.6 MB, enabling `pip install libephemeris`
 to include precomputed ephemeris with zero additional downloads.
 
-**Dependency:** `zstandard>=0.22.0` (required, ~200 KB wheel).
+**Dependency:** `zstandard` (required, ~200 KB wheel).
 
 ### 13.2 Binary File Format
 
@@ -2006,16 +1985,16 @@ applies the compression pipeline (§13.4) to each body's raw coefficients.
 
 ```bash
 # Step 1: Generate LEB1 (if not already present)
-poe leb:generate:base:groups
+leph leb generate base groups
 
 # Step 2: Convert LEB1 → LEB2 (all 4 groups)
-poe leb2:convert:base
+leph leb2 convert base
 
 # Step 3: Verify LEB2 against LEB1 reference
-poe leb2:verify:base
+leph leb2 verify base
 
 # Step 4: Run precision tests
-poe test:leb2:precision:base
+leph test leb2-format precision-base
 ```
 
 **From scratch (no LEB1):** the `generate` subcommand creates a temporary
@@ -2027,31 +2006,23 @@ python scripts/generate_leb2.py generate --tier base --group core -o data/leb2/b
 
 ### 13.11 Commands Reference
 
-**poe tasks:**
+**leph tasks (developer CLI):**
 
 ```bash
 # Convert LEB1 → LEB2 (all groups for a tier)
-poe leb2:convert:base              # Base tier → data/leb2/base_{core,asteroids,apogee,uranians}.leb
-poe leb2:convert:medium            # Medium tier
-poe leb2:convert:extended          # Extended tier
-
-# Convert single group
-poe leb2:convert:base:core         # Core group only
-poe leb2:convert:base:asteroids    # Asteroids group only
-poe leb2:convert:base:apogee       # Apogee group only
-poe leb2:convert:base:uranians     # Uranians group only
+leph leb2 convert base              # Base tier → data/leb2/base_{core,asteroids,apogee,uranians}.leb2
+leph leb2 convert medium            # Medium tier
+leph leb2 convert extended          # Extended tier
 
 # Verify against LEB1 reference
-poe leb2:verify:base               # 500 samples per body, compare vs LEB1
+leph leb2 verify base               # 500 samples per body, compare vs LEB1
 
 # Unit tests
-poe test:leb2                      # Compression round-trip + reader tests
+leph test leb2-format all           # Compression round-trip + reader tests
 
 # Precision tests (end-to-end via swe_calc_ut)
-poe test:leb2:precision:base       # Base tier (~15s)
-poe test:leb2:precision:medium     # Medium tier
-poe test:leb2:precision:extended   # Extended tier
-poe test:leb2:precision:all        # All tiers (~45s)
+leph test leb2-format precision-base       # Base tier (~15s)
+leph test leb2-format precision-all        # All tiers (~45s)
 ```
 
 **Direct CLI (`scripts/generate_leb2.py`):**
@@ -2107,7 +2078,7 @@ The LEB file was generated without proper SPK coverage for asteroids.
 Regenerate with:
 ```bash
 export LIBEPHEMERIS_AUTO_SPK=1
-poe leb:generate:base
+leph leb generate base groups
 ```
 
 ### 14.4 "Failed to open LEB file"
@@ -2303,12 +2274,12 @@ Example: Uranus, base tier:
 
 4. Regenerate LEB files:
    ```bash
-   poe leb:generate:base
+   leph leb generate base groups
    ```
 
 5. Run precision tests:
    ```bash
-   poe test:leb:precision:quick
+   leph test leb-format precision
    ```
 
 ## Appendix C: Key Constants

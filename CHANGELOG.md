@@ -5,6 +5,96 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-04-06
+
+First stable release of LibEphemeris. This entry summarizes all changes across
+the 1.0.0 alpha series (a2–a15) into thematic categories. The individual alpha
+entries are preserved below for detailed history.
+
+### Added
+
+- **Four calculation modes** (`auto`, `skyfield`, `leb`, `horizons`) with
+  automatic fallback chain: LEB → Horizons → Skyfield. Configurable via
+  `set_calc_mode()` or `LIBEPHEMERIS_MODE` env var.
+- **NASA JPL Horizons API backend** — zero-install ephemeris via REST API.
+  `HorizonsClient` with LRU cache (4096 entries), parallel fetch (8 workers),
+  retry with exponential backoff. Geocentric precision <0.0003" vs Skyfield.
+- **LEB2 compressed ephemeris format** — error-bounded lossy compression
+  achieving 4-10x size reduction while maintaining <0.001" precision vs LEB1.
+  Modular body groups (core, asteroids, apogee, uranians) enable selective
+  downloads. Base-tier core (~10.6 MB) bundled in wheel; other tiers
+  auto-downloaded on first use.
+- **LEB2 v2 chunked format** — 10-year temporal chunks instead of monolithic
+  per-body compression. Cold-start decompression 33x faster (1568ms → 47ms).
+- **`reset_session()`** — lightweight state reset preserving file handles and
+  caches. Consecutive calculations 1750x faster (~3500ms → ~2ms).
+- **LEB fast path** — pure-Python nutation (IAU 2006/2000A Chebyshev) and
+  precession (Fukushima-Williams polynomials), eliminating all Skyfield calls
+  from the LEB pipeline. Single `calc_ut()` 3.1x faster (~500µs → ~161µs).
+- **Vectorized search** — `heliacal_ut()` 5-15x faster, `lun_occult_when_glob()`
+  15-100x faster via batched numpy operations and coarse-to-fine scan.
+- **Comprehensive house system tests** — 8,318 pytest tests + 79,704 standalone
+  checks comparing all 25 house systems (26 codes) against pyswisseph.
+- **TOML configuration** — `libephemeris-config.toml` with auto-discovery.
+  Resolution chain: `set_*()` > env var > TOML > default.
+- **`libephemeris init`** wizard for initial setup.
+- **LEB2 auto-download** — `auto` mode downloads ~33 MB LEB2 core on first use
+  instead of requiring full DE440 (~128 MB).
+- **Vendored spktype21** — upstream unmaintained since 2018; vendored with
+  numpy 2.x fix for full-precision TNO/asteroid SPK loading.
+
+### Changed
+
+- **Stable API** — public API is now considered stable. Breaking changes will
+  follow semantic versioning.
+- **Python requirement** — requires Python 3.12+ (was 3.9+ in earlier docs).
+- **`set_ephe_path()` idempotent** — no-op when called with the same path,
+  avoiding redundant teardown of file handles and caches.
+- **Campanus house system** — clean-room rewrite using spherical trigonometry
+  from prime-vertical pole geometry with academic references (Smart, Meeus).
+- **`madvise(MADV_WILLNEED)`** — LEB1 and LEB2 readers hint the OS to
+  pre-load mmap pages in the background.
+
+### Fixed
+
+- **Topocentric house_pos** — explicit semi-arc handler for Topocentric (T)
+  reduces max error from 0.25 to 0.019 house position units with body latitude.
+- **Alcabitius house_pos** — RA-based interpolation between cusp RAs reduces
+  max error from 0.084 to 0.000 with body latitude.
+- **ASC near-360° normalization** — values like 359.99999999999994° now
+  correctly normalize to 0°, fixing Whole Sign cusp offsets at the boundary.
+- **Skyfield `reify` descriptor corruption** — bypassed descriptor-based
+  caching that shadowed methods with numpy arrays on cached Time objects.
+- **Occultation candidate detection** — `np.minimum` → `np.maximum` for
+  detection window, fixing 58% missed events in Venus/Mars searches.
+- **Observer cache identity collision** — cache validates object identity
+  instead of relying on `id()` which can be reused after deallocation.
+- **South node velocity** — consistent LEB/Skyfield path selection prevents
+  asymmetric velocity between north and south nodes.
+- **TNO/asteroid SPK with numpy 2.x** — vendored spktype21 `.item()` fix
+  resolves `TypeError` in `daf.map_array()` with 1-element arrays.
+- **White Moon (SE_WHITE_MOON)** — added dispatch for fictitious bodies 55-58.
+- **Occultation search range clamping** — prevents `EphemerisRangeError` when
+  search window extends beyond DE kernel coverage.
+
+### Performance
+
+| Optimization | Before | After | Speedup |
+|-------------|--------|-------|---------|
+| `reset_session()` consecutive calcs | ~3500ms | ~2ms | 1750x |
+| LEB2 v2 cold-start decompression | 1568ms | 47ms | 33x |
+| `lun_occult_when_glob()` | 10-60s | 0.6-1.3s | 15-100x |
+| `heliacal_ut()` | 5-30s | 1-2.5s | 5-15x |
+| LEB fast path (single calc_ut) | ~500µs | ~161µs | 3.1x |
+
+### Documentation
+
+- Full English and Italian manuals (15 chapters each).
+- Comprehensive guides: getting-started, migration, optional-modules, tracing.
+- LEB technical guide with LEB2 format specification.
+- Horizons backend architecture documentation.
+- CLI reference (`CLI.md`) covering `libephemeris` and `leph` commands.
+
 ## [1.0.0a15] — 2026-04-02
 
 ### Fixed
@@ -545,7 +635,7 @@ Heliocentric: ~0.01-0.03" systematic offset (Horizons Sun center vs Skyfield SSB
 - `poe test:horizons:vs:leb` — Cross-validation Horizons vs LEB2
 - `poe test:compare:horizons` — Compare vs pyswisseph via Horizons
 
-**Full documentation:** `docs/horizons-backend.md`
+**Full documentation:** `docs/architecture/horizons-backend.md`
 
 #### LEB2 Compressed Ephemeris Format
 
@@ -1548,9 +1638,9 @@ New CLI commands and Python API to download pre-generated LEB files from
 GitHub Releases, eliminating the need to generate them locally:
 
 ```bash
-libephemeris download:leb:base       # ~53 MB, 1850-2150 CE
-libephemeris download:leb:medium     # ~175 MB, 1550-2650 CE
-libephemeris download:leb:extended   # not yet available
+libephemeris download leb-base        # ~53 MB, 1850-2150 CE
+libephemeris download leb-medium      # ~175 MB, 1550-2650 CE
+libephemeris download leb-extended    # ~1.6 GB, -5000 to +5000 CE
 ```
 
 Python API:

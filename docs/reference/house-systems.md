@@ -1,6 +1,6 @@
 # House System Algorithms and Mathematical Formulas
 
-This document provides comprehensive mathematical documentation for all 19 house systems implemented in LibEphemeris. Each section includes the underlying algorithm, mathematical formulas, and implementation notes.
+This document provides comprehensive mathematical documentation for the 25 house systems (26 codes including the A/E equal-house alias) implemented in LibEphemeris. Each section includes the underlying algorithm, mathematical formulas, and implementation notes.
 
 ## Table of Contents
 
@@ -23,6 +23,13 @@ This document provides comprehensive mathematical documentation for all 19 house
 17. [Krusinski-Pisa (U)](#krusinski-pisa-u)
 18. [Natural Gradient (N)](#natural-gradient-n)
 19. [APC (Y)](#apc-y)
+20. [Sripati (S)](#sripati-s)
+21. [Pullen SD / Neo-Porphyry (L)](#pullen-sd--neo-porphyry-l)
+22. [Pullen SR (Q)](#pullen-sr-q)
+23. [Equal from MC (D)](#equal-from-mc-d)
+24. [Sunshine / Treindl (I)](#sunshine--treindl-i)
+25. [Sunshine / Makransky (i)](#sunshine--makransky-i)
+26. [Savard-A (J)](#savard-a-j)
 
 ---
 
@@ -672,28 +679,146 @@ For n >= 8 (above horizon):
 
 ---
 
+## Sripati (S)
+
+**Historical Origin:** Sripati (1019-1066), Indian mathematician and astronomer.
+
+**Conceptual Basis:** Midpoints of Porphyry cusps. Each cusp is the midpoint between consecutive Porphyry cusps, effectively shifting Porphyry houses by half a house.
+
+### Mathematical Formula
+
+```
+1. Compute Porphyry cusps P₁..P₁₂
+2. Sripati cusp Sᵢ = midpoint(Pᵢ, Pᵢ₊₁)
+```
+
+**Properties:** Works at all latitudes, same computational simplicity as Porphyry.
+
+---
+
+## Pullen SD / Neo-Porphyry (L)
+
+**Historical Origin:** Walter Pullen, modern astrologer.
+
+**Conceptual Basis:** Sinusoidal delta interpolation between angles. Instead of linear trisection (Porphyry), uses a sinusoidal curve to distribute cusps more smoothly between the angles.
+
+### Algorithm
+
+1. Compute quadrant arcs as in Porphyry
+2. Apply sinusoidal weighting to cusp placement within each quadrant
+
+**Properties:** Works at all latitudes, smoother cusp distribution than Porphyry.
+
+---
+
+## Pullen SR (Q)
+
+**Historical Origin:** Walter Pullen, modern astrologer.
+
+**Conceptual Basis:** Sinusoidal ratio interpolation between angles. Similar to Pullen SD but uses a ratio-based sinusoidal formula.
+
+### Algorithm
+
+1. Compute quadrant arcs as in Porphyry
+2. Apply sinusoidal ratio weighting to cusp placement within each quadrant
+
+**Properties:** Works at all latitudes, alternative sinusoidal distribution to Pullen SD.
+
+---
+
+## Equal from MC (D)
+
+**Historical Origin:** Modern variant of the Equal house system.
+
+**Conceptual Basis:** Equal 30-degree houses starting from the MC (10th house cusp) rather than the Ascendant.
+
+### Mathematical Formula
+
+```
+λ₁₀ = MC
+λᵢ = (MC + (i-10)·30°) mod 360°
+where i = 1, 2, ..., 12
+```
+
+**Properties:** MC always coincides with the 10th house cusp. Ascendant may not coincide with the 1st house cusp. Works at all latitudes.
+
+---
+
+## Sunshine / Treindl (I)
+
+**Historical Origin:** Developed by Alois Treindl. Also known as the Sunshine house system.
+
+**Conceptual Basis:** Houses based on the Sun's diurnal arc, dividing the sky according to the Sun's actual path above and below the horizon. Uses the Sun's declination to define house boundaries.
+
+### Algorithm
+
+1. Compute Sun's semi-diurnal and semi-nocturnal arcs from solar declination
+2. Divide arcs to produce house cusps
+3. Special handling when MC is below the horizon
+
+**Properties:** Requires Sun's declination as input. Latitude-dependent.
+
+---
+
+## Sunshine / Makransky (i)
+
+**Historical Origin:** Variant of the Sunshine system attributed to Makransky.
+
+**Conceptual Basis:** Similar to Sunshine/Treindl but with an alternative division algorithm for the Sun's diurnal arc.
+
+### Algorithm
+
+Same general approach as Sunshine/Treindl with modified arc division.
+
+**Properties:** Requires Sun's declination as input. Latitude-dependent.
+
+---
+
+## Savard-A (J)
+
+**Historical Origin:** Modern system by Savard.
+
+**Conceptual Basis:** A variant of the Campanus system with modified prime vertical projection.
+
+### Algorithm
+
+Uses Campanus-style prime vertical division with an alternative projection method.
+
+**Properties:** Latitude-dependent.
+
+---
+
 ## Summary Comparison
 
-| System | Calculation Type | Latitude Independent | Works at Poles |
-|--------|-----------------|---------------------|----------------|
-| Placidus | Iterative | No | No |
-| Koch | Iterative | No | No |
-| Regiomontanus | Direct | No | Yes* |
-| Campanus | Direct | No | Yes* |
-| Porphyry | Direct | No | Yes |
-| Equal | Simple | Yes | Yes |
-| Whole Sign | Simple | Yes | Yes |
-| Alcabitius | Direct | No | Yes* |
-| Topocentric | Direct | No | Yes* |
-| Morinus | Direct | Yes | Yes |
-| Meridian | Direct | Yes | Yes |
-| Vehlow | Simple | Yes | Yes |
-| Carter | Direct | No | Yes |
-| Gauquelin | Time-based | No | No |
-| Horizontal | Complex | No | Yes* |
-| Krusinski | Complex | No | Yes* |
-| Natural | Simple | Yes | Yes |
-| APC | Complex | No | Yes* |
+| Code | System | Calculation Type | Latitude Independent | Works at Poles |
+|------|--------|-----------------|---------------------|----------------|
+| P | Placidus | Iterative | No | No |
+| K | Koch | Iterative | No | No |
+| R | Regiomontanus | Direct | No | Yes* |
+| C | Campanus | Direct | No | Yes* |
+| O | Porphyry | Direct | No | Yes |
+| E/A | Equal | Simple | Yes | Yes |
+| W | Whole Sign | Simple | Yes | Yes |
+| B | Alcabitius | Direct | No | Yes* |
+| T | Topocentric | Direct | No | Yes* |
+| M | Morinus | Direct | Yes | Yes |
+| X | Meridian | Direct | Yes | Yes |
+| V | Vehlow | Simple | Yes | Yes |
+| F | Carter | Direct | No | Yes |
+| G | Gauquelin | Time-based | No | No |
+| H | Horizontal | Complex | No | Yes* |
+| U | Krusinski | Complex | No | Yes* |
+| N | Natural Gradient | Simple | Yes | Yes |
+| Y | APC | Complex | No | Yes* |
+| S | Sripati | Direct | No | Yes |
+| L | Pullen SD | Direct | No | Yes |
+| Q | Pullen SR | Direct | No | Yes |
+| D | Equal from MC | Simple | Yes | Yes |
+| I | Sunshine (Treindl) | Complex | No | No |
+| i | Sunshine (Makransky) | Complex | No | No |
+| J | Savard-A | Direct | No | Yes* |
+
+25 distinct systems, 26 character codes (A is an alias for E; both compute equal houses from the Ascendant).
 
 *May require special handling near poles.
 

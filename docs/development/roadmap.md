@@ -75,10 +75,12 @@ All 31 bodies pass verification with sub-arcsecond precision. Tests: 137 LEB tes
 
 ### Context
 
-The library has two operating modes:
+The library has four calculation modes (default: `auto`):
 
-1. **Skyfield mode** (default): each call to `swe_calc_ut()` queries Skyfield in real time (SPK + frame rotation + nutation). For asteroids without SPK, falls back to Keplerian. Precise but slow (~120us/call).
-2. **LEB mode**: if a `.leb` file is activated (via `set_leb_file()` or `LIBEPHEMERIS_LEB`), calls are served from precomputed Chebyshev coefficients (~2us/call, ~14x speedup). Falls back to Skyfield for bodies not in the LEB.
+1. **Auto mode** (default): tries LEB (bundled, auto-discovered, or auto-downloaded), then Horizons API (if no local DE440), then Skyfield.
+2. **Skyfield mode**: queries Skyfield in real time (SPK + frame rotation + nutation). Precise but slower (~120µs/call).
+3. **LEB mode**: requires a valid LEB file (configured, auto-discovered, or auto-downloaded). Calls served from precomputed Chebyshev coefficients (~2µs/call, ~14x speedup). Falls back to Skyfield for unsupported bodies/flags.
+4. **Horizons mode**: prefers NASA JPL Horizons REST API. Falls back to Skyfield for unsupported bodies/flags.
 
 ### Goal
 
@@ -88,9 +90,9 @@ Make the library fully transparent without LEB. A user can use `libephemeris` by
 
 - **3.1 Verify LEB-free mode is complete** — Already implemented. `_LEB_FILE` and `_LEB_READER` initialize to `None`; `get_leb_reader()` returns `None` when no LEB is configured; the `if reader is not None:` guard in `swe_calc_ut()`/`swe_calc()` skips the entire LEB block. All non-LEB tests exercise this path.
 - **3.2 Document both modes** — Documented in `README.md` (new "Binary Ephemeris Mode (LEB)" section) and `docs/leb/guide.md` (Calculation Mode section with mode table, examples, env var documentation).
-- **3.3 Environment variable for explicit mode** — Implemented `LIBEPHEMERIS_MODE` with three values: `skyfield` (force Skyfield, ignore LEB), `leb` (force LEB, error if not found), `auto` (default: use LEB if available). Added `set_calc_mode()`/`get_calc_mode()` in `state.py`, exported in `__init__.py`, reset in `close()`.
+- **3.3 Environment variable for explicit mode** — Implemented `LIBEPHEMERIS_MODE` with four values: `auto` (default: LEB → Horizons → Skyfield), `skyfield` (force Skyfield), `leb` (require LEB with auto-discovery/download), `horizons` (prefer Horizons API). Added `set_calc_mode()`/`get_calc_mode()` in `state.py`, exported in `__init__.py`, reset in `close()`.
 - **3.4 Graceful handling of missing LEB** — Already implemented. `get_leb_reader()` handles all edge cases: missing file (warning + `None`), corrupt file (warning + `None`), range too narrow (`ValueError` caught for per-body fallback), no file specified (`None` without warning).
-- **3.5 Distribution of pre-generated LEB files** — Implemented with GitHub Releases (`data-v1`), release script (`scripts/release_leb.py` + `poe release:leb:*`), CLI download (`libephemeris download:leb:{base,medium,extended}`), runtime auto-discovery (`~/.libephemeris/leb/ephemeris_{tier}.leb`), and programmatic download (`libephemeris.download_leb_for_tier("medium")`). Available tiers: `base` (~53 MB), `medium` (~175 MB). Extended tier not yet generated.
+- **3.5 Distribution of pre-generated LEB files** — Implemented with GitHub Releases (`data-v1`), release script (`scripts/release_leb.py` + `poe release:leb:*`), CLI download (`libephemeris download leb-{base,medium,extended}`), runtime auto-discovery (`~/.libephemeris/leb/ephemeris_{tier}.leb`), and programmatic download (`libephemeris.download_leb_for_tier("medium")`). Available tiers: `base` (~53 MB), `medium` (~175 MB), `extended` (~1604 MB).
 
 ---
 
@@ -176,7 +178,7 @@ Created `tests/test_keplerian_precision_benchmark.py` with SPK comparison in ecl
 
 ## Open Items
 
-Three items remain before this roadmap is fully closed:
+Two items remain before this roadmap is fully closed:
 
 ### 1. ASSIST Data Files Download + End-to-End Verification
 
@@ -184,11 +186,11 @@ Three items remain before this roadmap is fully closed:
 
 ASSIST data files (~714 MB total: `linux_p1550p2650.440` ~98 MB + `sb441-n16.bsp` ~616 MB) need to be downloaded and the full end-to-end path verified with real planetary perturbations. Nine conditional tests are currently skipped due to missing data files. Also pending: documentation for `pip install libephemeris[nbody]`.
 
-### 2. Extended Tier LEB File Not Yet Generated
+### 2. Extended Tier LEB File — COMPLETED
 
-**Status:** Pending
+**Status:** Completed
 
-The `base` (~53 MB) and `medium` (~175 MB) LEB files are available via GitHub Releases (`data-v1`) and CLI download. The `extended` tier LEB file has not been generated yet. Generation infrastructure is ready (`poe leb:generate:extended:groups`).
+All three LEB tiers are available via GitHub Releases (`data-v1`) and CLI download: `base` (~53 MB), `medium` (~175 MB), `extended` (~1604 MB).
 
 ### 3. ASSIST Performance Verification for Single Evaluations
 

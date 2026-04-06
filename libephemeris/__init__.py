@@ -4,19 +4,23 @@ Pure Python, API-compatible with PySwissEphemeris, using NASA JPL
 DE440/DE441 ephemerides via Skyfield and IAU 2006/2000A standards via pyerfa.
 
 Calculation backend:
-    By default all calculations use JPL DE440 via Skyfield (no configuration
-    needed). For ~14x faster batch evaluation, configure a precomputed ``.leb``
-    binary ephemeris file with ``set_leb_file()`` or the ``LIBEPHEMERIS_LEB``
-    environment variable.
+    The default calculation mode is ``"auto"``, which resolves data via
+    LEB (bundled, auto-discovered, or auto-downloaded), Horizons API, or
+    Skyfield -- no manual configuration required. For ~14x faster batch
+    evaluation, configure a precomputed ``.leb`` binary ephemeris file with
+    ``set_leb_file()`` or the ``LIBEPHEMERIS_LEB`` environment variable.
 
     The calculation mode (``set_calc_mode()`` / ``LIBEPHEMERIS_MODE``) controls
     backend selection:
 
-    - ``"auto"`` (default): use LEB if configured, otherwise Skyfield.
-    - ``"skyfield"``: always use Skyfield, even if a ``.leb`` file is present.
-    - ``"leb"``: require LEB; raises ``RuntimeError`` if unavailable.
-
-    With no ``.leb`` file configured, ``"auto"`` is equivalent to ``"skyfield"``.
+    - ``"auto"`` (default): try LEB first, then Horizons API (if no local
+      DE440), then Skyfield.
+    - ``"skyfield"``: always use Skyfield/DE440.
+    - ``"leb"``: require a valid LEB file (configured, auto-discovered, or
+      auto-downloaded). Raises ``RuntimeError`` if none can be resolved.
+      Bodies/flags not in the LEB file fall back to Skyfield.
+    - ``"horizons"``: prefer NASA JPL Horizons API (requires internet).
+      Bodies/flags not supported by Horizons fall back to Skyfield.
 """
 
 from __future__ import annotations
@@ -769,7 +773,7 @@ from .arabic_parts import calc_all_arabic_parts
 # .env file loader (public API for manual reloading)
 from ._dotenv import load_dotenv
 
-__version__ = "1.0.0a14"
+__version__ = "1.0.0"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0"

@@ -488,10 +488,10 @@ def horizons_backend_full() -> None:
 
 @compare_group.command(
     "houses",
-    short_help="Compare all 24 house systems vs pyswisseph with precision report.",
+    short_help="Compare all 25 house systems (26 codes) vs pyswisseph with precision report.",
 )
 def compare_houses() -> None:
-    """Compare all 24 house systems against pyswisseph.
+    """Compare all 25 house systems (26 codes) against pyswisseph.
 
     Tests cusps, all 8 ASCMC values, houses_armc, house_pos, and sidereal
     houses across 8 locations and 12 dates. Prints per-system precision report

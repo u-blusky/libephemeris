@@ -123,11 +123,13 @@ These are older, more compact versions of the satellite ephemerides. Newer versi
 ### Running the Script
 
 ```bash
-# Using poe task (recommended)
-poe generate-planet-centers-spk
+# Using leph CLI (recommended)
+leph generate planet-centers-medium
 
-# Or directly
-python scripts/generate_planet_centers_spk.py
+# Other tiers
+leph generate planet-centers-base
+leph generate planet-centers-extended
+leph generate planet-centers-all       # All three tiers
 ```
 
 ### Output
@@ -244,4 +246,4 @@ The script requires ~500 MB temporary space for downloading source files. These 
 
 - **2024**: Initial implementation
   - Created `generate_planet_centers_spk.py` script
-  - Added `poe generate-planet-centers-spk` task
+  - Added CLI command (`leph generate planet-centers-medium`)

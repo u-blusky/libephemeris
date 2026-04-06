@@ -34,7 +34,7 @@ def release_group() -> None:
 def release_leb(version: str) -> None:
     """Upload all LEB files to GitHub release and update download hashes.
 
-    VERSION is the release version string, e.g. '0.22.0' or '1.0.0a7'.
+    VERSION is the release version string, e.g. '1.0.0' or '1.1.0'.
     Requires: gh CLI authenticated (gh auth login).
     """
     _release(["--version", version, "--update-hashes"])
@@ -48,7 +48,7 @@ def release_leb(version: str) -> None:
 def release_leb_base(version: str) -> None:
     """Upload base tier LEB to GitHub release and update hashes.
 
-    VERSION is the release version string, e.g. '0.22.0'.
+    VERSION is the release version string, e.g. '1.0.0'.
     """
     _release(["--version", version, "--tier", "base", "--update-hashes"])
 
@@ -61,7 +61,7 @@ def release_leb_base(version: str) -> None:
 def release_leb_medium(version: str) -> None:
     """Upload medium tier LEB to GitHub release and update hashes.
 
-    VERSION is the release version string, e.g. '0.22.0'.
+    VERSION is the release version string, e.g. '1.0.0'.
     """
     _release(["--version", version, "--tier", "medium", "--update-hashes"])
 
@@ -74,7 +74,7 @@ def release_leb_medium(version: str) -> None:
 def release_leb_extended(version: str) -> None:
     """Upload extended tier LEB to GitHub release and update hashes.
 
-    VERSION is the release version string, e.g. '0.22.0'.
+    VERSION is the release version string, e.g. '1.0.0'.
     """
     _release(["--version", version, "--tier", "extended", "--update-hashes"])
 
@@ -87,6 +87,6 @@ def release_leb_extended(version: str) -> None:
 def release_leb_dry_run(version: str) -> None:
     """Dry run: show what LEB files would be uploaded without uploading.
 
-    VERSION is the release version string, e.g. '0.22.0'.
+    VERSION is the release version string, e.g. '1.0.0'.
     """
     _release(["--version", version, "--dry-run"])

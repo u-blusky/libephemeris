@@ -6,14 +6,14 @@
 pip install libephemeris
 ```
 
-The library works immediately after installation. When no local ephemeris files are present, it fetches data from NASA JPL Horizons API transparently.
+The PyPI wheel includes a bundled LEB2 base-tier core (~10.6 MB, 14 bodies, 1850-2150). With the default `medium` tier, LEB2 files are auto-downloaded on first use (~119 MB). Bodies not covered by LEB2 are resolved via Horizons API or Skyfield.
 
-For offline use or faster calculations:
+For full offline coverage, download a complete precision tier (DE kernel + planet centers + minor-body SPKs):
 
 ```bash
-libephemeris download:medium      # DE440 (~128 MB), 1550-2650 — recommended
-libephemeris download:base        # DE440s (~35 MB), 1850-2150 — lightweight
-libephemeris download:extended    # DE441 (~3.3 GB), -13200 to +17191 — full range
+libephemeris download medium       # 1550-2650, ~200 MB total — recommended
+libephemeris download base         # 1850-2150, lightweight
+libephemeris download extended     # -13200 to +17191, full range
 ```
 
 ### Optional Extras
@@ -24,7 +24,7 @@ pip install libephemeris[stars]   # Star catalog building (astropy)
 pip install libephemeris[all]     # Everything
 ```
 
-**Requirements:** Python 3.9+ | skyfield >= 1.54 | pyerfa >= 2.0
+**Requirements:** Python 3.12+ | skyfield >= 1.54 | pyerfa >= 2.0
 
 ## Ephemeris Tiers
 
@@ -79,7 +79,7 @@ cusps, ascmc = swe.houses(jd, 41.9028, 12.4964, b"P")
 
 print(f"ASC: {ascmc[0]:.4f}")
 print(f"MC:  {ascmc[1]:.4f}")
-for i, cusp in enumerate(cusps[1:13], 1):
+for i, cusp in enumerate(cusps, 1):
     print(f"House {i:2d}: {cusp:.4f}")
 ```
 
@@ -108,6 +108,8 @@ swe.set_auto_spk_download(True)
 pos, _ = swe.calc_ut(2460000.0, swe.SE_CHIRON, 0)
 ```
 
-Fallback chain: SPK kernel > auto-download > REBOUND/ASSIST > Keplerian propagation.
+Fallback chain: SPK kernel → auto-download → strict precision check → REBOUND/ASSIST → Keplerian propagation.
+
+With strict precision mode (enabled by default), `SPKRequiredError` is raised for mapped bodies when no SPK is available rather than silently falling back to low-precision Keplerian. Use `set_strict_precision(False)` to allow the full fallback chain.
 
 See [Optional Modules and Calculation Backends](optional-modules.md) for details on the fallback chain, ASSIST n-body integration, and known limitations (e.g., Bennu).

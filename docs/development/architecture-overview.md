@@ -67,7 +67,7 @@ kernels via **jplephem**). The library provides:
 |---------------------|--------|-----------------------------------------|
 | `eclipse.py`        | 14,240 | Solar/lunar eclipses, occultations      |
 | `fixed_stars.py`    | 5,224  | 102-star catalog, proper motion         |
-| `houses.py`         | 4,928  | 24 house systems                        |
+| `houses.py`         | 4,928  | 25 house systems (26 codes)                        |
 | `planets.py`        | 4,877  | Core planetary calculations             |
 | `hypothetical.py`   | 3,651  | Uranian planets, Transpluto             |
 | `lunar.py`          | 3,033  | Lunar nodes, Lilith (4 methods)         |
@@ -220,7 +220,7 @@ engine/
 │   ├── light_time.rs       # 3-iteration light-time           (~60 lines)
 │   ├── aberration.rs       # Annual aberration                (~100 lines)
 │   ├── ayanamsha.rs        # 43 sidereal systems              (~800 lines)
-│   ├── houses/             # 24 house systems                 (~2000 lines)
+│   ├── houses/             # 25 house systems (26 codes)                 (~2000 lines)
 │   │   ├── mod.rs
 │   │   ├── placidus.rs
 │   │   ├── koch.rs

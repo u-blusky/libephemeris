@@ -7,9 +7,9 @@ provides precise planet center positions for outer planets (Jupiter-Pluto).
 
 Usage:
     # From command line
-    libephemeris download:medium       Download data for 'medium' tier
-    libephemeris download:base         Download data for 'base' tier
-    libephemeris download:extended     Download data for 'extended' tier
+    libephemeris download medium       Download data for 'medium' tier
+    libephemeris download base         Download data for 'base' tier
+    libephemeris download extended     Download data for 'extended' tier
 
     # From Python
     from libephemeris.download import download_for_tier
@@ -1379,7 +1379,7 @@ def download_leb_for_tier(
     Raises:
         ValueError: If tier_name is invalid or hash verification fails
         urllib.error.URLError: If download fails
-        RuntimeError: If the extended tier LEB is not yet available
+        RuntimeError: If the LEB file has no download hash configured
     """
     logger = get_logger()
     filename = f"ephemeris_{tier_name}.leb"
@@ -1391,11 +1391,11 @@ def download_leb_for_tier(
             f"Unknown tier '{tier_name}'. Valid tiers: {', '.join(valid_tiers)}"
         )
 
-    # Extended tier is not yet generated
+    # Guard: file must have a download hash configured
     if file_info.get("sha256") is None:
         raise RuntimeError(
-            f"LEB file for '{tier_name}' tier is not yet available for download. "
-            f"You can generate it locally with: poe leb:generate:{tier_name}:groups"
+            f"LEB file for '{tier_name}' tier has no download hash configured. "
+            f"You can generate it locally with: leph leb generate {tier_name}"
         )
 
     dest_path = get_leb_path_for_tier(tier_name)

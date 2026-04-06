@@ -124,7 +124,7 @@ LibEphemeris uses NASA JPL DE ephemerides (via Skyfield) instead of Swiss Epheme
 
 | Component | Max Difference | Notes |
 |-----------|---------------|-------|
-| House cusps | < 0.001 degrees | All 19 house systems |
+| House cusps | < 0.001 degrees | All 25 house systems |
 | Ascendant | < 0.001 degrees | |
 | MC | < 0.001 degrees | |
 | ARMC | < 0.001 degrees | |
@@ -166,9 +166,9 @@ The True Node (osculating node) shows larger differences due to different algori
 
 ---
 
-## Features Not Yet Implemented
+## Known Compatibility Gaps
 
-The following features are present in pyswisseph but **not yet fully implemented** in LibEphemeris:
+The following features are present in pyswisseph but have limited or different implementation in LibEphemeris:
 
 ### Eclipse Functions (Partial)
 
@@ -389,7 +389,7 @@ pos, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SPEED)
 
 ## Calculation Backend
 
-Unlike Swiss Ephemeris (which selects between JPL, Swiss, and Moshier backends via flags), LibEphemeris always uses **JPL DE440/DE441 via Skyfield** by default. No ephemeris path or data file configuration is required -- kernels are managed automatically.
+Unlike Swiss Ephemeris (which selects between JPL, Swiss, and Moshier backends via flags), LibEphemeris uses **JPL DE440/DE441** as its data source. The default `"auto"` mode resolves positions via LEB (if configured), Horizons API (if no local DE440), or Skyfield — no manual configuration required.
 
 For performance-critical workloads, LibEphemeris also supports an optional **LEB** (LibEphemeris Binary) backend that provides ~14x faster evaluation using precomputed Chebyshev approximations. LEB is entirely opt-in and not needed for correctness.
 
@@ -397,19 +397,21 @@ The calculation mode controls which backend is used:
 
 | Mode | Behavior |
 |------|----------|
-| `"auto"` **(default)** | Use LEB if a `.leb` file is configured, otherwise Skyfield |
-| `"skyfield"` | Always Skyfield, even if a `.leb` file is configured |
-| `"leb"` | Require LEB; raises `RuntimeError` if no `.leb` file is available |
+| `"auto"` **(default)** | Try LEB first, then Horizons API (if no local DE440), then Skyfield |
+| `"skyfield"` | Always Skyfield/DE440 |
+| `"leb"` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield |
+| `"horizons"` | Prefer Horizons API (requires internet); unsupported bodies/flags fall back to Skyfield |
 
 ```python
 from libephemeris import set_calc_mode
 
-set_calc_mode("skyfield")  # Force pure JPL/Skyfield
-set_calc_mode("leb")       # Require LEB (error if unavailable)
-set_calc_mode("auto")      # Default: LEB if available, else Skyfield
+set_calc_mode("skyfield")   # Force pure JPL/Skyfield
+set_calc_mode("leb")        # Require LEB (error if unavailable)
+set_calc_mode("horizons")   # Force Horizons API
+set_calc_mode("auto")       # Default: LEB -> Horizons -> Skyfield
 ```
 
-With no `.leb` file configured (the default), `"auto"` and `"skyfield"` are functionally identical -- both use pure JPL/Skyfield.
+The default `"auto"` mode resolves data transparently: it tries LEB (bundled base-tier core or auto-downloaded), then Horizons API, then Skyfield. With the default `medium` tier, LEB2 files are auto-downloaded on first use.
 
 See the [LEB Technical Guide](../leb/guide.md) for details.
 

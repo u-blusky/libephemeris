@@ -760,7 +760,7 @@ def config() -> None:
     strict = os.environ.get("LIBEPHEMERIS_STRICT_PRECISION", "")
     click.echo(
         f"  {_e('LIBEPHEMERIS_STRICT_PRECISION')}  (1/0) "
-        f"Raise errors instead of falling back  [{strict or 'default: 0'}]"
+        f"Raise errors instead of falling back  [{strict or 'default: 1'}]"
     )
     click.echo()
 

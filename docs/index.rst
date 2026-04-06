@@ -1,43 +1,43 @@
 libephemeris Documentation
 ==========================
 
-libephemeris is a pure-Python astronomical ephemeris library compatible with
-the pyswisseph API. It provides high-precision planetary positions,
-house calculations, eclipse predictions, and more.
+libephemeris is a pure-Python astronomical ephemeris library, API-compatible
+with pyswisseph. It provides high-precision planetary positions,
+house calculations, eclipse predictions, and more using NASA JPL DE440/DE441
+ephemerides via Skyfield.
 
 Features
 --------
 
 - **pyswisseph Compatible**: Drop-in replacement for pyswisseph
 - **Pure Python**: No C extensions required
-- **High Precision**: Uses NASA JPL DE440 ephemeris via Skyfield
-- **Thread Safe**: EphemerisContext for concurrent calculations
-- **19 House Systems**: Including Placidus, Koch, Whole Sign, and more
+- **High Precision**: Uses NASA JPL DE440/DE441 ephemeris via Skyfield
+- **Four Calculation Modes**: auto, skyfield, leb, horizons
+- **25 House Systems**: Including Placidus, Koch, Whole Sign, and more (26 codes with A/E alias)
 - **43 Ayanamshas**: Full sidereal zodiac support
 - **Eclipses**: Solar and lunar eclipse calculations
-- **Fixed Stars**: Regulus, Spica, and more with proper motion
+- **Fixed Stars**: 116 Hipparcos stars with proper motion
 - **Minor Bodies**: Asteroids, centaurs, and TNOs with SPK kernel support
-- **High-Precision SPK**: Download SPK kernels from JPL Horizons for arcsecond-level precision
 
 Quick Start
 -----------
 
 .. code-block:: python
 
-   import libephemeris as ephem
+   import libephemeris as swe
 
    # Calculate planetary positions
-   jd = ephem.julday(2024, 1, 1, 12.0)
-   pos, flags = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+   jd = swe.julday(2024, 1, 1, 12.0)
+   pos, flags = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SPEED)
    print(f"Sun longitude: {pos[0]:.4f} degrees")
 
    # Calculate house cusps
-   cusps, ascmc = ephem.houses(jd, 41.9, 12.5, ord('P'))
+   cusps, ascmc = swe.houses(jd, 41.9, 12.5, b"P")
    print(f"Ascendant: {ascmc[0]:.2f} degrees")
 
    # Sidereal calculations
-   ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
-   pos_sid, _ = ephem.calc_ut(jd, ephem.SE_MOON, ephem.SEFLG_SIDEREAL)
+   swe.set_sid_mode(swe.SE_SIDM_LAHIRI)
+   pos_sid, _ = swe.calc_ut(jd, swe.SE_MOON, swe.SEFLG_SIDEREAL)
    print(f"Moon (sidereal): {pos_sid[0]:.4f} degrees")
 
 Installation
@@ -47,30 +47,72 @@ Installation
 
    pip install libephemeris
 
+Requires Python 3.12+.
+
 
 Contents
 --------
 
 .. toctree::
    :maxdepth: 2
-   :caption: Getting Started:
+   :caption: Guides
 
-   migration-guide
+   guides/getting-started
+   guides/migration-guide
+   guides/optional-modules
+   guides/precision-tuning
+   guides/tracing
 
 .. toctree::
    :maxdepth: 2
-   :caption: Technical Documentation:
+   :caption: Architecture
 
-   api_reference
-   PRECISION
-   PRECISION_TUNING
-   INTERPOLATED_APOGEE
-   interpolated_perigee_methodology
-   TRUE_LILITH_METHODS
-   HOUSE_SYSTEMS
-   AYANAMSHA
-   PLANET_CENTERS_SPK
-   testing
+   architecture/horizons-backend
+   development/architecture-overview
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
+   reference/precision
+   reference/flags
+   reference/divergences
+   reference/house-systems
+   reference/ayanamsha
+   reference/swisseph-comparison
+   reference/known-bugs
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Methodology
+
+   methodology/overview
+   methodology/planet-centers-spk
+   methodology/lunar-apsides
+   methodology/interpolated-apogee
+   methodology/interpolated-perigee
+   methodology/true-lilith
+   methodology/pyerfa-integration
+   methodology/rebound-integration
+
+.. toctree::
+   :maxdepth: 2
+   :caption: LEB Binary Ephemeris
+
+   leb/guide
+   leb/algorithms
+   leb/quickstart
+   leb/testing
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Development
+
+   development/testing
+   development/roadmap
+   development/precision-history
+   development/keplerian-improvements
+   development/full-range-coverage
 
 
 Indices and Tables

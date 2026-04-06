@@ -11,17 +11,15 @@
 
 A high-precision astronomical ephemeris library for Python, powered by NASA JPL data and modern IAU standards. API-compatible drop-in replacement for PySwissEph.
 
-> [!NOTE]
-> **Alpha 1.0.0** -- API is stabilizing. Breaking changes will be documented in the [changelog](CHANGELOG.md).
-
 ---
 
 ## Features
 
-- **NASA JPL ephemerides** -- all calculations use DE440/DE441 (2021) exclusively via Skyfield. No analytical fallbacks.
-- **Three calculation backends** -- Skyfield (pure JPL), LEB (precomputed Chebyshev, ~14x speedup), and Horizons API (zero-install, no local files needed).
+- **NASA JPL ephemerides** -- all calculations use DE440/DE441 (2021) via Skyfield, with Horizons API and precomputed LEB as alternative data sources.
+- **Four calculation modes** -- `auto` (default), `skyfield`, `leb` (~14x speedup), `horizons` (zero-install). All produce sub-arcsecond agreement.
 - **IAU standard transforms** -- nutation (IAU 2006/2000A), precession (IAU 2006), obliquity via the official ERFA library.
 - **Physical planet centers** -- outer planets corrected from system barycenters to true body centers using JPL satellite ephemerides.
+- **25 house systems** -- all systems supported by Swiss Ephemeris (26 codes including the A/E equal-house alias), independently verified against pyswisseph.
 - **Sub-arcsecond precision** -- all planets < 1", house cusps < 0.02", independently verified against JPL Horizons and astropy/ERFA. [Full report](docs/PRECISION.md).
 - **Pure Python** -- fully testable, readable, documented. No C extensions.
 
@@ -33,13 +31,13 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 pip install libephemeris
 ```
 
-Works immediately -- the library fetches data from NASA JPL Horizons API when no local files are present. For offline use or faster calculations, download ephemeris files:
+The PyPI wheel includes a bundled LEB2 base-tier core (~10.6 MB, 14 bodies, 1850-2150). With the default `medium` tier, LEB2 files are auto-downloaded on first use (~119 MB). For full offline coverage, download the complete data set for a precision tier:
 
 ```bash
-libephemeris download:medium      # JPL DE440 (~128 MB), recommended
+libephemeris download medium       # DE440 + planet centers + minor-body SPKs (~200 MB total)
 ```
 
-**Requirements:** Python 3.9+ | [Optional extras](docs/getting-started.md#optional-extras): `[nbody]`, `[stars]`, `[all]`
+**Requirements:** Python 3.12+ | [Optional extras](docs/guides/getting-started.md#optional-extras): `[nbody]`, `[stars]`, `[all]`
 
 ---
 
@@ -64,13 +62,13 @@ cusps, ascmc = swe.houses(swe.julday(2024, 11, 5, 18.0), 41.9028, 12.4964, b"P")
 print(f"ASC: {ascmc[0]:.4f}, MC: {ascmc[1]:.4f}")
 ```
 
-More examples: [Getting Started](docs/getting-started.md)
+More examples: [Getting Started](docs/guides/getting-started.md)
 
 ---
 
-## Calculation Backends
+## Calculation Modes
 
-LibEphemeris supports three backends with automatic fallback:
+LibEphemeris supports four calculation modes with automatic fallback:
 
 ```
 LEB (~5 us/eval)  -->  Horizons API (~300ms)  -->  Skyfield/DE440 (~120 us/eval)
@@ -79,9 +77,9 @@ LEB (~5 us/eval)  -->  Horizons API (~300ms)  -->  Skyfield/DE440 (~120 us/eval)
 | Mode | Behavior | Use case |
 |------|----------|----------|
 | `"auto"` **(default)** | LEB if configured, then Horizons if no DE440, then Skyfield | Works everywhere |
-| `"leb"` | LEB precomputed only | Maximum performance |
-| `"horizons"` | NASA JPL Horizons API only | Zero-install, serverless, CI |
-| `"skyfield"` | Skyfield/DE440 only | Offline, maximum precision |
+| `"leb"` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield | Maximum performance |
+| `"horizons"` | Prefer Horizons API; unsupported bodies/flags fall back to Skyfield | Zero-install, serverless, CI |
+| `"skyfield"` | Always Skyfield/DE440 | Offline, full precision |
 
 ```python
 from libephemeris import set_calc_mode
@@ -89,14 +87,14 @@ from libephemeris import set_calc_mode
 set_calc_mode("horizons")  # Or via env: LIBEPHEMERIS_MODE=horizons
 ```
 
-All backends produce the same positions (sub-arcsecond agreement). The default `"auto"` mode always works -- with or without local data files.
+All modes produce the same positions (sub-arcsecond agreement). The default `"auto"` mode resolves data transparently via bundled LEB2, auto-download, Horizons API, or Skyfield.
 
-| Backend | Details |
-|---------|---------|
-| **Skyfield** | Pure JPL DE440/DE441 via Skyfield. Gold standard. [Ephemeris tiers](docs/getting-started.md#ephemeris-tiers) |
+| Data source | Details |
+|-------------|---------|
+| **Skyfield** | Pure JPL DE440/DE441 via Skyfield. Gold standard. [Ephemeris tiers](docs/guides/getting-started.md#ephemeris-tiers) |
 | **LEB** | Precomputed Chebyshev polynomials, ~14x speedup. [LEB Guide](docs/leb/guide.md) |
-| **LEB2** | Compressed LEB format (4-10x smaller). Core bodies (~10.1 MB) ship in the PyPI wheel. [LEB2 details](docs/leb/guide.md#13-leb2-compressed-format) |
-| **Horizons** | NASA JPL Horizons REST API. No local files needed. [Horizons Guide](docs/horizons-backend.md) |
+| **LEB2** | Compressed LEB format (4-10x smaller). Base-tier core (~10.6 MB) bundled in wheel; other tiers auto-downloaded. [LEB2 details](docs/leb/guide.md#13-leb2-compressed-format) |
+| **Horizons** | NASA JPL Horizons REST API. No local files needed. [Horizons Guide](docs/architecture/horizons-backend.md) |
 
 ---
 
@@ -108,7 +106,7 @@ Measured across 4,400+ comparison rounds. [Full precision report](docs/PRECISION
 |----------|---------|-----|-------|
 | Planets (Sun-Pluto) | 0.04-0.26" | 0.75" | Sub-arcsecond, all planets |
 | Moon | 0.70" | 3.32" | Different lunar models |
-| House cusps | < 0.01" | 0.02" | All 24 systems tested |
+| House cusps | < 0.01" | 0.02" | All 25 systems tested |
 | Fixed stars | < 0.1" | 0.51" | 116 Hipparcos stars |
 | Solar eclipses | -- | < 6s | Timing precision |
 | Lunar eclipses | -- | < 8s | Timing precision |
@@ -140,6 +138,7 @@ Full flag reference with examples: [docs/reference/flags.md](docs/reference/flag
 ### Guides
 - [Getting Started](docs/guides/getting-started.md) -- installation, ephemeris tiers, first calculations
 - [Migration from PySwissEph](docs/guides/migration-guide.md)
+- [Optional Modules](docs/guides/optional-modules.md) -- backends, fallback chain, optional extras
 - [Precision Tuning](docs/guides/precision-tuning.md)
 - [Computation Tracing](docs/guides/tracing.md) -- discover which backend computed each body
 
@@ -167,7 +166,7 @@ Full flag reference with examples: [docs/reference/flags.md](docs/reference/flag
 - [Manual (EN)](docs/manual/en/) -- beginner's guide to astrological calculations, 15 chapters
 
 ### Development
-- [Testing](docs/development/testing.md) -- test suites, commands, coverage
+- [CLI Reference](CLI.md) -- full command reference for `libephemeris` and `leph`
 - [Roadmap](docs/development/roadmap.md)
 - [Changelog](CHANGELOG.md)
 
@@ -176,13 +175,13 @@ Full flag reference with examples: [docs/reference/flags.md](docs/reference/flag
 ## CLI Commands
 
 ```bash
-# Download ephemeris data
-libephemeris download:base         # DE440s (~35 MB), 1850-2150
-libephemeris download:medium       # DE440 (~130 MB), 1550-2650 (recommended)
-libephemeris download:extended     # DE441 (~3.3 GB), -13200 to +17191
+# Download ephemeris data (DE kernel + planet centers + minor-body SPKs)
+libephemeris download base          # 1850-2150 (lightweight)
+libephemeris download medium        # 1550-2650 (recommended)
+libephemeris download extended      # -13200 to +17191 (full range)
 
 # Status and version
-libephemeris status                # Show installed data files
+libephemeris status                 # Show installed data files
 libephemeris --version
 ```
 
@@ -195,22 +194,23 @@ git clone https://github.com/g-battaglia/libephemeris.git
 cd libephemeris && uv pip install -e ".[dev]"
 ```
 
-Key commands ([full list](docs/development/testing.md)):
+Key commands ([full list](CLI.md)):
 
 | Command | Description |
 |---------|-------------|
-| `poe test:unit:fast` | Unit tests, parallel (~1 min) |
-| `poe test:leb2:precision:all` | LEB2 compression precision (all tiers) |
-| `poe test:horizons:quick` | Horizons API precision (~15s) |
-| `poe test:compare` | Cross-validate vs reference |
+| `poe test:skyfield:fast` | Skyfield unit tests, parallel (~1 min) |
+| `poe test:leb:fast` | LEB unit tests, parallel (~1 min) |
+| `poe test:horizons:core` | Horizons API precision (~15s) |
+| `poe test:compare:skyfield` | Cross-validate vs pyswisseph |
+| `poe test:houses` | All 25 house systems vs pyswisseph |
 | `poe lint` | Ruff linter |
 | `poe format` | Ruff formatter |
 
 ---
 
-## Performance Optimizations (v1.0.0a13+)
+## Performance
 
-### `reset_session()` — lightweight state reset
+### `reset_session()` -- lightweight state reset
 
 Resets only per-calculation state (topo, sidereal mode, angles cache) without closing
 file handles or clearing LRU caches. Use between independent calculations to avoid the
@@ -226,28 +226,13 @@ swe.calc_ut(jd2, swe.SE_SUN, flags)  # Reuses LEB reader, timescale, caches
 
 **Impact**: Consecutive calculations drop from ~3500ms to ~2ms (1750x speedup).
 
-### `set_ephe_path()` idempotent
-
-When called with the same path, `set_ephe_path()` is now a no-op — no file handles are
-closed and no caches are cleared. Previously, every call triggered a full teardown.
-
 ### LEB2 v2 chunked format
 
-LEB2 files now use 10-year temporal chunks instead of monolithic per-body compression.
+LEB2 files use 10-year temporal chunks instead of monolithic per-body compression.
 Only the chunk containing the requested Julian Day is decompressed (~300 KB for Moon
 instead of 307 MB). The reader transparently supports both v1 (legacy) and v2 (chunked).
 
 **Impact**: Cold-start decompression drops from 1568ms to 47ms (33x speedup).
-
-Generate v2 files from LEB1 sources:
-```bash
-python scripts/generate_leb2.py convert ephemeris_extended.leb -o extended_core.leb2 --group core
-```
-
-### `madvise(MADV_WILLNEED)`
-
-LEB1 and LEB2 readers issue `madvise(MADV_WILLNEED)` on `mmap.mmap()` to hint the OS
-to pre-load pages in the background, reducing cold-start latency.
 
 ---
 

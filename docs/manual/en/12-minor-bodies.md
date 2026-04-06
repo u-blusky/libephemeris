@@ -81,9 +81,13 @@ When you request the position of a minor body, the library tries different metho
 
 **1. SPK Kernel** — If a JPL binary file (SPK/BSP format) is registered for that body, it uses it. Precision: sub-arcsecond. It is the gold standard method.
 
-**2. Automatic SPK download** — If automatic download is enabled and the kernel is not available locally, the library downloads it from JPL Horizons. Works for all 37+ bodies with predefined SPK information.
+**2. Automatic SPK download** — If automatic download is enabled and the kernel is not available locally, the library downloads it from JPL Horizons. Works for all 37 bodies in the SPK map.
 
-**3. Keplerian fallback** — If no SPK is available, it uses Kepler's laws with corrections for giant planet perturbations. Less precise (arcminutes over year scales), but always works without an Internet connection.
+**3. Strict precision check** — With strict precision mode (enabled by default), `SPKRequiredError` is raised for mapped bodies when no SPK is available, preventing silent precision loss. Use `set_strict_precision(False)` to allow lower-precision fallbacks.
+
+**4. ASSIST n-body** — If `libephemeris[nbody]` is installed with data files, REBOUND/ASSIST provides sub-arcsecond precision for any body with orbital elements.
+
+**5. Keplerian fallback** — Uses Kepler's laws with corrections for giant planet perturbations. Less precise (arcminutes over year scales), but works without an Internet connection.
 
 ```python
 import libephemeris as ephem
@@ -263,9 +267,10 @@ In this chapter, we learned how to work with the minor bodies of the Solar Syste
 **Key concepts:**
 
 - **Minor bodies** include asteroids, centaurs, TNOs, and near-Earth asteroids — thousands of bodies beyond the planets.
-- The library uses a **calculation chain**: first it looks for an SPK kernel (highest precision), then tries automatic download, and finally uses the Keplerian fallback.
+- The library uses a **calculation chain**: SPK kernel → auto-download → strict precision check → ASSIST n-body → Keplerian fallback.
 - **SPK Kernels** are NASA binary files with precise trajectories — the gold standard for sub-arcsecond positions.
-- The **Keplerian fallback** always works without the Internet, but precision degrades over time (arcminutes over year scales).
+- **Strict precision** (default) raises `SPKRequiredError` for mapped bodies without SPK, preventing silent precision loss. Disable with `set_strict_precision(False)`.
+- The **Keplerian fallback** works without the Internet but is only reached if strict precision is disabled or the body is not in the SPK map.
 - For bodies without a dedicated ID, use `SE_AST_OFFSET + catalog_number`.
 
 **Introduced functions:**

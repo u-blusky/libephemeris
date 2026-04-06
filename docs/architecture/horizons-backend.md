@@ -1,6 +1,5 @@
 # Horizons API Backend
 
-> **Status:** Production-ready (v1.0.0a2+)
 > **Requires:** Internet connection to ssd.jpl.nasa.gov
 
 ## Overview
@@ -18,10 +17,10 @@ or the `LIBEPHEMERIS_MODE` environment variable:
 
 | Mode | Behavior | Fails when |
 |------|----------|-----------|
-| `"auto"` (default) | LEB -> Horizons (if no DE440) -> Skyfield | never |
-| `"leb"` | LEB only | no `.leb` file configured |
-| `"horizons"` | Horizons API only | no internet / unsupported body |
-| `"skyfield"` | Skyfield/DE440 only | DE440 not available |
+| `"auto"` (default) | LEB → Horizons (if no DE440) → Skyfield | never |
+| `"leb"` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield | no LEB resolvable |
+| `"horizons"` | Prefer Horizons; unsupported bodies/flags fall back to Skyfield | no internet |
+| `"skyfield"` | Always Skyfield/DE440 | DE440 not available |
 
 ### Auto Mode Flow
 
@@ -166,14 +165,14 @@ error translates to ~0.04 seconds of arc over a 1-minute time step.
 
 ```bash
 # Horizons vs Skyfield precision (needs internet)
-poe test:horizons              # 200 dates, ~45s
-poe test:horizons:quick        # 50 dates, ~15s
+leph test horizons precision          # 200 dates, ~45s
+leph test horizons precision-quick    # 50 dates, ~15s
 
 # Horizons vs LEB2 cross-validation
-poe test:horizons:vs:leb       # 100 dates, ~30s
+leph test horizons vs-leb             # 100 dates, ~30s
 
 # Cross-validate vs reference (needs pyswisseph + internet)
-poe test:compare:horizons
+leph test compare horizons-backend
 ```
 
 ## Error Handling

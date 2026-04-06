@@ -20,8 +20,9 @@ at runtime.
 
 ## Calculation Backends
 
-Planets (Sun through Pluto), the Moon, and lunar nodes always use the
-Skyfield/DE440 backend. No optional modules are needed for these bodies.
+Planets (Sun through Pluto), the Moon, and lunar nodes are served by the
+active calculation mode (`auto`, `skyfield`, `leb`, or `horizons`). No
+optional modules are needed for these bodies.
 
 Minor bodies use a **fallback chain** of backends, each with different
 precision and requirements:
@@ -164,11 +165,12 @@ Different setups require different data downloads:
 
 | Setup | What to download | Total size | Command |
 |-------|-----------------|------------|---------|
-| **Minimal** | Nothing (uses Horizons API) | 0 | -- |
-| **Recommended** | Medium tier DE440 + SPKs | ~200 MB | `libephemeris download medium` |
+| **Minimal** | Nothing (LEB2 auto-downloaded on first use) | 0 up front | -- |
+| **Recommended** | Medium tier DE440 + planet centers + SPKs | ~200 MB | `libephemeris download medium` |
 | **High precision asteroids** | Above + ASSIST data | ~900 MB | Above + `libephemeris download assist` |
 | **Binary ephemeris (fast)** | LEB2 compressed | ~33-897 MB | `libephemeris download leb2-medium` |
-| **Offline everything** | All tiers + LEB + ASSIST | ~5-6 GB | `libephemeris download all` |
+| **Offline everything** | All tiers + LEB2 + DE + SPKs + IERS | ~5-6 GB | `libephemeris download all` |
+| **Offline + n-body** | Above + ASSIST data | ~6-7 GB | Above + `libephemeris download assist` |
 
 ---
 
@@ -256,5 +258,7 @@ libephemeris download leb2-medium
 
 ```python
 import libephemeris as swe
-swe.set_leb_file("~/.libephemeris/leb2/medium/core.leb2")
+from pathlib import Path
+
+swe.set_leb_file(str(Path("~/.libephemeris/leb/medium_core.leb2").expanduser()))
 ```

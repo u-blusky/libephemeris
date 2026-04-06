@@ -18,30 +18,29 @@ during generation if `LIBEPHEMERIS_AUTO_SPK=1`).
 
 ## 1. Generate LEB1 Files
 
-### Via poe (recommended)
+### Via leph (recommended)
 
 ```bash
 # Group workflow (recommended — avoids macOS deadlocks, allows partial regen)
-poe leb:generate:base:groups       # 3 groups + merge → ephemeris_base.leb
-poe leb:generate:medium:groups     # same for medium tier
-poe leb:generate:extended:groups   # same for extended tier
-
-# Or all at once (slower, no partial regen)
-poe leb:generate:base              # → data/leb/ephemeris_base.leb
-poe leb:generate:medium
-poe leb:generate:extended
+leph leb generate base groups       # 3 groups + merge → ephemeris_base.leb
+leph leb generate medium groups     # same for medium tier
+leph leb generate extended groups   # same for extended tier
 ```
 
 ### Step-by-step group workflow
 
 ```bash
-# 1. Generate each group separately
-poe leb:generate:base:planets      # → ephemeris_base_planets.leb    (~1s)
-poe leb:generate:base:asteroids    # → ephemeris_base_asteroids.leb2  (~15-60s)
-poe leb:generate:base:analytical   # → ephemeris_base_analytical.leb (~2-3min)
+# 1. Generate each group separately (via direct CLI)
+python scripts/generate_leb.py --tier base --group planets      # → ephemeris_base_planets.leb    (~1s)
+python scripts/generate_leb.py --tier base --group asteroids    # → ephemeris_base_asteroids.leb   (~15-60s)
+python scripts/generate_leb.py --tier base --group analytical   # → ephemeris_base_analytical.leb (~2-3min)
 
 # 2. Merge + verify
-poe leb:generate:base:merge        # → ephemeris_base.leb (with --verify)
+python scripts/generate_leb.py --tier base --merge \
+  data/leb/ephemeris_base_planets.leb \
+  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_analytical.leb \
+  --verify
 ```
 
 ### Regenerate a single group
@@ -49,8 +48,12 @@ poe leb:generate:base:merge        # → ephemeris_base.leb (with --verify)
 If only asteroids changed (e.g. SPK update):
 
 ```bash
-poe leb:generate:base:asteroids    # regenerate asteroids only
-poe leb:generate:base:merge        # re-merge all 3 partial files
+python scripts/generate_leb.py --tier base --group asteroids    # regenerate asteroids only
+python scripts/generate_leb.py --tier base --merge \
+  data/leb/ephemeris_base_planets.leb \
+  data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_analytical.leb \
+  --verify                                                      # re-merge all 3 partial files
 ```
 
 ### Direct CLI
@@ -71,7 +74,7 @@ python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
-  data/leb/ephemeris_base_asteroids.leb2 \
+  data/leb/ephemeris_base_asteroids.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -80,9 +83,9 @@ python scripts/generate_leb.py --tier base --merge \
 
 | Tier | File | Size | Coverage |
 |------|------|------|----------|
-| Base | `data/leb/ephemeris_base.leb` | ~102 MB | 1850-2150 |
-| Medium | `data/leb/ephemeris_medium.leb` | ~377 MB | 1550-2650 |
-| Extended | `data/leb/ephemeris_extended.leb` | ~2.8 GB | -5000 / +5000 |
+| Base | `data/leb/ephemeris_base.leb` | ~53 MB | 1850-2150 |
+| Medium | `data/leb/ephemeris_medium.leb` | ~175 MB | 1550-2650 |
+| Extended | `data/leb/ephemeris_extended.leb` | ~1.6 GB | -5000 / +5000 |
 
 ### LEB1 body groups
 
@@ -99,21 +102,15 @@ python scripts/generate_leb.py --tier base --merge \
 > LEB2 requires an existing LEB1 file as input. Generate one first
 > (section 1) if you don't have one.
 
-### Via poe
+### Via leph
 
 ```bash
 # All 4 groups for a tier
-poe leb2:convert:base              # → data/leb2/base_{core,asteroids,apogee,uranians}.leb
-
-# Single group
-poe leb2:convert:base:core         # → data/leb2/base_core.leb2
-poe leb2:convert:base:asteroids    # → data/leb2/base_asteroids.leb2
-poe leb2:convert:base:apogee       # → data/leb2/base_apogee.leb2
-poe leb2:convert:base:uranians     # → data/leb2/base_uranians.leb2
+leph leb2 convert base              # → data/leb2/base_{core,asteroids,apogee,uranians}.leb2
 
 # Medium / Extended
-poe leb2:convert:medium
-poe leb2:convert:extended
+leph leb2 convert medium
+leph leb2 convert extended
 ```
 
 ### Direct CLI
@@ -181,7 +178,7 @@ reader.close()
 
 ```bash
 # Against LEB1 reference
-poe leb2:verify:base
+leph leb2 verify base
 
 # Direct CLI
 python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
@@ -192,18 +189,17 @@ python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
 
 ```bash
 # LEB1
-poe test:leb                       # Unit tests (no @slow)
-poe test:leb:precision             # Full precision suite
-poe test:leb:precision:quick       # Medium tier only
+leph test leb-format all           # Unit tests (no @slow)
+leph test leb-format precision     # Full precision suite
 
 # LEB2
-poe test:leb2                      # Compression round-trip + reader tests
-poe test:leb2:precision:base       # End-to-end precision, base (~15s)
-poe test:leb2:precision:all        # All tiers (~45s)
+leph test leb2-format all          # Compression round-trip + reader tests
+leph test leb2-format precision-base  # End-to-end precision, base (~15s)
+leph test leb2-format precision-all   # All tiers (~45s)
 
 # With LEB active (any format)
-poe test:unit:leb                  # Unit tests in LEB mode
-poe test:unit:leb:fast             # Same, parallel
+leph test leb-backend unit         # Unit tests in LEB mode
+leph test leb-backend unit-fast    # Same, parallel
 ```
 
 ### Individual test files
@@ -222,13 +218,13 @@ pytest tests/test_leb/test_leb2_reader.py -v
 
 ```bash
 # 1. Generate the LEB files
-poe leb:generate:medium:groups
+leph leb generate medium groups
 
 # 2. Dry run
-poe release:leb:dry-run 0.22.0
+leph release leb-dry-run 1.0.0
 
 # 3. Upload + update hashes
-poe release:leb:medium 0.22.0
+leph release leb 1.0.0
 
 # 4. Commit
 git add libephemeris/download.py
@@ -258,9 +254,10 @@ set_calc_mode("leb")
 Auto-discovery: files in `~/.libephemeris/leb/` are found automatically.
 
 ```bash
-# End-user download (no poe needed)
-libephemeris download:leb:base       # ~53 MB
-libephemeris download:leb:medium     # ~175 MB
+# End-user download
+libephemeris download leb-base       # ~53 MB
+libephemeris download leb-medium     # ~175 MB
+libephemeris download leb-extended   # ~1.6 GB
 ```
 
 ---
@@ -269,14 +266,13 @@ libephemeris download:leb:medium     # ~175 MB
 
 | Action | Command |
 |--------|---------|
-| **LEB1 base (recommended)** | `poe leb:generate:base:groups` |
-| **LEB1 medium** | `poe leb:generate:medium:groups` |
-| **LEB1 extended** | `poe leb:generate:extended:groups` |
-| **LEB2 base (all groups)** | `poe leb2:convert:base` |
-| **LEB2 base core only** | `poe leb2:convert:base:core` |
-| **LEB2 medium** | `poe leb2:convert:medium` |
-| **Verify LEB2** | `poe leb2:verify:base` |
-| **Test LEB1** | `poe test:leb` |
-| **Test LEB2** | `poe test:leb2` |
-| **Test LEB2 precision** | `poe test:leb2:precision:base` |
-| **Release** | `poe release:leb 0.22.0` |
+| **LEB1 base (recommended)** | `leph leb generate base groups` |
+| **LEB1 medium** | `leph leb generate medium groups` |
+| **LEB1 extended** | `leph leb generate extended groups` |
+| **LEB2 base (all groups)** | `leph leb2 convert base` |
+| **LEB2 medium** | `leph leb2 convert medium` |
+| **Verify LEB2** | `leph leb2 verify base` |
+| **Test LEB1** | `leph test leb-format all` |
+| **Test LEB2** | `leph test leb2-format all` |
+| **Test LEB2 precision** | `leph test leb2-format precision-base` |
+| **Release** | `leph release leb 1.0.0` |

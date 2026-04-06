@@ -27,9 +27,9 @@ If the LEB file is not found, tests are **skipped** (they don't fail).
 
 | Tier | Ephemeris | Range | File |
 |------|-----------|-------|------|
-| `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~112 MB) |
-| `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~377 MB) |
-| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (~2.8 GB) |
+| `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~53 MB) |
+| `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~175 MB) |
+| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (~1.6 GB) |
 
 ### Dependencies
 
@@ -46,15 +46,10 @@ Asteroid tests require network access to automatically download SPK21 files from
 ### Medium tier (default)
 
 ```bash
-# All medium tests (full, ~90 seconds with -n 4)
-poe test:leb:compare
-poe test:leb:compare:medium
+# All medium comparison tests (full, ~90 seconds with -n 4)
+leph test leb-format vs-skyfield medium
 
-# Fast tests only (no @pytest.mark.slow)
-poe test:leb:compare:quick
-poe test:leb:compare:medium:quick
-
-# With parallelism (recommended)
+# With parallelism (direct pytest)
 LIBEPHEMERIS_LEB=/path/to/ephemeris_medium.leb \
   pytest tests/test_leb/compare/ -m "leb_compare" -v --tb=short -n 4
 ```
@@ -63,26 +58,16 @@ LIBEPHEMERIS_LEB=/path/to/ephemeris_medium.leb \
 
 ```bash
 # All base tests (~90 seconds with -n 4)
-poe test:leb:compare:base
+leph test leb-format vs-skyfield base
 
-# Fast only
-poe test:leb:compare:base:quick
-
-# With parallelism
+# With parallelism (direct pytest)
 pytest tests/test_leb/compare/base/ -m "leb_compare_base" -v --tb=short -n 4
 ```
 
 ### Extended tier
 
 ```bash
-poe test:leb:compare:extended
-poe test:leb:compare:extended:quick
-```
-
-### All tiers together
-
-```bash
-poe test:leb:compare:all
+leph test leb-format vs-skyfield extended
 ```
 
 ### Single test
@@ -372,13 +357,13 @@ On macOS always use group generation (avoids multiprocessing deadlocks):
 
 ```bash
 # Base tier
-poe leb:generate:base:groups
+leph leb generate base groups
 
 # Medium tier
-poe leb:generate:medium:groups
+leph leb generate medium groups
 
 # Extended tier
-poe leb:generate:extended:groups
+leph leb generate extended groups
 ```
 
 Each command runs in sequence:
@@ -392,14 +377,14 @@ Each command runs in sequence:
 If group generation still uses too much memory, use single-body mode. Each of the 31 bodies is generated in its own subprocess (one at a time), then all partial files are merged:
 
 ```bash
-# Base tier
-poe leb:generate:base:single
+# Base tier (direct CLI)
+python scripts/generate_leb.py --tier base --single-body
 
 # Medium tier
-poe leb:generate:medium:single
+python scripts/generate_leb.py --tier medium --single-body
 
 # Extended tier
-poe leb:generate:extended:single
+python scripts/generate_leb.py --tier extended --single-body
 ```
 
 This is slower than group mode but uses minimal memory (~1 body in memory at a time).
@@ -407,9 +392,9 @@ This is slower than group mode but uses minimal memory (~1 body in memory at a t
 ### Direct generation (Linux)
 
 ```bash
-poe leb:generate:base
-poe leb:generate:medium
-poe leb:generate:extended
+python scripts/generate_leb.py --tier base --verify
+python scripts/generate_leb.py --tier medium --verify
+python scripts/generate_leb.py --tier extended --verify
 ```
 
 ### Copy to external disk

@@ -302,8 +302,8 @@ leph download all             # DE/SPK + IERS + planet-center source kernels + A
 
 # SPK kernels (required for Skyfield backend and LEB generation)
 leph download spk-base        # DE440s + asteroid SPKs (1850-2150)
-leph download spk-medium      # DE440 + asteroid SPKs (1550-2650)
-leph download spk-extended    # de441 + max-range SPKs from Horizons
+leph download spk-medium      # DE440 + asteroid SPKs (1900-2100)
+leph download spk-extended    # de441 + max-range SPKs (1600-2500)
 
 # Time / Earth-orientation data
 leph download iers            # finals2000A.data + leap_seconds.dat + deltat.data
@@ -393,9 +393,9 @@ For end-users: download data files and check library status.
 
 ```bash
 # Download data
-libephemeris download base              # DE440s + SPKs (1850-2150)
-libephemeris download medium            # DE440 + SPKs (1550-2650, default)
-libephemeris download extended          # DE441 + SPKs (-13200 to +17191)
+libephemeris download base              # DE440s + planet centers + SPKs (1850-2150)
+libephemeris download medium            # DE440 + planet centers + SPKs (default)
+libephemeris download extended          # DE441 + planet centers + SPKs
 libephemeris download leb-base          # LEB1 binary (~53 MB)
 libephemeris download leb-medium        # LEB1 binary (~175 MB)
 libephemeris download leb-extended      # LEB1 binary

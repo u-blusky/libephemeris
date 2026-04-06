@@ -275,11 +275,11 @@ Come le efemeridi JPL, anche i file LEB esistono in tre versioni:
 
 ## 14.5 Modalità di calcolo e configurazione
 
-La libreria supporta tre modalità di calcolo, controllabili con `set_calc_mode()`:
+La libreria supporta quattro modalità di calcolo, controllabili con `set_calc_mode()`:
 
 ### `"auto"` (predefinita)
 
-Usa LEB se un file `.leb` è configurato (o auto-scoperto), altrimenti usa Skyfield. È la modalità raccomandata per l'uso normale:
+Prova prima LEB se un file `.leb` è configurato (o auto-scoperto), poi l'API Horizons se non è disponibile un file DE440 locale, infine Skyfield. È la modalità raccomandata per l'uso normale:
 
 ```python
 import libephemeris as ephem
@@ -316,7 +316,7 @@ Sole (Skyfield forzato): 19.140437°
 
 ### `"leb"`
 
-Richiede LEB obbligatoriamente. Se nessun file `.leb` è configurato, solleva un `RuntimeError`. I corpi non presenti nel file LEB passano comunque a Skyfield:
+Richiede un file LEB valido. La libreria prova il file configurato, poi l'auto-discovery, poi l'auto-download di LEB2 per il tier attivo. Solleva `RuntimeError` solo se nessun LEB può essere risolto. I corpi non presenti nel file LEB passano comunque a Skyfield:
 
 ```python
 import libephemeris as ephem
@@ -331,12 +331,34 @@ ephem.set_calc_mode("auto")  # ripristina
 Modalità: leb
 ```
 
+### `"horizons"`
+
+Usa sempre l'API REST NASA JPL Horizons per i calcoli. Questa modalità richiede una connessione internet e non necessita di file di efemeridi locali. Supporta pianeti, asteroidi, Nodo Medio, Apogeo Medio e Uraniani. Corpi o flag non supportati da Horizons (es. `SEFLG_TOPOCTR`, stelle fisse) passano automaticamente a Skyfield:
+
+```python
+import libephemeris as ephem
+
+ephem.set_calc_mode("horizons")
+print(f"Modalità: {ephem.get_calc_mode()}")
+
+jd = ephem.julday(2024, 4, 8, 12.0)
+pos, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+print(f"Sole (Horizons): {pos[0]:.6f}°")
+
+ephem.set_calc_mode("auto")  # ripristina
+```
+
+```
+Modalità: horizons
+Sole (Horizons): 19.140437°
+```
+
 ### Variabile d'ambiente
 
 La modalità può essere impostata anche tramite `LIBEPHEMERIS_MODE`:
 
 ```bash
-export LIBEPHEMERIS_MODE=skyfield
+export LIBEPHEMERIS_MODE=horizons
 ```
 
 ---
@@ -548,7 +570,7 @@ Risultato identico: True
 - `LIBEPHEMERIS_PRECISION` — tier di precisione: `base`, `medium`, `extended`
 - `LIBEPHEMERIS_EPHEMERIS` — nome del file efemeride (es. `de441.bsp`)
 - `LIBEPHEMERIS_LEB` — percorso al file `.leb` per la modalità binaria
-- `LIBEPHEMERIS_MODE` — modalità di calcolo: `auto`, `skyfield`, `leb`
+- `LIBEPHEMERIS_MODE` — modalità di calcolo: `auto`, `skyfield`, `leb`, `horizons`
 - `LIBEPHEMERIS_AUTO_SPK` — `1`/`0` per abilitare/disabilitare il download automatico SPK
 - `LIBEPHEMERIS_SPK_DIR` — directory cache per file SPK dei corpi minori
 
@@ -559,7 +581,7 @@ Risultato identico: True
 - **Precisione sub-arcsecondo** per tutti i corpi nell'intervallo 1900–2100 — nessun compromesso per l'uso moderno
 - **Tre tier di precisione**: `base` (1849–2150, 31 MB), `medium` (1550–2650, 114 MB), `extended` (-13200 a +17191, 3.1 GB)
 - **LEB** (efemeridi binarie precompilate): velocizzano i calcoli mantenendo precisione identica a Skyfield; attivazione con `set_leb_file()` o `download_leb_for_tier()`
-- **Tre modalità di calcolo**: `auto` (predefinita), `skyfield` (forza Skyfield), `leb` (richiede LEB)
+- **Quattro modalità di calcolo**: `auto` (predefinita — LEB, poi Horizons, poi Skyfield), `skyfield` (forza Skyfield), `leb` (richiede LEB), `horizons` (API NASA JPL Horizons, richiede connessione internet)
 - **EphemerisContext**: contesto thread-safe per calcoli paralleli, con stato isolato per osservatore, modo siderale e cache
 - **Download automatico** dei dati al primo utilizzo; gestione esplicita con `download_for_tier()` e `download_leb_for_tier()`
 - **`close()`** per reset completo delle risorse e dello stato
@@ -567,7 +589,7 @@ Risultato identico: True
 ## Funzioni introdotte
 
 - `set_precision_tier(tier)` / `get_precision_tier()` — seleziona il livello di precisione (`"base"`, `"medium"`, `"extended"`)
-- `set_calc_mode(mode)` / `get_calc_mode()` — imposta la modalità di calcolo (`"auto"`, `"skyfield"`, `"leb"`)
+- `set_calc_mode(mode)` / `get_calc_mode()` — imposta la modalità di calcolo (`"auto"`, `"skyfield"`, `"leb"`, `"horizons"`)
 - `set_leb_file(filepath)` — attiva le efemeridi binarie precompilate
 - `download_for_tier(tier)` — scarica tutti i dati per un tier
 - `download_leb_for_tier(tier)` — scarica il file LEB precompilato

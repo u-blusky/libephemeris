@@ -561,7 +561,7 @@ wheels = [
 
 [[package]]
 name = "libephemeris"
-version = "1.0.0a15"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "astroquery" },
@@ -576,6 +576,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "assist" },
+    { name = "astropy" },
     { name = "rebound" },
 ]
 dev = [
@@ -614,6 +615,7 @@ stars = [
 requires-dist = [
     { name = "assist", marker = "extra == 'all'", specifier = ">=1.1.0" },
     { name = "assist", marker = "extra == 'nbody'", specifier = ">=1.1.0" },
+    { name = "astropy", marker = "extra == 'all'", specifier = ">=5.0.0" },
     { name = "astropy", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "astropy", marker = "extra == 'stars'", specifier = ">=5.0.0" },
     { name = "astroquery", specifier = ">=0.4.7" },
