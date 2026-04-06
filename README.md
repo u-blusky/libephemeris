@@ -9,23 +9,23 @@
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
 
-A high-precision astronomical ephemeris library for Python, powered by NASA JPL DE440/DE441 ephemerides and IAU 2006/2000A standards. Drop-in replacement for PySwissEph - pure Python, no C extensions.
+A high-precision astronomical ephemeris library for Python, powered by NASA JPL DE440/DE441 ephemerides and IAU 2006/2000A standards.
+
+**Drop-in replacement for PySwissEph** - pure Python, no C extensions.
 
 ---
 
-## At a Glance
+## Features
 
-| | |
-|:--|:--|
-| **Data source** | NASA JPL DE440/DE441 (2021) - the same ephemerides used by mission navigation |
-| **Standards** | IAU 2006 precession, IAU 2000A nutation, ERFA/SOFA obliquity |
-| **Precision** | < 0.75" planets, < 0.02" house cusps - verified across 4,400+ test rounds |
-| **Coverage** | 15,000+ years (-13200 to +17191 CE) with extended tier |
-| **Bodies** | Sun through Pluto, 5 asteroids, lunar nodes and apsides, 9 Uranians, 116 fixed stars |
-| **House systems** | All 25 systems supported by Swiss Ephemeris |
-| **Sidereal** | 43 ayanamsha modes (Lahiri, Fagan-Bradley, Krishnamurti, ...) |
-| **Performance** | 4 backends: Skyfield, LEB (~14x speedup), Horizons API, auto-fallback |
-| **Platform** | Pure Python 3.12+ - runs anywhere Python runs |
+- **NASA JPL DE440/DE441** - the same ephemerides used for spacecraft navigation, via Skyfield
+- **IAU 2006/2000A standards** - precession, nutation, and obliquity via the official ERFA library
+- **Sub-arcsecond precision** - all planets < 0.75", house cusps < 0.02", verified across 4,400+ test rounds ([full report](docs/PRECISION.md))
+- **25 house systems, 43 ayanamsha modes** - all independently verified against pyswisseph
+- **Physical planet centers** - outer planets corrected from barycenters using JPL satellite ephemerides
+- **4 backends** - Skyfield, LEB (~14x speedup), Horizons API, auto-fallback. All sub-arcsecond
+- **15,000+ years** of coverage with extended tier (-13200 to +17191 CE)
+- **Drop-in replacement for PySwissEph** - same API, same function names, minimal migration effort ([migration guide](docs/guides/migration-guide.md))
+- **Pure Python 3.12+** - no C extensions, runs anywhere
 
 ---
 
@@ -75,7 +75,7 @@ More examples: [Getting Started](docs/guides/getting-started.md)
 Every number independently measured against pyswisseph across 4,400+ comparison rounds. [Full report](docs/PRECISION.md).
 
 | Category | Typical | Max | Scope |
-|-----|-----|---|----|
+|----------|---------|-----|-------|
 | Planets (Sun-Pluto) | 0.04-0.26" | 0.75" | All planets, sub-arcsecond |
 | Moon | 0.70" | 3.32" | Different underlying lunar models |
 | House cusps | < 0.01" | 0.02" | All 25 systems |
@@ -91,7 +91,7 @@ Every number independently measured against pyswisseph across 4,400+ comparison 
 Choose your trade-off between speed, precision, and infrastructure. All backends produce sub-arcsecond agreement through the same `calc_ut()` interface.
 
 | Mode | Backend | Speed | Use case |
-|---|-----|----|-----|
+|------|---------|-------|----------|
 | `"auto"` | LEB -> Horizons -> Skyfield | adaptive | **Default.** Works everywhere, zero config |
 | `"skyfield"` | JPL DE440/DE441 via Skyfield | ~120 us | Full precision, offline |
 | `"leb"` | Precomputed Chebyshev polynomials | ~5 us | Maximum throughput (14x faster) |
@@ -124,20 +124,18 @@ libephemeris status                # Show installed data files
 
 ## Documentation
 
-| | |
-|:--|:--|
-| **[Getting Started](docs/guides/getting-started.md)** | Installation, ephemeris tiers, first calculations |
-| **[Migration from PySwissEph](docs/guides/migration-guide.md)** | API mapping, flag compatibility, known divergences |
-| **[Precision Report](docs/PRECISION.md)** | Full methodology, comparison tables, verification process |
-| **[Flag Reference](docs/reference/flags.md)** | All supported flags with examples |
-| **[House Systems](docs/reference/house-systems.md)** | All 25 systems, verified against pyswisseph |
-| **[Ayanamsha Modes](docs/reference/ayanamsha.md)** | 43 sidereal modes |
-| **[LEB Binary Ephemeris](docs/leb/guide.md)** | Format, generation, LEB2 compression |
-| **[Horizons Backend](docs/architecture/horizons-backend.md)** | HTTP client, pipeline, precision |
-| **[Architecture](docs/development/architecture-overview.md)** | Internal design and data flow |
-| **[Methodology](docs/methodology/overview.md)** | Planet centers, lunar apsides, pyerfa integration |
-| **[CLI Reference](CLI.md)** | Full command reference |
-| **[Changelog](CHANGELOG.md)** | Release history |
+- [Getting Started](docs/guides/getting-started.md) - installation, ephemeris tiers, first calculations
+- [Migration from PySwissEph](docs/guides/migration-guide.md) - API mapping, flag compatibility, known divergences
+- [Precision Report](docs/PRECISION.md) - full methodology, comparison tables, verification process
+- [Flag Reference](docs/reference/flags.md) - all supported flags with examples
+- [House Systems](docs/reference/house-systems.md) - all 25 systems, verified against pyswisseph
+- [Ayanamsha Modes](docs/reference/ayanamsha.md) - 43 sidereal modes
+- [LEB Binary Ephemeris](docs/leb/guide.md) - format, generation, LEB2 compression
+- [Horizons Backend](docs/architecture/horizons-backend.md) - HTTP client, pipeline, precision
+- [Architecture](docs/development/architecture-overview.md) - internal design and data flow
+- [Methodology](docs/methodology/overview.md) - planet centers, lunar apsides, pyerfa integration
+- [CLI Reference](CLI.md) - full command reference
+- [Changelog](CHANGELOG.md) - release history
 
 ---
 
@@ -150,7 +148,7 @@ poe test:unit:fast                 # Run unit tests
 poe test:compare:skyfield          # Cross-validate vs pyswisseph
 ```
 
-----
+---
 
 ## License
 
