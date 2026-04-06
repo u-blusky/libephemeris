@@ -37,7 +37,7 @@ Four calc modes (`set_calc_mode()` / `LIBEPHEMERIS_MODE`): `auto` (default: LEB-
 
 LEB = precomputed Chebyshev polynomials (~14x speedup). Set via `set_leb_file()` or `LIBEPHEMERIS_LEB` env var.
 
-## Performance API (v1.0.0a13+)
+## Performance API
 
 These are libephemeris-only features, not part of the SwissEph-compatible API surface.
 

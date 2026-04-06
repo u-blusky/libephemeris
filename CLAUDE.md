@@ -96,7 +96,7 @@ poe leb:generate:extended:groups  # All 3 groups + merge for extended tier
 
 Runtime always uses a **single merged file** for LEB1. See `docs/leb/guide.md` for details.
 
-## LEB2 Compressed Format (v1.0.0a2+)
+## LEB2 Compressed Format
 
 LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reorder + byte shuffle + zstd) to achieve 4-10x compression while maintaining <0.001" precision vs LEB1.
 
@@ -138,7 +138,7 @@ poe test:leb2:precision:all        # All tiers (~45s)
 ### Full documentation
 - `docs/leb/guide.md` — Complete LEB technical guide (section 13 for LEB2)
 - `proposals/leb2-implementation-plan.md` — Implementation plan with benchmarks
-- `release-notes/v1.0.0a2.md` — Detailed release notes with measured results
+- `release-notes/v1.0.0.md` — Release notes with measured results
 
 ## Horizons API Backend
 

@@ -7,7 +7,7 @@ in future releases where possible.
 
 No active bugs at this time.
 
-## Fixed Bugs (v1.0.0a3)
+## Fixed Bugs (v1.0.0)
 
 ### True Node distance (FIXED)
 

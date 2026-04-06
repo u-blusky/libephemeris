@@ -4,7 +4,7 @@
 > **Status:** Production-ready (LEB1 and LEB2 formats), **all 31 bodies <0.001" precision**
 > **Source of truth:** This document. See also [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
 > **Quick reference:** [Generation Quickstart](quickstart.md) — step-by-step commands for generating LEB1 and LEB2 files.
-> LEB2 compressed format details: see `proposals/leb2-implementation-plan.md` and `release-notes/v1.0.0a2.md`.
+> LEB2 compressed format details: see `proposals/leb2-implementation-plan.md` and `release-notes/v1.0.0.md`.
 
 ---
 
