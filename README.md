@@ -11,21 +11,21 @@
 
 A high-precision astronomical ephemeris library for Python, powered by NASA JPL DE440/DE441 ephemerides and IAU 2006/2000A standards.
 
-**Drop-in replacement for PySwissEph** - pure Python, no C extensions.
+**Drop-in replacement for PySwissEph** - pure Python, no C extensions, easier deployment.
 
 ---
 
 ## Features
 
-- **NASA JPL DE440/DE441** - the same ephemerides used for spacecraft navigation, via Skyfield
+- **NASA JPL DE440/DE441** - modern planetary ephemerides via Skyfield, with full-range DE441 support for deep-history and far-future work
 - **IAU 2006/2000A standards** - precession, nutation, and obliquity via the official ERFA library
-- **Sub-arcsecond precision** - all planets < 0.75", house cusps < 0.02", verified across 4,400+ test rounds ([full report](docs/PRECISION.md))
-- **25 house systems, 43 ayanamsha modes** - all independently verified against pyswisseph
+- **Validated high precision** - planetary differences typically measured in fractions of an arcsecond, house cusps < 0.02", benchmarked across 4,400+ comparison rounds ([full report](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md))
+- **Four backends, one API** - Skyfield, LEB (~14x speedup), Horizons API, and adaptive auto mode through the same `calc_ut()` interface
+- **25 house systems, 43 ayanamsha modes** - independently verified against pyswisseph
 - **Physical planet centers** - outer planets corrected from barycenters using JPL satellite ephemerides
-- **4 backends** - Skyfield, LEB (~14x speedup), Horizons API, auto-fallback. All sub-arcsecond
-- **15,000+ years** of coverage with extended tier (-13200 to +17191 CE)
-- **Drop-in replacement for PySwissEph** - same API, same function names, minimal migration effort ([migration guide](docs/guides/migration-guide.md))
-- **Pure Python 3.12+** - no C extensions, runs anywhere
+- **Thread-safe contexts when you need them** - SwissEph-compatible globals for drop-in migration, `EphemerisContext` for concurrent workloads
+- **15,000+ years of coverage** - `base`, `medium`, and `extended` precision tiers from modern use to -13200 / +17191 CE
+- **Pure Python 3.12+** - no C extensions, clean installs across CI, containers, and serverless
 
 ---
 
@@ -38,10 +38,10 @@ LibEphemeris provides the **same API** with a modern foundation:
 - **NASA JPL ephemerides** instead of semi-analytical theory - DE440/DE441 are the latest planetary ephemerides from the Jet Propulsion Laboratory, the same data used for spacecraft navigation.
 - **IAU 2006/2000A standards** - precession and nutation computed via the official ERFA library (the open-source implementation of IAU SOFA), not custom routines.
 - **Physical planet centers** - Jupiter, Saturn, Uranus, Neptune corrected from system barycenters to actual body centers using JPL satellite ephemerides. Most libraries skip this.
-- **Independently verified** - every function cross-validated against pyswisseph, JPL Horizons, and astropy/ERFA. [Precision report with full methodology](docs/PRECISION.md).
+- **Independently verified** - every function cross-validated against pyswisseph, JPL Horizons, and astropy/ERFA. [Precision report with full methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md).
 - **Pure Python** - readable source, standard debugging, no build toolchain. Runs on any platform, any CI, any serverless environment.
 
-**Switching from pyswisseph?** Your existing code works with minimal changes. [Migration guide](docs/guides/migration-guide.md).
+**Switching from pyswisseph?** Your existing code works with minimal changes. [Migration guide](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md).
 
 ---
 
@@ -66,17 +66,19 @@ cusps, ascmc = swe.houses(swe.julday(2024, 11, 5, 18.0), 41.9028, 12.4964, b"P")
 print(f"ASC: {ascmc[0]:.4f}, MC: {ascmc[1]:.4f}")
 ```
 
-More examples: [Getting Started](docs/guides/getting-started.md)
+For concurrent or multi-threaded workloads, use `EphemerisContext` instead of the module-level global state.
+
+More examples: [Getting Started](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md)
 
 ---
 
 ## Verified Precision
 
-Every number independently measured against pyswisseph across 4,400+ comparison rounds. [Full report](docs/PRECISION.md).
+Every number independently measured against pyswisseph across 4,400+ comparison rounds. [Full report](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md).
 
 | Category | Typical | Max | Scope |
 |----------|---------|-----|-------|
-| Planets (Sun-Pluto) | 0.04-0.26" | 0.75" | All planets, sub-arcsecond |
+| Sun-Pluto | 0.04-0.26" | 1.17" | Pluto max 0.75"; Neptune is the widest observed planetary delta |
 | Moon | 0.70" | 3.32" | Different underlying lunar models |
 | House cusps | < 0.01" | 0.02" | All 25 systems |
 | Fixed stars | < 0.1" | 0.51" | 116 Hipparcos catalog stars |
@@ -88,14 +90,14 @@ Every number independently measured against pyswisseph across 4,400+ comparison 
 
 ## Four Backends, One API
 
-Choose your trade-off between speed, precision, and infrastructure. All backends produce sub-arcsecond agreement through the same `calc_ut()` interface.
+Choose your trade-off between speed, locality, and setup. The same `calc_ut()` interface works across all four modes, from zero-install Horizons lookups to precomputed LEB throughput.
 
 | Mode | Backend | Speed | Use case |
 |------|---------|-------|----------|
-| `"auto"` | LEB -> Horizons -> Skyfield | adaptive | **Default.** Works everywhere, zero config |
-| `"skyfield"` | JPL DE440/DE441 via Skyfield | ~120 us | Full precision, offline |
-| `"leb"` | Precomputed Chebyshev polynomials | ~5 us | Maximum throughput (14x faster) |
-| `"horizons"` | NASA JPL Horizons REST API | ~300 ms | Zero local files, CI/serverless |
+| `"auto"` | LEB -> Horizons -> Skyfield | adaptive | **Default.** Best onboarding; resolves local or remote data transparently |
+| `"skyfield"` | JPL DE440/DE441 via Skyfield | ~120 us | High-precision local JPL workflow |
+| `"leb"` | Precomputed Chebyshev polynomials | ~5 us | Maximum throughput for repeated calculations |
+| `"horizons"` | NASA JPL Horizons REST API | ~300 ms | No local ephemeris files required |
 
 ```python
 from libephemeris import set_calc_mode
@@ -110,32 +112,42 @@ set_calc_mode("leb")  # or via env: LIBEPHEMERIS_MODE=leb
 pip install libephemeris
 ```
 
-Works out of the box - the wheel includes bundled ephemeris data for 1850-2150 (14 bodies). For extended coverage:
+Out of the box, the wheel includes a bundled LEB2 base-tier core for the 14 core bodies (1850-2150). With the default `medium` tier, the library can auto-download the additional LEB2 data it needs on first use.
+
+Recommended first-time setup:
 
 ```bash
-libephemeris download medium       # 1550-2650, ~200 MB (recommended)
-libephemeris download extended     # -13200 to +17191 CE, full range
-libephemeris status                # Show installed data files
+libephemeris init                 # Optional but recommended interactive config
+libephemeris download auto        # Download exactly what your config needs
+libephemeris status               # Verify installed data and active setup
 ```
 
-**Optional extras:** `pip install libephemeris[stars]` for fixed stars, `[nbody]` for n-body integration, `[all]` for everything. [Details](docs/guides/getting-started.md#optional-extras).
+Prefer to install a tier directly? Use one of these:
+
+```bash
+libephemeris download base         # 1850-2150, lightweight
+libephemeris download medium       # 1550-2650, ~200 MB (recommended)
+libephemeris download extended     # -13200 to +17191 CE, full range
+```
+
+**Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration, `[all]` for everything. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).
 
 ---
 
 ## Documentation
 
-- [Getting Started](docs/guides/getting-started.md) - installation, ephemeris tiers, first calculations
-- [Migration from PySwissEph](docs/guides/migration-guide.md) - API mapping, flag compatibility, known divergences
-- [Precision Report](docs/PRECISION.md) - full methodology, comparison tables, verification process
-- [Flag Reference](docs/reference/flags.md) - all supported flags with examples
-- [House Systems](docs/reference/house-systems.md) - all 25 systems, verified against pyswisseph
-- [Ayanamsha Modes](docs/reference/ayanamsha.md) - 43 sidereal modes
-- [LEB Binary Ephemeris](docs/leb/guide.md) - format, generation, LEB2 compression
-- [Horizons Backend](docs/architecture/horizons-backend.md) - HTTP client, pipeline, precision
-- [Architecture](docs/development/architecture-overview.md) - internal design and data flow
-- [Methodology](docs/methodology/overview.md) - planet centers, lunar apsides, pyerfa integration
-- [CLI Reference](CLI.md) - full command reference
-- [Changelog](CHANGELOG.md) - release history
+- [Getting Started](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md) - installation, ephemeris tiers, first calculations
+- [Migration from PySwissEph](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md) - API mapping, flag compatibility, known divergences
+- [Precision Report](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md) - full methodology, comparison tables, verification process
+- [Flag Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/flags.md) - all supported flags with examples
+- [House Systems](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/house-systems.md) - all 25 systems, verified against pyswisseph
+- [Ayanamsha Modes](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/ayanamsha.md) - 43 sidereal modes
+- [LEB Binary Ephemeris](https://github.com/g-battaglia/libephemeris/blob/main/docs/leb/guide.md) - format, generation, LEB2 compression
+- [Horizons Backend](https://github.com/g-battaglia/libephemeris/blob/main/docs/architecture/horizons-backend.md) - HTTP client, pipeline, precision
+- [Architecture](https://github.com/g-battaglia/libephemeris/blob/main/docs/development/architecture-overview.md) - internal design and data flow
+- [Methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/overview.md) - planet centers, lunar apsides, pyerfa integration
+- [CLI Reference](https://github.com/g-battaglia/libephemeris/blob/main/CLI.md) - full command reference
+- [Changelog](https://github.com/g-battaglia/libephemeris/blob/main/CHANGELOG.md) - release history
 
 ---
 
@@ -144,7 +156,8 @@ libephemeris status                # Show installed data files
 ```bash
 git clone https://github.com/g-battaglia/libephemeris.git
 cd libephemeris && uv pip install -e ".[dev]"
-poe test:unit:fast                 # Run unit tests
+poe lint                           # Ruff lint + auto-fix
+poe test:leb:fast                  # Recommended fast unit suite
 poe test:compare:skyfield          # Cross-validate vs pyswisseph
 ```
 
